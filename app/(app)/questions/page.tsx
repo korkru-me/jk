@@ -28,27 +28,37 @@ export default async function QuestionsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Show only standalone questions and multi-step group parents (order_in_group = 0)
   const { data: questions } = await supabase
     .from('questions')
     .select('*, question_categories(name)')
     .eq('created_by', user!.id)
+    .or('group_id.is.null,order_in_group.eq.0')
     .order('created_at', { ascending: false })
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">คลังโจทย์ของฉัน</h1>
           <p className="text-sm text-gray-500 mt-1">
             {questions?.length ?? 0} โจทย์
           </p>
         </div>
-        <Link
-          href="/questions/new"
-          className={cn(buttonVariants({ variant: 'default' }))}
-        >
-          + สร้างโจทย์ใหม่
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/questions/multi/new"
+            className={cn(buttonVariants({ variant: 'outline' }))}
+          >
+            + โจทย์หลายขั้นตอน
+          </Link>
+          <Link
+            href="/questions/new"
+            className={cn(buttonVariants({ variant: 'default' }))}
+          >
+            + สร้างโจทย์ใหม่
+          </Link>
+        </div>
       </div>
 
       {!questions || questions.length === 0 ? (
@@ -65,40 +75,63 @@ export default async function QuestionsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {questions.map((q: Question & { question_categories: { name: string } | null }) => (
-            <div
-              key={q.id}
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-300 transition-colors"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-medium text-gray-900 truncate">{q.title}</p>
-                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', DIFFICULTY_COLOR[q.difficulty])}>
-                    {DIFFICULTY_LABEL[q.difficulty]}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                    {TYPE_LABEL[q.question_type]}
-                  </span>
-                  {q.question_categories && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
-                      {q.question_categories.name}
+          {questions.map((q: Question & { question_categories: { name: string } | null }) => {
+            const isGroup = q.order_in_group === 0
+            return (
+              <div
+                key={q.id}
+                className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-300 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isGroup && (
+                      <span className="text-sm">📚</span>
+                    )}
+                    <p className="font-medium text-gray-900 truncate">{q.title}</p>
+                    {isGroup ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                        หลายขั้นตอน
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {TYPE_LABEL[q.question_type]}
+                      </span>
+                    )}
+                    <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', DIFFICULTY_COLOR[q.difficulty])}>
+                      {DIFFICULTY_LABEL[q.difficulty]}
                     </span>
+                    {q.question_categories && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                        {q.question_categories.name}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-400 mt-0.5 truncate">{q.question_text}</p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {isGroup ? (
+                    <Link
+                      href={`/questions/multi/${q.group_id}`}
+                      className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                    >
+                      แก้ไข
+                    </Link>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/questions/${q.id}/edit`}
+                        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                      >
+                        แก้ไข
+                      </Link>
+                      <DeleteQuestionButton id={q.id} />
+                    </>
                   )}
                 </div>
-                <p className="text-sm text-gray-400 mt-0.5 truncate">{q.question_text}</p>
               </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  href={`/questions/${q.id}/edit`}
-                  className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-                >
-                  แก้ไข
-                </Link>
-                <DeleteQuestionButton id={q.id} />
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

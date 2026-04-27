@@ -1,4 +1,5 @@
 export type UserRole = 'teacher' | 'student' | 'admin'
+export type UserStatus = 'active' | 'suspended'
 
 export interface User {
   id: string
@@ -6,6 +7,7 @@ export interface User {
   full_name: string
   avatar_url: string | null
   role: UserRole
+  status: UserStatus
   created_at: string
   updated_at: string
 }
@@ -37,7 +39,7 @@ export interface QuestionCategory {
 
 export type QuestionType = 'mcq' | 'written'
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'analytical'
-export type Visibility = 'private' | 'school' | 'public'
+export type Visibility = 'private' | 'school' | 'public' | 'pending'
 
 export interface Variable {
   name: string
@@ -71,6 +73,7 @@ export interface Question {
   answer_tolerance: number
   mcq_options: MCQOption[] | null
   solution_text: string | null
+  rejected_reason: string | null
   image_urls: string[]
   parent_question_id: string | null
   group_id: string | null
