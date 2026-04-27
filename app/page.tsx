@@ -1,65 +1,198 @@
-import Image from "next/image";
+import Link from 'next/link'
+import Image from 'next/image'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-export default function Home() {
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+    <main className="flex flex-col min-h-screen">
+      {/* Navbar */}
+      <nav className="border-b bg-white/80 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center">
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              src="/logo.png"
+              alt="KorKru logo"
+              width={120}
+              height={48}
+              className="h-10 w-auto object-contain"
+              priority
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className={cn(buttonVariants({ variant: 'ghost' }))}
+            >
+              เข้าสู่ระบบ
+            </Link>
+            <Link
+              href="/register"
+              className={cn(buttonVariants({ variant: 'default' }))}
+            >
+              สมัครใช้งาน
+            </Link>
+          </div>
         </div>
-      </main>
-    </div>
-  );
+      </nav>
+
+      {/* Hero */}
+      <section className="flex-1 flex flex-col items-center justify-center px-4 py-20 bg-gradient-to-b from-blue-50 to-white text-center">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {/* Logo mark in hero */}
+          <div className="flex justify-center mb-2">
+            <Image
+              src="/logo.png"
+              alt="KorKru"
+              width={160}
+              height={160}
+              className="h-32 w-auto object-contain drop-shadow-md"
+              priority
+            />
+          </div>
+
+          <h1 className="text-4xl sm:text-6xl font-bold text-gray-900 leading-tight">
+            ก่อการเรียนรู้{' '}
+            <span className="text-blue-600">โดยครู</span>
+          </h1>
+
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            สร้างโจทย์ฟิสิกส์ที่{' '}
+            <strong>สุ่มตัวเลขต่างกันทุกคน</strong>{' '}
+            วิเคราะห์ผู้เรียน ประหยัดเวลาครู พิมพ์ใบงาน A4 ได้ทันที
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/register"
+              className={cn(buttonVariants({ size: 'lg' }), 'text-base px-8')}
+            >
+              เริ่มใช้งานฟรี
+            </Link>
+            <Link
+              href="/login"
+              className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'text-base px-8')}
+            >
+              เข้าสู่ระบบ
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-20 px-4 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
+            ทำอะไรได้บ้าง?
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((f) => (
+              <div
+                key={f.title}
+                className="border rounded-xl p-6 space-y-3 hover:shadow-md transition-shadow"
+              >
+                <div className="text-3xl">{f.icon}</div>
+                <h3 className="font-semibold text-lg">{f.title}</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="py-20 px-4 bg-gray-50">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-12">วิธีใช้งาน</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            {steps.map((s, i) => (
+              <div key={i} className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl font-bold">
+                  {i + 1}
+                </div>
+                <h3 className="font-semibold">{s.title}</h3>
+                <p className="text-gray-600 text-sm">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-16 px-4 bg-blue-600 text-white text-center">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <h2 className="text-3xl font-bold">พร้อมเริ่มใช้งานแล้วหรือยัง?</h2>
+          <p className="text-blue-100">ใช้งานฟรี ไม่ต้องใช้บัตรเครดิต</p>
+          <Link
+            href="/register"
+            className={cn(buttonVariants({ variant: 'secondary', size: 'lg' }), 'mt-4')}
+          >
+            สมัครใช้งานฟรี
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t py-8 bg-white">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col items-center gap-3">
+          <Image
+            src="/logo.png"
+            alt="KorKru"
+            width={80}
+            height={80}
+            className="h-12 w-auto object-contain opacity-70"
+          />
+          <p className="text-sm text-gray-500">© 2026 KorKru — Built by Teachers, For Teachers</p>
+        </div>
+      </footer>
+    </main>
+  )
 }
+
+const features = [
+  {
+    icon: '🔢',
+    title: 'โจทย์สุ่มตัวเลข',
+    desc: 'ระบบสุ่มค่าตัวแปรอัตโนมัติ นักเรียนแต่ละคนได้โจทย์ตัวเลขไม่เหมือนกัน ลดการลอกคำตอบ',
+  },
+  {
+    icon: '📝',
+    title: 'Editor สร้างโจทย์ง่าย',
+    desc: '4 วิธีสร้างสูตรคำตอบ ทั้งพิมพ์เอง คลังสูตร ปุ่มกด และลอกจากโจทย์เดิม',
+  },
+  {
+    icon: '🏫',
+    title: 'ระบบห้องเรียน',
+    desc: 'สร้างห้องเรียน แชร์ Class Code ให้นักเรียนเข้าร่วม มอบหมายชุดข้อสอบ',
+  },
+  {
+    icon: '🖨️',
+    title: 'พิมพ์ใบงาน A4',
+    desc: 'สร้างใบงาน Print-Ready พร้อม QR Code ประจำตัว พิมพ์แจกนักเรียนได้ทันที',
+  },
+  {
+    icon: '📊',
+    title: 'Dashboard คะแนน',
+    desc: 'ดูคะแนนนักเรียนรายคน วิเคราะห์ผู้เรียน Export เป็น Excel',
+  },
+  {
+    icon: '🔗',
+    title: 'โจทย์ต่อเนื่อง',
+    desc: 'สร้างโจทย์หลายข้อที่ใช้สถานการณ์เดียวกัน ผลลัพธ์ข้อก่อนนำมาคำนวณข้อต่อไป',
+  },
+]
+
+const steps = [
+  {
+    title: 'สร้างโจทย์',
+    desc: 'ครูสร้างโจทย์ฟิสิกส์พร้อมสูตรคำตอบและตัวแปรที่ต้องการสุ่ม',
+  },
+  {
+    title: 'มอบหมายให้ห้องเรียน',
+    desc: 'เพิ่มโจทย์เป็นชุดข้อสอบ มอบหมายให้ห้องเรียน หรือพิมพ์ใบงาน',
+  },
+  {
+    title: 'ดูผลคะแนน',
+    desc: 'ระบบตรวจคะแนนอัตโนมัติ ครูดูผลและวิเคราะห์ได้ทันที',
+  },
+]

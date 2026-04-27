@@ -1,0 +1,128 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
+
+export function RegisterForm() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [role, setRole] = useState<'teacher' | 'student'>('teacher')
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    const full_name = formData.get('full_name') as string
+
+    if (password.length < 6) {
+      toast.error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร')
+      setLoading(false)
+      return
+    }
+
+    const supabase = createClient()
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name, role } },
+    })
+
+    if (error) {
+      toast.error(error.message === 'User already registered'
+        ? 'อีเมลนี้มีบัญชีอยู่แล้ว'
+        : error.message
+      )
+      setLoading(false)
+      return
+    }
+
+    toast.success('สมัครสำเร็จ! กำลังเข้าสู่ระบบ...')
+    router.push('/dashboard')
+    router.refresh()
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Role selector */}
+      <div className="space-y-2">
+        <Label>ฉันคือ</Label>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { value: 'teacher', label: 'ครู / ติวเตอร์', icon: '👨‍🏫' },
+            { value: 'student', label: 'นักเรียน', icon: '🎒' },
+          ].map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              onClick={() => setRole(r.value as 'teacher' | 'student')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
+                role === r.value
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <span className="text-2xl">{r.icon}</span>
+              <span className="text-sm font-medium">{r.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="full_name">ชื่อ-นามสกุล</Label>
+        <Input
+          id="full_name"
+          name="full_name"
+          placeholder={role === 'teacher' ? 'ครูสมชาย ใจดี' : 'สมชาย ใจดี'}
+          required
+          autoComplete="name"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email">อีเมล</Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          placeholder="example@school.ac.th"
+          required
+          autoComplete="email"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">รหัสผ่าน</Label>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          placeholder="อย่างน้อย 6 ตัวอักษร"
+          required
+          minLength={6}
+          autoComplete="new-password"
+        />
+      </div>
+
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? 'กำลังสมัคร...' : 'สมัครใช้งาน'}
+      </Button>
+
+      <p className="text-center text-sm text-gray-600">
+        มีบัญชีอยู่แล้ว?{' '}
+        <Link href="/login" className="text-blue-600 hover:underline font-medium">
+          เข้าสู่ระบบ
+        </Link>
+      </p>
+    </form>
+  )
+}
