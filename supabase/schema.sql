@@ -9,7 +9,8 @@ create extension if not exists "uuid-ossp";
 create type user_role as enum ('teacher', 'student', 'admin');
 create type question_type as enum ('mcq', 'written');
 create type difficulty as enum ('easy', 'medium', 'hard', 'analytical');
-create type visibility as enum ('private', 'school', 'public');
+create type visibility as enum ('private', 'school', 'public', 'pending');
+create type user_status as enum ('active', 'suspended');
 create type assignment_status as enum ('draft', 'published', 'closed');
 create type assignment_mode as enum ('online', 'print');
 create type submission_status as enum ('in_progress', 'submitted', 'graded');
@@ -23,6 +24,7 @@ create table public.users (
   full_name text not null,
   avatar_url text,
   role user_role not null default 'student',
+  status user_status not null default 'active',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
