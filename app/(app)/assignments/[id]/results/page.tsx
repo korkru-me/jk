@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { ExportButton } from '@/components/assignments/export-button'
 
 export const metadata = { title: 'ผลคะแนน — KorKru' }
 
@@ -132,33 +133,3 @@ export default async function ResultsPage({
   )
 }
 
-function ExportButton({ submissions, title }: { submissions: any[]; title: string }) {
-  'use client'
-  // Simple CSV export via client-side script
-  return (
-    <button
-      onClick={() => {
-        const rows = [
-          ['ชื่อ', 'อีเมล', 'คะแนน', 'คะแนนเต็ม', '%'],
-          ...submissions.map((s: any) => [
-            s.users?.full_name ?? '',
-            s.users?.email ?? '',
-            s.total_score ?? 0,
-            s.max_score ?? 0,
-            s.max_score > 0 ? Math.round((s.total_score / s.max_score) * 100) : 0,
-          ]),
-        ]
-        const csv = rows.map(r => r.join(',')).join('\n')
-        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${title}.csv`
-        a.click()
-      }}
-      className="text-sm px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-    >
-      ⬇️ Export CSV
-    </button>
-  )
-}
