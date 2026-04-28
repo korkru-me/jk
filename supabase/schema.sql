@@ -6,19 +6,19 @@ create extension if not exists "uuid-ossp";
 
 -- ==================== ENUMS ====================
 
-create type user_role as enum ('teacher', 'student', 'admin');
-create type question_type as enum ('mcq', 'written');
-create type difficulty as enum ('easy', 'medium', 'hard', 'analytical');
-create type visibility as enum ('private', 'school', 'public', 'pending');
-create type user_status as enum ('active', 'suspended');
-create type assignment_status as enum ('draft', 'published', 'closed');
-create type assignment_mode as enum ('online', 'print');
-create type submission_status as enum ('in_progress', 'submitted', 'graded');
+do $$ begin create type user_role as enum ('teacher', 'student', 'admin'); exception when duplicate_object then null; end $$;
+do $$ begin create type question_type as enum ('mcq', 'written'); exception when duplicate_object then null; end $$;
+do $$ begin create type difficulty as enum ('easy', 'medium', 'hard', 'analytical'); exception when duplicate_object then null; end $$;
+do $$ begin create type visibility as enum ('private', 'school', 'public', 'pending'); exception when duplicate_object then null; end $$;
+do $$ begin create type user_status as enum ('active', 'suspended'); exception when duplicate_object then null; end $$;
+do $$ begin create type assignment_status as enum ('draft', 'published', 'closed'); exception when duplicate_object then null; end $$;
+do $$ begin create type assignment_mode as enum ('online', 'print'); exception when duplicate_object then null; end $$;
+do $$ begin create type submission_status as enum ('in_progress', 'submitted', 'graded'); exception when duplicate_object then null; end $$;
 
 -- ==================== TABLES ====================
 
 -- 4.1 Users (extends Supabase auth.users)
-create table public.users (
+create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   email text unique not null,
   full_name text not null,
@@ -30,7 +30,7 @@ create table public.users (
 );
 
 -- 4.2 Classrooms
-create table public.classrooms (
+create table if not exists public.classrooms (
   id uuid primary key default uuid_generate_v4(),
   teacher_id uuid not null references public.users(id) on delete cascade,
   name text not null,
@@ -41,7 +41,7 @@ create table public.classrooms (
 );
 
 -- 4.3 Classroom Students
-create table public.classroom_students (
+create table if not exists public.classroom_students (
   id uuid primary key default uuid_generate_v4(),
   classroom_id uuid not null references public.classrooms(id) on delete cascade,
   student_id uuid not null references public.users(id) on delete cascade,
@@ -50,7 +50,7 @@ create table public.classroom_students (
 );
 
 -- 4.4 Question Categories
-create table public.question_categories (
+create table if not exists public.question_categories (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
   parent_id uuid references public.question_categories(id) on delete set null,
@@ -59,7 +59,7 @@ create table public.question_categories (
 );
 
 -- 4.5 Questions
-create table public.questions (
+create table if not exists public.questions (
   id uuid primary key default uuid_generate_v4(),
   created_by uuid not null references public.users(id) on delete cascade,
   category_id uuid references public.question_categories(id) on delete set null,
@@ -84,7 +84,7 @@ create table public.questions (
 );
 
 -- 4.6 Assignments
-create table public.assignments (
+create table if not exists public.assignments (
   id uuid primary key default uuid_generate_v4(),
   classroom_id uuid not null references public.classrooms(id) on delete cascade,
   created_by uuid not null references public.users(id) on delete cascade,
@@ -101,7 +101,7 @@ create table public.assignments (
 );
 
 -- 4.7 Submissions
-create table public.submissions (
+create table if not exists public.submissions (
   id uuid primary key default uuid_generate_v4(),
   assignment_id uuid not null references public.assignments(id) on delete cascade,
   student_id uuid not null references public.users(id) on delete cascade,
@@ -115,7 +115,7 @@ create table public.submissions (
 );
 
 -- 4.8 Submission Answers
-create table public.submission_answers (
+create table if not exists public.submission_answers (
   id uuid primary key default uuid_generate_v4(),
   submission_id uuid not null references public.submissions(id) on delete cascade,
   question_id uuid not null references public.questions(id) on delete cascade,
@@ -130,7 +130,7 @@ create table public.submission_answers (
 );
 
 -- 4.9 Formula Presets
-create table public.formula_presets (
+create table if not exists public.formula_presets (
   id uuid primary key default uuid_generate_v4(),
   category_id uuid references public.question_categories(id) on delete set null,
   formula_name text not null,
@@ -169,15 +169,19 @@ $$ language plpgsql;
 
 -- ==================== TRIGGERS ====================
 
+drop trigger if exists users_updated_at on public.users;
 create trigger users_updated_at before update on public.users
   for each row execute function update_updated_at();
 
+drop trigger if exists classrooms_updated_at on public.classrooms;
 create trigger classrooms_updated_at before update on public.classrooms
   for each row execute function update_updated_at();
 
+drop trigger if exists questions_updated_at on public.questions;
 create trigger questions_updated_at before update on public.questions
   for each row execute function update_updated_at();
 
+drop trigger if exists assignments_updated_at on public.assignments;
 create trigger assignments_updated_at before update on public.assignments
   for each row execute function update_updated_at();
 
@@ -196,6 +200,7 @@ begin
 end;
 $$ language plpgsql security definer;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
@@ -213,31 +218,43 @@ alter table public.submission_answers enable row level security;
 alter table public.formula_presets enable row level security;
 
 -- Users: read own profile, update own profile
+drop policy if exists "users_select_own" on public.users;
 create policy "users_select_own" on public.users for select using (auth.uid() = id);
+drop policy if exists "users_update_own" on public.users;
 create policy "users_update_own" on public.users for update using (auth.uid() = id);
 
 -- Classrooms: teachers manage their own, students view joined
+drop policy if exists "classrooms_teacher_all" on public.classrooms;
 create policy "classrooms_teacher_all" on public.classrooms for all using (teacher_id = auth.uid());
+drop policy if exists "classrooms_student_select" on public.classrooms;
 create policy "classrooms_student_select" on public.classrooms for select
   using (id in (select classroom_id from public.classroom_students where student_id = auth.uid()));
 
 -- Classroom students
+drop policy if exists "classroom_students_teacher_select" on public.classroom_students;
 create policy "classroom_students_teacher_select" on public.classroom_students for select
   using (classroom_id in (select id from public.classrooms where teacher_id = auth.uid()));
+drop policy if exists "classroom_students_join" on public.classroom_students;
 create policy "classroom_students_join" on public.classroom_students for insert
   with check (student_id = auth.uid());
+drop policy if exists "classroom_students_own_select" on public.classroom_students;
 create policy "classroom_students_own_select" on public.classroom_students for select
   using (student_id = auth.uid());
 
 -- Question categories: everyone can read
+drop policy if exists "categories_select_all" on public.question_categories;
 create policy "categories_select_all" on public.question_categories for select using (true);
 
 -- Questions: creator manages, visibility controls read
+drop policy if exists "questions_creator_all" on public.questions;
 create policy "questions_creator_all" on public.questions for all using (created_by = auth.uid());
+drop policy if exists "questions_public_select" on public.questions;
 create policy "questions_public_select" on public.questions for select using (visibility = 'public');
 
 -- Assignments: teacher manages, students view published assigned to their classroom
+drop policy if exists "assignments_teacher_all" on public.assignments;
 create policy "assignments_teacher_all" on public.assignments for all using (created_by = auth.uid());
+drop policy if exists "assignments_student_select" on public.assignments;
 create policy "assignments_student_select" on public.assignments for select
   using (
     status = 'published'
@@ -247,7 +264,9 @@ create policy "assignments_student_select" on public.assignments for select
   );
 
 -- Submissions: student owns, teacher views in their classroom
+drop policy if exists "submissions_student_all" on public.submissions;
 create policy "submissions_student_all" on public.submissions for all using (student_id = auth.uid());
+drop policy if exists "submissions_teacher_select" on public.submissions;
 create policy "submissions_teacher_select" on public.submissions for select
   using (
     assignment_id in (
@@ -256,8 +275,10 @@ create policy "submissions_teacher_select" on public.submissions for select
   );
 
 -- Submission answers
+drop policy if exists "submission_answers_student_all" on public.submission_answers;
 create policy "submission_answers_student_all" on public.submission_answers for all
   using (submission_id in (select id from public.submissions where student_id = auth.uid()));
+drop policy if exists "submission_answers_teacher_select" on public.submission_answers;
 create policy "submission_answers_teacher_select" on public.submission_answers for select
   using (
     submission_id in (
@@ -268,6 +289,7 @@ create policy "submission_answers_teacher_select" on public.submission_answers f
   );
 
 -- Formula presets: everyone can read
+drop policy if exists "formula_presets_select_all" on public.formula_presets;
 create policy "formula_presets_select_all" on public.formula_presets for select using (true);
 
 -- ==================== SEED DATA ====================
@@ -282,7 +304,8 @@ insert into public.question_categories (name, "order") values
   ('คลื่น', 6),
   ('ไฟฟ้า', 7),
   ('ความร้อน', 8),
-  ('ฟิสิกส์อะตอม', 9);
+  ('ฟิสิกส์อะตอม', 9)
+on conflict do nothing;
 
 -- Formula presets (30 สูตร)
 insert into public.formula_presets (formula_name, equation, variables, target_variable, description) values
@@ -315,4 +338,5 @@ insert into public.formula_presets (formula_name, equation, variables, target_va
   ('ความร้อนแฝง', 'Q = m*L', '[{"name":"Q","min":0,"max":1000000,"unit":"J","decimals":0},{"name":"m","min":0.1,"max":10,"unit":"kg","decimals":1},{"name":"L","min":1000,"max":2260000,"unit":"J/kg","decimals":0}]', 'Q', 'ความร้อนในการเปลี่ยนสถานะ'),
   ('พลังงานโฟตอน', 'E = h*f', '[{"name":"E","min":0,"max":1e-15,"unit":"J","decimals":20},{"name":"h","min":6.626e-34,"max":6.626e-34,"unit":"J·s","decimals":34},{"name":"f","min":1e14,"max":1e17,"unit":"Hz","decimals":0}]', 'E', 'พลังงานโฟตอน'),
   ('มวล-พลังงาน', 'E = m*c^2', '[{"name":"E","min":0,"max":1e20,"unit":"J","decimals":0},{"name":"m","min":1e-30,"max":1e-25,"unit":"kg","decimals":30},{"name":"c","min":3e8,"max":3e8,"unit":"m/s","decimals":0}]', 'E', 'สมการมวล-พลังงานของไอน์สไตน์'),
-  ('ความยาวคลื่นเดอบรอยล์', 'lambda = h/(m*v)', '[{"name":"lambda","min":0,"max":1e-9,"unit":"m","decimals":12},{"name":"h","min":6.626e-34,"max":6.626e-34,"unit":"J·s","decimals":34},{"name":"m","min":9.1e-31,"max":1e-25,"unit":"kg","decimals":31},{"name":"v","min":1e5,"max":1e7,"unit":"m/s","decimals":0}]', 'lambda', 'ความยาวคลื่นเดอบรอยล์');
+  ('ความยาวคลื่นเดอบรอยล์', 'lambda = h/(m*v)', '[{"name":"lambda","min":0,"max":1e-9,"unit":"m","decimals":12},{"name":"h","min":6.626e-34,"max":6.626e-34,"unit":"J·s","decimals":34},{"name":"m","min":9.1e-31,"max":1e-25,"unit":"kg","decimals":31},{"name":"v","min":1e5,"max":1e7,"unit":"m/s","decimals":0}]', 'lambda', 'ความยาวคลื่นเดอบรอยล์')
+on conflict do nothing;

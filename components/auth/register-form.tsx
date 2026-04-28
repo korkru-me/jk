@@ -1,16 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { register } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 
 export function RegisterForm() {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [role, setRole] = useState<'teacher' | 'student'>('teacher')
 
@@ -19,9 +17,7 @@ export function RegisterForm() {
     setLoading(true)
 
     const formData = new FormData(e.currentTarget)
-    const email = formData.get('email') as string
     const password = formData.get('password') as string
-    const full_name = formData.get('full_name') as string
 
     if (password.length < 6) {
       toast.error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร')
@@ -29,25 +25,17 @@ export function RegisterForm() {
       return
     }
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name, role } },
-    })
+    formData.set('role', role)
 
-    if (error) {
-      toast.error(error.message === 'User already registered'
+    const result = await register(formData)
+
+    if (result?.error) {
+      toast.error(result.error === 'User already registered'
         ? 'อีเมลนี้มีบัญชีอยู่แล้ว'
-        : error.message
+        : result.error
       )
       setLoading(false)
-      return
     }
-
-    toast.success('สมัครสำเร็จ! กำลังเข้าสู่ระบบ...')
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (
