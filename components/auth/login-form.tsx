@@ -1,40 +1,40 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { login } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 
 export function LoginForm() {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
 
-    const formData = new FormData(e.currentTarget)
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
+    try {
+      const formData = new FormData(e.currentTarget)
+      const result = await login(formData)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (result?.error) {
+        toast.error(result.error === 'Invalid login credentials'
+          ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+          : result.error
+        )
+        setLoading(false)
+        return
+      }
 
-    if (error) {
-      toast.error(error.message === 'Invalid login credentials'
-        ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-        : error.message
-      )
+      router.push('/dashboard')
+    } catch {
+      toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่')
       setLoading(false)
-      return
     }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (

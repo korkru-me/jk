@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { register } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +12,7 @@ import { toast } from 'sonner'
 export function RegisterForm() {
   const [loading, setLoading] = useState(false)
   const [role, setRole] = useState<'teacher' | 'student'>('teacher')
+  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -27,13 +29,21 @@ export function RegisterForm() {
 
     formData.set('role', role)
 
-    const result = await register(formData)
+    try {
+      const result = await register(formData)
 
-    if (result?.error) {
-      toast.error(result.error === 'User already registered'
-        ? 'อีเมลนี้มีบัญชีอยู่แล้ว'
-        : result.error
-      )
+      if (result?.error) {
+        toast.error(result.error === 'User already registered'
+          ? 'อีเมลนี้มีบัญชีอยู่แล้ว'
+          : result.error
+        )
+        setLoading(false)
+        return
+      }
+
+      router.push('/dashboard')
+    } catch {
+      toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่')
       setLoading(false)
     }
   }

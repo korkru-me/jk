@@ -10,7 +10,8 @@ export const metadata = { title: 'หน้าหลัก — KorKru' }
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authUser = session?.user ?? null
   if (!authUser) redirect('/login')
 
   const { data: profile } = await supabase

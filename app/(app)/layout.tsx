@@ -5,7 +5,8 @@ import type { User } from '@/lib/types'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  const authUser = session?.user ?? null
 
   if (!authUser) redirect('/login')
 

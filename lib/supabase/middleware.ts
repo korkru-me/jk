@@ -25,24 +25,8 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
-
-  const publicPaths = ['/', '/login', '/register', '/answer']
-  const isPublic = publicPaths.some(
-    (p) => pathname === p || pathname.startsWith('/answer/')
-  )
-
-  if (!user && !isPublic) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  if (user && (pathname === '/login' || pathname === '/register')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
+  // Refresh session cookies only — redirect logic is handled by layouts
+  await supabase.auth.getSession()
 
   return supabaseResponse
 }
