@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
@@ -10,11 +11,11 @@ export const metadata = { title: 'หน้าหลัก — KorKru' }
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const authUser = session?.user ?? null
+  const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) redirect('/login')
 
-  const { data: profile } = await supabase
+  const admin = createAdminClient()
+  const { data: profile } = await admin
     .from('users')
     .select('*')
     .eq('id', authUser.id)

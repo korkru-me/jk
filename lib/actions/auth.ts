@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 
-export async function login(formData: FormData) {
+export async function login(_prevState: unknown, formData: FormData) {
   const supabase = await createClient()
 
   const email = formData.get('email') as string
@@ -13,7 +13,11 @@ export async function login(formData: FormData) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    return { error: error.message }
+    return {
+      error: error.message === 'Invalid login credentials'
+        ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+        : error.message,
+    }
   }
 
   // Recover orphaned auth users who have no profile row
@@ -36,7 +40,7 @@ export async function login(formData: FormData) {
     }
   }
 
-  return { success: true }
+  redirect('/dashboard')
 }
 
 export async function register(formData: FormData) {

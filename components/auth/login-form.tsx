@@ -1,44 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useActionState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { login } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { toast } from 'sonner'
 
 export function LoginForm() {
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      const formData = new FormData(e.currentTarget)
-      const result = await login(formData)
-
-      if (result?.error) {
-        toast.error(result.error === 'Invalid login credentials'
-          ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-          : result.error
-        )
-        setLoading(false)
-        return
-      }
-
-      router.push('/dashboard')
-    } catch {
-      toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่')
-      setLoading(false)
-    }
-  }
+  const [state, formAction, pending] = useActionState(login, null)
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form action={formAction} className="space-y-4">
+      {state?.error && (
+        <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+          {state.error}
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="email">อีเมล</Label>
         <Input
@@ -63,8 +42,8 @@ export function LoginForm() {
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
       </Button>
 
       <p className="text-center text-sm text-gray-600">

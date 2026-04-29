@@ -61,6 +61,7 @@ export interface Question {
   id: string
   created_by: string
   category_id: string
+  grade_level: string | null
   title: string
   question_text: string
   question_type: QuestionType

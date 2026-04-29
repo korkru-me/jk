@@ -12,6 +12,7 @@ export interface QuestionFormData {
   difficulty: Difficulty
   visibility: Visibility
   category_id: string
+  grade_level: string
   is_random: boolean
   variables: Variable[]
   answer_formula: string
@@ -29,6 +30,7 @@ export async function createQuestion(data: QuestionFormData) {
   const { error } = await supabase.from('questions').insert({
     created_by: user.id,
     category_id: data.category_id || null,
+    grade_level: data.grade_level || null,
     title: data.title,
     question_text: data.question_text,
     question_type: data.question_type,
@@ -58,6 +60,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
     .from('questions')
     .update({
       category_id: data.category_id || null,
+      grade_level: data.grade_level || null,
       title: data.title,
       question_text: data.question_text,
       question_type: data.question_type,
