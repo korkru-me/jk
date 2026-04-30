@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { createCategory, updateCategory, deleteCategory, reorderCategory } from '@/lib/actions/admin'
+import { createCategory, updateCategory, deleteCategory, reorderCategory, seedGradeCategories } from '@/lib/actions/admin'
 import type { QuestionCategory } from '@/lib/types'
 
 type CategoryWithCount = QuestionCategory & { question_count: number; children?: CategoryWithCount[] }
@@ -64,6 +64,25 @@ function CategoryRow({
   )
 }
 
+// ─── Seed button ─────────────────────────────────────────────
+function SeedButton() {
+  const [isPending, startTransition] = useTransition()
+
+  function handleSeed() {
+    startTransition(async () => {
+      const res = await seedGradeCategories()
+      if (res?.error) toast.error(res.error)
+      else toast.success(res?.message ?? 'เสร็จแล้ว')
+    })
+  }
+
+  return (
+    <Button variant="outline" onClick={handleSeed} disabled={isPending}>
+      {isPending ? 'กำลังสร้าง...' : 'สร้างหมวดหมู่ตามระดับชั้น'}
+    </Button>
+  )
+}
+
 // ─── Main component ──────────────────────────────────────────
 export function CategoriesTree({
   categories,
@@ -117,7 +136,8 @@ export function CategoriesTree({
 
   return (
     <>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between mb-4">
+        <SeedButton />
         <Button onClick={() => openAdd()}>+ เพิ่มหมวดหลัก</Button>
       </div>
 

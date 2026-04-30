@@ -47,9 +47,9 @@ const gradeTopics: Record<string, string[]> = {
   m1: [],
   m2: ['การเคลื่อนที่', 'แรงในชีวิตประจำวัน', 'แรงดันในของไหล', 'โมเมนต์ของแรง', 'แรงในธรรมชาติ', 'งานและกำลัง', 'เครื่องกลอย่างง่าย', 'พลังงานกล'],
   m3: ['ปริมาณทางไฟฟ้าและวงจรไฟฟ้า', 'พลังงานไฟฟ้าและชิ้นส่วนอิเล็กทรอนิกส์', 'คลื่นกล', 'คลื่นแม่เหล็กไฟฟ้า', 'การสะท้อนของแสง', 'การหักเหของแสง', 'การมองเห็นและทัศนอุปกรณ์'],
-  m4: [],
-  m5: [],
-  m6: [],
+  m4: ['ธรรมชาติและพัฒนาการทางฟิสิกส์', 'การเคลื่อนที่แนวตรง', 'แรงและกฎการเคลื่อนที่', 'สมดุลกล', 'งานและพลังงาน', 'โมเมนตัมและการชน', 'การเคลื่อนที่แนวโค้ง'],
+  m5: ['การเคลื่อนที่แบบฮาร์มอนิกอย่างง่าย', 'คลื่น', 'แสงเชิงคลื่น', 'แสงเชิงรังสี', 'เสียง', 'ไฟฟ้าสถิต', 'ไฟฟ้ากระแสตรง'],
+  m6: ['แม่เหล็กและไฟฟ้า', 'ไฟฟ้ากระแสสลับ', 'ความร้อนและแก๊ส', 'ของแข็งและของไหล', 'ฟิสิกส์อะตอม', 'ฟิสิกส์นิวเคลียร์และอนุภาค'],
 }
 
 export function QuestionForm({ question, categories, presets, mode }: QuestionFormProps) {
@@ -64,6 +64,7 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
   const [visibility, setVisibility] = useState(question?.visibility ?? 'private')
   const [gradeLevel, setGradeLevel] = useState(question?.grade_level ?? '')
   const [showExtraCategories, setShowExtraCategories] = useState(false)
+  const [extraGradeLevel, setExtraGradeLevel] = useState('')
 
   // category → sub-category
   const parentCategories = categories.filter(c => c.parent_id === null)
@@ -79,13 +80,16 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
       : ''
   )
 
-  // filter parent categories by grade level
-  const gradeLevelTopics = gradeLevel ? (gradeTopics[gradeLevel] ?? []) : []
-  const gradeFilteredParents = gradeLevelTopics.length > 0
-    ? parentCategories.filter(c => gradeLevelTopics.includes(c.name))
-    : parentCategories
-  const extraParents = gradeLevelTopics.length > 0
+  // null = ยังไม่เลือกระดับชั้น, [] = ม.1 (ไม่มีฟิสิกส์), [...] = มีหัวข้อ
+  const gradeLevelTopics: string[] | null = gradeLevel ? (gradeTopics[gradeLevel] ?? []) : null
+  const visibleParents = gradeLevelTopics === null
+    ? parentCategories
+    : parentCategories.filter(c => gradeLevelTopics.includes(c.name))
+  const extraParents = gradeLevelTopics !== null && gradeLevelTopics.length > 0
     ? parentCategories.filter(c => !gradeLevelTopics.includes(c.name))
+    : []
+  const filteredExtraParents = extraGradeLevel
+    ? parentCategories.filter(c => (gradeTopics[extraGradeLevel] ?? []).includes(c.name))
     : []
 
   const subCategories = categories.filter(c => c.parent_id === parentCategoryId)
@@ -96,6 +100,7 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
     setParentCategoryId('')
     setSubCategoryId('')
     setShowExtraCategories(false)
+    setExtraGradeLevel('')
   }
   const [isRandom, setIsRandom] = useState(question?.is_random ?? true)
   const [variables, setVariables] = useState<Variable[]>(question?.variables ?? [])
@@ -227,26 +232,25 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
           <div className="space-y-1.5">
             <Label>หมวดหมู่หลัก</Label>
             <Select
-              value={parentCategoryId}
+              value={parentCategoryId || undefined}
               onValueChange={(v) => {
-                if (!v) return
-                setParentCategoryId(v)
+                setParentCategoryId(v ?? '')
                 setSubCategoryId('')
               }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="เลือกหมวดหมู่">
-                  {parentCategories.find(c => c.id === parentCategoryId)?.name ?? ''}
+                  {parentCategories.find(c => c.id === parentCategoryId)?.name}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
-                {gradeFilteredParents.map(c => (
+              <SelectContent alignItemWithTrigger={false}>
+                {visibleParents.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
-                {extraParents.length > 0 && showExtraCategories && (
+                {showExtraCategories && filteredExtraParents.length > 0 && (
                   <>
                     <SelectSeparator />
-                    {extraParents.map(c => (
+                    {filteredExtraParents.map(c => (
                       <SelectItem key={c.id} value={c.id} className="text-gray-500">
                         {c.name}
                       </SelectItem>
@@ -255,30 +259,48 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
                 )}
               </SelectContent>
             </Select>
-            {extraParents.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowExtraCategories(prev => !prev)}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                📚 {showExtraCategories ? 'ซ่อนหมวดหมู่จากระดับชั้นอื่น' : `เพิ่มจากระดับชั้นอื่น (${extraParents.length})`}
-              </button>
+            {gradeLevelTopics !== null && (
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setShowExtraCategories(prev => !prev); setExtraGradeLevel('') }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  📚 {showExtraCategories ? 'ซ่อนหมวดหมู่จากระดับชั้นอื่น' : 'เพิ่มหมวดหมู่จากระดับชั้นอื่น'}
+                </button>
+                {showExtraCategories && (
+                  <Select value={extraGradeLevel} onValueChange={setExtraGradeLevel}>
+                    <SelectTrigger className="w-full h-8 text-xs">
+                      <SelectValue placeholder="เลือกระดับชั้น">
+                        {gradeLevelLabels[extraGradeLevel] ?? ''}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(gradeLevelLabels)
+                        .filter(([key]) => key !== gradeLevel && (gradeTopics[key]?.length ?? 0) > 0)
+                        .map(([key, label]) => (
+                          <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             )}
           </div>
 
           <div className="space-y-1.5">
             <Label>หมวดหมู่ย่อย</Label>
             <Select
-              value={subCategoryId}
-              onValueChange={(v) => v !== null && setSubCategoryId(v)}
+              value={subCategoryId || undefined}
+              onValueChange={(v) => setSubCategoryId(v ?? '')}
               disabled={subCategories.length === 0}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder={subCategories.length === 0 ? 'ไม่มีหมวดหมู่ย่อย' : 'เลือกหมวดหมู่ย่อย'}>
-                  {subCategories.find(c => c.id === subCategoryId)?.name ?? ''}
+                  {subCategories.find(c => c.id === subCategoryId)?.name}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent alignItemWithTrigger={false}>
                 {subCategories.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
