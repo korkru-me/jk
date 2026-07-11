@@ -47,7 +47,12 @@
       "Bash(Find-String \"staletime\\\\|staleTime\\\\|router.*cache\" \"D:\\\\1.งานโรงเรียนจุฬาภรณราชวิทยาลัย เชียงราย\\\\Korkru\\\\korkru\\\\node_modules\\\\next\\\\dist\\\\client\\\\router.js\")",
       "Skill(supabase:supabase)",
       "Bash(Start-Sleep -Seconds 8)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(curl -s -o /tmp/resp.html -w \"%{http_code}\\\\n\" http://localhost:3000/questions/new/random)",
+      "Read(//tmp/**)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq *\" //T)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)"
     ]
   }
 }

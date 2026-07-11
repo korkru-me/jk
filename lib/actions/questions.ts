@@ -162,6 +162,37 @@ export async function getFormulaPresets(categoryId?: string) {
   return data ?? []
 }
 
+export interface CreateFormulaPresetInput {
+  formula_name: string
+  equation: string
+  target_variable: string
+  variables: { name: string; min: number; max: number }[]
+  description?: string
+  category_id?: string | null
+}
+
+export async function createFormulaPreset(input: CreateFormulaPresetInput) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const { data, error } = await supabase
+    .from('formula_presets')
+    .insert({
+      formula_name: input.formula_name,
+      equation: input.equation,
+      target_variable: input.target_variable,
+      variables: input.variables,
+      description: input.description || null,
+      category_id: input.category_id || null,
+    })
+    .select('*, question_categories(name)')
+    .single()
+
+  if (error) return { error: error.message }
+  return { data }
+}
+
 export async function searchQuestions(query: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
