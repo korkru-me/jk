@@ -1,0 +1,32 @@
+'use client'
+
+import { AlertOctagon, ExternalLink } from 'lucide-react'
+
+export function QuestionHealth() {
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+          <AlertOctagon className="w-4 h-4 text-red-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className="text-sm font-semibold text-red-900">ตรวจพบข้อสอบมีปัญหา</p>
+            <span className="text-[10px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded-full">
+              ด่วน
+            </span>
+          </div>
+          <p className="text-sm text-red-800 leading-relaxed">
+            ข้อสอบรหัส <span className="font-mono font-semibold bg-red-100 px-1 rounded">PYS-402</span>{' '}
+            (เรื่องแรงเสียดทาน) มีค่าอำนาจจำแนกติดลบ นักเรียนกลุ่มเก่งตอบผิด{' '}
+            <span className="font-semibold">95%</span> กรุณาตรวจสอบความถูกต้องของเฉลย
+          </p>
+          <button className="flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-900 mt-2 transition-colors">
+            <ExternalLink className="w-3 h-3" />
+            เปิดแก้ไขโจทย์
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

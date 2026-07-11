@@ -17,11 +17,10 @@ interface Props {
   students: StudentSheet[]
 }
 
-function substituteVars(text: string, values: Record<string, number>, variables: Variable[]) {
+function substituteVars(text: string, values: Record<string, number>) {
   return text.replace(/\{(\w+)\}/g, (_, name) => {
     if (!(name in values)) return `{${name}}`
-    const def = variables.find(v => v.name === name)
-    return `${values[name]}${def?.unit ? ' ' + def.unit : ''}`
+    return `${values[name]}`
   })
 }
 
@@ -77,7 +76,7 @@ function WorksheetPage({ student, questions, assignmentId, assignmentTitle, clas
       <div className="space-y-6">
         {questions.map((q, i) => {
           const { values, answer } = questionValues[i]
-          const renderedText = substituteVars(q.question_text, values, q.variables as Variable[])
+          const renderedText = substituteVars(q.question_text, values)
 
           return (
             <div key={q.id} className="question print:break-inside-avoid">

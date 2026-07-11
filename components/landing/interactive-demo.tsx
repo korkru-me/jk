@@ -1,0 +1,308 @@
+'use client'
+
+import { useState, useCallback } from 'react'
+import { Shuffle, GripVertical, Zap, Calculator } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+// ---- Physics Randomizer Demo ----
+
+type FormulaTemplate = {
+  id: string
+  name: string
+  formula: string
+  vars: { key: string; label: string; unit: string; min: number; max: number; step: number }[]
+  result: (vals: Record<string, number>) => { label: string; value: number; unit: string }
+  description: (vals: Record<string, number>, res: { value: number }) => string
+}
+
+const FORMULAS: FormulaTemplate[] = [
+  {
+    id: 'newton2',
+    name: 'กฎข้อที่ 2 ของนิวตัน',
+    formula: 'F = ma',
+    vars: [
+      { key: 'm', label: 'มวล (m)', unit: 'kg', min: 1, max: 20, step: 0.1 },
+      { key: 'a', label: 'ความเร่ง (a)', unit: 'm/s²', min: 0.5, max: 15, step: 0.1 },
+    ],
+    result: (v) => ({ label: 'F', value: v.m * v.a, unit: 'N' }),
+    description: (v, r) =>
+      `วัตถุมวล ${v.m} kg เคลื่อนที่ด้วยความเร่ง ${v.a} m/s² จงหาแรงสุทธิที่กระทำต่อวัตถุ`,
+  },
+  {
+    id: 'kinematics',
+    name: 'สมการการเคลื่อนที่',
+    formula: 'v = u + at',
+    vars: [
+      { key: 'u', label: 'ความเร็วต้น (u)', unit: 'm/s', min: 0, max: 30, step: 0.5 },
+      { key: 'a', label: 'ความเร่ง (a)', unit: 'm/s²', min: 1, max: 10, step: 0.5 },
+      { key: 't', label: 'เวลา (t)', unit: 's', min: 1, max: 10, step: 0.5 },
+    ],
+    result: (v) => ({ label: 'v', value: v.u + v.a * v.t, unit: 'm/s' }),
+    description: (v, r) =>
+      `วัตถุเคลื่อนที่ด้วยความเร็วต้น ${v.u} m/s มีความเร่ง ${v.a} m/s² นาน ${v.t} s ความเร็วปลายคือเท่าใด`,
+  },
+  {
+    id: 'energy',
+    name: 'พลังงานจลน์',
+    formula: 'KE = ½mv²',
+    vars: [
+      { key: 'm', label: 'มวล (m)', unit: 'kg', min: 0.5, max: 20, step: 0.5 },
+      { key: 'v', label: 'ความเร็ว (v)', unit: 'm/s', min: 1, max: 30, step: 0.5 },
+    ],
+    result: (v) => ({ label: 'KE', value: 0.5 * v.m * v.v * v.v, unit: 'J' }),
+    description: (v, r) =>
+      `วัตถุมวล ${v.m} kg เคลื่อนที่ด้วยความเร็ว ${v.v} m/s พลังงานจลน์ของวัตถุคือเท่าใด`,
+  },
+]
+
+function randomInRange(min: number, max: number, step: number) {
+  const steps = Math.floor((max - min) / step)
+  const picked = Math.floor(Math.random() * (steps + 1))
+  return Math.round((min + picked * step) * 100) / 100
+}
+
+function genValues(template: FormulaTemplate) {
+  const vals: Record<string, number> = {}
+  for (const v of template.vars) {
+    vals[v.key] = randomInRange(v.min, v.max, v.step)
+  }
+  return vals
+}
+
+function PhysicsDemo() {
+  const [tplIdx, setTplIdx] = useState(0)
+  const tpl = FORMULAS[tplIdx]
+  const [vals, setVals] = useState<Record<string, number>>(() => genValues(FORMULAS[0]))
+  const [revealed, setRevealed] = useState(false)
+
+  const randomize = useCallback(() => {
+    setVals(genValues(tpl))
+    setRevealed(false)
+  }, [tpl])
+
+  function switchTemplate(idx: number) {
+    setTplIdx(idx)
+    setVals(genValues(FORMULAS[idx]))
+    setRevealed(false)
+  }
+
+  const res = tpl.result(vals)
+
+  return (
+    <div className="space-y-4">
+      {/* Formula tabs */}
+      <div className="flex flex-wrap gap-2">
+        {FORMULAS.map((f, i) => (
+          <button
+            key={f.id}
+            onClick={() => switchTemplate(i)}
+            className={cn(
+              'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+              i === tplIdx
+                ? 'bg-indigo-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+            )}
+          >
+            {f.formula} — {f.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Question card */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-start justify-between mb-3">
+          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+            <Calculator className="h-3 w-3" />
+            {tpl.name}
+          </span>
+          <button
+            onClick={randomize}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+          >
+            <Shuffle className="h-3 w-3" />
+            สุ่มตัวเลขใหม่
+          </button>
+        </div>
+
+        <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed mb-3">
+          {tpl.description(vals, res)}
+        </p>
+
+        {/* Variable chips */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {tpl.vars.map((v) => (
+            <span
+              key={v.key}
+              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-mono font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400"
+            >
+              {v.key} = {vals[v.key]} {v.unit}
+            </span>
+          ))}
+        </div>
+
+        {/* Answer */}
+        {!revealed ? (
+          <button
+            onClick={() => setRevealed(true)}
+            className="w-full rounded-lg border-2 border-dashed border-slate-200 py-3 text-sm text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors dark:border-slate-700 dark:hover:border-indigo-600"
+          >
+            กดเพื่อดูเฉลย
+          </button>
+        ) : (
+          <div className="flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 dark:bg-emerald-950/30">
+            <Zap className="h-4 w-4 text-emerald-500" />
+            <span className="text-sm text-slate-600 dark:text-slate-300">คำตอบ:</span>
+            <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400">
+              {res.label} = {res.value.toFixed(2)} {res.unit}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+        นักเรียนแต่ละคนจะได้รับตัวเลขต่างกัน — ระบบตรวจคะแนนอัตโนมัติโดยไม่ต้องตรวจด้วยมือ
+      </p>
+    </div>
+  )
+}
+
+// ---- Drag-and-Drop Card Demo ----
+
+const INITIAL_CARDS = [
+  { id: 'c1', topic: 'แรงและการเคลื่อนที่', level: 'ง่าย', points: 4 },
+  { id: 'c2', topic: 'พลังงานจลน์และศักย์', level: 'ปานกลาง', points: 6 },
+  { id: 'c3', topic: 'คลื่นกลและเสียง', level: 'ปานกลาง', points: 6 },
+  { id: 'c4', topic: 'ไฟฟ้าและแม่เหล็ก', level: 'ยาก', points: 10 },
+]
+
+const LEVEL_CLS: Record<string, string> = {
+  ง่าย: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+  ปานกลาง: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
+  ยาก: 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+}
+
+function DragDemo() {
+  const [cards, setCards] = useState(INITIAL_CARDS)
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+
+  function onDragStart(id: string) {
+    setDragging(id)
+  }
+
+  function onDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault()
+    setOver(id)
+  }
+
+  function onDrop(targetId: string) {
+    if (!dragging || dragging === targetId) return
+    setCards((prev) => {
+      const fromIdx = prev.findIndex((c) => c.id === dragging)
+      const toIdx = prev.findIndex((c) => c.id === targetId)
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      return next
+    })
+    setDragging(null)
+    setOver(null)
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        ลากวางเพื่อจัดลำดับข้อสอบในชุด — ตัวอย่างการจัดการชุดข้อสอบ
+      </p>
+      {cards.map((card, idx) => (
+        <div
+          key={card.id}
+          draggable
+          onDragStart={() => onDragStart(card.id)}
+          onDragOver={(e) => onDragOver(e, card.id)}
+          onDrop={() => onDrop(card.id)}
+          onDragEnd={() => { setDragging(null); setOver(null) }}
+          className={cn(
+            'flex items-center gap-3 rounded-xl border bg-white p-3.5 cursor-grab active:cursor-grabbing transition-all select-none',
+            'dark:bg-slate-900',
+            dragging === card.id
+              ? 'opacity-50 scale-95 border-indigo-300 dark:border-indigo-700'
+              : over === card.id
+                ? 'border-indigo-400 ring-2 ring-indigo-100 dark:border-indigo-600 dark:ring-indigo-900/50'
+                : 'border-slate-200 dark:border-slate-700',
+          )}
+        >
+          <GripVertical className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+            {idx + 1}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+              {card.topic}
+            </p>
+          </div>
+          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', LEVEL_CLS[card.level])}>
+            {card.level}
+          </span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">
+            {card.points} คะแนน
+          </span>
+        </div>
+      ))}
+      <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+        รวม {cards.reduce((s, c) => s + c.points, 0)} คะแนน
+      </p>
+    </div>
+  )
+}
+
+// ---- Main Demo Component ----
+
+export function InteractiveDemo() {
+  const [tab, setTab] = useState<'physics' | 'drag'>('physics')
+
+  return (
+    <section className="bg-white py-20 dark:bg-slate-950">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">
+            ทดลองใช้งานได้เลย ไม่ต้องล็อกอิน
+          </h2>
+          <p className="mt-3 text-slate-500 dark:text-slate-400">
+            สัมผัสประสบการณ์จริงก่อนตัดสินใจ ฟีเจอร์หลักทั้งสองอยู่ด้านล่างนี้
+          </p>
+        </div>
+
+        <div className="mx-auto max-w-2xl">
+          {/* Tabs */}
+          <div className="mb-6 flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
+            <button
+              onClick={() => setTab('physics')}
+              className={cn(
+                'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
+                tab === 'physics'
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
+              )}
+            >
+              สุ่มตัวเลขฟิสิกส์
+            </button>
+            <button
+              onClick={() => setTab('drag')}
+              className={cn(
+                'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
+                tab === 'drag'
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
+              )}
+            >
+              จัดลำดับข้อสอบ
+            </button>
+          </div>
+
+          {tab === 'physics' ? <PhysicsDemo /> : <DragDemo />}
+        </div>
+      </div>
+    </section>
+  )
+}

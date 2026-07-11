@@ -1,295 +1,529 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { parse } from 'mathjs'
+import { ChevronDown, Info, Sparkles, PenLine } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import type { Variable } from '@/lib/types'
+import type { Variable, FormulaPreset } from '@/lib/types'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+// mathjs built-in symbols to ignore when parsing custom equations
+const BUILTIN_SYMBOLS = new Set([
+  'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
+  'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
+  'sqrt', 'cbrt', 'nthRoot', 'exp', 'expm1',
+  'log', 'log2', 'log10', 'log1p',
+  'abs', 'sign', 'round', 'floor', 'ceil', 'fix',
+  'min', 'max', 'mod', 'pow', 'gcd', 'lcm',
+  'factorial', 'combinations', 'permutations',
+  'pi', 'e', 'i', 'phi', 'tau', 'Infinity', 'NaN',
+  'true', 'false', 'null', 'undefined',
+  'and', 'or', 'not', 'xor', 'bitAnd', 'bitOr', 'bitNot',
+  'to', 'in',
+])
+
+type Mode = 'preset' | 'custom'
+
+const EMPTY_VAR: Variable = { name: '', min: 1, max: 10, step: 1, type: 'value' }
+const EMPTY_REF: Variable = {
+  name: '', min: 0, max: 0, step: 1,
+  type: 'reference', reference_question_order: 1, reference_field: 'answer',
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface VariableEditorProps {
   variables: Variable[]
   onChange: (vars: Variable[]) => void
-  /** When provided, the user can add reference variables pointing to these question orders */
+  onInsertVariable?: (name: string) => void
+  presets?: (FormulaPreset & { question_categories: { name: string } | null })[]
   availableReferences?: number[]
 }
 
-const EMPTY_VAR: Variable = { name: '', min: 1, max: 10, unit: '', decimals: 0 }
-const EMPTY_REF: Variable = { name: '', min: 0, max: 0, unit: '', decimals: 0, type: 'reference', reference_question_order: 1, reference_field: 'answer' }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export function VariableEditor({ variables, onChange, availableReferences }: VariableEditorProps) {
-  const [adding, setAdding] = useState(false)
-  const [draftType, setDraftType] = useState<'value' | 'reference'>('value')
-  const [draft, setDraft] = useState<Variable>({ ...EMPTY_VAR })
-  const [error, setError] = useState('')
+function extractSymbols(expr: string): string[] {
+  if (!expr.trim()) return []
+  try {
+    const node = parse(expr)
+    const found = new Set<string>()
+    node.traverse((n: any) => {
+      if (n.isSymbolNode && !BUILTIN_SYMBOLS.has(n.name) && /^[a-zA-Z]/.test(n.name)) {
+        found.add(n.name)
+      }
+    })
+    return [...found]
+  } catch {
+    return []
+  }
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export function VariableEditor({
+  variables,
+  onChange,
+  onInsertVariable,
+  presets = [],
+  availableReferences,
+}: VariableEditorProps) {
+  const [mode, setMode] = useState<Mode>('preset')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedPresetId, setSelectedPresetId] = useState('')
+  const [customExpr, setCustomExpr] = useState('')
+  const [manualName, setManualName] = useState('')
+  const [manualError, setManualError] = useState('')
+
+  const hasRefs = availableReferences && availableReferences.length > 0
+
+  // Group presets by category name
+  const categories = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    presets.forEach(p => {
+      const cat = p.question_categories?.name ?? 'อื่นๆ'
+      if (!seen.has(cat)) { seen.add(cat); result.push(cat) }
+    })
+    return result
+  }, [presets])
+
+  const categoryPresets = useMemo(
+    () => presets.filter(p => (p.question_categories?.name ?? 'อื่นๆ') === selectedCategory),
+    [presets, selectedCategory]
+  )
+
+  const selectedPreset = useMemo(
+    () => presets.find(p => p.id === selectedPresetId) ?? null,
+    [presets, selectedPresetId]
+  )
+
+  // Parse custom expression → symbol list
+  const detectedSymbols = useMemo(() => extractSymbols(customExpr), [customExpr])
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
+
+  function addVariable(name: string, defaults?: Partial<Variable>) {
+    onInsertVariable?.(name)
+    if (variables.some(v => v.name === name)) return // already exists — just insert text
+    onChange([...variables, { ...EMPTY_VAR, name, ...defaults }])
+  }
+
+  function handlePresetVarClick(pVar: Variable) {
+    addVariable(pVar.name, { min: pVar.min, max: pVar.max, step: pVar.step })
+  }
+
+  function handleManualAdd() {
+    const name = manualName.trim()
+    if (!name) { setManualError('กรอกชื่อตัวแปร'); return }
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(name)) {
+      setManualError('ต้องขึ้นต้นด้วยอักษรภาษาอังกฤษ')
+      return
+    }
+    addVariable(name)
+    setManualName('')
+    setManualError('')
+  }
 
   function updateVar(index: number, field: keyof Variable, raw: string) {
-    const updated = variables.map((v, i) => {
-      if (i !== index) return v
-      const val = ['min', 'max', 'decimals', 'reference_question_order'].includes(field) ? Number(raw) : raw
-      return { ...v, [field]: val }
-    })
-    onChange(updated)
+    const numFields: (keyof Variable)[] = ['min', 'max', 'step', 'reference_question_order']
+    onChange(variables.map((v, i) =>
+      i === index ? { ...v, [field]: numFields.includes(field) ? Number(raw) : raw } : v
+    ))
   }
 
   function removeVar(index: number) {
     onChange(variables.filter((_, i) => i !== index))
   }
 
-  function handleAdd() {
-    setError('')
-    if (!draft.name.trim()) { setError('ต้องมีชื่อตัวแปร'); return }
-    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(draft.name)) {
-      setError('ชื่อตัวแปรต้องเป็นภาษาอังกฤษ (a-z, 0-9, _)')
-      return
-    }
-    if (variables.some((v) => v.name === draft.name)) {
-      setError('ชื่อตัวแปรซ้ำ')
-      return
-    }
-    if (draftType === 'value' && draft.min > draft.max) {
-      setError('ค่าต่ำสุดต้องน้อยกว่าค่าสูงสุด')
-      return
-    }
-    const toAdd: Variable = draftType === 'reference'
-      ? { ...draft, type: 'reference', reference_field: 'answer' }
-      : { ...draft, type: 'value' }
-    onChange([...variables, toAdd])
-    setDraft({ ...EMPTY_VAR })
-    setDraftType('value')
-    setAdding(false)
-  }
-
-  const hasRefs = availableReferences && availableReferences.length > 0
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-3">
-      {variables.length > 0 && (
-        <div className="space-y-2">
-          {variables.map((v, i) => (
-            <div key={i} className="border rounded-lg p-3 bg-gray-50">
-              {v.type === 'reference' ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs text-gray-500">ชื่อตัวแปร</Label>
-                      <Input
-                        value={v.name}
-                        onChange={(e) => updateVar(i, 'name', e.target.value)}
-                        className="h-8 font-mono text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">อ้างถึงคำตอบข้อที่</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={v.reference_question_order ?? 1}
-                        onChange={(e) => updateVar(i, 'reference_question_order', e.target.value)}
-                        className="h-8 text-sm"
-                      />
+    <div className="space-y-5">
+
+      {/* ══════════════ PICKER PANEL ══════════════ */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+
+        {/* Mode tabs */}
+        <div className="flex border-b border-gray-100">
+          <ModeTab
+            active={mode === 'preset'}
+            icon={<Sparkles className="w-3.5 h-3.5" />}
+            label="สมการมาตรฐาน"
+            onClick={() => setMode('preset')}
+          />
+          <ModeTab
+            active={mode === 'custom'}
+            icon={<PenLine className="w-3.5 h-3.5" />}
+            label="เขียนสมการเอง"
+            onClick={() => setMode('custom')}
+          />
+        </div>
+
+        <div className="p-4 space-y-4">
+
+          {/* ── Preset Mode ── */}
+          {mode === 'preset' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SelectField
+                  label="หมวดหมู่ฟิสิกส์"
+                  value={selectedCategory}
+                  onChange={v => { setSelectedCategory(v); setSelectedPresetId('') }}
+                  placeholder="-- เลือกหมวดหมู่ --"
+                  options={categories.map(c => ({ value: c, label: c }))}
+                />
+                <SelectField
+                  label="สมการ"
+                  value={selectedPresetId}
+                  onChange={setSelectedPresetId}
+                  placeholder="-- เลือกสมการ --"
+                  disabled={!selectedCategory}
+                  options={categoryPresets.map(p => ({ value: p.id, label: p.formula_name }))}
+                />
+              </div>
+
+              {selectedPreset ? (
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                  {/* Equation display */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mb-1">สมการ</p>
+                      <p className="font-mono text-base font-bold text-blue-900">{selectedPreset.equation}</p>
+                      {selectedPreset.description && (
+                        <p className="text-xs text-blue-500 mt-1">{selectedPreset.description}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded">อ้างอิง</span>
-                    <button
-                      type="button"
-                      onClick={() => removeVar(i)}
-                      className="h-7 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors text-sm"
-                    >
-                      ✕
-                    </button>
+
+                  {/* Variable buttons */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mb-2">
+                      กดตัวแปรเพื่อแทรกลงในโจทย์ + เพิ่มในรายการ
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedPreset.variables as Variable[]).map(pVar => (
+                        <VarChip
+                          key={pVar.name}
+                          name={pVar.name}
+                          active={variables.some(v => v.name === pVar.name)}
+                          onClick={() => handlePresetVarClick(pVar)}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
-                  <div>
-                    <Label className="text-xs text-gray-500">ชื่อ</Label>
-                    <Input
-                      value={v.name}
-                      onChange={(e) => updateVar(i, 'name', e.target.value)}
-                      className="h-8 font-mono text-sm"
-                      placeholder="m"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">ต่ำสุด</Label>
-                    <Input
-                      type="number"
-                      value={v.min}
-                      onChange={(e) => updateVar(i, 'min', e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">สูงสุด</Label>
-                    <Input
-                      type="number"
-                      value={v.max}
-                      onChange={(e) => updateVar(i, 'max', e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">หน่วย</Label>
-                    <Input
-                      value={v.unit}
-                      onChange={(e) => updateVar(i, 'unit', e.target.value)}
-                      className="h-8 text-sm"
-                      placeholder="kg"
-                    />
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-500">ทศนิยม</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={6}
-                        value={v.decimals}
-                        onChange={(e) => updateVar(i, 'decimals', e.target.value)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeVar(i)}
-                      className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors text-sm"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
+                <EmptyHint text="เลือกหมวดหมู่และสมการด้านบนเพื่อดูตัวแปรที่สามารถแทรกได้" />
               )}
             </div>
-          ))}
+          )}
+
+          {/* ── Custom Mode ── */}
+          {mode === 'custom' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  พิมพ์สมการ
+                </label>
+                <div className="relative">
+                  <Input
+                    value={customExpr}
+                    onChange={e => setCustomExpr(e.target.value)}
+                    placeholder="เช่น  v^2 = u^2 + 2*a*s   หรือ  E = (1/2)*m*v^2 + m*g*h"
+                    className="font-mono text-sm pr-10 h-10"
+                  />
+                  {customExpr && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomExpr('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400">
+                  ระบบจะ parse สมการด้วย mathjs และดึงเฉพาะตัวแปรออกมาให้อัตโนมัติ
+                </p>
+              </div>
+
+              {customExpr.trim() && (
+                detectedSymbols.length > 0 ? (
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <p className="text-xs font-semibold text-emerald-700">
+                        พบ {detectedSymbols.length} ตัวแปร — กดเพื่อแทรกลงในโจทย์
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {detectedSymbols.map(name => (
+                        <VarChip
+                          key={name}
+                          name={name}
+                          active={variables.some(v => v.name === name)}
+                          onClick={() => addVariable(name)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3.5 py-2.5">
+                    <span className="text-amber-500 text-base">⚠️</span>
+                    <p className="text-xs text-amber-700">
+                      ไม่พบตัวแปรในสมการ — ตรวจสอบ syntax อีกครั้ง (ใช้ * สำหรับคูณ ^ สำหรับยกกำลัง)
+                    </p>
+                  </div>
+                )
+              )}
+
+              {!customExpr.trim() && (
+                <EmptyHint text="พิมพ์สมการด้านบน เช่น  F = m*a  หรือ  KE = (1/2)*m*v^2" />
+              )}
+            </div>
+          )}
+
+          {/* ── Manual add — always visible ── */}
+          <div className="pt-3 border-t border-gray-100">
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">
+              เพิ่มตัวแปรชื่ออื่น (พิมพ์ชื่อ)
+            </p>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  value={manualName}
+                  onChange={e => { setManualName(e.target.value); setManualError('') }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleManualAdd() } }}
+                  placeholder="เช่น T, k, r, theta, omega"
+                  className="h-9 text-sm font-mono"
+                />
+                {manualError && <p className="text-xs text-red-500 mt-1">{manualError}</p>}
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={handleManualAdd} className="h-9 shrink-0 px-4">
+                + เพิ่ม
+              </Button>
+            </div>
+          </div>
+
+          {/* Reference vars (multi-step only) */}
+          {hasRefs && (
+            <div className="pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => onChange([...variables, { ...EMPTY_REF }])}
+                className="text-xs text-indigo-600 font-semibold hover:text-indigo-800 hover:underline"
+              >
+                + เพิ่มตัวแปรอ้างอิงคำตอบ (multi-step)
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ══════════════ VARIABLE LIST ══════════════ */}
+      {variables.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
+            <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-blue-600 leading-relaxed">
+              <span className="font-semibold">ขนาดก้าว</span>{' '}
+              คือระยะห่างระหว่างค่าที่จะสุ่ม เช่น ต่ำสุด=9, สูงสุด=10, ขนาดก้าว=0.2 → 9, 9.2, 9.4, 9.6, 9.8, 10
+            </p>
+          </div>
+
+          {variables.map((v, i) =>
+            v.type === 'reference'
+              ? <ReferenceCard key={i} v={v} index={i} onUpdate={updateVar} onRemove={removeVar} />
+              : <ValueCard key={i} v={v} index={i} onUpdate={updateVar} onRemove={removeVar} />
+          )}
         </div>
       )}
 
-      {adding ? (
-        <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 space-y-3">
-          <p className="text-sm font-medium text-blue-800">เพิ่มตัวแปรใหม่</p>
+      {variables.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-6">
+          ยังไม่มีตัวแปร — กดปุ่มตัวแปรด้านบนเพื่อเพิ่ม
+        </p>
+      )}
+    </div>
+  )
+}
 
-          {hasRefs && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { setDraftType('value'); setDraft({ ...EMPTY_VAR }) }}
-                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${draftType === 'value' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}
-              >
-                ค่าสุ่ม
-              </button>
-              <button
-                type="button"
-                onClick={() => { setDraftType('reference'); setDraft({ ...EMPTY_REF }) }}
-                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${draftType === 'reference' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300'}`}
-              >
-                อ้างอิงคำตอบ
-              </button>
-            </div>
-          )}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-          {draftType === 'reference' ? (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs text-gray-600">ชื่อตัวแปร *</Label>
-                <Input
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  className="h-8 font-mono text-sm"
-                  placeholder="ans1"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600">อ้างถึงคำตอบข้อที่ *</Label>
-                <select
-                  value={draft.reference_question_order ?? 1}
-                  onChange={(e) => setDraft({ ...draft, reference_question_order: Number(e.target.value) })}
-                  className="h-8 w-full text-sm border border-gray-300 rounded-md px-2 bg-white"
-                >
-                  {(availableReferences ?? []).map((n) => (
-                    <option key={n} value={n}>ข้อย่อยที่ {n}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              <div>
-                <Label className="text-xs text-gray-600">ชื่อ *</Label>
-                <Input
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  className="h-8 font-mono text-sm"
-                  placeholder="m"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600">ต่ำสุด *</Label>
-                <Input
-                  type="number"
-                  value={draft.min}
-                  onChange={(e) => setDraft({ ...draft, min: Number(e.target.value) })}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600">สูงสุด *</Label>
-                <Input
-                  type="number"
-                  value={draft.max}
-                  onChange={(e) => setDraft({ ...draft, max: Number(e.target.value) })}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600">หน่วย</Label>
-                <Input
-                  value={draft.unit}
-                  onChange={(e) => setDraft({ ...draft, unit: e.target.value })}
-                  className="h-8 text-sm"
-                  placeholder="kg"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600">ทศนิยม</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={6}
-                  value={draft.decimals}
-                  onChange={(e) => setDraft({ ...draft, decimals: Number(e.target.value) })}
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
-          )}
+function ModeTab({ active, icon, label, onClick }: {
+  active: boolean; icon: React.ReactNode; label: string; onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`
+        flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-all
+        ${active
+          ? 'bg-white text-blue-700 border-b-2 border-blue-600 shadow-sm'
+          : 'bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100'}
+      `}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
-          <div className="flex gap-2">
-            <Button type="button" size="sm" onClick={handleAdd}>เพิ่ม</Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => { setAdding(false); setError(''); setDraft({ ...EMPTY_VAR }); setDraftType('value') }}
-            >
-              ยกเลิก
-            </Button>
+function SelectField({ label, value, onChange, placeholder, options, disabled }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  options: { value: string; label: string }[]
+  disabled?: boolean
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          disabled={disabled}
+          className="
+            w-full h-9 text-sm border border-gray-300 rounded-lg pl-3 pr-8 bg-white
+            appearance-none cursor-pointer transition-colors
+            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+            disabled:opacity-40 disabled:cursor-not-allowed
+          "
+        >
+          <option value="">{placeholder}</option>
+          {options.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+      </div>
+    </div>
+  )
+}
+
+function VarChip({ name, active, onClick }: { name: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={active ? `แทรก {${name}} ลงในโจทย์อีกครั้ง` : `เพิ่มตัวแปร {${name}}`}
+      className={`
+        relative font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-150
+        ${active
+          ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
+          : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:text-blue-700 hover:bg-blue-50 hover:shadow-sm'}
+      `}
+    >
+      {'{' + name + '}'}
+      {active && (
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
+      )}
+    </button>
+  )
+}
+
+function EmptyHint({ text }: { text: string }) {
+  return (
+    <div className="rounded-xl border-2 border-dashed border-gray-200 py-6 text-center">
+      <p className="text-sm text-gray-400">{text}</p>
+    </div>
+  )
+}
+
+function ValueCard({ v, index, onUpdate, onRemove }: {
+  v: Variable; index: number
+  onUpdate: (i: number, f: keyof Variable, val: string) => void
+  onRemove: (i: number) => void
+}) {
+  return (
+    <div className="group border border-gray-200 rounded-xl p-3.5 bg-white hover:border-blue-200 hover:shadow-sm transition-all">
+      <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2.5 items-end">
+        {/* Variable badge */}
+        <div className="flex items-end pb-0.5">
+          <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg text-sm border border-blue-200">
+            {'{' + v.name + '}'}
+          </span>
+        </div>
+
+        {/* Min / Max / Step */}
+        {(['min', 'max', 'step'] as const).map(field => (
+          <div key={field}>
+            <Label className="text-xs text-gray-500 font-medium">
+              {field === 'min' ? 'ต่ำสุด' : field === 'max' ? 'สูงสุด' : 'ขนาดก้าว'}
+            </Label>
+            <Input
+              type="number"
+              value={v[field] as number}
+              onChange={e => onUpdate(index, field, e.target.value)}
+              className="h-8 text-sm"
+              step="any"
+              min={field === 'step' ? '0.0001' : undefined}
+            />
+          </div>
+        ))}
+
+        {/* Remove */}
+        <div className="flex items-end pb-0.5">
+          <button
+            type="button"
+            onClick={() => onRemove(index)}
+            title="ลบตัวแปรนี้"
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReferenceCard({ v, index, onUpdate, onRemove }: {
+  v: Variable; index: number
+  onUpdate: (i: number, f: keyof Variable, val: string) => void
+  onRemove: (i: number) => void
+}) {
+  return (
+    <div className="border border-indigo-200 rounded-xl p-3.5 bg-indigo-50/40">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 grid grid-cols-2 gap-2.5">
+          <div>
+            <Label className="text-xs text-indigo-500 font-medium">ชื่อตัวแปร</Label>
+            <Input
+              value={v.name}
+              onChange={e => onUpdate(index, 'name', e.target.value)}
+              className="h-8 font-mono text-sm"
+              placeholder="เช่น ans1"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-indigo-500 font-medium">อ้างถึงคำตอบข้อที่</Label>
+            <Input
+              type="number"
+              min={1}
+              value={v.reference_question_order ?? 1}
+              onChange={e => onUpdate(index, 'reference_question_order', e.target.value)}
+              className="h-8 text-sm"
+            />
           </div>
         </div>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setAdding(true)}
-          className="w-full border-dashed"
-        >
-          + เพิ่มตัวแปร
-        </Button>
-      )}
+        <div className="flex flex-col items-center gap-1.5 shrink-0">
+          <span className="text-xs text-indigo-600 font-bold bg-indigo-100 px-2.5 py-0.5 rounded-full">อ้างอิง</span>
+          <button
+            type="button"
+            onClick={() => onRemove(index)}
+            className="text-indigo-200 hover:text-red-500 hover:bg-red-50 rounded-lg px-2 py-1 transition-colors text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

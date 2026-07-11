@@ -1,18 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Plus, X } from 'lucide-react'
+
 import { VariableEditor } from './variable-editor'
-import { FormulaEditor } from './formula-editor/index'
+import { AnswerPartsEditor } from './answer-parts-editor'
 import { QuestionPreview } from './question-preview'
+import { QuestionImageUpload } from './question-image-upload'
+import { LogicRuleBuilder } from './logic-rule-builder'
+import { WhiteboardModal } from './whiteboard-modal'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
-import type { Question, Variable, MCQOption, QuestionCategory, FormulaPreset } from '@/lib/types'
+import type { Question, Variable, LogicRule, MCQOption, AnswerPart, QuestionCategory, FormulaPreset } from '@/lib/types'
 
 interface QuestionFormProps {
   question?: Question
@@ -55,18 +61,22 @@ const gradeTopics: Record<string, string[]> = {
 export function QuestionForm({ question, categories, presets, mode }: QuestionFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const questionEditorRef = useRef<RichTextEditorHandle>(null)
 
   // Form state
   const [title, setTitle] = useState(question?.title ?? '')
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
-  const [questionType, setQuestionType] = useState<'written' | 'mcq'>(question?.question_type ?? 'written')
+  const rawType = question?.question_type
+  const [questionType, setQuestionType] = useState<'written' | 'mcq'>(
+    rawType === 'mcq' ? 'mcq' : 'written'
+  )
   const [difficulty, setDifficulty] = useState(question?.difficulty ?? 'medium')
   const [visibility, setVisibility] = useState(question?.visibility ?? 'private')
   const [gradeLevel, setGradeLevel] = useState(question?.grade_level ?? '')
   const [showExtraCategories, setShowExtraCategories] = useState(false)
   const [extraGradeLevel, setExtraGradeLevel] = useState('')
 
-  // category → sub-category
+  // category
   const parentCategories = categories.filter(c => c.parent_id === null)
   const initialParent = question?.category_id
     ? (categories.find(c => c.id === question.category_id)?.parent_id
@@ -74,39 +84,52 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
         : question.category_id)
     : ''
   const [parentCategoryId, setParentCategoryId] = useState(initialParent)
-  const [subCategoryId, setSubCategoryId] = useState(
-    question?.category_id && categories.find(c => c.id === question.category_id)?.parent_id
-      ? question.category_id
-      : ''
-  )
+
+  // tags
+  const [tags, setTags] = useState<string[]>(question?.tags ?? [])
+  const [tagInput, setTagInput] = useState('')
 
   // null = ยังไม่เลือกระดับชั้น, [] = ม.1 (ไม่มีฟิสิกส์), [...] = มีหัวข้อ
   const gradeLevelTopics: string[] | null = gradeLevel ? (gradeTopics[gradeLevel] ?? []) : null
   const visibleParents = gradeLevelTopics === null
     ? parentCategories
     : parentCategories.filter(c => gradeLevelTopics.includes(c.name))
-  const extraParents = gradeLevelTopics !== null && gradeLevelTopics.length > 0
-    ? parentCategories.filter(c => !gradeLevelTopics.includes(c.name))
-    : []
   const filteredExtraParents = extraGradeLevel
     ? parentCategories.filter(c => (gradeTopics[extraGradeLevel] ?? []).includes(c.name))
     : []
 
-  const subCategories = categories.filter(c => c.parent_id === parentCategoryId)
-  const categoryId = subCategoryId || parentCategoryId
+  function addTag() {
+    const t = tagInput.trim()
+    if (t && !tags.includes(t)) setTags(prev => [...prev, t])
+    setTagInput('')
+  }
+  function removeTag(i: number) {
+    setTags(prev => prev.filter((_, idx) => idx !== i))
+  }
 
   function handleGradeLevelChange(v: string) {
     setGradeLevel(v)
     setParentCategoryId('')
-    setSubCategoryId('')
     setShowExtraCategories(false)
     setExtraGradeLevel('')
   }
+  const [showWhiteboard, setShowWhiteboard] = useState(false)
   const [isRandom, setIsRandom] = useState(question?.is_random ?? true)
   const [variables, setVariables] = useState<Variable[]>(question?.variables ?? [])
-  const [answerFormula, setAnswerFormula] = useState(question?.answer_formula ?? '')
-  const [answerUnit, setAnswerUnit] = useState(question?.answer_unit ?? '')
-  const [answerTolerance, setAnswerTolerance] = useState(question?.answer_tolerance ?? 0.01)
+  const [logicRules, setLogicRules] = useState<LogicRule[]>((question as any)?.logic_rules ?? [])
+  const [answerParts, setAnswerParts] = useState<AnswerPart[]>(() => {
+    const existing = question?.answer_parts
+    if (existing && existing.length > 0) {
+      return existing.map(p => ({ ...p, id: p.id ?? Math.random().toString(36).slice(2) }))
+    }
+    return [{
+      id: Math.random().toString(36).slice(2),
+      sub_text: '',
+      formula: question?.answer_formula ?? '',
+      unit: question?.answer_unit ?? '',
+      tolerance: question?.answer_tolerance ?? 0.1,
+    }]
+  })
   const [mcqOptions, setMcqOptions] = useState<MCQOption[]>(
     question?.mcq_options ?? [
       { text: '', is_correct: true },
@@ -116,24 +139,37 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
     ]
   )
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
-    if (!questionText.trim()) { toast.error('กรอกเนื้อหาโจทย์ด้วย'); return }
-    if (questionType === 'written' && !answerFormula.trim()) {
-      toast.error('กรอกสูตรคำตอบด้วย')
-      return
+    const plainText = questionText.replace(/<[^>]*>/g, '').trim()
+    if (!plainText) { toast.error('กรอกเนื้อหาโจทย์ด้วย'); return }
+    if (questionType === 'written') {
+      const emptyPart = answerParts.findIndex(p => !p.formula.trim())
+      if (emptyPart !== -1) {
+        toast.error(answerParts.length > 1
+          ? `กรอกสูตรคำตอบข้อย่อย ${['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ'][emptyPart] ?? emptyPart + 1} ด้วย`
+          : 'กรอกสูตรคำตอบด้วย')
+        return
+      }
     }
 
     setSaving(true)
+    const first = answerParts[0]
+
     const data = {
       title, question_text: questionText, question_type: questionType,
       difficulty: difficulty as any, visibility: visibility as any,
-      category_id: categoryId, grade_level: gradeLevel, is_random: isRandom,
-      variables, answer_formula: answerFormula,
-      answer_unit: answerUnit, answer_tolerance: answerTolerance,
-      mcq_options: mcqOptions, solution_text: solutionText,
+      category_id: parentCategoryId, grade_level: gradeLevel, is_random: isRandom,
+      variables, logic_rules: logicRules,
+      answer_parts: answerParts,
+      answer_formula: first?.formula ?? '',
+      answer_unit: first?.unit ?? '',
+      answer_tolerance: first?.tolerance ?? 0.1,
+      mcq_options: mcqOptions, solution_text: solutionText, tags,
+      image_urls: imageUrls,
     }
 
     const result = mode === 'create'
@@ -230,13 +266,10 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
         {/* หมวดหมู่ filter ตามระดับชั้น */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>หมวดหมู่หลัก</Label>
+            <Label>หมวดหมู่</Label>
             <Select
               value={parentCategoryId || undefined}
-              onValueChange={(v) => {
-                setParentCategoryId(v ?? '')
-                setSubCategoryId('')
-              }}
+              onValueChange={(v) => setParentCategoryId(v ?? '')}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="เลือกหมวดหมู่">
@@ -269,7 +302,7 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
                   📚 {showExtraCategories ? 'ซ่อนหมวดหมู่จากระดับชั้นอื่น' : 'เพิ่มหมวดหมู่จากระดับชั้นอื่น'}
                 </button>
                 {showExtraCategories && (
-                  <Select value={extraGradeLevel} onValueChange={setExtraGradeLevel}>
+                  <Select value={extraGradeLevel} onValueChange={(v) => setExtraGradeLevel(v ?? '')}>
                     <SelectTrigger className="w-full h-8 text-xs">
                       <SelectValue placeholder="เลือกระดับชั้น">
                         {gradeLevelLabels[extraGradeLevel] ?? ''}
@@ -289,23 +322,30 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
           </div>
 
           <div className="space-y-1.5">
-            <Label>หมวดหมู่ย่อย</Label>
-            <Select
-              value={subCategoryId || undefined}
-              onValueChange={(v) => setSubCategoryId(v ?? '')}
-              disabled={subCategories.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={subCategories.length === 0 ? 'ไม่มีหมวดหมู่ย่อย' : 'เลือกหมวดหมู่ย่อย'}>
-                  {subCategories.find(c => c.id === subCategoryId)?.name}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent alignItemWithTrigger={false}>
-                {subCategories.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            <Label>แท็ก</Label>
+            <div className="flex gap-2">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+                placeholder="พิมพ์แท็ก แล้วกด Enter หรือ +"
+              />
+              <Button type="button" variant="outline" size="icon" onClick={addTag}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {tags.map((tag, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                    {tag}
+                    <button type="button" onClick={() => removeTag(i)} className="hover:text-blue-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -339,18 +379,19 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
         <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาโจทย์</h2>
 
         <div className="space-y-1.5">
-          <Label htmlFor="question_text">โจทย์ *</Label>
-          <Textarea
-            id="question_text"
+          <Label>โจทย์ *</Label>
+          <RichTextEditor
+            ref={questionEditorRef}
             value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
+            onChange={setQuestionText}
             placeholder="วัตถุมวล {m} kg เคลื่อนที่บนพื้นราบ ได้รับแรง {F} N จงหาความเร่งของวัตถุ"
             rows={5}
-            required
           />
-          <p className="text-xs text-gray-500">
-            ใช้ {'{'}ชื่อตัวแปร{'}'} เพื่อแทนค่าที่จะสุ่ม เช่น {'{'}m{'}'} → ค่าจะถูกสุ่มแทนที่
-          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>รูปภาพประกอบโจทย์</Label>
+          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
         </div>
       </section>
 
@@ -370,7 +411,28 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
         </div>
 
         {isRandom ? (
-          <VariableEditor variables={variables} onChange={setVariables} />
+          <>
+            <VariableEditor
+              variables={variables}
+              onChange={setVariables}
+              presets={presets}
+              onInsertVariable={(name) => {
+                questionEditorRef.current?.insertText(`{${name}}`)
+              }}
+            />
+
+            {variables.filter(v => v.type !== 'reference').length > 1 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-sm font-medium text-gray-700">เงื่อนไขตัวแปร</p>
+                <p className="text-xs text-gray-400">กำหนดเงื่อนไขระหว่างตัวแปร เช่น v &lt; u เพื่อให้ค่าสุ่มสมเหตุสมผล</p>
+                <LogicRuleBuilder
+                  rules={logicRules}
+                  variables={variables}
+                  onChange={setLogicRules}
+                />
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-sm text-gray-400 py-2">
             ปิดการสุ่มตัวเลข — นักเรียนทุกคนจะได้โจทย์เหมือนกัน
@@ -385,40 +447,13 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
         </h2>
 
         {questionType === 'written' ? (
-          <>
-            <FormulaEditor
-              variables={variables}
-              value={answerFormula}
-              unit={answerUnit}
-              presets={presets}
-              onChange={setAnswerFormula}
-              onVariablesChange={setVariables}
-              onUnitChange={setAnswerUnit}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="answer_unit">หน่วยของคำตอบ</Label>
-                <Input
-                  id="answer_unit"
-                  value={answerUnit}
-                  onChange={(e) => setAnswerUnit(e.target.value)}
-                  placeholder="เช่น m/s², N, kg"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="answer_tolerance">ค่าคลาดเคลื่อนที่ยอมรับ (%)</Label>
-                <Input
-                  id="answer_tolerance"
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={answerTolerance}
-                  onChange={(e) => setAnswerTolerance(Number(e.target.value))}
-                />
-              </div>
-            </div>
-          </>
+          <AnswerPartsEditor
+            parts={answerParts}
+            variables={variables}
+            presets={presets}
+            onChange={setAnswerParts}
+            onVariablesChange={setVariables}
+          />
         ) : (
           <div className="space-y-3">
             {mcqOptions.map((opt, i) => (
@@ -460,19 +495,16 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
         />
       </section>
 
-      {/* Section 6: Preview */}
-      <QuestionPreview
-        questionText={questionText}
-        variables={variables}
-        answerFormula={answerFormula}
-        answerUnit={answerUnit}
-        isRandom={isRandom}
-        questionType={questionType}
-        mcqOptions={mcqOptions}
-      />
-
       {/* Actions */}
       <div className="flex items-center gap-3 pt-2 border-t">
+        <QuestionPreview
+          questionText={questionText}
+          variables={variables}
+          answerParts={answerParts}
+          isRandom={isRandom}
+          questionType={questionType}
+          mcqOptions={mcqOptions}
+        />
         <Button type="submit" disabled={saving}>
           {saving ? 'กำลังบันทึก...' : mode === 'create' ? 'บันทึกโจทย์' : 'อัปเดตโจทย์'}
         </Button>
@@ -485,6 +517,16 @@ export function QuestionForm({ question, categories, presets, mode }: QuestionFo
           ยกเลิก
         </Button>
       </div>
+
+      {showWhiteboard && (
+        <WhiteboardModal
+          onSave={(url) => {
+            setImageUrls(prev => [...prev, url])
+            setShowWhiteboard(false)
+          }}
+          onClose={() => setShowWhiteboard(false)}
+        />
+      )}
     </form>
   )
 }

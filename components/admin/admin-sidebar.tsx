@@ -39,7 +39,13 @@ export function AdminSidebar() {
           </Link>
         ))}
       </nav>
-      <div className="p-3 border-t">
+      <div className="p-3 border-t space-y-1">
+        <Link
+          href="/super-admin"
+          className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-200"
+        >
+          ⚡ Super Admin Portal
+        </Link>
         <Link
           href="/dashboard"
           className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors"

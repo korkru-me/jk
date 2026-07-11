@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { getMyOrgId } from '@/lib/actions/org'
 import type { AssignmentStatus } from '@/lib/types'
 
 interface CreateAssignmentData {
@@ -23,9 +24,13 @@ export async function createAssignment(data: CreateAssignmentData) {
 
   if (data.question_ids.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
 
+  const orgId = await getMyOrgId()
+  if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
+
   const { data: assignment, error } = await supabase
     .from('assignments')
     .insert({
+      org_id: orgId,
       classroom_id: data.classroom_id,
       created_by: user.id,
       title: data.title.trim(),

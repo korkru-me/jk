@@ -1,0 +1,319 @@
+'use client'
+
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts'
+import {
+  TrendingUp,
+  Users,
+  BookOpen,
+  FileText,
+  Activity,
+  DollarSign,
+} from 'lucide-react'
+
+const MRR_DATA = [
+  { month: 'มิ.ย. 68', mrr: 42500, tenants: 8 },
+  { month: 'ก.ค. 68', mrr: 51000, tenants: 10 },
+  { month: 'ส.ค. 68', mrr: 58500, tenants: 11 },
+  { month: 'ก.ย. 68', mrr: 67000, tenants: 13 },
+  { month: 'ต.ค. 68', mrr: 71500, tenants: 14 },
+  { month: 'พ.ย. 68', mrr: 85000, tenants: 16 },
+  { month: 'ธ.ค. 68', mrr: 94500, tenants: 17 },
+  { month: 'ม.ค. 69', mrr: 108000, tenants: 20 },
+  { month: 'ก.พ. 69', mrr: 119500, tenants: 22 },
+  { month: 'มี.ค. 69', mrr: 134000, tenants: 24 },
+  { month: 'เม.ย. 69', mrr: 148500, tenants: 27 },
+  { month: 'พ.ค. 69', mrr: 162000, tenants: 29 },
+]
+
+const EXAM_ACTIVITY = [
+  { day: 'จ', submissions: 1240, activeExams: 34 },
+  { day: 'อ', submissions: 1580, activeExams: 41 },
+  { day: 'พ', submissions: 2120, activeExams: 58 },
+  { day: 'พฤ', submissions: 1890, activeExams: 49 },
+  { day: 'ศ', submissions: 2340, activeExams: 62 },
+  { day: 'ส', submissions: 890, activeExams: 21 },
+  { day: 'อา', submissions: 420, activeExams: 11 },
+]
+
+const STAT_CARDS = [
+  {
+    label: 'ผู้ใช้งานรวม',
+    value: '14,832',
+    delta: '+12.4%',
+    positive: true,
+    icon: Users,
+    color: 'indigo',
+  },
+  {
+    label: 'MRR ปัจจุบัน',
+    value: '฿162,000',
+    delta: '+9.1%',
+    positive: true,
+    icon: DollarSign,
+    color: 'emerald',
+  },
+  {
+    label: 'Exams กำลังสอบ',
+    value: '62',
+    delta: '+8 จากเมื่อวาน',
+    positive: true,
+    icon: FileText,
+    color: 'amber',
+  },
+  {
+    label: 'คลังโจทย์',
+    value: '28,461',
+    delta: '+341 วันนี้',
+    positive: true,
+    icon: BookOpen,
+    color: 'violet',
+  },
+  {
+    label: 'Submissions วันนี้',
+    value: '2,340',
+    delta: '+18.7%',
+    positive: true,
+    icon: Activity,
+    color: 'cyan',
+  },
+  {
+    label: 'Tenants ใช้งาน',
+    value: '29',
+    delta: '+2 เดือนนี้',
+    positive: true,
+    icon: TrendingUp,
+    color: 'rose',
+  },
+]
+
+const COLOR_MAP: Record<string, string> = {
+  indigo: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
+  emerald: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
+  amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+  violet: 'bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
+  cyan: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300',
+  rose: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
+}
+
+const ICON_COLOR: Record<string, string> = {
+  indigo: 'text-indigo-500',
+  emerald: 'text-emerald-500',
+  amber: 'text-amber-500',
+  violet: 'text-violet-500',
+  cyan: 'text-cyan-500',
+  rose: 'text-rose-500',
+}
+
+function formatMRR(value: number) {
+  return `฿${(value / 1000).toFixed(0)}K`
+}
+
+export function AdminDashboard() {
+  const currentMRR = MRR_DATA[MRR_DATA.length - 1].mrr
+  const prevMRR = MRR_DATA[MRR_DATA.length - 2].mrr
+  const mrrGrowth = (((currentMRR - prevMRR) / prevMRR) * 100).toFixed(1)
+
+  return (
+    <div className="space-y-6">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+        {STAT_CARDS.map((card) => {
+          const Icon = card.icon
+          return (
+            <div
+              key={card.label}
+              className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900"
+            >
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {card.label}
+                </p>
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-lg ${COLOR_MAP[card.color]}`}
+                >
+                  <Icon className={`h-3.5 w-3.5 ${ICON_COLOR[card.color]}`} />
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+                {card.value}
+              </p>
+              <p
+                className={`mt-0.5 text-xs font-medium ${
+                  card.positive
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-red-500'
+                }`}
+              >
+                {card.delta}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        {/* MRR Chart */}
+        <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white">
+                Monthly Recurring Revenue
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                ย้อนหลัง 12 เดือน
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                ฿{(currentMRR / 1000).toFixed(0)}K
+              </p>
+              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                +{mrrGrowth}% MoM
+              </p>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={MRR_DATA}>
+              <defs>
+                <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={formatMRR}
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                formatter={(v) => [`฿${Number(v).toLocaleString()}`, 'MRR']}
+                contentStyle={{
+                  borderRadius: 8,
+                  border: '1px solid #e2e8f0',
+                  fontSize: 12,
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="mrr"
+                stroke="#6366f1"
+                strokeWidth={2.5}
+                fill="url(#mrrGrad)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Tenant Growth */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+          <div className="mb-4">
+            <h3 className="font-semibold text-slate-900 dark:text-white">
+              Tenant Growth
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              จำนวนสถาบันที่ใช้งาน
+            </p>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={MRR_DATA}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                formatter={(v) => [Number(v), 'Tenants']}
+                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              />
+              <Bar dataKey="tenants" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Weekly Exam Activity */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+        <div className="mb-4">
+          <h3 className="font-semibold text-slate-900 dark:text-white">
+            กิจกรรมการสอบรายสัปดาห์
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Submissions และ Active Exams แยกตามวัน
+          </p>
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={EXAM_ACTIVITY} barGap={4}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+            <XAxis
+              dataKey="day"
+              tick={{ fontSize: 12, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              yAxisId="left"
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{ borderRadius: 8, fontSize: 12 }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 12 }}
+              formatter={(value) =>
+                value === 'submissions' ? 'Submissions' : 'Active Exams'
+              }
+            />
+            <Bar
+              yAxisId="left"
+              dataKey="submissions"
+              fill="#6366f1"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              yAxisId="right"
+              dataKey="activeExams"
+              fill="#10b981"
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}

@@ -2,8 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
-import type { Question, Variable } from '@/lib/types'
+import { randomizeVariables, evaluateFormula, evaluatePartsChained } from '@/lib/math/evaluator'
+import { getMyOrgId } from '@/lib/actions/org'
+import type { Question, Variable, LogicRule } from '@/lib/types'
 
 export async function startSubmission(assignmentId: string) {
   const supabase = await createClient()
@@ -58,13 +59,66 @@ export async function startSubmission(assignmentId: string) {
 
   if (!questions || questions.length === 0) return { error: 'ไม่พบโจทย์' }
 
-  // Create submission
+  // Pre-compute correct answers and max_score per question
+  type AnswerSkeleton = {
+    question_id: string
+    random_values: Record<string, number>
+    correct_answer: string
+    max_score: number
+  }
+  const skeletons: AnswerSkeleton[] = questions.map((q: Question) => {
+    const extraData = (q as any).extra_data as any
+    const randomValues = randomizeVariables(
+      q.variables as Variable[],
+      (q.logic_rules ?? []) as LogicRule[],
+      {
+        formula: (q as any).answer_parts?.[0]?.formula ?? q.answer_formula,
+        answerStep: extraData?.answer_step ?? 0,
+        pythagoreanGroups: extraData?.pythagorean_groups ?? [],
+      }
+    )
+    const parts = (q as any).answer_parts as import('@/lib/types').AnswerPart[] | null
+
+    if (q.question_type === 'true_false') {
+      const maxScore = (extraData?.score_answer ?? 1) +
+        (extraData?.explanation_mode !== 'none' ? (extraData?.score_explanation ?? 1) : 0)
+      return { question_id: q.id, random_values: {}, correct_answer: extraData?.correct_answer ? 'true' : 'false', max_score: maxScore }
+    }
+
+    if (q.question_type === 'fill_blank') {
+      const blanks: import('@/lib/types').FillBlankItem[] = extraData?.blanks ?? []
+      const isManual = (extraData?.grading_mode ?? 'auto') === 'manual'
+      const prefix = isManual ? 'FILL_MANUAL:' : 'FILL:'
+      return { question_id: q.id, random_values: {}, correct_answer: prefix + JSON.stringify(blanks.map((b) => b.answer)), max_score: blanks.length || 1 }
+    }
+
+    if (q.question_type === 'ordering') {
+      const items: import('@/lib/types').OrderingItem[] = extraData?.items ?? []
+      return { question_id: q.id, random_values: {}, correct_answer: 'ORDER:' + JSON.stringify(items.map((i) => i.id)), max_score: items.length || 1 }
+    }
+
+    if (parts && parts.length > 1) {
+      const answers = evaluatePartsChained(parts, randomValues)
+      return { question_id: q.id, random_values: randomValues, correct_answer: JSON.stringify(answers.map(String)), max_score: parts.length }
+    }
+
+    const formula = parts?.[0]?.formula ?? q.answer_formula
+    return { question_id: q.id, random_values: randomValues, correct_answer: String(evaluateFormula(formula, randomValues)), max_score: 1 }
+  })
+
+  const totalMaxScore = skeletons.reduce((sum, s) => sum + s.max_score, 0)
+
+  const orgId = await getMyOrgId()
+  if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน' }
+
+  // Create submission with correct total max_score
   const { data: submission, error: subError } = await supabase
     .from('submissions')
     .insert({
+      org_id: orgId,
       assignment_id: assignmentId,
       student_id: user.id,
-      max_score: questions.length,
+      max_score: totalMaxScore,
       status: 'in_progress',
     })
     .select('id')
@@ -72,20 +126,9 @@ export async function startSubmission(assignmentId: string) {
 
   if (subError) return { error: subError.message }
 
-  // Randomize values per question and persist answers skeleton
-  const answers = questions.map((q: Question) => {
-    const randomValues = randomizeVariables(q.variables as Variable[])
-    const correctAnswer = evaluateFormula(q.answer_formula, randomValues)
-    return {
-      submission_id: submission.id,
-      question_id: q.id,
-      random_values: randomValues,
-      correct_answer: String(correctAnswer),
-      max_score: 1,
-    }
-  })
-
-  await supabase.from('submission_answers').insert(answers)
+  await supabase.from('submission_answers').insert(
+    skeletons.map(s => ({ ...s, org_id: orgId, submission_id: submission.id }))
+  )
 
   return { submissionId: submission.id }
 }
@@ -133,25 +176,101 @@ export async function submitSubmission(submissionId: string) {
 
   const { data: answers } = await supabase
     .from('submission_answers')
-    .select('*')
+    .select('*, questions(answer_tolerance, answer_parts, question_type, extra_data)')
     .eq('submission_id', submissionId)
 
   if (!answers) return { error: 'ไม่พบคำตอบ' }
 
+  function gradeValue(studentVal: number, correctVal: number, storedTolerance: number): boolean {
+    const tolerance = storedTolerance < 0
+      ? Math.abs(correctVal) * (Math.abs(storedTolerance) / 100)
+      : storedTolerance
+    return Math.abs(studentVal - correctVal) <= tolerance
+  }
+
   // Auto-grade: compare student_answer vs correct_answer with tolerance
   const updates = answers.map((a: any) => {
-    const studentVal = parseFloat(a.student_answer ?? '')
-    const correctVal = parseFloat(a.correct_answer ?? '')
+    const correctAns: string = a.correct_answer ?? ''
+    const studentAns: string = a.student_answer ?? ''
+
+    // True/False grading
+    if (correctAns === 'true' || correctAns === 'false') {
+      let studentTf = studentAns
+      if (studentAns.startsWith('{')) {
+        try { studentTf = JSON.parse(studentAns).answer ?? studentAns } catch { /* keep raw */ }
+      }
+      const extraData = a.questions?.extra_data as any
+      const scoreAnswer: number = extraData?.score_answer ?? 1
+      const isCorrect = studentTf.trim() === correctAns
+      return { id: a.id, is_correct: isCorrect, score: isCorrect ? scoreAnswer : 0 }
+    }
+
+    // Fill-blank grading
+    if (correctAns.startsWith('FILL_MANUAL:')) {
+      return { id: a.id, is_correct: null, score: 0 }
+    }
+
+    if (correctAns.startsWith('FILL:')) {
+      const extraData = a.questions?.extra_data as any
+      if ((extraData?.grading_mode ?? 'auto') === 'manual') {
+        return { id: a.id, is_correct: null, score: 0 }
+      }
+      const correctAnswers: string[] = JSON.parse(correctAns.slice(5))
+      const blanks: import('@/lib/types').FillBlankItem[] = extraData?.blanks ?? []
+      let studentAnswers: string[] = []
+      try { studentAnswers = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
+      let correctCount = 0
+      for (let i = 0; i < correctAnswers.length; i++) {
+        const ca = correctAnswers[i]?.trim() ?? ''
+        const sa = (studentAnswers[i] ?? '').trim()
+        const cs = blanks[i]?.case_sensitive ?? false
+        if (cs ? sa === ca : sa.toLowerCase() === ca.toLowerCase()) correctCount++
+      }
+      return { id: a.id, is_correct: correctCount === correctAnswers.length, score: correctCount }
+    }
+
+    // Ordering grading
+    if (correctAns.startsWith('ORDER:')) {
+      const correctOrder: string[] = JSON.parse(correctAns.slice(6))
+      let studentOrder: string[] = []
+      try { studentOrder = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
+      let correctPositions = 0
+      for (let i = 0; i < correctOrder.length; i++) {
+        if (studentOrder[i] === correctOrder[i]) correctPositions++
+      }
+      return { id: a.id, is_correct: correctPositions === correctOrder.length, score: correctPositions }
+    }
+
+    const isMultiPart = correctAns.startsWith('[')
+
+    if (isMultiPart) {
+      const correctAnswers: string[] = JSON.parse(correctAns)
+      let studentAnswers: string[] = []
+      try { studentAnswers = JSON.parse(studentAns || '[]') } catch { studentAnswers = [] }
+
+      const parts: Array<{ tolerance: number }> = a.questions?.answer_parts ?? []
+      let correctCount = 0
+      for (let i = 0; i < correctAnswers.length; i++) {
+        const sv = parseFloat(studentAnswers[i] ?? '')
+        const cv = parseFloat(correctAnswers[i] ?? '')
+        const tol = parts[i]?.tolerance ?? a.questions?.answer_tolerance ?? 0.1
+        if (!isNaN(sv) && !isNaN(cv) && gradeValue(sv, cv, tol)) correctCount++
+      }
+      return { id: a.id, is_correct: correctCount === correctAnswers.length, score: correctCount }
+    }
+
+    // Single-part (backwards compat)
+    const studentVal = parseFloat(studentAns)
+    const correctVal = parseFloat(correctAns)
     let isCorrect = false
     let score = 0
 
     if (!isNaN(studentVal) && !isNaN(correctVal)) {
-      const tolerance = Math.abs(correctVal) * 0.01 // 1% tolerance
-      isCorrect = Math.abs(studentVal - correctVal) <= Math.max(tolerance, 0.001)
+      const tol: number = a.questions?.answer_tolerance ?? 0.1
+      isCorrect = gradeValue(studentVal, correctVal, tol)
       score = isCorrect ? a.max_score : 0
-    } else if (a.student_answer && a.correct_answer) {
-      // MCQ: exact string match
-      isCorrect = a.student_answer.trim() === a.correct_answer.trim()
+    } else if (studentAns && correctAns) {
+      isCorrect = studentAns.trim() === correctAns.trim()
       score = isCorrect ? a.max_score : 0
     }
 

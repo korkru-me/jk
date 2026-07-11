@@ -1,11 +1,13 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { User } from '@/lib/types'
+import { TeacherDashboard } from './_components/teacher-dashboard'
+import { StreakGamification } from '@/components/student/streak-gamification'
+import { Clock, BookOpen, ChevronRight, TrendingUp, Flame, AlertCircle } from 'lucide-react'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
 
@@ -37,10 +39,8 @@ export default async function DashboardPage() {
         .eq('teacher_id', user.id),
       supabase
         .from('assignments')
-        .select('id, title, status, question_ids, classrooms(name)')
-        .eq('created_by', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5),
+        .select('id', { count: 'exact', head: true })
+        .eq('created_by', user.id),
     ])
 
     const classroomIds = (classroomsRes.data ?? []).map((c: any) => c.id)
@@ -55,14 +55,13 @@ export default async function DashboardPage() {
       <TeacherDashboard
         user={user}
         questionsCount={questionsRes.count ?? 0}
-        classroomsCount={classroomIds.length}
         studentsCount={studentsRes.count ?? 0}
-        recentAssignments={(assignmentsRes.data ?? []) as any[]}
+        assignmentsCount={assignmentsRes.count ?? 0}
       />
     )
   }
 
-  // Student
+  // ─── Student path ─────────────────────────────────────────────────────────────
   const [membershipsRes, submissionsRes] = await Promise.all([
     supabase
       .from('classroom_students')
@@ -70,7 +69,7 @@ export default async function DashboardPage() {
       .eq('student_id', user.id),
     supabase
       .from('submissions')
-      .select('total_score, max_score, status, assignment_id')
+      .select('total_score, max_score, status, assignment_id, created_at')
       .eq('student_id', user.id),
   ])
 
@@ -90,21 +89,27 @@ export default async function DashboardPage() {
   let pendingAssignments: any[] = []
   if (classroomIds.length > 0) {
     const submittedIds = new Set(completed.map((s: any) => s.assignment_id))
-    const inProgressIds = new Set(
-      allSubmissions.filter((s: any) => s.status === 'in_progress').map((s: any) => s.assignment_id)
+    const inProgressMap = new Map(
+      allSubmissions
+        .filter((s: any) => s.status === 'in_progress')
+        .map((s: any) => [s.assignment_id, s])
     )
 
     const { data: allAssignments } = await supabase
       .from('assignments')
-      .select('id, title, question_ids, classrooms(name), end_at')
+      .select('id, title, question_ids, classrooms(name), end_at, duration_minutes')
       .in('classroom_id', classroomIds)
       .eq('status', 'published')
-      .order('created_at', { ascending: false })
+      .order('end_at', { ascending: true, nullsFirst: false })
 
     pendingAssignments = (allAssignments ?? [])
       .filter((a: any) => !submittedIds.has(a.id))
-      .slice(0, 5)
-      .map((a: any) => ({ ...a, inProgress: inProgressIds.has(a.id) }))
+      .slice(0, 6)
+      .map((a: any) => ({
+        ...a,
+        inProgress: inProgressMap.has(a.id),
+        submissionId: inProgressMap.get(a.id)?.id ?? null,
+      }))
   }
 
   return (
@@ -115,131 +120,6 @@ export default async function DashboardPage() {
       completedCount={completed.length}
       pendingAssignments={pendingAssignments}
     />
-  )
-}
-
-// ─── Teacher Dashboard ────────────────────────────────────────────────────────
-
-function TeacherDashboard({
-  user,
-  questionsCount,
-  classroomsCount,
-  studentsCount,
-  recentAssignments,
-}: {
-  user: User
-  questionsCount: number
-  classroomsCount: number
-  studentsCount: number
-  recentAssignments: any[]
-}) {
-  const steps = [
-    { done: questionsCount > 0, text: 'สร้างโจทย์แรกของคุณ', href: '/questions/new' },
-    { done: classroomsCount > 0, text: 'สร้างห้องเรียน', href: '/classrooms/new' },
-    { done: studentsCount > 0, text: 'แชร์ Class Code ให้นักเรียน', href: '/classrooms' },
-    { done: recentAssignments.length > 0, text: 'สร้างชุดข้อสอบและมอบหมาย', href: '/assignments/new' },
-  ]
-  const allDone = steps.every(s => s.done)
-
-  return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">สวัสดี, {user.full_name}</h1>
-        <p className="text-gray-600 mt-1">ยินดีต้อนรับสู่ KorKru</p>
-      </div>
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <QuickActionCard icon="📝" title="สร้างโจทย์ใหม่" desc="เพิ่มโจทย์ฟิสิกส์พร้อมสูตรสุ่มตัวเลข" href="/questions/new" primary />
-        <QuickActionCard icon="🏫" title="สร้างห้องเรียน" desc="สร้างห้องเรียนและรับ Class Code" href="/classrooms/new" />
-        <QuickActionCard icon="📋" title="สร้างชุดข้อสอบ" desc="รวบรวมโจทย์เป็นชุดและมอบหมาย" href="/assignments/new" />
-      </div>
-
-      {/* Real stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="โจทย์ทั้งหมด" value={String(questionsCount)} icon="📚" href="/questions" />
-        <StatCard label="ห้องเรียน" value={String(classroomsCount)} icon="🏫" href="/classrooms" />
-        <StatCard label="นักเรียน" value={String(studentsCount)} icon="🎒" />
-      </div>
-
-      {/* Recent assignments */}
-      {recentAssignments.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">ชุดข้อสอบล่าสุด</CardTitle>
-              <Link href="/assignments" className="text-sm text-blue-600 hover:underline">
-                ดูทั้งหมด →
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {recentAssignments.map((a: any) => (
-              <Link
-                key={a.id}
-                href={`/assignments/${a.id}`}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 truncate">
-                    {a.title}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {(a.classrooms as any)?.name} · {(a.question_ids as string[]).length} ข้อ
-                  </p>
-                </div>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ml-3 shrink-0 ${
-                  a.status === 'published' ? 'bg-green-100 text-green-700'
-                  : a.status === 'draft' ? 'bg-gray-100 text-gray-600'
-                  : 'bg-red-100 text-red-600'
-                }`}>
-                  {a.status === 'published' ? 'เผยแพร่' : a.status === 'draft' ? 'ร่าง' : 'ปิด'}
-                </span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Getting started checklist */}
-      {!allDone && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">เริ่มต้นใช้งาน</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {steps.map((item, i) => (
-              <Link
-                key={i}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg transition-colors',
-                  item.done ? 'opacity-60 cursor-default' : 'hover:bg-gray-50 group'
-                )}
-              >
-                <div className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                  item.done
-                    ? 'bg-green-100 text-green-600 border-2 border-green-400'
-                    : 'border-2 border-gray-300 text-gray-500 group-hover:border-blue-500 group-hover:text-blue-500'
-                )}>
-                  {item.done ? '✓' : i + 1}
-                </div>
-                <span className={cn(
-                  'text-sm font-medium flex-1',
-                  item.done ? 'text-gray-400 line-through' : 'text-gray-700 group-hover:text-blue-600'
-                )}>
-                  {item.text}
-                </span>
-                {!item.done && (
-                  <span className="text-gray-400 group-hover:text-blue-500">→</span>
-                )}
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-    </div>
   )
 }
 
@@ -258,129 +138,196 @@ function StudentDashboard({
   completedCount: number
   pendingAssignments: any[]
 }) {
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น'
+
   return (
     <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">สวัสดี, {user.full_name}</h1>
-        <p className="text-gray-600 mt-1">ยินดีต้อนรับสู่ KorKru</p>
+      {/* Header greeting */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-muted-foreground text-sm">{greeting} 👋</p>
+          <h1 className="text-2xl font-bold mt-0.5">{user.full_name}</h1>
+          <p className="text-muted-foreground text-sm mt-1">พร้อมเรียนรู้วันนี้แล้วหรือยัง?</p>
+        </div>
+        <Link
+          href="/my-submissions"
+          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
+        >
+          <TrendingUp size={14} />
+          ดูสมรรถนะ
+        </Link>
       </div>
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <QuickActionCard icon="🏫" title="ห้องเรียนของฉัน" desc="ดูห้องเรียนและเข้าร่วมห้องใหม่" href="/classrooms" primary />
-        <QuickActionCard icon="📝" title="ประวัติการส่งงาน" desc="ดูผลคะแนนและเฉลยโจทย์" href="/my-submissions" />
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard
+          value={String(classroomsCount)}
+          label="ห้องเรียน"
+          icon={<span className="text-2xl">🏫</span>}
+          href="/classrooms"
+          accent="blue"
+        />
+        <StatCard
+          value={String(completedCount)}
+          label="ส่งงานแล้ว"
+          icon={<span className="text-2xl">✅</span>}
+          href="/my-submissions"
+          accent="green"
+        />
+        <StatCard
+          value={avgPct !== null ? `${avgPct}%` : '—'}
+          label="คะแนนเฉลี่ย"
+          icon={<span className="text-2xl">⭐</span>}
+          accent={avgPct !== null && avgPct >= 75 ? 'green' : avgPct !== null && avgPct >= 50 ? 'amber' : 'red'}
+        />
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="ห้องเรียน" value={String(classroomsCount)} icon="🏫" href="/classrooms" />
-        <StatCard label="ส่งงานแล้ว" value={String(completedCount)} icon="✅" href="/my-submissions" />
-        <StatCard label="คะแนนเฉลี่ย" value={avgPct !== null ? `${avgPct}%` : '—'} icon="⭐" />
-      </div>
+      {/* Gamification */}
+      <StreakGamification
+        completedCount={completedCount}
+        avgPct={avgPct}
+        classroomsCount={classroomsCount}
+      />
 
       {/* Pending assignments */}
-      {pendingAssignments.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">ชุดข้อสอบที่รอทำ</CardTitle>
-              <Link href="/assignments" className="text-sm text-blue-600 hover:underline">
-                ดูทั้งหมด →
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {pendingAssignments.map((a: any) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 gap-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">{a.title}</p>
-                  <p className="text-xs text-gray-400">
-                    {(a.classrooms as any)?.name} · {(a.question_ids as string[]).length} ข้อ
-                    {a.end_at && (
-                      <> · กำหนดส่ง {new Date(a.end_at).toLocaleDateString('th-TH', { dateStyle: 'short' })}</>
-                    )}
-                  </p>
-                </div>
-                <Link
-                  href={`/assignments/${a.id}/take`}
-                  className={cn(buttonVariants({ size: 'sm' }), 'shrink-0')}
-                >
-                  {a.inProgress ? 'ทำต่อ' : 'เริ่มทำ'} →
-                </Link>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Empty state: no classrooms */}
-      {classroomsCount === 0 && (
-        <Card className="border-dashed border-blue-200 bg-blue-50/50">
-          <CardContent className="py-10 text-center">
-            <p className="text-4xl mb-3">🏫</p>
-            <h3 className="font-semibold text-gray-900 mb-1">เข้าร่วมห้องเรียนแรกของคุณ</h3>
-            <p className="text-sm text-gray-500 mb-4">ขอรหัส Class Code จากครู แล้วกรอกในหน้าห้องเรียน</p>
-            <Link href="/classrooms" className={cn(buttonVariants())}>
-              ไปที่ห้องเรียน
+      {pendingAssignments.length > 0 ? (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold flex items-center gap-2">
+              <BookOpen size={16} className="text-blue-600 dark:text-blue-400" />
+              ชุดข้อสอบที่รอทำ
+              <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {pendingAssignments.length}
+              </span>
+            </h2>
+            <Link href="/assignments" className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+              ดูทั้งหมด <ChevronRight size={14} />
             </Link>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
-}
-
-// ─── Shared sub-components ────────────────────────────────────────────────────
-
-function QuickActionCard({
-  icon, title, desc, href, primary,
-}: {
-  icon: string; title: string; desc: string; href: string; primary?: boolean
-}) {
-  return (
-    <Card className={`hover:shadow-md transition-shadow ${primary ? 'border-blue-200 bg-blue-50' : ''}`}>
-      <CardContent className="pt-6">
-        <div className="space-y-3">
-          <div className="text-3xl">{icon}</div>
-          <div>
-            <h3 className="font-semibold">{title}</h3>
-            <p className="text-sm text-gray-600 mt-0.5">{desc}</p>
           </div>
-          <Link
-            href={href}
-            className={cn(buttonVariants({ variant: primary ? 'default' : 'outline', size: 'sm' }))}
-          >
-            ไปเลย →
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {pendingAssignments.map((a: any) => (
+              <AssignmentCard key={a.id} assignment={a} />
+            ))}
+          </div>
+        </div>
+      ) : classroomsCount > 0 ? (
+        <div className="bg-card border border-dashed rounded-2xl p-8 text-center">
+          <p className="text-3xl mb-3">🎉</p>
+          <p className="font-semibold">ทำงานครบหมดแล้ว!</p>
+          <p className="text-sm text-muted-foreground mt-1">ไม่มีชุดข้อสอบที่ค้างอยู่ในตอนนี้</p>
+        </div>
+      ) : (
+        <div className="bg-card border-2 border-dashed border-blue-200 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-950/20 rounded-2xl p-10 text-center">
+          <p className="text-4xl mb-3">🏫</p>
+          <h3 className="font-semibold mb-1">เข้าร่วมห้องเรียนแรกของคุณ</h3>
+          <p className="text-sm text-muted-foreground mb-4">ขอรหัส Class Code จากครู แล้วกรอกในหน้าห้องเรียน</p>
+          <Link href="/classrooms" className={cn(buttonVariants())}>
+            ไปที่ห้องเรียน
           </Link>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   )
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 function StatCard({
-  label, value, icon, href,
+  value, label, icon, href, accent = 'blue',
 }: {
-  label: string; value: string; icon: string; href?: string
+  value: string
+  label: string
+  icon: React.ReactNode
+  href?: string
+  accent?: 'blue' | 'green' | 'amber' | 'red'
 }) {
+  const accentClass = {
+    blue: 'text-blue-600 dark:text-blue-400',
+    green: 'text-green-600 dark:text-green-400',
+    amber: 'text-amber-600 dark:text-amber-400',
+    red: 'text-red-600 dark:text-red-400',
+  }[accent]
+
   const inner = (
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm text-gray-600">{label}</p>
-        <p className="text-3xl font-bold mt-1">{value}</p>
+    <div className="bg-card border rounded-2xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow h-full">
+      <div className="flex items-center justify-between">
+        {icon}
+        <span className={`text-xl font-black ${accentClass}`}>{value}</span>
       </div>
-      <div className="text-4xl opacity-20">{icon}</div>
+      <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   )
 
+  if (href) return <Link href={href} className="block">{inner}</Link>
+  return inner
+}
+
+function getDueInfo(endAt: string | null): { label: string; urgent: boolean; color: string } {
+  if (!endAt) return { label: 'ไม่มีกำหนด', urgent: false, color: 'text-muted-foreground' }
+  const diff = new Date(endAt).getTime() - Date.now()
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (diff < 0) return { label: 'เลยกำหนด', urgent: true, color: 'text-red-600 dark:text-red-400' }
+  if (hours < 24) return { label: `อีก ${hours} ชม.`, urgent: true, color: 'text-orange-600 dark:text-orange-400' }
+  if (days <= 2) return { label: `อีก ${days} วัน`, urgent: true, color: 'text-amber-600 dark:text-amber-400' }
+  return {
+    label: new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' }),
+    urgent: false,
+    color: 'text-muted-foreground',
+  }
+}
+
+function AssignmentCard({ assignment: a }: { assignment: any }) {
+  const due = getDueInfo(a.end_at)
+  const questionCount = (a.question_ids as string[] | null)?.length ?? 0
+
   return (
-    <Card className={href ? 'hover:shadow-md transition-shadow cursor-pointer' : ''}>
-      <CardContent className="pt-6">
-        {href ? <Link href={href} className="block">{inner}</Link> : inner}
-      </CardContent>
-    </Card>
+    <div className={`bg-card border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-all ${
+      due.urgent ? 'border-orange-300 dark:border-orange-800' : ''
+    }`}>
+      <div className="flex items-start gap-2">
+        {due.urgent && (
+          <AlertCircle size={15} className="text-orange-500 shrink-0 mt-0.5" />
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm line-clamp-2 leading-snug">{a.title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+            {(a.classrooms as any)?.name}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <BookOpen size={11} />
+          {questionCount} ข้อ
+        </span>
+        {a.duration_minutes && (
+          <span className="flex items-center gap-1">
+            <Clock size={11} />
+            {a.duration_minutes} นาที
+          </span>
+        )}
+        <span className={`flex items-center gap-1 ml-auto font-medium ${due.color}`}>
+          <Clock size={11} />
+          {due.label}
+        </span>
+      </div>
+
+      <Link
+        href={`/assignments/${a.id}/take`}
+        className={cn(
+          buttonVariants({ size: 'sm' }),
+          'w-full justify-center gap-1 text-xs',
+          a.inProgress
+            ? 'bg-amber-500 hover:bg-amber-600 text-white border-0'
+            : ''
+        )}
+      >
+        {a.inProgress ? '▶ ทำต่อ' : '▶ เริ่มทำข้อสอบ'}
+      </Link>
+    </div>
   )
 }

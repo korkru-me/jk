@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "katex/dist/katex.min.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -127,4 +128,39 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Rich text content display (preview) */
+.rich-text-content p {
+  @apply my-0.5;
+}
+.rich-text-content strong {
+  @apply font-bold;
+}
+.rich-text-content em {
+  @apply italic;
+}
+.rich-text-content u {
+  @apply underline;
+}
+
+/* TipTap rich text editor */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-gray-400 pointer-events-none float-left h-0;
+}
+.tiptap:focus {
+  outline: none;
+}
+.tiptap p {
+  @apply my-0;
+}
+.tiptap strong {
+  @apply font-bold;
+}
+.tiptap em {
+  @apply italic;
+}
+.tiptap u {
+  @apply underline;
 }

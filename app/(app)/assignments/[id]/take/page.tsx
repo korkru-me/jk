@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { startSubmission } from '@/lib/actions/submissions'
-import { ExamClient } from '@/components/exam/exam-client'
+import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
 
@@ -43,27 +43,26 @@ export default async function TakeExamPage({
 
   const { data: answers } = await supabase
     .from('submission_answers')
-    .select('*, questions(title, question_text, question_type, answer_unit, mcq_options, variables)')
+    .select('*, questions(title, question_text, question_type, answer_unit, mcq_options, variables, answer_parts, extra_data, image_urls)')
     .eq('submission_id', result.submissionId!)
     .order('created_at')
 
   const assignment = (submission as any).assignments
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4">
-      <div className="max-w-2xl mx-auto mb-6">
-        <h1 className="text-xl font-bold text-gray-900">{assignment.title}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {(answers ?? []).length} ข้อ
-          {assignment.duration_minutes && ` · ${assignment.duration_minutes} นาที`}
-        </p>
-      </div>
+  // Mock teacher config — replace with DB columns when added to schema
+  const examConfig: ExamConfig = {
+    isCalculatorEnabled: true,
+    isFullscreenEnforced: false,
+  }
 
+  return (
+    <div className="h-full flex flex-col">
       <ExamClient
         submissionId={result.submissionId!}
         answers={(answers ?? []) as any}
         durationMinutes={assignment.duration_minutes}
         startedAt={submission!.started_at}
+        config={examConfig}
       />
     </div>
   )

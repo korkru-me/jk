@@ -9,7 +9,7 @@ export function ShellClient({ user, children }: { user: User; children: React.Re
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black/50 md:hidden"
@@ -24,7 +24,7 @@ export function ShellClient({ user, children }: { user: User; children: React.Re
       />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Topbar user={user} onMenuToggle={() => setSidebarOpen(o => !o)} />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+        <main className="flex-1 overflow-y-auto bg-muted/30 p-6">
           {children}
         </main>
       </div>

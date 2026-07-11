@@ -2,159 +2,753 @@
 
 import { useState } from 'react'
 import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
-import type { Variable, MCQOption } from '@/lib/types'
+import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ']
+const RIGHT_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 interface QuestionPreviewProps {
   questionText: string
   variables: Variable[]
-  answerFormula: string
-  answerUnit: string
+  answerParts: AnswerPart[]
   isRandom: boolean
-  questionType: 'written' | 'mcq'
+  questionType: QuestionType
   mcqOptions?: MCQOption[]
+  matchingPairs?: MatchingPair[]
+  imageUrls?: string[]
+  trueFalseConfig?: TrueFalseConfig
+  fillBlankConfig?: FillBlankConfig
+  orderingConfig?: OrderingConfig
 }
 
-function substituteVars(text: string, values: Record<string, number>, variables: Variable[]) {
-  return text.replace(/\{(\w+)\}/g, (_, name) => {
-    if (!(name in values)) return `{${name}}`
-    const def = variables.find((v) => v.name === name)
-    return `${values[name]}${def?.unit ? ' ' + def.unit : ''}`
-  })
+function shuffleIndices(n: number): number[] {
+  const arr = Array.from({ length: n }, (_, i) => i)
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+function substituteVars(text: string, values: Record<string, number>) {
+  return text.replace(/\{(\w+)\}/g, (_, name) => (name in values ? `${values[name]}` : `{${name}}`))
+}
+
+function renderUnit(unit: string) {
+  const isHtmlUnit = /<[a-z][\s\S]*>/i.test(unit)
+  if (isHtmlUnit) return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: unit }} />
+  return <span>{unit}</span>
+}
+
+function isHtml(text: string) {
+  return /<[a-z][\s\S]*>/i.test(text)
 }
 
 function formatAnswer(n: number): string {
-  if (Math.abs(n) >= 1e6 || (Math.abs(n) < 0.001 && n !== 0)) {
-    return n.toExponential(3)
-  }
-  const s = n.toPrecision(4)
-  return parseFloat(s).toString()
+  if (Math.abs(n) >= 1e6 || (Math.abs(n) < 0.001 && n !== 0)) return n.toExponential(3)
+  return parseFloat(n.toPrecision(4)).toString()
+}
+
+function isClose(a: number, b: number): boolean {
+  if (b === 0) return Math.abs(a) < 1e-6
+  return Math.abs((a - b) / b) <= 0.01
+}
+
+function RenderText({ text }: { text: string }) {
+  if (!text) return <p className="text-gray-400 italic text-[15px]">ยังไม่มีเนื้อหาโจทย์</p>
+  if (isHtml(text)) return (
+    <div className="text-gray-900 leading-relaxed text-[15px] rich-text-content"
+      dangerouslySetInnerHTML={{ __html: text }} />
+  )
+  return <p className="text-gray-900 leading-relaxed whitespace-pre-line text-[15px]">{text}</p>
 }
 
 export function QuestionPreview({
   questionText,
   variables,
-  answerFormula,
-  answerUnit,
+  answerParts,
   isRandom,
   questionType,
   mcqOptions = [],
+  matchingPairs = [],
+  imageUrls = [],
+  trueFalseConfig,
+  fillBlankConfig,
+  orderingConfig,
 }: QuestionPreviewProps) {
-  const [values, setValues] = useState<Record<string, number> | null>(null)
+  const [open, setOpen] = useState(false)
+  const [values, setValues] = useState<Record<string, number>>({})
+  const [shuffledRight, setShuffledRight] = useState<number[]>([])
+
+  // written
+  const [writtenInputs, setWrittenInputs] = useState<string[]>([])
+  const [writtenResults, setWrittenResults] = useState<(boolean | null)[]>([])
+  const [writtenChecked, setWrittenChecked] = useState(false)
+
+  // mcq
+  const [selectedMcq, setSelectedMcq] = useState<number | null>(null)
+  const [mcqChecked, setMcqChecked] = useState(false)
+
+  // matching
+  const [matchingSelections, setMatchingSelections] = useState<string[]>([])
+  const [matchingChecked, setMatchingChecked] = useState(false)
+
+  // true_false
+  const [tfAnswer, setTfAnswer] = useState<'true' | 'false' | null>(null)
+  const [tfExplanation, setTfExplanation] = useState('')
+  const [tfChecked, setTfChecked] = useState(false)
+
+  // fill_blank
+  const [fillAnswers, setFillAnswers] = useState<string[]>([])
+  const [fillChecked, setFillChecked] = useState(false)
+  const [fillResults, setFillResults] = useState<boolean[]>([])
+
+  // ordering
+  const [shuffledItems, setShuffledItems] = useState<OrderingItem[]>([])
+  const [orderSelections, setOrderSelections] = useState<Record<string, string>>({})
+  const [orderChecked, setOrderChecked] = useState(false)
 
   function generate() {
-    setValues(randomizeVariables(variables))
+    const newValues = randomizeVariables(variables)
+    setValues(newValues)
+    setShuffledRight(matchingPairs.length > 0 ? shuffleIndices(matchingPairs.length) : [])
+    setWrittenInputs(answerParts.map(() => ''))
+    setWrittenResults(answerParts.map(() => null))
+    setWrittenChecked(false)
+    setSelectedMcq(null)
+    setMcqChecked(false)
+    setMatchingSelections(matchingPairs.map(() => ''))
+    setMatchingChecked(false)
+    setTfAnswer(null)
+    setTfExplanation('')
+    setTfChecked(false)
+    const blanks = fillBlankConfig?.blanks ?? []
+    setFillAnswers(blanks.map(() => ''))
+    setFillChecked(false)
+    setFillResults([])
+    if (orderingConfig?.items?.length) {
+      const shuffled = [...orderingConfig.items].sort(() => Math.random() - 0.5)
+      setShuffledItems(shuffled)
+      setOrderSelections({})
+      setOrderChecked(false)
+    }
   }
 
-  const answer =
-    values && answerFormula && questionType === 'written'
-      ? evaluateFormula(answerFormula, values)
-      : null
+  function handleOpen() {
+    if (orderingConfig?.items?.length) {
+      setShuffledItems([...orderingConfig.items].sort(() => Math.random() - 0.5))
+    }
+    generate()
+    setOpen(true)
+  }
 
-  const renderedText =
-    questionText && values ? substituteVars(questionText, values, variables) : questionText
+  function checkWritten() {
+    const results = answerParts.map((part, i) => {
+      const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
+      if (correctAnswer === null || typeof correctAnswer !== 'number') return null
+      const studentInput = parseFloat(writtenInputs[i])
+      if (isNaN(studentInput)) return null
+      return isClose(studentInput, correctAnswer)
+    })
+    setWrittenResults(results)
+    setWrittenChecked(true)
+  }
 
-  const hasContent = questionText.trim().length > 0 || (questionType === 'mcq' && mcqOptions.length > 0)
+  const renderedText = questionText
+    ? (Object.keys(values).length > 0 ? substituteVars(questionText, values) : questionText)
+    : ''
+
+  const correctOptions = mcqOptions.map((o, i) => ({ ...o, idx: i })).filter(o => o.is_correct)
+  const allWrittenFilled = writtenInputs.length > 0 && writtenInputs.every(v => v !== '')
+  const allMatchingFilled = matchingSelections.length > 0 && matchingSelections.every(v => v !== '')
+
+  const matchingScore = matchingSelections.filter((s, i) => {
+    const correctLabel = shuffledRight.length > 0 ? RIGHT_LABELS[shuffledRight.indexOf(i)] : RIGHT_LABELS[i]
+    return s === correctLabel
+  }).length
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between border-b pb-2">
-        <h2 className="text-base font-semibold text-gray-900">ตัวอย่างที่นักเรียนเห็น</h2>
-        <button
-          type="button"
-          onClick={generate}
-          className="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-        >
-          {values ? '🔄 สุ่มชุดใหม่' : '👁 ดูตัวอย่าง'}
-        </button>
-      </div>
+    <>
+      <button
+        type="button"
+        onClick={handleOpen}
+        className="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+      >
+        👁 ดูตัวอย่าง
+      </button>
 
-      {values ? (
-        <div className="border border-indigo-200 rounded-xl overflow-hidden shadow-sm">
-          {/* Student view header */}
-          <div className="bg-indigo-50 px-4 py-2 border-b border-indigo-100 flex items-center gap-2">
-            <span className="text-xs text-indigo-500 font-medium">มุมมองนักเรียน</span>
-            {isRandom && (
-              <span className="text-xs text-indigo-400">· ค่าถูกสุ่มแล้ว</span>
-            )}
-          </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between pr-6">
+              <span className="flex items-center gap-2">
+                <span>👁</span>
+                <span>มุมมองนักเรียน</span>
+                {isRandom && <span className="text-xs font-normal text-indigo-400">· ค่าถูกสุ่มแล้ว</span>}
+              </span>
+              <button
+                type="button"
+                onClick={generate}
+                className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors font-medium"
+              >
+                🔄 โจทย์ใหม่
+              </button>
+            </DialogTitle>
+          </DialogHeader>
 
-          {/* Question body */}
-          <div className="p-5 space-y-4 bg-white">
-            {/* Question text */}
-            <p className="text-gray-900 leading-relaxed whitespace-pre-line text-[15px]">
-              {renderedText || <span className="text-gray-400 italic">ยังไม่มีเนื้อหาโจทย์</span>}
-            </p>
-
-            {/* Variable badges */}
+          <div className="space-y-5">
+            {/* Variable badges (random only) */}
             {isRandom && Object.keys(values).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {Object.entries(values).map(([k, v]) => {
-                  const def = variables.find((vr) => vr.name === k)
-                  return (
-                    <span key={k} className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-lg text-sm font-mono">
-                      {k} = {v}{def?.unit ? ` ${def.unit}` : ''}
-                    </span>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* MCQ options */}
-            {questionType === 'mcq' && mcqOptions.length > 0 && (
-              <div className="space-y-2 pt-1">
-                {mcqOptions.map((opt, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200">
-                    <span className="w-6 h-6 rounded-full border-2 border-gray-300 shrink-0" />
-                    <span className="text-sm text-gray-800">
-                      {['ก', 'ข', 'ค', 'ง'][i]}. {opt.text || <span className="text-gray-400 italic">ยังไม่มีข้อความ</span>}
-                    </span>
-                  </div>
+              <div className="flex flex-wrap gap-1.5 bg-indigo-50 px-3 py-2 rounded-lg">
+                {Object.entries(values).map(([k, v]) => (
+                  <span key={k} className="bg-white text-indigo-700 px-2.5 py-1 rounded-lg text-sm font-mono border border-indigo-100">
+                    {k} = {v}
+                  </span>
                 ))}
               </div>
             )}
 
-            {/* Written answer box */}
-            {questionType === 'written' && (
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <p className="text-xs text-gray-400 mb-1">คำตอบ{answerUnit ? ` (${answerUnit})` : ''}:</p>
-                <div className="h-8 bg-white border border-gray-300 rounded" />
+            {/* Question text */}
+            <RenderText text={renderedText} />
+
+            {/* Question images */}
+            {imageUrls.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {imageUrls.map((url) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={url} src={url} alt="รูปประกอบโจทย์"
+                    className="max-h-48 rounded-lg border border-gray-200 object-contain" />
+                ))}
               </div>
             )}
-          </div>
 
-          {/* Answer key (teacher only) */}
-          {(answerFormula && questionType === 'written') || (questionType === 'mcq' && mcqOptions.some((o) => o.is_correct)) ? (
-            <div className="border-t border-indigo-100 px-5 py-3 bg-indigo-50/50">
-              <p className="text-xs text-indigo-400 font-medium mb-1">เฉลย (ครูเห็นเท่านั้น)</p>
-              {questionType === 'written' && answer !== null ? (
-                <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-lg font-bold text-indigo-700">
-                    {typeof answer === 'number' ? formatAnswer(answer) : answer}
-                  </span>
-                  {answerUnit && <span className="text-indigo-500">{answerUnit}</span>}
-                  <span className="font-mono text-xs text-indigo-300">= {answerFormula}</span>
+            {/* ── MCQ ── */}
+            {questionType === 'mcq' && mcqOptions.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 font-medium">เลือกคำตอบที่ถูกต้อง:</p>
+                {mcqOptions.map((opt, i) => {
+                  const isSelected = selectedMcq === i
+                  const isCorrect = opt.is_correct
+                  let cls = 'border-gray-200 bg-white'
+                  if (mcqChecked) {
+                    if (isCorrect) cls = 'border-green-400 bg-green-50'
+                    else if (isSelected) cls = 'border-red-400 bg-red-50'
+                  } else if (isSelected) {
+                    cls = 'border-indigo-400 bg-indigo-50'
+                  }
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => { if (!mcqChecked) setSelectedMcq(i) }}
+                      className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 ${cls} text-left transition-colors ${!mcqChecked ? 'hover:border-indigo-300 cursor-pointer' : 'cursor-default'}`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center
+                        ${isSelected && !mcqChecked ? 'border-indigo-500 bg-indigo-500' :
+                          mcqChecked && isCorrect ? 'border-green-500 bg-green-500' :
+                          mcqChecked && isSelected ? 'border-red-500 bg-red-500' :
+                          'border-gray-300'}`}
+                      >
+                        {(isSelected || (mcqChecked && isCorrect)) && (
+                          <span className="text-white text-[10px]">●</span>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-sm text-gray-800">
+                          {PART_LABELS[i]}. {opt.text || <span className="text-gray-400 italic">ยังไม่มีข้อความ</span>}
+                        </span>
+                        {opt.image_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={opt.image_url} alt={`ตัวเลือก ${PART_LABELS[i]}`}
+                            className="max-h-32 rounded border border-gray-200 object-contain" />
+                        )}
+                        {mcqChecked && isCorrect && (
+                          <span className="text-xs text-green-600 font-medium block">✓ ถูกต้อง</span>
+                        )}
+                        {mcqChecked && isSelected && !isCorrect && (
+                          <span className="text-xs text-red-500 font-medium block">✗ คำตอบของคุณ</span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+                {!mcqChecked ? (
+                  <button
+                    type="button"
+                    onClick={() => setMcqChecked(true)}
+                    disabled={selectedMcq === null}
+                    className="mt-1 px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                  >
+                    ตรวจคำตอบ
+                  </button>
+                ) : (
+                  <div className={`p-3 rounded-lg text-sm font-medium border ${
+                    selectedMcq !== null && mcqOptions[selectedMcq]?.is_correct
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    {selectedMcq !== null && mcqOptions[selectedMcq]?.is_correct
+                      ? '🎉 ถูกต้อง!'
+                      : `❌ ผิด — เฉลยคือ: ${correctOptions.map(o => `${PART_LABELS[o.idx]}. ${o.text || '(ไม่มีข้อความ)'}`).join(', ')}`
+                    }
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Matching ── */}
+            {questionType === 'matching' && matchingPairs.length > 0 && (
+              <div className="space-y-4">
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="bg-gray-50">
+                      <tr className="text-xs text-gray-500">
+                        <th className="text-left py-2 px-3 font-medium border-b border-gray-200 w-1/2">รายการ</th>
+                        <th className="text-left py-2 px-3 font-medium border-b border-gray-200 w-1/2">คำตรงกัน (สุ่มลำดับแล้ว)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {matchingPairs.map((pair, i) => {
+                        const rightIdx = shuffledRight[i] ?? i
+                        const rightPair = matchingPairs[rightIdx]
+                        return (
+                          <tr key={i}>
+                            <td className="py-2 px-3 align-top">
+                              <div className="flex items-start gap-2">
+                                <span className="text-xs text-gray-500 shrink-0 mt-0.5 font-medium">{i + 1}.</span>
+                                <div>
+                                  <span className="text-gray-800">{pair.left_text || `รายการ ${i + 1}`}</span>
+                                  {pair.left_image && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={pair.left_image} alt="" className="mt-1 max-h-16 rounded border border-gray-200 object-contain" />
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 align-top">
+                              <div className="flex items-start gap-2">
+                                <span className="text-xs text-indigo-500 shrink-0 mt-0.5 font-medium">{RIGHT_LABELS[i]}.</span>
+                                <div>
+                                  <span className="text-gray-800">{rightPair?.right_text || `คำตรงกัน ${i + 1}`}</span>
+                                  {rightPair?.right_image && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={rightPair.right_image} alt="" className="mt-1 max-h-16 rounded border border-gray-200 object-contain" />
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              ) : questionType === 'mcq' ? (
-                <p className="text-sm text-indigo-700">
-                  ข้อถูก: {mcqOptions.findIndex((o) => o.is_correct) >= 0
-                    ? `${['ก', 'ข', 'ค', 'ง'][mcqOptions.findIndex((o) => o.is_correct)]}. ${mcqOptions.find((o) => o.is_correct)?.text}`
-                    : '—'}
+
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 font-medium">เลือกตัวอักษรที่ตรงกัน:</p>
+                  {matchingPairs.map((pair, i) => {
+                    const correctLabel = shuffledRight.length > 0
+                      ? RIGHT_LABELS[shuffledRight.indexOf(i)]
+                      : RIGHT_LABELS[i]
+                    const studentSelected = matchingSelections[i] || ''
+                    const isCorrect = matchingChecked && studentSelected === correctLabel
+                    const isWrong = matchingChecked && studentSelected !== correctLabel
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-sm text-gray-700 shrink-0 w-28 truncate">
+                          {i + 1}. {pair.left_text || `รายการ ${i + 1}`}
+                        </span>
+                        <select
+                          value={studentSelected}
+                          onChange={(e) => {
+                            if (matchingChecked) return
+                            const next = [...matchingSelections]
+                            next[i] = e.target.value
+                            setMatchingSelections(next)
+                          }}
+                          disabled={matchingChecked}
+                          className={`h-8 w-20 border rounded-lg px-2 text-sm text-center ${
+                            isCorrect ? 'border-green-400 bg-green-50 text-green-700' :
+                            isWrong ? 'border-red-400 bg-red-50 text-red-700' :
+                            'border-gray-300 bg-white'
+                          }`}
+                        >
+                          <option value="">—</option>
+                          {RIGHT_LABELS.slice(0, matchingPairs.length).map(label => (
+                            <option key={label} value={label}>{label}</option>
+                          ))}
+                        </select>
+                        {isCorrect && <span className="text-xs text-green-600 font-medium">✓</span>}
+                        {isWrong && <span className="text-xs text-red-500">✗ เฉลย: <strong>{correctLabel}</strong></span>}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {!matchingChecked ? (
+                  <button
+                    type="button"
+                    onClick={() => setMatchingChecked(true)}
+                    disabled={!allMatchingFilled}
+                    className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                  >
+                    ตรวจคำตอบ
+                  </button>
+                ) : (
+                  <div className={`p-3 rounded-lg text-sm font-medium border ${
+                    matchingScore === matchingPairs.length
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : matchingScore > 0
+                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    {matchingScore === matchingPairs.length
+                      ? '🎉 ถูกต้องทุกข้อ!'
+                      : `✅ ถูก ${matchingScore}/${matchingPairs.length} ข้อ`}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Written (fixed / random) ── */}
+            {questionType === 'written' && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 font-medium">กรอกคำตอบ:</p>
+                {answerParts.map((part, i) => {
+                  const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
+                  const result = writtenResults[i]
+                  return (
+                    <div key={part.id} className="space-y-1.5">
+                      {answerParts.length > 1 && (
+                        <p className="text-sm font-medium text-gray-700">
+                          {PART_LABELS[i] ?? i + 1})
+                          {part.sub_text && <span className="font-normal text-gray-600 ml-1">{part.sub_text}</span>}
+                        </p>
+                      )}
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+                        result === true ? 'bg-green-50 border-green-300' :
+                        result === false ? 'bg-red-50 border-red-300' :
+                        'bg-gray-50 border-gray-200'
+                      }`}>
+                        <input
+                          type="number"
+                          value={writtenInputs[i] ?? ''}
+                          onChange={(e) => {
+                            if (writtenChecked) return
+                            const next = [...writtenInputs]
+                            next[i] = e.target.value
+                            setWrittenInputs(next)
+                          }}
+                          readOnly={writtenChecked}
+                          placeholder="กรอกตัวเลข"
+                          className={`h-9 w-36 border rounded-lg px-3 text-sm bg-white font-mono ${
+                            result === true ? 'border-green-400' :
+                            result === false ? 'border-red-400' :
+                            'border-gray-300'
+                          }`}
+                        />
+                        {part.unit && <span className="text-sm text-gray-600">{renderUnit(part.unit)}</span>}
+                        {result === true && (
+                          <span className="text-green-600 text-sm font-medium">✓ ถูก!</span>
+                        )}
+                        {result === false && correctAnswer !== null && typeof correctAnswer === 'number' && (
+                          <span className="text-red-500 text-sm">
+                            ✗ เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
+                          </span>
+                        )}
+                        {result === false && (correctAnswer === null || typeof correctAnswer !== 'number') && (
+                          <span className="text-red-500 text-sm">✗ ผิด</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {!writtenChecked ? (
+                  <button
+                    type="button"
+                    onClick={checkWritten}
+                    disabled={!allWrittenFilled}
+                    className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                  >
+                    ตรวจคำตอบ
+                  </button>
+                ) : (
+                  <div className={`p-3 rounded-lg text-sm font-medium border ${
+                    writtenResults.every(r => r === true)
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : writtenResults.some(r => r === true)
+                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    {writtenResults.every(r => r === true)
+                      ? '🎉 ถูกต้องทุกข้อ!'
+                      : writtenResults.some(r => r === true)
+                        ? `✅ ถูก ${writtenResults.filter(r => r === true).length}/${answerParts.length} ข้อ`
+                        : '❌ ผิดทุกข้อ — ดูเฉลยด้านบน'
+                    }
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Essay ── */}
+            {questionType === 'essay' && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 font-medium">กรอกคำตอบ (บรรยาย):</p>
+                <textarea
+                  rows={5}
+                  placeholder="พิมพ์คำตอบที่นี่..."
+                  className="w-full border border-gray-300 rounded-lg p-3 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+                <p className="text-xs text-indigo-500 bg-indigo-50 px-3 py-2 rounded-lg">
+                  * ครูจะเป็นผู้ตรวจและให้คะแนน — ระบบไม่ตรวจอัตโนมัติ
                 </p>
-              ) : (
-                <p className="text-sm text-indigo-400">กรอกสูตรคำตอบก่อน</p>
-              )}
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="py-8 text-center border-2 border-dashed border-gray-200 rounded-xl">
-          <p className="text-3xl mb-2">👁</p>
-          <p className="text-sm text-gray-400">กดปุ่ม "ดูตัวอย่าง" เพื่อดูว่านักเรียนจะเห็นโจทย์แบบไหน</p>
-          {!hasContent && (
-            <p className="text-xs text-gray-300 mt-1">กรอกเนื้อหาโจทย์ก่อนดูตัวอย่าง</p>
-          )}
-        </div>
-      )}
-    </section>
+              </div>
+            )}
+
+            {/* ── True/False ── */}
+            {questionType === 'true_false' && trueFalseConfig && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 font-medium">ข้อความนี้ถูกหรือผิด?</p>
+                <div className="flex gap-3">
+                  {([
+                    { val: 'true' as const,  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' },
+                    { val: 'false' as const, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' },
+                  ]).map(({ val, label, cls }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      disabled={tfChecked}
+                      onClick={() => { if (!tfChecked) setTfAnswer(val) }}
+                      className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+                        tfAnswer === val && !tfChecked ? cls :
+                        tfChecked && val === (trueFalseConfig.correct_answer ? 'true' : 'false') ? 'border-green-500 bg-green-50 text-green-700' :
+                        tfChecked && tfAnswer === val ? 'border-red-400 bg-red-50 text-red-600' :
+                        'border-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {trueFalseConfig.explanation_mode !== 'none' && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">
+                      {trueFalseConfig.explanation_mode === 'wrong_only'
+                        ? 'ให้เหตุผล (กรณีตอบผิด):'
+                        : 'ให้เหตุผล:'}
+                    </p>
+                    <textarea
+                      value={tfExplanation}
+                      onChange={(e) => { if (!tfChecked) setTfExplanation(e.target.value) }}
+                      readOnly={tfChecked}
+                      rows={3}
+                      placeholder="พิมพ์เหตุผลที่นี่..."
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                    <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-lg">
+                      ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
+                    </p>
+                  </div>
+                )}
+
+                {!tfChecked ? (
+                  <button
+                    type="button"
+                    onClick={() => setTfChecked(true)}
+                    disabled={tfAnswer === null}
+                    className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                  >
+                    ตรวจคำตอบ
+                  </button>
+                ) : (
+                  <div className={`p-3 rounded-lg text-sm font-medium border ${
+                    tfAnswer === (trueFalseConfig.correct_answer ? 'true' : 'false')
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    {tfAnswer === (trueFalseConfig.correct_answer ? 'true' : 'false')
+                      ? `🎉 ถูกต้อง! ข้อความนี้${trueFalseConfig.correct_answer ? 'ถูก' : 'ผิด'}`
+                      : `❌ ผิด — เฉลยคือ: ข้อความนี้${trueFalseConfig.correct_answer ? 'ถูก' : 'ผิด'}`
+                    }
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Fill Blank ── */}
+            {questionType === 'fill_blank' && fillBlankConfig && (() => {
+              const parts = questionText.split('[___]')
+              const blanks = fillBlankConfig.blanks
+              const isManual = fillBlankConfig.grading_mode === 'manual'
+              return (
+                <div className="space-y-4">
+                  <div className="leading-loose text-gray-900 text-[15px]">
+                    {parts.map((part, i) => (
+                      <span key={i}>
+                        {part}
+                        {i < blanks.length && (
+                          <input
+                            type="text"
+                            value={fillAnswers[i] ?? ''}
+                            onChange={(e) => {
+                              if (fillChecked) return
+                              const next = [...fillAnswers]
+                              next[i] = e.target.value
+                              setFillAnswers(next)
+                            }}
+                            readOnly={fillChecked}
+                            className={`inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600 ${
+                              !isManual && fillChecked
+                                ? fillResults[i] ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50'
+                                : ''
+                            }`}
+                          />
+                        )}
+                      </span>
+                    ))}
+                  </div>
+
+                  {isManual ? (
+                    <p className="text-xs text-orange-600 font-medium">ครูผู้สอนจะเป็นผู้ตรวจและให้คะแนน</p>
+                  ) : (
+                    <>
+                      {fillChecked && (
+                        <div className="space-y-1">
+                          {blanks.map((b, i) => (
+                            <p key={i} className={`text-xs px-2 py-1 rounded ${fillResults[i] ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                              {fillResults[i] ? `✓ ช่อง ${i + 1}: ถูกต้อง` : `✗ ช่อง ${i + 1}: เฉลยคือ "${b.answer}"`}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {!fillChecked ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const results = blanks.map((b, i) => {
+                              const sa = (fillAnswers[i] ?? '').trim()
+                              const ca = b.answer.trim()
+                              return b.case_sensitive ? sa === ca : sa.toLowerCase() === ca.toLowerCase()
+                            })
+                            setFillResults(results)
+                            setFillChecked(true)
+                          }}
+                          disabled={fillAnswers.some(a => !a?.trim())}
+                          className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                        >
+                          ตรวจคำตอบ
+                        </button>
+                      ) : (
+                        <div className={`p-3 rounded-lg text-sm font-medium border ${
+                          fillResults.every(Boolean)
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : fillResults.some(Boolean)
+                              ? 'bg-orange-50 text-orange-700 border-orange-200'
+                              : 'bg-red-50 text-red-700 border-red-200'
+                        }`}>
+                          {fillResults.every(Boolean)
+                            ? '🎉 ถูกต้องทุกช่อง!'
+                            : `✅ ถูก ${fillResults.filter(Boolean).length}/${blanks.length} ช่อง`}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* ── Ordering ── */}
+            {questionType === 'ordering' && orderingConfig && shuffledItems.length > 0 && (() => {
+              const n = shuffledItems.length
+              const correctOrder = orderingConfig.items.map(i => i.id)
+              const allSelected = shuffledItems.every(it => orderSelections[it.id])
+              const selectedPositions = Object.values(orderSelections)
+              const hasDuplicate = selectedPositions.length !== new Set(selectedPositions).size
+
+              return (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-500 font-medium">เลือกลำดับสำหรับแต่ละรายการ:</p>
+                  <div className="space-y-2">
+                    {shuffledItems.map((item) => {
+                      const sel = orderSelections[item.id] ?? ''
+                      const correctPos = correctOrder.indexOf(item.id) + 1
+                      const isCorrect = orderChecked && sel === String(correctPos)
+                      const isWrong = orderChecked && sel !== String(correctPos)
+                      return (
+                        <div key={item.id} className={`flex items-center gap-3 p-2.5 rounded-lg border ${
+                          isCorrect ? 'border-green-300 bg-green-50' :
+                          isWrong ? 'border-red-300 bg-red-50' :
+                          'border-gray-200 bg-white'
+                        }`}>
+                          {item.image_url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border border-gray-200" />
+                          )}
+                          <span className="flex-1 text-sm text-gray-800">{item.text}</span>
+                          <select
+                            value={sel}
+                            onChange={(e) => {
+                              if (orderChecked) return
+                              setOrderSelections(p => ({ ...p, [item.id]: e.target.value }))
+                            }}
+                            disabled={orderChecked}
+                            className={`h-8 w-16 border rounded-lg px-1 text-sm text-center ${
+                              isCorrect ? 'border-green-400 text-green-700' :
+                              isWrong ? 'border-red-400 text-red-600' :
+                              'border-gray-300'
+                            }`}
+                          >
+                            <option value="">—</option>
+                            {Array.from({ length: n }, (_, i) => (
+                              <option key={i + 1} value={String(i + 1)}>ที่ {i + 1}</option>
+                            ))}
+                          </select>
+                          {isCorrect && <span className="text-xs text-green-600 font-medium w-16">✓ ถูก</span>}
+                          {isWrong && <span className="text-xs text-red-500 w-16">✗ ควรที่ {correctPos}</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {hasDuplicate && !orderChecked && (
+                    <p className="text-xs text-orange-600">⚠️ มีลำดับซ้ำกัน กรุณาเลือกใหม่</p>
+                  )}
+
+                  {!orderChecked ? (
+                    <button
+                      type="button"
+                      onClick={() => setOrderChecked(true)}
+                      disabled={!allSelected || hasDuplicate}
+                      className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                    >
+                      ตรวจคำตอบ
+                    </button>
+                  ) : (() => {
+                    const correct = shuffledItems.filter(it => orderSelections[it.id] === String(correctOrder.indexOf(it.id) + 1)).length
+                    return (
+                      <div className={`p-3 rounded-lg text-sm font-medium border ${
+                        correct === n ? 'bg-green-50 text-green-700 border-green-200' :
+                        correct > 0 ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                        'bg-red-50 text-red-700 border-red-200'
+                      }`}>
+                        {correct === n ? '🎉 ถูกต้องทุกรายการ!' : `✅ ถูก ${correct}/${n} รายการ`}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

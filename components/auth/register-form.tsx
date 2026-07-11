@@ -11,8 +11,11 @@ import { toast } from 'sonner'
 
 export function RegisterForm() {
   const [loading, setLoading] = useState(false)
-  const [role, setRole] = useState<'teacher' | 'student'>('teacher')
+  const [selectedType, setSelectedType] = useState<'teacher' | 'tutor' | 'student'>('teacher')
   const router = useRouter()
+
+  const role = selectedType === 'student' ? 'student' : 'teacher'
+  const instructorType = selectedType === 'student' ? null : selectedType
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -28,6 +31,7 @@ export function RegisterForm() {
     }
 
     formData.set('role', role)
+    if (instructorType) formData.set('instructor_type', instructorType)
 
     try {
       const result = await register(formData)
@@ -53,17 +57,18 @@ export function RegisterForm() {
       {/* Role selector */}
       <div className="space-y-2">
         <Label>ฉันคือ</Label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {[
-            { value: 'teacher', label: 'ครู / ติวเตอร์', icon: '👨‍🏫' },
+            { value: 'teacher', label: 'ครู', icon: '👨‍🏫' },
+            { value: 'tutor', label: 'ติวเตอร์', icon: '📚' },
             { value: 'student', label: 'นักเรียน', icon: '🎒' },
           ].map((r) => (
             <button
               key={r.value}
               type="button"
-              onClick={() => setRole(r.value as 'teacher' | 'student')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
-                role === r.value
+              onClick={() => setSelectedType(r.value as 'teacher' | 'tutor' | 'student')}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                selectedType === r.value
                   ? 'border-blue-600 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
@@ -80,7 +85,11 @@ export function RegisterForm() {
         <Input
           id="full_name"
           name="full_name"
-          placeholder={role === 'teacher' ? 'ครูสมชาย ใจดี' : 'สมชาย ใจดี'}
+          placeholder={
+            selectedType === 'teacher' ? 'ครูสมชาย ใจดี' :
+            selectedType === 'tutor' ? 'สมชาย ใจดี (ติวเตอร์)' :
+            'สมชาย ใจดี'
+          }
           required
           autoComplete="name"
         />

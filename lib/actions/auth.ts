@@ -49,17 +49,26 @@ export async function register(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const full_name = formData.get('full_name') as string
-  const role = formData.get('role') as string
+  const survey_role = formData.get('survey_role') as string
+  const role_custom = formData.get('role_custom') as string | null
 
   if (!full_name?.trim()) {
     return { error: 'กรุณากรอกชื่อ-นามสกุล' }
   }
 
+  // Map survey role → system role + instructor_type
+  const role = survey_role === 'student' || survey_role === 'parent' || survey_role === 'other'
+    ? 'student'
+    : 'teacher'
+  const instructor_type = survey_role === 'teacher' || survey_role === 'tutor'
+    ? survey_role
+    : null
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { full_name, role },
+      data: { full_name, role, instructor_type, survey_role, role_custom },
     },
   })
 
@@ -77,6 +86,9 @@ export async function register(formData: FormData) {
           email: data.user.email!,
           full_name,
           role: role as 'teacher' | 'student',
+          instructor_type: instructor_type || null,
+          survey_role: survey_role || null,
+          role_custom: survey_role === 'other' ? (role_custom || null) : null,
         },
         { onConflict: 'id', ignoreDuplicates: true }
       )
@@ -86,6 +98,45 @@ export async function register(formData: FormData) {
     }
   }
 
+  return { success: true }
+}
+
+export async function loginWithGoogle() {
+  const supabase = await createClient()
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${siteUrl}/auth/callback`,
+      queryParams: { access_type: 'offline', prompt: 'consent' },
+    },
+  })
+
+  if (error || !data.url) {
+    return { error: error?.message ?? 'ไม่สามารถเชื่อมต่อ Google ได้' }
+  }
+
+  redirect(data.url)
+}
+
+export async function sendMagicLink(email: string) {
+  const supabase = await createClient()
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: `${siteUrl}/auth/callback` },
+  })
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function forgotPassword(email: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/reset-password`,
+  })
+  if (error) return { error: error.message }
   return { success: true }
 }
 

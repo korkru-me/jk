@@ -15,15 +15,24 @@ interface NavItem {
 const teacherNav: NavItem[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/questions', label: 'คลังโจทย์', icon: '📚' },
+  { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
   { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
   { href: '/assignments', label: 'ชุดข้อสอบ', icon: '📋' },
+  { href: '/settings/profile', label: 'ตั้งค่า', icon: '⚙️' },
 ]
 
 const studentNav: NavItem[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: '🏫' },
-  { href: '/my-submissions', label: 'การส่งงาน', icon: '📝' },
+  { href: '/my-submissions', label: 'ผลงานและสมรรถนะ', icon: '📊' },
 ]
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === '/dashboard') return pathname === '/dashboard'
+  if (href === '/settings/profile') return pathname.startsWith('/settings')
+  if (href === '/questions') return pathname === '/questions' || (pathname.startsWith('/questions/') && !pathname.startsWith('/questions/new'))
+  return pathname === href || pathname.startsWith(href + '/')
+}
 
 interface SidebarProps {
   role: UserRole
@@ -38,7 +47,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose }: SidebarProp
 
   return (
     <aside className={cn(
-      'w-64 flex-shrink-0 border-r bg-white flex flex-col',
+      'w-64 flex-shrink-0 border-r bg-card flex flex-col',
       'fixed inset-y-0 left-0 z-30 transition-transform duration-200 ease-in-out',
       'md:static md:translate-x-0',
       isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
@@ -51,7 +60,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose }: SidebarProp
             alt="KorKru"
             width={100}
             height={40}
-            className="h-9 w-auto object-contain"
+            className="h-9 w-auto object-contain dark:brightness-0 dark:invert"
           />
         </Link>
       </div>
@@ -65,9 +74,9 @@ export function Sidebar({ role, fullName, isOpen = false, onClose }: SidebarProp
             onClick={onClose}
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-              pathname === item.href
-                ? 'bg-blue-50 text-blue-700'
-                : 'text-gray-700 hover:bg-gray-100'
+              isNavActive(pathname, item.href)
+                ? 'bg-primary/10 text-primary'
+                : 'text-foreground/70 hover:bg-muted hover:text-foreground'
             )}
           >
             <span className="text-base">{item.icon}</span>
@@ -75,6 +84,20 @@ export function Sidebar({ role, fullName, isOpen = false, onClose }: SidebarProp
           </Link>
         ))}
       </nav>
+
+      {/* Admin link */}
+      {role === 'admin' && (
+        <div className="px-3 pb-2">
+          <Link
+            href="/admin"
+            onClick={onClose}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border border-amber-500/20"
+          >
+            <span className="text-base">⚙️</span>
+            Admin Panel
+          </Link>
+        </div>
+      )}
 
       {/* User info */}
       <div className="p-4 border-t shrink-0">
@@ -84,7 +107,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose }: SidebarProp
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{fullName}</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {role === 'teacher' ? 'ครู' : role === 'student' ? 'นักเรียน' : 'Admin'}
             </p>
           </div>

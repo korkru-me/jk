@@ -1,99 +1,106 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { LandingNavbar } from '@/components/landing/landing-navbar'
+import { LandingFooter } from '@/components/landing/landing-footer'
+import { HeroSection } from '@/components/landing/hero-section'
+import { TrustBadges } from '@/components/landing/trust-badges'
+import { InteractiveDemo } from '@/components/landing/interactive-demo'
+import { CookieConsent } from '@/components/landing/cookie-consent'
+import { ArrowRight } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'KorKru — คลังข้อสอบอัจฉริยะ สร้างโดยครู เพื่อครู',
+  description:
+    'สร้างโจทย์ฟิสิกส์ที่สุ่มตัวเลขต่างกันทุกคน วิเคราะห์ผู้เรียน พิมพ์ใบงาน A4 ได้ทันที รองรับกรอบ PISA',
+}
+
+const FEATURES = [
+  {
+    icon: '🔢',
+    title: 'โจทย์สุ่มตัวเลข',
+    desc: 'ระบบสุ่มค่าตัวแปรอัตโนมัติ นักเรียนแต่ละคนได้โจทย์ตัวเลขไม่เหมือนกัน ลดการลอกคำตอบ ตรวจอัตโนมัติด้วยสูตร',
+  },
+  {
+    icon: '📝',
+    title: 'Editor ง่าย ไม่ต้องเขียน LaTeX',
+    desc: '4 วิธีสร้างสูตรคำตอบ พิมพ์เอง คลังสูตร ปุ่มกด และลอกจากโจทย์เดิม รองรับตัวเลขลงตัว',
+  },
+  {
+    icon: '🏫',
+    title: 'ระบบห้องเรียนสมบูรณ์',
+    desc: 'สร้างห้องเรียน แชร์ Class Code ให้นักเรียนเข้าร่วม มอบหมายชุดข้อสอบ ติดตามความก้าวหน้ารายคน',
+  },
+  {
+    icon: '🖨️',
+    title: 'พิมพ์ใบงาน A4 ทันที',
+    desc: 'สร้างใบงาน Print-Ready พร้อม QR Code ประจำตัว นักเรียนสแกนส่งงานออนไลน์ได้',
+  },
+  {
+    icon: '📊',
+    title: 'Dashboard วิเคราะห์ผู้เรียน',
+    desc: 'ดูคะแนนรายคน วิเคราะห์ตัวลวง ระบุจุดอ่อนของห้องเรียน Export Excel ได้ทันที',
+  },
+  {
+    icon: '🔗',
+    title: 'โจทย์ต่อเนื่อง Multi-step',
+    desc: 'สร้างโจทย์หลายข้อที่ใช้สถานการณ์เดียวกัน ผลลัพธ์ข้อก่อนนำมาคำนวณข้อต่อไป',
+  },
+]
+
+const HOW_IT_WORKS = [
+  {
+    step: 1,
+    icon: '🖊️',
+    title: 'สร้างโจทย์',
+    desc: 'ครูสร้างโจทย์ฟิสิกส์พร้อมสูตรคำตอบ กำหนดตัวแปรที่ต้องการสุ่ม และขอบเขตค่าที่ยอมรับ',
+  },
+  {
+    step: 2,
+    icon: '📤',
+    title: 'มอบหมาย',
+    desc: 'เพิ่มโจทย์เป็นชุดข้อสอบ มอบหมายให้ห้องเรียน หรือพิมพ์ใบงานแจกได้ทันที',
+  },
+  {
+    step: 3,
+    icon: '📈',
+    title: 'ดูผลและวิเคราะห์',
+    desc: 'ระบบตรวจคะแนนอัตโนมัติ ครูเห็นผลแบบ Real-time และวิเคราะห์ผู้เรียนได้ลึกซึ้ง',
+  },
+]
 
 export default function LandingPage() {
   return (
-    <main className="flex flex-col min-h-screen">
-      {/* Navbar */}
-      <nav className="border-b bg-white/80 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <Image
-              src="/logo.png"
-              alt="KorKru logo"
-              width={120}
-              height={48}
-              className="h-10 w-auto object-contain"
-              priority
-            />
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className={cn(buttonVariants({ variant: 'ghost' }))}
-            >
-              เข้าสู่ระบบ
-            </Link>
-            <Link
-              href="/register"
-              className={cn(buttonVariants({ variant: 'default' }))}
-            >
-              สมัครใช้งาน
-            </Link>
-          </div>
-        </div>
-      </nav>
+    <main className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
+      <LandingNavbar />
 
-      {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center px-4 py-20 bg-gradient-to-b from-blue-50 to-white text-center">
-        <div className="max-w-3xl mx-auto space-y-6">
-          {/* Logo mark in hero */}
-          <div className="flex justify-center mb-2">
-            <Image
-              src="/logo.png"
-              alt="KorKru"
-              width={160}
-              height={160}
-              className="h-32 w-auto object-contain drop-shadow-md"
-              priority
-            />
-          </div>
+      <HeroSection />
 
-          <h1 className="text-4xl sm:text-6xl font-bold text-gray-900 leading-tight">
-            ก่อการเรียนรู้{' '}
-            <span className="text-blue-600">โดยครู</span>
-          </h1>
+      <TrustBadges />
 
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            สร้างโจทย์ฟิสิกส์ที่{' '}
-            <strong>สุ่มตัวเลขต่างกันทุกคน</strong>{' '}
-            วิเคราะห์ผู้เรียน ประหยัดเวลาครู พิมพ์ใบงาน A4 ได้ทันที
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/register"
-              className={cn(buttonVariants({ size: 'lg' }), 'text-base px-8')}
-            >
-              เริ่มใช้งานฟรี
-            </Link>
-            <Link
-              href="/login"
-              className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'text-base px-8')}
-            >
-              เข้าสู่ระบบ
-            </Link>
-          </div>
-        </div>
-      </section>
+      <InteractiveDemo />
 
       {/* Features */}
-      <section className="py-20 px-4 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            ทำอะไรได้บ้าง?
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f) => (
+      <section className="bg-slate-50 py-20 dark:bg-slate-900/40">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">
+              ฟีเจอร์ที่ครูต้องการ
+            </h2>
+            <p className="mt-3 text-slate-500 dark:text-slate-400">
+              ทุกสิ่งที่คุณต้องการสำหรับการสอนฟิสิกส์ยุคใหม่
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((f) => (
               <div
                 key={f.title}
-                className="border rounded-xl p-6 space-y-3 hover:shadow-md transition-shadow"
+                className="rounded-2xl border border-slate-200 bg-white p-6 hover:shadow-md transition-shadow dark:border-slate-700/60 dark:bg-slate-900"
               >
-                <div className="text-3xl">{f.icon}</div>
-                <h3 className="font-semibold text-lg">{f.title}</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">{f.desc}</p>
+                <div className="text-3xl mb-3">{f.icon}</div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-2">{f.title}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {f.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -101,17 +108,29 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section className="py-20 px-4 bg-gray-50">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-12">วิธีใช้งาน</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            {steps.map((s, i) => (
-              <div key={i} className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl font-bold">
-                  {i + 1}
+      <section className="bg-white py-20 dark:bg-slate-950">
+        <div className="mx-auto max-w-5xl px-4 text-center">
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl mb-12">
+            เริ่มต้นได้ใน 3 ขั้นตอน
+          </h2>
+          <div className="grid grid-cols-1 gap-10 sm:grid-cols-3">
+            {HOW_IT_WORKS.map((s, i) => (
+              <div key={s.step} className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-500/30">
+                    <span className="text-2xl">{s.icon}</span>
+                  </div>
+                  <span className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-xs font-bold text-white dark:border-slate-950">
+                    {s.step}
+                  </span>
                 </div>
-                <h3 className="font-semibold">{s.title}</h3>
-                <p className="text-gray-600 text-sm">{s.desc}</p>
+                <h3 className="font-semibold text-slate-900 dark:text-white text-lg">
+                  {s.title}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">{s.desc}</p>
+                {i < HOW_IT_WORKS.length - 1 && (
+                  <ArrowRight className="hidden sm:block absolute translate-x-32 text-slate-200 dark:text-slate-700 h-6 w-6" />
+                )}
               </div>
             ))}
           </div>
@@ -119,80 +138,34 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-16 px-4 bg-blue-600 text-white text-center">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <h2 className="text-3xl font-bold">พร้อมเริ่มใช้งานแล้วหรือยัง?</h2>
-          <p className="text-blue-100">ใช้งานฟรี ไม่ต้องใช้บัตรเครดิต</p>
-          <Link
-            href="/register"
-            className={cn(buttonVariants({ variant: 'secondary', size: 'lg' }), 'mt-4')}
-          >
-            สมัครใช้งานฟรี
-          </Link>
+      <section className="bg-indigo-600 py-20">
+        <div className="mx-auto max-w-2xl px-4 text-center">
+          <h2 className="text-3xl font-bold text-white sm:text-4xl">
+            พร้อมเริ่มสอนแบบใหม่แล้วหรือยัง?
+          </h2>
+          <p className="mt-4 text-indigo-200">
+            สมัครฟรี ใช้งานได้ทันที ไม่ต้องใช้บัตรเครดิต
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-base font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors shadow-lg"
+            >
+              สมัครใช้งานฟรี
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/pricing"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-400 px-8 py-4 text-base font-semibold text-white hover:bg-indigo-700 transition-colors"
+            >
+              ดูราคาแพ็กเกจ
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t py-8 bg-white">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col items-center gap-3">
-          <Image
-            src="/logo.png"
-            alt="KorKru"
-            width={80}
-            height={80}
-            className="h-12 w-auto object-contain opacity-70"
-          />
-          <p className="text-sm text-gray-500">© 2026 KorKru — Built by Teachers, For Teachers</p>
-        </div>
-      </footer>
+      <LandingFooter />
+      <CookieConsent />
     </main>
   )
 }
-
-const features = [
-  {
-    icon: '🔢',
-    title: 'โจทย์สุ่มตัวเลข',
-    desc: 'ระบบสุ่มค่าตัวแปรอัตโนมัติ นักเรียนแต่ละคนได้โจทย์ตัวเลขไม่เหมือนกัน ลดการลอกคำตอบ',
-  },
-  {
-    icon: '📝',
-    title: 'Editor สร้างโจทย์ง่าย',
-    desc: '4 วิธีสร้างสูตรคำตอบ ทั้งพิมพ์เอง คลังสูตร ปุ่มกด และลอกจากโจทย์เดิม',
-  },
-  {
-    icon: '🏫',
-    title: 'ระบบห้องเรียน',
-    desc: 'สร้างห้องเรียน แชร์ Class Code ให้นักเรียนเข้าร่วม มอบหมายชุดข้อสอบ',
-  },
-  {
-    icon: '🖨️',
-    title: 'พิมพ์ใบงาน A4',
-    desc: 'สร้างใบงาน Print-Ready พร้อม QR Code ประจำตัว พิมพ์แจกนักเรียนได้ทันที',
-  },
-  {
-    icon: '📊',
-    title: 'Dashboard คะแนน',
-    desc: 'ดูคะแนนนักเรียนรายคน วิเคราะห์ผู้เรียน Export เป็น Excel',
-  },
-  {
-    icon: '🔗',
-    title: 'โจทย์ต่อเนื่อง',
-    desc: 'สร้างโจทย์หลายข้อที่ใช้สถานการณ์เดียวกัน ผลลัพธ์ข้อก่อนนำมาคำนวณข้อต่อไป',
-  },
-]
-
-const steps = [
-  {
-    title: 'สร้างโจทย์',
-    desc: 'ครูสร้างโจทย์ฟิสิกส์พร้อมสูตรคำตอบและตัวแปรที่ต้องการสุ่ม',
-  },
-  {
-    title: 'มอบหมายให้ห้องเรียน',
-    desc: 'เพิ่มโจทย์เป็นชุดข้อสอบ มอบหมายให้ห้องเรียน หรือพิมพ์ใบงาน',
-  },
-  {
-    title: 'ดูผลคะแนน',
-    desc: 'ระบบตรวจคะแนนอัตโนมัติ ครูดูผลและวิเคราะห์ได้ทันที',
-  },
-]
