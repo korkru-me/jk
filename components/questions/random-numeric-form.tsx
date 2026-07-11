@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/label'
@@ -15,7 +15,8 @@ import { FormulaEditor } from './formula-editor/index'
 import { QuestionPreview } from './question-preview'
 import { QuestionImageUpload } from './question-image-upload'
 import { WhiteboardModal } from './whiteboard-modal'
-import { createQuestion } from '@/lib/actions/questions'
+import { SpecialCharInput } from './special-char-input'
+import { createQuestion, createFormulaPreset } from '@/lib/actions/questions'
 import { runTrials, PYTHAGOREAN_FAMILIES } from '@/lib/math/evaluator'
 import type { TrialSummary, TrialSample } from '@/lib/math/evaluator'
 import type {
@@ -23,7 +24,7 @@ import type {
   PythagoreanGroup,
 } from '@/lib/types'
 
-type CreationMode = 'from-equation' | 'manual'
+type CreationMode = 'from-equation' | 'manual' | 'fixed'
 type PresetWithCat = FormulaPreset & { question_categories: { name: string } | null }
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
@@ -590,9 +591,13 @@ function UnitField({ value, onChange }: { value: string; onChange: (v: string) =
 
 // ─── PresetEquationSelector ───────────────────────────────────────────────────
 
+function normalizeEq(s: string): string {
+  return s.replace(/\s+/g, '').toLowerCase()
+}
+
 function PresetEquationSelector({
   presets, variables, onVariablesChange, onFormulaChange,
-  logicRules, onLogicRulesChange,
+  logicRules, onLogicRulesChange, onPresetCreated,
 }: {
   presets: PresetWithCat[]
   variables: Variable[]
@@ -600,6 +605,7 @@ function PresetEquationSelector({
   onFormulaChange: (formula: string) => void
   logicRules: LogicRule[]
   onLogicRulesChange: (r: LogicRule[]) => void
+  onPresetCreated: (p: PresetWithCat) => void
 }) {
   const [selPresetId, setSelPresetId] = useState('')
   const [equationText, setEquationText] = useState('')
@@ -608,6 +614,7 @@ function PresetEquationSelector({
   const [derivedFormula, setDerivedFormula] = useState('')
   const [solving, setSolving] = useState(false)
   const [solveError, setSolveError] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   function applyEquation(eq: string, forceAnswerVar?: string) {
     const defaultAnswer = detectAnswerVar(eq)
@@ -654,6 +661,7 @@ function PresetEquationSelector({
 
   function handlePresetChange(id: string) {
     setSelPresetId(id)
+    setShowSuggestions(false)
     const p = presets.find(pr => pr.id === id)
     if (p) {
       setEquationText(p.equation)
@@ -663,32 +671,68 @@ function PresetEquationSelector({
 
   function handleEquationInput(eq: string) {
     setEquationText(eq)
+    setShowSuggestions(true)
     if (selPresetId) setSelPresetId('')
     applyEquation(eq)
   }
 
   const selectedPreset = presets.find(p => p.id === selPresetId) ?? null
 
+  // Suggestions: presets whose variables overlap with what's typed, or whose
+  // equation/name text contains what's typed — only shown once the user types something.
+  const matches = useMemo(() => {
+    const typed = equationText.trim()
+    if (!typed) return []
+    const typedVars = new Set(parseVarsFromEquation(typed))
+    const typedNorm = normalizeEq(typed)
+    const scored = presets
+      .map(p => {
+        const presetVars = parseVarsFromEquation(p.equation)
+        const overlap = presetVars.filter(v => typedVars.has(v)).length
+        const substr = normalizeEq(p.equation).includes(typedNorm) || normalizeEq(p.formula_name).includes(typedNorm)
+        return { preset: p, score: overlap * 10 + (substr ? 1 : 0), overlap, substr }
+      })
+      .filter(s => s.overlap > 0 || s.substr)
+    scored.sort((a, b) => b.score - a.score)
+    return scored.slice(0, 6).map(s => s.preset)
+  }, [equationText, presets])
+
+  const exactMatch = presets.some(p => normalizeEq(p.equation) === normalizeEq(equationText))
+
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
       <div className="p-4 space-y-3">
-        <SelectField
-          label="สมการสำเร็จรูป"
-          value={selPresetId}
-          onChange={handlePresetChange}
-          placeholder="-- เลือกสมการ --"
-          options={presets.map(p => ({ value: p.id, label: `${p.formula_name}  (${p.equation})` }))}
-        />
-
         <div className="space-y-1">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">สมการ</p>
-          <Input
-            value={equationText}
-            onChange={e => handleEquationInput(e.target.value)}
-            placeholder="เช่น F = m * a   หรือ   v = u + a * t"
-            className="h-9 text-sm font-mono"
-          />
-          <p className="text-[11px] text-blue-500">สามารถพิมพ์หรือปรับแก้สมการในช่องนี้ได้โดยตรง</p>
+          <div className="relative">
+            <Input
+              value={equationText}
+              onChange={e => handleEquationInput(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="พิมพ์สมการของคุณเอง เช่น F = m * a   หรือ   v = u + a * t"
+              className="h-9 text-sm font-mono"
+            />
+            {showSuggestions && matches.length > 0 && (
+              <div className="absolute z-10 top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                {matches.map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => handlePresetChange(p.id)}
+                    className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-gray-800">{p.formula_name}</p>
+                    <p className="text-xs font-mono text-gray-500">{p.equation}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-blue-500">
+            พิมพ์สมการเองได้เลย — ถ้าตรงกับสมการในคลัง ระบบจะแสดงให้เลือกอัตโนมัติ
+          </p>
           {selectedPreset?.description && (
             <p className="text-xs text-gray-400">{selectedPreset.description}</p>
           )}
@@ -733,6 +777,15 @@ function PresetEquationSelector({
                 <span className="text-[10px] text-emerald-500 shrink-0">คำนวณอัตโนมัติ</span>
               </div>
             )}
+
+            {answerVarName && derivedFormula && !exactMatch && (
+              <SavePresetControl
+                equation={equationText}
+                targetVariable={answerVarName}
+                variables={variables}
+                onSaved={p => { onPresetCreated(p); setSelPresetId(p.id) }}
+              />
+            )}
           </div>
         )}
       </div>
@@ -747,6 +800,68 @@ function PresetEquationSelector({
           />
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── SavePresetControl ────────────────────────────────────────────────────────
+// Offers to save a typed equation that doesn't already exist in the formula library.
+
+function SavePresetControl({ equation, targetVariable, variables, onSaved }: {
+  equation: string
+  targetVariable: string
+  variables: Variable[]
+  onSaved: (p: PresetWithCat) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!name.trim()) { toast.error('ตั้งชื่อสมการก่อนบันทึก'); return }
+    setSaving(true)
+    const result = await createFormulaPreset({
+      formula_name: name.trim(),
+      equation,
+      target_variable: targetVariable,
+      variables: variables.filter(v => !v.is_answer).map(v => ({ name: v.name, min: v.min, max: v.max })),
+      description: description.trim() || undefined,
+    })
+    setSaving(false)
+    if (result.error) { toast.error(result.error); return }
+    toast.success('บันทึกสมการลงคลังแล้ว')
+    if (result.data) onSaved(result.data as PresetWithCat)
+    setExpanded(false)
+    setName('')
+    setDescription('')
+  }
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" /> บันทึกสมการนี้ลงคลังสมการ
+      </button>
+    )
+  }
+
+  return (
+    <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-3 space-y-2">
+      <p className="text-xs font-semibold text-blue-700">บันทึกสมการนี้ลงคลังสมการ</p>
+      <Input value={name} onChange={e => setName(e.target.value)} placeholder="ตั้งชื่อสมการ เช่น กฎข้อที่สองของนิวตัน" className="h-8 text-sm" />
+      <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="คำอธิบาย (ไม่บังคับ)" className="h-8 text-sm" />
+      <div className="flex gap-2">
+        <Button type="button" size="sm" onClick={handleSave} disabled={saving} className="h-8 text-xs">
+          {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => setExpanded(false)} disabled={saving} className="h-8 text-xs">
+          ยกเลิก
+        </Button>
+      </div>
     </div>
   )
 }
@@ -1113,6 +1228,51 @@ function SubQuestionManual({
   )
 }
 
+// ─── SubQuestionFixed ─────────────────────────────────────────────────────────
+// Sub question for "fixed" mode — literal numeric answer, no formula/variables.
+
+function SubQuestionFixed({
+  part, index, onChange, onRemove,
+}: {
+  part: AnswerPart; index: number
+  onChange: (patch: Partial<AnswerPart>) => void; onRemove: () => void
+}) {
+  const label = PART_LABELS[index] ?? String(index + 1)
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+        <span className="text-sm font-bold text-gray-700">ข้อย่อย {label})</span>
+        <button type="button" onClick={onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">
+          <Trash2 className="w-3.5 h-3.5" /> ลบข้อนี้
+        </button>
+      </div>
+      <div className="p-4 space-y-4">
+        <div className="space-y-1.5">
+          <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+          <div className="flex gap-2 items-start">
+            <Input value={part.sub_text} onChange={e => onChange({ sub_text: e.target.value })} placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²" className="text-sm flex-1" />
+            <Button type="button" variant="outline" size="sm" className="text-xs h-9 shrink-0"
+              onClick={() => onChange({ sub_text: part.sub_text + '[คำตอบ]' })}>
+              + [คำตอบ]
+            </Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
+            <SpecialCharInput value={part.formula} onChange={v => onChange({ formula: v })} placeholder="เช่น 9.8" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-gray-500">หน่วย</Label>
+            <SpecialCharInput value={part.unit} onChange={v => onChange({ unit: v })} placeholder="เช่น m/s²" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── AnswerStepField ──────────────────────────────────────────────────────────
 
 const STEP_PRESETS = [
@@ -1451,12 +1611,18 @@ interface RandomNumericFormProps {
   presets: PresetWithCat[]
 }
 
-export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) {
+export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNumericFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 
   const [creationMode, setCreationMode] = useState<CreationMode>('from-equation')
+
+  // Local copy so newly-saved formulas show up immediately without a page reload.
+  const [presetList, setPresetList] = useState<PresetWithCat[]>(initialPresets)
+  function addPreset(p: PresetWithCat) {
+    setPresetList(prev => [...prev, p])
+  }
 
   const [title, setTitle] = useState('')
   const [subject, setSubject] = useState('')
@@ -1525,7 +1691,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
     const result = await createQuestion({
       title, subject, question_text: questionText, question_type: 'written',
       difficulty, visibility, category_id: '',
-      grade_level: '', is_random: true,
+      grade_level: '', is_random: creationMode !== 'fixed',
       variables, logic_rules: logicRules,
       answer_parts: partsWithTolerance,
       answer_formula: first.formula,
@@ -1554,6 +1720,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
         {([
           { value: 'from-equation' as const, label: 'สร้างโจทย์จากสมการ', desc: 'เลือกสมการสำเร็จรูป ระบบคำนวณคำตอบให้อัตโนมัติ' },
           { value: 'manual' as const, label: 'เขียนสมการด้วยตัวเอง', desc: 'ประกาศตัวแปรและเขียนสมการเอง' },
+          { value: 'fixed' as const, label: 'กำหนดคำตอบด้วยตัวเอง', desc: 'ไม่มีสมการ ไม่มีการสุ่ม นักเรียนทุกคนได้โจทย์และคำตอบเดียวกัน' },
         ]).map(opt => (
           <button
             key={opt.value}
@@ -1589,12 +1756,13 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
           <section className="space-y-4">
             <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เลือกสมการ</h2>
             <PresetEquationSelector
-              presets={presets}
+              presets={presetList}
               variables={variables}
               onVariablesChange={setVariables}
               onFormulaChange={formula => updatePart(0, { formula })}
               logicRules={logicRules}
               onLogicRulesChange={setLogicRules}
+              onPresetCreated={addPreset}
             />
           </section>
 
@@ -1665,7 +1833,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
                 key={part.id}
                 part={part}
                 index={i}
-                presets={presets}
+                presets={presetList}
                 mainVariables={variables}
                 onChange={patch => updatePart(i + 1, patch)}
                 onRemove={() => removeSubQuestion(i + 1)}
@@ -1674,7 +1842,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
             <AddSubQuestionButton onClick={addSubQuestion} />
           </section>
         </>
-      ) : (
+      ) : creationMode === 'manual' ? (
         <>
           {/* 2. ประกาศตัวแปร */}
           <section className="space-y-4">
@@ -1736,7 +1904,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
                 variables={variables.filter(v => !v.is_answer)}
                 value={answerParts[0].formula}
                 unit={answerParts[0].unit}
-                presets={presets}
+                presets={presetList}
                 onChange={formula => updatePart(0, { formula })}
                 onVariablesChange={vars => {
                   const ansVars = variables.filter(v => v.is_answer)
@@ -1777,8 +1945,79 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
                 key={part.id}
                 part={part}
                 index={i}
-                presets={presets}
+                presets={presetList}
                 mainVariables={variables}
+                onChange={patch => updatePart(i + 1, patch)}
+                onRemove={() => removeSubQuestion(i + 1)}
+              />
+            ))}
+            <AddSubQuestionButton onClick={addSubQuestion} />
+          </section>
+        </>
+      ) : (
+        <>
+          {/* 2. สร้างโจทย์ */}
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">สร้างโจทย์</h2>
+            <div className="space-y-1.5">
+              <Label>โจทย์ *</Label>
+              <RichTextEditor
+                ref={editorRef}
+                value={questionText}
+                onChange={setQuestionText}
+                placeholder="พิมพ์เนื้อหาโจทย์ที่นี่..."
+                rows={5}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>รูปภาพประกอบโจทย์</Label>
+              <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+              <div className="flex gap-2 items-start">
+                <Input
+                  value={answerParts[0].sub_text ?? ''}
+                  onChange={e => updatePart(0, { sub_text: e.target.value })}
+                  placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
+                  className="text-sm flex-1"
+                />
+                <Button
+                  type="button" variant="outline" size="sm"
+                  className="text-xs h-9 shrink-0"
+                  onClick={() => updatePart(0, { sub_text: (answerParts[0].sub_text ?? '') + '[คำตอบ]' })}
+                >
+                  + แทรก [คำตอบ]
+                </Button>
+              </div>
+              <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">คำตอบ</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
+                  <SpecialCharInput value={answerParts[0].formula} onChange={v => updatePart(0, { formula: v })} placeholder="เช่น 9.8" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-500">หน่วย</Label>
+                  <SpecialCharInput value={answerParts[0].unit} onChange={v => updatePart(0, { unit: v })} placeholder="เช่น m/s²" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 3. โจทย์ย่อย */}
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">โจทย์ย่อย</h2>
+            {subParts.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีโจทย์ย่อย — กดปุ่มด้านล่างเพื่อเพิ่ม</p>
+            )}
+            {subParts.map((part, i) => (
+              <SubQuestionFixed
+                key={part.id}
+                part={part}
+                index={i}
                 onChange={patch => updatePart(i + 1, patch)}
                 onRemove={() => removeSubQuestion(i + 1)}
               />
@@ -1789,6 +2028,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
       )}
 
       {/* ตั้งค่าการสุ่ม */}
+      {creationMode !== 'fixed' && (
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ตั้งค่าการสุ่ม</h2>
 
@@ -1810,6 +2050,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
           pythagoreanGroups={pythagoreanGroups}
         />
       </section>
+      )}
 
       {/* ค่าคลาดเคลื่อน */}
       <section className="space-y-4">
@@ -1833,7 +2074,7 @@ export function RandomNumericForm({ allTags, presets }: RandomNumericFormProps) 
           questionText={questionText}
           variables={variables}
           answerParts={answerParts}
-          isRandom={true}
+          isRandom={creationMode !== 'fixed'}
           questionType="written"
           imageUrls={imageUrls}
         />

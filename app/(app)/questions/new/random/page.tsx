@@ -6,8 +6,8 @@ export default async function NewRandomQuestionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">สร้างโจทย์ตอบสั้น — ตัวแปรสุ่ม</h1>
-        <p className="text-sm text-gray-500 mt-1">ค่าตัวเลขสุ่มแตกต่างกันในแต่ละคน คำตอบคำนวณจากสูตรโดยอัตโนมัติ</p>
+        <h1 className="text-2xl font-bold text-gray-900">สร้างโจทย์ตอบสั้น — เติมคำตอบตัวเลข</h1>
+        <p className="text-sm text-gray-500 mt-1">สร้างจากสมการสำเร็จรูป เขียนสมการเอง หรือกำหนดคำตอบด้วยตัวเอง</p>
       </div>
       <RandomNumericForm allTags={allTags} presets={presets} />
     </div>

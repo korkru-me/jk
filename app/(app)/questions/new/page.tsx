@@ -1,20 +1,12 @@
 import Link from 'next/link'
-import { Hash, Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, Zap } from 'lucide-react'
+import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, Zap } from 'lucide-react'
 
 const QUESTION_TYPES = [
   {
-    href: '/questions/new/fixed',
-    icon: Hash,
-    title: 'เติมคำตอบตัวเลข — ค่าคงที่',
-    desc: 'นักเรียนพิมพ์คำตอบเป็นตัวเลข โจทย์และคำตอบเหมือนกันทุกคน',
-    color: 'bg-blue-50 border-blue-200 text-blue-700',
-    iconColor: 'text-blue-500',
-  },
-  {
     href: '/questions/new/random',
     icon: Shuffle,
-    title: 'เติมคำตอบตัวเลข — ตัวแปรสุ่ม',
-    desc: 'ค่าในโจทย์สุ่มต่างกันแต่ละคน ระบบคำนวณคำตอบให้อัตโนมัติ',
+    title: 'เติมคำตอบตัวเลข',
+    desc: 'สร้างจากสมการ เขียนสมการเอง หรือกำหนดคำตอบตายตัว — เลือกได้ในหน้าเดียว',
     color: 'bg-violet-50 border-violet-200 text-violet-700',
     iconColor: 'text-violet-500',
   },
