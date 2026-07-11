@@ -52,7 +52,10 @@
       "Read(//tmp/**)",
       "Bash(taskkill //F //FI \"WINDOWTITLE eq *\" //T)",
       "Bash(netstat -ano)",
-      "Bash(taskkill *)"
+      "Bash(taskkill *)",
+      "Bash(git commit *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
