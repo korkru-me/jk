@@ -438,7 +438,6 @@ export function AdvancedEditor({ allTags, presets, categories, draftKey = 'advan
           >
             <option value="private">ส่วนตัว</option>
             <option value="school">โรงเรียน</option>
-            <option value="public">สาธารณะ</option>
           </select>
 
           <div className="flex-1" />

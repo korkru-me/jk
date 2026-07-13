@@ -40,7 +40,6 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
 const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
   { value: 'private', label: 'ส่วนตัว' },
   { value: 'school', label: 'โรงเรียน' },
-  { value: 'public', label: 'สาธารณะ' },
 ]
 
 function emptySubQuestion(): SubQuestionData {

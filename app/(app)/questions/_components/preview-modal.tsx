@@ -6,6 +6,7 @@ import {
   CheckCircle2, TrendingUp, Activity,
 } from 'lucide-react'
 import { DIFF_META, mockStats } from './question-card'
+import { RichText } from '@/components/ui/rich-text'
 import type { QuestionWithCategory } from '../page'
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
@@ -177,7 +178,11 @@ function ContentTab({ q }: { q: QuestionWithCategory }) {
             <div className="space-y-1">
               {q.answer_parts.map((part, i) => (
                 <p key={i} className="text-sm text-blue-900 font-medium">
-                  {part.sub_text && <span className="text-blue-500 mr-2">{part.sub_text}:</span>}
+                  {part.sub_text && (
+                    <span className="text-blue-500 mr-2">
+                      <RichText text={part.sub_text} />:
+                    </span>
+                  )}
                   {part.formula} {part.unit}
                 </p>
               ))}

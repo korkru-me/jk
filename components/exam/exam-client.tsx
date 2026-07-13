@@ -14,6 +14,7 @@ import {
 import { Calculator } from './calculator'
 import { FormulaSheet } from './formula-sheet'
 import { Scratchpad } from './scratchpad'
+import { RichText } from '@/components/ui/rich-text'
 import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -941,7 +942,7 @@ function MultiPartAnswerInput({
         <div key={part.id} className="space-y-1">
           <label className="text-sm font-medium">
             {PART_LABELS[i] ?? i + 1})
-            {part.sub_text && <span className="font-normal text-muted-foreground ml-1">{part.sub_text}</span>}
+            {part.sub_text && <RichText text={part.sub_text} className="font-normal text-muted-foreground ml-1" />}
           </label>
           <div className="flex items-center gap-2">
             <Input type="number" step="any" placeholder="ใส่คำตอบ..." value={partValues[i] ?? ''}

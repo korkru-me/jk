@@ -17,7 +17,6 @@ const difficultyLabels: Record<string, string> = {
 const visibilityLabels: Record<string, string> = {
   private: 'ส่วนตัว',
   school: 'โรงเรียน',
-  public: 'สาธารณะ',
 }
 
 export const THAI_SUBJECTS = [
@@ -286,7 +285,6 @@ export function GeneralInfoSection({
             <SelectContent>
               <SelectItem value="private">ส่วนตัว</SelectItem>
               <SelectItem value="school">โรงเรียน</SelectItem>
-              <SelectItem value="public">สาธารณะ</SelectItem>
             </SelectContent>
           </Select>
         </div>
