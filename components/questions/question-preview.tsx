@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
 import { RichText } from '@/components/ui/rich-text'
+import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
 import {
   Dialog,
@@ -26,6 +27,7 @@ interface QuestionPreviewProps {
   trueFalseConfig?: TrueFalseConfig
   fillBlankConfig?: FillBlankConfig
   orderingConfig?: OrderingConfig
+  partLabelStyle?: PartLabelStyle
 }
 
 function shuffleIndices(n: number): number[] {
@@ -82,7 +84,9 @@ export function QuestionPreview({
   trueFalseConfig,
   fillBlankConfig,
   orderingConfig,
+  partLabelStyle,
 }: QuestionPreviewProps) {
+  const labels = partLabels(partLabelStyle)
   const [open, setOpen] = useState(false)
   const [values, setValues] = useState<Record<string, number>>({})
   const [shuffledRight, setShuffledRight] = useState<number[]>([])
@@ -101,7 +105,7 @@ export function QuestionPreview({
   const [matchingChecked, setMatchingChecked] = useState(false)
 
   // true_false
-  const [tfAnswer, setTfAnswer] = useState<'true' | 'false' | null>(null)
+  const [tfAnswers, setTfAnswers] = useState<('true' | 'false' | null)[]>([null])
   const [tfExplanation, setTfExplanation] = useState('')
   const [tfChecked, setTfChecked] = useState(false)
 
@@ -126,7 +130,7 @@ export function QuestionPreview({
     setMcqChecked(false)
     setMatchingSelections(matchingPairs.map(() => ''))
     setMatchingChecked(false)
-    setTfAnswer(null)
+    setTfAnswers(Array(1 + (trueFalseConfig?.statements?.length ?? 0)).fill(null))
     setTfExplanation('')
     setTfChecked(false)
     const blanks = fillBlankConfig?.blanks ?? []
@@ -428,7 +432,7 @@ export function QuestionPreview({
                     <div key={part.id} className="space-y-1.5">
                       {answerParts.length > 1 && (
                         <p className="text-sm font-medium text-gray-700">
-                          {PART_LABELS[i] ?? i + 1})
+                          {labels[i] ?? i + 1})
                           {part.sub_text && <RichText text={part.sub_text} className="font-normal text-gray-600 ml-1" />}
                         </p>
                       )}
@@ -514,75 +518,96 @@ export function QuestionPreview({
             )}
 
             {/* ── True/False ── */}
-            {questionType === 'true_false' && trueFalseConfig && (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500 font-medium">ข้อความนี้ถูกหรือผิด?</p>
-                <div className="flex gap-3">
-                  {([
-                    { val: 'true' as const,  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' },
-                    { val: 'false' as const, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' },
-                  ]).map(({ val, label, cls }) => (
-                    <button
-                      key={val}
-                      type="button"
-                      disabled={tfChecked}
-                      onClick={() => { if (!tfChecked) setTfAnswer(val) }}
-                      className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
-                        tfAnswer === val && !tfChecked ? cls :
-                        tfChecked && val === (trueFalseConfig.correct_answer ? 'true' : 'false') ? 'border-green-500 bg-green-50 text-green-700' :
-                        tfChecked && tfAnswer === val ? 'border-red-400 bg-red-50 text-red-600' :
-                        'border-gray-200 text-gray-500'
-                      }`}
-                    >
-                      {label}
-                    </button>
+            {questionType === 'true_false' && trueFalseConfig && (() => {
+              const subStatements = trueFalseConfig.statements ?? []
+              const labels = partLabels(trueFalseConfig.part_label_style)
+              const hasSubs = subStatements.length > 0
+              const correctCount = subStatements.reduce((n, s, i) =>
+                n + (tfAnswers[i + 1] === (s.correct_answer ? 'true' : 'false') ? 1 : 0),
+                tfAnswers[0] === (trueFalseConfig.correct_answer ? 'true' : 'false') ? 1 : 0)
+              const total = 1 + subStatements.length
+              return (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-500 font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
+                  {[{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...subStatements].map((st, i) => (
+                    <div key={i} className="space-y-1.5">
+                      {hasSubs && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-500">{labels[i] ?? i + 1})</span>
+                          {i > 0 && <RenderText text={st.text} />}
+                        </div>
+                      )}
+                      <div className="flex gap-3">
+                        {([
+                          { val: 'true' as const,  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' },
+                          { val: 'false' as const, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' },
+                        ]).map(({ val, label, cls }) => (
+                          <button
+                            key={val}
+                            type="button"
+                            disabled={tfChecked}
+                            onClick={() => { if (!tfChecked) setTfAnswers(a => a.map((v, ai) => ai === i ? val : v)) }}
+                            className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+                              tfAnswers[i] === val && !tfChecked ? cls :
+                              tfChecked && val === (st.correct_answer ? 'true' : 'false') ? 'border-green-500 bg-green-50 text-green-700' :
+                              tfChecked && tfAnswers[i] === val ? 'border-red-400 bg-red-50 text-red-600' :
+                              'border-gray-200 text-gray-500'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
+
+                  {trueFalseConfig.explanation_mode !== 'none' && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">
+                        {trueFalseConfig.explanation_mode === 'wrong_only'
+                          ? 'ให้เหตุผล (กรณีตอบผิด):'
+                          : 'ให้เหตุผล:'}
+                      </p>
+                      <textarea
+                        value={tfExplanation}
+                        onChange={(e) => { if (!tfChecked) setTfExplanation(e.target.value) }}
+                        readOnly={tfChecked}
+                        rows={3}
+                        placeholder="พิมพ์เหตุผลที่นี่..."
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      />
+                      <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-lg">
+                        ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
+                      </p>
+                    </div>
+                  )}
+
+                  {!tfChecked ? (
+                    <button
+                      type="button"
+                      onClick={() => setTfChecked(true)}
+                      disabled={tfAnswers.some(a => a === null)}
+                      className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                    >
+                      ตรวจคำตอบ
+                    </button>
+                  ) : (
+                    <div className={`p-3 rounded-lg text-sm font-medium border ${
+                      correctCount === total
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}>
+                      {total > 1
+                        ? `ถูก ${correctCount}/${total} ข้อ`
+                        : correctCount === 1
+                          ? `🎉 ถูกต้อง! ข้อความนี้${trueFalseConfig.correct_answer ? 'ถูก' : 'ผิด'}`
+                          : `❌ ผิด — เฉลยคือ: ข้อความนี้${trueFalseConfig.correct_answer ? 'ถูก' : 'ผิด'}`
+                      }
+                    </div>
+                  )}
                 </div>
-
-                {trueFalseConfig.explanation_mode !== 'none' && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">
-                      {trueFalseConfig.explanation_mode === 'wrong_only'
-                        ? 'ให้เหตุผล (กรณีตอบผิด):'
-                        : 'ให้เหตุผล:'}
-                    </p>
-                    <textarea
-                      value={tfExplanation}
-                      onChange={(e) => { if (!tfChecked) setTfExplanation(e.target.value) }}
-                      readOnly={tfChecked}
-                      rows={3}
-                      placeholder="พิมพ์เหตุผลที่นี่..."
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    />
-                    <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-lg">
-                      ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
-                    </p>
-                  </div>
-                )}
-
-                {!tfChecked ? (
-                  <button
-                    type="button"
-                    onClick={() => setTfChecked(true)}
-                    disabled={tfAnswer === null}
-                    className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
-                  >
-                    ตรวจคำตอบ
-                  </button>
-                ) : (
-                  <div className={`p-3 rounded-lg text-sm font-medium border ${
-                    tfAnswer === (trueFalseConfig.correct_answer ? 'true' : 'false')
-                      ? 'bg-green-50 text-green-700 border-green-200'
-                      : 'bg-red-50 text-red-700 border-red-200'
-                  }`}>
-                    {tfAnswer === (trueFalseConfig.correct_answer ? 'true' : 'false')
-                      ? `🎉 ถูกต้อง! ข้อความนี้${trueFalseConfig.correct_answer ? 'ถูก' : 'ผิด'}`
-                      : `❌ ผิด — เฉลยคือ: ข้อความนี้${trueFalseConfig.correct_answer ? 'ถูก' : 'ผิด'}`
-                    }
-                  </div>
-                )}
-              </div>
-            )}
+              )
+            })()}
 
             {/* ── Fill Blank ── */}
             {questionType === 'fill_blank' && fillBlankConfig && (() => {

@@ -13,8 +13,10 @@ import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
 import { QuestionPreview } from './question-preview'
 import { WhiteboardModal } from './whiteboard-modal'
+import { AnswerPartCard, LabelStyleToggle, AddSubItemButton } from './answer-set-controls'
 import { createQuestion } from '@/lib/actions/questions'
-import type { Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig } from '@/lib/types'
+import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
+import type { Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
 
 interface TrueFalseFormProps {
   allTags: string[]
@@ -25,6 +27,64 @@ const EXPLANATION_MODES: { value: TrueFalseExplanationMode; label: string; desc:
   { value: 'wrong_only', label: 'ให้เหตุผลเฉพาะกรณีตอบผิด',       desc: 'ครูตรวจเหตุผลด้วยมือ' },
   { value: 'always',     label: 'ให้เหตุผลทั้งถูกและผิด',          desc: 'ครูตรวจเหตุผลด้วยมือ' },
 ]
+
+function newStatement(): TrueFalseStatement {
+  return { id: Math.random().toString(36).slice(2), text: '', correct_answer: true }
+}
+
+// The main statement — always item ก. Shown bare (no card) until a sub-statement
+// is added, then wrapped in AnswerPartCard by the caller.
+function TrueFalseMainItem({
+  editorRef, questionText, onQuestionTextChange,
+  imageUrls, onImageUrlsChange, onOpenWhiteboard,
+  correctAnswer, onCorrectAnswerChange,
+}: {
+  editorRef: React.RefObject<RichTextEditorHandle | null>
+  questionText: string; onQuestionTextChange: (v: string) => void
+  imageUrls: string[]; onImageUrlsChange: (v: string[]) => void
+  onOpenWhiteboard: () => void
+  correctAnswer: boolean; onCorrectAnswerChange: (v: boolean) => void
+}) {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label>ข้อความ *</Label>
+        <RichTextEditor
+          ref={editorRef}
+          value={questionText}
+          onChange={onQuestionTextChange}
+          placeholder="เช่น แสงเดินทางได้เร็วกว่าเสียงในอากาศ"
+          rows={4}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>รูปภาพประกอบ (ไม่บังคับ)</Label>
+        <QuestionImageUpload value={imageUrls} onChange={onImageUrlsChange} onOpenWhiteboard={onOpenWhiteboard} />
+      </div>
+      <div>
+        <p className="text-sm text-gray-600 mb-2">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
+        <div className="flex gap-3">
+          {[
+            { val: true,  label: '✓ ถูก',  cls: 'border-green-500 bg-green-50 text-green-700' },
+            { val: false, label: '✗ ผิด',  cls: 'border-red-500 bg-red-50 text-red-700' },
+          ].map(({ val, label, cls }) => (
+            <button
+              key={String(val)}
+              type="button"
+              onClick={() => onCorrectAnswerChange(val)}
+              className={`flex-1 py-4 rounded-xl border-2 font-semibold text-lg transition-colors ${
+                correctAnswer === val ? cls : 'border-gray-200 text-gray-400 hover:border-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 mt-2">เลือกว่าคำตอบที่ถูกต้องคืออะไร นักเรียนจะเห็นปุ่มทั้งสองปุ่มเสมอ</p>
+      </div>
+    </>
+  )
+}
 
 export function TrueFalseForm({ allTags }: TrueFalseFormProps) {
   const router = useRouter()
@@ -42,16 +102,32 @@ export function TrueFalseForm({ allTags }: TrueFalseFormProps) {
   const [showWhiteboard, setShowWhiteboard] = useState(false)
 
   const [correctAnswer, setCorrectAnswer] = useState<boolean>(true)
+  const [statements, setStatements] = useState<TrueFalseStatement[]>([])
+  const [labelStyle, setLabelStyle] = useState<PartLabelStyle>('thai')
   const [explanationMode, setExplanationMode] = useState<TrueFalseExplanationMode>('none')
   const [scoreAnswer, setScoreAnswer] = useState(1)
   const [scoreExplanation, setScoreExplanation] = useState(1)
   const [solutionText, setSolutionText] = useState('')
+
+  const labels = PART_LABEL_SETS[labelStyle]
+
+  function addStatement() {
+    setStatements(s => [...s, newStatement()])
+  }
+  function updateStatement(i: number, patch: Partial<TrueFalseStatement>) {
+    setStatements(s => s.map((st, idx) => idx === i ? { ...st, ...patch } : st))
+  }
+  function removeStatement(i: number) {
+    setStatements(s => s.filter((_, idx) => idx !== i))
+  }
 
   const trueFalseConfig: TrueFalseConfig = {
     correct_answer: correctAnswer,
     explanation_mode: explanationMode,
     score_answer: scoreAnswer,
     score_explanation: scoreExplanation,
+    statements: statements.length > 0 ? statements : undefined,
+    part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -60,6 +136,10 @@ export function TrueFalseForm({ allTags }: TrueFalseFormProps) {
     if (!subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
     const plainText = questionText.replace(/<[^>]*>/g, '').trim()
     if (!plainText) { toast.error('กรอกเนื้อหาข้อความด้วย'); return }
+    const emptyIdx = statements.findIndex(s => !s.text.replace(/<[^>]*>/g, '').trim())
+    if (emptyIdx !== -1) {
+      toast.error(`กรอกข้อความข้อย่อย ${labels[emptyIdx + 1] ?? emptyIdx + 2} ด้วย`); return
+    }
     if (scoreAnswer <= 0) { toast.error('คะแนนส่วนถูก/ผิดต้องมากกว่า 0'); return }
     if (explanationMode !== 'none' && scoreExplanation <= 0) {
       toast.error('คะแนนส่วนเหตุผลต้องมากกว่า 0'); return
@@ -96,45 +176,67 @@ export function TrueFalseForm({ allTags }: TrueFalseFormProps) {
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาข้อความ</h2>
-        <p className="text-xs text-gray-500">พิมพ์ข้อความที่นักเรียนจะต้องตัดสินว่าถูกหรือผิด</p>
-        <div className="space-y-1.5">
-          <Label>ข้อความ *</Label>
-          <RichTextEditor
-            ref={editorRef}
-            value={questionText}
-            onChange={setQuestionText}
-            placeholder="เช่น แสงเดินทางได้เร็วกว่าเสียงในอากาศ"
-            rows={4}
-          />
+        <div className="flex items-center justify-between border-b pb-2">
+          <h2 className="text-base font-semibold text-gray-900">ชุดข้อความถูก-ผิด</h2>
+          {statements.length > 0 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
         </div>
-        <div className="space-y-1.5">
-          <Label>รูปภาพประกอบ (ไม่บังคับ)</Label>
-          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
-        </div>
-      </section>
+        <p className="text-xs text-gray-500">พิมพ์ข้อความที่นักเรียนจะต้องตัดสินว่าถูกหรือผิด — กดเพิ่มข้อย่อยได้ถ้าอยากให้มีหลายข้อความในโจทย์เดียว</p>
 
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">คำตอบ</h2>
-        <p className="text-sm text-gray-600">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
-        <div className="flex gap-3">
-          {[
-            { val: true,  label: '✓ ถูก',  cls: 'border-green-500 bg-green-50 text-green-700' },
-            { val: false, label: '✗ ผิด',  cls: 'border-red-500 bg-red-50 text-red-700' },
-          ].map(({ val, label, cls }) => (
-            <button
-              key={String(val)}
-              type="button"
-              onClick={() => setCorrectAnswer(val)}
-              className={`flex-1 py-4 rounded-xl border-2 font-semibold text-lg transition-colors ${
-                correctAnswer === val ? cls : 'border-gray-200 text-gray-400 hover:border-gray-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-gray-400">เลือกว่าคำตอบที่ถูกต้องคืออะไร นักเรียนจะเห็นปุ่มทั้งสองปุ่มเสมอ</p>
+        {statements.length > 0 ? (
+          <AnswerPartCard label={labels[0]} locked>
+            <TrueFalseMainItem
+              editorRef={editorRef}
+              questionText={questionText} onQuestionTextChange={setQuestionText}
+              imageUrls={imageUrls} onImageUrlsChange={setImageUrls}
+              onOpenWhiteboard={() => setShowWhiteboard(true)}
+              correctAnswer={correctAnswer} onCorrectAnswerChange={setCorrectAnswer}
+            />
+          </AnswerPartCard>
+        ) : (
+          <TrueFalseMainItem
+            editorRef={editorRef}
+            questionText={questionText} onQuestionTextChange={setQuestionText}
+            imageUrls={imageUrls} onImageUrlsChange={setImageUrls}
+            onOpenWhiteboard={() => setShowWhiteboard(true)}
+            correctAnswer={correctAnswer} onCorrectAnswerChange={setCorrectAnswer}
+          />
+        )}
+
+        {statements.map((st, i) => (
+          <AnswerPartCard key={st.id} label={labels[i + 1] ?? String(i + 2)} onRemove={() => removeStatement(i)}>
+            <div className="space-y-1.5">
+              <Label>ข้อความย่อย *</Label>
+              <RichTextEditor
+                value={st.text}
+                onChange={v => updateStatement(i, { text: v })}
+                placeholder="พิมพ์ข้อความที่ต้องตัดสินถูก-ผิด..."
+                rows={2}
+              />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 mb-2">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
+              <div className="flex gap-3">
+                {[
+                  { val: true,  label: '✓ ถูก',  cls: 'border-green-500 bg-green-50 text-green-700' },
+                  { val: false, label: '✗ ผิด',  cls: 'border-red-500 bg-red-50 text-red-700' },
+                ].map(({ val, label, cls }) => (
+                  <button
+                    key={String(val)}
+                    type="button"
+                    onClick={() => updateStatement(i, { correct_answer: val })}
+                    className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+                      st.correct_answer === val ? cls : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </AnswerPartCard>
+        ))}
+
+        <AddSubItemButton onClick={addStatement} label="เพิ่มข้อย่อย" />
       </section>
 
       <section className="space-y-4">

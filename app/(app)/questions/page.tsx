@@ -12,12 +12,14 @@ export default async function QuestionsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: questions } = await supabase
+  const { data: questions, error } = await supabase
     .from('questions')
     .select('*, question_categories(name)')
     .eq('created_by', user.id)
     .or('group_id.is.null,order_in_group.eq.0')
     .order('created_at', { ascending: false })
+
+  if (error) console.error('[questions/page] query failed:', error)
 
   return <QuestionBankClient questions={(questions ?? []) as QuestionWithCategory[]} />
 }

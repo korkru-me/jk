@@ -31,9 +31,10 @@ const TYPE_SHORT: Record<string, string> = {
 interface Props {
   classrooms: Classroom[]
   questions: Question[]
+  preselectedClassroomId?: string
 }
 
-export function CreateAssignmentForm({ classrooms, questions }: Props) {
+export function CreateAssignmentForm({ classrooms, questions, preselectedClassroomId }: Props) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
@@ -41,8 +42,11 @@ export function CreateAssignmentForm({ classrooms, questions }: Props) {
   // Step 1
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [classroomId, setClassroomId] = useState(classrooms[0]?.id ?? '')
+  const [classroomIds, setClassroomIds] = useState<string[]>(
+    preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
+  )
   const [mode, setMode] = useState<'online' | 'print'>('online')
+  const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exam')
 
   // Step 2
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -69,8 +73,12 @@ export function CreateAssignmentForm({ classrooms, questions }: Props) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
+  function toggleClassroom(id: string) {
+    setClassroomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  }
+
   function canNext() {
-    if (step === 0) return title.trim().length > 0 && classroomId.length > 0 && classrooms.length > 0
+    if (step === 0) return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
     if (step === 1) return selectedIds.length > 0
     return true
   }
@@ -78,7 +86,7 @@ export function CreateAssignmentForm({ classrooms, questions }: Props) {
   function handleSubmit() {
     startTransition(async () => {
       const res = await createAssignment({
-        classroom_id: classroomId,
+        classroom_ids: classroomIds,
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
@@ -86,6 +94,7 @@ export function CreateAssignmentForm({ classrooms, questions }: Props) {
         end_at: endAt || null,
         duration_minutes: duration ? Number(duration) : null,
         mode,
+        type: assignmentType,
       })
       if (res?.error) toast.error(res.error)
     })
@@ -145,7 +154,7 @@ export function CreateAssignmentForm({ classrooms, questions }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <Label>ห้องเรียน <span className="text-red-500">*</span></Label>
+              <Label>ห้องเรียน <span className="text-red-500">*</span> {classroomIds.length > 1 && <span className="text-gray-400 font-normal">({classroomIds.length} ห้อง)</span>}</Label>
               {classrooms.length === 0 ? (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
                   ยังไม่มีห้องเรียน กรุณา{' '}
@@ -153,29 +162,54 @@ export function CreateAssignmentForm({ classrooms, questions }: Props) {
                 </div>
               ) : (
                 <div className="grid gap-2">
-                  {classrooms.map(c => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setClassroomId(c.id)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                        classroomId === c.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        classroomId === c.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        <BookOpen className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                        {c.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{c.description}</p>}
-                      </div>
-                      {classroomId === c.id && <Check className="w-4 h-4 text-blue-500 shrink-0" />}
-                    </button>
-                  ))}
+                  {classrooms.map(c => {
+                    const isSelected = classroomIds.includes(c.id)
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => toggleClassroom(c.id)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isSelected ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          <BookOpen className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                          {c.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{c.description}</p>}
+                        </div>
+                        {isSelected && <Check className="w-4 h-4 text-blue-500 shrink-0" />}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
+            <h2 className="font-semibold text-gray-900">ประเภทงาน</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {(['exam', 'exercise'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setAssignmentType(t)}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    assignmentType === t ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-2xl mb-2">{t === 'exam' ? '📝' : '🔁'}</div>
+                  <p className="font-medium text-sm text-gray-900">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {t === 'exam' ? 'ทำได้ครั้งเดียว' : 'ทำได้หลายครั้ง'}
+                  </p>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -394,7 +428,13 @@ export function CreateAssignmentForm({ classrooms, questions }: Props) {
             <div className="space-y-2.5 text-sm">
               {[
                 { label: 'ชื่อ',      value: title },
-                { label: 'ห้องเรียน', value: classrooms.find(c => c.id === classroomId)?.name ?? '—' },
+                {
+                  label: 'ห้องเรียน',
+                  value: classroomIds.length <= 1
+                    ? (classrooms.find(c => c.id === classroomIds[0])?.name ?? '—')
+                    : `${classrooms.find(c => c.id === classroomIds[0])?.name ?? ''} และอีก ${classroomIds.length - 1} ห้อง`,
+                },
+                { label: 'ประเภท',    value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
                 { label: 'โจทย์',     value: `${selectedIds.length} ข้อ` },
                 { label: 'โหมด',      value: mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
                 ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),

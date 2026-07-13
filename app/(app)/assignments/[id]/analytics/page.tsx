@@ -35,7 +35,9 @@ export default async function AnalyticsPage({
   if (!assignment) notFound()
 
   const a = assignment as Assignment & { classrooms: { name: string } | null }
-  if (a.created_by !== user.id) redirect('/assignments')
+  // No explicit ownership check here — RLS (assignments_org_teacher_all /
+  // assignments_co_teacher_all) already scoped the row above; a null result
+  // means unauthorized and is handled by notFound() before this point.
 
   const [{ data: questions }, { data: submissions }] = await Promise.all([
     supabase

@@ -15,11 +15,11 @@ import { Calculator } from './calculator'
 import { FormulaSheet } from './formula-sheet'
 import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
-import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
+import { partLabels } from '@/lib/part-labels'
+import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-const PART_LABELS  = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 const LS_KEY = (id: string) => `korkru_exam_${id}`
 
@@ -37,7 +37,7 @@ interface AnswerRow {
     mcq_options: Array<{ text: string; is_correct: boolean }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
     answer_parts: AnswerPart[] | null
-    extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | null
+    extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | null
     image_urls: string[] | null
   }
 }
@@ -415,6 +415,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             <MultiPartAnswerInput
               answerId={current.id}
               parts={current.questions.answer_parts}
+              labels={partLabels((current.questions.extra_data as RandomQuestionConfig | null)?.part_label_style)}
               fallbackUnit={current.questions.answer_unit}
               rawValue={localAnswers[current.id] ?? ''}
               onSingleChange={val => handleAnswerChange(current.id, val)}
@@ -910,10 +911,11 @@ function MCQInput({
 // ─── Multi-part numeric ───────────────────────────────────────────────────────
 
 function MultiPartAnswerInput({
-  answerId, parts, fallbackUnit, rawValue, onSingleChange, onPartChange,
+  answerId, parts, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
 }: {
   answerId: string
   parts: AnswerPart[] | null
+  labels: string[]
   fallbackUnit: string | null
   rawValue: string
   onSingleChange: (val: string) => void
@@ -941,7 +943,7 @@ function MultiPartAnswerInput({
       {activeParts.map((part, i) => (
         <div key={part.id} className="space-y-1">
           <label className="text-sm font-medium">
-            {PART_LABELS[i] ?? i + 1})
+            {labels[i] ?? i + 1})
             {part.sub_text && <RichText text={part.sub_text} className="font-normal text-muted-foreground ml-1" />}
           </label>
           <div className="flex items-center gap-2">
@@ -960,36 +962,90 @@ function MultiPartAnswerInput({
 function TrueFalseAnswerInput({ config, rawValue, onChange }: {
   answerId: string; config: TrueFalseConfig | null; rawValue: string; onChange: (v: string) => void
 }) {
-  let tfAnswer = rawValue; let explanation = ''
-  if (rawValue.startsWith('{')) {
-    try { const p = JSON.parse(rawValue); tfAnswer = p.answer ?? ''; explanation = p.explanation ?? '' } catch { /* */ }
-  }
   const mode = config?.explanation_mode ?? 'none'
-  function update(a: string, exp: string) {
-    mode === 'none' ? onChange(a) : onChange(JSON.stringify({ answer: a, explanation: exp }))
+  const subStatements = config?.statements ?? []
+
+  if (subStatements.length === 0) {
+    let tfAnswer = rawValue; let explanation = ''
+    if (rawValue.startsWith('{')) {
+      try { const p = JSON.parse(rawValue); tfAnswer = p.answer ?? ''; explanation = p.explanation ?? '' } catch { /* */ }
+    }
+    function update(a: string, exp: string) {
+      mode === 'none' ? onChange(a) : onChange(JSON.stringify({ answer: a, explanation: exp }))
+    }
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-medium">ข้อความนี้ถูกหรือผิด?</p>
+        <div className="flex gap-3">
+          {([
+            { val: 'true',  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400' },
+            { val: 'false', label: '✗ ผิด', cls: 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' },
+          ] as const).map(({ val, label, cls }) => (
+            <button key={val} type="button" onClick={() => update(val, explanation)}
+              className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+                tfAnswer === val ? cls : 'border-border text-muted-foreground hover:border-muted-foreground'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {mode !== 'none' && (
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">
+              {mode === 'wrong_only' ? 'เหตุผล (กรณีตอบผิด):' : 'เหตุผล:'}
+            </label>
+            <textarea value={explanation} onChange={e => update(tfAnswer, e.target.value)} rows={3}
+              placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
+            <p className="text-xs text-amber-600">ครูจะตรวจและให้คะแนนด้วยมือ</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  let answers: string[] = []; let explanation = ''
+  if (rawValue) {
+    try { const p = JSON.parse(rawValue); answers = p.answers ?? []; explanation = p.explanation ?? '' } catch { /* */ }
+  }
+  const labels = partLabels(config?.part_label_style)
+  function updateAnswer(i: number, val: string) {
+    const next = [...answers]
+    next[i] = val
+    onChange(JSON.stringify({ answers: next, explanation }))
+  }
+  function updateExplanation(exp: string) {
+    onChange(JSON.stringify({ answers, explanation: exp }))
   }
   return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium">ข้อความนี้ถูกหรือผิด?</p>
-      <div className="flex gap-3">
-        {([
-          { val: 'true',  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400' },
-          { val: 'false', label: '✗ ผิด', cls: 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' },
-        ] as const).map(({ val, label, cls }) => (
-          <button key={val} type="button" onClick={() => update(val, explanation)}
-            className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
-              tfAnswer === val ? cls : 'border-border text-muted-foreground hover:border-muted-foreground'
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-4">
+      <p className="text-sm font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
+      {[null, ...subStatements].map((st, i) => (
+        <div key={i} className="space-y-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
+            {st && <RichText text={st.text} className="text-sm" />}
+          </div>
+          <div className="flex gap-3">
+            {([
+              { val: 'true',  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400' },
+              { val: 'false', label: '✗ ผิด', cls: 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' },
+            ] as const).map(({ val, label, cls }) => (
+              <button key={val} type="button" onClick={() => updateAnswer(i, val)}
+                className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+                  answers[i] === val ? cls : 'border-border text-muted-foreground hover:border-muted-foreground'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
       {mode !== 'none' && (
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">
             {mode === 'wrong_only' ? 'เหตุผล (กรณีตอบผิด):' : 'เหตุผล:'}
           </label>
-          <textarea value={explanation} onChange={e => update(tfAnswer, e.target.value)} rows={3}
+          <textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
             placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
           <p className="text-xs text-amber-600">ครูจะตรวจและให้คะแนนด้วยมือ</p>
         </div>

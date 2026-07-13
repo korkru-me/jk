@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import { DIFF_META, mockStats } from './question-card'
 import { RichText } from '@/components/ui/rich-text'
+import { partLabels } from '@/lib/part-labels'
+import type { TrueFalseConfig } from '@/lib/types'
 import type { QuestionWithCategory } from '../page'
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
@@ -202,14 +204,33 @@ function ContentTab({ q }: { q: QuestionWithCategory }) {
       )}
 
       {/* True/False */}
-      {q.question_type === 'true_false' && q.extra_data && 'correct_answer' in q.extra_data && (
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-          <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
-          <p className="text-sm font-bold text-blue-900">
-            {(q.extra_data as { correct_answer: boolean }).correct_answer ? '✓ ถูก (True)' : '✗ ผิด (False)'}
-          </p>
-        </div>
-      )}
+      {q.question_type === 'true_false' && q.extra_data && 'correct_answer' in q.extra_data && (() => {
+        const tf = q.extra_data as TrueFalseConfig
+        const statements = tf.statements ?? []
+        if (statements.length === 0) {
+          return (
+            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+              <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
+              <p className="text-sm font-bold text-blue-900">
+                {tf.correct_answer ? '✓ ถูก (True)' : '✗ ผิด (False)'}
+              </p>
+            </div>
+          )
+        }
+        const labels = partLabels(tf.part_label_style)
+        return (
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-1.5">
+            <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
+            <p className="text-sm font-bold text-blue-900">{labels[0]}) {tf.correct_answer ? '✓ ถูก' : '✗ ผิด'}</p>
+            {statements.map((s, i) => (
+              <p key={s.id} className="text-sm font-bold text-blue-900">
+                {labels[i + 1] ?? i + 2}) {s.correct_answer ? '✓ ถูก' : '✗ ผิด'}
+                {s.text && <RichText text={s.text} className="ml-2 font-normal text-blue-700" />}
+              </p>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Solution text */}
       {q.solution_text && (

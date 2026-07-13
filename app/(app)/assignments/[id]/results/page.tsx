@@ -18,11 +18,12 @@ export default async function ResultsPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // No explicit created_by filter — RLS (assignments_org_teacher_all /
+  // assignments_co_teacher_all) already scopes this to owner or co-teacher.
   const { data: assignment } = await supabase
     .from('assignments')
     .select('*, classrooms(name)')
     .eq('id', id)
-    .eq('created_by', user.id)
     .maybeSingle()
 
   if (!assignment) notFound()
