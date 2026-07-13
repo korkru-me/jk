@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, Zap } from 'lucide-react'
+import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight } from 'lucide-react'
 
 const QUESTION_TYPES = [
   {
@@ -67,24 +67,6 @@ export default function NewQuestionTypePage() {
         <h1 className="text-2xl font-bold text-gray-900">สร้างโจทย์ใหม่</h1>
         <p className="text-sm text-gray-500 mt-1">เลือกประเภทโจทย์ที่ต้องการสร้าง</p>
       </div>
-
-      {/* Advanced Editor Banner */}
-      <Link
-        href="/questions/advanced/new"
-        className="flex items-center gap-4 p-4 rounded-xl border-2 border-indigo-300 bg-gradient-to-r from-indigo-50 to-violet-50 hover:shadow-lg hover:border-indigo-400 transition-all group"
-      >
-        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0">
-          <Zap className="w-5 h-5 text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm text-indigo-800">Advanced Question Editor</p>
-          <p className="text-xs mt-0.5 text-indigo-600 leading-relaxed">
-            Split-screen LaTeX · ตัวแปรสุ่ม · กราฟเวกเตอร์ · โจทย์สถานการณ์ PISA · บันทึกอัตโนมัติ
-          </p>
-        </div>
-        <span className="text-xs font-bold text-white bg-indigo-600 px-2.5 py-1 rounded-full shrink-0">ใหม่</span>
-        <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
-      </Link>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {QUESTION_TYPES.map((type) => {

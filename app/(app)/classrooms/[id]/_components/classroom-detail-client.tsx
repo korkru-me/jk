@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   Users, BookOpen, Copy, Check, Settings,
   GraduationCap, UserPlus, Grid3x3, Mail, GitBranch, Activity, ChevronLeft,
+  ClipboardList,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -13,22 +14,26 @@ import type { Classroom } from '@/lib/types'
 
 import { StudentTable } from './student-table'
 import { InvitePanel } from './invite-panel'
-import { CoTeachers } from './co-teachers'
+import { CoTeachers, type CoTeacherRow, type InviteRow } from './co-teachers'
+import { ClassroomAssignmentsTab, type ClassroomAssignmentRow } from './classroom-assignments-tab'
+import { ClassroomScoresMatrix } from './classroom-scores-matrix'
 import { ParentPortal } from './parent-portal'
 import { LearningPaths } from './learning-paths'
 import { AuditLog } from './audit-log'
 import { BreakoutGroups } from './breakout-groups'
 
-type Tab = 'students' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
+type Tab = 'students' | 'assignments' | 'scores' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
 
-const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
-  { key: 'students',   label: 'นักเรียน',      icon: Users },
-  { key: 'groups',     label: 'กลุ่มย่อย',     icon: Grid3x3 },
-  { key: 'invite',     label: 'เชิญเข้าร่วม',  icon: UserPlus },
-  { key: 'coteachers', label: 'ผู้ช่วยสอน',    icon: GraduationCap },
-  { key: 'parents',    label: 'ผู้ปกครอง',     icon: Mail },
-  { key: 'paths',      label: 'เส้นทางการเรียน', icon: GitBranch },
-  { key: 'log',        label: 'ประวัติ',        icon: Activity },
+const TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
+  { key: 'students',    label: 'นักเรียน',        icon: Users },
+  { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
+  { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
+  { key: 'groups',      label: 'กลุ่มย่อย',       icon: Grid3x3 },
+  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
+  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
+  { key: 'parents',     label: 'ผู้ปกครอง',       icon: Mail },
+  { key: 'paths',       label: 'เส้นทางการเรียน', icon: GitBranch },
+  { key: 'log',         label: 'ประวัติ',          icon: Activity },
 ]
 
 interface RealStudent { id: string; full_name: string; email: string }
@@ -39,11 +44,23 @@ interface Props {
   assignmentCount: number
   otherClassrooms: { id: string; name: string }[]
   isOwner: boolean
+  canManage: boolean
+  coTeachers: CoTeacherRow[]
+  invites: InviteRow[]
+  classroomAssignments: ClassroomAssignmentRow[]
+  classroomSubmissions: {
+    id: string; assignment_id: string; student_id: string; status: string
+    total_score: number | null; max_score: number; submitted_at: string | null; attempt_number: number
+  }[]
+  classroomExtensions: {
+    id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
+  }[]
   ownerName: string
 }
 
 export function ClassroomDetailClient({
-  classroom, students, assignmentCount, otherClassrooms, isOwner, ownerName,
+  classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
+  classroomAssignments, classroomSubmissions, classroomExtensions, ownerName,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('students')
   const [codeCopied, setCodeCopied] = useState(false)
@@ -84,7 +101,7 @@ export function ClassroomDetailClient({
                 <span className="font-semibold">{assignmentCount}</span>
                 <span className="text-gray-400">ชุดข้อสอบ</span>
               </div>
-              <Link href={`/assignments/new`} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">
+              <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">
                 + สร้างชุดข้อสอบ
               </Link>
             </div>
@@ -120,7 +137,7 @@ export function ClassroomDetailClient({
 
       {/* Tab bar */}
       <div className="flex items-center gap-1 bg-gray-100 rounded-2xl p-1 overflow-x-auto">
-        {TABS.map(tab => {
+        {TABS.filter(tab => !tab.managerOnly || canManage).map(tab => {
           const Icon = tab.icon
           return (
             <button
@@ -155,6 +172,22 @@ export function ClassroomDetailClient({
             otherClassrooms={otherClassrooms}
           />
         )}
+        {activeTab === 'assignments' && canManage && (
+          <ClassroomAssignmentsTab
+            classroomId={classroom.id}
+            assignments={classroomAssignments}
+            onViewScores={() => setActiveTab('scores')}
+          />
+        )}
+        {activeTab === 'scores' && canManage && (
+          <ClassroomScoresMatrix
+            classroomId={classroom.id}
+            students={students}
+            assignments={classroomAssignments}
+            submissions={classroomSubmissions}
+            extensions={classroomExtensions}
+          />
+        )}
         {activeTab === 'groups' && (
           <BreakoutGroups students={students} />
         )}
@@ -165,7 +198,13 @@ export function ClassroomDetailClient({
         )}
         {activeTab === 'coteachers' && (
           <div className="max-w-2xl">
-            <CoTeachers ownerName={ownerName} />
+            <CoTeachers
+              classroomId={classroom.id}
+              ownerName={ownerName}
+              canManage={canManage}
+              coTeachers={coTeachers}
+              invites={invites}
+            />
           </div>
         )}
         {activeTab === 'parents' && (

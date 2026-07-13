@@ -8,10 +8,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
-import { Plus, Trash2, ChevronDown, ChevronRight, Info, Target, X } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Info, Target, X } from 'lucide-react'
 
 import { GeneralInfoSection } from './general-info-section'
-import { FormulaEditor } from './formula-editor/index'
 import { QuestionPreview } from './question-preview'
 import { QuestionImageUpload } from './question-image-upload'
 import { WhiteboardModal } from './whiteboard-modal'
@@ -23,13 +22,15 @@ import type {
   FormulaPreset, Variable, LogicRule, LogicOperator, AnswerPart, Difficulty, Visibility,
   PythagoreanGroup,
 } from '@/lib/types'
+import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
+import { AnswerPartCard, LabelStyleToggle, AddSubItemButton } from './answer-set-controls'
 
-type CreationMode = 'from-equation' | 'manual' | 'fixed'
+type CreationMode = 'from-equation' | 'fixed'
 type PresetWithCat = FormulaPreset & { question_categories: { name: string } | null }
 
-const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
-// 0 = main question, 1 = ข้อย่อย ก, 2 = ข้อย่อย ข, ...
-const PREV_ANS_LABELS = ['คำตอบหลัก', 'คำตอบ ก)', 'คำตอบ ข)', 'คำตอบ ค)', 'คำตอบ ง)', 'คำตอบ จ)', 'คำตอบ ฉ)', 'คำตอบ ช)']
+// answerParts[0] (the main question's own answer) is the first item in the answer
+// set (ก / 1 / a), matching how students see it during the exam. answerParts[1] is
+// the second (ข / 2 / b), and so on.
 
 const MATH_KW = new Set(['sin','cos','tan','asin','acos','atan','sinh','cosh','tanh','sqrt','cbrt','log','log2','log10','exp','abs','ceil','floor','round','sign','pi','e'])
 
@@ -60,15 +61,6 @@ function extractRHS(eq: string): string {
 
 function newPart(): AnswerPart {
   return { id: Math.random().toString(36).slice(2), sub_text: '', formula: '', unit: '', tolerance: 0 }
-}
-
-// Returns virtual Variable objects for ans0, ans1, ... ans_{partIndex-1}
-function makePrevAnswerVars(partIndex: number): Variable[] {
-  return Array.from({ length: partIndex }, (_, i) => ({
-    name: `ans${i}`,
-    min: 0, max: 100, step: 1,
-    type: 'reference' as const,
-  }))
 }
 
 // ─── SelectField ──────────────────────────────────────────────────────────────
@@ -866,89 +858,16 @@ function SavePresetControl({ equation, targetVariable, variables, onSaved }: {
   )
 }
 
-// ─── ManualVariableAdder ──────────────────────────────────────────────────────
-
-function ManualVariableAdder({
-  variables, onVariablesChange,
-  logicRules, onLogicRulesChange,
-  onSetAnswer,
-}: {
-  variables: Variable[]
-  onVariablesChange: (v: Variable[]) => void
-  logicRules: LogicRule[]
-  onLogicRulesChange: (r: LogicRule[]) => void
-  onSetAnswer?: (name: string | null) => void
-}) {
-  const [name, setName] = useState('')
-  const [error, setError] = useState('')
-
-  function handleAdd() {
-    const n = name.trim()
-    if (!n) { setError('กรอกชื่อตัวแปร'); return }
-    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(n)) { setError('ต้องขึ้นต้นด้วยอักษรภาษาอังกฤษ'); return }
-    if (variables.some(v => v.name === n)) { setError('มีตัวแปรนี้แล้ว'); return }
-    onVariablesChange([...variables, { name: n, min: 1, max: 10, step: 1, type: 'value' }])
-    setName('')
-    setError('')
-  }
-
-  return (
-    <div className="space-y-3">
-      {variables.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีตัวแปร — พิมพ์ชื่อตัวแปรด้านล่างเพื่อเพิ่ม</p>
-      ) : (
-        <VarList
-          variables={variables}
-          onChange={onVariablesChange}
-          logicRules={logicRules}
-          onLogicRulesChange={onLogicRulesChange}
-          onSetAnswer={onSetAnswer}
-        />
-      )}
-
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <Input
-            value={name}
-            onChange={e => { setName(e.target.value); setError('') }}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAdd() } }}
-            placeholder="เช่น m, v, F, a, theta, omega"
-            className="h-9 text-sm font-mono"
-          />
-          {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-        </div>
-        <Button type="button" size="sm" variant="outline" onClick={handleAdd} className="h-9 shrink-0 px-3 gap-1">
-          <Plus className="w-3.5 h-3.5" /> เพิ่ม
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ─── AddSubQuestionButton ─────────────────────────────────────────────────────
-
-function AddSubQuestionButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 border-2 border-dashed border-blue-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors w-full justify-center"
-    >
-      <Plus className="w-4 h-4" />
-      เพิ่มโจทย์ย่อย
-    </button>
-  )
-}
-
 // ─── SubEquationPicker ────────────────────────────────────────────────────────
 // Lighter equation picker for sub questions — derives formula only, no variable management.
 
 function SubEquationPicker({
-  presets, mainVarNames, partIndex, onFormulaChange,
+  presets, mainVarNames, partIndex, labels, onFormulaChange,
 }: {
   presets: PresetWithCat[]
   mainVarNames: string[]
-  partIndex: number  // index in answerParts (1 = ก, 2 = ข, ...)
+  partIndex: number  // index in answerParts (1 = second label, 2 = third, ...)
+  labels: string[]
   onFormulaChange: (formula: string) => void
 }) {
   const [selPresetId, setSelPresetId] = useState('')
@@ -1045,7 +964,7 @@ function SubEquationPicker({
                   className="font-mono text-xs px-2.5 py-1 rounded-lg border-2 border-amber-200 bg-amber-50 text-amber-800 font-bold hover:bg-amber-100 transition-colors"
                 >
                   {name}
-                  <span className="ml-1.5 font-normal text-amber-500 text-[10px]">{PREV_ANS_LABELS[i]}</span>
+                  <span className="ml-1.5 font-normal text-amber-500 text-[10px]">คำตอบ {labels[i]})</span>
                 </button>
               ))}
             </div>
@@ -1116,125 +1035,44 @@ function SubEquationPicker({
 // Sub question for "from-equation" mode — no variable management, shares main vars.
 
 function SubQuestionFromEquation({
-  part, index, presets, mainVariables, onChange, onRemove,
+  part, index, presets, mainVariables, labels, onChange, onRemove,
 }: {
   part: AnswerPart; index: number; presets: PresetWithCat[]
-  mainVariables: Variable[]
+  mainVariables: Variable[]; labels: string[]
   onChange: (patch: Partial<AnswerPart>) => void; onRemove: () => void
 }) {
-  const label = PART_LABELS[index] ?? String(index + 1)
+  const label = labels[index + 1] ?? String(index + 2)
   const partIndex = index + 1  // position in answerParts array
   const mainVarNames = mainVariables.filter(v => !v.is_answer).map(v => v.name)
   const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-        <span className="text-sm font-bold text-gray-700">ข้อย่อย {label})</span>
-        <button type="button" onClick={onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">
-          <Trash2 className="w-3.5 h-3.5" /> ลบข้อนี้
-        </button>
+    <AnswerPartCard label={label} onRemove={onRemove}>
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">เลือกสมการ</p>
+        <SubEquationPicker
+          presets={presets}
+          mainVarNames={mainVarNames}
+          partIndex={partIndex}
+          labels={labels}
+          onFormulaChange={formula => onChange({ formula })}
+        />
       </div>
-      <div className="p-4 space-y-4">
-        <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">เลือกสมการ</p>
-          <SubEquationPicker
-            presets={presets}
-            mainVarNames={mainVarNames}
-            partIndex={partIndex}
-            onFormulaChange={formula => onChange({ formula })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-          <RichTextEditor
-            ref={subTextEditorRef}
-            value={part.sub_text}
-            onChange={v => onChange({ sub_text: v })}
-            placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
-            rows={1}
-          />
-          <Button type="button" variant="outline" size="sm" className="text-xs h-8"
-            onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
-            + [คำตอบ]
-          </Button>
-        </div>
+      <div className="space-y-1.5">
+        <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <RichTextEditor
+          ref={subTextEditorRef}
+          value={part.sub_text}
+          onChange={v => onChange({ sub_text: v })}
+          placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
+          rows={1}
+        />
+        <Button type="button" variant="outline" size="sm" className="text-xs h-8"
+          onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
+          + [คำตอบ]
+        </Button>
       </div>
-    </div>
-  )
-}
-
-// ─── SubQuestionManual ────────────────────────────────────────────────────────
-// Sub question for "manual" mode — no variable management, shares main vars + prev answers.
-
-function SubQuestionManual({
-  part, index, presets, mainVariables, onChange, onRemove,
-}: {
-  part: AnswerPart; index: number; presets: PresetWithCat[]
-  mainVariables: Variable[]
-  onChange: (patch: Partial<AnswerPart>) => void; onRemove: () => void
-}) {
-  const label = PART_LABELS[index] ?? String(index + 1)
-  const partIndex = index + 1  // position in answerParts array
-  const prevVars = makePrevAnswerVars(partIndex)
-  // FormulaEditor sees all main input vars + virtual prev-answer vars
-  const allAvailableVars = [...mainVariables.filter(v => !v.is_answer), ...prevVars]
-  const subTextEditorRef = useRef<RichTextEditorHandle>(null)
-
-  return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-        <span className="text-sm font-bold text-gray-700">ข้อย่อย {label})</span>
-        <button type="button" onClick={onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">
-          <Trash2 className="w-3.5 h-3.5" /> ลบข้อนี้
-        </button>
-      </div>
-      <div className="p-4 space-y-4">
-        {/* Prev answer reference panel */}
-        {prevVars.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 space-y-1.5">
-            <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">
-              คำตอบที่ใช้ได้จากข้อก่อนหน้า
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {prevVars.map((v, i) => (
-                <span key={v.name} className="font-mono text-xs px-2.5 py-1 rounded-lg border border-amber-300 bg-white text-amber-800 font-bold">
-                  {'{' + v.name + '}'}
-                  <span className="ml-1.5 font-normal text-amber-600 text-[10px]">{PREV_ANS_LABELS[i]}</span>
-                </span>
-              ))}
-            </div>
-            <p className="text-[10px] text-amber-600">กดที่แท็บ "ปุ่มกด" ของ Formula Editor ด้านล่างเพื่อแทรกลงสมการ</p>
-          </div>
-        )}
-
-        <div className="space-y-1.5">
-          <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-          <RichTextEditor
-            ref={subTextEditorRef}
-            value={part.sub_text}
-            onChange={v => onChange({ sub_text: v })}
-            placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
-            rows={1}
-          />
-          <Button type="button" variant="outline" size="sm" className="text-xs h-8"
-            onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
-            + [คำตอบ]
-          </Button>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">สมการคำตอบ</p>
-          <FormulaEditor
-            variables={allAvailableVars}
-            value={part.formula}
-            unit={part.unit}
-            presets={presets}
-            onChange={formula => onChange({ formula })}
-            onUnitChange={unit => onChange({ unit })}
-          />
-        </div>
-      </div>
-    </div>
+    </AnswerPartCard>
   )
 }
 
@@ -1242,49 +1080,41 @@ function SubQuestionManual({
 // Sub question for "fixed" mode — literal numeric answer, no formula/variables.
 
 function SubQuestionFixed({
-  part, index, onChange, onRemove,
+  part, index, labels, onChange, onRemove,
 }: {
-  part: AnswerPart; index: number
+  part: AnswerPart; index: number; labels: string[]
   onChange: (patch: Partial<AnswerPart>) => void; onRemove: () => void
 }) {
-  const label = PART_LABELS[index] ?? String(index + 1)
+  const label = labels[index + 1] ?? String(index + 2)
   const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-        <span className="text-sm font-bold text-gray-700">ข้อย่อย {label})</span>
-        <button type="button" onClick={onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">
-          <Trash2 className="w-3.5 h-3.5" /> ลบข้อนี้
-        </button>
+    <AnswerPartCard label={label} onRemove={onRemove}>
+      <div className="space-y-1.5">
+        <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <RichTextEditor
+          ref={subTextEditorRef}
+          value={part.sub_text}
+          onChange={v => onChange({ sub_text: v })}
+          placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
+          rows={1}
+        />
+        <Button type="button" variant="outline" size="sm" className="text-xs h-8"
+          onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
+          + [คำตอบ]
+        </Button>
       </div>
-      <div className="p-4 space-y-4">
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-          <RichTextEditor
-            ref={subTextEditorRef}
-            value={part.sub_text}
-            onChange={v => onChange({ sub_text: v })}
-            placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
-            rows={1}
-          />
-          <Button type="button" variant="outline" size="sm" className="text-xs h-8"
-            onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
-            + [คำตอบ]
-          </Button>
+          <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
+          <SpecialCharInput value={part.formula} onChange={v => onChange({ formula: v })} placeholder="เช่น 9.8" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
-            <SpecialCharInput value={part.formula} onChange={v => onChange({ formula: v })} placeholder="เช่น 9.8" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-gray-500">หน่วย</Label>
-            <SpecialCharInput value={part.unit} onChange={v => onChange({ unit: v })} placeholder="เช่น m/s²" />
-          </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-gray-500">หน่วย</Label>
+          <SpecialCharInput value={part.unit} onChange={v => onChange({ unit: v })} placeholder="เช่น m/s²" />
         </div>
       </div>
-    </div>
+    </AnswerPartCard>
   )
 }
 
@@ -1654,15 +1484,13 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
   const [logicRules, setLogicRules] = useState<LogicRule[]>([])
 
   const [answerParts, setAnswerParts] = useState<AnswerPart[]>([newPart()])
+  const [labelStyle, setLabelStyle] = useState<PartLabelStyle>('thai')
+  const labels = PART_LABEL_SETS[labelStyle]
   const [globalTolerance, setGlobalTolerance] = useState(0.1)
   const [answerStep, setAnswerStep] = useState(0)
   const [pythagoreanEnabled, setPythagoreanEnabled] = useState(false)
   const [pythagoreanGroups, setPythagoreanGroups] = useState<PythagoreanGroup[]>([])
   const [solutionText, setSolutionText] = useState('')
-
-  function handleSetAnswer(name: string | null) {
-    setVariables(vars => vars.map(v => ({ ...v, is_answer: name !== null && v.name === name })))
-  }
 
   function updatePart(i: number, patch: Partial<AnswerPart>) {
     setAnswerParts(parts => parts.map((p, idx) => idx === i ? { ...p, ...patch } : p))
@@ -1686,14 +1514,14 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
       if (!answerParts[0].formula.trim()) { toast.error('เลือกสมการก่อนบันทึก'); return }
       const badSub = answerParts.slice(1).findIndex(p => !p.formula.trim())
       if (badSub !== -1) {
-        toast.error(`เลือกสมการสำหรับข้อย่อย ${PART_LABELS[badSub] ?? badSub + 1} ด้วย`)
+        toast.error(`เลือกสมการสำหรับข้อย่อย ${labels[badSub + 1] ?? badSub + 2} ด้วย`)
         return
       }
     } else {
       const emptyIdx = answerParts.findIndex(p => !p.formula.trim())
       if (emptyIdx !== -1) {
         toast.error(answerParts.length > 1
-          ? `กรอกสมการคำตอบข้อย่อย ${PART_LABELS[emptyIdx] ?? emptyIdx + 1} ด้วย`
+          ? `กรอกสมการคำตอบข้อย่อย ${labels[emptyIdx] ?? emptyIdx + 1} ด้วย`
           : 'กรอกสมการคำตอบด้วย')
         return
       }
@@ -1717,6 +1545,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
       extra_data: {
         answer_step: answerStep > 0 ? answerStep : undefined,
         pythagorean_groups: pythagoreanGroups.length > 0 ? pythagoreanGroups : undefined,
+        part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
       },
       solution_text: solutionText, tags, image_urls: imageUrls,
     })
@@ -1728,14 +1557,79 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
   const answerVar = variables.find(v => v.is_answer)
   const inputVars = variables.filter(v => !v.is_answer)
 
+  // Main answer content per mode — shown bare (no card chrome) when there are no
+  // sub-questions yet, and wrapped in a labeled AnswerPartCard once one is added.
+  const fromEquationMainContent = (
+    <>
+      {answerVar && answerParts[0].formula && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <span className="font-mono font-bold text-emerald-700 text-sm">{'{'}{answerVar.name}{'}'}</span>
+          <span className="text-emerald-500">=</span>
+          <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{answerParts[0].formula}</span>
+          <span className="text-[10px] text-emerald-500 shrink-0">จากสมการที่เลือกด้านบน</span>
+        </div>
+      )}
+      <div className="space-y-1.5">
+        <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <RichTextEditor
+          ref={subTextEditorRef}
+          value={answerParts[0].sub_text ?? ''}
+          onChange={v => updatePart(0, { sub_text: v })}
+          placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
+          rows={1}
+        />
+        <Button
+          type="button" variant="outline" size="sm"
+          className="text-xs h-8"
+          onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
+        >
+          + แทรก [คำตอบ]
+        </Button>
+        <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
+      </div>
+    </>
+  )
+
+  const fixedMainContent = (
+    <>
+      <div className="space-y-1.5">
+        <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <RichTextEditor
+          ref={subTextEditorRef}
+          value={answerParts[0].sub_text ?? ''}
+          onChange={v => updatePart(0, { sub_text: v })}
+          placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
+          rows={1}
+        />
+        <Button
+          type="button" variant="outline" size="sm"
+          className="text-xs h-8"
+          onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
+        >
+          + แทรก [คำตอบ]
+        </Button>
+        <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
+          <SpecialCharInput value={answerParts[0].formula} onChange={v => updatePart(0, { formula: v })} placeholder="เช่น 9.8" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-gray-500">หน่วย</Label>
+          <SpecialCharInput value={answerParts[0].unit} onChange={v => updatePart(0, { unit: v })} placeholder="เช่น m/s²" />
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl">
 
       {/* Mode selection */}
       <div className="flex gap-3">
         {([
-          { value: 'from-equation' as const, label: 'สร้างโจทย์จากสมการ', desc: 'เลือกสมการสำเร็จรูป ระบบคำนวณคำตอบให้อัตโนมัติ' },
-          { value: 'manual' as const, label: 'เขียนสมการด้วยตัวเอง', desc: 'ประกาศตัวแปรและเขียนสมการเอง' },
+          { value: 'from-equation' as const, label: 'สร้างโจทย์จากสมการ', desc: 'เลือกสมการสำเร็จรูป หรือพิมพ์สมการเอง ระบบคำนวณคำตอบให้อัตโนมัติ' },
           { value: 'fixed' as const, label: 'กำหนดคำตอบด้วยตัวเอง', desc: 'ไม่มีสมการ ไม่มีการสุ่ม นักเรียนทุกคนได้โจทย์และคำตอบเดียวกัน' },
         ]).map(opt => (
           <button
@@ -1817,32 +1711,17 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
               <Label>รูปภาพประกอบโจทย์</Label>
               <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-              <RichTextEditor
-                ref={subTextEditorRef}
-                value={answerParts[0].sub_text ?? ''}
-                onChange={v => updatePart(0, { sub_text: v })}
-                placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
-                rows={1}
-              />
-              <Button
-                type="button" variant="outline" size="sm"
-                className="text-xs h-8"
-                onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
-              >
-                + แทรก [คำตอบ]
-              </Button>
-              <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
-            </div>
           </section>
 
-          {/* 4. โจทย์ย่อย */}
+          {/* 4. ชุดคำตอบ */}
           <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">โจทย์ย่อย</h2>
-            {subParts.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีโจทย์ย่อย — กดปุ่มด้านล่างเพื่อเพิ่ม</p>
-            )}
+            <div className="flex items-center justify-between border-b pb-2">
+              <h2 className="text-base font-semibold text-gray-900">ชุดคำตอบ</h2>
+              {subParts.length > 0 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
+            </div>
+            {subParts.length > 0
+              ? <AnswerPartCard label={labels[0]} locked>{fromEquationMainContent}</AnswerPartCard>
+              : fromEquationMainContent}
             {subParts.map((part, i) => (
               <SubQuestionFromEquation
                 key={part.id}
@@ -1850,122 +1729,12 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
                 index={i}
                 presets={presetList}
                 mainVariables={variables}
+                labels={labels}
                 onChange={patch => updatePart(i + 1, patch)}
                 onRemove={() => removeSubQuestion(i + 1)}
               />
             ))}
-            <AddSubQuestionButton onClick={addSubQuestion} />
-          </section>
-        </>
-      ) : creationMode === 'manual' ? (
-        <>
-          {/* 2. ประกาศตัวแปร */}
-          <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ประกาศตัวแปร</h2>
-            <ManualVariableAdder
-              variables={variables}
-              onVariablesChange={setVariables}
-              logicRules={logicRules}
-              onLogicRulesChange={setLogicRules}
-              onSetAnswer={handleSetAnswer}
-            />
-          </section>
-
-          {/* 3. สร้างโจทย์ */}
-          <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">สร้างโจทย์</h2>
-            <div className="space-y-1.5">
-              <Label>โจทย์ *</Label>
-              <RichTextEditor
-                ref={editorRef}
-                value={questionText}
-                onChange={setQuestionText}
-                placeholder="วัตถุมวล {m} kg เคลื่อนที่บนพื้นราบ ได้รับแรง {F} N จงหาความเร่งของวัตถุ"
-                rows={5}
-              />
-              {/* Variable insert chips — directly below the editor */}
-              {inputVars.length > 0 && (
-                <div className="space-y-1.5 pt-1">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                    กดเพื่อแทรกตัวแปรในโจทย์
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {inputVars.map(v => (
-                      <VarChip
-                        key={v.name}
-                        name={v.name}
-                        active={false}
-                        onClick={() => editorRef.current?.insertText(`{${v.name}}`)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>รูปภาพประกอบโจทย์</Label>
-              <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">
-                สมการคำตอบ
-                {answerVar && (
-                  <span className="ml-2 font-mono text-emerald-700 font-normal">
-                    {'{'}{answerVar.name}{'}'} =
-                  </span>
-                )}
-              </p>
-              <FormulaEditor
-                variables={variables.filter(v => !v.is_answer)}
-                value={answerParts[0].formula}
-                unit={answerParts[0].unit}
-                presets={presetList}
-                onChange={formula => updatePart(0, { formula })}
-                onVariablesChange={vars => {
-                  const ansVars = variables.filter(v => v.is_answer)
-                  setVariables([...vars, ...ansVars])
-                }}
-                onUnitChange={unit => updatePart(0, { unit })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-              <RichTextEditor
-                ref={subTextEditorRef}
-                value={answerParts[0].sub_text ?? ''}
-                onChange={v => updatePart(0, { sub_text: v })}
-                placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
-                rows={1}
-              />
-              <Button
-                type="button" variant="outline" size="sm"
-                className="text-xs h-8"
-                onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
-              >
-                + แทรก [คำตอบ]
-              </Button>
-              <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
-            </div>
-          </section>
-
-          {/* 4. โจทย์ย่อย */}
-          <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">โจทย์ย่อย</h2>
-            {subParts.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีโจทย์ย่อย — กดปุ่มด้านล่างเพื่อเพิ่ม</p>
-            )}
-            {subParts.map((part, i) => (
-              <SubQuestionManual
-                key={part.id}
-                part={part}
-                index={i}
-                presets={presetList}
-                mainVariables={variables}
-                onChange={patch => updatePart(i + 1, patch)}
-                onRemove={() => removeSubQuestion(i + 1)}
-              />
-            ))}
-            <AddSubQuestionButton onClick={addSubQuestion} />
+            <AddSubItemButton onClick={addSubQuestion} />
           </section>
         </>
       ) : (
@@ -1987,55 +1756,28 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
               <Label>รูปภาพประกอบโจทย์</Label>
               <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-              <RichTextEditor
-                ref={subTextEditorRef}
-                value={answerParts[0].sub_text ?? ''}
-                onChange={v => updatePart(0, { sub_text: v })}
-                placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
-                rows={1}
-              />
-              <Button
-                type="button" variant="outline" size="sm"
-                className="text-xs h-8"
-                onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
-              >
-                + แทรก [คำตอบ]
-              </Button>
-              <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">คำตอบ</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
-                  <SpecialCharInput value={answerParts[0].formula} onChange={v => updatePart(0, { formula: v })} placeholder="เช่น 9.8" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-gray-500">หน่วย</Label>
-                  <SpecialCharInput value={answerParts[0].unit} onChange={v => updatePart(0, { unit: v })} placeholder="เช่น m/s²" />
-                </div>
-              </div>
-            </div>
           </section>
 
-          {/* 3. โจทย์ย่อย */}
+          {/* 3. ชุดคำตอบ */}
           <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">โจทย์ย่อย</h2>
-            {subParts.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีโจทย์ย่อย — กดปุ่มด้านล่างเพื่อเพิ่ม</p>
-            )}
+            <div className="flex items-center justify-between border-b pb-2">
+              <h2 className="text-base font-semibold text-gray-900">ชุดคำตอบ</h2>
+              {subParts.length > 0 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
+            </div>
+            {subParts.length > 0
+              ? <AnswerPartCard label={labels[0]} locked>{fixedMainContent}</AnswerPartCard>
+              : fixedMainContent}
             {subParts.map((part, i) => (
               <SubQuestionFixed
                 key={part.id}
                 part={part}
                 index={i}
+                labels={labels}
                 onChange={patch => updatePart(i + 1, patch)}
                 onRemove={() => removeSubQuestion(i + 1)}
               />
             ))}
-            <AddSubQuestionButton onClick={addSubQuestion} />
+            <AddSubItemButton onClick={addSubQuestion} />
           </section>
         </>
       )}
@@ -2090,6 +1832,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
           isRandom={creationMode !== 'fixed'}
           questionType="written"
           imageUrls={imageUrls}
+          partLabelStyle={labelStyle}
         />
         <Button type="submit" disabled={saving}>
           {saving ? 'กำลังบันทึก...' : 'บันทึกโจทย์'}

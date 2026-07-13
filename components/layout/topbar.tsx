@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { NotificationsBell } from '@/components/layout/notifications-bell'
 import type { User } from '@/lib/types'
 
 interface TopbarProps {
@@ -37,6 +38,9 @@ export function Topbar({ user, onMenuToggle }: TopbarProps) {
       <div className="hidden md:block" />
 
       <div className="flex items-center gap-3">
+        {/* Notifications */}
+        <NotificationsBell />
+
         {/* Dark / Light toggle switch */}
         <div className="flex items-center gap-1.5">
           <Sun size={13} className={isDark ? 'text-muted-foreground' : 'text-amber-500'} />

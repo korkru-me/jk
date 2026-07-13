@@ -1,3 +1,5 @@
+import type { PartLabelStyle } from './part-labels'
+
 export type UserRole = 'teacher' | 'student' | 'admin'
 export type UserStatus = 'active' | 'suspended'
 export type InstructorType = 'teacher' | 'tutor'
@@ -51,11 +53,19 @@ export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_fals
 
 export type TrueFalseExplanationMode = 'none' | 'wrong_only' | 'always'
 
-export interface TrueFalseConfig {
+export interface TrueFalseStatement {
+  id: string
+  text: string   // rich text (HTML) — the statement to judge true/false
   correct_answer: boolean
+}
+
+export interface TrueFalseConfig {
+  correct_answer: boolean   // the main statement's (question_text) answer
   explanation_mode: TrueFalseExplanationMode
-  score_answer: number
+  score_answer: number      // points per statement
   score_explanation: number
+  statements?: TrueFalseStatement[]   // additional statements beyond the main one — ข, ค, ...
+  part_label_style?: PartLabelStyle
 }
 
 export interface FillBlankItem {
@@ -137,6 +147,7 @@ export interface PythagoreanGroup {
 export interface RandomQuestionConfig {
   answer_step?: number            // 0 or undefined = disabled
   pythagorean_groups?: PythagoreanGroup[]
+  part_label_style?: PartLabelStyle   // undefined = 'thai' (ก, ข, ค, ...)
 }
 
 export interface Question {
@@ -162,7 +173,7 @@ export interface Question {
   tags: string[] | null
   rejected_reason: string | null
   image_urls: string[]
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | Record<string, never>
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | Record<string, never>
   parent_question_id: string | null
   group_id: string | null
   order_in_group: number | null
@@ -172,6 +183,7 @@ export interface Question {
 
 export type AssignmentStatus = 'draft' | 'published' | 'closed'
 export type AssignmentMode = 'online' | 'print'
+export type AssignmentType = 'exercise' | 'exam'
 
 export interface Assignment {
   id: string
@@ -185,8 +197,16 @@ export interface Assignment {
   duration_minutes: number | null
   status: AssignmentStatus
   mode: AssignmentMode
+  type: AssignmentType
   created_at: string
   updated_at: string
+}
+
+export interface AssignmentClassroom {
+  id: string
+  assignment_id: string
+  classroom_id: string
+  created_at: string
 }
 
 export type SubmissionStatus = 'in_progress' | 'submitted' | 'graded'
@@ -200,6 +220,59 @@ export interface Submission {
   total_score: number | null
   max_score: number
   status: SubmissionStatus
+  attempt_number: number
+  created_at: string
+}
+
+export type CoTeacherPermission = 'admin' | 'manage' | 'view'
+
+export interface ClassroomCoTeacher {
+  id: string
+  classroom_id: string
+  user_id: string
+  permission: CoTeacherPermission
+  invited_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ClassroomInvitation {
+  id: string
+  classroom_id: string
+  token: string
+  permission: CoTeacherPermission
+  email: string | null
+  created_by: string
+  expires_at: string
+  used_at: string | null
+  used_by: string | null
+  created_at: string
+}
+
+export interface AssignmentExtension {
+  id: string
+  assignment_id: string
+  student_id: string
+  extended_end_at: string
+  note: string | null
+  granted_by: string
+  created_at: string
+}
+
+export type NotificationType = 'assignment_reminder' | 'co_teacher_invite' | 'extension_granted'
+
+export interface Notification {
+  id: string
+  org_id: string
+  recipient_id: string
+  actor_id: string | null
+  type: NotificationType
+  title: string
+  body: string | null
+  link: string | null
+  related_assignment_id: string | null
+  related_classroom_id: string | null
+  is_read: boolean
   created_at: string
 }
 

@@ -21,34 +21,59 @@ export async function startSubmission(assignmentId: string) {
 
   if (!assignment) return { error: 'ไม่พบชุดข้อสอบ' }
 
-  // Check student is in classroom
-  const { data: membership } = await supabase
-    .from('classroom_students')
-    .select('id')
-    .eq('classroom_id', assignment.classroom_id)
-    .eq('student_id', user.id)
-    .maybeSingle()
+  // Check student is in one of the classrooms this assignment is linked to
+  // (not just the legacy single classroom_id column — an assignment may now
+  // target multiple classrooms via assignment_classrooms).
+  const { data: links } = await supabase
+    .from('assignment_classrooms')
+    .select('classroom_id')
+    .eq('assignment_id', assignmentId)
+  const classroomIds = (links ?? []).map((l: any) => l.classroom_id)
+
+  const { data: membership } = classroomIds.length > 0
+    ? await supabase
+        .from('classroom_students')
+        .select('id')
+        .eq('student_id', user.id)
+        .in('classroom_id', classroomIds)
+        .maybeSingle()
+    : { data: null }
 
   if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องเรียนนี้' }
 
-  // Check deadline
-  if (assignment.end_at && new Date(assignment.end_at) < new Date()) {
-    return { error: 'หมดเวลาส่งแล้ว' }
-  }
-
-  // Return existing in-progress submission
-  const { data: existing } = await supabase
-    .from('submissions')
-    .select('id, status')
+  // Check deadline — a per-student extension overrides the assignment's end_at
+  const { data: extension } = await supabase
+    .from('assignment_extensions')
+    .select('extended_end_at')
     .eq('assignment_id', assignmentId)
     .eq('student_id', user.id)
     .maybeSingle()
 
+  const effectiveEndAt = extension?.extended_end_at ?? assignment.end_at
+  if (effectiveEndAt && new Date(effectiveEndAt) < new Date()) {
+    return { error: 'หมดเวลาส่งแล้ว' }
+  }
+
+  // Return existing in-progress submission, or decide on a retry
+  const { data: existing } = await supabase
+    .from('submissions')
+    .select('id, status, attempt_number')
+    .eq('assignment_id', assignmentId)
+    .eq('student_id', user.id)
+    .order('attempt_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let attemptNumber = 1
   if (existing) {
-    if (existing.status === 'submitted' || existing.status === 'graded') {
+    if (existing.status === 'in_progress') {
+      return { submissionId: existing.id }
+    }
+    // submitted / graded: exams stay single-attempt, exercises may retry
+    if (assignment.type !== 'exercise') {
       return { submissionId: existing.id, alreadySubmitted: true }
     }
-    return { submissionId: existing.id }
+    attemptNumber = existing.attempt_number + 1
   }
 
   // Fetch questions
@@ -80,9 +105,18 @@ export async function startSubmission(assignmentId: string) {
     const parts = (q as any).answer_parts as import('@/lib/types').AnswerPart[] | null
 
     if (q.question_type === 'true_false') {
-      const maxScore = (extraData?.score_answer ?? 1) +
-        (extraData?.explanation_mode !== 'none' ? (extraData?.score_explanation ?? 1) : 0)
-      return { question_id: q.id, random_values: {}, correct_answer: extraData?.correct_answer ? 'true' : 'false', max_score: maxScore }
+      const statements: import('@/lib/types').TrueFalseStatement[] = extraData?.statements ?? []
+      const scoreAnswer = extraData?.score_answer ?? 1
+      const explanationScore = extraData?.explanation_mode !== 'none' ? (extraData?.score_explanation ?? 1) : 0
+      if (statements.length > 0) {
+        const correctAnswers = [extraData?.correct_answer, ...statements.map(s => s.correct_answer)]
+        return {
+          question_id: q.id, random_values: {},
+          correct_answer: 'TF:' + JSON.stringify(correctAnswers.map(b => b ? 'true' : 'false')),
+          max_score: scoreAnswer * correctAnswers.length + explanationScore,
+        }
+      }
+      return { question_id: q.id, random_values: {}, correct_answer: extraData?.correct_answer ? 'true' : 'false', max_score: scoreAnswer + explanationScore }
     }
 
     if (q.question_type === 'fill_blank') {
@@ -120,6 +154,7 @@ export async function startSubmission(assignmentId: string) {
       student_id: user.id,
       max_score: totalMaxScore,
       status: 'in_progress',
+      attempt_number: attemptNumber,
     })
     .select('id')
     .single()
@@ -203,6 +238,20 @@ export async function submitSubmission(submissionId: string) {
       const scoreAnswer: number = extraData?.score_answer ?? 1
       const isCorrect = studentTf.trim() === correctAns
       return { id: a.id, is_correct: isCorrect, score: isCorrect ? scoreAnswer : 0 }
+    }
+
+    // Multi-statement True/False grading
+    if (correctAns.startsWith('TF:')) {
+      const correctAnswers: string[] = JSON.parse(correctAns.slice(3))
+      let studentAnswers: string[] = []
+      try { studentAnswers = JSON.parse(studentAns || '{}').answers ?? [] } catch { /* keep empty */ }
+      const extraData = a.questions?.extra_data as any
+      const scoreAnswer: number = extraData?.score_answer ?? 1
+      let correctCount = 0
+      for (let i = 0; i < correctAnswers.length; i++) {
+        if ((studentAnswers[i] ?? '').trim() === correctAnswers[i]) correctCount++
+      }
+      return { id: a.id, is_correct: correctCount === correctAnswers.length, score: correctCount * scoreAnswer }
     }
 
     // Fill-blank grading

@@ -7,7 +7,7 @@ import { getMyOrgId } from '@/lib/actions/org'
 import type { AssignmentStatus } from '@/lib/types'
 
 interface CreateAssignmentData {
-  classroom_id: string
+  classroom_ids: string[]
   title: string
   description: string
   question_ids: string[]
@@ -15,6 +15,7 @@ interface CreateAssignmentData {
   end_at: string | null
   duration_minutes: number | null
   mode: 'online' | 'print'
+  type?: 'exercise' | 'exam'
 }
 
 export async function createAssignment(data: CreateAssignmentData) {
@@ -23,6 +24,7 @@ export async function createAssignment(data: CreateAssignmentData) {
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (data.question_ids.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
+  if (data.classroom_ids.length === 0) return { error: 'กรุณาเลือกห้องเรียนอย่างน้อย 1 ห้อง' }
 
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
@@ -31,7 +33,7 @@ export async function createAssignment(data: CreateAssignmentData) {
     .from('assignments')
     .insert({
       org_id: orgId,
-      classroom_id: data.classroom_id,
+      classroom_id: data.classroom_ids[0],
       created_by: user.id,
       title: data.title.trim(),
       description: data.description.trim() || null,
@@ -40,12 +42,19 @@ export async function createAssignment(data: CreateAssignmentData) {
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
       mode: data.mode,
+      ...(data.type ? { type: data.type } : {}),
       status: 'draft',
     })
     .select('id')
     .single()
 
   if (error) return { error: error.message }
+
+  const { error: linkError } = await supabase
+    .from('assignment_classrooms')
+    .insert(data.classroom_ids.map(classroom_id => ({ assignment_id: assignment.id, classroom_id })))
+
+  if (linkError) return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนนี้' }
 
   revalidatePath('/assignments')
   redirect(`/assignments/${assignment.id}`)
@@ -56,11 +65,15 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
+  // No explicit created_by filter — RLS (assignments_org_teacher_all /
+  // assignments_co_teacher_all, the latter scoped to admin/manage
+  // permission) already restricts this update to owner or authorized
+  // co-teacher; an update matching zero rows fails silently (0 rows
+  // affected, not an error), which is acceptable here.
   const { error } = await supabase
     .from('assignments')
     .update({ status })
     .eq('id', id)
-    .eq('created_by', user.id)
 
   if (error) return { error: error.message }
   revalidatePath(`/assignments/${id}`)
@@ -72,15 +85,74 @@ export async function deleteAssignment(id: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
+  // No explicit created_by filter — RLS already restricts this to owner or
+  // authorized (admin/manage) co-teacher.
   const { error } = await supabase
     .from('assignments')
     .delete()
     .eq('id', id)
-    .eq('created_by', user.id)
 
   if (error) return { error: error.message }
   revalidatePath('/assignments')
   redirect('/assignments')
+}
+
+export async function duplicateAssignment(id: string, opts?: { targetClassroomIds?: string[] }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const { data: source } = await supabase
+    .from('assignments')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!source) return { error: 'ไม่พบชุดข้อสอบ' }
+
+  const { data: sourceLinks } = await supabase
+    .from('assignment_classrooms')
+    .select('classroom_id')
+    .eq('assignment_id', id)
+
+  const targetClassroomIds = opts?.targetClassroomIds?.length
+    ? opts.targetClassroomIds
+    : (sourceLinks ?? []).map((l: any) => l.classroom_id)
+
+  if (targetClassroomIds.length === 0) return { error: 'ไม่พบห้องเรียนปลายทาง' }
+
+  const orgId = await getMyOrgId()
+  if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
+
+  const { data: copy, error } = await supabase
+    .from('assignments')
+    .insert({
+      org_id: orgId,
+      classroom_id: targetClassroomIds[0],
+      created_by: user.id,
+      title: `${source.title} (สำเนา)`,
+      description: source.description,
+      question_ids: source.question_ids,
+      start_at: null,
+      end_at: null,
+      duration_minutes: source.duration_minutes,
+      mode: source.mode,
+      type: source.type,
+      status: 'draft',
+    })
+    .select('id')
+    .single()
+
+  if (error) return { error: error.message }
+
+  const { error: linkError } = await supabase
+    .from('assignment_classrooms')
+    .insert(targetClassroomIds.map(classroom_id => ({ assignment_id: copy.id, classroom_id })))
+
+  if (linkError) return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนปลายทาง' }
+
+  revalidatePath('/assignments')
+  redirect(`/assignments/${copy.id}`)
 }
 
 export async function getMyAssignments() {

@@ -7,10 +7,10 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
-  AlertCircle, Activity,
+  AlertCircle, Activity, Copy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { updateAssignmentStatus, deleteAssignment } from '@/lib/actions/assignments'
+import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
 import type { Assignment, Question } from '@/lib/types'
 import type { SubmissionRow } from '../page'
 
@@ -83,6 +83,13 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
   function handleDelete() {
     if (!confirm('ลบชุดข้อสอบนี้? ข้อมูลการส่งทั้งหมดจะถูกลบด้วย')) return
     startTransition(async () => { await deleteAssignment(a.id) })
+  }
+
+  function handleDuplicate() {
+    startTransition(async () => {
+      const res = await duplicateAssignment(a.id)
+      if (res?.error) toast.error(res.error)
+    })
   }
 
   return (
@@ -192,9 +199,16 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             </Button>
           </Link>
           <button
+            onClick={handleDuplicate}
+            disabled={isPending}
+            className="ml-auto flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors disabled:opacity-50"
+          >
+            <Copy className="w-3.5 h-3.5" /> ทำสำเนา
+          </button>
+          <button
             onClick={handleDelete}
             disabled={isPending}
-            className="ml-auto flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
           >
             <Trash2 className="w-3.5 h-3.5" /> ลบ
           </button>
@@ -426,7 +440,7 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
           const isDone = s.status === 'submitted' || s.status === 'graded'
           const pct = s.total_score != null && s.max_score > 0 ? Math.round((s.total_score / s.max_score) * 100) : null
           return (
-            <div key={s.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-0 items-center px-5 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+            <div key={s.id ?? s.student_id} className="grid grid-cols-[1fr_auto_auto_auto] gap-0 items-center px-5 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
               <span className="text-sm font-medium text-gray-900">{s.users?.full_name ?? '—'}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-20 text-center ${
                 isDone ? 'bg-green-100 text-green-700' :
