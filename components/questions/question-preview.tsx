@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
+import { RichText } from '@/components/ui/rich-text'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
 import {
   Dialog,
@@ -428,7 +429,7 @@ export function QuestionPreview({
                       {answerParts.length > 1 && (
                         <p className="text-sm font-medium text-gray-700">
                           {PART_LABELS[i] ?? i + 1})
-                          {part.sub_text && <span className="font-normal text-gray-600 ml-1">{part.sub_text}</span>}
+                          {part.sub_text && <RichText text={part.sub_text} className="font-normal text-gray-600 ml-1" />}
                         </p>
                       )}
                       <div className={`flex items-center gap-3 p-3 rounded-lg border ${

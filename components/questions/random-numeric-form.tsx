@@ -1125,6 +1125,7 @@ function SubQuestionFromEquation({
   const label = PART_LABELS[index] ?? String(index + 1)
   const partIndex = index + 1  // position in answerParts array
   const mainVarNames = mainVariables.filter(v => !v.is_answer).map(v => v.name)
+  const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
@@ -1146,13 +1147,17 @@ function SubQuestionFromEquation({
         </div>
         <div className="space-y-1.5">
           <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-          <div className="flex gap-2 items-start">
-            <Input value={part.sub_text} onChange={e => onChange({ sub_text: e.target.value })} placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²" className="text-sm flex-1" />
-            <Button type="button" variant="outline" size="sm" className="text-xs h-9 shrink-0"
-              onClick={() => onChange({ sub_text: part.sub_text + '[คำตอบ]' })}>
-              + [คำตอบ]
-            </Button>
-          </div>
+          <RichTextEditor
+            ref={subTextEditorRef}
+            value={part.sub_text}
+            onChange={v => onChange({ sub_text: v })}
+            placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
+            rows={1}
+          />
+          <Button type="button" variant="outline" size="sm" className="text-xs h-8"
+            onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
+            + [คำตอบ]
+          </Button>
         </div>
       </div>
     </div>
@@ -1174,6 +1179,7 @@ function SubQuestionManual({
   const prevVars = makePrevAnswerVars(partIndex)
   // FormulaEditor sees all main input vars + virtual prev-answer vars
   const allAvailableVars = [...mainVariables.filter(v => !v.is_answer), ...prevVars]
+  const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
@@ -1204,13 +1210,17 @@ function SubQuestionManual({
 
         <div className="space-y-1.5">
           <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-          <div className="flex gap-2 items-start">
-            <Input value={part.sub_text} onChange={e => onChange({ sub_text: e.target.value })} placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²" className="text-sm flex-1" />
-            <Button type="button" variant="outline" size="sm" className="text-xs h-9 shrink-0"
-              onClick={() => onChange({ sub_text: part.sub_text + '[คำตอบ]' })}>
-              + [คำตอบ]
-            </Button>
-          </div>
+          <RichTextEditor
+            ref={subTextEditorRef}
+            value={part.sub_text}
+            onChange={v => onChange({ sub_text: v })}
+            placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
+            rows={1}
+          />
+          <Button type="button" variant="outline" size="sm" className="text-xs h-8"
+            onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
+            + [คำตอบ]
+          </Button>
         </div>
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">สมการคำตอบ</p>
@@ -1238,6 +1248,7 @@ function SubQuestionFixed({
   onChange: (patch: Partial<AnswerPart>) => void; onRemove: () => void
 }) {
   const label = PART_LABELS[index] ?? String(index + 1)
+  const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
@@ -1250,13 +1261,17 @@ function SubQuestionFixed({
       <div className="p-4 space-y-4">
         <div className="space-y-1.5">
           <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-          <div className="flex gap-2 items-start">
-            <Input value={part.sub_text} onChange={e => onChange({ sub_text: e.target.value })} placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²" className="text-sm flex-1" />
-            <Button type="button" variant="outline" size="sm" className="text-xs h-9 shrink-0"
-              onClick={() => onChange({ sub_text: part.sub_text + '[คำตอบ]' })}>
-              + [คำตอบ]
-            </Button>
-          </div>
+          <RichTextEditor
+            ref={subTextEditorRef}
+            value={part.sub_text}
+            onChange={v => onChange({ sub_text: v })}
+            placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
+            rows={1}
+          />
+          <Button type="button" variant="outline" size="sm" className="text-xs h-8"
+            onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
+            + [คำตอบ]
+          </Button>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
@@ -1615,6 +1630,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
+  const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
   const [creationMode, setCreationMode] = useState<CreationMode>('from-equation')
 
@@ -1803,21 +1819,20 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-              <div className="flex gap-2 items-start">
-                <Input
-                  value={answerParts[0].sub_text ?? ''}
-                  onChange={e => updatePart(0, { sub_text: e.target.value })}
-                  placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
-                  className="text-sm flex-1"
-                />
-                <Button
-                  type="button" variant="outline" size="sm"
-                  className="text-xs h-9 shrink-0"
-                  onClick={() => updatePart(0, { sub_text: (answerParts[0].sub_text ?? '') + '[คำตอบ]' })}
-                >
-                  + แทรก [คำตอบ]
-                </Button>
-              </div>
+              <RichTextEditor
+                ref={subTextEditorRef}
+                value={answerParts[0].sub_text ?? ''}
+                onChange={v => updatePart(0, { sub_text: v })}
+                placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
+                rows={1}
+              />
+              <Button
+                type="button" variant="outline" size="sm"
+                className="text-xs h-8"
+                onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
+              >
+                + แทรก [คำตอบ]
+              </Button>
               <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
             </div>
           </section>
@@ -1915,21 +1930,20 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-              <div className="flex gap-2 items-start">
-                <Input
-                  value={answerParts[0].sub_text ?? ''}
-                  onChange={e => updatePart(0, { sub_text: e.target.value })}
-                  placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
-                  className="text-sm flex-1"
-                />
-                <Button
-                  type="button" variant="outline" size="sm"
-                  className="text-xs h-9 shrink-0"
-                  onClick={() => updatePart(0, { sub_text: (answerParts[0].sub_text ?? '') + '[คำตอบ]' })}
-                >
-                  + แทรก [คำตอบ]
-                </Button>
-              </div>
+              <RichTextEditor
+                ref={subTextEditorRef}
+                value={answerParts[0].sub_text ?? ''}
+                onChange={v => updatePart(0, { sub_text: v })}
+                placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
+                rows={1}
+              />
+              <Button
+                type="button" variant="outline" size="sm"
+                className="text-xs h-8"
+                onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
+              >
+                + แทรก [คำตอบ]
+              </Button>
               <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
             </div>
           </section>
@@ -1975,21 +1989,20 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-              <div className="flex gap-2 items-start">
-                <Input
-                  value={answerParts[0].sub_text ?? ''}
-                  onChange={e => updatePart(0, { sub_text: e.target.value })}
-                  placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
-                  className="text-sm flex-1"
-                />
-                <Button
-                  type="button" variant="outline" size="sm"
-                  className="text-xs h-9 shrink-0"
-                  onClick={() => updatePart(0, { sub_text: (answerParts[0].sub_text ?? '') + '[คำตอบ]' })}
-                >
-                  + แทรก [คำตอบ]
-                </Button>
-              </div>
+              <RichTextEditor
+                ref={subTextEditorRef}
+                value={answerParts[0].sub_text ?? ''}
+                onChange={v => updatePart(0, { sub_text: v })}
+                placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
+                rows={1}
+              />
+              <Button
+                type="button" variant="outline" size="sm"
+                className="text-xs h-8"
+                onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
+              >
+                + แทรก [คำตอบ]
+              </Button>
               <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
             </div>
             <div>
