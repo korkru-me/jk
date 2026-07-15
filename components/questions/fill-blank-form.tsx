@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -12,11 +12,14 @@ import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
 import { QuestionPreview } from './question-preview'
 import { WhiteboardModal } from './whiteboard-modal'
-import { createQuestion } from '@/lib/actions/questions'
-import type { Difficulty, Visibility, FillBlankConfig, FillBlankItem } from '@/lib/types'
+import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { readDuplicateSeed } from '@/lib/question-duplicate'
+import type { Difficulty, Visibility, FillBlankConfig, FillBlankItem, Question } from '@/lib/types'
 
 interface FillBlankFormProps {
   allTags: string[]
+  mode?: 'create' | 'edit'
+  question?: Question
 }
 
 const BLANK_MARKER = '[___]'
@@ -25,24 +28,46 @@ function parseBlankCount(text: string): number {
   return (text.match(/\[___\]/g) ?? []).length
 }
 
-export function FillBlankForm({ allTags }: FillBlankFormProps) {
+export function FillBlankForm({ allTags, mode = 'create', question }: FillBlankFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const [title, setTitle] = useState('')
-  const [subject, setSubject] = useState('')
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
-  const [visibility, setVisibility] = useState<Visibility>('private')
-  const [tags, setTags] = useState<string[]>([])
+  const existingConfig = question?.extra_data as FillBlankConfig | undefined
 
-  const [questionText, setQuestionText] = useState('')
-  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [title, setTitle] = useState(question?.title ?? '')
+  const [subject, setSubject] = useState(question?.subject ?? '')
+  const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
+  const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [tags, setTags] = useState<string[]>(question?.tags ?? [])
+
+  const [questionText, setQuestionText] = useState(question?.question_text ?? '')
+  const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
   const [showWhiteboard, setShowWhiteboard] = useState(false)
 
-  const [gradingMode, setGradingMode] = useState<'manual' | 'auto'>('manual')
-  const [blankAnswers, setBlankAnswers] = useState<Array<{ answer: string; case_sensitive: boolean }>>([])
-  const [solutionText, setSolutionText] = useState('')
+  const [gradingMode, setGradingMode] = useState<'manual' | 'auto'>(existingConfig?.grading_mode ?? 'manual')
+  const [blankAnswers, setBlankAnswers] = useState<Array<{ answer: string; case_sensitive: boolean }>>(
+    (existingConfig?.blanks ?? []).map(b => ({ answer: b.answer, case_sensitive: b.case_sensitive }))
+  )
+  const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+
+  useEffect(() => {
+    if (mode !== 'create' || question) return
+    const seed = readDuplicateSeed('fill_blank')
+    if (!seed) return
+    setTitle(seed.title)
+    setSubject(seed.subject ?? '')
+    setDifficulty(seed.difficulty)
+    setVisibility(seed.visibility)
+    setTags(seed.tags ?? [])
+    setQuestionText(seed.question_text)
+    setImageUrls(seed.image_urls ?? [])
+    setSolutionText(seed.solution_text ?? '')
+
+    const config = (seed.extra_data ?? {}) as FillBlankConfig
+    setGradingMode(config.grading_mode ?? 'manual')
+    setBlankAnswers((config.blanks ?? []).map(b => ({ answer: b.answer, case_sensitive: b.case_sensitive })))
+  })
 
   const blankCount = parseBlankCount(questionText)
 
@@ -102,17 +127,20 @@ export function FillBlankForm({ allTags }: FillBlankFormProps) {
     }
 
     setSaving(true)
-    const result = await createQuestion({
-      title, subject, question_text: questionText, question_type: 'fill_blank',
-      difficulty, visibility, category_id: '',
-      grade_level: '', is_random: false,
+    const payload = {
+      title, subject, question_text: questionText, question_type: 'fill_blank' as const,
+      difficulty, visibility, category_id: question?.category_id ?? '',
+      grade_level: question?.grade_level ?? '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: [],
       extra_data: fillBlankConfig,
       solution_text: solutionText, tags, image_urls: imageUrls,
-    })
+    }
+    const result = mode === 'edit' && question
+      ? await updateQuestion(question.id, payload)
+      : await createQuestion(payload)
 
     if (result?.error) {
       toast.error(result.error)
@@ -266,9 +294,9 @@ export function FillBlankForm({ allTags }: FillBlankFormProps) {
           fillBlankConfig={fillBlankConfig}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : 'บันทึกโจทย์'}
+          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push('/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

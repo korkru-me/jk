@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -16,8 +16,9 @@ import { QuestionImageUpload } from './question-image-upload'
 import { QuestionPreview } from './question-preview'
 import { WhiteboardModal } from './whiteboard-modal'
 import { McqAutoForm } from './mcq-auto-form'
-import { createQuestion } from '@/lib/actions/questions'
-import type { Difficulty, Visibility, MCQOption, FormulaPreset } from '@/lib/types'
+import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { readDuplicateSeed } from '@/lib/question-duplicate'
+import type { Difficulty, Visibility, MCQOption, FormulaPreset, Question } from '@/lib/types'
 
 const OPTION_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ']
 
@@ -27,6 +28,8 @@ type PresetWithCat = FormulaPreset & { question_categories: { name: string } | n
 interface McqFormProps {
   allTags: string[]
   presets?: PresetWithCat[]
+  mode?: 'create' | 'edit'
+  question?: Question
 }
 
 function newOption(): MCQOption {
@@ -45,13 +48,13 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
   )
 }
 
-export function McqForm({ allTags, presets = [] }: McqFormProps) {
-  const [mode, setMode] = useState<McqMode>('manual')
+export function McqForm({ allTags, presets = [], mode = 'create', question }: McqFormProps) {
+  const [entryMode, setEntryMode] = useState<McqMode>('manual')
 
-  if (mode === 'auto') {
+  if (mode === 'create' && entryMode === 'auto') {
     return (
       <div className="space-y-6">
-        <ModeSwitcher mode={mode} onChange={setMode} />
+        <ModeSwitcher mode={entryMode} onChange={setEntryMode} />
         <McqAutoForm allTags={allTags} presets={presets} />
       </div>
     )
@@ -59,8 +62,8 @@ export function McqForm({ allTags, presets = [] }: McqFormProps) {
 
   return (
     <div className="space-y-6">
-      <ModeSwitcher mode={mode} onChange={setMode} />
-      <McqManualForm allTags={allTags} />
+      {mode === 'create' && <ModeSwitcher mode={entryMode} onChange={setEntryMode} />}
+      <McqManualForm allTags={allTags} mode={mode} question={question} />
     </div>
   )
 }
@@ -110,29 +113,46 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
   )
 }
 
-function McqManualForm({ allTags }: { allTags: string[] }) {
+function McqManualForm({ allTags, mode = 'create', question }: { allTags: string[]; mode?: 'create' | 'edit'; question?: Question }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 
-  const [title, setTitle] = useState('')
-  const [subject, setSubject] = useState('')
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
-  const [visibility, setVisibility] = useState<Visibility>('private')
-  const [tags, setTags] = useState<string[]>([])
+  const [title, setTitle] = useState(question?.title ?? '')
+  const [subject, setSubject] = useState(question?.subject ?? '')
+  const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
+  const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
-  const [questionText, setQuestionText] = useState('')
-  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [questionText, setQuestionText] = useState(question?.question_text ?? '')
+  const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
   const [showWhiteboard, setShowWhiteboard] = useState(false)
 
-  const [options, setOptions] = useState<MCQOption[]>([
-    { text: '', is_correct: false },
-    { text: '', is_correct: false },
-    { text: '', is_correct: false },
-    { text: '', is_correct: false },
-  ])
+  const [options, setOptions] = useState<MCQOption[]>(
+    question?.mcq_options ?? [
+      { text: '', is_correct: false },
+      { text: '', is_correct: false },
+      { text: '', is_correct: false },
+      { text: '', is_correct: false },
+    ]
+  )
   const [showImageForOption, setShowImageForOption] = useState<Record<number, boolean>>({})
-  const [solutionText, setSolutionText] = useState('')
+  const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+
+  useEffect(() => {
+    if (mode !== 'create' || question) return
+    const seed = readDuplicateSeed('mcq')
+    if (!seed) return
+    setTitle(seed.title)
+    setSubject(seed.subject ?? '')
+    setDifficulty(seed.difficulty)
+    setVisibility(seed.visibility)
+    setTags(seed.tags ?? [])
+    setQuestionText(seed.question_text)
+    setImageUrls(seed.image_urls ?? [])
+    setOptions(seed.mcq_options ?? [])
+    setSolutionText(seed.solution_text ?? '')
+  })
 
   function updateOption(i: number, field: keyof MCQOption, value: string | boolean | undefined) {
     setOptions(prev => prev.map((opt, idx) => idx === i ? { ...opt, [field]: value } : opt))
@@ -176,16 +196,19 @@ function McqManualForm({ allTags }: { allTags: string[] }) {
     }
 
     setSaving(true)
-    const result = await createQuestion({
-      title, subject, question_text: questionText, question_type: 'mcq',
-      difficulty, visibility, category_id: '',
-      grade_level: '', is_random: false,
+    const payload = {
+      title, subject, question_text: questionText, question_type: 'mcq' as const,
+      difficulty, visibility, category_id: question?.category_id ?? '',
+      grade_level: question?.grade_level ?? '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: options,
       solution_text: solutionText, tags, image_urls: imageUrls,
-    })
+    }
+    const result = mode === 'edit' && question
+      ? await updateQuestion(question.id, payload)
+      : await createQuestion(payload)
 
     if (result?.error) {
       toast.error(result.error)
@@ -308,9 +331,9 @@ function McqManualForm({ allTags }: { allTags: string[] }) {
           imageUrls={imageUrls}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : 'บันทึกโจทย์'}
+          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push('/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

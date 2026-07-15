@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Eye, Share2, Flag, Edit2, Trash2, AlertTriangle,
+  Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy,
   Users, TrendingUp, BookOpen,
 } from 'lucide-react'
 import { deleteQuestion } from '@/lib/actions/questions'
+import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
 import type { QuestionWithCategory } from '../page'
 
 export const DIFF_META: Record<string, { label: string; color: string; bar: string }> = {
@@ -42,6 +44,7 @@ interface Props {
 }
 
 export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, teachers }: Props) {
+  const router = useRouter()
   const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const { pVal, rVal, usedIn } = mockStats(q.id)
@@ -56,6 +59,11 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   function handleDelete() {
     if (!confirm('ลบโจทย์นี้? ไม่สามารถกู้คืนได้')) return
     startTransition(async () => { await deleteQuestion(q.id) })
+  }
+
+  function handleDuplicate() {
+    storeDuplicateSeed(q)
+    router.push(`/questions/new/${NEW_QUESTION_ROUTE_BY_TYPE[q.question_type]}`)
   }
 
   return (
@@ -204,6 +212,17 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
               >
                 <Flag className="w-3.5 h-3.5" />
               </button>
+
+              {/* Duplicate (non-group only) */}
+              {!isGroup && (
+                <button
+                  onClick={handleDuplicate}
+                  title="ทำสำเนาเพื่อแก้ไข"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              )}
 
               {/* Edit */}
               <Link

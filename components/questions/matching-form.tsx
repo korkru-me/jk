@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -14,8 +14,9 @@ import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
 import { QuestionPreview } from './question-preview'
 import { WhiteboardModal } from './whiteboard-modal'
-import { createQuestion } from '@/lib/actions/questions'
-import type { Difficulty, Visibility } from '@/lib/types'
+import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { readDuplicateSeed } from '@/lib/question-duplicate'
+import type { Difficulty, Visibility, MatchingPair, Question } from '@/lib/types'
 
 interface PairState {
   id: string
@@ -29,6 +30,19 @@ interface PairState {
 
 interface MatchingFormProps {
   allTags: string[]
+  mode?: 'create' | 'edit'
+  question?: Question
+}
+
+function pairsFromQuestion(question?: Question): PairState[] | undefined {
+  if (!question) return undefined
+  const raw = (question.mcq_options ?? []) as unknown as MatchingPair[]
+  return raw.map(p => ({
+    id: Math.random().toString(36).slice(2),
+    left_text: p.left_text, right_text: p.right_text,
+    left_image: p.left_image, right_image: p.right_image,
+    showLeftImage: false, showRightImage: false,
+  }))
 }
 
 function newPair(): PairState {
@@ -51,23 +65,45 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
   )
 }
 
-export function MatchingForm({ allTags }: MatchingFormProps) {
+export function MatchingForm({ allTags, mode = 'create', question }: MatchingFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 
-  const [title, setTitle] = useState('')
-  const [subject, setSubject] = useState('')
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
-  const [visibility, setVisibility] = useState<Visibility>('private')
-  const [tags, setTags] = useState<string[]>([])
+  const [title, setTitle] = useState(question?.title ?? '')
+  const [subject, setSubject] = useState(question?.subject ?? '')
+  const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
+  const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
-  const [questionText, setQuestionText] = useState('')
-  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [questionText, setQuestionText] = useState(question?.question_text ?? '')
+  const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
   const [showWhiteboard, setShowWhiteboard] = useState(false)
 
-  const [pairs, setPairs] = useState<PairState[]>([newPair(), newPair(), newPair()])
-  const [solutionText, setSolutionText] = useState('')
+  const [pairs, setPairs] = useState<PairState[]>(pairsFromQuestion(question) ?? [newPair(), newPair(), newPair()])
+  const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+
+  useEffect(() => {
+    if (mode !== 'create' || question) return
+    const seed = readDuplicateSeed('matching')
+    if (!seed) return
+    setTitle(seed.title)
+    setSubject(seed.subject ?? '')
+    setDifficulty(seed.difficulty)
+    setVisibility(seed.visibility)
+    setTags(seed.tags ?? [])
+    setQuestionText(seed.question_text)
+    setImageUrls(seed.image_urls ?? [])
+    setSolutionText(seed.solution_text ?? '')
+
+    const seedPairs = (seed.mcq_options ?? []) as unknown as MatchingPair[]
+    setPairs(seedPairs.map(p => ({
+      id: Math.random().toString(36).slice(2),
+      left_text: p.left_text, right_text: p.right_text,
+      left_image: p.left_image, right_image: p.right_image,
+      showLeftImage: false, showRightImage: false,
+    })))
+  })
 
   function updatePair(i: number, field: keyof PairState, value: string | boolean | undefined) {
     setPairs(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p))
@@ -102,17 +138,20 @@ export function MatchingForm({ allTags }: MatchingFormProps) {
       ...(right_image ? { right_image } : {}),
     }))
 
-    const result = await createQuestion({
-      title, subject, question_text: questionText, question_type: 'matching',
-      difficulty, visibility, category_id: '',
-      grade_level: '', is_random: false,
+    const payload = {
+      title, subject, question_text: questionText, question_type: 'matching' as const,
+      difficulty, visibility, category_id: question?.category_id ?? '',
+      grade_level: question?.grade_level ?? '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: [],
       matching_pairs: matchingPairs,
       solution_text: solutionText, tags, image_urls: imageUrls,
-    })
+    }
+    const result = mode === 'edit' && question
+      ? await updateQuestion(question.id, payload)
+      : await createQuestion(payload)
 
     if (result?.error) {
       toast.error(result.error)
@@ -257,9 +296,9 @@ export function MatchingForm({ allTags }: MatchingFormProps) {
           imageUrls={imageUrls}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : 'บันทึกโจทย์'}
+          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push('/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

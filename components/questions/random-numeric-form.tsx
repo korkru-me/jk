@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/label'
@@ -15,13 +15,22 @@ import { QuestionPreview } from './question-preview'
 import { QuestionImageUpload } from './question-image-upload'
 import { WhiteboardModal } from './whiteboard-modal'
 import { SpecialCharInput } from './special-char-input'
-import { createQuestion, createFormulaPreset } from '@/lib/actions/questions'
+import { createQuestion, updateQuestion, createFormulaPreset } from '@/lib/actions/questions'
+import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { runTrials, PYTHAGOREAN_FAMILIES } from '@/lib/math/evaluator'
 import type { TrialSummary, TrialSample } from '@/lib/math/evaluator'
 import type {
   FormulaPreset, Variable, LogicRule, LogicOperator, AnswerPart, Difficulty, Visibility,
-  PythagoreanGroup,
+  PythagoreanGroup, RandomQuestionConfig, Question,
 } from '@/lib/types'
+
+function equationTextFromQuestion(q?: Question | null): string | undefined {
+  if (!q || !q.is_random) return undefined
+  const answerVarName = (q.variables ?? []).find(v => v.is_answer)?.name
+  const formula = q.answer_parts?.[0]?.formula
+  if (!answerVarName || !formula) return undefined
+  return `${answerVarName} = ${formula}`
+}
 import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
 import { AnswerPartCard, LabelStyleToggle, AddSubItemButton } from './answer-set-controls'
 
@@ -424,6 +433,11 @@ function TolerancePicker({ value, onChange }: { value: number; onChange: (v: num
   const [mode, setMode] = useState<'decimal' | 'percent'>(value < 0 ? 'percent' : 'decimal')
   const [display, setDisplay] = useState(Math.abs(value))
 
+  useEffect(() => {
+    setMode(value < 0 ? 'percent' : 'decimal')
+    setDisplay(Math.abs(value))
+  }, [value])
+
   function changeMode(m: 'decimal' | 'percent') {
     setMode(m)
     onChange(m === 'percent' ? -display : display)
@@ -589,7 +603,7 @@ function normalizeEq(s: string): string {
 
 function PresetEquationSelector({
   presets, variables, onVariablesChange, onFormulaChange,
-  logicRules, onLogicRulesChange, onPresetCreated,
+  logicRules, onLogicRulesChange, onPresetCreated, initialEquationText,
 }: {
   presets: PresetWithCat[]
   variables: Variable[]
@@ -598,6 +612,7 @@ function PresetEquationSelector({
   logicRules: LogicRule[]
   onLogicRulesChange: (r: LogicRule[]) => void
   onPresetCreated: (p: PresetWithCat) => void
+  initialEquationText?: string
 }) {
   const [selPresetId, setSelPresetId] = useState('')
   const [equationText, setEquationText] = useState('')
@@ -624,6 +639,12 @@ function PresetEquationSelector({
     const existingMap = new Map(variables.map(v => [v.name, v]))
     onVariablesChange(inputVarNames.map(n => existingMap.get(n) ?? { name: n, min: 1, max: 10, step: 1 }))
   }
+
+  useEffect(() => {
+    if (!initialEquationText) return
+    setEquationText(initialEquationText)
+    applyEquation(initialEquationText, variables.find(v => v.is_answer)?.name)
+  }, [initialEquationText])
 
   async function selectAnswerVar(varName: string) {
     if (varName === answerVarName || !equationText.trim()) return
@@ -1454,15 +1475,19 @@ const ALL_PYTHAGOREAN_TRIPLES_COUNT = PYTHAGOREAN_FAMILIES.reduce((s, f) => s + 
 interface RandomNumericFormProps {
   allTags: string[]
   presets: PresetWithCat[]
+  mode?: 'create' | 'edit'
+  question?: Question
 }
 
-export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNumericFormProps) {
+export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'create', question }: RandomNumericFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
   const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
-  const [creationMode, setCreationMode] = useState<CreationMode>('from-equation')
+  const [creationMode, setCreationMode] = useState<CreationMode>(
+    question ? (question.is_random ? 'from-equation' : 'fixed') : 'from-equation'
+  )
 
   // Local copy so newly-saved formulas show up immediately without a page reload.
   const [presetList, setPresetList] = useState<PresetWithCat[]>(initialPresets)
@@ -1470,27 +1495,63 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
     setPresetList(prev => [...prev, p])
   }
 
-  const [title, setTitle] = useState('')
-  const [subject, setSubject] = useState('')
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
-  const [visibility, setVisibility] = useState<Visibility>('private')
-  const [tags, setTags] = useState<string[]>([])
+  const [title, setTitle] = useState(question?.title ?? '')
+  const [subject, setSubject] = useState(question?.subject ?? '')
+  const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
+  const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
-  const [questionText, setQuestionText] = useState('')
-  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [questionText, setQuestionText] = useState(question?.question_text ?? '')
+  const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
   const [showWhiteboard, setShowWhiteboard] = useState(false)
 
-  const [variables, setVariables] = useState<Variable[]>([])
-  const [logicRules, setLogicRules] = useState<LogicRule[]>([])
+  const [variables, setVariables] = useState<Variable[]>(question?.variables ?? [])
+  const [logicRules, setLogicRules] = useState<LogicRule[]>(question?.logic_rules ?? [])
 
-  const [answerParts, setAnswerParts] = useState<AnswerPart[]>([newPart()])
-  const [labelStyle, setLabelStyle] = useState<PartLabelStyle>('thai')
+  const [answerParts, setAnswerParts] = useState<AnswerPart[]>(
+    question?.answer_parts && question.answer_parts.length > 0 ? question.answer_parts : [newPart()]
+  )
+  const existingConfig = question?.extra_data as RandomQuestionConfig | undefined
+  const [labelStyle, setLabelStyle] = useState<PartLabelStyle>(existingConfig?.part_label_style ?? 'thai')
   const labels = PART_LABEL_SETS[labelStyle]
-  const [globalTolerance, setGlobalTolerance] = useState(0.1)
-  const [answerStep, setAnswerStep] = useState(0)
-  const [pythagoreanEnabled, setPythagoreanEnabled] = useState(false)
-  const [pythagoreanGroups, setPythagoreanGroups] = useState<PythagoreanGroup[]>([])
-  const [solutionText, setSolutionText] = useState('')
+  const [globalTolerance, setGlobalTolerance] = useState(question?.answer_tolerance ?? 0.1)
+  const [answerStep, setAnswerStep] = useState(existingConfig?.answer_step ?? 0)
+  const [pythagoreanEnabled, setPythagoreanEnabled] = useState((existingConfig?.pythagorean_groups ?? []).length > 0)
+  const [pythagoreanGroups, setPythagoreanGroups] = useState<PythagoreanGroup[]>(existingConfig?.pythagorean_groups ?? [])
+  const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [initialEquationText, setInitialEquationText] = useState<string | undefined>(() => equationTextFromQuestion(question))
+
+  useEffect(() => {
+    if (mode !== 'create' || question) return
+    const seed = readDuplicateSeed('written')
+    if (!seed) return
+    setTitle(seed.title)
+    setSubject(seed.subject ?? '')
+    setDifficulty(seed.difficulty)
+    setVisibility(seed.visibility)
+    setTags(seed.tags ?? [])
+    setQuestionText(seed.question_text)
+    setImageUrls(seed.image_urls ?? [])
+    setSolutionText(seed.solution_text ?? '')
+
+    setCreationMode(seed.is_random ? 'from-equation' : 'fixed')
+    setVariables(seed.variables ?? [])
+    setLogicRules(seed.logic_rules ?? [])
+    setAnswerParts(seed.answer_parts && seed.answer_parts.length > 0 ? seed.answer_parts : [newPart()])
+    setGlobalTolerance(seed.answer_tolerance ?? 0.1)
+
+    const answerVarName = (seed.variables ?? []).find(v => v.is_answer)?.name
+    const mainFormula = seed.answer_parts?.[0]?.formula
+    if (seed.is_random && answerVarName && mainFormula) {
+      setInitialEquationText(`${answerVarName} = ${mainFormula}`)
+    }
+
+    const config = (seed.extra_data ?? {}) as RandomQuestionConfig
+    setLabelStyle(config.part_label_style ?? 'thai')
+    setAnswerStep(config.answer_step ?? 0)
+    setPythagoreanGroups(config.pythagorean_groups ?? [])
+    setPythagoreanEnabled((config.pythagorean_groups ?? []).length > 0)
+  })
 
   function updatePart(i: number, patch: Partial<AnswerPart>) {
     setAnswerParts(parts => parts.map((p, idx) => idx === i ? { ...p, ...patch } : p))
@@ -1532,10 +1593,10 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
     // Apply global tolerance to all parts
     const partsWithTolerance = answerParts.map(p => ({ ...p, tolerance: globalTolerance }))
 
-    const result = await createQuestion({
-      title, subject, question_text: questionText, question_type: 'written',
-      difficulty, visibility, category_id: '',
-      grade_level: '', is_random: creationMode !== 'fixed',
+    const payload = {
+      title, subject, question_text: questionText, question_type: 'written' as const,
+      difficulty, visibility, category_id: question?.category_id ?? '',
+      grade_level: question?.grade_level ?? '', is_random: creationMode !== 'fixed',
       variables, logic_rules: logicRules,
       answer_parts: partsWithTolerance,
       answer_formula: first.formula,
@@ -1548,7 +1609,10 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
         part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
       },
       solution_text: solutionText, tags, image_urls: imageUrls,
-    })
+    }
+    const result = mode === 'edit' && question
+      ? await updateQuestion(question.id, payload)
+      : await createQuestion(payload)
 
     if (result?.error) { toast.error(result.error); setSaving(false) }
   }
@@ -1673,6 +1737,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
               logicRules={logicRules}
               onLogicRulesChange={setLogicRules}
               onPresetCreated={addPreset}
+              initialEquationText={initialEquationText}
             />
           </section>
 
@@ -1835,9 +1900,9 @@ export function RandomNumericForm({ allTags, presets: initialPresets }: RandomNu
           partLabelStyle={labelStyle}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : 'บันทึกโจทย์'}
+          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push('/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>
