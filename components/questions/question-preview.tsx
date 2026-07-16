@@ -53,6 +53,43 @@ function isHtml(text: string) {
   return /<[a-z][\s\S]*>/i.test(text)
 }
 
+const ANSWER_BLANK = '[คำตอบ]'
+
+// Splitting the raw (possibly HTML) sub_text string on the placeholder by plain string
+// slicing can cut a tag in half — e.g. "<p>...[คำตอบ]</p>" leaves a dangling "</p>"
+// fragment — and stripping tags instead loses formatting like superscript/subscript.
+// Use a DOM Range to split at the placeholder so each half keeps only its own
+// (correctly closed) formatting tags.
+function splitAtAnswerBlank(html: string): [string, string] | null {
+  if (typeof document === 'undefined') return null
+  const container = document.createElement('div')
+  container.innerHTML = html
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  let target: Text | null = null
+  let idx = -1
+  let node: Node | null
+  while ((node = walker.nextNode())) {
+    const i = (node as Text).data.indexOf(ANSWER_BLANK)
+    if (i !== -1) { target = node as Text; idx = i; break }
+  }
+  if (!target) return null
+
+  const beforeRange = document.createRange()
+  beforeRange.setStart(container, 0)
+  beforeRange.setEnd(target, idx)
+  const beforeDiv = document.createElement('div')
+  beforeDiv.appendChild(beforeRange.cloneContents())
+
+  const afterRange = document.createRange()
+  afterRange.setStart(target, idx + ANSWER_BLANK.length)
+  afterRange.setEnd(container, container.childNodes.length)
+  const afterDiv = document.createElement('div')
+  afterDiv.appendChild(afterRange.cloneContents())
+
+  return [beforeDiv.innerHTML, afterDiv.innerHTML]
+}
+
 function formatAnswer(n: number): string {
   if (Math.abs(n) >= 1e6 || (Math.abs(n) < 0.001 && n !== 0)) return n.toExponential(3)
   return parseFloat(n.toPrecision(4)).toString()
@@ -428,49 +465,78 @@ export function QuestionPreview({
                 {answerParts.map((part, i) => {
                   const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
                   const result = writtenResults[i]
+                  const blankSplit = part.sub_text ? splitAtAnswerBlank(part.sub_text) : null
+
+                  const inputEl = (
+                    <input
+                      type="number"
+                      value={writtenInputs[i] ?? ''}
+                      onChange={(e) => {
+                        if (writtenChecked) return
+                        const next = [...writtenInputs]
+                        next[i] = e.target.value
+                        setWrittenInputs(next)
+                      }}
+                      readOnly={writtenChecked}
+                      placeholder="กรอกตัวเลข"
+                      className={`h-9 w-36 border rounded-lg px-3 text-sm bg-white font-mono ${
+                        result === true ? 'border-green-400' :
+                        result === false ? 'border-red-400' :
+                        'border-gray-300'
+                      }`}
+                    />
+                  )
+
+                  const feedback = (
+                    <>
+                      {result === true && (
+                        <span className="text-green-600 text-sm font-medium">✓ ถูก!</span>
+                      )}
+                      {result === false && correctAnswer !== null && typeof correctAnswer === 'number' && (
+                        <span className="text-red-500 text-sm">
+                          ✗ เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
+                        </span>
+                      )}
+                      {result === false && (correctAnswer === null || typeof correctAnswer !== 'number') && (
+                        <span className="text-red-500 text-sm">✗ ผิด</span>
+                      )}
+                    </>
+                  )
+
                   return (
                     <div key={part.id} className="space-y-1.5">
-                      {answerParts.length > 1 && (
-                        <p className="text-sm font-medium text-gray-700">
-                          {labels[i] ?? i + 1})
-                          {part.sub_text && <RichText text={part.sub_text} className="font-normal text-gray-600 ml-1" />}
-                        </p>
+                      {blankSplit ? (
+                        <div className={`flex flex-wrap items-center gap-2 p-3 rounded-lg border text-sm text-gray-800 ${
+                          result === true ? 'bg-green-50 border-green-300' :
+                          result === false ? 'bg-red-50 border-red-300' :
+                          'bg-gray-50 border-gray-200'
+                        }`}>
+                          {answerParts.length > 1 && <span className="font-medium shrink-0">{labels[i] ?? i + 1})</span>}
+                          {blankSplit[0] && <RichText text={blankSplit[0]} className="[&_p]:inline" />}
+                          {inputEl}
+                          {part.unit && <span className="text-gray-600">{renderUnit(part.unit)}</span>}
+                          {blankSplit[1] && <RichText text={blankSplit[1]} className="[&_p]:inline" />}
+                          {feedback}
+                        </div>
+                      ) : (
+                        <>
+                          {part.sub_text && (
+                            <p className="text-sm font-medium text-gray-700">
+                              {answerParts.length > 1 && <>{labels[i] ?? i + 1}) </>}
+                              <RichText text={part.sub_text} className="font-normal text-gray-600" />
+                            </p>
+                          )}
+                          <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+                            result === true ? 'bg-green-50 border-green-300' :
+                            result === false ? 'bg-red-50 border-red-300' :
+                            'bg-gray-50 border-gray-200'
+                          }`}>
+                            {inputEl}
+                            {part.unit && <span className="text-sm text-gray-600">{renderUnit(part.unit)}</span>}
+                            {feedback}
+                          </div>
+                        </>
                       )}
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                        result === true ? 'bg-green-50 border-green-300' :
-                        result === false ? 'bg-red-50 border-red-300' :
-                        'bg-gray-50 border-gray-200'
-                      }`}>
-                        <input
-                          type="number"
-                          value={writtenInputs[i] ?? ''}
-                          onChange={(e) => {
-                            if (writtenChecked) return
-                            const next = [...writtenInputs]
-                            next[i] = e.target.value
-                            setWrittenInputs(next)
-                          }}
-                          readOnly={writtenChecked}
-                          placeholder="กรอกตัวเลข"
-                          className={`h-9 w-36 border rounded-lg px-3 text-sm bg-white font-mono ${
-                            result === true ? 'border-green-400' :
-                            result === false ? 'border-red-400' :
-                            'border-gray-300'
-                          }`}
-                        />
-                        {part.unit && <span className="text-sm text-gray-600">{renderUnit(part.unit)}</span>}
-                        {result === true && (
-                          <span className="text-green-600 text-sm font-medium">✓ ถูก!</span>
-                        )}
-                        {result === false && correctAnswer !== null && typeof correctAnswer === 'number' && (
-                          <span className="text-red-500 text-sm">
-                            ✗ เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
-                          </span>
-                        )}
-                        {result === false && (correctAnswer === null || typeof correctAnswer !== 'number') && (
-                          <span className="text-red-500 text-sm">✗ ผิด</span>
-                        )}
-                      </div>
                     </div>
                   )
                 })}

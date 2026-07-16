@@ -124,6 +124,7 @@ export interface AnswerPart {
   formula: string
   unit: string
   tolerance: number   // negative = percent mode, positive = absolute decimal
+  equation_text?: string   // raw "{var} = formula" text shown in the equation picker, for edit/duplicate prefill
 }
 
 export type LogicOperator = '<' | '>' | '<=' | '>=' | '!='
