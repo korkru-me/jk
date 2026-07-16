@@ -26,6 +26,8 @@ import type {
 
 function equationTextFromQuestion(q?: Question | null): string | undefined {
   if (!q || !q.is_random) return undefined
+  const stored = q.answer_parts?.[0]?.equation_text
+  if (stored) return stored
   const answerVarName = (q.variables ?? []).find(v => v.is_answer)?.name
   const formula = q.answer_parts?.[0]?.formula
   if (!answerVarName || !formula) return undefined
@@ -70,6 +72,17 @@ function extractRHS(eq: string): string {
 
 function newPart(): AnswerPart {
   return { id: Math.random().toString(36).slice(2), sub_text: '', formula: '', unit: '', tolerance: 0 }
+}
+
+// Older questions (saved before answer_parts existed) keep their formula/unit/tolerance
+// in the legacy top-level columns instead. Fall back to those so edit/duplicate don't
+// silently show a blank answer set for them.
+function answerPartsFromQuestion(q?: Question | null): AnswerPart[] {
+  if (q?.answer_parts && q.answer_parts.length > 0) return q.answer_parts
+  if (q?.answer_formula) {
+    return [{ ...newPart(), formula: q.answer_formula, unit: q.answer_unit ?? '', tolerance: q.answer_tolerance ?? 0.1 }]
+  }
+  return [newPart()]
 }
 
 // ─── SelectField ──────────────────────────────────────────────────────────────
@@ -603,7 +616,7 @@ function normalizeEq(s: string): string {
 
 function PresetEquationSelector({
   presets, variables, onVariablesChange, onFormulaChange,
-  logicRules, onLogicRulesChange, onPresetCreated, initialEquationText,
+  logicRules, onLogicRulesChange, onPresetCreated, initialEquationText, onEquationTextChange,
 }: {
   presets: PresetWithCat[]
   variables: Variable[]
@@ -613,6 +626,7 @@ function PresetEquationSelector({
   onLogicRulesChange: (r: LogicRule[]) => void
   onPresetCreated: (p: PresetWithCat) => void
   initialEquationText?: string
+  onEquationTextChange?: (text: string) => void
 }) {
   const [selPresetId, setSelPresetId] = useState('')
   const [equationText, setEquationText] = useState('')
@@ -643,8 +657,17 @@ function PresetEquationSelector({
   useEffect(() => {
     if (!initialEquationText) return
     setEquationText(initialEquationText)
-    applyEquation(initialEquationText, variables.find(v => v.is_answer)?.name)
+    applyEquation(initialEquationText, detectAnswerVar(initialEquationText) ?? variables.find(v => v.is_answer)?.name)
   }, [initialEquationText])
+
+  useEffect(() => {
+    if (!onEquationTextChange) return
+    if (answerVarName && derivedFormula) {
+      onEquationTextChange(`${answerVarName} = ${derivedFormula}`)
+    } else if (equationText) {
+      onEquationTextChange(equationText)
+    }
+  }, [answerVarName, derivedFormula, equationText])
 
   async function selectAnswerVar(varName: string) {
     if (varName === answerVarName || !equationText.trim()) return
@@ -883,16 +906,18 @@ function SavePresetControl({ equation, targetVariable, variables, onSaved }: {
 // Lighter equation picker for sub questions — derives formula only, no variable management.
 
 function SubEquationPicker({
-  presets, mainVarNames, partIndex, labels, onFormulaChange,
+  presets, mainVarNames, partIndex, labels, onFormulaChange, initialEquationText, onEquationTextChange,
 }: {
   presets: PresetWithCat[]
   mainVarNames: string[]
   partIndex: number  // index in answerParts (1 = second label, 2 = third, ...)
   labels: string[]
   onFormulaChange: (formula: string) => void
+  initialEquationText?: string
+  onEquationTextChange?: (text: string) => void
 }) {
   const [selPresetId, setSelPresetId] = useState('')
-  const [equationText, setEquationText] = useState('')
+  const [equationText, setEquationText] = useState(initialEquationText ?? '')
   const [allVarNames, setAllVarNames] = useState<string[]>([])
   const [answerVarName, setAnswerVarName] = useState<string | null>(null)
   const [derivedFormula, setDerivedFormula] = useState('')
@@ -927,6 +952,20 @@ function SubEquationPicker({
     setSolveError('')
     onFormulaChange(rhs)
   }
+
+  useEffect(() => {
+    if (!initialEquationText) return
+    applyEquation(initialEquationText)
+  }, [initialEquationText])
+
+  useEffect(() => {
+    if (!onEquationTextChange) return
+    if (answerVarName && derivedFormula) {
+      onEquationTextChange(`${answerVarName} = ${derivedFormula}`)
+    } else if (equationText) {
+      onEquationTextChange(equationText)
+    }
+  }, [answerVarName, derivedFormula, equationText])
 
   async function selectAnswerVar(varName: string) {
     if (varName === answerVarName || !equationText.trim()) return
@@ -1070,17 +1109,19 @@ function SubQuestionFromEquation({
   return (
     <AnswerPartCard label={label} onRemove={onRemove}>
       <div>
-        <p className="text-sm font-semibold text-gray-700 mb-2">เลือกสมการ</p>
+        <p className="text-sm font-semibold text-gray-700 mb-2">เลือกสมการ *</p>
         <SubEquationPicker
           presets={presets}
           mainVarNames={mainVarNames}
           partIndex={partIndex}
           labels={labels}
           onFormulaChange={formula => onChange({ formula })}
+          initialEquationText={part.equation_text}
+          onEquationTextChange={text => onChange({ equation_text: text })}
         />
       </div>
       <div className="space-y-1.5">
-        <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <Label>คำถามย่อย / รูปแบบช่องคำตอบ *</Label>
         <RichTextEditor
           ref={subTextEditorRef}
           value={part.sub_text}
@@ -1112,7 +1153,7 @@ function SubQuestionFixed({
   return (
     <AnswerPartCard label={label} onRemove={onRemove}>
       <div className="space-y-1.5">
-        <Label>คำถามย่อย / รูปแบบช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <Label>คำถามย่อย / รูปแบบช่องคำตอบ *</Label>
         <RichTextEditor
           ref={subTextEditorRef}
           value={part.sub_text}
@@ -1508,9 +1549,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const [variables, setVariables] = useState<Variable[]>(question?.variables ?? [])
   const [logicRules, setLogicRules] = useState<LogicRule[]>(question?.logic_rules ?? [])
 
-  const [answerParts, setAnswerParts] = useState<AnswerPart[]>(
-    question?.answer_parts && question.answer_parts.length > 0 ? question.answer_parts : [newPart()]
-  )
+  const [answerParts, setAnswerParts] = useState<AnswerPart[]>(answerPartsFromQuestion(question))
   const existingConfig = question?.extra_data as RandomQuestionConfig | undefined
   const [labelStyle, setLabelStyle] = useState<PartLabelStyle>(existingConfig?.part_label_style ?? 'thai')
   const labels = PART_LABEL_SETS[labelStyle]
@@ -1537,13 +1576,13 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
     setCreationMode(seed.is_random ? 'from-equation' : 'fixed')
     setVariables(seed.variables ?? [])
     setLogicRules(seed.logic_rules ?? [])
-    setAnswerParts(seed.answer_parts && seed.answer_parts.length > 0 ? seed.answer_parts : [newPart()])
+    const seedParts = answerPartsFromQuestion(seed)
+    setAnswerParts(seedParts)
     setGlobalTolerance(seed.answer_tolerance ?? 0.1)
 
-    const answerVarName = (seed.variables ?? []).find(v => v.is_answer)?.name
-    const mainFormula = seed.answer_parts?.[0]?.formula
-    if (seed.is_random && answerVarName && mainFormula) {
-      setInitialEquationText(`${answerVarName} = ${mainFormula}`)
+    const equationText = equationTextFromQuestion(seed)
+    if (equationText) {
+      setInitialEquationText(equationText)
     }
 
     const config = (seed.extra_data ?? {}) as RandomQuestionConfig
@@ -1588,6 +1627,14 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       }
     }
 
+    const emptySubTextIdx = answerParts.findIndex(p => !(p.sub_text ?? '').replace(/<[^>]*>/g, '').trim())
+    if (emptySubTextIdx !== -1) {
+      toast.error(answerParts.length > 1
+        ? `กรอกรูปแบบคำถาม/ช่องคำตอบข้อย่อย ${labels[emptySubTextIdx] ?? emptySubTextIdx + 1} ด้วย`
+        : 'กรอกรูปแบบคำถาม/ช่องคำตอบด้วย')
+      return
+    }
+
     setSaving(true)
     const first = answerParts[0]
     // Apply global tolerance to all parts
@@ -1618,23 +1665,23 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   }
 
   const subParts = answerParts.slice(1)
-  const answerVar = variables.find(v => v.is_answer)
+  const answerVarName = detectAnswerVar(answerParts[0]?.equation_text ?? '') ?? variables.find(v => v.is_answer)?.name
   const inputVars = variables.filter(v => !v.is_answer)
 
   // Main answer content per mode — shown bare (no card chrome) when there are no
   // sub-questions yet, and wrapped in a labeled AnswerPartCard once one is added.
   const fromEquationMainContent = (
     <>
-      {answerVar && answerParts[0].formula && (
+      {answerVarName && answerParts[0].formula && (
         <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
-          <span className="font-mono font-bold text-emerald-700 text-sm">{'{'}{answerVar.name}{'}'}</span>
+          <span className="font-mono font-bold text-emerald-700 text-sm">{'{'}{answerVarName}{'}'}</span>
           <span className="text-emerald-500">=</span>
           <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{answerParts[0].formula}</span>
           <span className="text-[10px] text-emerald-500 shrink-0">จากสมการที่เลือกด้านบน</span>
         </div>
       )}
       <div className="space-y-1.5">
-        <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ *</Label>
         <RichTextEditor
           ref={subTextEditorRef}
           value={answerParts[0].sub_text ?? ''}
@@ -1657,7 +1704,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const fixedMainContent = (
     <>
       <div className="space-y-1.5">
-        <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+        <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ *</Label>
         <RichTextEditor
           ref={subTextEditorRef}
           value={answerParts[0].sub_text ?? ''}
@@ -1728,7 +1775,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         <>
           {/* 2. เลือกสมการ */}
           <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เลือกสมการ</h2>
+            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เลือกสมการ *</h2>
             <PresetEquationSelector
               presets={presetList}
               variables={variables}
@@ -1738,6 +1785,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
               onLogicRulesChange={setLogicRules}
               onPresetCreated={addPreset}
               initialEquationText={initialEquationText}
+              onEquationTextChange={text => updatePart(0, { equation_text: text })}
             />
           </section>
 
