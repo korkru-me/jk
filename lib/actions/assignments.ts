@@ -11,6 +11,7 @@ interface CreateAssignmentData {
   title: string
   description: string
   question_ids: string[]
+  set_id?: string
   start_at: string | null
   end_at: string | null
   duration_minutes: number | null
@@ -23,8 +24,23 @@ export async function createAssignment(data: CreateAssignmentData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
-  if (data.question_ids.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
   if (data.classroom_ids.length === 0) return { error: 'กรุณาเลือกห้องเรียนอย่างน้อย 1 ห้อง' }
+
+  // When created from a saved set, trust the set's own question_ids (fetched
+  // server-side under RLS) rather than whatever the client sent, so a
+  // tampered request can't smuggle in questions the set doesn't contain.
+  let questionIds = data.question_ids
+  if (data.set_id) {
+    const { data: set } = await supabase
+      .from('question_sets')
+      .select('question_ids')
+      .eq('id', data.set_id)
+      .maybeSingle()
+    if (!set) return { error: 'ไม่พบชุดโจทย์' }
+    questionIds = set.question_ids
+  }
+
+  if (questionIds.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
 
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
@@ -37,7 +53,8 @@ export async function createAssignment(data: CreateAssignmentData) {
       created_by: user.id,
       title: data.title.trim(),
       description: data.description.trim() || null,
-      question_ids: data.question_ids,
+      question_ids: questionIds,
+      set_id: data.set_id ?? null,
       start_at: data.start_at || null,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
@@ -133,6 +150,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       title: `${source.title} (สำเนา)`,
       description: source.description,
       question_ids: source.question_ids,
+      set_id: null,
       start_at: null,
       end_at: null,
       duration_minutes: source.duration_minutes,

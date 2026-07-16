@@ -193,12 +193,25 @@ export interface Assignment {
   title: string
   description: string | null
   question_ids: string[]
+  set_id: string | null
   start_at: string | null
   end_at: string | null
   duration_minutes: number | null
   status: AssignmentStatus
   mode: AssignmentMode
   type: AssignmentType
+  created_at: string
+  updated_at: string
+}
+
+export interface QuestionSet {
+  id: string
+  org_id: string
+  created_by: string
+  title: string
+  description: string | null
+  question_ids: string[]
+  tags: string[]
   created_at: string
   updated_at: string
 }
@@ -260,7 +273,7 @@ export interface AssignmentExtension {
   created_at: string
 }
 
-export type NotificationType = 'assignment_reminder' | 'co_teacher_invite' | 'extension_granted'
+export type NotificationType = 'assignment_reminder' | 'co_teacher_invite' | 'extension_granted' | 'classroom_post'
 
 export interface Notification {
   id: string
@@ -275,6 +288,27 @@ export interface Notification {
   related_classroom_id: string | null
   is_read: boolean
   created_at: string
+}
+
+export interface ClassroomPost {
+  id: string
+  classroom_id: string
+  author_id: string
+  body: string
+  pinned: boolean
+  created_at: string
+  updated_at: string
+  users: { full_name: string } | null
+  comments: PostComment[]
+}
+
+export interface PostComment {
+  id: string
+  post_id: string
+  author_id: string
+  body: string
+  created_at: string
+  users: { full_name: string } | null
 }
 
 export interface SubmissionAnswer {

@@ -64,45 +64,78 @@ export default async function ClassroomsPage() {
     .map((m: any) => m.classrooms)
     .filter((c: any) => c && c.status === 'active') as Classroom[]
 
-  return <StudentView classrooms={classrooms} />
+  const classroomIds = classrooms.map(c => c.id)
+  const { data: links } = classroomIds.length > 0
+    ? await admin.from('assignment_classrooms').select('assignment_id, classroom_id').in('classroom_id', classroomIds)
+    : { data: [] }
+  const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+
+  const { data: assignmentRows } = assignmentIds.length > 0
+    ? await admin.from('assignments').select('id, status').in('id', assignmentIds).eq('status', 'published')
+    : { data: [] }
+  const publishedIds = new Set((assignmentRows ?? []).map((a: any) => a.id))
+
+  const { data: subRows } = assignmentIds.length > 0
+    ? await admin.from('submissions').select('assignment_id, status').eq('student_id', authUser!.id).in('assignment_id', assignmentIds)
+    : { data: [] }
+  const doneAssignmentIds = new Set(
+    (subRows ?? []).filter((s: any) => s.status === 'submitted' || s.status === 'graded').map((s: any) => s.assignment_id)
+  )
+
+  const pendingCountMap: Record<string, number> = {}
+  for (const l of (links ?? []) as any[]) {
+    if (publishedIds.has(l.assignment_id) && !doneAssignmentIds.has(l.assignment_id)) {
+      pendingCountMap[l.classroom_id] = (pendingCountMap[l.classroom_id] ?? 0) + 1
+    }
+  }
+
+  return <StudentView classrooms={classrooms} pendingCountMap={pendingCountMap} />
 }
 
-function StudentView({ classrooms }: { classrooms: Classroom[] }) {
+function StudentView({ classrooms, pendingCountMap }: { classrooms: Classroom[]; pendingCountMap: Record<string, number> }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">ห้องเรียนของฉัน</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{classrooms.length} ห้องเรียน</p>
+        <h1 className="text-xl font-bold">ห้องเรียนของฉัน</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{classrooms.length} ห้องเรียน</p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <p className="text-sm font-medium text-gray-700 mb-3">เข้าร่วมห้องเรียนใหม่</p>
+      <div className="bg-card border rounded-2xl p-5">
+        <p className="text-sm font-medium mb-3">เข้าร่วมห้องเรียนใหม่</p>
         <JoinClassroomForm />
       </div>
 
       {classrooms.length === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl">
+        <div className="text-center py-16 border-2 border-dashed rounded-2xl">
           <p className="text-4xl mb-3">🏫</p>
-          <p className="text-gray-500 font-medium">ยังไม่ได้เข้าร่วมห้องเรียนใด</p>
-          <p className="text-sm text-gray-400 mt-1">กรอกรหัสห้องเรียนจากครูเพื่อเริ่มต้น</p>
+          <p className="text-muted-foreground font-medium">ยังไม่ได้เข้าร่วมห้องเรียนใด</p>
+          <p className="text-sm text-muted-foreground/70 mt-1">กรอกรหัสห้องเรียนจากครูเพื่อเริ่มต้น</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classrooms.map((c) => (
-            <Link
-              key={c.id}
-              href={`/classrooms/${c.id}`}
-              className="block p-5 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-sm transition-all"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-gray-900 truncate">{c.name}</p>
-                <span className="shrink-0 text-2xl">🏫</span>
-              </div>
-              {c.description && (
-                <p className="text-sm text-gray-400 mt-1 line-clamp-2">{c.description}</p>
-              )}
-            </Link>
-          ))}
+          {classrooms.map((c) => {
+            const pending = pendingCountMap[c.id] ?? 0
+            return (
+              <Link
+                key={c.id}
+                href={`/classrooms/${c.id}`}
+                className="block p-5 bg-card border rounded-2xl hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold truncate">{c.name}</p>
+                  <span className="shrink-0 text-2xl">🏫</span>
+                </div>
+                {c.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description}</p>
+                )}
+                {pending > 0 && (
+                  <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+                    {pending} รอทำ
+                  </span>
+                )}
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>

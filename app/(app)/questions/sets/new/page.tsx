@@ -1,0 +1,43 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { getMyQuestionSets } from '@/lib/actions/question-sets'
+import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
+import type { Question } from '@/lib/types'
+
+export const metadata = { title: 'สร้างชุดโจทย์ — KorKru' }
+
+export default async function NewQuestionSetPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('users').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'teacher' && profile?.role !== 'admin') redirect('/dashboard')
+
+  const [{ data: questions }, existingSets] = await Promise.all([
+    supabase
+      .from('questions')
+      .select('id, title, question_text, difficulty, question_type, visibility')
+      .eq('created_by', user.id)
+      .neq('visibility', 'pending')
+      .order('created_at', { ascending: false }),
+    getMyQuestionSets(),
+  ])
+
+  const allTags = Array.from(new Set(existingSets.flatMap(s => s.tags)))
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">สร้างชุดโจทย์</h1>
+        <p className="text-sm text-gray-500 mt-1">รวมโจทย์จากคลังเป็นชุด ติดแท็กไว้ใช้ซ้ำ — ไม่ต้องเลือกห้องเรียนตอนนี้</p>
+      </div>
+
+      <CreateQuestionSetForm
+        questions={(questions ?? []) as Question[]}
+        allTags={allTags}
+      />
+    </div>
+  )
+}

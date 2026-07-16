@@ -4,52 +4,53 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
+import { createQuestionSet } from '@/lib/actions/question-sets'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { QuestionPicker } from '@/components/assignments/question-picker'
 import {
-  Check, ChevronRight, ChevronLeft, Search, Eye, Timer,
-  BookOpen, Globe, Calendar, Shuffle, FileText,
+  Check, ChevronRight, ChevronLeft, Eye, Timer,
+  BookOpen, Globe, Calendar, Shuffle, FileText, Layers,
 } from 'lucide-react'
 import type { Question, Classroom } from '@/lib/types'
 
 const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'ตั้งค่า', 'กำหนดการสอบ']
 
-const DIFF_META: Record<string, { label: string; color: string }> = {
-  easy:       { label: 'ง่าย',      color: 'bg-green-50 text-green-700 border-green-200' },
-  medium:     { label: 'กลาง',      color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  hard:       { label: 'ยาก',       color: 'bg-red-50 text-red-700 border-red-200' },
-  analytical: { label: 'วิเคราะห์', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-}
-
-const TYPE_SHORT: Record<string, string> = {
-  mcq: 'MCQ', written: 'เขียน', matching: 'จับคู่', essay: 'บรรยาย',
-  true_false: 'ถ/ผ', fill_blank: 'เติมคำ', ordering: 'เรียง',
+interface PreselectedSet {
+  id: string
+  title: string
+  description: string | null
+  question_ids: string[]
 }
 
 interface Props {
   classrooms: Classroom[]
   questions: Question[]
   preselectedClassroomId?: string
+  preselectedSet?: PreselectedSet
 }
 
-export function CreateAssignmentForm({ classrooms, questions, preselectedClassroomId }: Props) {
+export function CreateAssignmentForm({ classrooms, questions, preselectedClassroomId, preselectedSet }: Props) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
 
   // Step 1
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [title, setTitle] = useState(preselectedSet?.title ?? '')
+  const [description, setDescription] = useState(preselectedSet?.description ?? '')
   const [classroomIds, setClassroomIds] = useState<string[]>(
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
   const [mode, setMode] = useState<'online' | 'print'>('online')
   const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exam')
+  // When not starting from an existing set, offer to save the picked
+  // questions back into the library as a new reusable set.
+  const [saveAsSet, setSaveAsSet] = useState(true)
 
   // Step 2
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>(preselectedSet?.question_ids ?? [])
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
@@ -62,12 +63,6 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
   // Step 4
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
-
-  const filteredQs = questions.filter(q => {
-    if (diffFilter !== 'all' && q.difficulty !== diffFilter) return false
-    if (search && !q.title.toLowerCase().includes(search.toLowerCase()) && !q.question_text.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
 
   function toggleQ(id: string) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
@@ -85,11 +80,29 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
 
   function handleSubmit() {
     startTransition(async () => {
+      let setId = preselectedSet?.id
+
+      if (!preselectedSet && saveAsSet) {
+        const classroomName = classrooms.find(c => c.id === classroomIds[0])?.name
+        const setRes = await createQuestionSet({
+          title: title.trim(),
+          description: description.trim(),
+          question_ids: selectedIds,
+          tags: classroomName ? [classroomName] : [],
+        })
+        if (setRes?.error) {
+          toast.error(`บันทึกชุดโจทย์ลงคลังไม่สำเร็จ: ${setRes.error} (จะมอบหมายต่อโดยไม่บันทึกลงคลัง)`)
+        } else if ('id' in setRes) {
+          setId = setRes.id
+        }
+      }
+
       const res = await createAssignment({
         classroom_ids: classroomIds,
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
+        set_id: setId,
         start_at: startAt || null,
         end_at: endAt || null,
         duration_minutes: duration ? Number(duration) : null,
@@ -130,6 +143,13 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
         <div className="space-y-4">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
             <h2 className="font-semibold text-gray-900">ข้อมูลพื้นฐาน</h2>
+
+            {preselectedSet && (
+              <div className="flex items-center gap-2 text-sm bg-blue-50 text-blue-700 rounded-xl px-3 py-2.5">
+                <Layers className="w-4 h-4 shrink-0" />
+                ใช้ชุดโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({preselectedSet.question_ids.length} ข้อ) — ปรับโจทย์ที่เลือกได้ในขั้นตอนถัดไป
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="title">ชื่อชุดข้อสอบ <span className="text-red-500">*</span></Label>
@@ -189,6 +209,26 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
                 </div>
               )}
             </div>
+
+            {!preselectedSet && (
+              <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                    <Layers className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">บันทึกชุดโจทย์นี้ไว้ในคลังเพื่อใช้ซ้ำ</p>
+                    <p className="text-xs text-gray-400">โจทย์ที่เลือกจะถูกบันทึกเป็นชุดในคลังชุดโจทย์ ติดแท็กชื่อห้องเรียนให้อัตโนมัติ</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={saveAsSet}
+                  onChange={e => setSaveAsSet(e.target.checked)}
+                  className="accent-blue-600 w-4 h-4 shrink-0"
+                />
+              </label>
+            )}
           </div>
 
           <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
@@ -239,96 +279,15 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
 
       {/* ── Step 2: เลือกโจทย์ ────────────────────────────────────────── */}
       {step === 1 && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">เลือกโจทย์</h2>
-            <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-              {selectedIds.length} ข้อที่เลือก
-            </span>
-          </div>
-
-          <div className="flex gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-48">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="ค้นหาโจทย์..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              {['all', 'easy', 'medium', 'hard', 'analytical'].map(d => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDiffFilter(d)}
-                  className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                    diffFilter === d ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.label ?? d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
-            {filteredQs.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">ไม่พบโจทย์ที่ตรงกัน</div>
-            ) : filteredQs.map(q => {
-              const diff = DIFF_META[q.difficulty]
-              const isSelected = selectedIds.includes(q.id)
-              return (
-                <label
-                  key={q.id}
-                  className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
-                    isSelected ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleQ(q.id)}
-                    className="mt-0.5 accent-blue-600"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{q.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{q.question_text}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`text-xs px-1.5 py-0.5 rounded border ${diff?.color ?? 'bg-gray-50 text-gray-500 border-gray-200'}`}>
-                      {diff?.label ?? q.difficulty}
-                    </span>
-                    <span className="text-xs text-gray-400">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
-                  </div>
-                </label>
-              )
-            })}
-          </div>
-
-          {selectedIds.length > 0 && (
-            <div className="border-t border-gray-100 pt-3">
-              <p className="text-xs text-gray-500 mb-2">โจทย์ที่เลือก ({selectedIds.length} ข้อ)</p>
-              <div className="flex flex-wrap gap-1.5">
-                {selectedIds.map((id, i) => {
-                  const q = questions.find(qq => qq.id === id)
-                  return (
-                    <span key={id} className="flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
-                      <span className="text-gray-400 font-medium">{i + 1}.</span>
-                      <span className="truncate max-w-[120px]">{q?.title ?? id}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleQ(id)}
-                        className="text-gray-400 hover:text-red-500 transition-colors ml-0.5"
-                      >×</button>
-                    </span>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+        <QuestionPicker
+          questions={questions}
+          selectedIds={selectedIds}
+          onToggle={toggleQ}
+          search={search}
+          onSearchChange={setSearch}
+          diffFilter={diffFilter}
+          onDiffFilterChange={setDiffFilter}
+        />
       )}
 
       {/* ── Step 3: ตั้งค่า ──────────────────────────────────────────── */}

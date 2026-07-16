@@ -8,9 +8,10 @@ import {
   BookOpen, Plus, Search, Clock, Users, CheckCircle2, FileText,
   Globe, ChevronRight, Loader2, Play, Square, Timer,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { updateAssignmentStatus } from '@/lib/actions/assignments'
+import { cn } from '@/lib/utils'
 import type { AssignmentRow } from '../page'
 
 type StudentSub = { id: string; status: string; total_score: number | null; max_score: number }
@@ -283,58 +284,58 @@ function StudentView({
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">ชุดข้อสอบที่ได้รับ</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{totalCount} ชุดข้อสอบ</p>
+        <h1 className="text-xl font-bold">ชุดข้อสอบที่ได้รับ</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{totalCount} ชุดข้อสอบ</p>
       </div>
 
       {totalCount > 0 && (
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white rounded-2xl ring-1 ring-black/5 p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+          <div className="bg-card border rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950 flex items-center justify-center">
               <Clock className="w-4 h-4 text-amber-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 leading-none">{pendingCount}</p>
-              <p className="text-xs text-gray-500 mt-0.5">รอทำ</p>
+              <p className="text-2xl font-bold leading-none">{pendingCount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">รอทำ</p>
             </div>
           </div>
-          <div className="bg-white rounded-2xl ring-1 ring-black/5 p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
+          <div className="bg-card border rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-950 flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-green-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 leading-none">{doneCount}</p>
-              <p className="text-xs text-gray-500 mt-0.5">ส่งแล้ว</p>
+              <p className="text-2xl font-bold leading-none">{doneCount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">ส่งแล้ว</p>
             </div>
           </div>
         </div>
       )}
 
       <div className="relative max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input placeholder="ค้นหา..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
       </div>
 
       {totalCount === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl">
+        <div className="text-center py-16 border-2 border-dashed rounded-2xl">
           <p className="text-4xl mb-3">📝</p>
-          <p className="text-gray-500 font-medium">ยังไม่มีชุดข้อสอบ</p>
-          <p className="text-sm text-gray-400 mt-1">ครูจะมอบหมายข้อสอบให้ผ่านห้องเรียน</p>
+          <p className="text-muted-foreground font-medium">ยังไม่มีชุดข้อสอบ</p>
+          <p className="text-sm text-muted-foreground/70 mt-1">ครูจะมอบหมายข้อสอบให้ผ่านห้องเรียน</p>
         </div>
       ) : assignments.length === 0 ? (
-        <div className="text-center py-8 text-gray-400 text-sm">ไม่พบชุดข้อสอบที่ตรงกัน</div>
+        <div className="text-center py-8 text-muted-foreground text-sm">ไม่พบชุดข้อสอบที่ตรงกัน</div>
       ) : (
         <div className="space-y-3">
           {assignments.map(a => {
             const sub = mySubMap[a.id]
             const isDone = sub?.status === 'submitted' || sub?.status === 'graded'
             return (
-              <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-200 transition-colors">
+              <div key={a.id} className="bg-card border rounded-2xl p-4 hover:border-blue-300 dark:hover:border-blue-800 transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900">{a.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{a.classrooms?.name}</p>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                    <p className="font-semibold">{a.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{a.classrooms?.name}</p>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><FileText className="w-3 h-3" />{a.question_ids.length} ข้อ</span>
                       {a.duration_minutes && <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{a.duration_minutes} นาที</span>}
                       {a.end_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />ถึง {new Date(a.end_at).toLocaleDateString('th-TH', { dateStyle: 'short' })}</span>}
@@ -342,15 +343,15 @@ function StudentView({
                   </div>
                   {isDone ? (
                     <div className="text-right shrink-0">
-                      <p className="text-xs text-green-600 font-medium">ส่งแล้ว ✓</p>
+                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">ส่งแล้ว ✓</p>
                       {sub.total_score != null && (
-                        <p className="text-lg font-bold text-gray-900">{sub.total_score}/{sub.max_score}</p>
+                        <p className="text-lg font-bold">{sub.total_score}/{sub.max_score}</p>
                       )}
                     </div>
                   ) : (
                     <Link
                       href={`/assignments/${a.id}/take`}
-                      className="shrink-0 flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                      className={cn(buttonVariants({ size: 'sm' }), 'shrink-0 gap-1.5')}
                     >
                       <Play className="w-3.5 h-3.5" /> เริ่มทำ
                     </Link>

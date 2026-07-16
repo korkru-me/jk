@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen,
+  Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -95,9 +95,9 @@ export function QuestionBankClient({ questions }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/questions/multi/new">
+            <Link href="/questions/sets/new">
               <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
-                <Plus className="w-3.5 h-3.5" /> โจทย์หลายขั้นตอน
+                <Layers className="w-3.5 h-3.5" /> สร้างชุดโจทย์/ชุดแบบฝึกหัด
               </Button>
             </Link>
             <Link href="/questions/new">

@@ -1,16 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
+import { getQuestionSet } from '@/lib/actions/question-sets'
 import type { Question, Classroom } from '@/lib/types'
 
 export const metadata = { title: 'สร้างชุดข้อสอบ — KorKru' }
 
 interface Props {
-  searchParams: Promise<{ classroom?: string }>
+  searchParams: Promise<{ classroom?: string; set?: string }>
 }
 
 export default async function NewAssignmentPage({ searchParams }: Props) {
-  const { classroom: classroomParam } = await searchParams
+  const { classroom: classroomParam, set: setParam } = await searchParams
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -46,6 +47,8 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   }
 
   const preselectedClassroomId = classroomParam && seen.has(classroomParam) ? classroomParam : undefined
+  const preselectedSetRow = setParam ? await getQuestionSet(setParam) : null
+  const preselectedSet = preselectedSetRow ?? undefined
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -66,6 +69,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
         classrooms={classrooms}
         questions={(questions ?? []) as Question[]}
         preselectedClassroomId={preselectedClassroomId}
+        preselectedSet={preselectedSet}
       />
     </div>
   )

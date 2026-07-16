@@ -5,13 +5,14 @@ import Link from 'next/link'
 import {
   Users, BookOpen, Copy, Check, Settings,
   GraduationCap, UserPlus, Grid3x3, Mail, GitBranch, Activity, ChevronLeft,
-  ClipboardList,
+  ClipboardList, Megaphone,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
-import type { Classroom } from '@/lib/types'
+import type { Classroom, ClassroomPost } from '@/lib/types'
 
+import { ClassroomStream } from './classroom-stream'
 import { StudentTable } from './student-table'
 import { InvitePanel } from './invite-panel'
 import { CoTeachers, type CoTeacherRow, type InviteRow } from './co-teachers'
@@ -22,9 +23,10 @@ import { LearningPaths } from './learning-paths'
 import { AuditLog } from './audit-log'
 import { BreakoutGroups } from './breakout-groups'
 
-type Tab = 'students' | 'assignments' | 'scores' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
+type Tab = 'stream' | 'students' | 'assignments' | 'scores' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
 
 const TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
+  { key: 'stream',      label: 'ประกาศ',          icon: Megaphone },
   { key: 'students',    label: 'นักเรียน',        icon: Users },
   { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
   { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
@@ -56,13 +58,14 @@ interface Props {
     id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
   }[]
   ownerName: string
+  posts: ClassroomPost[]
 }
 
 export function ClassroomDetailClient({
   classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
-  classroomAssignments, classroomSubmissions, classroomExtensions, ownerName,
+  classroomAssignments, classroomSubmissions, classroomExtensions, ownerName, posts,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('students')
+  const [activeTab, setActiveTab] = useState<Tab>('stream')
   const [codeCopied, setCodeCopied] = useState(false)
 
   function copyCode() {
@@ -165,6 +168,11 @@ export function ClassroomDetailClient({
 
       {/* Tab content */}
       <div>
+        {activeTab === 'stream' && (
+          <div className="max-w-2xl">
+            <ClassroomStream classroomId={classroom.id} canPost={canManage} initialPosts={posts} />
+          </div>
+        )}
         {activeTab === 'students' && (
           <StudentTable
             classroomId={classroom.id}

@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Classroom, User } from '@/lib/types'
 import { ClassroomDetailClient } from './_components/classroom-detail-client'
+import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
+import { getClassroomPosts } from '@/lib/actions/classroom-posts'
 
 export default async function ClassroomDetailPage({
   params,
@@ -25,6 +27,76 @@ export default async function ClassroomDetailPage({
   if (!classroom) notFound()
 
   const c = classroom as Classroom
+
+  // ─── Student path ─────────────────────────────────────────────────────────
+  if (!isTeacher) {
+    const { data: membership } = await admin
+      .from('classroom_students')
+      .select('id')
+      .eq('classroom_id', id)
+      .eq('student_id', authUser!.id)
+      .maybeSingle()
+    if (!membership) notFound()
+
+    const [{ data: teacherProfile }, { count: studentCount }, { data: links }, posts] = await Promise.all([
+      admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
+      admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
+      admin.from('assignment_classrooms').select('assignment_id').eq('classroom_id', id),
+      getClassroomPosts(id),
+    ])
+    const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+
+    const { data: assignmentRows } = assignmentIds.length > 0
+      ? await admin
+          .from('assignments')
+          .select('id, title, question_ids, end_at, duration_minutes')
+          .in('id', assignmentIds)
+          .eq('status', 'published')
+          .order('end_at', { ascending: true, nullsFirst: false })
+      : { data: [] }
+    const publishedIds = (assignmentRows ?? []).map((a: any) => a.id)
+
+    const { data: subRows } = publishedIds.length > 0
+      ? await admin
+          .from('submissions')
+          .select('id, assignment_id, status, total_score, max_score, attempt_number')
+          .in('assignment_id', publishedIds)
+          .eq('student_id', authUser!.id)
+      : { data: [] }
+
+    // Multiple attempts possible (exercise type) — keep the best-scoring one
+    const subMap: Record<string, any> = {}
+    for (const s of (subRows ?? []) as any[]) {
+      const prev = subMap[s.assignment_id]
+      if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1) ||
+          ((s.total_score ?? -1) === (prev.total_score ?? -1) && s.attempt_number > prev.attempt_number)) {
+        subMap[s.assignment_id] = s
+      }
+    }
+
+    const assignments: StudentAssignmentRow[] = (assignmentRows ?? []).map((a: any) => ({
+      id: a.id,
+      title: a.title,
+      question_ids: a.question_ids ?? [],
+      end_at: a.end_at,
+      duration_minutes: a.duration_minutes,
+      submission: subMap[a.id]
+        ? { id: subMap[a.id].id, status: subMap[a.id].status, total_score: subMap[a.id].total_score, max_score: subMap[a.id].max_score }
+        : null,
+    }))
+
+    return (
+      <StudentClassroomView
+        classroom={c}
+        teacherName={teacherProfile?.full_name ?? 'ครูผู้สอน'}
+        studentCount={studentCount ?? 0}
+        assignments={assignments}
+        posts={posts}
+      />
+    )
+  }
+
+  // ─── Teacher / co-teacher path ────────────────────────────────────────────
   const isOwner = c.teacher_id === authUser!.id
 
   // Co-teacher permission for the current user (null if not a co-teacher)
@@ -133,6 +205,8 @@ export default async function ClassroomDetailPage({
   const { data: ownerProfile } = await admin
     .from('users').select('full_name').eq('id', c.teacher_id).single()
 
+  const posts = await getClassroomPosts(id)
+
   return (
     <ClassroomDetailClient
       classroom={c}
@@ -147,6 +221,7 @@ export default async function ClassroomDetailPage({
       classroomSubmissions={classroomSubmissions}
       classroomExtensions={classroomExtensions}
       ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
+      posts={posts}
     />
   )
 }

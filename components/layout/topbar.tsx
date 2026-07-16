@@ -1,7 +1,7 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { logout } from '@/lib/actions/auth'
 import {
   DropdownMenu,
@@ -16,9 +16,11 @@ import type { User } from '@/lib/types'
 interface TopbarProps {
   user: User
   onMenuToggle?: () => void
+  sidebarCollapsed?: boolean
+  onSidebarCollapseToggle?: () => void
 }
 
-export function Topbar({ user, onMenuToggle }: TopbarProps) {
+export function Topbar({ user, onMenuToggle, sidebarCollapsed = false, onSidebarCollapseToggle }: TopbarProps) {
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
 
@@ -35,7 +37,14 @@ export function Topbar({ user, onMenuToggle }: TopbarProps) {
           <line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
-      <div className="hidden md:block" />
+      <button
+        className="hidden md:flex p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+        onClick={onSidebarCollapseToggle}
+        aria-label={sidebarCollapsed ? 'แสดงแถบด้านข้าง' : 'ซ่อนแถบด้านข้าง'}
+        title={sidebarCollapsed ? 'แสดงแถบด้านข้าง' : 'ซ่อนแถบด้านข้าง'}
+      >
+        {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+      </button>
 
       <div className="flex items-center gap-3">
         {/* Notifications */}
