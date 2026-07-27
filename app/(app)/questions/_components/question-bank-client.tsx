@@ -2,14 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2,
+  Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { FolderSidebar } from './folder-sidebar'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import { QuestionCard, TYPE_LABEL, DIFF_META, type Teacher } from './question-card'
 import { PreviewModal } from './preview-modal'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
@@ -23,14 +23,6 @@ export const MOCK_TEACHERS: Teacher[] = [
   { id: 't3', name: 'ครูสุภาพร ใจดี',    initials: 'ส', color: 'bg-green-100 text-green-700' },
 ]
 
-const MOCK_FOLDERS = [
-  { id: 'all', name: 'โจทย์ทั้งหมด',     emoji: '📚' },
-  { id: 'f1',  name: 'ฟิสิกส์ ม.4',      emoji: '⚙️' },
-  { id: 'f2',  name: 'ข้อสอบ PISA',      emoji: '🌍' },
-  { id: 'f3',  name: 'คลังข้อสอบ CERN',  emoji: '⚛️' },
-  { id: 'f4',  name: 'ทดสอบปลายภาค',     emoji: '📋' },
-]
-
 const TAGS = ['อนุภาคมูลฐาน', 'กลศาสตร์', 'เวกเตอร์', 'คลื่น', 'ไฟฟ้า', 'แม่เหล็ก', 'ควอนตัม', 'สัมพัทธภาพ']
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -40,13 +32,17 @@ interface Props {
   teamQuestions: QuestionWithCreator[]
   hasTeamOrg: boolean
   hasMultipleTeams: boolean
+  myTeams: { id: string; name: string }[]
   currentUserId: string
 }
 
-export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMultipleTeams, currentUserId }: Props) {
+export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId }: Props) {
   const router = useRouter()
-  const [tab,          setTab]          = useState<'mine' | 'team'>('mine')
-  const [folder,       setFolder]       = useState('all')
+  const searchParams = useSearchParams()
+  const initialScopeParam = searchParams.get('tab')
+  const [scope,        setScope]        = useState<'all' | 'mine' | 'team'>(
+    initialScopeParam === 'mine' || initialScopeParam === 'team' ? initialScopeParam : 'all'
+  )
   const [search,       setSearch]       = useState('')
   const [diffFilter,   setDiffFilter]   = useState('all')
   const [typeFilter,   setTypeFilter]   = useState('all')
@@ -54,6 +50,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
   const [viewMode,     setViewMode]     = useState<'list' | 'grid'>('list')
   const [previewQ,     setPreviewQ]     = useState<QuestionWithCategory | null>(null)
   const [teamSearch,   setTeamSearch]   = useState('')
+  const [teamFilter,   setTeamFilter]   = useState('all')
   const [flaggedIds,   setFlaggedIds]   = useState<Set<string>>(new Set())
   const [showFilters,  setShowFilters]  = useState(false)
 
@@ -75,43 +72,27 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
 
   const activeFilterCount = [diffFilter !== 'all', typeFilter !== 'all', !!activeTag].filter(Boolean).length
 
-  const typeBreakdown = useMemo(() => {
-    const m: Record<string, number> = {}
-    for (const q of questions) m[q.question_type] = (m[q.question_type] ?? 0) + 1
-    return m
-  }, [questions])
-
-  const filteredTeam = useMemo(() => teamQuestions.filter(q =>
-    !teamSearch ||
-    q.title.toLowerCase().includes(teamSearch.toLowerCase()) ||
-    q.question_text.toLowerCase().includes(teamSearch.toLowerCase())
-  ), [teamQuestions, teamSearch])
+  const filteredTeam = useMemo(() => teamQuestions.filter(q => {
+    if (teamFilter !== 'all' && q.org_id !== teamFilter && !q.shared_org_ids?.includes(teamFilter)) return false
+    if (teamSearch && !q.title.toLowerCase().includes(teamSearch.toLowerCase()) && !q.question_text.toLowerCase().includes(teamSearch.toLowerCase())) return false
+    return true
+  }), [teamQuestions, teamSearch, teamFilter])
 
   return (
-    <div className="flex gap-5">
-      {/* ── Sidebar ───────────────────────────────────── */}
-      {tab === 'mine' && (
-        <FolderSidebar
-          folders={MOCK_FOLDERS}
-          selectedFolder={folder}
-          onSelectFolder={setFolder}
-          totalCount={questions.length}
-          flaggedCount={flaggedIds.size}
-          typeBreakdown={typeBreakdown}
-        />
-      )}
-
-      {/* ── Main ──────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 space-y-4">
+    <div className="space-y-4">
 
         {/* Header */}
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900">คลังโจทย์ของฉัน</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {filtered.length !== questions.length
-                ? `${filtered.length} จาก ${questions.length} โจทย์`
-                : `${questions.length} โจทย์`}
+              {scope === 'team'
+                ? `${filteredTeam.length} โจทย์`
+                : scope === 'all'
+                  ? `${questions.length + teamQuestions.length} โจทย์`
+                  : filtered.length !== questions.length
+                    ? `${filtered.length} จาก ${questions.length} โจทย์`
+                    : `${questions.length} โจทย์`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -134,20 +115,37 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
           </div>
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => v && setTab(v as 'mine' | 'team')}>
-          <TabsList>
-            <TabsTrigger value="mine">ของฉัน</TabsTrigger>
-            <TabsTrigger value="team" className="gap-1.5">
-              <Users className="w-3.5 h-3.5" /> ทีมของฉัน
-              {teamQuestions.length > 0 && (
-                <span className="bg-blue-500 text-white text-[10px] font-bold rounded-full px-1.5 leading-[18px]">
-                  {teamQuestions.length}
+        <div className="inline-flex w-fit items-center rounded-lg bg-muted p-[3px] gap-0.5">
+          {([
+            { value: 'all' as const, label: 'ทั้งหมด', count: questions.length + teamQuestions.length },
+            { value: 'mine' as const, label: 'ของฉัน', count: questions.length },
+            { value: 'team' as const, label: 'แชร์ในทีม', count: teamQuestions.length },
+          ]).map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setScope(opt.value)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2.5 h-[26px] text-sm font-medium transition-all',
+                scope === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-foreground/60 hover:text-foreground'
+              )}
+            >
+              {opt.value === 'team' && <Users className="w-3.5 h-3.5" />}
+              {opt.label}
+              {opt.count > 0 && (
+                <span className={cn(
+                  'text-[10px] font-bold rounded-full px-1.5 leading-[18px]',
+                  scope === opt.value ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
+                )}>
+                  {opt.count}
                 </span>
               )}
-            </TabsTrigger>
-          </TabsList>
+            </button>
+          ))}
+        </div>
 
-          <TabsContent value="mine" className="space-y-4">
+        {(scope === 'all' || scope === 'mine') && (
+          <div className="space-y-4">
+            {scope === 'all' && <h2 className="text-sm font-semibold text-gray-700">โจทย์ของฉัน</h2>}
 
         {/* Search + controls */}
         <div className="flex gap-2">
@@ -310,7 +308,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
             <p className="text-sm text-gray-400 mt-1">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
           </div>
         ) : (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 xl:grid-cols-2 gap-3' : 'space-y-2.5'}>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'space-y-2.5'}>
             {filtered.map(q => (
               <QuestionCard
                 key={q.id}
@@ -323,9 +321,12 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
             ))}
           </div>
         )}
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="team" className="space-y-4">
+        {(scope === 'all' || scope === 'team') && (
+          <div className="space-y-4">
+            {scope === 'all' && <h2 className="text-sm font-semibold text-gray-700">โจทย์ที่แชร์ในทีม</h2>}
             {!hasTeamOrg ? (
               <div className="text-center py-24 bg-white rounded-2xl ring-1 ring-black/5">
                 <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -339,14 +340,31 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
               </div>
             ) : (
               <>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
-                    value={teamSearch}
-                    onChange={e => setTeamSearch(e.target.value)}
-                    className="pl-9 bg-white"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
+                      value={teamSearch}
+                      onChange={e => setTeamSearch(e.target.value)}
+                      className="pl-9 bg-white"
+                    />
+                  </div>
+                  {hasMultipleTeams && (
+                    <Select value={teamFilter} onValueChange={(v) => v !== null && setTeamFilter(v)}>
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="ทุกทีม">
+                          {teamFilter === 'all' ? 'ทุกทีม' : myTeams.find(t => t.id === teamFilter)?.name ?? 'ทุกทีม'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">ทุกทีม</SelectItem>
+                        {myTeams.map(t => (
+                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 {teamQuestions.length === 0 ? (
@@ -371,9 +389,8 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                 )}
               </>
             )}
-          </TabsContent>
-        </Tabs>
-      </div>
+          </div>
+        )}
 
       {/* Preview modal */}
       {previewQ && (
@@ -464,7 +481,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
         <div className="flex items-center gap-1.5">
           {canEdit && (
             <Link
-              href={isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`}
+              href={isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit?tab=team`}
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition-all"
             >
               <Edit2 className="w-3.5 h-3.5" /> แก้ไข
@@ -474,7 +491,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
             onClick={onPreview}
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
           >
-            <BookOpen className="w-3.5 h-3.5" /> ดูตัวอย่าง
+            <Eye className="w-3.5 h-3.5" /> ดูตัวอย่าง
           </button>
         </div>
       </div>

@@ -93,7 +93,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   }
 
   return (
-    <div className={`bg-white rounded-2xl ring-1 transition-all hover:shadow-sm group ${
+    <div className={`@container bg-white rounded-2xl ring-1 transition-all hover:shadow-sm group ${
       isFlagged ? 'ring-orange-300 hover:ring-orange-400' : 'ring-black/5 hover:ring-blue-200'
     }`}>
       {/* Flagged banner */}
@@ -107,7 +107,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
       )}
 
       <div className="p-4">
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col @md:flex-row @md:items-start gap-3">
           {/* Left: content */}
           <div className="flex-1 min-w-0">
             {/* Badge row */}
@@ -153,7 +153,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{q.question_text}</p>
 
             {/* Stats row */}
-            <div className="flex items-center gap-5 mt-3 pt-3 border-t border-gray-50">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-gray-50">
               {/* p-value bar */}
               <div className="flex-1 min-w-0 max-w-[180px]">
                 <div className="flex items-center justify-between mb-1">
@@ -187,7 +187,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
           </div>
 
           {/* Right: actions (always visible on hover) */}
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center justify-between @md:flex-col @md:items-end @md:justify-start gap-1.5 @md:shrink-0">
             {/* Primary action: preview */}
             <button
               onClick={onPreview}
@@ -197,7 +197,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             </button>
 
             {/* Secondary actions row */}
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center flex-wrap gap-0.5">
               {/* Share */}
               <div className="relative">
                 <button
