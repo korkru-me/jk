@@ -1,10 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SmartTagInput } from '@/components/ui/smart-tag-input'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
+import { cn } from '@/lib/utils'
 import type { Difficulty, Visibility } from '@/lib/types'
 
 const difficultyLabels: Record<string, string> = {
@@ -16,7 +20,8 @@ const difficultyLabels: Record<string, string> = {
 
 const visibilityLabels: Record<string, string> = {
   private: 'ส่วนตัว',
-  school: 'โรงเรียน',
+  organization: 'ทีมของฉัน',
+  school: 'ทีมของฉัน', // legacy value, displayed the same as 'organization'
 }
 
 export const THAI_SUBJECTS = [
@@ -130,6 +135,49 @@ function SubjectAutocomplete({ value, onChange }: {
   )
 }
 
+// ─── TeamShareChips ────────────────────────────────────────────────────────────
+// Multi-select team picker — lets a question be shared to more than one team at once.
+
+export function TeamShareChips({ label, teams, selectedIds, onToggle, disabled }: {
+  label: string
+  teams: { id: string; name: string }[]
+  selectedIds: string[]
+  onToggle: (id: string) => void
+  disabled?: boolean
+}) {
+  if (teams.length === 0) return null
+
+  return (
+    <div className="pt-1">
+      <Label className="text-xs text-gray-500 mb-1 block">{label}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {teams.map(t => {
+          const selected = selectedIds.includes(t.id)
+          return (
+            <button
+              key={t.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onToggle(t.id)}
+              aria-pressed={selected}
+              className={cn(
+                'inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors',
+                disabled && 'opacity-50 cursor-not-allowed',
+                selected
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50'
+              )}
+            >
+              {selected && <Check className="w-3 h-3" />}
+              {t.name}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── GeneralInfoSection ────────────────────────────────────────────────────────
 
 interface GeneralInfoSectionProps {
@@ -142,6 +190,17 @@ interface GeneralInfoSectionProps {
   onDifficultyChange: (v: Difficulty) => void
   visibility: Visibility
   onVisibilityChange: (v: Visibility) => void
+  teamOrgId: string | null
+  onTeamOrgIdChange: (id: string | null) => void
+  /** Other teams (besides teamOrgId) this question is additionally shared with. */
+  sharedOrgIds: string[]
+  onSharedOrgIdsChange: (ids: string[]) => void
+  /** Whether teammates with access to this question may also edit it. */
+  teamEditAllowed: boolean
+  onTeamEditAllowedChange: (v: boolean) => void
+  /** False for a teammate editing someone else's shared question — locks the
+   *  visibility/sharing controls, which stay owner-only. Defaults to true. */
+  canEditSharing?: boolean
   tags: string[]
   onTagsChange: (tags: string[]) => void
 }
@@ -152,8 +211,61 @@ export function GeneralInfoSection({
   subject, onSubjectChange,
   difficulty, onDifficultyChange,
   visibility, onVisibilityChange,
+  teamOrgId, onTeamOrgIdChange,
+  sharedOrgIds, onSharedOrgIdsChange,
+  teamEditAllowed, onTeamEditAllowedChange,
+  canEditSharing = true,
   tags, onTagsChange,
 }: GeneralInfoSectionProps) {
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
+  const [teamChecked, setTeamChecked] = useState(false)
+
+  // teamOrgId can be left over from a *private* question — where it points at the
+  // creator's personal workspace, not a real team. Only count it once it's confirmed
+  // to be one of the user's actual teams, otherwise it silently inflates the count
+  // below without ever showing up as a selected chip.
+  const isRealTeam = (id: string | null) => !!id && teams.some(t => t.id === id)
+  const effectiveTeamOrgId = isRealTeam(teamOrgId) ? teamOrgId : null
+
+  useEffect(() => {
+    getMyTeamOrgOptions()
+      .then((list) => {
+        setTeams(list)
+        // exactly one team — pin it automatically, nothing for the user to pick
+        if (list.length === 1 && !list.some(t => t.id === teamOrgId)) onTeamOrgIdChange(list[0].id)
+      })
+      .finally(() => setTeamChecked(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // legacy questions saved with visibility='school' display/behave as 'organization'
+  const displayVisibility = visibility === 'school' ? 'organization' : visibility
+  const hasTeams = teams.length > 0
+  const selectedTeamName = teams.find(t => t.id === effectiveTeamOrgId)?.name ?? null
+
+  // effectiveTeamOrgId + sharedOrgIds together form "every team this question is
+  // shared to" — effectiveTeamOrgId is just an implementation detail (the "home"
+  // row), invisible to the user.
+  const allSelectedTeamIds = effectiveTeamOrgId ? [effectiveTeamOrgId, ...sharedOrgIds] : sharedOrgIds
+
+  function toggleTeam(id: string) {
+    const isSelected = allSelectedTeamIds.includes(id)
+    if (isSelected) {
+      if (allSelectedTeamIds.length <= 1) return // must keep at least one team while sharing to a team
+      if (id === effectiveTeamOrgId) {
+        const [nextPrimary, ...rest] = sharedOrgIds
+        onTeamOrgIdChange(nextPrimary ?? null)
+        onSharedOrgIdsChange(rest)
+      } else {
+        onSharedOrgIdsChange(sharedOrgIds.filter(x => x !== id))
+      }
+    } else if (!effectiveTeamOrgId) {
+      onTeamOrgIdChange(id) // replaces a stale (non-team) teamOrgId, if any
+    } else {
+      onSharedOrgIdsChange([...sharedOrgIds, id])
+    }
+  }
+
   return (
     <section className="space-y-4">
       <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ข้อมูลทั่วไป</h2>
@@ -193,17 +305,65 @@ export function GeneralInfoSection({
 
         <div className="space-y-1.5">
           <Label>การมองเห็น</Label>
-          <Select value={visibility} onValueChange={(v) => v !== null && onVisibilityChange(v as Visibility)}>
+          <Select
+            value={displayVisibility}
+            disabled={!canEditSharing}
+            onValueChange={(v) => {
+              if (v === null) return
+              onVisibilityChange(v as Visibility)
+              if (v === 'private') {
+                onTeamOrgIdChange(null)
+                onSharedOrgIdsChange([])
+              } else if (teams.length === 1) {
+                onTeamOrgIdChange(teams[0].id)
+              }
+            }}
+          >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="เลือกการมองเห็น">
-                {visibilityLabels[visibility] ?? ''}
+                {displayVisibility === 'organization'
+                  ? (allSelectedTeamIds.length > 1
+                      ? `ทีมของฉัน (${allSelectedTeamIds.length} ทีม)`
+                      : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน')
+                  : visibilityLabels[displayVisibility] ?? ''}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="private">ส่วนตัว</SelectItem>
-              <SelectItem value="school">โรงเรียน</SelectItem>
+              <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นโจทย์นี้</SelectItem>
+              <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
+                ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
+              </SelectItem>
             </SelectContent>
           </Select>
+          {teamChecked && !hasTeams && (
+            <p className="text-xs text-gray-500">
+              สร้างทีมก่อนเพื่อใช้งาน —{' '}
+              <a href="/settings/team" className="text-blue-600 hover:underline">
+                ไปที่หน้าทีมของฉัน
+              </a>
+            </p>
+          )}
+
+          {displayVisibility === 'organization' && teams.length > 1 && (
+            <TeamShareChips
+              label="แชร์ให้ทีมไหน (เลือกได้หลายทีม)"
+              teams={teams}
+              selectedIds={allSelectedTeamIds}
+              onToggle={toggleTeam}
+              disabled={!canEditSharing}
+            />
+          )}
+
+          {displayVisibility === 'organization' && (
+            <div className="flex items-center gap-2 pt-2">
+              <ToggleSwitch
+                checked={teamEditAllowed}
+                onChange={onTeamEditAllowedChange}
+                disabled={!canEditSharing}
+              />
+              <span className="text-xs text-gray-600">อนุญาตให้เพื่อนในทีมแก้ไขโจทย์นี้ได้</span>
+            </div>
+          )}
         </div>
       </div>
 

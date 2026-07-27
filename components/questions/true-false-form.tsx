@@ -23,6 +23,7 @@ interface TrueFalseFormProps {
   allTags: string[]
   mode?: 'create' | 'edit'
   question?: Question
+  isOwner?: boolean
 }
 
 const EXPLANATION_MODES: { value: TrueFalseExplanationMode; label: string; desc: string }[] = [
@@ -89,7 +90,7 @@ function TrueFalseMainItem({
   )
 }
 
-export function TrueFalseForm({ allTags, mode = 'create', question }: TrueFalseFormProps) {
+export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = true }: TrueFalseFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
@@ -100,6 +101,9 @@ export function TrueFalseForm({ allTags, mode = 'create', question }: TrueFalseF
   const [subject, setSubject] = useState(question?.subject ?? '')
   const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
   const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(question?.org_id ?? null)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
+  const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
@@ -175,7 +179,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question }: TrueFalseF
     setSaving(true)
     const payload = {
       title, subject, question_text: questionText, question_type: 'true_false' as const,
-      difficulty, visibility, category_id: question?.category_id ?? '',
+      difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
       grade_level: question?.grade_level ?? '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
@@ -202,6 +206,10 @@ export function TrueFalseForm({ allTags, mode = 'create', question }: TrueFalseF
         subject={subject} onSubjectChange={setSubject}
         difficulty={difficulty} onDifficultyChange={setDifficulty}
         visibility={visibility} onVisibilityChange={setVisibility}
+        teamOrgId={teamOrgId} onTeamOrgIdChange={setTeamOrgId}
+        sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
+        teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
+        canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
       />
 

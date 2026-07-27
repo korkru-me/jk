@@ -7,6 +7,7 @@ import {
   Download, FileSpreadsheet, FileText as FilePdf,
 } from 'lucide-react'
 import type { Assignment, Question } from '@/lib/types'
+import { passingPercent } from '@/lib/grading'
 import type { AnalyticsSubmissionRow } from '../page'
 import { StatCards } from './stat-cards'
 import { CompetencyRadarChart } from './competency-radar'
@@ -166,6 +167,8 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
           teacherName={teacherName}
           questions={questions}
           assignmentId={assignment.id}
+          passingType={assignment.passing_type}
+          passingValue={assignment.passing_value}
         />
       )}
     </div>
@@ -192,6 +195,9 @@ function OverviewSection({ assignment, questions, submissions }: {
   const max = scores.length > 0 ? scores[scores.length - 1] : 0
   const min = scores.length > 0 ? scores[0] : 0
 
+  const maxScore = submissions[0]?.max_score ?? questions.length
+  const passingPct = passingPercent(maxScore, assignment.passing_type, assignment.passing_value)
+
   return (
     <div className="space-y-5">
       <StatCards mean={mean} median={median} max={max} min={min} count={scores.length} />
@@ -201,7 +207,7 @@ function OverviewSection({ assignment, questions, submissions }: {
         <GrowthTracker assignmentId={assignment.id} currentMean={mean} assignmentTitle={assignment.title} />
       </div>
 
-      <PercentileBenchmark mean={mean} assignmentId={assignment.id} />
+      <PercentileBenchmark mean={mean} assignmentId={assignment.id} passingPercent={passingPct} />
     </div>
   )
 }

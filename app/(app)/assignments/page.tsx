@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Assignment } from '@/lib/types'
+import { selectOfficialAttempt } from '@/lib/scoring'
+import { isAttemptExpired } from '@/lib/grading'
 import { ExamDashboard } from './_components/exam-dashboard'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
@@ -16,50 +18,9 @@ export default async function AssignmentsPage() {
     .from('users').select('role').eq('id', user.id).single()
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
 
-  if (isTeacher) {
-    // Own assignments + assignments for classrooms co-taught with
-    // admin/manage permission (RLS also allows this via
-    // assignments_co_teacher_all, but selecting explicitly avoids relying on
-    // policy OR-combination order and keeps this query self-documenting).
-    const { data: coTeaching } = await supabase
-      .from('classroom_co_teachers')
-      .select('classroom_id')
-      .eq('user_id', user.id)
-      .in('permission', ['admin', 'manage'])
-    const coTeachingClassroomIds = (coTeaching ?? []).map((r: any) => r.classroom_id)
-
-    const { data: coTaughtLinks } = coTeachingClassroomIds.length > 0
-      ? await supabase.from('assignment_classrooms').select('assignment_id').in('classroom_id', coTeachingClassroomIds)
-      : { data: [] }
-    const coTaughtAssignmentIds = Array.from(new Set((coTaughtLinks ?? []).map((l: any) => l.assignment_id)))
-
-    const [{ data: ownAssignments }, { data: coTaughtAssignments }] = await Promise.all([
-      supabase
-        .from('assignments')
-        .select('*, classrooms(name)')
-        .eq('created_by', user.id)
-        .order('created_at', { ascending: false }),
-      coTaughtAssignmentIds.length > 0
-        ? supabase.from('assignments').select('*, classrooms(name)').in('id', coTaughtAssignmentIds).order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] as any[] }),
-    ])
-
-    const seen = new Set<string>()
-    const list: AssignmentRow[] = []
-    for (const a of [...(ownAssignments ?? []), ...(coTaughtAssignments ?? [])]) {
-      if (!seen.has(a.id)) { seen.add(a.id); list.push(a as AssignmentRow) }
-    }
-    const ids = list.map(a => a.id)
-
-    const { data: subs } = ids.length > 0
-      ? await supabase.from('submissions').select('assignment_id').in('assignment_id', ids)
-      : { data: [] }
-
-    const subCountMap: Record<string, number> = {}
-    for (const s of subs ?? []) subCountMap[(s as any).assignment_id] = (subCountMap[(s as any).assignment_id] ?? 0) + 1
-
-    return <ExamDashboard assignments={list} subCountMap={subCountMap} isStudent={false} />
-  }
+  // Teachers manage assignments from within each classroom's "งานที่มอบหมาย"
+  // tab now — there's no separate cross-classroom list page for them.
+  if (isTeacher) redirect('/classrooms')
 
   // Student view
   const { data: memberships } = await supabase
@@ -84,20 +45,38 @@ export default async function AssignmentsPage() {
 
   const { data: mySubs } = pIds.length > 0
     ? await supabase
-        .from('submissions').select('assignment_id, id, status, total_score, max_score, attempt_number')
+        .from('submissions').select('assignment_id, id, status, total_score, max_score, attempt_number, started_at')
         .in('assignment_id', pIds).eq('student_id', user.id)
     : { data: [] }
 
-  // An assignment may have multiple attempts (exercise type) — keep the
-  // best-scoring attempt, tie-broken by the most recent one, for the badge.
-  const mySubMap: Record<string, { id: string; status: string; total_score: number | null; max_score: number }> = {}
+  // An assignment may have multiple attempts — reduce to the "official"
+  // score per the assignment's own score_strategy, for the badge. Also
+  // track the highest attempt_number seen so the UI can tell whether
+  // retries remain against max_attempts.
+  const strategyByAssignment = new Map(pList.map(a => [a.id, a.score_strategy]))
+  const durationByAssignment = new Map(pList.map(a => [a.id, a.duration_minutes]))
+  const attemptsByAssignment = new Map<string, any[]>()
+  const attemptsUsed: Record<string, number> = {}
+  const hasInProgress: Record<string, boolean> = {}
   for (const s of (mySubs ?? []) as any[]) {
-    const prev = mySubMap[s.assignment_id] as (typeof s | undefined)
-    if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1) ||
-        ((s.total_score ?? -1) === (prev.total_score ?? -1) && s.attempt_number > prev.attempt_number)) {
-      mySubMap[s.assignment_id] = s
+    attemptsUsed[s.assignment_id] = Math.max(attemptsUsed[s.assignment_id] ?? 0, s.attempt_number)
+    // An abandoned in-progress attempt whose timer already ran out gets
+    // force-finalized by startSubmission() on the next visit rather than
+    // resumed — don't offer "ทำต่อ" for it here either.
+    if (s.status === 'in_progress' && !isAttemptExpired(s.started_at, durationByAssignment.get(s.assignment_id) ?? null)) {
+      hasInProgress[s.assignment_id] = true
+    }
+    const arr = attemptsByAssignment.get(s.assignment_id) ?? []
+    arr.push(s)
+    attemptsByAssignment.set(s.assignment_id, arr)
+  }
+  const mySubMap: Record<string, { id: string; status: string; total_score: number | null; max_score: number }> = {}
+  for (const [assignmentId, attempts] of attemptsByAssignment) {
+    const official = selectOfficialAttempt(attempts, strategyByAssignment.get(assignmentId) ?? 'best')
+    if (official) {
+      mySubMap[assignmentId] = { id: official.representative.id, status: official.representative.status, total_score: official.total_score, max_score: official.max_score }
     }
   }
 
-  return <ExamDashboard assignments={pList} subCountMap={{}} isStudent mySubMap={mySubMap} />
+  return <ExamDashboard assignments={pList} mySubMap={mySubMap} attemptsUsed={attemptsUsed} hasInProgress={hasInProgress} />
 }

@@ -2,16 +2,21 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Search, Tag, Layers, Trash2, Edit2, Send } from 'lucide-react'
+import { Plus, Search, Tag, Layers, Trash2, Edit2, Send, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { deleteQuestionSet } from '@/lib/actions/question-sets'
+import { exportQuestionSet } from '@/lib/actions/question-export'
+import { downloadTextFile } from '@/lib/utils'
+import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import type { QuestionSet } from '@/lib/types'
 
 interface Props { sets: QuestionSet[] }
 
 export function QuestionSetsClient({ sets }: Props) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [activeTag, setActiveTag] = useState<string | null>(null)
 
@@ -30,11 +35,18 @@ export function QuestionSetsClient({ sets }: Props) {
           <h1 className="text-xl font-bold text-gray-900">คลังชุดโจทย์</h1>
           <p className="text-sm text-gray-500 mt-0.5">{sets.length} ชุดโจทย์ — รวมโจทย์เป็นชุดไว้ใช้ซ้ำ ไม่ผูกกับห้องเรียน</p>
         </div>
-        <Link href="/questions/sets/new">
-          <Button className="gap-2 shadow-sm">
-            <Plus className="w-4 h-4" /> สร้างชุดโจทย์ใหม่
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ImportQuestionsButton
+            label="นำเข้าไฟล์"
+            className="gap-2"
+            onImported={() => router.refresh()}
+          />
+          <Link href="/questions/sets/new">
+            <Button className="gap-2 shadow-sm">
+              <Plus className="w-4 h-4" /> สร้างชุดโจทย์ใหม่
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {sets.length === 0 ? (
@@ -100,6 +112,15 @@ function SetCard({ set }: { set: QuestionSet }) {
     })
   }
 
+  function handleExport() {
+    startTransition(async () => {
+      const result = await exportQuestionSet(set.id)
+      if ('error' in result) { toast.error(result.error); return }
+      downloadTextFile(result.filename, result.content)
+      toast.success('ดาวน์โหลดไฟล์ชุดโจทย์แล้ว')
+    })
+  }
+
   if (deleted) return null
 
   return (
@@ -108,14 +129,24 @@ function SetCard({ set }: { set: QuestionSet }) {
         <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
           <Layers className="w-4 h-4 text-blue-500" />
         </div>
-        <button
-          onClick={handleDelete}
-          disabled={isPending}
-          className="text-gray-300 hover:text-red-500 transition-colors p-1"
-          title="ลบชุดโจทย์"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleExport}
+            disabled={isPending}
+            className="text-gray-300 hover:text-blue-500 transition-colors p-1"
+            title="ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isPending}
+            className="text-gray-300 hover:text-red-500 transition-colors p-1"
+            title="ลบชุดโจทย์"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1">

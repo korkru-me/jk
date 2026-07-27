@@ -3,13 +3,22 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { StudyPathPanel } from '@/components/student/study-path-panel'
-import { CheckCircle2, XCircle, Clock, ChevronLeft, Trophy } from 'lucide-react'
-import type { AnswerPart } from '@/lib/types'
+import { CheckCircle2, XCircle, Clock, ChevronLeft, Trophy, RotateCcw, School, FileText } from 'lucide-react'
+import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
+import { getBlankType } from '@/lib/fill-blank'
+import { computePassed, formatPassingThreshold } from '@/lib/grading'
+import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 
 export const metadata = { title: 'ผลการสอบ — KorKru' }
+
+function reorderOptions<T>(options: T[] | null, order: number[] | null): T[] | null {
+  if (!options) return null
+  if (!order) return options
+  return order.map(i => options[i])
+}
 
 function formatAnswer(n: number): string {
   if (Math.abs(n) >= 1e6 || (Math.abs(n) < 0.001 && n !== 0)) return n.toExponential(3)
@@ -26,33 +35,38 @@ export default async function SubmissionResultPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // No student_id filter here — RLS (submissions_student_own /
+  // submissions_org_teacher_select) already scopes this to the owning
+  // student or the assignment's teacher, so a teacher can review a
+  // student's submission (including any attached work-images) too.
   const { data: submission } = await supabase
     .from('submissions')
     .select(`
       *,
-      assignments(title, classrooms(name)),
+      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, classrooms(name)),
       submission_answers(*, questions(*))
     `)
     .eq('id', id)
-    .eq('student_id', user.id)
     .maybeSingle()
 
   if (!submission) notFound()
 
+  const isOwnSubmission = submission.student_id === user.id
+
   if (submission.status === 'in_progress') {
+    if (!isOwnSubmission) notFound()
     redirect(`/assignments/${submission.assignment_id}/take`)
   }
 
   const answers = (submission as any).submission_answers as any[]
-  const sortedAnswers = [...answers].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  )
+  const sortedAnswers = [...answers].sort((a, b) => a.order_index - b.order_index)
 
+  // Fill-blank is the only question type that can grade to a pending
+  // (null) is_correct — a whole-manual blank, or a mix of manual + auto
+  // blanks where the auto ones are already scored but the row still
+  // awaits a teacher's review of the manual blank(s).
   function isManualFillBlank(a: any): boolean {
-    const ca = String(a.correct_answer ?? '')
-    if (ca.startsWith('FILL_MANUAL:')) return true
-    if (ca.startsWith('FILL:') && (a.questions?.extra_data as any)?.grading_mode === 'manual') return true
-    return false
+    return String(a.correct_answer ?? '').startsWith('FILL') && a.is_correct === null
   }
 
   const pendingManualCount = answers.filter(isManualFillBlank).length
@@ -61,7 +75,16 @@ export default async function SubmissionResultPage({
     : 0
 
   const assignment = (submission as any).assignments
-  const canShowAnswers = true
+  const passed = computePassed(submission.total_score, submission.max_score, assignment.passing_type, assignment.passing_value)
+  const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
+  const canShowAnswers =
+    assignment.show_results !== 'after_due' ||
+    !assignment.end_at ||
+    new Date(assignment.end_at) < new Date()
+
+  const attemptsRemaining = assignment.max_attempts == null || submission.attempt_number < assignment.max_attempts
+  const canRetry = attemptsRemaining && assignment.status === 'published' &&
+    (!assignment.end_at || new Date(assignment.end_at) > new Date())
 
   // Extract wrong answers for study path
   const wrongAnswers = sortedAnswers
@@ -91,6 +114,21 @@ export default async function SubmissionResultPage({
         }`} />
 
         <div className="relative">
+          {passed !== null && (
+            <div className="flex flex-col items-center gap-1 mb-3">
+              <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border ${
+                passed
+                  ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
+                  : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+              }`}>
+                {passed ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                {passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}
+              </div>
+              {passingThreshold && (
+                <p className="text-xs text-muted-foreground">เกณฑ์ผ่าน: ต้องได้ {passingThreshold} ขึ้นไป</p>
+              )}
+            </div>
+          )}
           {pct >= 90 && (
             <div className="flex justify-center mb-3">
               <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full px-3 py-1 text-xs font-semibold">
@@ -141,10 +179,47 @@ export default async function SubmissionResultPage({
               ⏳ มี {pendingManualCount} ข้อรอครูตรวจ — คะแนนจะอัปเดตภายหลัง
             </div>
           )}
+
+          {assignment.max_attempts !== 1 && (
+            <p className="text-xs text-muted-foreground mt-3">
+              {`การเก็บคะแนน: ${SCORE_STRATEGY_LABELS[assignment.score_strategy as 'best' | 'average' | 'latest']} (จากทั้งหมด ${submission.attempt_number} ครั้งที่ทำ)`}
+            </p>
+          )}
+
+          {(canRetry || assignment.classroom_id) && (
+            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+              {canRetry && (
+                <Link
+                  href={`/assignments/${submission.assignment_id}/take`}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 transition-colors"
+                >
+                  <RotateCcw size={15} />
+                  {assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}
+                </Link>
+              )}
+              {assignment.classroom_id && (
+                <Link
+                  href={`/classrooms/${assignment.classroom_id}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-muted hover:bg-muted/70 text-foreground text-sm font-semibold px-4 py-2 transition-colors border"
+                >
+                  <School size={15} />
+                  กลับไปห้องเรียน
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Answer review */}
+      {!canShowAnswers && (
+        <div className="bg-card border border-dashed rounded-2xl p-6 text-center text-sm text-muted-foreground">
+          🔒 เฉลยและคะแนนรายข้อจะแสดงหลังพ้นกำหนดส่งงาน
+          {assignment.end_at && (
+            <> ({new Date(assignment.end_at).toLocaleString('th-TH')})</>
+          )}
+        </div>
+      )}
       {canShowAnswers && (
         <div className="space-y-3">
           <h2 className="font-semibold flex items-center gap-2">
@@ -224,7 +299,8 @@ export default async function SubmissionResultPage({
                       answerUnit={q.answer_unit}
                       questionType={q.question_type}
                       extraData={q.extra_data}
-                      mcqOptions={q.mcq_options ?? null}
+                      mcqOptions={reorderOptions(q.mcq_options, a.option_order)}
+                      workImages={a.work_images ?? null}
                     />
                   </div>
                 </div>
@@ -261,6 +337,7 @@ function AnswerReview({
   questionType,
   extraData,
   mcqOptions,
+  workImages,
 }: {
   studentAnswer: string | null
   correctAnswer: string
@@ -270,6 +347,7 @@ function AnswerReview({
   questionType?: string
   extraData?: Record<string, unknown>
   mcqOptions: Array<{ text: string; is_correct: boolean }> | null
+  workImages?: (string | null)[] | null
 }) {
   // ─── MCQ: show all options with color highlighting ───────────────────────
   if (questionType === 'mcq' && mcqOptions && mcqOptions.length > 0) {
@@ -315,12 +393,44 @@ function AnswerReview({
     )
   }
 
-  // ─── Fill-blank manual ────────────────────────────────────────────────────
-  const isFillManual =
-    correctAnswer.startsWith('FILL_MANUAL:') ||
-    (correctAnswer.startsWith('FILL:') && (extraData as any)?.grading_mode === 'manual')
+  // ─── File upload: submitted files + submit status ────────────────────────
+  if (questionType === 'file_upload') {
+    let files: SubmittedFile[] = []
+    try { files = studentAnswer ? JSON.parse(studentAnswer) : [] } catch { files = [] }
+    const submitted = files.length > 0
+    return (
+      <div className="mt-2 space-y-2 text-sm">
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+          submitted
+            ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400'
+            : 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400'
+        }`}>
+          {submitted ? '✓ ส่งแล้ว' : '✗ ไม่ได้ส่งไฟล์'}
+        </span>
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {files.map((f, i) => (
+              f.type.startsWith('image/') ? (
+                <a key={i} href={f.url} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.url} alt={f.name} className="w-20 h-20 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
+                </a>
+              ) : (
+                <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg border bg-muted/40 hover:bg-muted transition-colors max-w-[160px]">
+                  <FileText size={14} className="shrink-0 text-muted-foreground" />
+                  <span className="truncate">{f.name}</span>
+                </a>
+              )
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
-  if (isFillManual) {
+  // ─── Fill-blank manual (legacy, pre-dates per-blank types) ───────────────
+  if (correctAnswer.startsWith('FILL_MANUAL:')) {
     let studentAnswers: string[] = []
     try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { /* */ }
     return (
@@ -338,32 +448,32 @@ function AnswerReview({
     )
   }
 
-  // ─── Fill-blank auto ──────────────────────────────────────────────────────
+  // ─── Fill-blank — per-blank type (text / fixed / dropdown) ───────────────
   if (correctAnswer.startsWith('FILL:')) {
     let studentAnswers: string[] = []
     let correctAnswers: string[] = []
     try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { /* */ }
     try { correctAnswers = JSON.parse(correctAnswer.slice(5)) } catch { /* */ }
 
-    if (correctAnswers.every(c => c.trim() === '')) {
-      return (
-        <div className="mt-2 space-y-2 text-sm">
-          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">รอครูผู้สอนตรวจสอบและให้คะแนน</p>
-          {studentAnswers.map((ans, i) => (
-            <div key={i} className="flex gap-2">
-              <span className="text-muted-foreground shrink-0 w-16">ช่อง {i + 1}:</span>
-              <span className="font-medium">{ans || '—'}</span>
-            </div>
-          ))}
-        </div>
-      )
-    }
-
-    const blanks: Array<{ case_sensitive?: boolean }> = (extraData as any)?.blanks ?? []
+    const blanks: FillBlankItem[] = (extraData as any)?.blanks ?? []
     return (
       <div className="mt-2 space-y-2 text-sm">
         {correctAnswers.map((correct, i) => {
           const student = studentAnswers[i] ?? ''
+          const type = getBlankType(extraData as any, blanks[i])
+
+          if (type === 'text') {
+            return (
+              <div key={i} className="pl-3 border-l-2 border-amber-300 space-y-0.5">
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">ช่อง {i + 1} — รอครูตรวจ</p>
+                <div className="flex gap-2">
+                  <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
+                  <span className="font-medium">{student || '—'}</span>
+                </div>
+              </div>
+            )
+          }
+
           const cs = blanks[i]?.case_sensitive ?? false
           const partCorrect = cs
             ? student.trim() === correct.trim()
@@ -421,6 +531,7 @@ function AnswerReview({
                   {formatAnswerDisplay(correct)} {unit && <UnitText html={unit} />}
                 </span>
               </div>
+              <WorkImageThumbnail url={workImages?.[i]} />
             </div>
           )
         })}
@@ -443,7 +554,18 @@ function AnswerReview({
           {formatAnswerDisplay(correctAnswer)} {answerUnit}
         </span>
       </div>
+      <WorkImageThumbnail url={workImages?.[0]} />
     </div>
+  )
+}
+
+function WorkImageThumbnail({ url }: { url?: string | null }) {
+  if (!url) return null
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-block mt-1">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="รูปวิธีทำ" className="w-24 h-24 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
+    </a>
   )
 }
 

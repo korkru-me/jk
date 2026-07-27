@@ -3,11 +3,12 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Plus, CheckSquare, X, Archive, Trash2, BookOpen, Users } from 'lucide-react'
+import { Plus, CheckSquare, X, Archive, Trash2, BookOpen, Users, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
-import { bulkDeleteClassrooms, bulkArchiveClassrooms } from '@/lib/actions/classrooms'
+import { bulkDeleteClassrooms, bulkArchiveClassrooms, togglePinClassroom } from '@/lib/actions/classrooms'
 import { ClassroomCard } from './classroom-card'
+import { HomeroomBanner } from './homeroom-banner'
 import type { Classroom } from '@/lib/types'
 
 interface Props {
@@ -27,6 +28,18 @@ export function TeacherViewClient({
   const [isSelecting, setIsSelecting] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
+  const [, startPinTransition] = useTransition()
+
+  const homeroomClassrooms = classrooms.filter(c => c.classroom_type === 'homeroom')
+  const subjectClassrooms = classrooms.filter(c => c.classroom_type !== 'homeroom')
+
+  function handleTogglePin(id: string, currentlyPinned: boolean) {
+    startPinTransition(async () => {
+      const res = await togglePinClassroom(id, !currentlyPinned)
+      if (res?.error) toast.error(res.error)
+      else toast.success(currentlyPinned ? 'เลิกปักหมุดแล้ว' : 'ปักหมุดห้องเรียนแล้ว')
+    })
+  }
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -175,30 +188,60 @@ export function TeacherViewClient({
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {classrooms.map((c, i) => (
-            <ClassroomCard
-              key={c.id}
-              classroom={c}
-              studentCount={studentCountMap[c.id] ?? 0}
-              assignmentCount={assignmentCountMap[c.id] ?? 0}
-              index={i}
-              isSelecting={isSelecting}
-              isSelected={selected.has(c.id)}
-              onToggle={() => toggleSelect(c.id)}
-            />
-          ))}
-          {!isSelecting && (
-            <Link
-              href="/classrooms/new"
-              className="border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center gap-3 p-8 hover:border-blue-300 hover:bg-blue-50/30 transition-colors group min-h-[200px]"
-            >
-              <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                <Plus className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+        <div className="space-y-8">
+          {homeroomClassrooms.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <GraduationCap className="w-3.5 h-3.5" /> ห้อง Homeroom
               </div>
-              <p className="text-sm text-gray-400 group-hover:text-blue-500 font-medium transition-colors">สร้างห้องเรียนใหม่</p>
-            </Link>
+              <div className="space-y-3">
+                {homeroomClassrooms.map((c) => (
+                  <HomeroomBanner
+                    key={c.id}
+                    classroom={c}
+                    studentCount={studentCountMap[c.id] ?? 0}
+                    isSelecting={isSelecting}
+                    isSelected={selected.has(c.id)}
+                    onToggle={() => toggleSelect(c.id)}
+                  />
+                ))}
+              </div>
+            </div>
           )}
+
+          <div className="space-y-3">
+            {homeroomClassrooms.length > 0 && (
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <BookOpen className="w-3.5 h-3.5" /> ห้องเรียนวิชา
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {subjectClassrooms.map((c, i) => (
+                <ClassroomCard
+                  key={c.id}
+                  classroom={c}
+                  studentCount={studentCountMap[c.id] ?? 0}
+                  assignmentCount={assignmentCountMap[c.id] ?? 0}
+                  index={i}
+                  isSelecting={isSelecting}
+                  isSelected={selected.has(c.id)}
+                  onToggle={() => toggleSelect(c.id)}
+                  onTogglePin={() => handleTogglePin(c.id, !!c.pinned_at)}
+                />
+              ))}
+              {!isSelecting && (
+                <Link
+                  href="/classrooms/new"
+                  className="border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center gap-3 p-8 hover:border-blue-300 hover:bg-blue-50/30 transition-colors group min-h-[200px]"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                    <Plus className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                  </div>
+                  <p className="text-sm text-gray-400 group-hover:text-blue-500 font-medium transition-colors">สร้างห้องเรียนใหม่</p>
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

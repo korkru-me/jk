@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Palette } from 'lucide-react'
+import { Plus, Palette, BookOpen, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import { createClassroom } from '@/lib/actions/classrooms'
+import type { ClassroomType } from '@/lib/types'
 
 const SUBJECTS = [
   { value: 'mechanics', label: '⚙️  กลศาสตร์', desc: 'แรง ความเร็ว พลังงาน' },
@@ -32,6 +33,7 @@ const COVER_COLORS = [
 
 export function CreateClassroomModal() {
   const [open, setOpen] = useState(false)
+  const [classroomType, setClassroomType] = useState<ClassroomType>('subject')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [subject, setSubject] = useState('')
@@ -39,6 +41,7 @@ export function CreateClassroomModal() {
   const [isPending, startTransition] = useTransition()
 
   function reset() {
+    setClassroomType('subject')
     setName('')
     setDescription('')
     setSubject('')
@@ -49,9 +52,11 @@ export function CreateClassroomModal() {
     e.preventDefault()
     if (!name.trim()) { toast.error('กรุณากรอกชื่อห้องเรียน'); return }
     const subjectLabel = SUBJECTS.find(s => s.value === subject)?.label ?? ''
-    const fullDesc = [subjectLabel ? `วิชา: ${subjectLabel}` : '', description.trim()].filter(Boolean).join(' · ')
+    const fullDesc = classroomType === 'subject'
+      ? [subjectLabel ? `วิชา: ${subjectLabel}` : '', description.trim()].filter(Boolean).join(' · ')
+      : description.trim()
     startTransition(async () => {
-      const res = await createClassroom({ name: name.trim(), description: fullDesc })
+      const res = await createClassroom({ name: name.trim(), description: fullDesc, classroomType })
       if (res?.error) toast.error(res.error)
       else { reset(); setOpen(false) }
     })
@@ -68,6 +73,43 @@ export function CreateClassroomModal() {
           <DialogTitle>สร้างห้องเรียนใหม่</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 pt-1">
+          {/* Classroom type */}
+          <div className="space-y-1.5">
+            <Label>ประเภทห้องเรียน</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setClassroomType('subject')}
+                className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
+                  classroomType === 'subject'
+                    ? 'border-blue-500 bg-blue-50 text-blue-900'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                }`}
+              >
+                <BookOpen className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium leading-tight">ห้องเรียนวิชา</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">มอบหมายการบ้าน สอบ ให้คะแนน</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setClassroomType('homeroom')}
+                className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
+                  classroomType === 'homeroom'
+                    ? 'border-blue-500 bg-blue-50 text-blue-900'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                }`}
+              >
+                <Users className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium leading-tight">ห้อง Homeroom</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">ครูที่ปรึกษาติดตามการส่งงานทุกวิชา</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Cover preview */}
           <div className={`h-16 rounded-xl bg-gradient-to-br ${coverColor} flex items-center px-5 transition-all duration-300`}>
             <p className="text-white font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
@@ -99,35 +141,37 @@ export function CreateClassroomModal() {
               id="new-name"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="เช่น ฟิสิกส์ ม.4/1"
+              placeholder={classroomType === 'homeroom' ? 'เช่น ที่ปรึกษา ม.4/1' : 'เช่น ฟิสิกส์ ม.4/1'}
               autoFocus
             />
           </div>
 
-          {/* Subject */}
-          <div className="space-y-1.5">
-            <Label>รายวิชา / บท</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {SUBJECTS.map(s => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setSubject(s.value === subject ? '' : s.value)}
-                  className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
-                    subject === s.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-900'
-                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                  }`}
-                >
-                  <span className="text-base leading-none mt-0.5">{s.label.split('  ')[0]}</span>
-                  <div>
-                    <p className="font-medium leading-tight">{s.label.split('  ')[1]}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{s.desc}</p>
-                  </div>
-                </button>
-              ))}
+          {/* Subject (subject classrooms only) */}
+          {classroomType === 'subject' && (
+            <div className="space-y-1.5">
+              <Label>รายวิชา / บท</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {SUBJECTS.map(s => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setSubject(s.value === subject ? '' : s.value)}
+                    className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
+                      subject === s.value
+                        ? 'border-blue-500 bg-blue-50 text-blue-900'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    <span className="text-base leading-none mt-0.5">{s.label.split('  ')[0]}</span>
+                    <div>
+                      <p className="font-medium leading-tight">{s.label.split('  ')[1]}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{s.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1.5">
@@ -136,7 +180,7 @@ export function CreateClassroomModal() {
               id="new-desc"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="ภาคเรียนที่ 1/2568 · กลุ่ม A"
+              placeholder={classroomType === 'homeroom' ? 'ครูที่ปรึกษา · ภาคเรียนที่ 1/2568' : 'ภาคเรียนที่ 1/2568 · กลุ่ม A'}
               rows={2}
             />
           </div>

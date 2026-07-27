@@ -5,6 +5,9 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ExportButton } from '@/components/assignments/export-button'
+import { computePassed } from '@/lib/grading'
+import { selectOfficialAttempt } from '@/lib/scoring'
+import { CheckCircle2, XCircle } from 'lucide-react'
 
 export const metadata = { title: 'ผลคะแนน — KorKru' }
 
@@ -34,15 +37,36 @@ export default async function ResultsPage({
     .eq('assignment_id', id)
     .order('total_score', { ascending: false })
 
-  const submitted = (submissions ?? []).filter(
+  const submittedAttempts = (submissions ?? []).filter(
     (s: any) => s.status === 'submitted' || s.status === 'graded'
   )
+
+  // A student may have multiple attempts — reduce to the "official" score
+  // per the assignment's score_strategy, so retries don't inflate the table.
+  const attemptsByStudent = new Map<string, any[]>()
+  for (const s of submittedAttempts) {
+    const arr = attemptsByStudent.get(s.student_id) ?? []
+    arr.push(s)
+    attemptsByStudent.set(s.student_id, arr)
+  }
+  const submitted = Array.from(attemptsByStudent.values())
+    .map(attempts => {
+      const official = selectOfficialAttempt(attempts, assignment.score_strategy)
+      return official ? { ...official.representative, total_score: official.total_score, max_score: official.max_score } : null
+    })
+    .filter((s): s is NonNullable<typeof s> => s !== null)
+    .sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0))
 
   const avgScore = submitted.length > 0
     ? submitted.reduce((sum: number, s: any) => sum + (s.total_score ?? 0), 0) / submitted.length
     : null
 
   const maxScore = submitted[0]?.max_score ?? assignment.question_ids.length
+
+  const hasPassingThreshold = assignment.passing_type != null && assignment.passing_value != null
+  const passCount = submitted.filter(
+    (s: any) => computePassed(s.total_score, s.max_score, assignment.passing_type, assignment.passing_value) === true
+  ).length
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -58,7 +82,7 @@ export default async function ResultsPage({
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid gap-3 ${hasPassingThreshold ? 'grid-cols-4' : 'grid-cols-3'}`}>
         <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
           <p className="text-xs text-gray-500">ส่งแล้ว</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{submitted.length}</p>
@@ -75,6 +99,18 @@ export default async function ResultsPage({
             {(submissions ?? []).filter((s: any) => s.status === 'in_progress').length}
           </p>
         </div>
+        {hasPassingThreshold && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+            <p className="text-xs text-gray-500">
+              ผ่านเกณฑ์ ({assignment.passing_type === 'percent' ? `${assignment.passing_value}%` : `${assignment.passing_value} คะแนน`})
+            </p>
+            <p className="text-2xl font-bold mt-1">
+              <span className="text-green-600">{passCount}</span>
+              <span className="text-gray-300"> / </span>
+              <span className="text-red-500">{submitted.length - passCount}</span>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Score table */}
@@ -86,24 +122,30 @@ export default async function ResultsPage({
               <th className="text-left px-4 py-3 font-medium text-gray-600">ชื่อ</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">คะแนน</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">%</th>
+              {hasPassingThreshold && (
+                <th className="text-center px-4 py-3 font-medium text-gray-600">ผลเกณฑ์</th>
+              )}
               <th className="text-left px-4 py-3 font-medium text-gray-600">เวลาส่ง</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {submitted.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-10 text-gray-400">
+                <td colSpan={hasPassingThreshold ? 6 : 5} className="text-center py-10 text-gray-400">
                   ยังไม่มีการส่งงาน
                 </td>
               </tr>
             ) : (
               submitted.map((s: any, i: number) => {
                 const pct = s.max_score > 0 ? Math.round((s.total_score / s.max_score) * 100) : 0
+                const passed = computePassed(s.total_score, s.max_score, assignment.passing_type, assignment.passing_value)
                 return (
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-400">{i + 1}</td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{s.users?.full_name}</p>
+                      <Link href={`/submissions/${s.id}`} className="font-medium text-gray-900 hover:text-blue-600 hover:underline">
+                        {s.users?.full_name}
+                      </Link>
                       <p className="text-xs text-gray-400">{s.users?.email}</p>
                     </td>
                     <td className="px-4 py-3 text-center font-bold text-gray-900">
@@ -118,6 +160,16 @@ export default async function ResultsPage({
                         {pct}%
                       </span>
                     </td>
+                    {hasPassingThreshold && (
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                          passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                        }`}>
+                          {passed ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                          {passed ? 'ผ่าน' : 'ไม่ผ่าน'}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {s.submitted_at
                         ? new Date(s.submitted_at).toLocaleTimeString('th-TH', { timeStyle: 'short' })

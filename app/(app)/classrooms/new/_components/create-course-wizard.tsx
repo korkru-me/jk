@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { createClassroom } from '@/lib/actions/classrooms'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import type { ClassroomType } from '@/lib/types'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -114,6 +116,7 @@ function gradientStyle(from: string, to: string, angle: number): React.CSSProper
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const wizardSchema = z.object({
+  classroomType:   z.enum(['subject', 'homeroom']),
   coverFrom:       z.string().min(1),
   coverTo:         z.string().min(1),
   coverAngle:      z.number().min(0).max(360),
@@ -133,6 +136,7 @@ const wizardSchema = z.object({
 type WizardData = z.infer<typeof wizardSchema>
 
 const DEFAULT_VALUES: WizardData = {
+  classroomType:   'subject',
   coverFrom:       '#4776E6',
   coverTo:         '#8E54E9',
   coverAngle:      135,
@@ -173,27 +177,6 @@ function FieldError({ message }: { message?: string }) {
       <Info className="w-3 h-3 shrink-0" />
       {message}
     </p>
-  )
-}
-
-function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        checked ? 'bg-blue-600 dark:bg-blue-500' : 'bg-muted-foreground/25',
-      )}
-    >
-      <span className={cn(
-        'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200',
-        checked ? 'translate-x-6' : 'translate-x-1',
-      )} />
-    </button>
   )
 }
 
@@ -712,10 +695,57 @@ function ClassroomPreviewCard({ values }: { values: WizardData }) {
 
 // ─── Step 0: Cover Design & Metadata ─────────────────────────────────────────
 
+function ClassroomTypeSection({ value, onChange }: { value: ClassroomType; onChange: (v: ClassroomType) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">ประเภทห้องเรียน</Label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => onChange('subject')}
+          className={cn(
+            'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+            value === 'subject'
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-sm'
+              : 'border-border bg-card hover:border-muted-foreground/30',
+          )}
+        >
+          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'subject' ? 'bg-white/60 dark:bg-white/10' : 'bg-muted')}>
+            <BookOpen className={cn('w-4 h-4', value === 'subject' ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground')} />
+          </div>
+          <div>
+            <p className={cn('font-semibold text-sm', value === 'subject' ? 'text-blue-600 dark:text-blue-400' : 'text-foreground')}>ห้องเรียนวิชา</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">มอบหมายการบ้าน สอบ ให้คะแนน</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange('homeroom')}
+          className={cn(
+            'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+            value === 'homeroom'
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-sm'
+              : 'border-border bg-card hover:border-muted-foreground/30',
+          )}
+        >
+          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'homeroom' ? 'bg-white/60 dark:bg-white/10' : 'bg-muted')}>
+            <Users className={cn('w-4 h-4', value === 'homeroom' ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground')} />
+          </div>
+          <div>
+            <p className={cn('font-semibold text-sm', value === 'homeroom' ? 'text-blue-600 dark:text-blue-400' : 'text-foreground')}>ห้อง Homeroom</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">ครูที่ปรึกษาติดตามการส่งงานทุกวิชา</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Step0Content({
   control,
   errors,
   values,
+  onClassroomTypeChange,
   onCoverFromChange,
   onCoverToChange,
   onCoverAngleChange,
@@ -725,6 +755,7 @@ function Step0Content({
   control: ReturnType<typeof useForm<WizardData>>['control']
   errors: ReturnType<typeof useForm<WizardData>>['formState']['errors']
   values: WizardData
+  onClassroomTypeChange: (v: ClassroomType) => void
   onCoverFromChange: (h: string) => void
   onCoverToChange: (h: string) => void
   onCoverAngleChange: (d: number) => void
@@ -737,6 +768,8 @@ function Step0Content({
         <h2 className="text-lg font-bold text-foreground">การออกแบบหน้าปกและข้อมูล</h2>
         <p className="text-sm text-muted-foreground mt-0.5">ตั้งชื่อ เลือกธีม และกรอกรายละเอียดห้องเรียน</p>
       </div>
+
+      <ClassroomTypeSection value={values.classroomType} onChange={onClassroomTypeChange} />
 
       <CoverDesignSection
         coverFrom={values.coverFrom}
@@ -1045,6 +1078,7 @@ export function CreateCourseWizard() {
         const res = await createClassroom({
           name: data.name.trim(),
           description: descParts.join('\n'),
+          classroomType: data.classroomType,
         })
         if (res?.error) {
           toast.error(res.error)
@@ -1079,6 +1113,7 @@ export function CreateCourseWizard() {
               control={control}
               errors={errors}
               values={values}
+              onClassroomTypeChange={(v) => setValue('classroomType', v)}
               onCoverFromChange={(h) => setValue('coverFrom', h)}
               onCoverToChange={(h) => setValue('coverTo', h)}
               onCoverAngleChange={(d) => setValue('coverAngle', d)}

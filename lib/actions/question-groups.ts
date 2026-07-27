@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { randomUUID } from 'crypto'
+import { resolveOrgId } from '@/lib/actions/questions'
 import type { Variable, Difficulty, Visibility } from '@/lib/types'
 
 export interface SubQuestionData {
@@ -24,8 +25,33 @@ export interface QuestionGroupPayload {
   context: string
   category_id: string
   visibility: Visibility
+  org_id?: string | null
+  /** Other teams (besides org_id) to additionally share this group with. */
+  shared_org_ids?: string[]
+  /** Whether teammates with access to this group may also edit it (creator can always edit). Default true. */
+  team_edit_allowed?: boolean
   difficulty: Difficulty
   subQuestions: SubQuestionData[]
+}
+
+/** Replaces question_shares for every row in the group (parent + sub-questions) with `orgIds`. */
+async function syncGroupShares(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  groupId: string,
+  orgIds: string[]
+) {
+  const { data: rows } = await supabase.from('questions').select('id').eq('group_id', groupId)
+  const ids = (rows ?? []).map((r) => r.id)
+  if (ids.length === 0) return
+
+  await supabase.from('question_shares').delete().in('question_id', ids)
+
+  const uniqueOrgIds = [...new Set(orgIds)]
+  if (uniqueOrgIds.length > 0) {
+    await supabase
+      .from('question_shares')
+      .insert(ids.flatMap((questionId) => uniqueOrgIds.map((orgId) => ({ question_id: questionId, org_id: orgId }))))
+  }
 }
 
 export async function saveQuestionGroup(payload: QuestionGroupPayload) {
@@ -35,17 +61,44 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
 
   if (payload.subQuestions.length === 0) return { error: 'ต้องมีอย่างน้อย 1 ข้อย่อย' }
 
+  // Only the owner may change who this group is shared with — teammates with
+  // edit access can fix content, but not reassign ownership/visibility/sharing.
+  let isOwner = true
+  let existing: { org_id: string | null; visibility: Visibility; team_edit_allowed: boolean } | null = null
+  if (payload.parentId) {
+    const { data } = await supabase
+      .from('questions')
+      .select('created_by, org_id, visibility, team_edit_allowed')
+      .eq('id', payload.parentId)
+      .maybeSingle()
+    if (!data) return { error: 'ไม่พบชุดโจทย์นี้' }
+    isOwner = data.created_by === user.id
+    if (!isOwner && !data.team_edit_allowed) {
+      return { error: 'เจ้าของชุดโจทย์ไม่อนุญาตให้ทีมแก้ไขชุดโจทย์นี้' }
+    }
+    existing = data
+  }
+
+  const orgResult = isOwner
+    ? await resolveOrgId(payload.visibility, payload.org_id)
+    : { orgId: existing!.org_id as string }
+  if ('error' in orgResult) return orgResult
+
+  const visibility = isOwner ? payload.visibility : existing!.visibility
+  const teamEditAllowed = isOwner ? (payload.team_edit_allowed ?? true) : existing!.team_edit_allowed
+
   const groupId = payload.groupId ?? randomUUID()
 
   // Upsert parent (order_in_group = 0, holds shared context)
   const parentPayload = {
-    created_by: user.id,
+    org_id: orgResult.orgId,
     category_id: payload.category_id || null,
     title: payload.title,
     question_text: payload.context,
     question_type: 'written' as const,
     difficulty: payload.difficulty,
-    visibility: payload.visibility,
+    visibility,
+    team_edit_allowed: teamEditAllowed,
     is_random: false,
     variables: [] as Variable[],
     answer_formula: '',
@@ -57,10 +110,11 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
 
   let parentId = payload.parentId
   if (parentId) {
-    const { error } = await supabase.from('questions').update(parentPayload).eq('id', parentId).eq('created_by', user.id)
+    const { error } = await supabase.from('questions').update(parentPayload).eq('id', parentId)
     if (error) return { error: error.message }
   } else {
-    const { data: newParent, error } = await supabase.from('questions').insert(parentPayload).select('id').single()
+    const { data: newParent, error } = await supabase
+      .from('questions').insert({ ...parentPayload, created_by: user.id }).select('id').single()
     if (error) return { error: error.message }
     parentId = newParent.id
   }
@@ -80,13 +134,14 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
   for (let i = 0; i < payload.subQuestions.length; i++) {
     const sq = payload.subQuestions[i]
     const subPayload = {
-      created_by: user.id,
+      org_id: orgResult.orgId,
       category_id: payload.category_id || null,
       title: `${payload.title} — ข้อ ${i + 1}`,
       question_text: sq.question_text,
       question_type: 'written' as const,
       difficulty: sq.difficulty,
-      visibility: payload.visibility,
+      visibility,
+      team_edit_allowed: teamEditAllowed,
       is_random: sq.variables.some((v) => v.type !== 'reference'),
       variables: sq.variables,
       answer_formula: sq.answer_formula,
@@ -98,12 +153,19 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
       order_in_group: i + 1,
     }
     if (sq.id) {
-      const { error } = await supabase.from('questions').update(subPayload).eq('id', sq.id).eq('created_by', user.id)
+      const { error } = await supabase.from('questions').update(subPayload).eq('id', sq.id)
       if (error) return { error: error.message }
     } else {
-      const { error } = await supabase.from('questions').insert(subPayload)
+      const { error } = await supabase.from('questions').insert({ ...subPayload, created_by: user.id })
       if (error) return { error: error.message }
     }
+  }
+
+  if (isOwner) {
+    const extraShares = (visibility === 'organization' || visibility === 'school')
+      ? (payload.shared_org_ids ?? []).filter((oid) => oid !== orgResult.orgId)
+      : []
+    await syncGroupShares(supabase, groupId, extraShares)
   }
 
   revalidatePath('/questions')

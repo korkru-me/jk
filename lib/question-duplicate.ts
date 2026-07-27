@@ -10,6 +10,7 @@ export const NEW_QUESTION_ROUTE_BY_TYPE: Record<QuestionType, string> = {
   matching: 'matching',
   essay: 'essay',
   written: 'random',
+  file_upload: 'file-upload',
 }
 
 export function storeDuplicateSeed(question: Question) {

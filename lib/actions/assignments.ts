@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
-import type { AssignmentStatus } from '@/lib/types'
+import type { AssignmentStatus, ScoreStrategy } from '@/lib/types'
 
 interface CreateAssignmentData {
   classroom_ids: string[]
@@ -17,6 +17,16 @@ interface CreateAssignmentData {
   duration_minutes: number | null
   mode: 'online' | 'print'
   type?: 'exercise' | 'exam'
+  shuffle_questions?: boolean
+  shuffle_options?: boolean
+  show_results?: 'immediate' | 'after_due'
+  max_attempts?: number | null
+  score_strategy?: ScoreStrategy
+  access_code?: string | null
+  passing_type?: 'score' | 'percent' | null
+  passing_value?: number | null
+  require_work_image?: boolean
+  status?: AssignmentStatus
 }
 
 export async function createAssignment(data: CreateAssignmentData) {
@@ -60,7 +70,16 @@ export async function createAssignment(data: CreateAssignmentData) {
       duration_minutes: data.duration_minutes || null,
       mode: data.mode,
       ...(data.type ? { type: data.type } : {}),
-      status: 'draft',
+      shuffle_questions: data.shuffle_questions ?? false,
+      shuffle_options: data.shuffle_options ?? false,
+      show_results: data.show_results ?? 'immediate',
+      max_attempts: data.max_attempts || null,
+      score_strategy: data.score_strategy ?? 'best',
+      access_code: data.access_code?.trim() || null,
+      passing_type: data.passing_type ?? null,
+      passing_value: data.passing_value ?? null,
+      require_work_image: data.require_work_image ?? true,
+      status: data.status ?? 'draft',
     })
     .select('id')
     .single()
@@ -97,10 +116,63 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
   return { success: true }
 }
 
+interface UpdateAssignmentData {
+  title: string
+  description: string
+  start_at: string | null
+  end_at: string | null
+  duration_minutes: number | null
+  max_attempts: number | null
+  score_strategy: ScoreStrategy
+  passing_type: 'score' | 'percent' | null
+  passing_value: number | null
+}
+
+export async function updateAssignment(id: string, data: UpdateAssignmentData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  if (!data.title.trim()) return { error: 'กรุณากรอกชื่อชุดข้อสอบ' }
+  if (data.start_at && data.end_at && data.start_at > data.end_at) {
+    return { error: 'วันเปิดรับต้องอยู่ก่อนวันปิดรับ' }
+  }
+
+  // No explicit created_by filter — RLS (assignments_org_teacher_all /
+  // assignments_co_teacher_all) already restricts this update to owner or
+  // authorized co-teacher, same as updateAssignmentStatus above.
+  const { error } = await supabase
+    .from('assignments')
+    .update({
+      title: data.title.trim(),
+      description: data.description.trim() || null,
+      start_at: data.start_at || null,
+      end_at: data.end_at || null,
+      duration_minutes: data.duration_minutes || null,
+      max_attempts: data.max_attempts || null,
+      score_strategy: data.score_strategy,
+      passing_type: data.passing_type,
+      passing_value: data.passing_value,
+    })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  revalidatePath(`/assignments/${id}`)
+  return { success: true }
+}
+
 export async function deleteAssignment(id: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  // Fetch the home classroom before deleting so we have somewhere to send
+  // the teacher back to — there's no more global assignments list page.
+  const { data: existing } = await supabase
+    .from('assignments')
+    .select('classroom_id')
+    .eq('id', id)
+    .maybeSingle()
 
   // No explicit created_by filter — RLS already restricts this to owner or
   // authorized (admin/manage) co-teacher.
@@ -110,8 +182,9 @@ export async function deleteAssignment(id: string) {
     .eq('id', id)
 
   if (error) return { error: error.message }
-  revalidatePath('/assignments')
-  redirect('/assignments')
+  const classroomId = existing?.classroom_id
+  if (classroomId) revalidatePath(`/classrooms/${classroomId}`)
+  redirect(classroomId ? `/classrooms/${classroomId}` : '/classrooms')
 }
 
 export async function duplicateAssignment(id: string, opts?: { targetClassroomIds?: string[] }) {
@@ -156,6 +229,15 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       duration_minutes: source.duration_minutes,
       mode: source.mode,
       type: source.type,
+      shuffle_questions: source.shuffle_questions,
+      shuffle_options: source.shuffle_options,
+      show_results: source.show_results,
+      max_attempts: source.max_attempts,
+      score_strategy: source.score_strategy,
+      access_code: null,
+      passing_type: source.passing_type,
+      passing_value: source.passing_value,
+      require_work_image: source.require_work_image,
       status: 'draft',
     })
     .select('id')

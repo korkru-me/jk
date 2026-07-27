@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { saveAnswer, submitSubmission } from '@/lib/actions/submissions'
+import { saveAnswer, saveWorkImage, saveFileSubmission, submitSubmission } from '@/lib/actions/submissions'
+import { WorkImageUpload } from './work-image-upload'
+import { FileSubmissionUpload } from './file-submission-upload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +18,8 @@ import { FormulaSheet } from './formula-sheet'
 import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
 import { partLabels } from '@/lib/part-labels'
-import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig } from '@/lib/types'
+import { getBlankType } from '@/lib/fill-blank'
+import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,22 +32,30 @@ interface AnswerRow {
   random_values: Record<string, number>
   correct_answer: string
   student_answer: string | null
+  work_images: (string | null)[] | null
   questions: {
     title: string
     question_text: string
     question_type: string
     answer_unit: string | null
-    mcq_options: Array<{ text: string; is_correct: boolean }> | null
+    // is_correct is intentionally stripped server-side before this reaches
+    // the client — never trust/display it here pre-submission.
+    mcq_options: Array<{ text: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
     answer_parts: AnswerPart[] | null
-    extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | null
+    extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | null
     image_urls: string[] | null
+    requires_work_image: boolean
   }
 }
 
 export interface ExamConfig {
   isCalculatorEnabled: boolean
   isFullscreenEnforced: boolean
+  // Assignment-level override of each question's own requires_work_image —
+  // asked of the teacher at assignment-creation time; false switches the
+  // work-image requirement off for every question in this assignment.
+  isWorkImageEnforced: boolean
 }
 
 interface Props {
@@ -61,12 +72,26 @@ function initLocalAnswers(answers: AnswerRow[]): Record<string, string> {
   return Object.fromEntries(answers.map(a => [a.id, a.student_answer ?? '']))
 }
 
+function initWorkImages(answers: AnswerRow[]): Record<string, (string | null)[]> {
+  return Object.fromEntries(answers.map(a => [a.id, a.work_images ?? []]))
+}
+
+function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
+  if (!config.isWorkImageEnforced) return 0
+  if (a.questions.question_type !== 'written' || !a.questions.requires_work_image) return 0
+  const parts = a.questions.answer_parts
+  return parts && parts.length > 0 ? parts.length : 1
+}
+
 export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config }: Props) {
   const router = useRouter()
 
   // ── Core state ──────────────────────────────────────────────────────────────
   const [localAnswers, setLocalAnswers] = useState<Record<string, string>>(
     () => initLocalAnswers(answers)
+  )
+  const [workImages, setWorkImages] = useState<Record<string, (string | null)[]>>(
+    () => initWorkImages(answers)
   )
   const [pendingSync, setPendingSync] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -234,6 +259,29 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     await handleAnswerChange(answerId, JSON.stringify(arr))
   }, [handleAnswerChange])
 
+  const handleWorkImageChange = useCallback(async (answerId: string, partIndex: number, url: string | null) => {
+    setWorkImages(prev => {
+      const arr = [...(prev[answerId] ?? [])]
+      while (arr.length <= partIndex) arr.push(null)
+      arr[partIndex] = url
+      return { ...prev, [answerId]: arr }
+    })
+    try {
+      await saveWorkImage(answerId, partIndex, url)
+    } catch {
+      toast.error('บันทึกรูปวิธีทำไม่สำเร็จ ลองใหม่อีกครั้ง')
+    }
+  }, [])
+
+  const handleFileSubmissionChange = useCallback(async (answerId: string, files: SubmittedFile[]) => {
+    setLocalAnswers(prev => ({ ...prev, [answerId]: JSON.stringify(files) }))
+    try {
+      await saveFileSubmission(answerId, files)
+    } catch {
+      toast.error('บันทึกไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง')
+    }
+  }, [])
+
   function toggleFlag(answerId: string) {
     setFlagged(prev => {
       const next = new Set(prev)
@@ -264,7 +312,25 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     router.push(`/submissions/${submissionId}`)
   }
 
+  function findMissingWorkImage(): number | null {
+    for (let i = 0; i < answers.length; i++) {
+      const required = requiredWorkImageCount(answers[i], config)
+      if (required === 0) continue
+      const imgs = workImages[answers[i].id] ?? []
+      for (let p = 0; p < required; p++) {
+        if (!imgs[p]) return i
+      }
+    }
+    return null
+  }
+
   function openSubmitDialog() {
+    const missingIndex = findMissingWorkImage()
+    if (missingIndex !== null) {
+      toast.error(`กรุณาแนบรูปวิธีทำให้ครบก่อนส่งคำตอบ (ข้อ ${missingIndex + 1})`)
+      setCurrentIndex(missingIndex)
+      return
+    }
     setShowSubmitConfirm(true)
     setSubmitCountdown(3)
   }
@@ -280,7 +346,13 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   function hasAnswered(answerId: string): boolean {
     const raw = localAnswers[answerId] ?? ''
     if (raw.startsWith('[')) {
-      try { return (JSON.parse(raw) as string[]).some(v => v.trim() !== '') } catch { return false }
+      // Arrays encode either plain strings (ordering / multi-part numeric —
+      // "answered" means at least one non-blank entry) or file-submission
+      // objects ({url,name,type} — any entry at all counts as answered).
+      try {
+        const parsed = JSON.parse(raw) as unknown[]
+        return parsed.some(v => typeof v === 'string' ? v.trim() !== '' : v != null)
+      } catch { return false }
     }
     return raw.trim() !== ''
   }
@@ -363,6 +435,24 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             </div>
           )}
 
+          {current.questions.question_type === 'file_upload' && (
+            ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {((current.questions.extra_data as FileUploadConfig).attachment_urls ?? []).map(url => (
+                  /\.pdf(\?|$)/i.test(url) ? (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border bg-muted/40 hover:bg-muted transition-colors">
+                      📄 <span className="truncate max-w-[140px]">{decodeURIComponent(url.split('/').pop() ?? 'PDF')}</span>
+                    </a>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-52 rounded-xl border object-contain" />
+                  )
+                ))}
+              </div>
+            )
+          )}
+
           {Object.keys(current.random_values).length > 0 && (
             <div className="bg-muted/40 rounded-xl p-3 border border-border/50">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">ค่าที่กำหนด</p>
@@ -411,6 +501,11 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
+          ) : current.questions.question_type === 'file_upload' ? (
+            <FileUploadAnswerInput
+              rawValue={localAnswers[current.id] ?? ''}
+              onChange={files => handleFileSubmissionChange(current.id, files)}
+            />
           ) : (
             <MultiPartAnswerInput
               answerId={current.id}
@@ -421,6 +516,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               onSingleChange={val => handleAnswerChange(current.id, val)}
               onPartChange={(pi, val, total) =>
                 handlePartAnswerChange(current.id, pi, val, total, localAnswers[current.id] ?? '')}
+              requiresWorkImage={requiredWorkImageCount(current, config) > 0}
+              workImages={workImages[current.id] ?? []}
+              onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
             />
           )}
         </div>
@@ -845,7 +943,7 @@ function MCQInput({
   answerId, options, selected, eliminatedSet, onSelect, onToggleEliminate,
 }: {
   answerId: string
-  options: Array<{ text: string; is_correct: boolean }>
+  options: Array<{ text: string }>
   selected: string
   eliminatedSet: Set<number>
   onSelect: (val: string) => void
@@ -912,6 +1010,7 @@ function MCQInput({
 
 function MultiPartAnswerInput({
   answerId, parts, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
+  requiresWorkImage, workImages, onWorkImageChange,
 }: {
   answerId: string
   parts: AnswerPart[] | null
@@ -920,6 +1019,9 @@ function MultiPartAnswerInput({
   rawValue: string
   onSingleChange: (val: string) => void
   onPartChange: (pi: number, val: string, total: number) => void
+  requiresWorkImage: boolean
+  workImages: (string | null)[]
+  onWorkImageChange: (partIndex: number, url: string | null) => void
 }) {
   const activeParts = parts && parts.length > 0 ? parts : null
   if (!activeParts || activeParts.length === 1) {
@@ -932,6 +1034,13 @@ function MultiPartAnswerInput({
             onChange={e => onSingleChange(e.target.value)} className="max-w-[200px]" />
           {unit && <UnitDisplay html={unit} />}
         </div>
+        {requiresWorkImage && (
+          <WorkImageUpload
+            value={workImages[0] ?? null}
+            onChange={url => onWorkImageChange(0, url)}
+            required
+          />
+        )}
       </div>
     )
   }
@@ -951,6 +1060,13 @@ function MultiPartAnswerInput({
               onChange={e => onPartChange(i, e.target.value, activeParts.length)} className="max-w-[200px]" />
             {part.unit && <UnitDisplay html={part.unit} />}
           </div>
+          {requiresWorkImage && (
+            <WorkImageUpload
+              value={workImages[i] ?? null}
+              onChange={url => onWorkImageChange(i, url)}
+              required
+            />
+          )}
         </div>
       ))}
     </div>
@@ -1069,16 +1185,28 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
   }
   return (
     <div className="leading-loose text-sm">
-      {parts.map((part, i) => (
-        <span key={i}>
-          {part}
-          {i < blanks.length && (
-            <input type="text" value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
-              className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600"
-              placeholder={`ช่อง ${i + 1}`} />
-          )}
-        </span>
-      ))}
+      {parts.map((part, i) => {
+        const blank = blanks[i]
+        const type = i < blanks.length ? getBlankType(config, blank) : null
+        return (
+          <span key={i}>
+            {part}
+            {type === 'dropdown' ? (
+              <select value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
+                className="inline-block mx-1 px-2 py-0.5 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600">
+                <option value="">เลือกคำตอบ</option>
+                {(blank?.options ?? []).map((opt, oi) => (
+                  <option key={oi} value={opt}>{opt}</option>
+                ))}
+              </select>
+            ) : type !== null ? (
+              <input type="text" value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
+                className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600"
+                placeholder={`ช่อง ${i + 1}`} />
+            ) : null}
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -1130,6 +1258,27 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
       </div>
       {hasdup     && <p className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 rounded-lg">⚠️ มีลำดับซ้ำ</p>}
       {allFilled && !hasdup && <p className="text-xs text-green-600 dark:text-green-400">✓ เลือกครบแล้ว</p>}
+    </div>
+  )
+}
+
+// ─── File upload ──────────────────────────────────────────────────────────────
+
+function FileUploadAnswerInput({ rawValue, onChange }: {
+  rawValue: string; onChange: (files: SubmittedFile[]) => void
+}) {
+  let files: SubmittedFile[] = []
+  try { files = rawValue ? JSON.parse(rawValue) : [] } catch { files = [] }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">แนบไฟล์คำตอบ (รูปภาพหรือ PDF)</p>
+      <FileSubmissionUpload value={files} onChange={onChange} />
+      {files.length === 0 ? (
+        <p className="text-xs text-amber-600 dark:text-amber-400">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
+      ) : (
+        <p className="text-xs text-green-600 dark:text-green-400">✓ แนบไฟล์แล้ว {files.length} ไฟล์</p>
+      )}
     </div>
   )
 }

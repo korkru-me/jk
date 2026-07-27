@@ -14,24 +14,22 @@ interface NavItem {
 
 const teacherNav: NavItem[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
-  { href: '/questions', label: 'คลังโจทย์', icon: '📚' },
   { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
-  { href: '/questions/sets', label: 'คลังชุดโจทย์', icon: '🗂️' },
+  { href: '/questions', label: 'คลังโจทย์', icon: '📚' },
   { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
-  { href: '/assignments', label: 'ชุดข้อสอบ/งานที่มอบหมาย', icon: '📋' },
   { href: '/settings/profile', label: 'ตั้งค่า', icon: '⚙️' },
 ]
 
 const studentNav: NavItem[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: '🏫' },
-  { href: '/my-submissions', label: 'ผลงานและสมรรถนะ', icon: '📊' },
+  { href: '/my-submissions', label: 'ผลงานของฉัน', icon: '📊' },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard'
   if (href === '/settings/profile') return pathname.startsWith('/settings')
-  if (href === '/questions') return pathname === '/questions' || (pathname.startsWith('/questions/') && !pathname.startsWith('/questions/new') && !pathname.startsWith('/questions/sets'))
+  if (href === '/questions') return pathname === '/questions' || (pathname.startsWith('/questions/') && !pathname.startsWith('/questions/new'))
   return pathname === href || pathname.startsWith(href + '/')
 }
 

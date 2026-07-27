@@ -1,7 +1,11 @@
 'use client'
 
+import { useState, useTransition } from 'react'
 import { Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { setRequiresWorkImage } from '@/lib/actions/questions'
 import type { Question } from '@/lib/types'
 
 export const DIFF_META: Record<string, { label: string; color: string }> = {
@@ -14,6 +18,7 @@ export const DIFF_META: Record<string, { label: string; color: string }> = {
 export const TYPE_SHORT: Record<string, string> = {
   mcq: 'MCQ', written: 'เขียน', matching: 'จับคู่', essay: 'บรรยาย',
   true_false: 'ถ/ผ', fill_blank: 'เติมคำ', ordering: 'เรียง',
+  file_upload: 'ไฟล์งาน',
 }
 
 interface Props {
@@ -31,9 +36,40 @@ export function QuestionPicker({
   questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
   title = 'เลือกโจทย์',
 }: Props) {
+  const [tagFilters, setTagFilters] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [workImageOverrides, setWorkImageOverrides] = useState<Record<string, boolean>>({})
+  const [, startTransition] = useTransition()
+  const allTags = Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort()
+
+  function handleToggleWorkImage(id: string, next: boolean) {
+    setWorkImageOverrides(prev => ({ ...prev, [id]: next }))
+    startTransition(async () => {
+      const result = await setRequiresWorkImage(id, next)
+      if (result?.error) {
+        setWorkImageOverrides(prev => ({ ...prev, [id]: !next }))
+        toast.error(result.error)
+      }
+    })
+  }
+
+  function addTagFilter(tag: string) {
+    const t = tag.trim()
+    if (!t || tagFilters.some(f => f.toLowerCase() === t.toLowerCase())) return
+    setTagFilters(prev => [...prev, t])
+    setTagInput('')
+  }
+  function removeTagFilter(tag: string) {
+    setTagFilters(prev => prev.filter(f => f !== tag))
+  }
+
   const filteredQs = questions.filter(q => {
     if (diffFilter !== 'all' && q.difficulty !== diffFilter) return false
     if (search && !q.title.toLowerCase().includes(search.toLowerCase()) && !q.question_text.toLowerCase().includes(search.toLowerCase())) return false
+    if (tagFilters.length > 0) {
+      const qTags = (q.tags ?? []).map(t => t.toLowerCase())
+      if (!tagFilters.every(f => qTags.includes(f.toLowerCase()))) return false
+    }
     return true
   })
 
@@ -72,6 +108,30 @@ export function QuestionPicker({
         </div>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-40">
+          <Input
+            list="question-picker-tags"
+            placeholder="พิมพ์แท็กแล้วกด Enter เพื่อเพิ่มตัวกรอง..."
+            value={tagInput}
+            onChange={e => setTagInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTagFilter(tagInput) }
+            }}
+            className="text-sm"
+          />
+          <datalist id="question-picker-tags">
+            {allTags.map(t => <option key={t} value={t} />)}
+          </datalist>
+        </div>
+        {tagFilters.map(t => (
+          <span key={t} className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg">
+            #{t}
+            <button type="button" onClick={() => removeTagFilter(t)} className="text-blue-400 hover:text-red-500 transition-colors ml-0.5">×</button>
+          </span>
+        ))}
+      </div>
+
       <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
         {filteredQs.length === 0 ? (
           <div className="text-center py-12 text-gray-400 text-sm">ไม่พบโจทย์ที่ตรงกัน</div>
@@ -100,6 +160,18 @@ export function QuestionPicker({
                   {diff?.label ?? q.difficulty}
                 </span>
                 <span className="text-xs text-gray-400">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
+                {q.question_type === 'written' && (
+                  <div
+                    className="flex items-center gap-1"
+                    onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                    title="บังคับแนบรูปวิธีทำ"
+                  >
+                    <ToggleSwitch
+                      checked={workImageOverrides[q.id] ?? q.requires_work_image}
+                      onChange={next => handleToggleWorkImage(q.id, next)}
+                    />
+                  </div>
+                )}
               </div>
             </label>
           )

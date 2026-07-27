@@ -6,8 +6,9 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { User } from '@/lib/types'
 import { TeacherDashboard } from './_components/teacher-dashboard'
-import { StreakGamification } from '@/components/student/streak-gamification'
-import { Clock, BookOpen, ChevronRight, TrendingUp, Flame, AlertCircle } from 'lucide-react'
+import { AssignmentCalendar, type CalendarEvent } from './_components/assignment-calendar'
+import { computePassed } from '@/lib/grading'
+import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
 
@@ -69,7 +70,7 @@ export default async function DashboardPage() {
       .eq('student_id', user.id),
     supabase
       .from('submissions')
-      .select('total_score, max_score, status, assignment_id, created_at')
+      .select('id, total_score, max_score, status, assignment_id, created_at')
       .eq('student_id', user.id),
   ])
 
@@ -87,30 +88,82 @@ export default async function DashboardPage() {
     : null
 
   let pendingAssignments: any[] = []
+  let calendarEvents: CalendarEvent[] = []
+
   if (classroomIds.length > 0) {
-    const submittedIds = new Set(completed.map((s: any) => s.assignment_id))
     const inProgressMap = new Map(
       allSubmissions
         .filter((s: any) => s.status === 'in_progress')
         .map((s: any) => [s.assignment_id, s])
     )
+    // Best (highest-scoring) submitted/graded attempt per assignment — an
+    // exercise may have several retry attempts behind it.
+    const bestByAssignment = new Map<string, any>()
+    for (const s of completed) {
+      const prev = bestByAssignment.get(s.assignment_id)
+      if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1)) {
+        bestByAssignment.set(s.assignment_id, s)
+      }
+    }
 
-    const { data: allAssignments } = await supabase
-      .from('assignments')
-      .select('id, title, question_ids, classrooms(name), end_at, duration_minutes')
+    // Route through assignment_classrooms (not the legacy single
+    // assignments.classroom_id column) so multi-classroom assignments show
+    // up here regardless of which classroom they were "primarily" created in.
+    const { data: links } = await supabase
+      .from('assignment_classrooms')
+      .select('assignment_id')
       .in('classroom_id', classroomIds)
-      .eq('status', 'published')
-      .order('end_at', { ascending: true, nullsFirst: false })
+    const assignedIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+
+    const { data: allAssignments } = assignedIds.length > 0
+      ? await supabase
+          .from('assignments')
+          .select('id, title, question_ids, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value')
+          .in('id', assignedIds)
+          .eq('status', 'published')
+          .order('end_at', { ascending: true, nullsFirst: false })
+      : { data: [] }
+
+    // An exercise submission that hasn't cleared its passing threshold isn't
+    // "done" yet — the student is expected to retry. Exams count once submitted.
+    function isDone(a: any): boolean {
+      const best = bestByAssignment.get(a.id)
+      if (!best) return false
+      if (a.type === 'exercise') {
+        if (computePassed(best.total_score, best.max_score, a.passing_type, a.passing_value) === false) return false
+      }
+      return true
+    }
 
     pendingAssignments = (allAssignments ?? [])
-      .filter((a: any) => !submittedIds.has(a.id))
+      .filter((a: any) => !isDone(a))
       .slice(0, 6)
       .map((a: any) => ({
         ...a,
         inProgress: inProgressMap.has(a.id),
         submissionId: inProgressMap.get(a.id)?.id ?? null,
       }))
+
+    calendarEvents = (allAssignments ?? [])
+      .filter((a: any) => a.end_at)
+      .map((a: any) => ({
+        id: a.id,
+        title: a.title,
+        classroomName: (a.classrooms as any)?.name ?? '',
+        endAt: a.end_at as string,
+        done: isDone(a),
+        submissionId: bestByAssignment.get(a.id)?.id ?? null,
+      }))
   }
+
+  const { data: recentPosts } = classroomIds.length > 0
+    ? await supabase
+        .from('classroom_posts')
+        .select('id, classroom_id, body, created_at, users(full_name), classrooms(name)')
+        .in('classroom_id', classroomIds)
+        .order('created_at', { ascending: false })
+        .limit(5)
+    : { data: [] }
 
   return (
     <StudentDashboard
@@ -119,6 +172,8 @@ export default async function DashboardPage() {
       avgPct={avgPct}
       completedCount={completed.length}
       pendingAssignments={pendingAssignments}
+      calendarEvents={calendarEvents}
+      recentPosts={recentPosts ?? []}
     />
   )
 }
@@ -131,12 +186,16 @@ function StudentDashboard({
   avgPct,
   completedCount,
   pendingAssignments,
+  calendarEvents,
+  recentPosts,
 }: {
   user: User
   classroomsCount: number
   avgPct: number | null
   completedCount: number
   pendingAssignments: any[]
+  calendarEvents: CalendarEvent[]
+  recentPosts: any[]
 }) {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น'
@@ -155,7 +214,7 @@ function StudentDashboard({
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
         >
           <TrendingUp size={14} />
-          ดูสมรรถนะ
+          ดูผลงานของฉัน
         </Link>
       </div>
 
@@ -183,12 +242,8 @@ function StudentDashboard({
         />
       </div>
 
-      {/* Gamification */}
-      <StreakGamification
-        completedCount={completedCount}
-        avgPct={avgPct}
-        classroomsCount={classroomsCount}
-      />
+      {/* Due-date calendar */}
+      <AssignmentCalendar events={calendarEvents} />
 
       {/* Pending assignments */}
       {pendingAssignments.length > 0 ? (
@@ -227,8 +282,51 @@ function StudentDashboard({
           </Link>
         </div>
       )}
+
+      {/* Recent announcements across all classrooms */}
+      {recentPosts.length > 0 && (
+        <div>
+          <h2 className="font-semibold flex items-center gap-2 mb-3">
+            <Megaphone size={16} className="text-violet-600 dark:text-violet-400" />
+            ประกาศล่าสุด
+          </h2>
+          <div className="bg-card border rounded-2xl divide-y">
+            {recentPosts.map((p: any) => (
+              <Link
+                key={p.id}
+                href={`/classrooms/${p.classroom_id}`}
+                className="flex items-start gap-3 p-4 hover:bg-muted/30 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-950/30 flex items-center justify-center shrink-0 text-violet-600 dark:text-violet-400">
+                  <Megaphone size={14} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 truncate">{p.classrooms?.name}</span>
+                    <span className="text-xs text-muted-foreground">· {p.users?.full_name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto shrink-0">{timeAgo(p.created_at)}</span>
+                  </div>
+                  <p className="text-sm mt-1 line-clamp-2 whitespace-pre-wrap">{p.body}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'เมื่อสักครู่'
+  if (mins < 60) return `${mins} นาทีที่แล้ว`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} ชม.ที่แล้ว`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} วันที่แล้ว`
+  return new Date(iso).toLocaleDateString('th-TH', { dateStyle: 'short' })
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

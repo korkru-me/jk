@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
 import { RichText } from '@/components/ui/rich-text'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
+import { getBlankType } from '@/lib/fill-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
 import {
   Dialog,
@@ -14,6 +15,10 @@ import {
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ']
 const RIGHT_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+
+function isPdfUrl(url: string) {
+  return /\.pdf(\?|$)/i.test(url)
+}
 
 interface QuestionPreviewProps {
   questionText: string
@@ -28,6 +33,7 @@ interface QuestionPreviewProps {
   fillBlankConfig?: FillBlankConfig
   orderingConfig?: OrderingConfig
   partLabelStyle?: PartLabelStyle
+  attachmentUrls?: string[]
 }
 
 function shuffleIndices(n: number): number[] {
@@ -122,6 +128,7 @@ export function QuestionPreview({
   fillBlankConfig,
   orderingConfig,
   partLabelStyle,
+  attachmentUrls = [],
 }: QuestionPreviewProps) {
   const labels = partLabels(partLabelStyle)
   const [open, setOpen] = useState(false)
@@ -266,6 +273,25 @@ export function QuestionPreview({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={url} src={url} alt="รูปประกอบโจทย์"
                     className="max-h-48 rounded-lg border border-gray-200 object-contain" />
+                ))}
+              </div>
+            )}
+
+            {/* File-upload reference attachments */}
+            {questionType === 'file_upload' && attachmentUrls.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {attachmentUrls.map((url) => (
+                  isPdfUrl(url) ? (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                      className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <span className="text-lg">📄</span>
+                      <span className="text-[9px] text-gray-500">PDF</span>
+                    </a>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์"
+                      className="max-h-32 rounded-lg border border-gray-200 object-contain" />
+                  )
                 ))}
               </div>
             )}
@@ -583,6 +609,19 @@ export function QuestionPreview({
               </div>
             )}
 
+            {/* ── File upload ── */}
+            {questionType === 'file_upload' && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 font-medium">แนบไฟล์คำตอบ (จำลอง):</p>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-gray-400">
+                  📎 นักเรียนจะแนบไฟล์รูปภาพหรือ PDF ที่นี่
+                </div>
+                <p className="text-xs text-indigo-500 bg-indigo-50 px-3 py-2 rounded-lg">
+                  * ระบบให้คะแนนเต็มอัตโนมัติเมื่อมีการแนบไฟล์อย่างน้อย 1 ไฟล์ — ไม่มีการตรวจเนื้อหาไฟล์
+                </p>
+              </div>
+            )}
+
             {/* ── True/False ── */}
             {questionType === 'true_false' && trueFalseConfig && (() => {
               const subStatements = trueFalseConfig.statements ?? []
@@ -679,42 +718,71 @@ export function QuestionPreview({
             {questionType === 'fill_blank' && fillBlankConfig && (() => {
               const parts = questionText.split('[___]')
               const blanks = fillBlankConfig.blanks
-              const isManual = fillBlankConfig.grading_mode === 'manual'
+              const types = blanks.map(b => getBlankType(fillBlankConfig, b))
+              const autoIdx = types.reduce<number[]>((acc, t, i) => { if (t !== 'text') acc.push(i); return acc }, [])
+              const hasManual = types.some(t => t === 'text')
+              const hasAuto = autoIdx.length > 0
               return (
                 <div className="space-y-4">
                   <div className="leading-loose text-gray-900 text-[15px]">
-                    {parts.map((part, i) => (
-                      <span key={i}>
-                        {part}
-                        {i < blanks.length && (
-                          <input
-                            type="text"
-                            value={fillAnswers[i] ?? ''}
-                            onChange={(e) => {
-                              if (fillChecked) return
-                              const next = [...fillAnswers]
-                              next[i] = e.target.value
-                              setFillAnswers(next)
-                            }}
-                            readOnly={fillChecked}
-                            className={`inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600 ${
-                              !isManual && fillChecked
-                                ? fillResults[i] ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50'
-                                : ''
-                            }`}
-                          />
-                        )}
-                      </span>
-                    ))}
+                    {parts.map((part, i) => {
+                      const type = types[i]
+                      return (
+                        <span key={i}>
+                          {part}
+                          {type === 'dropdown' ? (
+                            <select
+                              value={fillAnswers[i] ?? ''}
+                              onChange={(e) => {
+                                if (fillChecked) return
+                                const next = [...fillAnswers]
+                                next[i] = e.target.value
+                                setFillAnswers(next)
+                              }}
+                              disabled={fillChecked}
+                              className={`inline-block mx-1 px-2 py-0.5 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600 ${
+                                fillChecked ? (fillResults[i] ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50') : ''
+                              }`}
+                            >
+                              <option value="">เลือกคำตอบ</option>
+                              {(blanks[i]?.options ?? []).map((opt, oi) => (
+                                <option key={oi} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          ) : i < blanks.length ? (
+                            <input
+                              type="text"
+                              value={fillAnswers[i] ?? ''}
+                              onChange={(e) => {
+                                if (fillChecked) return
+                                const next = [...fillAnswers]
+                                next[i] = e.target.value
+                                setFillAnswers(next)
+                              }}
+                              readOnly={fillChecked}
+                              className={`inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600 ${
+                                fillChecked && type !== 'text'
+                                  ? fillResults[i] ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50'
+                                  : ''
+                              }`}
+                            />
+                          ) : null}
+                        </span>
+                      )
+                    })}
                   </div>
 
-                  {isManual ? (
-                    <p className="text-xs text-orange-600 font-medium">ครูผู้สอนจะเป็นผู้ตรวจและให้คะแนน</p>
-                  ) : (
+                  {hasManual && (
+                    <p className="text-xs text-orange-600 font-medium">
+                      {hasAuto ? 'บางช่องครูผู้สอนจะเป็นผู้ตรวจและให้คะแนนเอง' : 'ครูผู้สอนจะเป็นผู้ตรวจและให้คะแนน'}
+                    </p>
+                  )}
+
+                  {hasAuto && (
                     <>
                       {fillChecked && (
                         <div className="space-y-1">
-                          {blanks.map((b, i) => (
+                          {blanks.map((b, i) => types[i] === 'text' ? null : (
                             <p key={i} className={`text-xs px-2 py-1 rounded ${fillResults[i] ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                               {fillResults[i] ? `✓ ช่อง ${i + 1}: ถูกต้อง` : `✗ ช่อง ${i + 1}: เฉลยคือ "${b.answer}"`}
                             </p>
@@ -726,29 +794,30 @@ export function QuestionPreview({
                           type="button"
                           onClick={() => {
                             const results = blanks.map((b, i) => {
+                              if (types[i] === 'text') return false
                               const sa = (fillAnswers[i] ?? '').trim()
                               const ca = b.answer.trim()
-                              return b.case_sensitive ? sa === ca : sa.toLowerCase() === ca.toLowerCase()
+                              return types[i] === 'dropdown' ? sa === ca : (b.case_sensitive ? sa === ca : sa.toLowerCase() === ca.toLowerCase())
                             })
                             setFillResults(results)
                             setFillChecked(true)
                           }}
-                          disabled={fillAnswers.some(a => !a?.trim())}
+                          disabled={autoIdx.some(i => !fillAnswers[i]?.trim())}
                           className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
                         >
                           ตรวจคำตอบ
                         </button>
                       ) : (
                         <div className={`p-3 rounded-lg text-sm font-medium border ${
-                          fillResults.every(Boolean)
+                          autoIdx.every(i => fillResults[i])
                             ? 'bg-green-50 text-green-700 border-green-200'
-                            : fillResults.some(Boolean)
+                            : autoIdx.some(i => fillResults[i])
                               ? 'bg-orange-50 text-orange-700 border-orange-200'
                               : 'bg-red-50 text-red-700 border-red-200'
                         }`}>
-                          {fillResults.every(Boolean)
-                            ? '🎉 ถูกต้องทุกช่อง!'
-                            : `✅ ถูก ${fillResults.filter(Boolean).length}/${blanks.length} ช่อง`}
+                          {autoIdx.every(i => fillResults[i])
+                            ? '🎉 ถูกต้องทุกช่อง (ที่ตรวจอัตโนมัติ)!'
+                            : `✅ ถูก ${autoIdx.filter(i => fillResults[i]).length}/${autoIdx.length} ช่อง (ที่ตรวจอัตโนมัติ)`}
                         </div>
                       )}
                     </>

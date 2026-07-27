@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Users, BookOpen, TrendingUp, Check } from 'lucide-react'
+import { Users, BookOpen, TrendingUp, Check, Pin, PinOff } from 'lucide-react'
 import { BarChart, Bar, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 import type { Classroom } from '@/lib/types'
@@ -48,12 +48,14 @@ interface Props {
   isSelecting?: boolean
   isSelected?: boolean
   onToggle?: () => void
+  onTogglePin?: () => void
 }
 
 export function ClassroomCard({
   classroom, studentCount, assignmentCount, index,
-  isSelecting = false, isSelected = false, onToggle,
+  isSelecting = false, isSelected = false, onToggle, onTogglePin,
 }: Props) {
+  const isPinned = !!classroom.pinned_at
   const gradient = GRADIENTS[index % GRADIENTS.length]
   const emoji = COVER_EMOJIS[index % COVER_EMOJIS.length]
   const pisaData = getPisaData(classroom.id)
@@ -81,6 +83,19 @@ export function ClassroomCard({
           )}
         </div>
         <span className="text-3xl">{emoji}</span>
+        {!isSelecting && onTogglePin && (
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin() }}
+            title={isPinned ? 'เลิกปักหมุด' : 'ปักหมุดไว้บนสุด'}
+            className={cn(
+              'absolute top-2.5 right-2.5 w-7 h-7 rounded-lg flex items-center justify-center transition-colors z-10',
+              isPinned ? 'bg-white text-amber-500' : 'bg-white/15 text-white/70 hover:bg-white/25 hover:text-white'
+            )}
+          >
+            {isPinned ? <Pin className="w-3.5 h-3.5 fill-current" /> : <PinOff className="w-3.5 h-3.5" />}
+          </button>
+        )}
         <div className={cn(
           'absolute inset-0 transition-colors',
           isSelecting && isSelected ? 'bg-blue-600/15' : 'bg-black/0 group-hover:bg-black/5'
@@ -104,6 +119,11 @@ export function ClassroomCard({
             <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
             <span className="text-sm font-bold text-emerald-600">{avgScore}%</span>
           </div>
+          {isPinned && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+              <Pin className="w-2.5 h-2.5 fill-current" /> ปักหมุด
+            </span>
+          )}
         </div>
 
         <div className="mb-3">
@@ -153,7 +173,10 @@ export function ClassroomCard({
   return (
     <Link
       href={`/classrooms/${classroom.id}`}
-      className="group block bg-white rounded-2xl ring-1 ring-black/5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      className={cn(
+        'group block bg-white rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden',
+        isPinned ? 'ring-2 ring-amber-300' : 'ring-1 ring-black/5'
+      )}
     >
       {cardBody}
     </Link>

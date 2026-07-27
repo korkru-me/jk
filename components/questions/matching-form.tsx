@@ -32,6 +32,7 @@ interface MatchingFormProps {
   allTags: string[]
   mode?: 'create' | 'edit'
   question?: Question
+  isOwner?: boolean
 }
 
 function pairsFromQuestion(question?: Question): PairState[] | undefined {
@@ -65,7 +66,7 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
   )
 }
 
-export function MatchingForm({ allTags, mode = 'create', question }: MatchingFormProps) {
+export function MatchingForm({ allTags, mode = 'create', question, isOwner = true }: MatchingFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
@@ -74,6 +75,9 @@ export function MatchingForm({ allTags, mode = 'create', question }: MatchingFor
   const [subject, setSubject] = useState(question?.subject ?? '')
   const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
   const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(question?.org_id ?? null)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
+  const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
@@ -140,7 +144,7 @@ export function MatchingForm({ allTags, mode = 'create', question }: MatchingFor
 
     const payload = {
       title, subject, question_text: questionText, question_type: 'matching' as const,
-      difficulty, visibility, category_id: question?.category_id ?? '',
+      difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
       grade_level: question?.grade_level ?? '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
@@ -167,6 +171,10 @@ export function MatchingForm({ allTags, mode = 'create', question }: MatchingFor
         subject={subject} onSubjectChange={setSubject}
         difficulty={difficulty} onDifficultyChange={setDifficulty}
         visibility={visibility} onVisibilityChange={setVisibility}
+        teamOrgId={teamOrgId} onTeamOrgIdChange={setTeamOrgId}
+        sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
+        teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
+        canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
       />
 

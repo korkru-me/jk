@@ -5,11 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy,
+  Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download,
   Users, TrendingUp, BookOpen,
 } from 'lucide-react'
-import { deleteQuestion } from '@/lib/actions/questions'
+import { deleteQuestion, setRequiresWorkImage } from '@/lib/actions/questions'
+import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { downloadTextFile } from '@/lib/utils'
 import type { QuestionWithCategory } from '../page'
 
 export const DIFF_META: Record<string, { label: string; color: string; bar: string }> = {
@@ -22,6 +25,7 @@ export const DIFF_META: Record<string, { label: string; color: string; bar: stri
 export const TYPE_LABEL: Record<string, string> = {
   mcq: 'ปรนัย', written: 'อัตนัย', essay: 'บรรยาย',
   true_false: 'ถ/ผ', fill_blank: 'เติมคำ', matching: 'จับคู่', ordering: 'เรียงลำดับ',
+  file_upload: 'ไฟล์งาน',
 }
 
 export function mockStats(id: string) {
@@ -47,6 +51,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   const router = useRouter()
   const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [requiresWorkImage, setRequiresWorkImageLocal] = useState(q.requires_work_image)
   const { pVal, rVal, usedIn } = mockStats(q.id)
   const diff = DIFF_META[q.difficulty]
   const isGroup = q.order_in_group === 0
@@ -64,6 +69,27 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   function handleDuplicate() {
     storeDuplicateSeed(q)
     router.push(`/questions/new/${NEW_QUESTION_ROUTE_BY_TYPE[q.question_type]}`)
+  }
+
+  function handleExport() {
+    setShareOpen(false)
+    startTransition(async () => {
+      const result = await exportQuestions([q.id])
+      if ('error' in result) { toast.error(result.error); return }
+      downloadTextFile(result.filename, result.content)
+      toast.success('ดาวน์โหลดไฟล์โจทย์แล้ว')
+    })
+  }
+
+  function handleToggleWorkImage(next: boolean) {
+    setRequiresWorkImageLocal(next)
+    startTransition(async () => {
+      const result = await setRequiresWorkImage(q.id, next)
+      if (result?.error) {
+        setRequiresWorkImageLocal(!next)
+        toast.error(result.error)
+      }
+    })
   }
 
   return (
@@ -106,6 +132,14 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                 </span>
               ))}
             </div>
+
+            {/* Work-image requirement toggle (written questions only) */}
+            {q.question_type === 'written' && (
+              <div className="flex items-center gap-2 mb-2">
+                <ToggleSwitch checked={requiresWorkImage} onChange={handleToggleWorkImage} disabled={isPending} />
+                <span className="text-xs text-gray-500">บังคับแนบรูปวิธีทำ</span>
+              </div>
+            )}
 
             {/* Title */}
             <button
@@ -180,6 +214,18 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                       <div className="px-3 py-2.5 border-b border-gray-50">
                         <p className="text-xs font-semibold text-gray-500">แชร์ให้ครูท่านอื่น</p>
                       </div>
+                      {!isGroup && (
+                        <button
+                          onClick={handleExport}
+                          disabled={isPending}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 disabled:opacity-50"
+                        >
+                          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
+                            <Download className="w-3.5 h-3.5" />
+                          </span>
+                          <span className="text-sm text-gray-700">ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)</span>
+                        </button>
+                      )}
                       {teachers.map(t => (
                         <button
                           key={t.id}

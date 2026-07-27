@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle } from 'lucide-react'
+import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
+import { computePassed } from '@/lib/grading'
+import { selectOfficialAttempt } from '@/lib/scoring'
 import { ExtensionDialog } from './extension-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 
@@ -42,16 +44,22 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
   const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  // (assignmentId, studentId) -> best/latest submission
+  // (assignmentId, studentId) -> official submission per that assignment's score_strategy
   const subKey = (aId: string, sId: string) => `${aId}::${sId}`
-  const bestSubmission = new Map<string, SubmissionRow>()
+  const strategyByAssignment = new Map(assignments.map(a => [a.id, a.score_strategy]))
+  const attemptsByKey = new Map<string, SubmissionRow[]>()
   for (const s of submissions) {
     const key = subKey(s.assignment_id, s.student_id)
-    const prev = bestSubmission.get(key)
-    if (!prev ||
-        (s.total_score ?? -1) > (prev.total_score ?? -1) ||
-        ((s.total_score ?? -1) === (prev.total_score ?? -1) && s.attempt_number > prev.attempt_number)) {
-      bestSubmission.set(key, s)
+    const arr = attemptsByKey.get(key) ?? []
+    arr.push(s)
+    attemptsByKey.set(key, arr)
+  }
+  const bestSubmission = new Map<string, SubmissionRow>()
+  for (const [key, attempts] of attemptsByKey) {
+    const strategy = strategyByAssignment.get(attempts[0].assignment_id) ?? 'best'
+    const official = selectOfficialAttempt(attempts, strategy)
+    if (official) {
+      bestSubmission.set(key, { ...official.representative, total_score: official.total_score, max_score: official.max_score })
     }
   }
 
@@ -125,12 +133,17 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
                   const extension = extensionMap.get(subKey(a.id, student.id))
                   const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
                   const inProgress = sub?.status === 'in_progress'
+                  const passed = submitted
+                    ? computePassed(sub!.total_score, sub!.max_score, a.passing_type, a.passing_value)
+                    : null
 
                   return (
                     <td key={a.id} className="px-3 py-2.5 text-center group relative">
                       {submitted ? (
-                        <div className="flex items-center justify-center gap-1 text-emerald-600">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        <div className={`flex items-center justify-center gap-1 ${
+                          passed === false ? 'text-red-500' : 'text-emerald-600'
+                        }`}>
+                          {passed === false ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                           <span className="text-xs font-semibold">
                             {sub!.total_score ?? 0}/{sub!.max_score}
                           </span>

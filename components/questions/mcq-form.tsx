@@ -30,6 +30,7 @@ interface McqFormProps {
   presets?: PresetWithCat[]
   mode?: 'create' | 'edit'
   question?: Question
+  isOwner?: boolean
 }
 
 function newOption(): MCQOption {
@@ -48,7 +49,7 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
   )
 }
 
-export function McqForm({ allTags, presets = [], mode = 'create', question }: McqFormProps) {
+export function McqForm({ allTags, presets = [], mode = 'create', question, isOwner = true }: McqFormProps) {
   const [entryMode, setEntryMode] = useState<McqMode>('manual')
 
   if (mode === 'create' && entryMode === 'auto') {
@@ -63,7 +64,7 @@ export function McqForm({ allTags, presets = [], mode = 'create', question }: Mc
   return (
     <div className="space-y-6">
       {mode === 'create' && <ModeSwitcher mode={entryMode} onChange={setEntryMode} />}
-      <McqManualForm allTags={allTags} mode={mode} question={question} />
+      <McqManualForm allTags={allTags} mode={mode} question={question} isOwner={isOwner} />
     </div>
   )
 }
@@ -113,7 +114,7 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
   )
 }
 
-function McqManualForm({ allTags, mode = 'create', question }: { allTags: string[]; mode?: 'create' | 'edit'; question?: Question }) {
+function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: { allTags: string[]; mode?: 'create' | 'edit'; question?: Question; isOwner?: boolean }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
@@ -122,6 +123,9 @@ function McqManualForm({ allTags, mode = 'create', question }: { allTags: string
   const [subject, setSubject] = useState(question?.subject ?? '')
   const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
   const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(question?.org_id ?? null)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
+  const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
@@ -198,7 +202,7 @@ function McqManualForm({ allTags, mode = 'create', question }: { allTags: string
     setSaving(true)
     const payload = {
       title, subject, question_text: questionText, question_type: 'mcq' as const,
-      difficulty, visibility, category_id: question?.category_id ?? '',
+      difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
       grade_level: question?.grade_level ?? '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
@@ -224,6 +228,10 @@ function McqManualForm({ allTags, mode = 'create', question }: { allTags: string
         subject={subject} onSubjectChange={setSubject}
         difficulty={difficulty} onDifficultyChange={setDifficulty}
         visibility={visibility} onVisibilityChange={setVisibility}
+        teamOrgId={teamOrgId} onTeamOrgIdChange={setTeamOrgId}
+        sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
+        teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
+        canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
       />
 

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight } from 'lucide-react'
+import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, FileUp } from 'lucide-react'
 
 const QUESTION_TYPES = [
   {
@@ -57,6 +57,14 @@ const QUESTION_TYPES = [
     desc: 'นักเรียนเขียนคำตอบอิสระ ครูตรวจและให้คะแนนเอง',
     color: 'bg-rose-50 border-rose-200 text-rose-700',
     iconColor: 'text-rose-500',
+  },
+  {
+    href: '/questions/new/file-upload',
+    icon: FileUp,
+    title: 'ส่งไฟล์งาน',
+    desc: 'แนบไฟล์รูปภาพหรือ PDF พร้อมคำสั่ง ให้นักเรียนส่งไฟล์คำตอบกลับมา',
+    color: 'bg-sky-50 border-sky-200 text-sky-700',
+    iconColor: 'text-sky-500',
   },
 ]
 

@@ -8,15 +8,28 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
-import { ChevronDown, RefreshCw } from 'lucide-react'
+import { ChevronDown, RefreshCw, Image as ImageIcon } from 'lucide-react'
 
 import { GeneralInfoSection } from './general-info-section'
+import { SymbolPicker } from './special-char-input'
 import { QuestionImageUpload } from './question-image-upload'
 import { QuestionPreview } from './question-preview'
 import { WhiteboardModal } from './whiteboard-modal'
 import { createQuestion } from '@/lib/actions/questions'
 import { evaluateFormula } from '@/lib/math/evaluator'
 import type { Difficulty, Visibility, MCQOption, FormulaPreset, Variable } from '@/lib/types'
+
+function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url?: string) => void }) {
+  return (
+    <QuestionImageUpload
+      value={value ? [value] : []}
+      onChange={(urls) => {
+        if (urls.length === 0) onChange(undefined)
+        else onChange(urls[urls.length - 1])
+      }}
+    />
+  )
+}
 
 // ─── Option label styles ───────────────────────────────────────────────────────
 
@@ -190,15 +203,12 @@ const TO_SUB: Record<string, string> = {
   '+':'₊','-':'₋','=':'₌','(':'₍',')':'₎',
   'a':'ₐ','e':'ₑ','o':'ₒ','x':'ₓ','h':'ₕ','k':'ₖ','l':'ₗ','m':'ₘ','n':'ₙ','p':'ₚ','s':'ₛ','t':'ₜ',
 }
-const TMPL_CHARS = [
-  { group: 'ตัวคั่น', chars: ['·', '×', '÷', '/', '⁻'] },
-  { group: 'กรีก',   chars: ['μ', 'Ω', 'θ', 'α', 'β', 'γ', 'λ', 'ρ', 'π', 'Δ'] },
-  { group: 'อื่นๆ',  chars: ['°', '∞', '%', '√', '∑', '≈', '≠', '≤', '≥'] },
-]
-
-function TemplateField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function TemplateField({ value, onChange, imageUrl, onImageChange }: {
+  value: string; onChange: (v: string) => void
+  imageUrl?: string; onImageChange: (url?: string) => void
+}) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [showPicker, setShowPicker] = useState(false)
+  const [showImagePicker, setShowImagePicker] = useState(false)
 
   function insertAt(char: string) {
     const input = inputRef.current
@@ -242,28 +252,21 @@ function TemplateField({ value, onChange }: { value: string; onChange: (v: strin
           className="text-xs border rounded-md px-2 py-1.5 font-medium text-gray-600 border-gray-300 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 transition-colors shrink-0">
           X₂
         </button>
-        <button type="button" onClick={() => setShowPicker(s => !s)}
-          className={`text-xs border rounded-md px-2 py-1.5 transition-colors shrink-0 ${showPicker ? 'bg-blue-600 text-white border-blue-600' : 'text-blue-600 border-blue-200 hover:bg-blue-50'}`}>
-          Ω· พิเศษ
+        <SymbolPicker onInsert={insertAt} />
+        <button
+          type="button"
+          onClick={() => setShowImagePicker(s => !s)}
+          className={`flex-shrink-0 p-1.5 rounded-md border transition-colors ${
+            showImagePicker || imageUrl ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-400 hover:text-gray-600'
+          }`}
+          title="แทรกรูปภาพในตัวเลือก"
+        >
+          <ImageIcon className="w-3.5 h-3.5" />
         </button>
       </div>
       <p className="text-[10px] text-gray-400">คลุมข้อความแล้วกด X² หรือ X₂ เพื่อแปลงอักษร</p>
-      {showPicker && (
-        <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-2">
-          {TMPL_CHARS.map(({ group, chars }) => (
-            <div key={group} className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] text-gray-400 font-semibold w-14 shrink-0">{group}</span>
-              <div className="flex flex-wrap gap-1">
-                {chars.map(ch => (
-                  <button key={ch} type="button" onClick={() => insertAt(ch)}
-                    className="font-mono text-sm px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors">
-                    {ch}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+      {(showImagePicker || imageUrl) && (
+        <SingleImageUpload value={imageUrl} onChange={onImageChange} />
       )}
     </div>
   )
@@ -508,6 +511,9 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
   const [subject, setSubject] = useState('')
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [visibility, setVisibility] = useState<Visibility>('private')
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(null)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>([])
+  const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(true)
   const [tags, setTags] = useState<string[]>([])
 
   // Equation / formula
@@ -529,6 +535,8 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
 
   // Option template: e.g. "ใช้เวลา {answer} วินาที"
   const [optionTemplate, setOptionTemplate] = useState('')
+  // Image shown on every generated option (e.g. a shared diagram)
+  const [optionImageUrl, setOptionImageUrl] = useState<string | undefined>(undefined)
 
   const [solutionText, setSolutionText] = useState('')
 
@@ -648,12 +656,13 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
     const mcqOptions: MCQOption[] = opts.map(o => ({
       text: o.value !== null ? applyTemplate(o.value) : String(o.value ?? ''),
       is_correct: o.isCorrect,
+      image_url: optionImageUrl,
     }))
 
     setSaving(true)
     const result = await createQuestion({
       title, subject, question_text: questionText, question_type: 'mcq',
-      difficulty, visibility, category_id: '',
+      difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: '',
       grade_level: '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
@@ -680,6 +689,9 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
         subject={subject} onSubjectChange={setSubject}
         difficulty={difficulty} onDifficultyChange={setDifficulty}
         visibility={visibility} onVisibilityChange={setVisibility}
+        teamOrgId={teamOrgId} onTeamOrgIdChange={setTeamOrgId}
+        sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
+        teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         tags={tags} onTagsChange={setTags}
       />
 
@@ -793,7 +805,10 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
         {/* Option template */}
         <div className="space-y-1.5">
           <Label className="text-sm">แม่แบบตัวเลือก <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
-          <TemplateField value={optionTemplate} onChange={setOptionTemplate} />
+          <TemplateField
+            value={optionTemplate} onChange={setOptionTemplate}
+            imageUrl={optionImageUrl} onImageChange={setOptionImageUrl}
+          />
           {optionTemplate.trim() && correctAnswer !== null && (
             <p className="text-xs text-purple-700 font-medium bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5">
               ตัวอย่าง: {applyTemplate(correctAnswer)}
@@ -893,6 +908,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
           mcqOptions={fullOptions.map(o => ({
             text: o.value !== null ? applyTemplate(o.value) : (o.formula || '—'),
             is_correct: o.isCorrect,
+            image_url: optionImageUrl,
           }))}
           imageUrls={imageUrls}
         />

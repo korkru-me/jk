@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Users, BookOpen, Copy, Check, Settings,
   GraduationCap, UserPlus, Grid3x3, Mail, GitBranch, Activity, ChevronLeft,
-  ClipboardList, Megaphone,
+  ClipboardList, Megaphone, CalendarDays, Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -18,23 +18,35 @@ import { InvitePanel } from './invite-panel'
 import { CoTeachers, type CoTeacherRow, type InviteRow } from './co-teachers'
 import { ClassroomAssignmentsTab, type ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { ClassroomScoresMatrix } from './classroom-scores-matrix'
+import { HomeroomOverview, type StudentNoteRow } from './homeroom-overview'
+import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { ParentPortal } from './parent-portal'
 import { LearningPaths } from './learning-paths'
 import { AuditLog } from './audit-log'
 import { BreakoutGroups } from './breakout-groups'
 
-type Tab = 'stream' | 'students' | 'assignments' | 'scores' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
+type Tab = 'stream' | 'students' | 'assignments' | 'scores' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
 
-const TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
+const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
   { key: 'stream',      label: 'ประกาศ',          icon: Megaphone },
-  { key: 'students',    label: 'นักเรียน',        icon: Users },
   { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
   { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
+  { key: 'students',    label: 'นักเรียน',        icon: Users },
   { key: 'groups',      label: 'กลุ่มย่อย',       icon: Grid3x3 },
   { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
   { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
   { key: 'parents',     label: 'ผู้ปกครอง',       icon: Mail },
   { key: 'paths',       label: 'เส้นทางการเรียน', icon: GitBranch },
+  { key: 'log',         label: 'ประวัติ',          icon: Activity },
+]
+
+const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
+  { key: 'homeroom',    label: 'การบ้านนักเรียน', icon: CalendarDays, managerOnly: true },
+  { key: 'stream',      label: 'ประกาศ',          icon: Megaphone },
+  { key: 'students',    label: 'นักเรียน',        icon: Users },
+  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
+  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
+  { key: 'parents',     label: 'ผู้ปกครอง',       icon: Mail },
   { key: 'log',         label: 'ประวัติ',          icon: Activity },
 ]
 
@@ -57,15 +69,24 @@ interface Props {
   classroomExtensions: {
     id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
   }[]
+  homeroomAssignments: HomeroomAssignmentRow[]
+  homeroomSubmissions: {
+    id: string; assignment_id: string; student_id: string; status: string
+    total_score: number | null; max_score: number; submitted_at: string | null; attempt_number: number
+  }[]
+  studentNotes: StudentNoteRow[]
   ownerName: string
   posts: ClassroomPost[]
 }
 
 export function ClassroomDetailClient({
   classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
-  classroomAssignments, classroomSubmissions, classroomExtensions, ownerName, posts,
+  classroomAssignments, classroomSubmissions, classroomExtensions,
+  homeroomAssignments, homeroomSubmissions, studentNotes, ownerName, posts,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('stream')
+  const isHomeroom = classroom.classroom_type === 'homeroom'
+  const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
+  const [activeTab, setActiveTab] = useState<Tab>(isHomeroom && canManage ? 'homeroom' : 'stream')
   const [codeCopied, setCodeCopied] = useState(false)
 
   function copyCode() {
@@ -84,9 +105,14 @@ export function ClassroomDetailClient({
       </Link>
 
       {/* Header card */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
+      <div className={`bg-gradient-to-br rounded-2xl p-6 text-white ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
+            {isHomeroom && (
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-300 mb-1.5">
+                <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
+              </p>
+            )}
             <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
             {classroom.description && (
               <p className="text-gray-400 text-sm mt-1">{classroom.description}</p>
@@ -101,12 +127,14 @@ export function ClassroomDetailClient({
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <BookOpen className="w-4 h-4 text-gray-400" />
-                <span className="font-semibold">{assignmentCount}</span>
-                <span className="text-gray-400">ชุดข้อสอบ</span>
+                <span className="font-semibold">{isHomeroom ? homeroomAssignments.length : assignmentCount}</span>
+                <span className="text-gray-400">{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
               </div>
-              <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                + สร้างชุดข้อสอบ
-              </Link>
+              {!isHomeroom && (
+                <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                  + สร้างชุดข้อสอบ
+                </Link>
+              )}
             </div>
           </div>
 
@@ -184,6 +212,8 @@ export function ClassroomDetailClient({
           <ClassroomAssignmentsTab
             classroomId={classroom.id}
             assignments={classroomAssignments}
+            submissions={classroomSubmissions}
+            studentCount={students.length}
             onViewScores={() => setActiveTab('scores')}
           />
         )}
@@ -194,6 +224,15 @@ export function ClassroomDetailClient({
             assignments={classroomAssignments}
             submissions={classroomSubmissions}
             extensions={classroomExtensions}
+          />
+        )}
+        {activeTab === 'homeroom' && canManage && (
+          <HomeroomOverview
+            classroomId={classroom.id}
+            students={students}
+            assignments={homeroomAssignments}
+            submissions={homeroomSubmissions}
+            notes={studentNotes}
           />
         )}
         {activeTab === 'groups' && (

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { MultiStepEditor } from '@/components/questions/multi-step-editor'
+import { getQuestionShareOrgIds } from '@/lib/actions/questions'
 import type { QuestionCategory, FormulaPreset, Question, Difficulty, Visibility } from '@/lib/types'
 import type { SubQuestionData } from '@/lib/actions/question-groups'
 
@@ -18,7 +19,6 @@ export default async function MultiStepEditPage({
       .from('questions')
       .select('*')
       .eq('group_id', groupId)
-      .eq('created_by', user!.id)
       .order('order_in_group', { ascending: true }),
     supabase.from('question_categories').select('*').order('order'),
     supabase.from('formula_presets').select('*, question_categories(name)').order('formula_name'),
@@ -28,6 +28,11 @@ export default async function MultiStepEditPage({
 
   const parent = (groupQuestions as Question[]).find((q) => q.order_in_group === 0)
   if (!parent) notFound()
+
+  const isOwner = parent.created_by === user!.id
+  if (!isOwner && !parent.team_edit_allowed) notFound()
+
+  const sharedOrgIds = await getQuestionShareOrgIds(parent.id)
 
   const subQs = (groupQuestions as Question[])
     .filter((q) => (q.order_in_group ?? 0) > 0)
@@ -60,8 +65,12 @@ export default async function MultiStepEditPage({
         initialContext={parent.question_text}
         initialCategoryId={parent.category_id ?? ''}
         initialVisibility={parent.visibility as Visibility}
+        initialOrgId={parent.org_id}
+        initialSharedOrgIds={sharedOrgIds}
+        initialTeamEditAllowed={parent.team_edit_allowed}
         initialDifficulty={parent.difficulty as Difficulty}
         initialSubQuestions={initialSubQuestions}
+        isOwner={isOwner}
       />
     </div>
   )

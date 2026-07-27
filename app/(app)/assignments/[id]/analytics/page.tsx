@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
+import { selectOfficialAttempt } from '@/lib/scoring'
 import { AnalyticsClient } from './_components/analytics-client'
 
 export const metadata = { title: 'วิเคราะห์และประเมินผล — KorKru' }
@@ -46,7 +47,7 @@ export default async function AnalyticsPage({
       .in('id', a.question_ids),
     supabase
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, users(full_name, avatar_url)')
+      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users(full_name, avatar_url)')
       .eq('assignment_id', id)
       .in('status', ['submitted', 'graded'])
       .order('total_score', { ascending: false }),
@@ -55,11 +56,27 @@ export default async function AnalyticsPage({
   const qMap = new Map((questions ?? []).map((q: any) => [q.id, q]))
   const orderedQuestions = a.question_ids.map(qid => qMap.get(qid)).filter(Boolean) as Question[]
 
+  // A student may have multiple attempts — reduce to the "official" score
+  // per the assignment's score_strategy, so retries don't skew the stats.
+  const attemptsByStudent = new Map<string, any[]>()
+  for (const s of (submissions ?? []) as any[]) {
+    const arr = attemptsByStudent.get(s.student_id) ?? []
+    arr.push(s)
+    attemptsByStudent.set(s.student_id, arr)
+  }
+  const dedupedSubmissions = Array.from(attemptsByStudent.values())
+    .map(attempts => {
+      const official = selectOfficialAttempt(attempts, a.score_strategy)
+      return official ? { ...official.representative, total_score: official.total_score, max_score: official.max_score } : null
+    })
+    .filter((s): s is NonNullable<typeof s> => s !== null)
+    .sort((x, y) => (y.total_score ?? 0) - (x.total_score ?? 0))
+
   return (
     <AnalyticsClient
       assignment={a}
       questions={orderedQuestions}
-      submissions={(submissions ?? []) as unknown as AnalyticsSubmissionRow[]}
+      submissions={dedupedSubmissions as unknown as AnalyticsSubmissionRow[]}
       teacherName={user.user_metadata?.full_name ?? 'ครูผู้สอน'}
     />
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
@@ -8,10 +8,13 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { VariableEditor } from '@/components/questions/variable-editor'
 import { FormulaEditor } from '@/components/questions/formula-editor'
+import { TeamShareChips } from '@/components/questions/general-info-section'
 import { evaluateMultiStep } from '@/lib/math/evaluator'
 import { saveQuestionGroup, deleteQuestionGroup } from '@/lib/actions/question-groups'
+import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import type { SubQuestionData, QuestionGroupPayload } from '@/lib/actions/question-groups'
 import type { Variable, Difficulty, Visibility, QuestionCategory, FormulaPreset } from '@/lib/types'
 
@@ -26,8 +29,12 @@ interface MultiStepEditorProps {
   initialContext?: string
   initialCategoryId?: string
   initialVisibility?: Visibility
+  initialOrgId?: string | null
+  initialSharedOrgIds?: string[]
+  initialTeamEditAllowed?: boolean
   initialDifficulty?: Difficulty
   initialSubQuestions?: SubQuestionData[]
+  isOwner?: boolean
 }
 
 const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
@@ -35,11 +42,6 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: 'medium', label: 'ปานกลาง' },
   { value: 'hard', label: 'ยาก' },
   { value: 'analytical', label: 'วิเคราะห์' },
-]
-
-const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
-  { value: 'private', label: 'ส่วนตัว' },
-  { value: 'school', label: 'โรงเรียน' },
 ]
 
 function emptySubQuestion(): SubQuestionData {
@@ -64,8 +66,12 @@ export function MultiStepEditor({
   initialContext = '',
   initialCategoryId = '',
   initialVisibility = 'private',
+  initialOrgId = null,
+  initialSharedOrgIds = [],
+  initialTeamEditAllowed = true,
   initialDifficulty = 'medium',
   initialSubQuestions,
+  isOwner = true,
 }: MultiStepEditorProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -73,7 +79,11 @@ export function MultiStepEditor({
   const [title, setTitle] = useState(initialTitle)
   const [context, setContext] = useState(initialContext)
   const [categoryId, setCategoryId] = useState(initialCategoryId)
-  const [visibility, setVisibility] = useState<Visibility>(initialVisibility)
+  const [visibility, setVisibility] = useState<Visibility>(initialVisibility === 'school' ? 'organization' : initialVisibility)
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(initialOrgId)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(initialSharedOrgIds)
+  const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(initialTeamEditAllowed)
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [difficulty, setDifficulty] = useState<Difficulty>(initialDifficulty)
   const [subQuestions, setSubQuestions] = useState<SubQuestionData[]>(
     initialSubQuestions && initialSubQuestions.length > 0
@@ -82,6 +92,47 @@ export function MultiStepEditor({
   )
   const [expandedIndex, setExpandedIndex] = useState(0)
   const [previewResults, setPreviewResults] = useState<Array<{ values: Record<string, number>; answer: number | string }> | null>(null)
+  const [teamChecked, setTeamChecked] = useState(false)
+
+  // teamOrgId can be left over from a *private* group — where it points at the
+  // creator's personal workspace, not a real team. Only count it once it's confirmed
+  // to be one of the user's actual teams, otherwise it silently inflates the count
+  // shown at "การมองเห็น" without ever appearing as a selected chip.
+  const isRealTeam = (id: string | null) => !!id && teams.some(t => t.id === id)
+  const effectiveTeamOrgId = isRealTeam(teamOrgId) ? teamOrgId : null
+
+  useEffect(() => {
+    getMyTeamOrgOptions()
+      .then((list) => {
+        setTeams(list)
+        if (list.length === 1 && !list.some(t => t.id === teamOrgId)) setTeamOrgId(list[0].id)
+      })
+      .finally(() => setTeamChecked(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // effectiveTeamOrgId + sharedOrgIds together form "every team this group is
+  // shared to" — effectiveTeamOrgId is just an implementation detail (the "home"
+  // row), invisible to the user.
+  const allSelectedTeamIds = effectiveTeamOrgId ? [effectiveTeamOrgId, ...sharedOrgIds] : sharedOrgIds
+
+  function toggleTeam(id: string) {
+    const isSelected = allSelectedTeamIds.includes(id)
+    if (isSelected) {
+      if (allSelectedTeamIds.length <= 1) return // must keep at least one team while sharing to a team
+      if (id === effectiveTeamOrgId) {
+        const [nextPrimary, ...rest] = sharedOrgIds
+        setTeamOrgId(nextPrimary ?? null)
+        setSharedOrgIds(rest)
+      } else {
+        setSharedOrgIds((prev) => prev.filter((x) => x !== id))
+      }
+    } else if (!effectiveTeamOrgId) {
+      setTeamOrgId(id) // replaces a stale (non-team) teamOrgId, if any
+    } else {
+      setSharedOrgIds((prev) => [...prev, id])
+    }
+  }
 
   function updateSubQuestion(index: number, patch: Partial<SubQuestionData>) {
     setSubQuestions((prev) => prev.map((sq, i) => i === index ? { ...sq, ...patch } : sq))
@@ -143,6 +194,9 @@ export function MultiStepEditor({
       context: context.trim(),
       category_id: categoryId,
       visibility,
+      org_id: teamOrgId,
+      shared_org_ids: sharedOrgIds,
+      team_edit_allowed: teamEditAllowed,
       difficulty,
       subQuestions,
     }
@@ -201,14 +255,49 @@ export function MultiStepEditor({
 
           <div className="space-y-1.5">
             <Label>การมองเห็น</Label>
-            <Select value={visibility} onValueChange={(v) => v !== null && setVisibility(v as Visibility)}>
+            <Select
+              value={visibility === 'school' ? 'organization' : visibility}
+              disabled={!isOwner}
+              onValueChange={(v) => {
+                if (v === null) return
+                setVisibility(v as Visibility)
+                if (v === 'private') {
+                  setTeamOrgId(null)
+                  setSharedOrgIds([])
+                } else if (teams.length === 1) {
+                  setTeamOrgId(teams[0].id)
+                }
+              }}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {VISIBILITY_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
+                <SelectItem value="private">ส่วนตัว</SelectItem>
+                <SelectItem value="organization" disabled={teamChecked && teams.length === 0}>
+                  ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
+                </SelectItem>
               </SelectContent>
             </Select>
+            {teamChecked && teams.length === 0 && (
+              <p className="text-xs text-gray-500">
+                สร้างทีมก่อนเพื่อใช้งาน —{' '}
+                <a href="/settings/team" className="text-blue-600 hover:underline">ไปที่หน้าทีมของฉัน</a>
+              </p>
+            )}
+            {visibility === 'organization' && teams.length > 1 && (
+              <TeamShareChips
+                label="แชร์ให้ทีมไหน (เลือกได้หลายทีม)"
+                teams={teams}
+                selectedIds={allSelectedTeamIds}
+                onToggle={toggleTeam}
+                disabled={!isOwner}
+              />
+            )}
+            {visibility === 'organization' && (
+              <div className="flex items-center gap-2 pt-2">
+                <ToggleSwitch checked={teamEditAllowed} onChange={setTeamEditAllowed} disabled={!isOwner} />
+                <span className="text-xs text-gray-600">อนุญาตให้เพื่อนในทีมแก้ไขชุดโจทย์นี้ได้</span>
+              </div>
+            )}
           </div>
 
           {parentCategories.length > 0 && (

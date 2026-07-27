@@ -10,6 +10,7 @@ function seedRand(seed: string, index: number): number {
 interface Props {
   mean: number
   assignmentId: string
+  passingPercent?: number | null
 }
 
 const PERCENTILE_LABELS = [
@@ -20,7 +21,7 @@ const PERCENTILE_LABELS = [
   { p: 99, label: 'เป็นเลิศ',      color: 'text-violet-600', bg: 'bg-violet-50', bar: 'bg-violet-500' },
 ]
 
-export function PercentileBenchmark({ mean, assignmentId }: Props) {
+export function PercentileBenchmark({ mean, assignmentId, passingPercent = null }: Props) {
   // Derive a mock percentile from the mean + a small seed-based adjustment
   const adjust = Math.round(seedRand(assignmentId + 'pct', 0) * 12) - 6
   const rawPercentile = Math.max(5, Math.min(99, mean + adjust))
@@ -33,7 +34,7 @@ export function PercentileBenchmark({ mean, assignmentId }: Props) {
   const benchmarks = [
     { label: 'ห้องเรียนนี้',      value: mean,        color: 'bg-blue-500' },
     { label: 'ค่าเฉลี่ยประเทศ',  value: nationMean,  color: 'bg-gray-300' },
-    { label: 'เกณฑ์ผ่าน',        value: 60,          color: 'bg-red-300' },
+    ...(passingPercent != null ? [{ label: 'เกณฑ์ผ่าน', value: Math.round(passingPercent), color: 'bg-red-300' }] : []),
   ]
 
   return (

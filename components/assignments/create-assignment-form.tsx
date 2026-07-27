@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
+import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,9 +13,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import {
   Check, ChevronRight, ChevronLeft, Eye, Timer,
-  BookOpen, Globe, Calendar, Shuffle, FileText, Layers,
+  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target,
 } from 'lucide-react'
-import type { Question, Classroom } from '@/lib/types'
+import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy } from '@/lib/types'
 
 const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'ตั้งค่า', 'กำหนดการสอบ']
 
@@ -28,14 +29,20 @@ interface PreselectedSet {
 interface Props {
   classrooms: Classroom[]
   questions: Question[]
+  questionSets?: QuestionSet[]
   preselectedClassroomId?: string
   preselectedSet?: PreselectedSet
 }
 
-export function CreateAssignmentForm({ classrooms, questions, preselectedClassroomId, preselectedSet }: Props) {
+export function CreateAssignmentForm({ classrooms, questions, questionSets = [], preselectedClassroomId, preselectedSet }: Props) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
+  const [showWorkImageConfirm, setShowWorkImageConfirm] = useState(false)
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
+  const [pendingRequireWorkImage, setPendingRequireWorkImage] = useState(true)
+  const [scheduleMode, setScheduleMode] = useState(false)
+  const [scheduleAt, setScheduleAt] = useState('')
 
   // Step 1
   const [title, setTitle] = useState(preselectedSet?.title ?? '')
@@ -44,10 +51,10 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
   const [mode, setMode] = useState<'online' | 'print'>('online')
-  const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exam')
+  const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exercise')
   // When not starting from an existing set, offer to save the picked
   // questions back into the library as a new reusable set.
-  const [saveAsSet, setSaveAsSet] = useState(true)
+  const [saveAsSet, setSaveAsSet] = useState(false)
 
   // Step 2
   const [selectedIds, setSelectedIds] = useState<string[]>(preselectedSet?.question_ids ?? [])
@@ -58,7 +65,14 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
-  const [showResults, setShowResults] = useState(true)
+  const [showResults, setShowResults] = useState<'immediate' | 'after_due'>('immediate')
+  const [maxAttempts, setMaxAttempts] = useState('')
+  const [attemptsAuto, setAttemptsAuto] = useState(true)
+  const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
+  const [accessCode, setAccessCode] = useState('')
+  const [passingEnabled, setPassingEnabled] = useState(false)
+  const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
+  const [passingValue, setPassingValue] = useState('')
 
   // Step 4
   const [startAt, setStartAt] = useState('')
@@ -66,6 +80,11 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
 
   function toggleQ(id: string) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  }
+
+  function importSet(set: QuestionSet) {
+    setSelectedIds(prev => Array.from(new Set([...prev, ...set.question_ids])))
+    toast.success(`เพิ่ม ${set.question_ids.length} ข้อจากชุด "${set.title}"`)
   }
 
   function toggleClassroom(id: string) {
@@ -78,7 +97,50 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
     return true
   }
 
-  function handleSubmit() {
+  // Selected questions where the teacher (in the question/set editor) has
+  // turned on "บังคับแนบรูปวิธีทำ" — only relevant for exams, so the
+  // teacher gets asked whether to keep that enforced for this assignment.
+  const hasWorkImageQuestions = selectedIds.some(
+    id => questions.find(q => q.id === id)?.requires_work_image
+  )
+
+  function handleConfirmClick() {
+    if (assignmentType === 'exam' && hasWorkImageQuestions) {
+      setShowWorkImageConfirm(true)
+      return
+    }
+    openPublishDialog(true)
+  }
+
+  function resolveWorkImageChoice(requireWorkImage: boolean) {
+    setShowWorkImageConfirm(false)
+    openPublishDialog(requireWorkImage)
+  }
+
+  function openPublishDialog(requireWorkImage: boolean) {
+    setPendingRequireWorkImage(requireWorkImage)
+    setScheduleMode(false)
+    setScheduleAt(startAt)
+    setShowPublishDialog(true)
+  }
+
+  function handlePublishNow() {
+    setShowPublishDialog(false)
+    finalizeSubmit(pendingRequireWorkImage, 'published', startAt)
+  }
+
+  function handleScheduleConfirm() {
+    if (!scheduleAt) { toast.error('กรุณาเลือกวันและเวลาที่จะเผยแพร่'); return }
+    setShowPublishDialog(false)
+    finalizeSubmit(pendingRequireWorkImage, 'published', scheduleAt)
+  }
+
+  function handleSaveDraft() {
+    setShowPublishDialog(false)
+    finalizeSubmit(pendingRequireWorkImage, 'draft', startAt)
+  }
+
+  function finalizeSubmit(requireWorkImage: boolean, status: AssignmentStatus, effectiveStartAt: string) {
     startTransition(async () => {
       let setId = preselectedSet?.id
 
@@ -103,11 +165,21 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
         description: description.trim(),
         question_ids: selectedIds,
         set_id: setId,
-        start_at: startAt || null,
+        start_at: effectiveStartAt || null,
         end_at: endAt || null,
         duration_minutes: duration ? Number(duration) : null,
         mode,
         type: assignmentType,
+        shuffle_questions: shuffleQ,
+        shuffle_options: shuffleA,
+        show_results: showResults,
+        max_attempts: maxAttempts ? Number(maxAttempts) : null,
+        score_strategy: scoreStrategy,
+        access_code: accessCode.trim() || null,
+        passing_type: passingEnabled && passingValue ? passingType : null,
+        passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
+        require_work_image: requireWorkImage,
+        status,
       })
       if (res?.error) toast.error(res.error)
     })
@@ -234,11 +306,14 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
           <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
             <h2 className="font-semibold text-gray-900">ประเภทงาน</h2>
             <div className="grid grid-cols-2 gap-3">
-              {(['exam', 'exercise'] as const).map(t => (
+              {(['exercise', 'exam'] as const).map(t => (
                 <button
                   key={t}
                   type="button"
-                  onClick={() => setAssignmentType(t)}
+                  onClick={() => {
+                    setAssignmentType(t)
+                    if (attemptsAuto) setMaxAttempts(t === 'exam' ? '1' : '')
+                  }}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
                     assignmentType === t ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                   }`}
@@ -279,15 +354,41 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
 
       {/* ── Step 2: เลือกโจทย์ ────────────────────────────────────────── */}
       {step === 1 && (
-        <QuestionPicker
-          questions={questions}
-          selectedIds={selectedIds}
-          onToggle={toggleQ}
-          search={search}
-          onSearchChange={setSearch}
-          diffFilter={diffFilter}
-          onDiffFilterChange={setDiffFilter}
-        />
+        <div className="space-y-4">
+          {questionSets.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-2.5">
+              <div className="flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-gray-400" />
+                <h3 className="text-sm font-semibold text-gray-900">เพิ่มจากชุดโจทย์ที่มีอยู่</h3>
+              </div>
+              <p className="text-xs text-gray-400">เลือกชุดเพื่อเพิ่มโจทย์ทั้งหมดเข้ามา — ปรับเพิ่ม/ลดทีละข้อได้ด้านล่าง</p>
+              <div className="flex flex-wrap gap-2">
+                {questionSets.map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => importSet(s)}
+                    className="flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    <Layers className="w-3 h-3 text-gray-400" />
+                    {s.title}
+                    <span className="text-gray-400">({s.question_ids.length})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <QuestionPicker
+            questions={questions}
+            selectedIds={selectedIds}
+            onToggle={toggleQ}
+            search={search}
+            onSearchChange={setSearch}
+            diffFilter={diffFilter}
+            onDiffFilterChange={setDiffFilter}
+          />
+        </div>
       )}
 
       {/* ── Step 3: ตั้งค่า ──────────────────────────────────────────── */}
@@ -326,13 +427,6 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
                 value: shuffleA,
                 set: setShuffleA,
               },
-              {
-                label: 'แสดงผลทันทีหลังส่ง',
-                desc: 'นักเรียนเห็นคะแนนและเฉลยหลังส่งงาน',
-                icon: Eye,
-                value: showResults,
-                set: setShowResults,
-              },
             ].map(opt => {
               const Icon = opt.icon
               return (
@@ -358,6 +452,138 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
                 </label>
               )
             })}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5">
+              <Eye className="w-4 h-4 text-gray-400" /> แสดงผลลัพธ์
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนน+เฉลยทันที' },
+                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนเฉลยจนกว่าจะหมดเขต' },
+              ] as const).map(o => (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() => setShowResults(o.key)}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    showResults === o.key ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="font-medium text-sm text-gray-900">{o.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{o.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                  <Target className="w-4 h-4 text-gray-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">ตั้งเกณฑ์คะแนนผ่าน</p>
+                  <p className="text-xs text-gray-400">
+                    {assignmentType === 'exercise'
+                      ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
+                      : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={passingEnabled}
+                onChange={e => setPassingEnabled(e.target.checked)}
+                className="accent-blue-600 w-4 h-4 shrink-0"
+              />
+            </label>
+
+            {passingEnabled && (
+              <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200">
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+                  {(['percent', 'score'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPassingType(t)}
+                      className={`px-3 py-2 text-xs font-medium transition-all ${
+                        passingType === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  type="number"
+                  min={0}
+                  max={passingType === 'percent' ? 100 : undefined}
+                  value={passingValue}
+                  onChange={e => setPassingValue(e.target.value)}
+                  placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
+                  className="max-w-[120px]"
+                />
+                <span className="text-sm text-gray-500 shrink-0">
+                  {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="attempts" className="flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-gray-400" /> จำกัดจำนวนครั้งที่ทำได้
+            </Label>
+            <Input
+              id="attempts"
+              type="number"
+              min={1}
+              value={maxAttempts}
+              onChange={e => {
+                setMaxAttempts(e.target.value)
+                setAttemptsAuto(false)
+              }}
+              placeholder="ไม่จำกัด (เว้นว่าง)"
+              className="max-w-[200px]"
+            />
+          </div>
+
+          {maxAttempts !== '1' && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-gray-400" /> เลือกคะแนนของนักเรียนจาก
+              </Label>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit">
+                {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setScoreStrategy(s)}
+                    className={`px-3 py-2 text-xs font-medium transition-all ${
+                      scoreStrategy === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    {SCORE_STRATEGY_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="code" className="flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-gray-400" /> รหัสผ่านเข้าทำ (ถ้ามี)
+            </Label>
+            <Input
+              id="code"
+              value={accessCode}
+              onChange={e => setAccessCode(e.target.value)}
+              placeholder="ไม่บังคับ — เว้นว่างถ้าไม่ต้องใช้รหัส"
+              className="max-w-[200px]"
+            />
           </div>
         </div>
       )}
@@ -397,6 +623,11 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
                 { label: 'โจทย์',     value: `${selectedIds.length} ข้อ` },
                 { label: 'โหมด',      value: mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
                 ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
+                ...(passingEnabled && passingValue ? [{ label: 'เกณฑ์ผ่าน', value: passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน` }] : []),
+                ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
+                ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
+                ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
+                { label: 'แสดงผล',    value: showResults === 'immediate' ? 'ทันทีหลังส่ง' : 'หลังพ้นกำหนดส่ง' },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">
                   <span className="text-gray-400">{row.label}</span>
@@ -435,15 +666,101 @@ export function CreateAssignmentForm({ classrooms, questions, preselectedClassro
         ) : (
           <Button
             type="button"
-            onClick={handleSubmit}
+            onClick={handleConfirmClick}
             disabled={isPending}
             className="gap-2"
           >
             <FileText className="w-4 h-4" />
-            {isPending ? 'กำลังสร้าง...' : 'สร้างชุดข้อสอบ'}
+            {isPending ? 'กำลังสร้าง...' : assignmentType === 'exam' ? 'สร้างชุดข้อสอบ' : 'สร้างแบบฝึกหัด'}
           </Button>
         )}
       </div>
+
+      {/* Work-image enforcement confirm dialog */}
+      {showWorkImageConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="font-bold text-lg text-gray-900">บังคับแนบรูปวิธีทำหรือไม่?</h3>
+            <p className="text-sm text-gray-500 mt-2">
+              ชุดข้อสอบนี้มีโจทย์ที่ตั้งค่าไว้ให้นักเรียนต้องแนบรูปวิธีทำ
+              ต้องการให้นักเรียนแนบรูปวิธีทำแบบบังคับก่อนส่งคำตอบสำหรับข้อสอบชุดนี้หรือไม่
+            </p>
+            <div className="flex flex-col gap-2 mt-5">
+              <Button type="button" onClick={() => resolveWorkImageChoice(true)} disabled={isPending} className="w-full">
+                ใช่ บังคับแนบรูป
+              </Button>
+              <Button type="button" variant="outline" onClick={() => resolveWorkImageChoice(false)} disabled={isPending} className="w-full">
+                ไม่ใช่ ไม่ต้องบังคับ
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowWorkImageConfirm(false)}
+                disabled={isPending}
+                className="w-full text-gray-500"
+              >
+                ยกเลิก
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish timing dialog */}
+      {showPublishDialog && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="font-bold text-lg text-gray-900">เผยแพร่{assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?</h3>
+            <p className="text-sm text-gray-500 mt-2">
+              เลือกได้ว่าจะให้นักเรียนเห็นและเริ่มทำได้ทันที ตั้งเวลาให้เปิดล่วงหน้า หรือเก็บไว้เป็นร่างก่อนแล้วค่อยเผยแพร่ทีหลัง
+            </p>
+
+            {!scheduleMode ? (
+              <div className="flex flex-col gap-2 mt-5">
+                <Button type="button" onClick={handlePublishNow} disabled={isPending} className="w-full">
+                  {isPending ? 'กำลังสร้าง...' : 'เผยแพร่ทันที'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setScheduleMode(true)} disabled={isPending} className="w-full">
+                  ตั้งเวลาเผยแพร่ล่วงหน้า
+                </Button>
+                <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={isPending} className="w-full">
+                  {isPending ? 'กำลังบันทึก...' : 'ยังไม่เผยแพร่ (เก็บไว้เป็นร่าง)'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowPublishDialog(false)}
+                  disabled={isPending}
+                  className="w-full text-gray-500"
+                >
+                  ยกเลิก
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="scheduleAt">เผยแพร่เมื่อ</Label>
+                  <Input
+                    id="scheduleAt"
+                    type="datetime-local"
+                    value={scheduleAt}
+                    onChange={e => setScheduleAt(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400">นักเรียนจะเริ่มเห็นและเข้าทำได้ตั้งแต่เวลานี้เป็นต้นไป</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button type="button" onClick={handleScheduleConfirm} disabled={isPending} className="w-full">
+                    {isPending ? 'กำลังสร้าง...' : 'ยืนยันตั้งเวลาเผยแพร่'}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setScheduleMode(false)} disabled={isPending} className="w-full text-gray-500">
+                    ย้อนกลับ
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

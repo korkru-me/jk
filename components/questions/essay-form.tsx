@@ -27,6 +27,7 @@ interface EssayFormProps {
   allTags: string[]
   mode?: 'create' | 'edit'
   question?: Question
+  isOwner?: boolean
 }
 
 function rubricFromQuestion(question?: Question): RubricItem[] | undefined {
@@ -35,7 +36,7 @@ function rubricFromQuestion(question?: Question): RubricItem[] | undefined {
   return raw.map(r => ({ id: Math.random().toString(36).slice(2), criterion: r.criterion, points: r.points }))
 }
 
-export function EssayForm({ allTags, mode = 'create', question }: EssayFormProps) {
+export function EssayForm({ allTags, mode = 'create', question, isOwner = true }: EssayFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
@@ -44,6 +45,9 @@ export function EssayForm({ allTags, mode = 'create', question }: EssayFormProps
   const [subject, setSubject] = useState(question?.subject ?? '')
   const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
   const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(question?.org_id ?? null)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
+  const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
@@ -98,7 +102,7 @@ export function EssayForm({ allTags, mode = 'create', question }: EssayFormProps
     setSaving(true)
     const payload = {
       title, subject, question_text: questionText, question_type: 'essay' as const,
-      difficulty, visibility, category_id: question?.category_id ?? '',
+      difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
       grade_level: question?.grade_level ?? '', is_random: false,
       variables: [], logic_rules: [],
       answer_parts: [],
@@ -127,6 +131,10 @@ export function EssayForm({ allTags, mode = 'create', question }: EssayFormProps
         subject={subject} onSubjectChange={setSubject}
         difficulty={difficulty} onDifficultyChange={setDifficulty}
         visibility={visibility} onVisibilityChange={setVisibility}
+        teamOrgId={teamOrgId} onTeamOrgIdChange={setTeamOrgId}
+        sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
+        teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
+        canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
       />
 

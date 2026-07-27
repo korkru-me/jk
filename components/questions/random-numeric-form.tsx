@@ -15,6 +15,7 @@ import { QuestionPreview } from './question-preview'
 import { QuestionImageUpload } from './question-image-upload'
 import { WhiteboardModal } from './whiteboard-modal'
 import { SpecialCharInput } from './special-char-input'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { createQuestion, updateQuestion, createFormulaPreset } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { runTrials, PYTHAGOREAN_FAMILIES } from '@/lib/math/evaluator'
@@ -1518,9 +1519,10 @@ interface RandomNumericFormProps {
   presets: PresetWithCat[]
   mode?: 'create' | 'edit'
   question?: Question
+  isOwner?: boolean
 }
 
-export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'create', question }: RandomNumericFormProps) {
+export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'create', question, isOwner = true }: RandomNumericFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
@@ -1540,6 +1542,9 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const [subject, setSubject] = useState(question?.subject ?? '')
   const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'medium')
   const [visibility, setVisibility] = useState<Visibility>(question?.visibility ?? 'private')
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(question?.org_id ?? null)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
+  const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
@@ -1558,6 +1563,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const [pythagoreanEnabled, setPythagoreanEnabled] = useState((existingConfig?.pythagorean_groups ?? []).length > 0)
   const [pythagoreanGroups, setPythagoreanGroups] = useState<PythagoreanGroup[]>(existingConfig?.pythagorean_groups ?? [])
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [requireWorkImage, setRequireWorkImage] = useState(question?.requires_work_image ?? false)
   const [initialEquationText, setInitialEquationText] = useState<string | undefined>(() => equationTextFromQuestion(question))
 
   useEffect(() => {
@@ -1572,6 +1578,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
     setQuestionText(seed.question_text)
     setImageUrls(seed.image_urls ?? [])
     setSolutionText(seed.solution_text ?? '')
+    setRequireWorkImage(seed.requires_work_image ?? false)
 
     setCreationMode(seed.is_random ? 'from-equation' : 'fixed')
     setVariables(seed.variables ?? [])
@@ -1642,7 +1649,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
 
     const payload = {
       title, subject, question_text: questionText, question_type: 'written' as const,
-      difficulty, visibility, category_id: question?.category_id ?? '',
+      difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
       grade_level: question?.grade_level ?? '', is_random: creationMode !== 'fixed',
       variables, logic_rules: logicRules,
       answer_parts: partsWithTolerance,
@@ -1656,6 +1663,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
       },
       solution_text: solutionText, tags, image_urls: imageUrls,
+      requires_work_image: requireWorkImage,
     }
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
@@ -1768,6 +1776,10 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         subject={subject} onSubjectChange={setSubject}
         difficulty={difficulty} onDifficultyChange={setDifficulty}
         visibility={visibility} onVisibilityChange={setVisibility}
+        teamOrgId={teamOrgId} onTeamOrgIdChange={setTeamOrgId}
+        sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
+        teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
+        canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
       />
 
@@ -1924,6 +1936,18 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ค่าคลาดเคลื่อนที่ยอมรับ</h2>
         <TolerancePicker value={globalTolerance} onChange={setGlobalTolerance} />
+      </section>
+
+      {/* บังคับแนบรูปวิธีทำ */}
+      <section className="space-y-2">
+        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">บังคับแนบรูปวิธีทำ</h2>
+        <div className="flex items-start gap-3">
+          <ToggleSwitch checked={requireWorkImage} onChange={setRequireWorkImage} />
+          <div className="text-sm text-gray-600">
+            <p>เปิดเพื่อให้นักเรียนต้องถ่ายรูป/แนบรูปวิธีทำก่อนส่งคำตอบข้อนี้</p>
+            <p className="text-xs text-gray-400">ถ้ามีข้อย่อยหลายข้อ นักเรียนต้องแนบรูปทีละข้อย่อย (1 รูปต่อคำตอบ)</p>
+          </div>
+        </div>
       </section>
 
       {/* เฉลยวิธีทำ */}

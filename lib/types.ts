@@ -20,6 +20,7 @@ export interface User {
 }
 
 export type ClassroomStatus = 'active' | 'archived' | 'deleted'
+export type ClassroomType = 'subject' | 'homeroom'
 
 export interface Classroom {
   id: string
@@ -29,6 +30,8 @@ export interface Classroom {
   description: string | null
   class_code: string
   status: ClassroomStatus
+  classroom_type: ClassroomType
+  pinned_at: string | null
   deleted_at: string | null
   created_at: string
   updated_at: string
@@ -49,7 +52,7 @@ export interface QuestionCategory {
   created_at: string
 }
 
-export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering'
+export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering' | 'file_upload'
 
 export type TrueFalseExplanationMode = 'none' | 'wrong_only' | 'always'
 
@@ -68,15 +71,23 @@ export interface TrueFalseConfig {
   part_label_style?: PartLabelStyle
 }
 
+// 'text': student may answer anything, teacher grades manually
+// 'fixed': student types freely, system auto-grades against `answer`
+// 'dropdown': student picks from `options`, system auto-grades against `answer`
+export type FillBlankType = 'text' | 'fixed' | 'dropdown'
+
 export interface FillBlankItem {
   id: number
+  type: FillBlankType
   answer: string
   case_sensitive: boolean
+  options?: string[]   // only used when type === 'dropdown'
 }
 
 export interface FillBlankConfig {
   blanks: FillBlankItem[]
-  grading_mode: 'auto' | 'manual'
+  /** @deprecated legacy whole-question grading mode, superseded by per-blank FillBlankItem.type */
+  grading_mode?: 'auto' | 'manual'
 }
 
 export interface OrderingItem {
@@ -88,8 +99,43 @@ export interface OrderingItem {
 export interface OrderingConfig {
   items: OrderingItem[]
 }
+
+// "ส่งไฟล์งาน" (Google-Classroom-style file submission). The teacher's
+// instructions live in the shared `question_text` field; `attachment_urls`
+// holds optional teacher-provided reference material (images/PDF), stored
+// in the same `question-images` bucket as other teacher-side uploads.
+export interface FileUploadConfig {
+  attachment_urls?: string[]
+}
+
+// A student's submitted answer for a `file_upload` question — encoded as a
+// JSON array in `submission_answers.student_answer` (see SubmittedFile[]).
+export interface SubmittedFile {
+  url: string
+  name: string
+  type: string
+}
+
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'analytical'
-export type Visibility = 'private' | 'school' | 'public' | 'pending'
+export type Visibility = 'private' | 'school' | 'organization' | 'public' | 'pending'
+
+export type OrgType = 'school' | 'team'
+export type TeamOrgRole = 'owner' | 'teacher'
+
+export interface TeamOrg {
+  id: string
+  name: string
+  type: OrgType
+  invite_code: string
+}
+
+export interface TeamOrgMember {
+  userId: string
+  role: TeamOrgRole
+  joinedAt: string
+  fullName: string
+  email: string
+}
 
 export interface Variable {
   name: string
@@ -154,6 +200,12 @@ export interface RandomQuestionConfig {
 export interface Question {
   id: string
   created_by: string
+  org_id: string | null
+  /** org_ids of teams this question was *additionally* shared to, beyond org_id.
+   *  Only populated where explicitly fetched (e.g. the edit page) — absent otherwise. */
+  shared_org_ids?: string[]
+  /** Whether teammates with access to this question (via org_id/question_shares) may edit it. Default true. */
+  team_edit_allowed: boolean
   category_id: string
   grade_level: string | null
   subject: string | null
@@ -174,7 +226,8 @@ export interface Question {
   tags: string[] | null
   rejected_reason: string | null
   image_urls: string[]
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | Record<string, never>
+  requires_work_image: boolean
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | Record<string, never>
   parent_question_id: string | null
   group_id: string | null
   order_in_group: number | null
@@ -186,8 +239,12 @@ export type AssignmentStatus = 'draft' | 'published' | 'closed'
 export type AssignmentMode = 'online' | 'print'
 export type AssignmentType = 'exercise' | 'exam'
 
+export type ShowResultsMode = 'immediate' | 'after_due'
+export type ScoreStrategy = 'best' | 'average' | 'latest'
+
 export interface Assignment {
   id: string
+  org_id: string
   classroom_id: string
   created_by: string
   title: string
@@ -200,6 +257,15 @@ export interface Assignment {
   status: AssignmentStatus
   mode: AssignmentMode
   type: AssignmentType
+  shuffle_questions: boolean
+  shuffle_options: boolean
+  show_results: ShowResultsMode
+  max_attempts: number | null
+  score_strategy: ScoreStrategy
+  access_code: string | null
+  passing_type: 'score' | 'percent' | null
+  passing_value: number | null
+  require_work_image: boolean
   created_at: string
   updated_at: string
 }
@@ -273,7 +339,7 @@ export interface AssignmentExtension {
   created_at: string
 }
 
-export type NotificationType = 'assignment_reminder' | 'co_teacher_invite' | 'extension_granted' | 'classroom_post'
+export type NotificationType = 'assignment_reminder' | 'co_teacher_invite' | 'extension_granted' | 'classroom_post' | 'homeroom_weekly_digest'
 
 export interface Notification {
   id: string
@@ -322,6 +388,9 @@ export interface SubmissionAnswer {
   score: number
   max_score: number
   teacher_feedback: string | null
+  order_index: number
+  option_order: number[] | null
+  work_images: (string | null)[] | null
   created_at: string
 }
 

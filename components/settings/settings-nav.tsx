@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { User, Users, Palette, BookOpen, Bell, CreditCard } from 'lucide-react'
+import { User, Users, School, Palette, BookOpen, Bell, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -17,6 +17,12 @@ const NAV_ITEMS = [
     label: 'พื้นที่ทำงานและทีม',
     icon: Users,
     description: 'สมาชิก, สิทธิ์การใช้งาน',
+  },
+  {
+    href: '/settings/team',
+    label: 'ทีมของฉัน',
+    icon: School,
+    description: 'สร้าง/เข้าร่วมทีม, แชร์โจทย์',
   },
   {
     href: '/settings/branding',

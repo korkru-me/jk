@@ -8,8 +8,12 @@ import {
 import { DIFF_META, mockStats } from './question-card'
 import { RichText } from '@/components/ui/rich-text'
 import { partLabels } from '@/lib/part-labels'
-import type { TrueFalseConfig } from '@/lib/types'
+import type { TrueFalseConfig, FileUploadConfig } from '@/lib/types'
 import type { QuestionWithCategory } from '../page'
+
+function isPdfUrl(url: string) {
+  return /\.pdf(\?|$)/i.test(url)
+}
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
 
@@ -202,6 +206,40 @@ function ContentTab({ q }: { q: QuestionWithCategory }) {
           <p className="text-sm text-blue-400 italic">ตรวจโดยครู (อัตนัย)</p>
         </div>
       )}
+
+      {/* File upload */}
+      {q.question_type === 'file_upload' && (() => {
+        const attachmentUrls = (q.extra_data as FileUploadConfig)?.attachment_urls ?? []
+        return (
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-2">
+            <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
+            <p className="text-sm text-blue-400 italic">
+              นักเรียนแนบไฟล์คำตอบ — ให้คะแนนเต็มอัตโนมัติเมื่อมีการแนบไฟล์อย่างน้อย 1 ไฟล์
+            </p>
+            {attachmentUrls.length > 0 && (
+              <div className="flex flex-wrap gap-3 pt-1">
+                {attachmentUrls.map((url) => (
+                  isPdfUrl(url) ? (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 transition-colors px-1.5"
+                    >
+                      <span className="text-lg">📄</span>
+                      <span className="text-[9px] text-blue-500 text-center truncate w-full">PDF</span>
+                    </a>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="w-20 h-20 rounded-lg object-cover border border-blue-200" />
+                  )
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* True/False */}
       {q.question_type === 'true_false' && q.extra_data && 'correct_answer' in q.extra_data && (() => {

@@ -7,6 +7,7 @@ import type { Question } from '@/lib/types'
 import type { AnalyticsSubmissionRow } from '../page'
 import type { ScoreOverride } from './analytics-client'
 import { ScoreOverrideModal } from './score-override-modal'
+import { computePassed } from '@/lib/grading'
 
 function getInitials(name: string): string {
   return name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
@@ -33,6 +34,8 @@ interface Props {
   teacherName: string
   questions: Question[]
   assignmentId: string
+  passingType: 'score' | 'percent' | null
+  passingValue: number | null
 }
 
 type SortKey = 'name' | 'score' | 'time'
@@ -46,6 +49,8 @@ export function StudentScoreTable({
   teacherName,
   questions,
   assignmentId,
+  passingType,
+  passingValue,
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('score')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -69,10 +74,10 @@ export function StudentScoreTable({
     return sortDir === 'asc' ? cmp : -cmp
   })
 
-  const passCount = sorted.filter(s => {
-    const pct = maxScore > 0 ? getEffectiveScore(s) / maxScore * 100 : 0
-    return pct >= 60
-  }).length
+  const hasThreshold = passingType != null && passingValue != null
+  const passCount = hasThreshold
+    ? sorted.filter(s => computePassed(getEffectiveScore(s), maxScore, passingType, passingValue) === true).length
+    : 0
 
   function handleRemediation(sub: AnalyticsSubmissionRow) {
     // Mock: pick 3 easy questions from the bank as remediation set
@@ -111,16 +116,22 @@ export function StudentScoreTable({
     <>
       {/* Summary row */}
       <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm font-medium">
-          <CheckCircle2 className="w-4 h-4" />
-          ผ่าน {passCount} คน
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-full text-sm font-medium">
-          <XCircle className="w-4 h-4" />
-          ไม่ผ่าน {submissions.length - passCount} คน
-        </div>
+        {hasThreshold && (
+          <>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm font-medium">
+              <CheckCircle2 className="w-4 h-4" />
+              ผ่าน {passCount} คน
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-full text-sm font-medium">
+              <XCircle className="w-4 h-4" />
+              ไม่ผ่าน {submissions.length - passCount} คน
+            </div>
+          </>
+        )}
         <p className="text-xs text-gray-400 ml-auto">
-          เกณฑ์ผ่าน 60% · คะแนนเต็ม {maxScore}
+          {hasThreshold
+            ? `เกณฑ์ผ่าน ${passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน`} · คะแนนเต็ม ${maxScore}`
+            : `คะแนนเต็ม ${maxScore}`}
         </p>
       </div>
 
@@ -148,7 +159,10 @@ export function StudentScoreTable({
         {sorted.map((sub) => {
           const effectiveScore = getEffectiveScore(sub)
           const pct = maxScore > 0 ? Math.round(effectiveScore / maxScore * 100) : 0
-          const pass = pct >= 60
+          const realPass = hasThreshold ? computePassed(effectiveScore, maxScore, passingType, passingValue) : null
+          // No threshold configured: fall back to the pct>=60 heuristic just
+          // for row tint / remediation grouping — never shown as a verdict.
+          const pass = realPass ?? pct >= 60
           const name = sub.users?.full_name ?? '—'
           const isOverridden = overrides.some(o => o.submissionId === sub.id)
           const initials = getInitials(name)
@@ -199,11 +213,15 @@ export function StudentScoreTable({
 
               {/* Status */}
               <div className="flex justify-center">
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                  pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                }`}>
-                  {pass ? 'ผ่าน' : 'ไม่ผ่าน'}
-                </span>
+                {realPass !== null ? (
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                    realPass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                  }`}>
+                    {realPass ? 'ผ่าน' : 'ไม่ผ่าน'}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-300">—</span>
+                )}
               </div>
 
               {/* Actions */}

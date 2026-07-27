@@ -89,7 +89,7 @@ const SYMBOL_GROUPS = [
 
 // ─── SymbolPicker (identical UX to RichTextEditor) ────────────────────────────
 
-function SymbolPicker({ onInsert }: { onInsert: (char: string) => void }) {
+export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 

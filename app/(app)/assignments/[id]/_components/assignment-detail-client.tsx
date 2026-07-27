@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
-  AlertCircle, Activity, Copy,
+  AlertCircle, Activity, Copy, Pencil,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
@@ -24,6 +24,7 @@ const DIFF_META: Record<string, { label: string; color: string; bar: string }> =
 const TYPE_SHORT: Record<string, string> = {
   mcq: 'MCQ', written: 'เขียน', matching: 'จับคู่', essay: 'บรรยาย',
   true_false: 'ถ/ผ', fill_blank: 'เติมคำ', ordering: 'เรียง',
+  file_upload: 'ไฟล์งาน',
 }
 
 const STATUS_META = {
@@ -94,9 +95,12 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
 
   return (
     <div className="space-y-6 max-w-[1100px]">
-      {/* Back */}
-      <Link href="/assignments" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
-        <ChevronLeft className="w-4 h-4" /> ชุดข้อสอบทั้งหมด
+      {/* Back — returns to the classroom this was assigned from */}
+      <Link
+        href={`/classrooms/${a.classroom_id}`}
+        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+      >
+        <ChevronLeft className="w-4 h-4" /> {a.classrooms?.name ?? 'กลับไปห้องเรียน'}
       </Link>
 
       {/* Header card */}
@@ -183,6 +187,11 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
               </Button>
             </Link>
           )}
+          <Link href={`/assignments/${a.id}/edit`}>
+            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-white/10 hover:text-white bg-transparent">
+              <Pencil className="w-3.5 h-3.5" /> แก้ไขรายละเอียด
+            </Button>
+          </Link>
           <Link href={`/assignments/${a.id}/results`}>
             <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-white/10 hover:text-white bg-transparent">
               <BarChart2 className="w-3.5 h-3.5" /> ดูคะแนนเต็ม
@@ -324,6 +333,9 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
             { label: 'เวลาทำ', value: a.duration_minutes ? `${a.duration_minutes} นาที` : 'ไม่จำกัด' },
             { label: 'เปิดรับ', value: a.start_at ? new Date(a.start_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ทันที' },
             { label: 'ปิดรับ', value: a.end_at ? new Date(a.end_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่กำหนด' },
+            ...(a.passing_type != null && a.passing_value != null
+              ? [{ label: 'เกณฑ์ผ่าน', value: a.passing_type === 'percent' ? `${a.passing_value}%` : `${a.passing_value} คะแนน` }]
+              : []),
           ].map(row => (
             <div key={row.label} className="flex justify-between py-2.5 text-sm">
               <span className="text-gray-500">{row.label}</span>

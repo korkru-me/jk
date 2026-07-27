@@ -21,7 +21,7 @@ async function getAuthUser() {
 
 // ── Create ─────────────────────────────────────────────────────────────────
 
-export async function createClassroom(data: { name: string; description: string }) {
+export async function createClassroom(data: { name: string; description: string; classroomType?: 'subject' | 'homeroom' }) {
   const user = await getAuthUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
@@ -45,6 +45,7 @@ export async function createClassroom(data: { name: string; description: string 
     description: data.description || null,
     class_code: classCode,
     status: 'active',
+    classroom_type: data.classroomType ?? 'subject',
   })
 
   if (error) return { error: error.message }
@@ -146,6 +147,22 @@ export async function permanentDeleteClassroom(id: string) {
   const { error } = await admin.from('classrooms').delete().eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/classrooms/trash')
+  return { success: true }
+}
+
+// ── Pinning (sort a classroom first on the teacher's list) ─────────────────
+
+export async function togglePinClassroom(id: string, pinned: boolean) {
+  const user = await getAuthUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('classrooms')
+    .update({ pinned_at: pinned ? new Date().toISOString() : null })
+    .eq('id', id)
+    .eq('teacher_id', user.id)
+  if (error) return { error: error.message }
+  revalidatePath('/classrooms')
   return { success: true }
 }
 

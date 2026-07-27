@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Search, BookOpen, Users, Zap, ArrowRight,
-  FileText, Plus, BarChart2, Settings, X
+  FileText, Plus, Settings, X
 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -34,7 +34,6 @@ const CATEGORIES = [
     items: [
       { name: 'สร้างโจทย์ข้อใหม่', sub: 'เปิด Question Editor', href: '/questions/new', icon: Plus },
       { name: 'จัดชุดข้อสอบ', sub: 'ดึงจากคลัง', href: '/assignments/new', icon: FileText },
-      { name: 'ดูรายงานผล', sub: 'วิเคราะห์สถิติห้องเรียน', href: '/assignments', icon: BarChart2 },
       { name: 'ตั้งค่าบัญชี', sub: 'โปรไฟล์และองค์กร', href: '/settings/organization', icon: Settings },
     ],
   },

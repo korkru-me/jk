@@ -1,10 +1,16 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Classroom, User } from '@/lib/types'
 import { ClassroomDetailClient } from './_components/classroom-detail-client'
 import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
+import { HomeroomStudentView } from './_components/homeroom-student-view'
 import { getClassroomPosts } from '@/lib/actions/classroom-posts'
+import { getHomeroomAggregate } from '@/lib/homeroom-data'
+import { selectOfficialAttempt } from '@/lib/scoring'
+import { isAttemptExpired } from '@/lib/grading'
+import type { StudentNoteRow } from './_components/homeroom-overview'
+import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 
 export default async function ClassroomDetailPage({
   params,
@@ -14,6 +20,7 @@ export default async function ClassroomDetailPage({
   const { id } = await params
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
+  if (!authUser) redirect('/login')
 
   const { data: profile } = await supabase
     .from('users').select('role, full_name').eq('id', authUser!.id).single()
@@ -38,6 +45,61 @@ export default async function ClassroomDetailPage({
       .maybeSingle()
     if (!membership) notFound()
 
+    // Homeroom rooms have no assignments of their own — a student sees a
+    // personal calendar/compliance view aggregated from their other
+    // (subject) classrooms instead of an assignment list.
+    if (c.classroom_type === 'homeroom') {
+      const [{ data: teacherProfile }, { count: studentCount }, { data: classmateRows }, posts] = await Promise.all([
+        admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
+        admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
+        admin
+          .from('classroom_students')
+          .select('student_id, users!inner(id, full_name)')
+          .eq('classroom_id', id)
+          .neq('student_id', authUser!.id),
+        getClassroomPosts(id),
+      ])
+      const classmates = (classmateRows ?? []).map((m: any) => ({ id: m.users.id as string, full_name: m.users.full_name as string }))
+
+      const { assignments, submissions } = await getHomeroomAggregate(admin, id, [authUser!.id])
+
+      const now = Date.now()
+      const isDone = (status?: string) => status === 'submitted' || status === 'graded'
+      const bestByAssignment = new Map<string, typeof submissions[number]>()
+      for (const s of submissions) {
+        const prev = bestByAssignment.get(s.assignment_id)
+        if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1)) bestByAssignment.set(s.assignment_id, s)
+      }
+      const dueAssignments = assignments.filter(a => !a.end_at || new Date(a.end_at).getTime() <= now)
+      const complianceSubmitted = dueAssignments.filter(a => isDone(bestByAssignment.get(a.id)?.status)).length
+      const complianceRate = dueAssignments.length > 0 ? Math.round((complianceSubmitted / dueAssignments.length) * 100) : null
+
+      const calendarEvents: CalendarEvent[] = assignments
+        .filter((a): a is typeof a & { end_at: string } => !!a.end_at)
+        .map(a => ({
+          id: a.id,
+          title: a.title,
+          classroomName: a.classroomName,
+          endAt: a.end_at,
+          done: isDone(bestByAssignment.get(a.id)?.status),
+          submissionId: bestByAssignment.get(a.id)?.id ?? null,
+        }))
+
+      return (
+        <HomeroomStudentView
+          classroom={c}
+          teacherName={teacherProfile?.full_name ?? 'ครูที่ปรึกษา'}
+          studentCount={studentCount ?? 0}
+          classmates={classmates}
+          calendarEvents={calendarEvents}
+          complianceRate={complianceRate}
+          complianceSubmitted={complianceSubmitted}
+          complianceTotal={dueAssignments.length}
+          posts={posts}
+        />
+      )
+    }
+
     const [{ data: teacherProfile }, { count: studentCount }, { data: links }, posts] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
@@ -49,7 +111,7 @@ export default async function ClassroomDetailPage({
     const { data: assignmentRows } = assignmentIds.length > 0
       ? await admin
           .from('assignments')
-          .select('id, title, question_ids, end_at, duration_minutes')
+          .select('id, title, question_ids, end_at, duration_minutes, type, max_attempts, score_strategy, passing_type, passing_value')
           .in('id', assignmentIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false })
@@ -59,18 +121,35 @@ export default async function ClassroomDetailPage({
     const { data: subRows } = publishedIds.length > 0
       ? await admin
           .from('submissions')
-          .select('id, assignment_id, status, total_score, max_score, attempt_number')
+          .select('id, assignment_id, status, total_score, max_score, attempt_number, started_at')
           .in('assignment_id', publishedIds)
           .eq('student_id', authUser!.id)
       : { data: [] }
 
-    // Multiple attempts possible (exercise type) — keep the best-scoring one
-    const subMap: Record<string, any> = {}
+    // Multiple attempts are possible — reduce to the "official" score per
+    // the assignment's own score_strategy, but also track the highest
+    // attempt_number seen so the UI can tell whether retries remain against
+    // max_attempts.
+    const strategyByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id, a.score_strategy]))
+    const durationByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id, a.duration_minutes]))
+    const attemptsByAssignment: Record<string, any[]> = {}
+    const attemptsUsed: Record<string, number> = {}
+    const hasInProgress: Record<string, boolean> = {}
     for (const s of (subRows ?? []) as any[]) {
-      const prev = subMap[s.assignment_id]
-      if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1) ||
-          ((s.total_score ?? -1) === (prev.total_score ?? -1) && s.attempt_number > prev.attempt_number)) {
-        subMap[s.assignment_id] = s
+      attemptsUsed[s.assignment_id] = Math.max(attemptsUsed[s.assignment_id] ?? 0, s.attempt_number)
+      // An abandoned in-progress attempt whose timer already ran out gets
+      // force-finalized by startSubmission() on the next visit rather than
+      // resumed — don't offer "ทำต่อ" for it here either.
+      if (s.status === 'in_progress' && !isAttemptExpired(s.started_at, durationByAssignment.get(s.assignment_id) ?? null)) {
+        hasInProgress[s.assignment_id] = true
+      }
+      ;(attemptsByAssignment[s.assignment_id] ??= []).push(s)
+    }
+    const subMap: Record<string, any> = {}
+    for (const [assignmentId, attempts] of Object.entries(attemptsByAssignment)) {
+      const official = selectOfficialAttempt(attempts, strategyByAssignment.get(assignmentId) ?? 'best')
+      if (official) {
+        subMap[assignmentId] = { ...official.representative, total_score: official.total_score, max_score: official.max_score }
       }
     }
 
@@ -80,6 +159,12 @@ export default async function ClassroomDetailPage({
       question_ids: a.question_ids ?? [],
       end_at: a.end_at,
       duration_minutes: a.duration_minutes,
+      type: a.type,
+      max_attempts: a.max_attempts,
+      passing_type: a.passing_type,
+      passing_value: a.passing_value,
+      attempts_used: attemptsUsed[a.id] ?? 0,
+      has_in_progress: hasInProgress[a.id] ?? false,
       submission: subMap[a.id]
         ? { id: subMap[a.id].id, status: subMap[a.id].status, total_score: subMap[a.id].total_score, max_score: subMap[a.id].max_score }
         : null,
@@ -161,6 +246,8 @@ export default async function ClassroomDetailPage({
   let classroomAssignments: {
     id: string; title: string; type: string; mode: string; status: string
     start_at: string | null; end_at: string | null; question_ids: string[]; created_at: string
+    passing_type: 'score' | 'percent' | null; passing_value: number | null
+    max_attempts: number | null; score_strategy: 'best' | 'average' | 'latest'
   }[] = []
   let classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
@@ -173,7 +260,7 @@ export default async function ClassroomDetailPage({
     const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }] = await Promise.all([
       admin
         .from('assignments')
-        .select('id, title, type, mode, status, start_at, end_at, question_ids, created_at')
+        .select('id, title, type, mode, status, start_at, end_at, question_ids, created_at, passing_type, passing_value, max_attempts, score_strategy')
         .in('id', linkedAssignmentIds)
         .order('created_at', { ascending: false }),
       admin
@@ -188,6 +275,37 @@ export default async function ClassroomDetailPage({
     classroomAssignments = assignmentRows ?? []
     classroomSubmissions = submissionRows ?? []
     classroomExtensions = extensionRows ?? []
+  }
+
+  // Homeroom aggregate: pull assignments/submissions from the *other*
+  // (subject) classrooms this roster's students belong to, since a homeroom
+  // classroom has no assignments of its own — it only monitors them.
+  const { assignments: homeroomAssignments, submissions: homeroomSubmissions } =
+    c.classroom_type === 'homeroom' && canManage
+      ? await getHomeroomAggregate(admin, id, students.map(s => s.id))
+      : { assignments: [], submissions: [] }
+
+  // Homeroom advisor's private per-student notes (health/family/behavior),
+  // kept separate from grades.
+  let studentNotes: StudentNoteRow[] = []
+  if (c.classroom_type === 'homeroom' && canManage) {
+    const { data: noteRows } = await admin
+      .from('student_notes')
+      .select('id, student_id, author_id, body, created_at')
+      .eq('classroom_id', id)
+      .order('created_at', { ascending: false })
+    const authorIds = Array.from(new Set((noteRows ?? []).map((n: any) => n.author_id)))
+    const { data: authorRows } = authorIds.length > 0
+      ? await admin.from('users').select('id, full_name').in('id', authorIds)
+      : { data: [] }
+    const authorNameMap = new Map((authorRows ?? []).map((u: any) => [u.id as string, u.full_name as string]))
+    studentNotes = (noteRows ?? []).map((n: any) => ({
+      id: n.id as string,
+      student_id: n.student_id as string,
+      author_name: authorNameMap.get(n.author_id) ?? 'ครู',
+      body: n.body as string,
+      created_at: n.created_at as string,
+    }))
   }
 
   // Other classrooms for "move student" feature
@@ -220,6 +338,9 @@ export default async function ClassroomDetailPage({
       classroomAssignments={classroomAssignments}
       classroomSubmissions={classroomSubmissions}
       classroomExtensions={classroomExtensions}
+      homeroomAssignments={homeroomAssignments}
+      homeroomSubmissions={homeroomSubmissions}
+      studentNotes={studentNotes}
       ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
       posts={posts}
     />

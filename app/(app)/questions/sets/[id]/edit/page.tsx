@@ -22,7 +22,7 @@ export default async function EditQuestionSetPage({ params }: Props) {
   const [{ data: questions }, existingSets] = await Promise.all([
     supabase
       .from('questions')
-      .select('id, title, question_text, difficulty, question_type, visibility')
+      .select('id, title, question_text, difficulty, question_type, visibility, requires_work_image')
       .eq('created_by', user.id)
       .neq('visibility', 'pending')
       .order('created_at', { ascending: false }),

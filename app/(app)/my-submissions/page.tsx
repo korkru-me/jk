@@ -3,10 +3,11 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { PisaRadar } from '@/components/student/pisa-radar'
-import { TrendingUp, CheckCircle2, XCircle, Clock, ChevronRight } from 'lucide-react'
+import { TrendingUp, CheckCircle2, XCircle, Clock, ChevronRight, ListTodo } from 'lucide-react'
+import { computePassed } from '@/lib/grading'
+import { selectOfficialAttempt } from '@/lib/scoring'
 
-export const metadata = { title: 'ผลงานและสมรรถนะ — KorKru' }
+export const metadata = { title: 'ผลงานของฉัน — KorKru' }
 
 export default async function MySubmissionsPage() {
   const supabase = await createClient()
@@ -15,7 +16,7 @@ export default async function MySubmissionsPage() {
 
   const { data: submissions } = await supabase
     .from('submissions')
-    .select('*, assignments(title, classrooms(name), duration_minutes)')
+    .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy)')
     .eq('student_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -23,28 +24,79 @@ export default async function MySubmissionsPage() {
   const completed = all.filter((s: any) => s.status === 'submitted' || s.status === 'graded')
   const inProgress = all.filter((s: any) => s.status === 'in_progress')
 
-  const avgPct = completed.length > 0
-    ? Math.round(
-        completed.reduce((sum: number, s: any) =>
-          sum + (s.max_score > 0 ? (s.total_score ?? 0) / s.max_score : 0), 0
-        ) / completed.length * 100
-      )
-    : null
+  // Official (per the assignment's score_strategy) submitted/graded attempt
+  // per assignment — used to decide per-assignment completion/pass state
+  // instead of counting raw submission rows, so multiple retries count as
+  // one assignment.
+  const attemptsByAssignment = new Map<string, any[]>()
+  for (const s of completed) {
+    const arr = attemptsByAssignment.get(s.assignment_id) ?? []
+    arr.push(s)
+    attemptsByAssignment.set(s.assignment_id, arr)
+  }
+  const bestByAssignment = new Map<string, any>()
+  for (const [assignmentId, attempts] of attemptsByAssignment) {
+    const official = selectOfficialAttempt(attempts, attempts[0].assignments?.score_strategy ?? 'best')
+    if (official) {
+      bestByAssignment.set(assignmentId, {
+        ...official.representative,
+        total_score: official.total_score,
+        max_score: official.max_score,
+      })
+    }
+  }
 
-  const highestPct = completed.length > 0
-    ? Math.max(...completed.map((s: any) =>
-        s.max_score > 0 ? Math.round((s.total_score / s.max_score) * 100) : 0
-      ))
-    : null
+  // An exercise with a passing threshold isn't "done" until the best attempt
+  // clears it — the student is expected to retry. Exams always count once
+  // submitted, since they're single-attempt.
+  function isAssignmentDone(s: any): boolean {
+    const a = s.assignments
+    if (a?.type === 'exercise') {
+      const passed = computePassed(s.total_score, s.max_score, a.passing_type, a.passing_value)
+      if (passed === false) return false
+    }
+    return true
+  }
+
+  const doneAssignments = Array.from(bestByAssignment.values()).filter(isAssignmentDone)
+  const doneCount = doneAssignments.length
+
+  // "ต้องทำส่ง" = every published assignment across the student's classrooms
+  // that isn't done yet — including ones never even started (no row in
+  // `submissions` at all), not just the ones currently in_progress.
+  const { data: memberships } = await supabase
+    .from('classroom_students')
+    .select('classroom_id')
+    .eq('student_id', user.id)
+  const classroomIds = (memberships ?? []).map((m: any) => m.classroom_id)
+
+  const { data: links } = classroomIds.length > 0
+    ? await supabase
+        .from('assignment_classrooms')
+        .select('assignment_id')
+        .in('classroom_id', classroomIds)
+    : { data: [] }
+  const assignedIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+
+  const { data: publishedAssignments } = assignedIds.length > 0
+    ? await supabase
+        .from('assignments')
+        .select('id')
+        .in('id', assignedIds)
+        .eq('status', 'published')
+    : { data: [] }
+
+  const doneAssignmentIds = new Set(doneAssignments.map((s: any) => s.assignment_id))
+  const pendingCount = (publishedAssignments ?? []).filter((a: any) => !doneAssignmentIds.has(a.id)).length
 
   return (
     <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <TrendingUp size={22} className="text-blue-600 dark:text-blue-400" />
-          ผลงานและสมรรถนะ
+          ผลงานของฉัน
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">ภาพรวมผลการเรียนและทักษะตามกรอบ PISA</p>
+        <p className="text-muted-foreground text-sm mt-1">งานที่ต้องทำ งานที่ส่งแล้ว และคะแนนที่ได้</p>
       </div>
 
       {all.length === 0 ? (
@@ -58,12 +110,10 @@ export default async function MySubmissionsPage() {
       ) : (
         <>
           {/* Summary stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'ทำสำเร็จแล้ว', value: String(completed.length), icon: <CheckCircle2 size={18} className="text-green-500" />, sub: 'ชุด' },
-              { label: 'กำลังทำอยู่', value: String(inProgress.length), icon: <Clock size={18} className="text-amber-500" />, sub: 'ชุด' },
-              { label: 'คะแนนเฉลี่ย', value: avgPct !== null ? `${avgPct}%` : '—', icon: <TrendingUp size={18} className="text-blue-500" />, sub: '' },
-              { label: 'สูงสุด', value: highestPct !== null ? `${highestPct}%` : '—', icon: <span className="text-lg">🏆</span>, sub: '' },
+              { label: 'ส่งงานแล้ว', value: String(doneCount), icon: <CheckCircle2 size={18} className="text-green-500" />, sub: 'ชุด' },
+              { label: 'ต้องทำส่ง', value: String(pendingCount), icon: <ListTodo size={18} className="text-amber-500" />, sub: 'ชุด' },
             ].map(s => (
               <div key={s.label} className="bg-card border rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-1">
@@ -74,21 +124,6 @@ export default async function MySubmissionsPage() {
               </div>
             ))}
           </div>
-
-          {/* PISA Competency Radar */}
-          {completed.length >= 2 && (
-            <div className="bg-card border rounded-2xl p-5">
-              <div className="mb-4">
-                <h2 className="font-semibold flex items-center gap-2">
-                  <span>🧠</span> โปรไฟล์สมรรถนะ (กรอบ PISA)
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  คำนวณจากผลการทำแบบทดสอบ {completed.length} ชุด — ทักษะวิทยาศาสตร์ตามกรอบประเมิน PISA
-                </p>
-              </div>
-              <PisaRadar avgPct={avgPct} completedCount={completed.length} />
-            </div>
-          )}
 
           {/* History table */}
           <div className="bg-card border rounded-2xl overflow-hidden">
