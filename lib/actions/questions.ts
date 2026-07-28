@@ -38,6 +38,8 @@ export interface QuestionFormData {
   shared_org_ids?: string[]
   /** Whether teammates with access to this question may also edit it (creator can always edit). Default true. */
   team_edit_allowed?: boolean
+  /** Where to redirect after a successful save. Defaults to '/questions'. */
+  redirect_to?: string
 }
 
 /** Replaces every question_shares row for a question with exactly `orgIds`. */
@@ -201,7 +203,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   revalidatePath('/questions')
   revalidatePath(`/questions/${id}/edit`)
-  redirect('/questions')
+  redirect(data.redirect_to || '/questions')
 }
 
 export async function setRequiresWorkImage(id: string, value: boolean) {

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
-import { getQuestionSet, getMyQuestionSets } from '@/lib/actions/question-sets'
+import { getQuestionSet, getMyQuestionSets, getQuestionSetShareOrgIds } from '@/lib/actions/question-sets'
 import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
 import type { Question } from '@/lib/types'
 
@@ -18,8 +18,10 @@ export default async function EditQuestionSetPage({ params }: Props) {
 
   const set = await getQuestionSet(id)
   if (!set) notFound()
+  // Editing a set stays creator-only — teammates can view/use a shared set, not edit its question list.
+  if (set.created_by !== user.id) notFound()
 
-  const [{ data: questions }, existingSets] = await Promise.all([
+  const [{ data: questions }, existingSets, sharedOrgIds] = await Promise.all([
     supabase
       .from('questions')
       .select('id, title, question_text, difficulty, question_type, visibility, requires_work_image')
@@ -27,6 +29,7 @@ export default async function EditQuestionSetPage({ params }: Props) {
       .neq('visibility', 'pending')
       .order('created_at', { ascending: false }),
     getMyQuestionSets(),
+    getQuestionSetShareOrgIds(id),
   ])
 
   const allTags = Array.from(new Set(existingSets.flatMap(s => s.tags)))
@@ -41,7 +44,7 @@ export default async function EditQuestionSetPage({ params }: Props) {
       <CreateQuestionSetForm
         questions={(questions ?? []) as Question[]}
         allTags={allTags}
-        initialSet={set}
+        initialSet={{ ...set, shared_org_ids: sharedOrgIds }}
       />
     </div>
   )

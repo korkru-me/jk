@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getMyQuestionSets } from '@/lib/actions/question-sets'
+import { getMyQuestionSets, getTeamQuestionSets } from '@/lib/actions/question-sets'
 import { QuestionSetsClient } from './_components/question-sets-client'
 
 export const metadata = { title: 'คลังชุดโจทย์ — KorKru' }
@@ -14,7 +14,7 @@ export default async function QuestionSetsPage() {
     .from('users').select('role').eq('id', user.id).single()
   if (profile?.role !== 'teacher' && profile?.role !== 'admin') redirect('/dashboard')
 
-  const sets = await getMyQuestionSets()
+  const [mySets, teamSets] = await Promise.all([getMyQuestionSets(), getTeamQuestionSets()])
 
-  return <QuestionSetsClient sets={sets} />
+  return <QuestionSetsClient mySets={mySets} teamSets={teamSets} currentUserId={user.id} />
 }

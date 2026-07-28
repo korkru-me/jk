@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +40,7 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
 
 export function OrderingForm({ allTags, mode = 'create', question, isOwner = true }: OrderingFormProps) {
   const router = useRouter()
+  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 
@@ -127,6 +128,7 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
       mcq_options: [],
       extra_data: orderingConfig,
       solution_text: solutionText, tags, image_urls: imageUrls,
+      redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
@@ -262,7 +264,7 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
         <Button type="submit" disabled={saving}>
           {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

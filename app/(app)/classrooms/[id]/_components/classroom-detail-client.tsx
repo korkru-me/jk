@@ -18,7 +18,7 @@ import { InvitePanel } from './invite-panel'
 import { CoTeachers, type CoTeacherRow, type InviteRow } from './co-teachers'
 import { ClassroomAssignmentsTab, type ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { ClassroomScoresMatrix } from './classroom-scores-matrix'
-import { HomeroomOverview, type StudentNoteRow } from './homeroom-overview'
+import { HomeroomOverview, type StudentNoteRow, type StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { ParentPortal } from './parent-portal'
 import { LearningPaths } from './learning-paths'
@@ -50,7 +50,7 @@ const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?
   { key: 'log',         label: 'ประวัติ',          icon: Activity },
 ]
 
-interface RealStudent { id: string; full_name: string; email: string }
+interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
 
 interface Props {
   classroom: Classroom
@@ -75,6 +75,7 @@ interface Props {
     total_score: number | null; max_score: number; submitted_at: string | null; attempt_number: number
   }[]
   studentNotes: StudentNoteRow[]
+  studentProfiles: Record<string, StudentProfileRow>
   ownerName: string
   posts: ClassroomPost[]
 }
@@ -82,7 +83,7 @@ interface Props {
 export function ClassroomDetailClient({
   classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
   classroomAssignments, classroomSubmissions, classroomExtensions,
-  homeroomAssignments, homeroomSubmissions, studentNotes, ownerName, posts,
+  homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
 }: Props) {
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
@@ -206,6 +207,9 @@ export function ClassroomDetailClient({
             classroomId={classroom.id}
             students={students}
             otherClassrooms={otherClassrooms}
+            profiles={studentProfiles}
+            showRoster={canManage}
+            showProfiles={isHomeroom && canManage}
           />
         )}
         {activeTab === 'assignments' && canManage && (
@@ -233,6 +237,7 @@ export function ClassroomDetailClient({
             assignments={homeroomAssignments}
             submissions={homeroomSubmissions}
             notes={studentNotes}
+            profiles={studentProfiles}
           />
         )}
         {activeTab === 'groups' && (

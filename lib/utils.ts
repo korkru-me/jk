@@ -9,6 +9,10 @@ export function escapeLike(s: string) {
   return s.replace(/[%_\\]/g, m => `\\${m}`)
 }
 
+export function buildFullName(prefix: string | null | undefined, firstName: string | null | undefined, lastName: string | null | undefined) {
+  return `${prefix ?? ''}${firstName ?? ''}${lastName ? ` ${lastName}` : ''}`.trim()
+}
+
 export function downloadTextFile(filename: string, content: string, mimeType = 'application/json') {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)

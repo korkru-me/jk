@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -116,6 +116,7 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
 
 function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: { allTags: string[]; mode?: 'create' | 'edit'; question?: Question; isOwner?: boolean }) {
   const router = useRouter()
+  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 
@@ -209,6 +210,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: options,
       solution_text: solutionText, tags, image_urls: imageUrls,
+      redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
@@ -341,7 +343,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
         <Button type="submit" disabled={saving}>
           {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

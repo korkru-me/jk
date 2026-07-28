@@ -4,11 +4,15 @@ export type UserRole = 'teacher' | 'student' | 'admin'
 export type UserStatus = 'active' | 'suspended'
 export type InstructorType = 'teacher' | 'tutor'
 export type SurveyRole = 'teacher' | 'tutor' | 'student' | 'parent' | 'other'
+export type NamePrefix = 'เด็กชาย' | 'เด็กหญิง' | 'นาย' | 'นางสาว'
 
 export interface User {
   id: string
   email: string
   full_name: string
+  prefix: NamePrefix | null
+  first_name: string | null
+  last_name: string | null
   avatar_url: string | null
   role: UserRole
   instructor_type: InstructorType | null
@@ -16,6 +20,31 @@ export interface User {
   role_custom: string | null
   status: UserStatus
   created_at: string
+  updated_at: string
+}
+
+export type StudentGender = 'male' | 'female'
+
+export interface StudentGuardian {
+  name: string
+  phone: string
+}
+
+export interface StudentProfile {
+  student_id: string
+  nickname: string | null
+  date_of_birth: string | null
+  gender: StudentGender | null
+  food_allergy: string | null
+  chronic_disease: string | null
+  grade_level: string | null
+  section_number: number | null
+  school_name: string | null
+  student_code: string | null
+  class_number: number | null
+  address: string | null
+  phone: string | null
+  guardians: StudentGuardian[]
   updated_at: string
 }
 
@@ -274,6 +303,10 @@ export interface QuestionSet {
   id: string
   org_id: string
   created_by: string
+  visibility: Visibility
+  /** org_ids of teams this set was *additionally* shared to, beyond org_id.
+   *  Only populated where explicitly fetched — absent otherwise. */
+  shared_org_ids?: string[]
   title: string
   description: string | null
   question_ids: string[]

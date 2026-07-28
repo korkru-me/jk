@@ -151,6 +151,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           description: description.trim(),
           question_ids: selectedIds,
           tags: classroomName ? [classroomName] : [],
+          visibility: 'private',
         })
         if (setRes?.error) {
           toast.error(`บันทึกชุดโจทย์ลงคลังไม่สำเร็จ: ${setRes.error} (จะมอบหมายต่อโดยไม่บันทึกลงคลัง)`)

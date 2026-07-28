@@ -6,14 +6,12 @@ import {
   CheckCircle2, TrendingUp, Activity,
 } from 'lucide-react'
 import { DIFF_META, mockStats } from './question-card'
-import { RichText } from '@/components/ui/rich-text'
-import { partLabels } from '@/lib/part-labels'
-import type { TrueFalseConfig, FileUploadConfig } from '@/lib/types'
+import { QuestionPreviewContent } from '@/components/questions/question-preview'
+import type {
+  Variable, MCQOption, MatchingPair, TrueFalseConfig, FillBlankConfig,
+  OrderingConfig, FileUploadConfig, RandomQuestionConfig,
+} from '@/lib/types'
 import type { QuestionWithCategory } from '../page'
-
-function isPdfUrl(url: string) {
-  return /\.pdf(\?|$)/i.test(url)
-}
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
 
@@ -96,7 +94,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
         {/* Tabs */}
         <div className="flex gap-0 px-6 border-b border-gray-100 shrink-0">
           {([
-            { key: 'content' as Tab, label: 'โจทย์และเฉลย',      icon: BookOpen },
+            { key: 'content' as Tab, label: 'ลองทำโจทย์',        icon: BookOpen },
             { key: 'history' as Tab, label: 'ประวัติการแก้ไข',   icon: GitBranch },
             { key: 'stats'   as Tab, label: 'สถิติ',              icon: BarChart2 },
           ]).map(t => {
@@ -119,7 +117,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {tab === 'content' && <ContentTab q={q} />}
+          {tab === 'content' && <InteractiveTab key={q.id} q={q} />}
           {tab === 'history' && <HistoryTab versions={versions} />}
           {tab === 'stats'   && <StatsTab stats={stats} />}
         </div>
@@ -128,147 +126,31 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
   )
 }
 
-// ── Content Tab ────────────────────────────────────────────────────────────────
+// ── Interactive Tab ────────────────────────────────────────────────────────────
+// Answerable "student view" — auto-graded types (mcq/matching/written/true_false/
+// fill_blank/ordering) reveal correct/incorrect plus the right answer on check;
+// essay/file_upload have no auto-grading, so it's just a free try with no verdict.
 
-function ContentTab({ q }: { q: QuestionWithCategory }) {
-  const isHtml = /<[a-z][\s\S]*>/i.test(q.question_text)
+function InteractiveTab({ q }: { q: QuestionWithCategory }) {
+  const extraData = q.extra_data as any
 
   return (
     <div className="space-y-5">
-      {/* Question body */}
-      <div className="bg-gray-50 rounded-xl p-4">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">โจทย์</p>
-        {isHtml ? (
-          <div className="text-gray-900 leading-relaxed rich-text-content" dangerouslySetInnerHTML={{ __html: q.question_text }} />
-        ) : (
-          <p className="text-gray-900 leading-relaxed whitespace-pre-line">{q.question_text}</p>
-        )}
-      </div>
-
-      {/* MCQ options */}
-      {q.question_type === 'mcq' && q.mcq_options && q.mcq_options.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">ตัวเลือก</p>
-          <div className="space-y-2">
-            {q.mcq_options.map((opt, i) => (
-              <div
-                key={i}
-                className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
-                  opt.is_correct ? 'border-green-300 bg-green-50' : 'border-gray-200'
-                }`}
-              >
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                  opt.is_correct ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ'][i]}
-                </span>
-                <span className={`text-sm leading-relaxed ${opt.is_correct ? 'text-green-800 font-medium' : 'text-gray-700'}`}>
-                  {opt.text}
-                  {opt.is_correct && (
-                    <span className="ml-2 inline-flex items-center gap-0.5 text-green-600 text-xs font-medium">
-                      <CheckCircle2 className="w-3 h-3" /> เฉลยที่ถูกต้อง
-                    </span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Written / random answer */}
-      {(q.question_type === 'written' || q.is_random) && (q.answer_formula || q.answer_parts?.length) && (
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-          <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1.5">เฉลย</p>
-          {q.answer_parts && q.answer_parts.length > 0 ? (
-            <div className="space-y-1">
-              {q.answer_parts.map((part, i) => (
-                <p key={i} className="text-sm text-blue-900 font-medium">
-                  {part.sub_text && (
-                    <span className="text-blue-500 mr-2">
-                      <RichText text={part.sub_text} />:
-                    </span>
-                  )}
-                  {part.formula} {part.unit}
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-blue-900 font-medium">{q.answer_formula} {q.answer_unit ?? ''}</p>
-          )}
-        </div>
-      )}
-
-      {/* Essay */}
-      {q.question_type === 'essay' && (
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-          <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
-          <p className="text-sm text-blue-400 italic">ตรวจโดยครู (อัตนัย)</p>
-        </div>
-      )}
-
-      {/* File upload */}
-      {q.question_type === 'file_upload' && (() => {
-        const attachmentUrls = (q.extra_data as FileUploadConfig)?.attachment_urls ?? []
-        return (
-          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-2">
-            <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
-            <p className="text-sm text-blue-400 italic">
-              นักเรียนแนบไฟล์คำตอบ — ให้คะแนนเต็มอัตโนมัติเมื่อมีการแนบไฟล์อย่างน้อย 1 ไฟล์
-            </p>
-            {attachmentUrls.length > 0 && (
-              <div className="flex flex-wrap gap-3 pt-1">
-                {attachmentUrls.map((url) => (
-                  isPdfUrl(url) ? (
-                    <a
-                      key={url}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 transition-colors px-1.5"
-                    >
-                      <span className="text-lg">📄</span>
-                      <span className="text-[9px] text-blue-500 text-center truncate w-full">PDF</span>
-                    </a>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="w-20 h-20 rounded-lg object-cover border border-blue-200" />
-                  )
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* True/False */}
-      {q.question_type === 'true_false' && q.extra_data && 'correct_answer' in q.extra_data && (() => {
-        const tf = q.extra_data as TrueFalseConfig
-        const statements = tf.statements ?? []
-        if (statements.length === 0) {
-          return (
-            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-              <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
-              <p className="text-sm font-bold text-blue-900">
-                {tf.correct_answer ? '✓ ถูก (True)' : '✗ ผิด (False)'}
-              </p>
-            </div>
-          )
-        }
-        const labels = partLabels(tf.part_label_style)
-        return (
-          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-1.5">
-            <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">เฉลย</p>
-            <p className="text-sm font-bold text-blue-900">{labels[0]}) {tf.correct_answer ? '✓ ถูก' : '✗ ผิด'}</p>
-            {statements.map((s, i) => (
-              <p key={s.id} className="text-sm font-bold text-blue-900">
-                {labels[i + 1] ?? i + 2}) {s.correct_answer ? '✓ ถูก' : '✗ ผิด'}
-                {s.text && <RichText text={s.text} className="ml-2 font-normal text-blue-700" />}
-              </p>
-            ))}
-          </div>
-        )
-      })()}
+      <QuestionPreviewContent
+        questionText={q.question_text}
+        variables={(q.variables ?? []) as Variable[]}
+        answerParts={q.question_type === 'written' ? (q.answer_parts ?? []) : []}
+        isRandom={q.is_random}
+        questionType={q.question_type}
+        mcqOptions={q.question_type === 'mcq' ? ((q.mcq_options ?? []) as MCQOption[]) : []}
+        matchingPairs={q.question_type === 'matching' ? ((q.mcq_options ?? []) as unknown as MatchingPair[]) : []}
+        imageUrls={q.image_urls ?? []}
+        trueFalseConfig={q.question_type === 'true_false' ? (extraData as TrueFalseConfig) : undefined}
+        fillBlankConfig={q.question_type === 'fill_blank' ? (extraData as FillBlankConfig) : undefined}
+        orderingConfig={q.question_type === 'ordering' ? (extraData as OrderingConfig) : undefined}
+        partLabelStyle={(extraData as RandomQuestionConfig)?.part_label_style}
+        attachmentUrls={q.question_type === 'file_upload' ? ((extraData as FileUploadConfig)?.attachment_urls ?? []) : []}
+      />
 
       {/* Solution text */}
       {q.solution_text && (

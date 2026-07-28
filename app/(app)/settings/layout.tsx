@@ -1,7 +1,14 @@
 import { SettingsNav } from '@/components/settings/settings-nav'
 import { Settings } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
 
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const { data: profile } = authUser
+    ? await supabase.from('users').select('role').eq('id', authUser.id).maybeSingle()
+    : { data: null }
+
   return (
     <div className="max-w-6xl mx-auto">
       {/* Page header */}
@@ -19,7 +26,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         {/* Left: Settings sidebar nav */}
         <aside className="w-60 shrink-0 sticky top-0">
           <div className="bg-card border rounded-2xl p-2">
-            <SettingsNav />
+            <SettingsNav role={profile?.role} />
           </div>
         </aside>
 

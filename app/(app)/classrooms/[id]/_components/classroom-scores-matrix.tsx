@@ -5,10 +5,13 @@ import Link from 'next/link'
 import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
+import { setAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
 import { ExtensionDialog } from './extension-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
+
+type TypeFilter = 'all' | 'exercise' | 'exam'
 
 interface RealStudent { id: string; full_name: string; email: string }
 
@@ -43,6 +46,37 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
   const [reminding, setReminding] = useState<string | null>(null)
   const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({})
+  const [isOrderPending, startOrderTransition] = useTransition()
+
+  function commitOrder(assignmentId: string, raw: string) {
+    const trimmed = raw.trim()
+    const parsed = trimmed === '' ? null : Number.parseInt(trimmed, 10)
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 1)) {
+      toast.error('ลำดับต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป')
+      setOrderDrafts(d => { const next = { ...d }; delete next[assignmentId]; return next })
+      return
+    }
+    startOrderTransition(async () => {
+      const res = await setAssignmentDisplayOrder(classroomId, assignmentId, parsed)
+      if (res?.error) toast.error(res.error)
+      setOrderDrafts(d => { const next = { ...d }; delete next[assignmentId]; return next })
+    })
+  }
+
+  // Default order (no manual display_order set) is oldest-assigned-first —
+  // whichever assignment the teacher gave to students first leads the table.
+  // A teacher-set display_order always wins over that default.
+  const visibleAssignments = assignments
+    .filter(a => typeFilter === 'all' ? true : a.type === typeFilter)
+    .slice()
+    .sort((x, y) => {
+      const ox = x.display_order ?? Infinity
+      const oy = y.display_order ?? Infinity
+      if (ox !== oy) return ox - oy
+      return new Date(x.created_at).getTime() - new Date(y.created_at).getTime()
+    })
 
   // (assignmentId, studentId) -> official submission per that assignment's score_strategy
   const subKey = (aId: string, sId: string) => `${aId}::${sId}`
@@ -87,6 +121,30 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
 
   return (
     <div className="space-y-3">
+      {/* Filter chips */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {([
+          { key: 'all', label: 'ทั้งหมด' },
+          { key: 'exercise', label: 'แบบฝึกหัด' },
+          { key: 'exam', label: 'ข้อสอบ' },
+        ] as { key: TypeFilter; label: string }[]).map(f => (
+          <button
+            key={f.key}
+            onClick={() => setTypeFilter(f.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {visibleAssignments.length === 0 ? (
+        <div className="bg-white rounded-2xl ring-1 ring-black/5 py-12 text-center text-sm text-gray-400">
+          ไม่พบงานที่ตรงกับตัวกรอง
+        </div>
+      ) : (
       <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
@@ -94,13 +152,25 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
               <th className="sticky left-0 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[180px]">
                 นักเรียน
               </th>
-              {assignments.map(a => {
+              {visibleAssignments.map(a => {
                 const hasNonSubmitter = students.some(s => {
                   const sub = bestSubmission.get(subKey(a.id, s.id))
                   return !sub || (sub.status !== 'submitted' && sub.status !== 'graded')
                 })
                 return (
                   <th key={a.id} className="px-3 py-3 text-center min-w-[140px]">
+                    <input
+                      type="number"
+                      min={1}
+                      value={orderDrafts[a.id] ?? a.display_order ?? ''}
+                      onChange={e => setOrderDrafts(d => ({ ...d, [a.id]: e.target.value }))}
+                      onBlur={e => commitOrder(a.id, e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                      disabled={isOrderPending}
+                      placeholder="-"
+                      title="ลำดับคอลัมน์ (ยิ่งน้อยยิ่งอยู่ซ้าย)"
+                      className="w-10 mx-auto mb-1 block text-xs text-center rounded-lg border border-gray-200 py-0.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                    />
                     <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-gray-700 hover:text-blue-600 line-clamp-2">
                       {a.title}
                     </Link>
@@ -128,7 +198,7 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
                   <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">{student.full_name}</p>
                   <p className="text-xs text-gray-400 truncate max-w-[160px]">{student.email}</p>
                 </td>
-                {assignments.map(a => {
+                {visibleAssignments.map(a => {
                   const sub = bestSubmission.get(subKey(a.id, student.id))
                   const extension = extensionMap.get(subKey(a.id, student.id))
                   const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
@@ -179,6 +249,7 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
           </tbody>
         </table>
       </div>
+      )}
 
       {dialogTarget && (() => {
         const assignment = assignments.find(a => a.id === dialogTarget.assignmentId)

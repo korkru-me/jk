@@ -3,12 +3,18 @@
 import { useState, useTransition } from 'react'
 import {
   Search, Filter, ChevronUp, ChevronDown, MoreVertical,
-  Mail, ArrowRightLeft, UserMinus, X, SlidersHorizontal,
+  Mail, ArrowRightLeft, UserMinus, X, SlidersHorizontal, IdCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { removeStudent } from '@/lib/actions/classrooms'
+import { removeStudent, setStudentRosterOrder } from '@/lib/actions/classrooms'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview'
 
-type SortKey = 'name' | 'score' | 'status' | 'joined'
+type SortKey = 'order' | 'name' | 'grade' | 'section' | 'number' | 'score' | 'status' | 'joined'
 type SortDir = 'asc' | 'desc'
 type StatusType = 'ปกติ' | 'ขาดส่งงาน' | 'ออฟไลน์นาน' | 'เสี่ยงสอบตก'
 
@@ -26,7 +32,7 @@ const MOCK_STATUSES: StatusType[] = [
   'เสี่ยงสอบตก', 'ปกติ', 'ขาดส่งงาน', 'ปกติ',
 ]
 
-interface RealStudent { id: string; full_name: string; email: string }
+interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
 interface Student extends RealStudent {
   score: number
   status: StatusType
@@ -37,9 +43,27 @@ interface Props {
   classroomId: string
   students: RealStudent[]
   otherClassrooms: { id: string; name: string }[]
+  profiles?: Record<string, StudentProfileRow>
+  /** Grade/room/number columns + teacher-set roster order — any teacher who
+   *  can manage this classroom (subject or homeroom), scoped per classroom. */
+  showRoster?: boolean
+  /** Full personal-info dialog (health/address/guardians) — homeroom
+   *  advisor only, a stricter gate than showRoster. */
+  showProfiles?: boolean
 }
 
-export function StudentTable({ classroomId, students, otherClassrooms }: Props) {
+const GRID_COLS_DEFAULT = 'grid-cols-[auto_1fr_100px_110px_40px]'
+const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_1fr_110px_80px_70px_100px_110px_40px]'
+
+function cmpNullsLast<T>(av: T | null | undefined, bv: T | null | undefined, cmp: (x: T, y: T) => number) {
+  if (av == null && bv == null) return 0
+  if (av == null) return 1
+  if (bv == null) return -1
+  return cmp(av, bv)
+}
+
+export function StudentTable({ classroomId, students, otherClassrooms, profiles = {}, showRoster = false, showProfiles = false }: Props) {
+  const GRID_COLS = showRoster ? GRID_COLS_WITH_ROSTER : GRID_COLS_DEFAULT
   const augmented: Student[] = students.map((s, i) => ({
     ...s,
     score: MOCK_SCORES[i % MOCK_SCORES.length],
@@ -50,10 +74,26 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
   const [query, setQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<StatusType | ''>('')
   const [showFilters, setShowFilters] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortKey, setSortKey] = useState<SortKey>(showRoster ? 'order' : 'name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [viewingProfile, setViewingProfile] = useState<Student | null>(null)
+  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({})
   const [isPending, startTransition] = useTransition()
+
+  function commitOrder(studentId: string, raw: string) {
+    const trimmed = raw.trim()
+    const parsed = trimmed === '' ? null : Number.parseInt(trimmed, 10)
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 1)) {
+      toast.error('ลำดับต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป')
+      setOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
+      return
+    }
+    startTransition(async () => {
+      const res = await setStudentRosterOrder(classroomId, studentId, parsed)
+      if (res?.error) toast.error(res.error)
+      setOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
+    })
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -68,7 +108,24 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
     .filter(s => activeFilter ? s.status === activeFilter : true)
     .sort((a, b) => {
       let cmp = 0
+      if (sortKey === 'order') {
+        const av = a.roster_order ?? Infinity
+        const bv = b.roster_order ?? Infinity
+        cmp = av === bv ? a.full_name.localeCompare(b.full_name, 'th') : av - bv
+      }
       if (sortKey === 'name') cmp = a.full_name.localeCompare(b.full_name, 'th')
+      if (sortKey === 'grade') {
+        cmp = cmpNullsLast(profiles[a.id]?.grade_level, profiles[b.id]?.grade_level, (x, y) => x.localeCompare(y, 'th'))
+        if (cmp === 0) cmp = a.full_name.localeCompare(b.full_name, 'th')
+      }
+      if (sortKey === 'section') {
+        cmp = cmpNullsLast(profiles[a.id]?.section_number, profiles[b.id]?.section_number, (x, y) => x - y)
+        if (cmp === 0) cmp = a.full_name.localeCompare(b.full_name, 'th')
+      }
+      if (sortKey === 'number') {
+        cmp = cmpNullsLast(profiles[a.id]?.class_number, profiles[b.id]?.class_number, (x, y) => x - y)
+        if (cmp === 0) cmp = a.full_name.localeCompare(b.full_name, 'th')
+      }
       if (sortKey === 'score') cmp = a.score - b.score
       if (sortKey === 'status') cmp = a.status.localeCompare(b.status)
       return sortDir === 'asc' ? cmp : -cmp
@@ -76,7 +133,6 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
 
   function handleRemove(studentId: string, name: string) {
     if (!confirm(`ลบ "${name}" ออกจากห้องเรียน?`)) return
-    setOpenMenu(null)
     startTransition(async () => {
       const res = await removeStudent(classroomId, studentId)
       if (res?.error) toast.error(res.error)
@@ -87,8 +143,14 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
   function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return <ChevronUp className="w-3 h-3 text-gray-300" />
     return sortDir === 'asc'
-      ? <ChevronUp className="w-3 h-3 text-blue-500" />
-      : <ChevronDown className="w-3 h-3 text-blue-500" />
+      ? <ChevronUp className="w-3 h-3 text-blue-600" />
+      : <ChevronDown className="w-3 h-3 text-blue-600" />
+  }
+
+  function headerBtnClass(col: SortKey) {
+    return `flex items-center gap-1 px-2 py-1 -my-1 rounded-lg transition-colors ${
+      sortKey === col ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:text-gray-700 hover:bg-gray-100'
+    }`
   }
 
   return (
@@ -158,17 +220,35 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-hidden">
+      <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-x-auto">
         {/* Header */}
-        <div className="grid grid-cols-[auto_1fr_100px_110px_40px] gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <div className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-max`}>
+          {showRoster && (
+            <button className={headerBtnClass('order')} onClick={() => toggleSort('order')}>
+              ลำดับ <SortIcon col="order" />
+            </button>
+          )}
           <div className="w-8" />
-          <button className="flex items-center gap-1 text-left hover:text-gray-700" onClick={() => toggleSort('name')}>
+          <button className={`text-left ${headerBtnClass('name')}`} onClick={() => toggleSort('name')}>
             ชื่อ <SortIcon col="name" />
           </button>
-          <button className="flex items-center gap-1 hover:text-gray-700" onClick={() => toggleSort('score')}>
+          {showRoster && (
+            <>
+              <button className={headerBtnClass('grade')} onClick={() => toggleSort('grade')}>
+                ระดับชั้น <SortIcon col="grade" />
+              </button>
+              <button className={headerBtnClass('section')} onClick={() => toggleSort('section')}>
+                ห้อง <SortIcon col="section" />
+              </button>
+              <button className={headerBtnClass('number')} onClick={() => toggleSort('number')}>
+                เลขที่ <SortIcon col="number" />
+              </button>
+            </>
+          )}
+          <button className={headerBtnClass('score')} onClick={() => toggleSort('score')}>
             คะแนน <SortIcon col="score" />
           </button>
-          <button className="flex items-center gap-1 hover:text-gray-700" onClick={() => toggleSort('status')}>
+          <button className={headerBtnClass('status')} onClick={() => toggleSort('status')}>
             สถานะ <SortIcon col="status" />
           </button>
           <div />
@@ -181,11 +261,25 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
           <div className="divide-y divide-gray-50">
             {filtered.map(student => {
               const cfg = STATUS_CFG[student.status]
+              const profile = profiles[student.id]
               return (
                 <div
                   key={student.id}
-                  className="grid grid-cols-[auto_1fr_100px_110px_40px] gap-3 items-center px-4 py-3 hover:bg-gray-50/50 transition-colors relative"
+                  className={`grid ${GRID_COLS} gap-3 items-center px-4 py-3 hover:bg-gray-50/50 transition-colors relative min-w-max`}
                 >
+                  {showRoster && (
+                    <input
+                      type="number"
+                      min={1}
+                      value={orderDrafts[student.id] ?? student.roster_order ?? ''}
+                      onChange={e => setOrderDrafts(d => ({ ...d, [student.id]: e.target.value }))}
+                      onBlur={e => commitOrder(student.id, e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                      disabled={isPending}
+                      placeholder="-"
+                      className="w-11 text-sm text-center rounded-lg border border-gray-200 py-1 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                    />
+                  )}
                   {/* Avatar */}
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-violet-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
                     {student.initials}
@@ -195,7 +289,23 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{student.full_name}</p>
                     <p className="text-xs text-gray-400 truncate">{student.email}</p>
+                    {showProfiles && (
+                      <button
+                        onClick={() => setViewingProfile(student)}
+                        className="flex items-center gap-1 text-[11px] text-blue-600 hover:underline font-medium mt-0.5"
+                      >
+                        <IdCard className="w-3 h-3" /> ดูข้อมูลนักเรียน
+                      </button>
+                    )}
                   </div>
+
+                  {showRoster && (
+                    <>
+                      <span className="text-sm text-gray-700 truncate">{profile?.grade_level || '—'}</span>
+                      <span className="text-sm text-gray-700">{profile?.section_number ? `ห้อง ${profile.section_number}` : '—'}</span>
+                      <span className="text-sm text-gray-700">{profile?.class_number ?? '—'}</span>
+                    </>
+                  )}
 
                   {/* Score */}
                   <div className="flex items-center gap-2">
@@ -214,60 +324,57 @@ export function StudentTable({ classroomId, students, otherClassrooms }: Props) 
                   </span>
 
                   {/* Actions */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setOpenMenu(openMenu === student.id ? null : student.id)}
-                      className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
-                    >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors outline-none">
                       <MoreVertical className="w-3.5 h-3.5" />
-                    </button>
-                    {openMenu === student.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(null)} />
-                        <div className="absolute right-0 top-8 z-20 bg-white rounded-xl shadow-lg ring-1 ring-black/10 py-1 min-w-[160px]">
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            onClick={() => { toast.success('ฟีเจอร์กำลังพัฒนา'); setOpenMenu(null) }}
-                          >
-                            <Mail className="w-3.5 h-3.5 text-gray-400" /> ส่งข้อความ
-                          </button>
-                          {otherClassrooms.length > 0 && (
-                            <div className="group relative">
-                              <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                                <ArrowRightLeft className="w-3.5 h-3.5 text-gray-400" /> ย้ายห้องเรียน
-                                <span className="ml-auto text-gray-300">›</span>
-                              </button>
-                              <div className="absolute right-full top-0 bg-white rounded-xl shadow-lg ring-1 ring-black/10 py-1 min-w-[160px] hidden group-hover:block">
-                                {otherClassrooms.map(c => (
-                                  <button
-                                    key={c.id}
-                                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    onClick={() => { toast.success(`ย้ายไป ${c.name} (ฟีเจอร์กำลังพัฒนา)`); setOpenMenu(null) }}
-                                  >
-                                    {c.name}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          <div className="border-t border-gray-100 my-1" />
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                            onClick={() => handleRemove(student.id, student.full_name)}
-                            disabled={isPending}
-                          >
-                            <UserMinus className="w-3.5 h-3.5" /> ลบออกจากห้อง
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => toast.success('ฟีเจอร์กำลังพัฒนา')}>
+                        <Mail className="w-3.5 h-3.5 text-gray-400" /> ส่งข้อความ
+                      </DropdownMenuItem>
+                      {otherClassrooms.length > 0 && (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <ArrowRightLeft className="w-3.5 h-3.5 text-gray-400" /> ย้ายห้องเรียน
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {otherClassrooms.map(c => (
+                              <DropdownMenuItem
+                                key={c.id}
+                                onClick={() => toast.success(`ย้ายไป ${c.name} (ฟีเจอร์กำลังพัฒนา)`)}
+                              >
+                                {c.name}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => handleRemove(student.id, student.full_name)}
+                        disabled={isPending}
+                      >
+                        <UserMinus className="w-3.5 h-3.5" /> ลบออกจากห้อง
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      {/* Student personal-info dialog (homeroom advisor only) */}
+      <Dialog open={!!viewingProfile} onOpenChange={open => !open && setViewingProfile(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>ข้อมูลนักเรียน: {viewingProfile?.full_name}</DialogTitle>
+          </DialogHeader>
+          {viewingProfile && <StudentProfilePanel profile={profiles[viewingProfile.id]} />}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

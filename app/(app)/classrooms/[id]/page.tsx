@@ -9,7 +9,7 @@ import { getClassroomPosts } from '@/lib/actions/classroom-posts'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { selectOfficialAttempt } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
-import type { StudentNoteRow } from './_components/homeroom-overview'
+import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 
 export default async function ClassroomDetailPage({
@@ -225,21 +225,32 @@ export default async function ClassroomDetailPage({
     createdAt: i.created_at as string,
   }))
 
-  // Students in this classroom
+  // Students in this classroom, in the advisor's custom roster order when
+  // set (nulls — i.e. not yet assigned an order — sort after, by name).
   const { data: memberships } = await admin
     .from('classroom_students')
-    .select('student_id, users!inner(id, full_name, email)')
+    .select('student_id, roster_order, users!inner(id, full_name, email)')
     .eq('classroom_id', id)
 
-  const students = (memberships ?? []).map((m: any) => m.users) as Pick<User, 'id' | 'full_name' | 'email'>[]
+  const students = (memberships ?? [])
+    .map((m: any) => ({ ...m.users, roster_order: m.roster_order }))
+    .sort((a: any, b: any) => {
+      if (a.roster_order != null && b.roster_order != null) return a.roster_order - b.roster_order
+      if (a.roster_order != null) return -1
+      if (b.roster_order != null) return 1
+      return a.full_name.localeCompare(b.full_name, 'th')
+    }) as (Pick<User, 'id' | 'full_name' | 'email'> & { roster_order: number | null })[]
 
   // Assignments linked to this classroom (via assignment_classrooms, not the
   // legacy single classroom_id column, so multi-classroom assignments count too)
   const { data: assignmentLinkRows } = await admin
     .from('assignment_classrooms')
-    .select('assignment_id')
+    .select('assignment_id, display_order')
     .eq('classroom_id', id)
   const linkedAssignmentIds = Array.from(new Set((assignmentLinkRows ?? []).map((l: any) => l.assignment_id)))
+  const displayOrderByAssignment = new Map(
+    (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, l.display_order as number | null])
+  )
 
   const assignmentCount = linkedAssignmentIds.length
 
@@ -248,6 +259,7 @@ export default async function ClassroomDetailPage({
     start_at: string | null; end_at: string | null; question_ids: string[]; created_at: string
     passing_type: 'score' | 'percent' | null; passing_value: number | null
     max_attempts: number | null; score_strategy: 'best' | 'average' | 'latest'
+    display_order: number | null
   }[] = []
   let classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
@@ -272,7 +284,10 @@ export default async function ClassroomDetailPage({
         .select('id, assignment_id, student_id, extended_end_at, note')
         .in('assignment_id', linkedAssignmentIds),
     ])
-    classroomAssignments = assignmentRows ?? []
+    classroomAssignments = (assignmentRows ?? []).map(a => ({
+      ...a,
+      display_order: displayOrderByAssignment.get(a.id) ?? null,
+    }))
     classroomSubmissions = submissionRows ?? []
     classroomExtensions = extensionRows ?? []
   }
@@ -308,6 +323,31 @@ export default async function ClassroomDetailPage({
     }))
   }
 
+  // Roster columns (grade/section/class number) go to any teacher who can
+  // manage this classroom, subject or homeroom, so they can see and sort by
+  // them. The rest of student_profiles (DOB, health, address, guardians) is
+  // sensitive and only ever leaves the server for the homeroom advisor —
+  // subject teachers get those fields nulled out before this ever reaches
+  // the client bundle, not just hidden in the UI.
+  let studentProfiles: Record<string, StudentProfileRow> = {}
+  if (canManage && students.length > 0) {
+    const isHomeroomAdvisor = c.classroom_type === 'homeroom'
+    const { data: profileRows } = await admin
+      .from('student_profiles')
+      .select(isHomeroomAdvisor
+        ? 'student_id, nickname, date_of_birth, gender, food_allergy, chronic_disease, grade_level, section_number, school_name, student_code, class_number, address, phone, guardians'
+        : 'student_id, grade_level, section_number, class_number')
+      .in('student_id', students.map(s => s.id))
+    studentProfiles = Object.fromEntries((profileRows ?? []).map((p: any) => [p.student_id, isHomeroomAdvisor ? p : {
+      student_id: p.student_id,
+      grade_level: p.grade_level,
+      section_number: p.section_number,
+      class_number: p.class_number,
+      nickname: null, date_of_birth: null, gender: null, food_allergy: null, chronic_disease: null,
+      school_name: null, student_code: null, address: null, phone: null, guardians: [],
+    }]))
+  }
+
   // Other classrooms for "move student" feature
   let otherClassrooms: { id: string; name: string }[] = []
   if (isOwner) {
@@ -341,6 +381,7 @@ export default async function ClassroomDetailPage({
       homeroomAssignments={homeroomAssignments}
       homeroomSubmissions={homeroomSubmissions}
       studentNotes={studentNotes}
+      studentProfiles={studentProfiles}
       ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
       posts={posts}
     />

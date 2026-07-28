@@ -4,6 +4,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { User, Users, School, Palette, BookOpen, Bell, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { UserRole } from '@/lib/types'
+
+const STUDENT_NAV_ITEMS = [
+  {
+    href: '/settings/profile',
+    label: 'ข้อมูลส่วนตัว',
+    icon: User,
+    description: 'โปรไฟล์, ข้อมูลนักเรียน, รหัสผ่าน',
+  },
+]
 
 const NAV_ITEMS = [
   {
@@ -50,12 +60,13 @@ const NAV_ITEMS = [
   },
 ]
 
-export function SettingsNav() {
+export function SettingsNav({ role }: { role?: UserRole }) {
   const pathname = usePathname()
+  const items = role === 'student' ? STUDENT_NAV_ITEMS : NAV_ITEMS
 
   return (
     <nav className="flex flex-col gap-1">
-      {NAV_ITEMS.map(item => {
+      {items.map(item => {
         const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
         const Icon = item.icon
         return (

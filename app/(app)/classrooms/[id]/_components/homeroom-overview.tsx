@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   CheckCircle2, CircleDashed, MinusCircle, XCircle, AlertTriangle,
-  MessageSquare, Trash2, ChevronDown, ChevronUp, Printer,
+  MessageSquare, Trash2, ChevronDown, ChevronUp, Printer, IdCard, Info,
 } from 'lucide-react'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
@@ -21,6 +21,23 @@ export interface StudentNoteRow {
   created_at: string
 }
 
+export interface StudentProfileRow {
+  student_id: string
+  nickname: string | null
+  date_of_birth: string | null
+  gender: 'male' | 'female' | null
+  food_allergy: string | null
+  chronic_disease: string | null
+  grade_level: string | null
+  section_number: number | null
+  school_name: string | null
+  student_code: string | null
+  class_number: number | null
+  address: string | null
+  phone: string | null
+  guardians: { name: string; phone: string }[]
+}
+
 interface RealStudent { id: string; full_name: string; email: string }
 
 interface Props {
@@ -29,6 +46,57 @@ interface Props {
   assignments: HomeroomAssignmentRow[]
   submissions: SubmissionRow[]
   notes: StudentNoteRow[]
+  profiles: Record<string, StudentProfileRow>
+}
+
+const GENDER_LABEL: Record<string, string> = { male: 'ชาย', female: 'หญิง' }
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+export function StudentProfilePanel({ profile }: { profile?: StudentProfileRow }) {
+  const rows: [string, string | null | undefined][] = [
+    ['ชื่อเล่น', profile?.nickname],
+    ['วันเกิด', profile?.date_of_birth ? formatDate(profile.date_of_birth) : null],
+    ['เพศสภาพ', profile?.gender ? GENDER_LABEL[profile.gender] : null],
+    ['แพ้อาหาร', profile?.food_allergy],
+    ['โรคประจำตัว', profile?.chronic_disease],
+    ['ระดับชั้น', profile?.grade_level],
+    ['ห้อง', profile?.section_number ? `ห้อง ${profile.section_number}` : null],
+    ['โรงเรียน', profile?.school_name],
+    ['รหัสนักเรียน', profile?.student_code],
+    ['เลขที่', profile?.class_number != null ? String(profile.class_number) : null],
+    ['ที่อยู่', profile?.address],
+    ['เบอร์โทรนักเรียน', profile?.phone],
+    ...(profile?.guardians ?? [])
+      .filter(g => g.name || g.phone)
+      .map((g, i): [string, string] => [
+        (profile?.guardians?.length ?? 0) > 1 ? `ผู้ปกครองคนที่ ${i + 1}` : 'ผู้ปกครอง',
+        [g.name, g.phone].filter(Boolean).join(' · '),
+      ]),
+  ]
+  const hasAny = rows.some(([, v]) => !!v)
+
+  return (
+    <div className="bg-blue-50/60 rounded-xl p-3">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-blue-700 uppercase tracking-wide mb-2">
+        <IdCard className="w-3 h-3" /> ข้อมูลส่วนตัว (จากหน้าตั้งค่าของนักเรียน)
+      </div>
+      {hasAny ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+          {rows.filter(([, v]) => !!v).map(([label, value]) => (
+            <div key={label}>
+              <p className="text-[10px] text-gray-400">{label}</p>
+              <p className="text-sm text-gray-800 truncate">{value}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400">นักเรียนยังไม่ได้กรอกข้อมูลส่วนตัว</p>
+      )}
+    </div>
+  )
 }
 
 function formatDateTime(iso: string) {
@@ -105,7 +173,7 @@ function StudentNotesPanel({
   )
 }
 
-export function HomeroomOverview({ classroomId, students, assignments, submissions, notes }: Props) {
+export function HomeroomOverview({ classroomId, students, assignments, submissions, notes, profiles }: Props) {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null)
 
   const subKey = (aId: string, sId: string) => `${aId}::${sId}`
@@ -248,8 +316,12 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
 
       {/* Compliance + private notes */}
       <div className="bg-white rounded-2xl ring-1 ring-black/5 p-4">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          <AlertTriangle className="w-3.5 h-3.5" /> ความรับผิดชอบในการส่งงาน และบันทึกครูที่ปรึกษา
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          <AlertTriangle className="w-3.5 h-3.5" /> ความรับผิดชอบในการส่งงาน, ข้อมูลส่วนตัว และบันทึกครูที่ปรึกษา
+        </div>
+        <div className="flex items-start gap-1.5 text-[11px] text-gray-400 mb-3">
+          <Info className="w-3 h-3 mt-0.5 shrink-0" />
+          <span>ข้อมูลส่วนตัวที่นักเรียนกรอกไว้ และบันทึกด้านล่าง เห็นเฉพาะครูที่ปรึกษาและผู้ช่วยสอนของห้องนี้เท่านั้น</span>
         </div>
         <div className="space-y-1.5">
           {compliance.map(({ student, submitted, total, rate }) => {
@@ -278,7 +350,8 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
                   </button>
                 </div>
                 {isExpanded && (
-                  <div className="pl-0 pb-2 pt-1">
+                  <div className="pl-0 pb-2 pt-1 space-y-2">
+                    <StudentProfilePanel profile={profiles[student.id]} />
                     <StudentNotesPanel
                       classroomId={classroomId}
                       studentId={student.id}

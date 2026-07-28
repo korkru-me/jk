@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ interface FileUploadFormProps {
 
 export function FileUploadForm({ allTags, mode = 'create', question, isOwner = true }: FileUploadFormProps) {
   const router = useRouter()
+  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 
@@ -76,6 +77,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
       mcq_options: [],
       extra_data: { attachment_urls: attachmentUrls } as FileUploadConfig,
       solution_text: solutionText, tags, image_urls: [],
+      redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
@@ -148,7 +150,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
         <Button type="submit" disabled={saving}>
           {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

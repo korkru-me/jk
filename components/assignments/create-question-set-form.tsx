@@ -1,17 +1,20 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Save, Trash2 } from 'lucide-react'
 import { createQuestionSet, updateQuestionSet, deleteQuestionSet } from '@/lib/actions/question-sets'
+import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { SmartTagInput } from '@/components/ui/smart-tag-input'
+import { TeamShareChips } from '@/components/questions/general-info-section'
 import { QuestionPicker } from '@/components/assignments/question-picker'
-import type { Question, QuestionSet } from '@/lib/types'
+import type { Question, QuestionSet, Visibility } from '@/lib/types'
 
 interface Props {
   questions: Question[]
@@ -30,6 +33,49 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
+  const [visibility, setVisibility] = useState<Visibility>(initialSet?.visibility ?? 'private')
+  const [teamOrgId, setTeamOrgId] = useState<string | null>(initialSet?.org_id ?? null)
+  const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(initialSet?.shared_org_ids ?? [])
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
+  const [teamChecked, setTeamChecked] = useState(false)
+
+  useEffect(() => {
+    getMyTeamOrgOptions()
+      .then((list) => {
+        setTeams(list)
+        if (list.length === 1 && !list.some(t => t.id === teamOrgId)) setTeamOrgId(list[0].id)
+      })
+      .finally(() => setTeamChecked(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // teamOrgId can be left over from a *private* set — where it points at the
+  // creator's personal workspace, not a real team. Only count it once it's
+  // confirmed to be one of the user's actual teams.
+  const isRealTeam = (id: string | null) => !!id && teams.some(t => t.id === id)
+  const effectiveTeamOrgId = isRealTeam(teamOrgId) ? teamOrgId : null
+  const hasTeams = teams.length > 0
+  const selectedTeamName = teams.find(t => t.id === effectiveTeamOrgId)?.name ?? null
+  const allSelectedTeamIds = effectiveTeamOrgId ? [effectiveTeamOrgId, ...sharedOrgIds] : sharedOrgIds
+
+  function toggleTeam(id: string) {
+    const isSelected = allSelectedTeamIds.includes(id)
+    if (isSelected) {
+      if (allSelectedTeamIds.length <= 1) return
+      if (id === effectiveTeamOrgId) {
+        const [nextPrimary, ...rest] = sharedOrgIds
+        setTeamOrgId(nextPrimary ?? null)
+        setSharedOrgIds(rest)
+      } else {
+        setSharedOrgIds(prev => prev.filter(x => x !== id))
+      }
+    } else if (!effectiveTeamOrgId) {
+      setTeamOrgId(id)
+    } else {
+      setSharedOrgIds(prev => [...prev, id])
+    }
+  }
+
   function toggleQ(id: string) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
@@ -38,7 +84,10 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
 
   function handleSubmit() {
     startTransition(async () => {
-      const payload = { title: title.trim(), description: description.trim(), question_ids: selectedIds, tags }
+      const payload = {
+        title: title.trim(), description: description.trim(), question_ids: selectedIds, tags,
+        visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds,
+      }
       const res = initialSet
         ? await updateQuestionSet(initialSet.id, payload)
         : await createQuestionSet(payload)
@@ -91,6 +140,55 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
           <Label>แท็ก</Label>
           <p className="text-xs text-gray-500">ใช้ค้นหา/กรองชุดโจทย์ในคลัง เช่น ฟิสิกส์ ม.4, กลศาสตร์</p>
           <SmartTagInput allTags={allTags} tags={tags} onTagsChange={setTags} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>การมองเห็น</Label>
+          <Select
+            value={visibility === 'school' ? 'organization' : visibility}
+            onValueChange={(v) => {
+              if (v === null) return
+              setVisibility(v as Visibility)
+              if (v === 'private') {
+                setTeamOrgId(null)
+                setSharedOrgIds([])
+              } else if (teams.length === 1) {
+                setTeamOrgId(teams[0].id)
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="เลือกการมองเห็น">
+                {visibility === 'organization' || visibility === 'school'
+                  ? (allSelectedTeamIds.length > 1
+                      ? `ทีมของฉัน (${allSelectedTeamIds.length} ทีม)`
+                      : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน')
+                  : 'ส่วนตัว'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นชุดโจทย์นี้</SelectItem>
+              <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
+                ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          {teamChecked && !hasTeams && (
+            <p className="text-xs text-gray-500">
+              สร้างทีมก่อนเพื่อใช้งาน —{' '}
+              <a href="/settings/team" className="text-blue-600 hover:underline">
+                ไปที่หน้าทีมของฉัน
+              </a>
+            </p>
+          )}
+          {visibility === 'organization' && teams.length > 1 && (
+            <TeamShareChips
+              label="แชร์ให้ทีมไหน (เลือกได้หลายทีม)"
+              teams={teams}
+              selectedIds={allSelectedTeamIds}
+              onToggle={toggleTeam}
+            />
+          )}
         </div>
       </div>
 

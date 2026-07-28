@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
-import { getMyTeamOrgIds } from '@/lib/actions/team-org'
+import { getMyTeamOrgs } from '@/lib/actions/team-org'
 import { QuestionBankClient } from './_components/question-bank-client'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
@@ -28,7 +28,8 @@ export default async function QuestionsPage() {
 
   if (error) console.error('[questions/page] query failed:', error)
 
-  const teamOrgIds = await getMyTeamOrgIds()
+  const myTeams = await getMyTeamOrgs()
+  const teamOrgIds = myTeams.map(t => t.id)
 
   let teamQuestions: QuestionWithCreator[] = []
   if (teamOrgIds.length > 0) {
@@ -42,21 +43,21 @@ export default async function QuestionsPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('question_shares')
-        .select('question_id, organizations(name)')
+        .select('question_id, org_id, organizations(name)')
         .in('org_id', teamOrgIds),
     ])
 
     if (primaryError) console.error('[questions/page] team query failed:', primaryError)
     if (shareError) console.error('[questions/page] share query failed:', shareError)
 
-    // question_id -> names of the extra teams it was shared to
+    // question_id -> extra teams it was shared to (id + name, for filtering + badges)
     const sharedNamesByQuestion = new Map<string, string[]>()
+    const sharedIdsByQuestion = new Map<string, string[]>()
     for (const row of (shareRows ?? []) as any[]) {
       const name = row.organizations?.name
       if (!name) continue
-      const names = sharedNamesByQuestion.get(row.question_id) ?? []
-      names.push(name)
-      sharedNamesByQuestion.set(row.question_id, names)
+      sharedNamesByQuestion.set(row.question_id, [...(sharedNamesByQuestion.get(row.question_id) ?? []), name])
+      sharedIdsByQuestion.set(row.question_id, [...(sharedIdsByQuestion.get(row.question_id) ?? []), row.org_id])
     }
 
     // Questions shared into a team the user belongs to, but whose home org
@@ -76,7 +77,11 @@ export default async function QuestionsPage() {
 
     const byId = new Map<string, QuestionWithCreator>()
     for (const q of [...(primaryData ?? []), ...sharedOnlyData] as QuestionWithCreator[]) {
-      byId.set(q.id, { ...q, shared_org_names: sharedNamesByQuestion.get(q.id) ?? [] })
+      byId.set(q.id, {
+        ...q,
+        shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
+        shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
+      })
     }
     teamQuestions = [...byId.values()].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -89,6 +94,7 @@ export default async function QuestionsPage() {
       teamQuestions={teamQuestions}
       hasTeamOrg={teamOrgIds.length > 0}
       hasMultipleTeams={teamOrgIds.length > 1}
+      myTeams={myTeams.map(t => ({ id: t.id, name: t.name }))}
       currentUserId={user.id}
     />
   )

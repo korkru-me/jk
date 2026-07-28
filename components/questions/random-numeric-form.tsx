@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -1524,6 +1524,7 @@ interface RandomNumericFormProps {
 
 export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'create', question, isOwner = true }: RandomNumericFormProps) {
   const router = useRouter()
+  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
   const subTextEditorRef = useRef<RichTextEditorHandle>(null)
@@ -1664,6 +1665,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       },
       solution_text: solutionText, tags, image_urls: imageUrls,
       requires_work_image: requireWorkImage,
+      redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
@@ -1974,7 +1976,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         <Button type="submit" disabled={saving}>
           {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? '/questions' : '/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

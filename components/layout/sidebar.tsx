@@ -23,7 +23,7 @@ const teacherNav: NavItem[] = [
 const studentNav: NavItem[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: '🏫' },
-  { href: '/my-submissions', label: 'ผลงานของฉัน', icon: '📊' },
+  { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: '⚙️' },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {

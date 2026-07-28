@@ -22,6 +22,7 @@ export interface ClassroomAssignmentRow {
   passing_value: number | null
   max_attempts: number | null
   score_strategy: 'best' | 'average' | 'latest'
+  display_order?: number | null
 }
 
 export interface ClassroomAssignmentSubmissionRow {

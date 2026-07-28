@@ -22,6 +22,9 @@ create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   email text unique not null,
   full_name text not null,
+  prefix text check (prefix is null or prefix in ('เด็กชาย', 'เด็กหญิง', 'นาย', 'นางสาว')),
+  first_name text,
+  last_name text,
   avatar_url text,
   role user_role not null default 'student',
   status user_status not null default 'active',
@@ -185,20 +188,26 @@ drop trigger if exists assignments_updated_at on public.assignments;
 create trigger assignments_updated_at before update on public.assignments
   for each row execute function update_updated_at();
 
--- Auto-create user profile on signup
+-- Auto-create user profile on signup.
+-- SET search_path = public is required: this trigger fires on auth.users
+-- insert under the supabase_auth_admin role, whose search_path is just
+-- "auth" — without it, the bare user_role cast below fails to resolve.
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into public.users (id, email, full_name, role)
+  insert into public.users (id, email, full_name, prefix, first_name, last_name, role)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-    coalesce((new.raw_user_meta_data->>'role')::user_role, 'student')
+    new.raw_user_meta_data->>'prefix',
+    new.raw_user_meta_data->>'first_name',
+    new.raw_user_meta_data->>'last_name',
+    coalesce((new.raw_user_meta_data->>'role')::public.user_role, 'student')
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

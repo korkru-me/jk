@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { isAuthRetryableFetchError } from '@supabase/supabase-js'
+import { buildFullName } from '@/lib/utils'
 
 export async function login(_prevState: unknown, formData: FormData) {
   const supabase = await createClient()
@@ -13,6 +15,9 @@ export async function login(_prevState: unknown, formData: FormData) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
+    if (isAuthRetryableFetchError(error)) {
+      return { error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่' }
+    }
     return {
       error: error.message === 'Invalid login credentials'
         ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
@@ -35,6 +40,9 @@ export async function login(_prevState: unknown, formData: FormData) {
         id: data.user.id,
         email: data.user.email!,
         full_name: meta?.full_name ?? email.split('@')[0],
+        prefix: meta?.prefix ?? null,
+        first_name: meta?.first_name ?? null,
+        last_name: meta?.last_name ?? null,
         role: (meta?.role as 'teacher' | 'student') ?? 'student',
       })
     }
@@ -48,13 +56,17 @@ export async function register(formData: FormData) {
 
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const full_name = formData.get('full_name') as string
+  const prefix = formData.get('prefix') as string
+  const first_name = formData.get('first_name') as string
+  const last_name = formData.get('last_name') as string
   const survey_role = formData.get('survey_role') as string
   const role_custom = formData.get('role_custom') as string | null
 
-  if (!full_name?.trim()) {
-    return { error: 'กรุณากรอกชื่อ-นามสกุล' }
+  if (!prefix?.trim() || !first_name?.trim() || !last_name?.trim()) {
+    return { error: 'กรุณากรอกคำนำหน้าชื่อ ชื่อ และสกุล' }
   }
+
+  const full_name = buildFullName(prefix, first_name, last_name)
 
   // Map survey role → system role + instructor_type
   const role = survey_role === 'student' || survey_role === 'parent' || survey_role === 'other'
@@ -68,7 +80,7 @@ export async function register(formData: FormData) {
     email,
     password,
     options: {
-      data: { full_name, role, instructor_type, survey_role, role_custom },
+      data: { full_name, prefix, first_name, last_name, role, instructor_type, survey_role, role_custom },
     },
   })
 
@@ -85,6 +97,9 @@ export async function register(formData: FormData) {
           id: data.user.id,
           email: data.user.email!,
           full_name,
+          prefix,
+          first_name,
+          last_name,
           role: role as 'teacher' | 'student',
           instructor_type: instructor_type || null,
           survey_role: survey_role || null,

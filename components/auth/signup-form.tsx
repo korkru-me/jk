@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+const NAME_PREFIXES = ['เด็กหญิง', 'เด็กชาย', 'นาย', 'นางสาว'] as const
+
 const SURVEY_ROLES = [
   { value: 'teacher', label: 'ครูผู้สอน', icon: '👨‍🏫', desc: 'ในโรงเรียนหรือมหาวิทยาลัย' },
   { value: 'tutor', label: 'ติวเตอร์อิสระ', icon: '📚', desc: 'หรือสถาบันกวดวิชา' },
@@ -24,7 +26,9 @@ const SURVEY_ROLES = [
 
 const schema = z
   .object({
-    full_name: z.string().min(2, 'กรุณากรอกชื่อ-นามสกุล'),
+    prefix: z.string().min(1, 'กรุณาเลือกคำนำหน้าชื่อ'),
+    first_name: z.string().min(1, 'กรุณากรอกชื่อ'),
+    last_name: z.string().min(1, 'กรุณากรอกสกุล'),
     email: z.string().email('รูปแบบอีเมลไม่ถูกต้อง'),
     password: z
       .string()
@@ -71,7 +75,9 @@ export function SignupForm() {
   async function onSubmit(values: FormValues) {
     setLoading(true)
     const fd = new FormData()
-    fd.set('full_name', values.full_name)
+    fd.set('prefix', values.prefix)
+    fd.set('first_name', values.first_name)
+    fd.set('last_name', values.last_name)
     fd.set('email', values.email)
     fd.set('password', values.password)
     fd.set('survey_role', values.survey_role)
@@ -145,18 +151,49 @@ export function SignupForm() {
         </div>
       )}
 
-      {/* Full name */}
-      <div className="space-y-1.5">
-        <Label htmlFor="full_name">ชื่อ-นามสกุล</Label>
-        <Input
-          id="full_name"
-          placeholder="สมชาย ใจดี"
-          autoComplete="name"
-          {...reg('full_name')}
-        />
-        {errors.full_name && (
-          <p className="text-xs text-red-600 dark:text-red-400">{errors.full_name.message}</p>
-        )}
+      {/* Name: prefix + first name + last name */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[8.5rem_1fr_1fr]">
+        <div className="space-y-1.5">
+          <Label htmlFor="prefix">คำนำหน้าชื่อ</Label>
+          <select
+            id="prefix"
+            defaultValue=""
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+            {...reg('prefix')}
+          >
+            <option value="" disabled>เลือก</option>
+            {NAME_PREFIXES.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          {errors.prefix && (
+            <p className="text-xs text-red-600 dark:text-red-400">{errors.prefix.message}</p>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="first_name">ชื่อ</Label>
+          <Input
+            id="first_name"
+            placeholder="สมชาย"
+            autoComplete="given-name"
+            {...reg('first_name')}
+          />
+          {errors.first_name && (
+            <p className="text-xs text-red-600 dark:text-red-400">{errors.first_name.message}</p>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="last_name">สกุล</Label>
+          <Input
+            id="last_name"
+            placeholder="ใจดี"
+            autoComplete="family-name"
+            {...reg('last_name')}
+          />
+          {errors.last_name && (
+            <p className="text-xs text-red-600 dark:text-red-400">{errors.last_name.message}</p>
+          )}
+        </div>
       </div>
 
       {/* Email */}
