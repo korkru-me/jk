@@ -11,6 +11,7 @@ interface CreateAssignmentData {
   title: string
   description: string
   question_ids: string[]
+  question_points?: Record<string, number> | null
   set_id?: string
   start_at: string | null
   end_at: string | null
@@ -52,6 +53,16 @@ export async function createAssignment(data: CreateAssignmentData) {
 
   if (questionIds.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
 
+  // Only keep overrides for questions actually in this assignment, with a
+  // valid positive point value — drops anything a tampered client might add.
+  const questionIdSet = new Set(questionIds)
+  const sanitizedPoints = Object.fromEntries(
+    Object.entries(data.question_points ?? {}).filter(
+      ([qid, pts]) => questionIdSet.has(qid) && Number.isFinite(pts) && pts > 0
+    )
+  )
+  const questionPoints = Object.keys(sanitizedPoints).length > 0 ? sanitizedPoints : null
+
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
 
@@ -64,6 +75,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       title: data.title.trim(),
       description: data.description.trim() || null,
       question_ids: questionIds,
+      question_points: questionPoints,
       set_id: data.set_id ?? null,
       start_at: data.start_at || null,
       end_at: data.end_at || null,
@@ -126,6 +138,7 @@ interface UpdateAssignmentData {
   score_strategy: ScoreStrategy
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
+  question_points?: Record<string, number> | null
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -141,6 +154,23 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // No explicit created_by filter — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all) already restricts this update to owner or
   // authorized co-teacher, same as updateAssignmentStatus above.
+  const { data: existing } = await supabase
+    .from('assignments')
+    .select('question_ids')
+    .eq('id', id)
+    .maybeSingle()
+  if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
+
+  // Same sanitization as createAssignment — only keep overrides for
+  // questions actually in this assignment, with a valid positive value.
+  const questionIdSet = new Set(existing.question_ids as string[])
+  const sanitizedPoints = Object.fromEntries(
+    Object.entries(data.question_points ?? {}).filter(
+      ([qid, pts]) => questionIdSet.has(qid) && Number.isFinite(pts) && pts > 0
+    )
+  )
+  const questionPoints = Object.keys(sanitizedPoints).length > 0 ? sanitizedPoints : null
+
   const { error } = await supabase
     .from('assignments')
     .update({
@@ -153,6 +183,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       score_strategy: data.score_strategy,
       passing_type: data.passing_type,
       passing_value: data.passing_value,
+      question_points: questionPoints,
     })
     .eq('id', id)
 
@@ -223,6 +254,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       title: `${source.title} (สำเนา)`,
       description: source.description,
       question_ids: source.question_ids,
+      question_points: source.question_points,
       set_id: null,
       start_at: null,
       end_at: null,

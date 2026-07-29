@@ -2,18 +2,27 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle } from 'lucide-react'
+import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle, Download, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
-import { setAssignmentDisplayOrder } from '@/lib/actions/classrooms'
+import { setAssignmentDisplayOrder, setStudentRosterOrder } from '@/lib/actions/classrooms'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
+import { downloadTextFile, toCsv, safeFilenamePart } from '@/lib/utils'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ExtensionDialog } from './extension-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 
+const STATUS_LABEL: Record<string, string> = {
+  submitted: 'ส่งแล้ว', graded: 'ส่งแล้ว', in_progress: 'กำลังทำ',
+}
+
 type TypeFilter = 'all' | 'exercise' | 'exam'
 
-interface RealStudent { id: string; full_name: string; email: string }
+interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
 
 interface SubmissionRow {
   id: string
@@ -36,19 +45,22 @@ interface ExtensionRow {
 
 interface Props {
   classroomId: string
+  classroomName: string
   students: RealStudent[]
   assignments: ClassroomAssignmentRow[]
   submissions: SubmissionRow[]
   extensions: ExtensionRow[]
 }
 
-export function ClassroomScoresMatrix({ classroomId, students, assignments, submissions, extensions }: Props) {
+export function ClassroomScoresMatrix({ classroomId, classroomName, students, assignments, submissions, extensions }: Props) {
   const [reminding, setReminding] = useState<string | null>(null)
   const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
   const [isPending, startTransition] = useTransition()
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({})
   const [isOrderPending, startOrderTransition] = useTransition()
+  const [studentOrderDrafts, setStudentOrderDrafts] = useState<Record<string, string>>({})
+  const [isStudentOrderPending, startStudentOrderTransition] = useTransition()
 
   function commitOrder(assignmentId: string, raw: string) {
     const trimmed = raw.trim()
@@ -62,6 +74,21 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
       const res = await setAssignmentDisplayOrder(classroomId, assignmentId, parsed)
       if (res?.error) toast.error(res.error)
       setOrderDrafts(d => { const next = { ...d }; delete next[assignmentId]; return next })
+    })
+  }
+
+  function commitStudentOrder(studentId: string, raw: string) {
+    const trimmed = raw.trim()
+    const parsed = trimmed === '' ? null : Number.parseInt(trimmed, 10)
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 1)) {
+      toast.error('ลำดับต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป')
+      setStudentOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
+      return
+    }
+    startStudentOrderTransition(async () => {
+      const res = await setStudentRosterOrder(classroomId, studentId, parsed)
+      if (res?.error) toast.error(res.error)
+      setStudentOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
     })
   }
 
@@ -111,6 +138,62 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
     })
   }
 
+  function cellText(assignmentId: string, studentId: string) {
+    const sub = bestSubmission.get(subKey(assignmentId, studentId))
+    if (!sub || (sub.status !== 'submitted' && sub.status !== 'graded')) {
+      return sub?.status === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ทำ'
+    }
+    const assignment = assignments.find(a => a.id === assignmentId)
+    const passed = computePassed(sub.total_score, sub.max_score, assignment?.passing_type ?? null, assignment?.passing_value ?? null)
+    const score = `${sub.total_score ?? 0}/${sub.max_score}`
+    return passed === false ? `${score} (ไม่ผ่าน)` : score
+  }
+
+  function exportAll() {
+    // Mirrors exactly what's on screen: same columns, same order, same filter.
+    const header = ['ลำดับ', 'นักเรียน', 'อีเมล', ...visibleAssignments.map(a => a.title)]
+    const rows = students.map(s => [
+      s.roster_order ?? '', s.full_name, s.email,
+      ...visibleAssignments.map(a => cellText(a.id, s.id)),
+    ])
+    const dateStr = new Date().toLocaleDateString('th-TH').replace(/\//g, '-')
+    downloadTextFile(
+      `คะแนน-${safeFilenamePart(classroomName)}-${dateStr}.csv`,
+      toCsv([header, ...rows]),
+      'text/csv;charset=utf-8;'
+    )
+    toast.success('ส่งออกข้อมูลคะแนนแล้ว')
+  }
+
+  function exportAssignment(assignment: ClassroomAssignmentRow) {
+    const header = ['ลำดับ', 'นักเรียน', 'อีเมล', 'สถานะ', 'คะแนน', 'คะแนนเต็ม', 'ผลการประเมิน', 'ส่งเมื่อ', 'ครั้งที่', 'ขยายเวลาถึง']
+    const rows = students.map(s => {
+      const sub = bestSubmission.get(subKey(assignment.id, s.id))
+      const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
+      const passed = submitted
+        ? computePassed(sub!.total_score, sub!.max_score, assignment.passing_type, assignment.passing_value)
+        : null
+      const extension = extensionMap.get(subKey(assignment.id, s.id))
+      return [
+        s.roster_order ?? '', s.full_name, s.email,
+        sub ? (STATUS_LABEL[sub.status] ?? sub.status) : 'ยังไม่ทำ',
+        submitted ? sub!.total_score ?? 0 : '',
+        submitted ? sub!.max_score : '',
+        passed === null ? '' : (passed ? 'ผ่าน' : 'ไม่ผ่าน'),
+        sub?.submitted_at ? new Date(sub.submitted_at).toLocaleString('th-TH') : '',
+        sub?.attempt_number ?? '',
+        extension ? new Date(extension.extended_end_at).toLocaleString('th-TH') : '',
+      ]
+    })
+    const dateStr = new Date().toLocaleDateString('th-TH').replace(/\//g, '-')
+    downloadTextFile(
+      `คะแนน-${safeFilenamePart(assignment.title)}-${dateStr}.csv`,
+      toCsv([header, ...rows]),
+      'text/csv;charset=utf-8;'
+    )
+    toast.success('ส่งออกข้อมูลงานนี้แล้ว')
+  }
+
   if (assignments.length === 0) {
     return (
       <div className="bg-white rounded-2xl ring-1 ring-black/5 py-12 text-center text-sm text-gray-400">
@@ -121,23 +204,47 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
 
   return (
     <div className="space-y-3">
-      {/* Filter chips */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {([
-          { key: 'all', label: 'ทั้งหมด' },
-          { key: 'exercise', label: 'แบบฝึกหัด' },
-          { key: 'exam', label: 'ข้อสอบ' },
-        ] as { key: TypeFilter; label: string }[]).map(f => (
-          <button
-            key={f.key}
-            onClick={() => setTypeFilter(f.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* Filter chips + export */}
+      <div className="flex items-center gap-2 flex-wrap justify-between">
+        <div className="flex items-center gap-2 flex-wrap">
+          {([
+            { key: 'all', label: 'ทั้งหมด' },
+            { key: 'exercise', label: 'แบบฝึกหัด' },
+            { key: 'exam', label: 'ข้อสอบ' },
+          ] as { key: TypeFilter; label: string }[]).map(f => (
+            <button
+              key={f.key}
+              onClick={() => setTypeFilter(f.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {visibleAssignments.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all outline-none">
+              <Download className="w-3.5 h-3.5" /> ส่งออกข้อมูล <ChevronDown className="w-3 h-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-w-64">
+              <DropdownMenuItem onClick={exportAll}>
+                <Download className="w-3.5 h-3.5 text-gray-400" /> ส่งออกทั้งหมด (ตามตารางนี้)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>ส่งออกเฉพาะงาน</DropdownMenuLabel>
+                {visibleAssignments.map(a => (
+                  <DropdownMenuItem key={a.id} onClick={() => exportAssignment(a)}>
+                    <span className="truncate">{a.title}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {visibleAssignments.length === 0 ? (
@@ -149,7 +256,10 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="sticky left-0 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[180px]">
+              <th className="sticky left-0 bg-white text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-16">
+                ลำดับ
+              </th>
+              <th className="sticky left-16 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[180px]">
                 นักเรียน
               </th>
               {visibleAssignments.map(a => {
@@ -194,7 +304,21 @@ export function ClassroomScoresMatrix({ classroomId, students, assignments, subm
           <tbody>
             {students.map(student => (
               <tr key={student.id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50/50">
-                <td className="sticky left-0 bg-white px-4 py-2.5">
+                <td className="sticky left-0 bg-white px-2 py-2.5 text-center">
+                  <input
+                    type="number"
+                    min={1}
+                    value={studentOrderDrafts[student.id] ?? student.roster_order ?? ''}
+                    onChange={e => setStudentOrderDrafts(d => ({ ...d, [student.id]: e.target.value }))}
+                    onBlur={e => commitStudentOrder(student.id, e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                    disabled={isStudentOrderPending}
+                    placeholder="-"
+                    title="ลำดับนักเรียน"
+                    className="w-11 mx-auto text-xs text-center rounded-lg border border-gray-200 py-1 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                  />
+                </td>
+                <td className="sticky left-16 bg-white px-4 py-2.5">
                   <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">{student.full_name}</p>
                   <p className="text-xs text-gray-400 truncate max-w-[160px]">{student.email}</p>
                 </td>

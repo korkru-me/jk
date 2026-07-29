@@ -17,6 +17,43 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a
 }
 
+// A question's point value before any assignment-level custom override —
+// same formula used both when an attempt starts (to seed submission_answers.
+// max_score) and when grading (to know how much to rescale a raw score by,
+// so a custom override changes the ceiling without silently changing which
+// answers count as correct). Must stay identical in both places: when no
+// override is set, this being equal to the stored max_score is exactly what
+// keeps grading unchanged from before this feature existed.
+function naturalMaxScore(questionType: string, extraData: any, answerParts: unknown[] | null): number {
+  if (questionType === 'true_false') {
+    const statements: unknown[] = extraData?.statements ?? []
+    const scoreAnswer: number = extraData?.score_answer ?? 1
+    const explanationScore = extraData?.explanation_mode !== 'none' ? (extraData?.score_explanation ?? 1) : 0
+    if (statements.length > 0) return scoreAnswer * (statements.length + 1) + explanationScore
+    return scoreAnswer + explanationScore
+  }
+  if (questionType === 'fill_blank') {
+    const blanks: unknown[] = extraData?.blanks ?? []
+    return blanks.length || 1
+  }
+  if (questionType === 'ordering') {
+    const items: unknown[] = extraData?.items ?? []
+    return items.length || 1
+  }
+  if (questionType === 'file_upload') return 1
+  if (answerParts && answerParts.length > 1) return answerParts.length
+  return 1
+}
+
+// Rescales a raw auto-graded score to a custom point override. `storedMax`
+// equals `structuralMax` exactly when no override was set (see
+// naturalMaxScore above), so this is a no-op for every pre-existing
+// assignment — it only kicks in once a teacher sets question_points.
+function scaleScore(rawScore: number, structuralMax: number, storedMax: number): number {
+  if (structuralMax <= 0 || structuralMax === storedMax) return rawScore
+  return Math.round((rawScore / structuralMax) * storedMax * 100) / 100
+}
+
 export async function startSubmission(assignmentId: string, accessCode?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -154,28 +191,26 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
 
     if (q.question_type === 'true_false') {
       const statements: import('@/lib/types').TrueFalseStatement[] = extraData?.statements ?? []
-      const scoreAnswer = extraData?.score_answer ?? 1
-      const explanationScore = extraData?.explanation_mode !== 'none' ? (extraData?.score_explanation ?? 1) : 0
       if (statements.length > 0) {
         const correctAnswers = [extraData?.correct_answer, ...statements.map(s => s.correct_answer)]
         return {
           question_id: q.id, random_values: {},
           correct_answer: 'TF:' + JSON.stringify(correctAnswers.map(b => b ? 'true' : 'false')),
-          max_score: scoreAnswer * correctAnswers.length + explanationScore,
+          max_score: naturalMaxScore(q.question_type, extraData, null),
         }
       }
-      return { question_id: q.id, random_values: {}, correct_answer: extraData?.correct_answer ? 'true' : 'false', max_score: scoreAnswer + explanationScore }
+      return { question_id: q.id, random_values: {}, correct_answer: extraData?.correct_answer ? 'true' : 'false', max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
 
     if (q.question_type === 'fill_blank') {
       const blanks: import('@/lib/types').FillBlankItem[] = extraData?.blanks ?? []
       const answers = blanks.map((b) => getBlankType(extraData, b) === 'text' ? '' : b.answer)
-      return { question_id: q.id, random_values: {}, correct_answer: 'FILL:' + JSON.stringify(answers), max_score: blanks.length || 1 }
+      return { question_id: q.id, random_values: {}, correct_answer: 'FILL:' + JSON.stringify(answers), max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
 
     if (q.question_type === 'ordering') {
       const items: import('@/lib/types').OrderingItem[] = extraData?.items ?? []
-      return { question_id: q.id, random_values: {}, correct_answer: 'ORDER:' + JSON.stringify(items.map((i) => i.id)), max_score: items.length || 1 }
+      return { question_id: q.id, random_values: {}, correct_answer: 'ORDER:' + JSON.stringify(items.map((i) => i.id)), max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
 
     // File-upload: no meaningful correct answer to precompute — grading
@@ -183,17 +218,19 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
     // question_type instead of a correct_answer prefix, since "correct" here
     // just means "the student attached at least one file".
     if (q.question_type === 'file_upload') {
-      return { question_id: q.id, random_values: {}, correct_answer: '', max_score: 1 }
+      return { question_id: q.id, random_values: {}, correct_answer: '', max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
 
     if (parts && parts.length > 1) {
       const answers = evaluatePartsChained(parts, randomValues)
-      return { question_id: q.id, random_values: randomValues, correct_answer: JSON.stringify(answers.map(String)), max_score: parts.length }
+      return { question_id: q.id, random_values: randomValues, correct_answer: JSON.stringify(answers.map(String)), max_score: naturalMaxScore(q.question_type, extraData, parts) }
     }
 
     const formula = parts?.[0]?.formula ?? q.answer_formula
-    return { question_id: q.id, random_values: randomValues, correct_answer: String(evaluateFormula(formula, randomValues)), max_score: 1 }
+    return { question_id: q.id, random_values: randomValues, correct_answer: String(evaluateFormula(formula, randomValues)), max_score: naturalMaxScore(q.question_type, extraData, parts) }
   }
+
+  const questionPoints = assignment.question_points as Record<string, number> | null
 
   // A question referenced by assignment.question_ids may have since been
   // deleted — skip dangling ids instead of crashing the whole attempt.
@@ -205,7 +242,14 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
         ? shuffleArray((q.mcq_options as unknown[]).map((_, i) => i))
         : null
 
-      return { ...buildSkeletonBase(q), order_index: orderIndex, option_order: optionOrder }
+      const base = buildSkeletonBase(q)
+      const override = questionPoints?.[qid]
+      return {
+        ...base,
+        max_score: override ?? base.max_score,
+        order_index: orderIndex,
+        option_order: optionOrder,
+      }
     })
 
   const totalMaxScore = skeletons.reduce((sum, s) => sum + s.max_score, 0)
@@ -426,7 +470,8 @@ async function gradeAndFinalizeSubmission(
       const extraData = a.questions?.extra_data as any
       const scoreAnswer: number = extraData?.score_answer ?? 1
       const isCorrect = studentTf.trim() === correctAns
-      return { id: a.id, is_correct: isCorrect, score: isCorrect ? scoreAnswer : 0 }
+      const structuralMax = naturalMaxScore('true_false', extraData, null)
+      return { id: a.id, is_correct: isCorrect, score: scaleScore(isCorrect ? scoreAnswer : 0, structuralMax, a.max_score) }
     }
 
     // Multi-statement True/False grading
@@ -440,7 +485,8 @@ async function gradeAndFinalizeSubmission(
       for (let i = 0; i < correctAnswers.length; i++) {
         if ((studentAnswers[i] ?? '').trim() === correctAnswers[i]) correctCount++
       }
-      return { id: a.id, is_correct: correctCount === correctAnswers.length, score: correctCount * scoreAnswer }
+      const structuralMax = naturalMaxScore('true_false', extraData, null)
+      return { id: a.id, is_correct: correctCount === correctAnswers.length, score: scaleScore(correctCount * scoreAnswer, structuralMax, a.max_score) }
     }
 
     // Fill-blank grading — legacy fully-manual submissions (pre-dates per-blank types)
@@ -473,7 +519,8 @@ async function gradeAndFinalizeSubmission(
         const isBlankCorrect = type === 'dropdown' ? sa === ca : (cs ? sa === ca : sa.toLowerCase() === ca.toLowerCase())
         if (isBlankCorrect) autoCorrect++
       }
-      return { id: a.id, is_correct: hasManual ? null : autoCorrect === autoCount, score: autoCorrect }
+      const structuralMax = naturalMaxScore('fill_blank', extraData, null)
+      return { id: a.id, is_correct: hasManual ? null : autoCorrect === autoCount, score: scaleScore(autoCorrect, structuralMax, a.max_score) }
     }
 
     // Ordering grading
@@ -485,7 +532,8 @@ async function gradeAndFinalizeSubmission(
       for (let i = 0; i < correctOrder.length; i++) {
         if (studentOrder[i] === correctOrder[i]) correctPositions++
       }
-      return { id: a.id, is_correct: correctPositions === correctOrder.length, score: correctPositions }
+      const structuralMax = naturalMaxScore('ordering', a.questions?.extra_data, null)
+      return { id: a.id, is_correct: correctPositions === correctOrder.length, score: scaleScore(correctPositions, structuralMax, a.max_score) }
     }
 
     const isMultiPart = correctAns.startsWith('[')
@@ -503,7 +551,8 @@ async function gradeAndFinalizeSubmission(
         const tol = parts[i]?.tolerance ?? a.questions?.answer_tolerance ?? 0.1
         if (!isNaN(sv) && !isNaN(cv) && gradeValue(sv, cv, tol)) correctCount++
       }
-      return { id: a.id, is_correct: correctCount === correctAnswers.length, score: correctCount }
+      const structuralMax = naturalMaxScore(a.questions?.question_type, a.questions?.extra_data, parts)
+      return { id: a.id, is_correct: correctCount === correctAnswers.length, score: scaleScore(correctCount, structuralMax, a.max_score) }
     }
 
     // Single-part (backwards compat)

@@ -224,6 +224,7 @@ export function ClassroomDetailClient({
         {activeTab === 'scores' && canManage && (
           <ClassroomScoresMatrix
             classroomId={classroom.id}
+            classroomName={classroom.name}
             students={students}
             assignments={classroomAssignments}
             submissions={classroomSubmissions}

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy } from '@/lib/types'
 
-const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'ตั้งค่า', 'กำหนดการสอบ']
+const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
 interface PreselectedSet {
   id: string
@@ -61,7 +61,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
-  // Step 3
+  // Step 3 (คะแนน) — every question defaults to 1 point; teacher can edit
+  // individual questions and the total recalculates automatically.
+  const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>({})
+
+  // Step 4 (ตั้งค่า)
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
@@ -74,7 +78,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
 
-  // Step 4
+  // Step 5 (กำหนดการสอบ)
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
 
@@ -90,6 +94,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   function toggleClassroom(id: string) {
     setClassroomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
+
+  const previewQuestions = selectedIds
+    .map(id => questions.find(q => q.id === id))
+    .filter((q): q is Question => !!q)
+  const pointsSum = Math.round(
+    previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(questionPointDrafts[q.id] ?? '1') || 0), 0) * 100
+  ) / 100
 
   function canNext() {
     if (step === 0) return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
@@ -160,11 +171,21 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         }
       }
 
+      // Every question gets an explicit point value — defaults to 1 unless
+      // the teacher edited it, and falls back to 1 for invalid input.
+      const questionPoints = Object.fromEntries(
+        selectedIds.map(id => {
+          const parsed = Number.parseFloat(questionPointDrafts[id] ?? '1')
+          return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
+        })
+      )
+
       const res = await createAssignment({
         classroom_ids: classroomIds,
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
+        question_points: questionPoints,
         set_id: setId,
         start_at: effectiveStartAt || null,
         end_at: endAt || null,
@@ -392,8 +413,99 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         </div>
       )}
 
-      {/* ── Step 3: ตั้งค่า ──────────────────────────────────────────── */}
+      {/* ── Step 3: คะแนน ────────────────────────────────────────────── */}
       {step === 2 && (
+        <div className="space-y-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900">คะแนนแต่ละข้อ</h2>
+              <span className="text-sm font-semibold text-blue-600">รวม {pointsSum} คะแนน</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              ค่าเริ่มต้นข้อละ 1 คะแนน — แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
+            </p>
+
+            <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+              {previewQuestions.map((q, i) => (
+                <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-200">
+                  <span className="text-xs font-semibold text-gray-400 w-10 shrink-0">ข้อ {i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{q.title}</p>
+                    <p className="text-xs text-gray-400 truncate">{q.question_text}</p>
+                  </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={questionPointDrafts[q.id] ?? '1'}
+                    onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
+                    className="w-20 text-center shrink-0"
+                  />
+                  <span className="text-xs text-gray-400 shrink-0">คะแนน</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-1.5">
+            <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                  <Target className="w-4 h-4 text-gray-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">ตั้งเกณฑ์คะแนนผ่าน</p>
+                  <p className="text-xs text-gray-400">
+                    {assignmentType === 'exercise'
+                      ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
+                      : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={passingEnabled}
+                onChange={e => setPassingEnabled(e.target.checked)}
+                className="accent-blue-600 w-4 h-4 shrink-0"
+              />
+            </label>
+
+            {passingEnabled && (
+              <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200">
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+                  {(['percent', 'score'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPassingType(t)}
+                      className={`px-3 py-2 text-xs font-medium transition-all ${
+                        passingType === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  type="number"
+                  min={0}
+                  max={passingType === 'percent' ? 100 : undefined}
+                  value={passingValue}
+                  onChange={e => setPassingValue(e.target.value)}
+                  placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
+                  className="max-w-[120px]"
+                />
+                <span className="text-sm text-gray-500 shrink-0">
+                  {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 4: ตั้งค่า ──────────────────────────────────────────── */}
+      {step === 3 && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
           <h2 className="font-semibold text-gray-900">ตั้งค่าการสอบ</h2>
 
@@ -480,61 +592,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           </div>
 
           <div className="space-y-1.5">
-            <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                  <Target className="w-4 h-4 text-gray-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">ตั้งเกณฑ์คะแนนผ่าน</p>
-                  <p className="text-xs text-gray-400">
-                    {assignmentType === 'exercise'
-                      ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
-                      : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
-                  </p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={passingEnabled}
-                onChange={e => setPassingEnabled(e.target.checked)}
-                className="accent-blue-600 w-4 h-4 shrink-0"
-              />
-            </label>
-
-            {passingEnabled && (
-              <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200">
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
-                  {(['percent', 'score'] as const).map(t => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setPassingType(t)}
-                      className={`px-3 py-2 text-xs font-medium transition-all ${
-                        passingType === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
-                    </button>
-                  ))}
-                </div>
-                <Input
-                  type="number"
-                  min={0}
-                  max={passingType === 'percent' ? 100 : undefined}
-                  value={passingValue}
-                  onChange={e => setPassingValue(e.target.value)}
-                  placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
-                  className="max-w-[120px]"
-                />
-                <span className="text-sm text-gray-500 shrink-0">
-                  {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
             <Label htmlFor="attempts" className="flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-gray-400" /> จำกัดจำนวนครั้งที่ทำได้
             </Label>
@@ -589,8 +646,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         </div>
       )}
 
-      {/* ── Step 4: กำหนดการสอบ ───────────────────────────────────────── */}
-      {step === 3 && (
+      {/* ── Step 5: กำหนดการสอบ ───────────────────────────────────────── */}
+      {step === 4 && (
         <div className="space-y-4">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -622,6 +679,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 },
                 { label: 'ประเภท',    value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
                 { label: 'โจทย์',     value: `${selectedIds.length} ข้อ` },
+                { label: 'คะแนนเต็ม', value: `${pointsSum} คะแนน` },
                 { label: 'โหมด',      value: mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
                 ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
                 ...(passingEnabled && passingValue ? [{ label: 'เกณฑ์ผ่าน', value: passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน` }] : []),

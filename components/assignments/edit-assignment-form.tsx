@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
-import type { Assignment, ScoreStrategy } from '@/lib/types'
+import type { Assignment, Question, ScoreStrategy } from '@/lib/types'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -21,9 +21,10 @@ function toLocalInputValue(iso: string | null): string {
 
 interface Props {
   assignment: Assignment
+  questions: Question[]
 }
 
-export function EditAssignmentForm({ assignment: a }: Props) {
+export function EditAssignmentForm({ assignment: a, questions }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -40,9 +41,26 @@ export function EditAssignmentForm({ assignment: a }: Props) {
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
 
+  // Every question defaults to 1 point (or its existing override); teacher
+  // can edit individual questions and the total recalculates automatically.
+  const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>(
+    Object.fromEntries(questions.map(q => [q.id, String(a.question_points?.[q.id] ?? 1)]))
+  )
+
+  const pointsSum = Math.round(
+    questions.reduce((sum, q) => sum + (Number.parseFloat(questionPointDrafts[q.id] ?? '1') || 0), 0) * 100
+  ) / 100
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรุณากรอกชื่อชุดข้อสอบ'); return }
+
+    const questionPoints = Object.fromEntries(
+      questions.map(q => {
+        const parsed = Number.parseFloat(questionPointDrafts[q.id] ?? '1')
+        return [q.id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
+      })
+    )
 
     startTransition(async () => {
       const res = await updateAssignment(a.id, {
@@ -55,6 +73,7 @@ export function EditAssignmentForm({ assignment: a }: Props) {
         score_strategy: scoreStrategy,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
+        question_points: questionPoints,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -73,6 +92,92 @@ export function EditAssignmentForm({ assignment: a }: Props) {
           <Label htmlFor="edit-desc">คำอธิบาย</Label>
           <Textarea id="edit-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
         </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900">คะแนนแต่ละข้อ</h2>
+          <span className="text-sm font-semibold text-blue-600">รวม {pointsSum} คะแนน</span>
+        </div>
+        <p className="text-xs text-gray-400">
+          ค่าเริ่มต้นข้อละ 1 คะแนน — แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
+        </p>
+
+        <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+          {questions.map((q, i) => (
+            <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-200">
+              <span className="text-xs font-semibold text-gray-400 w-10 shrink-0">ข้อ {i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{q.title}</p>
+                <p className="text-xs text-gray-400 truncate">{q.question_text}</p>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={questionPointDrafts[q.id] ?? '1'}
+                onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
+                className="w-20 text-center shrink-0"
+              />
+              <span className="text-xs text-gray-400 shrink-0">คะแนน</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-1.5">
+        <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+              <Target className="w-4 h-4 text-gray-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900">ตั้งเกณฑ์คะแนนผ่าน</p>
+              <p className="text-xs text-gray-400">
+                {a.type === 'exercise'
+                  ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
+                  : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
+              </p>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={passingEnabled}
+            onChange={e => setPassingEnabled(e.target.checked)}
+            className="accent-blue-600 w-4 h-4 shrink-0"
+          />
+        </label>
+
+        {passingEnabled && (
+          <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200">
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+              {(['percent', 'score'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setPassingType(t)}
+                  className={`px-3 py-2 text-xs font-medium transition-all ${
+                    passingType === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
+                </button>
+              ))}
+            </div>
+            <Input
+              type="number"
+              min={0}
+              max={passingType === 'percent' ? 100 : undefined}
+              value={passingValue}
+              onChange={e => setPassingValue(e.target.value)}
+              placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
+              className="max-w-[120px]"
+            />
+            <span className="text-sm text-gray-500 shrink-0">
+              {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
@@ -106,61 +211,6 @@ export function EditAssignmentForm({ assignment: a }: Props) {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-        <div className="space-y-1.5">
-          <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                <Target className="w-4 h-4 text-gray-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">ตั้งเกณฑ์คะแนนผ่าน</p>
-                <p className="text-xs text-gray-400">
-                  {a.type === 'exercise'
-                    ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
-                    : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
-                </p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={passingEnabled}
-              onChange={e => setPassingEnabled(e.target.checked)}
-              className="accent-blue-600 w-4 h-4 shrink-0"
-            />
-          </label>
-
-          {passingEnabled && (
-            <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200">
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
-                {(['percent', 'score'] as const).map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setPassingType(t)}
-                    className={`px-3 py-2 text-xs font-medium transition-all ${
-                      passingType === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
-                  </button>
-                ))}
-              </div>
-              <Input
-                type="number"
-                min={0}
-                max={passingType === 'percent' ? 100 : undefined}
-                value={passingValue}
-                onChange={e => setPassingValue(e.target.value)}
-                placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
-                className="max-w-[120px]"
-              />
-              <span className="text-sm text-gray-500 shrink-0">
-                {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
-              </span>
-            </div>
-          )}
-        </div>
-
         <div className="space-y-1.5">
           <Label htmlFor="edit-attempts" className="flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-gray-400" /> จำกัดจำนวนครั้งที่ทำได้
@@ -201,7 +251,10 @@ export function EditAssignmentForm({ assignment: a }: Props) {
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2 text-sm text-amber-800">
         <FileText className="w-4 h-4 shrink-0 mt-0.5" />
-        <p>แก้ไขได้เฉพาะกำหนดการและรายละเอียด — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน</p>
+        <p>
+          แก้ไขได้เฉพาะกำหนดการ รายละเอียด และคะแนน — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน
+          (การเปลี่ยนคะแนนเต็มจะมีผลกับการทำครั้งใหม่เท่านั้น ไม่กระทบคะแนนที่นักเรียนทำไปแล้ว)
+        </p>
       </div>
 
       <div className="flex gap-2">

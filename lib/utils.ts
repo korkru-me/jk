@@ -22,3 +22,17 @@ export function downloadTextFile(filename: string, content: string, mimeType = '
   a.click()
   URL.revokeObjectURL(url)
 }
+
+// Excel needs a BOM to render Thai (and other non-ASCII) text in a CSV as
+// UTF-8 instead of guessing the system codepage and mangling it.
+export function toCsv(rows: (string | number | null | undefined)[][]) {
+  const escapeCell = (cell: string | number | null | undefined) => {
+    const s = cell == null ? '' : String(cell)
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  return '﻿' + rows.map(row => row.map(escapeCell).join(',')).join('\r\n')
+}
+
+export function safeFilenamePart(s: string) {
+  return s.replace(/[\\/:*?"<>|]+/g, ' ').trim()
+}

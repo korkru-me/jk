@@ -279,6 +279,9 @@ export interface Assignment {
   title: string
   description: string | null
   question_ids: string[]
+  /** Custom per-question point overrides, keyed by question_id. NULL = use
+   *  each question's own structural point value (the pre-existing default). */
+  question_points: Record<string, number> | null
   set_id: string | null
   start_at: string | null
   end_at: string | null
