@@ -6,16 +6,20 @@ import {
   Mail, ArrowRightLeft, UserMinus, X, SlidersHorizontal, IdCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { removeStudent, setStudentRosterOrder } from '@/lib/actions/classrooms'
+import { removeStudent } from '@/lib/actions/classrooms'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
   DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview'
+import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib/student-sort'
 
-type SortKey = 'order' | 'name' | 'grade' | 'section' | 'number' | 'score' | 'status' | 'joined'
-type SortDir = 'asc' | 'desc'
+// 'score'/'status' are extra local-only sort options on top of the shared
+// roster keys — they sort by this table's own sample data, which has no
+// counterpart on the scores page, so they're never lifted/synced.
+export type SortKey = StudentSortKey | 'score' | 'status'
+export type SortDir = StudentSortDir
 type StatusType = 'ปกติ' | 'ขาดส่งงาน' | 'ออฟไลน์นาน' | 'เสี่ยงสอบตก'
 
 const STATUS_CFG: Record<StatusType, { bg: string; text: string }> = {
@@ -32,7 +36,7 @@ const MOCK_STATUSES: StatusType[] = [
   'เสี่ยงสอบตก', 'ปกติ', 'ขาดส่งงาน', 'ปกติ',
 ]
 
-interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
+interface RealStudent { id: string; full_name: string; email: string }
 interface Student extends RealStudent {
   score: number
   status: StatusType
@@ -44,25 +48,30 @@ interface Props {
   students: RealStudent[]
   otherClassrooms: { id: string; name: string }[]
   profiles?: Record<string, StudentProfileRow>
-  /** Grade/room/number columns + teacher-set roster order — any teacher who
-   *  can manage this classroom (subject or homeroom), scoped per classroom. */
+  /** Grade/room/number/code columns — any teacher who can manage this
+   *  classroom (subject or homeroom), scoped per classroom. */
   showRoster?: boolean
   /** Full personal-info dialog (health/address/guardians) — homeroom
    *  advisor only, a stricter gate than showRoster. */
   showProfiles?: boolean
+  /** Sort state lives in the parent so the "คะแนนและการส่งงาน" tab can
+   *  mirror the same student order. */
+  sortKey: SortKey
+  sortDir: SortDir
+  onToggleSort: (key: SortKey) => void
 }
 
-const GRID_COLS_DEFAULT = 'grid-cols-[auto_1fr_100px_110px_40px]'
-const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_1fr_110px_80px_70px_100px_110px_40px]'
+// The name column uses minmax(0,1fr) rather than a bare 1fr — with a bare
+// 1fr, each row's intrinsic width calc lets its own full_name+email length
+// push the track wider, so rows (and the header) end up different total
+// widths and the fixed columns after it drift out of alignment row to row.
+const GRID_COLS_DEFAULT = 'grid-cols-[auto_minmax(160px,1fr)_100px_110px_40px]'
+const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_100px_110px_40px]'
 
-function cmpNullsLast<T>(av: T | null | undefined, bv: T | null | undefined, cmp: (x: T, y: T) => number) {
-  if (av == null && bv == null) return 0
-  if (av == null) return 1
-  if (bv == null) return -1
-  return cmp(av, bv)
-}
-
-export function StudentTable({ classroomId, students, otherClassrooms, profiles = {}, showRoster = false, showProfiles = false }: Props) {
+export function StudentTable({
+  classroomId, students, otherClassrooms, profiles = {}, showRoster = false, showProfiles = false,
+  sortKey, sortDir, onToggleSort,
+}: Props) {
   const GRID_COLS = showRoster ? GRID_COLS_WITH_ROSTER : GRID_COLS_DEFAULT
   const augmented: Student[] = students.map((s, i) => ({
     ...s,
@@ -74,31 +83,8 @@ export function StudentTable({ classroomId, students, otherClassrooms, profiles 
   const [query, setQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<StatusType | ''>('')
   const [showFilters, setShowFilters] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>(showRoster ? 'order' : 'name')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewingProfile, setViewingProfile] = useState<Student | null>(null)
-  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({})
   const [isPending, startTransition] = useTransition()
-
-  function commitOrder(studentId: string, raw: string) {
-    const trimmed = raw.trim()
-    const parsed = trimmed === '' ? null : Number.parseInt(trimmed, 10)
-    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 1)) {
-      toast.error('ลำดับต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป')
-      setOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
-      return
-    }
-    startTransition(async () => {
-      const res = await setStudentRosterOrder(classroomId, studentId, parsed)
-      if (res?.error) toast.error(res.error)
-      setOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
-    })
-  }
-
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('asc') }
-  }
 
   const filtered = augmented
     .filter(s =>
@@ -107,28 +93,12 @@ export function StudentTable({ classroomId, students, otherClassrooms, profiles 
     )
     .filter(s => activeFilter ? s.status === activeFilter : true)
     .sort((a, b) => {
-      let cmp = 0
-      if (sortKey === 'order') {
-        const av = a.roster_order ?? Infinity
-        const bv = b.roster_order ?? Infinity
-        cmp = av === bv ? a.full_name.localeCompare(b.full_name, 'th') : av - bv
+      if (sortKey === 'score') return sortDir === 'asc' ? a.score - b.score : b.score - a.score
+      if (sortKey === 'status') {
+        const cmp = a.status.localeCompare(b.status)
+        return sortDir === 'asc' ? cmp : -cmp
       }
-      if (sortKey === 'name') cmp = a.full_name.localeCompare(b.full_name, 'th')
-      if (sortKey === 'grade') {
-        cmp = cmpNullsLast(profiles[a.id]?.grade_level, profiles[b.id]?.grade_level, (x, y) => x.localeCompare(y, 'th'))
-        if (cmp === 0) cmp = a.full_name.localeCompare(b.full_name, 'th')
-      }
-      if (sortKey === 'section') {
-        cmp = cmpNullsLast(profiles[a.id]?.section_number, profiles[b.id]?.section_number, (x, y) => x - y)
-        if (cmp === 0) cmp = a.full_name.localeCompare(b.full_name, 'th')
-      }
-      if (sortKey === 'number') {
-        cmp = cmpNullsLast(profiles[a.id]?.class_number, profiles[b.id]?.class_number, (x, y) => x - y)
-        if (cmp === 0) cmp = a.full_name.localeCompare(b.full_name, 'th')
-      }
-      if (sortKey === 'score') cmp = a.score - b.score
-      if (sortKey === 'status') cmp = a.status.localeCompare(b.status)
-      return sortDir === 'asc' ? cmp : -cmp
+      return compareStudents(a, b, profiles, sortKey, sortDir)
     })
 
   function handleRemove(studentId: string, name: string) {
@@ -222,33 +192,36 @@ export function StudentTable({ classroomId, students, otherClassrooms, profiles 
       {/* Table */}
       <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-x-auto">
         {/* Header */}
-        <div className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-max`}>
+        <div className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide`}>
           {showRoster && (
-            <button className={headerBtnClass('order')} onClick={() => toggleSort('order')}>
-              ลำดับ <SortIcon col="order" />
-            </button>
+            <div className="text-center" title="ลำดับตามที่แสดงในตารางนี้ (เรียงคอลัมน์อื่นได้ แต่เลขนี้ไม่เปลี่ยน)">
+              ลำดับ
+            </div>
           )}
           <div className="w-8" />
-          <button className={`text-left ${headerBtnClass('name')}`} onClick={() => toggleSort('name')}>
+          <button className={`text-left ${headerBtnClass('name')}`} onClick={() => onToggleSort('name')}>
             ชื่อ <SortIcon col="name" />
           </button>
           {showRoster && (
             <>
-              <button className={headerBtnClass('grade')} onClick={() => toggleSort('grade')}>
+              <button className={headerBtnClass('grade')} onClick={() => onToggleSort('grade')}>
                 ระดับชั้น <SortIcon col="grade" />
               </button>
-              <button className={headerBtnClass('section')} onClick={() => toggleSort('section')}>
+              <button className={headerBtnClass('section')} onClick={() => onToggleSort('section')}>
                 ห้อง <SortIcon col="section" />
               </button>
-              <button className={headerBtnClass('number')} onClick={() => toggleSort('number')}>
+              <button className={headerBtnClass('number')} onClick={() => onToggleSort('number')}>
                 เลขที่ <SortIcon col="number" />
+              </button>
+              <button className={headerBtnClass('code')} onClick={() => onToggleSort('code')}>
+                รหัสนักเรียน <SortIcon col="code" />
               </button>
             </>
           )}
-          <button className={headerBtnClass('score')} onClick={() => toggleSort('score')}>
+          <button className={headerBtnClass('score')} onClick={() => onToggleSort('score')}>
             คะแนน <SortIcon col="score" />
           </button>
-          <button className={headerBtnClass('status')} onClick={() => toggleSort('status')}>
+          <button className={headerBtnClass('status')} onClick={() => onToggleSort('status')}>
             สถานะ <SortIcon col="status" />
           </button>
           <div />
@@ -259,26 +232,16 @@ export function StudentTable({ classroomId, students, otherClassrooms, profiles 
           <div className="py-12 text-center text-sm text-gray-400">ไม่พบนักเรียน</div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {filtered.map(student => {
+            {filtered.map((student, index) => {
               const cfg = STATUS_CFG[student.status]
               const profile = profiles[student.id]
               return (
                 <div
                   key={student.id}
-                  className={`grid ${GRID_COLS} gap-3 items-center px-4 py-3 hover:bg-gray-50/50 transition-colors relative min-w-max`}
+                  className={`grid ${GRID_COLS} gap-3 items-center px-4 py-3 hover:bg-gray-50/50 transition-colors relative`}
                 >
                   {showRoster && (
-                    <input
-                      type="number"
-                      min={1}
-                      value={orderDrafts[student.id] ?? student.roster_order ?? ''}
-                      onChange={e => setOrderDrafts(d => ({ ...d, [student.id]: e.target.value }))}
-                      onBlur={e => commitOrder(student.id, e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                      disabled={isPending}
-                      placeholder="-"
-                      className="w-11 text-sm text-center rounded-lg border border-gray-200 py-1 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
-                    />
+                    <span className="text-sm text-gray-500 text-center">{index + 1}</span>
                   )}
                   {/* Avatar */}
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-violet-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
@@ -304,6 +267,7 @@ export function StudentTable({ classroomId, students, otherClassrooms, profiles 
                       <span className="text-sm text-gray-700 truncate">{profile?.grade_level || '—'}</span>
                       <span className="text-sm text-gray-700">{profile?.section_number ? `ห้อง ${profile.section_number}` : '—'}</span>
                       <span className="text-sm text-gray-700">{profile?.class_number ?? '—'}</span>
+                      <span className="text-sm text-gray-700 truncate">{profile?.student_code || '—'}</span>
                     </>
                   )}
 

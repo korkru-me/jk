@@ -232,21 +232,6 @@ async function canManageClassroom(admin: ReturnType<typeof createAdminClient>, c
   return coTeacher?.permission === 'admin' || coTeacher?.permission === 'manage'
 }
 
-export async function setStudentRosterOrder(classroomId: string, studentId: string, order: number | null) {
-  const user = await getAuthUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-  const admin = createAdminClient()
-  if (!(await canManageClassroom(admin, classroomId, user.id))) return { error: 'ไม่มีสิทธิ์' }
-  const { error } = await admin
-    .from('classroom_students')
-    .update({ roster_order: order })
-    .eq('classroom_id', classroomId)
-    .eq('student_id', studentId)
-  if (error) return { error: error.message }
-  revalidatePath(`/classrooms/${classroomId}`)
-  return { success: true }
-}
-
 export async function setAssignmentDisplayOrder(classroomId: string, assignmentId: string, order: number | null) {
   const user = await getAuthUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }

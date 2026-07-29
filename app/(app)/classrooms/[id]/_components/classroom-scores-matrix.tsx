@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle, Download, ChevronDown } from 'lucide-react'
+import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle, Download, ChevronDown, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
-import { setAssignmentDisplayOrder, setStudentRosterOrder } from '@/lib/actions/classrooms'
+import { setAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
 import { downloadTextFile, toCsv, safeFilenamePart } from '@/lib/utils'
@@ -15,6 +15,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ExtensionDialog } from './extension-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
+import type { StudentProfileRow } from './homeroom-overview'
+import type { SortKey as StudentTableSortKey, SortDir as StudentTableSortDir } from './student-table'
+import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey } from '@/lib/student-sort'
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'ส่งแล้ว', graded: 'ส่งแล้ว', in_progress: 'กำลังทำ',
@@ -22,7 +25,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 type TypeFilter = 'all' | 'exercise' | 'exam'
 
-interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
+interface RealStudent { id: string; full_name: string; email: string }
 
 interface SubmissionRow {
   id: string
@@ -50,17 +53,30 @@ interface Props {
   assignments: ClassroomAssignmentRow[]
   submissions: SubmissionRow[]
   extensions: ExtensionRow[]
+  profiles?: Record<string, StudentProfileRow>
+  /** Same sort state driving the "นักเรียน" tab, so both tabs show
+   *  students in the same order. Falls back to name when the active sort
+   *  is one of that tab's local-only columns (score/status — sample data
+   *  with no counterpart here). */
+  sortKey: StudentTableSortKey
+  sortDir: StudentTableSortDir
+  onViewStudents?: () => void
 }
 
-export function ClassroomScoresMatrix({ classroomId, classroomName, students, assignments, submissions, extensions }: Props) {
+function isSyncableSortKey(key: StudentTableSortKey): key is StudentSortKey {
+  return key in STUDENT_SORT_LABEL
+}
+
+export function ClassroomScoresMatrix({
+  classroomId, classroomName, students, assignments, submissions, extensions, profiles = {},
+  sortKey, sortDir, onViewStudents,
+}: Props) {
   const [reminding, setReminding] = useState<string | null>(null)
   const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
   const [isPending, startTransition] = useTransition()
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({})
   const [isOrderPending, startOrderTransition] = useTransition()
-  const [studentOrderDrafts, setStudentOrderDrafts] = useState<Record<string, string>>({})
-  const [isStudentOrderPending, startStudentOrderTransition] = useTransition()
 
   function commitOrder(assignmentId: string, raw: string) {
     const trimmed = raw.trim()
@@ -77,20 +93,12 @@ export function ClassroomScoresMatrix({ classroomId, classroomName, students, as
     })
   }
 
-  function commitStudentOrder(studentId: string, raw: string) {
-    const trimmed = raw.trim()
-    const parsed = trimmed === '' ? null : Number.parseInt(trimmed, 10)
-    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 1)) {
-      toast.error('ลำดับต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป')
-      setStudentOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
-      return
-    }
-    startStudentOrderTransition(async () => {
-      const res = await setStudentRosterOrder(classroomId, studentId, parsed)
-      if (res?.error) toast.error(res.error)
-      setStudentOrderDrafts(d => { const next = { ...d }; delete next[studentId]; return next })
-    })
-  }
+  // Mirror the same student order as the "นักเรียน" tab. If that tab is
+  // currently sorted by one of its local-only columns (score/status —
+  // sample data with no counterpart here), fall back to name.
+  const effectiveSortKey: StudentSortKey = isSyncableSortKey(sortKey) ? sortKey : 'name'
+  const orderedStudents = sortStudents(students, profiles, effectiveSortKey, sortDir)
+  const sortLabel = STUDENT_SORT_LABEL[effectiveSortKey]
 
   // Default order (no manual display_order set) is oldest-assigned-first —
   // whichever assignment the teacher gave to students first leads the table.
@@ -141,19 +149,16 @@ export function ClassroomScoresMatrix({ classroomId, classroomName, students, as
   function cellText(assignmentId: string, studentId: string) {
     const sub = bestSubmission.get(subKey(assignmentId, studentId))
     if (!sub || (sub.status !== 'submitted' && sub.status !== 'graded')) {
-      return sub?.status === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ทำ'
+      return ''
     }
-    const assignment = assignments.find(a => a.id === assignmentId)
-    const passed = computePassed(sub.total_score, sub.max_score, assignment?.passing_type ?? null, assignment?.passing_value ?? null)
-    const score = `${sub.total_score ?? 0}/${sub.max_score}`
-    return passed === false ? `${score} (ไม่ผ่าน)` : score
+    return sub.total_score ?? 0
   }
 
   function exportAll() {
     // Mirrors exactly what's on screen: same columns, same order, same filter.
     const header = ['ลำดับ', 'นักเรียน', 'อีเมล', ...visibleAssignments.map(a => a.title)]
-    const rows = students.map(s => [
-      s.roster_order ?? '', s.full_name, s.email,
+    const rows = orderedStudents.map((s, i) => [
+      i + 1, s.full_name, s.email,
       ...visibleAssignments.map(a => cellText(a.id, s.id)),
     ])
     const dateStr = new Date().toLocaleDateString('th-TH').replace(/\//g, '-')
@@ -167,7 +172,7 @@ export function ClassroomScoresMatrix({ classroomId, classroomName, students, as
 
   function exportAssignment(assignment: ClassroomAssignmentRow) {
     const header = ['ลำดับ', 'นักเรียน', 'อีเมล', 'สถานะ', 'คะแนน', 'คะแนนเต็ม', 'ผลการประเมิน', 'ส่งเมื่อ', 'ครั้งที่', 'ขยายเวลาถึง']
-    const rows = students.map(s => {
+    const rows = orderedStudents.map((s, i) => {
       const sub = bestSubmission.get(subKey(assignment.id, s.id))
       const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
       const passed = submitted
@@ -175,7 +180,7 @@ export function ClassroomScoresMatrix({ classroomId, classroomName, students, as
         : null
       const extension = extensionMap.get(subKey(assignment.id, s.id))
       return [
-        s.roster_order ?? '', s.full_name, s.email,
+        i + 1, s.full_name, s.email,
         sub ? (STATUS_LABEL[sub.status] ?? sub.status) : 'ยังไม่ทำ',
         submitted ? sub!.total_score ?? 0 : '',
         submitted ? sub!.max_score : '',
@@ -247,28 +252,48 @@ export function ClassroomScoresMatrix({ classroomId, classroomName, students, as
         )}
       </div>
 
+      <p className="flex items-center gap-1.5 text-xs text-gray-400">
+        <Info className="w-3.5 h-3.5 shrink-0" />
+        รายชื่อเรียงตาม<strong className="font-semibold text-gray-500">{sortLabel}</strong> ({sortDir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'}) ตามที่ตั้งไว้ที่แท็บ
+        {onViewStudents ? (
+          <button onClick={onViewStudents} className="text-blue-600 hover:underline font-medium">
+            &ldquo;นักเรียน&rdquo;
+          </button>
+        ) : (
+          <span className="font-medium text-gray-500">&ldquo;นักเรียน&rdquo;</span>
+        )}
+        — ไปเปลี่ยนได้ที่นั่น
+      </p>
+
       {visibleAssignments.length === 0 ? (
         <div className="bg-white rounded-2xl ring-1 ring-black/5 py-12 text-center text-sm text-gray-400">
           ไม่พบงานที่ตรงกับตัวกรอง
         </div>
       ) : (
       <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        {/* border-separate (not -collapse): sticky positioning on table
+            cells doesn't reliably paint over a collapsed border seam, which
+            let scrolled-under content show through the gap between the
+            sticky ลำดับ/นักเรียน columns. */}
+        <table className="w-full text-sm border-separate border-spacing-0">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="sticky left-0 bg-white text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-16">
+            {/* Row-divider borders live on the cells, not the <tr> — the
+                separated-borders table model (needed above) doesn't render
+                borders set directly on rows. */}
+            <tr>
+              <th className="sticky left-0 z-20 bg-white text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-16 min-w-16 max-w-16 border-b border-gray-100">
                 ลำดับ
               </th>
-              <th className="sticky left-16 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[180px]">
+              <th className="sticky left-16 z-20 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[180px] border-b border-gray-100">
                 นักเรียน
               </th>
               {visibleAssignments.map(a => {
-                const hasNonSubmitter = students.some(s => {
+                const hasNonSubmitter = orderedStudents.some(s => {
                   const sub = bestSubmission.get(subKey(a.id, s.id))
                   return !sub || (sub.status !== 'submitted' && sub.status !== 'graded')
                 })
                 return (
-                  <th key={a.id} className="px-3 py-3 text-center min-w-[140px]">
+                  <th key={a.id} className="px-3 py-3 text-center min-w-[140px] border-b border-gray-100">
                     <input
                       type="number"
                       min={1}
@@ -302,23 +327,12 @@ export function ClassroomScoresMatrix({ classroomId, classroomName, students, as
             </tr>
           </thead>
           <tbody>
-            {students.map(student => (
-              <tr key={student.id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50/50">
-                <td className="sticky left-0 bg-white px-2 py-2.5 text-center">
-                  <input
-                    type="number"
-                    min={1}
-                    value={studentOrderDrafts[student.id] ?? student.roster_order ?? ''}
-                    onChange={e => setStudentOrderDrafts(d => ({ ...d, [student.id]: e.target.value }))}
-                    onBlur={e => commitStudentOrder(student.id, e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                    disabled={isStudentOrderPending}
-                    placeholder="-"
-                    title="ลำดับนักเรียน"
-                    className="w-11 mx-auto text-xs text-center rounded-lg border border-gray-200 py-1 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
-                  />
+            {orderedStudents.map((student, index) => (
+              <tr key={student.id} className="hover:bg-gray-50/50">
+                <td className="sticky left-0 z-10 bg-white px-2 py-2.5 text-center text-sm text-gray-500 w-16 min-w-16 max-w-16 border-b border-gray-50">
+                  {index + 1}
                 </td>
-                <td className="sticky left-16 bg-white px-4 py-2.5">
+                <td className="sticky left-16 z-10 bg-white px-4 py-2.5 border-b border-gray-50">
                   <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">{student.full_name}</p>
                   <p className="text-xs text-gray-400 truncate max-w-[160px]">{student.email}</p>
                 </td>
@@ -332,7 +346,7 @@ export function ClassroomScoresMatrix({ classroomId, classroomName, students, as
                     : null
 
                   return (
-                    <td key={a.id} className="px-3 py-2.5 text-center group relative">
+                    <td key={a.id} className="px-3 py-2.5 text-center group relative border-b border-gray-50">
                       {submitted ? (
                         <div className={`flex items-center justify-center gap-1 ${
                           passed === false ? 'text-red-500' : 'text-emerald-600'

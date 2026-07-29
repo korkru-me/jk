@@ -13,7 +13,7 @@ import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomStream } from './classroom-stream'
-import { StudentTable } from './student-table'
+import { StudentTable, type SortKey as StudentSortKey, type SortDir as StudentSortDir } from './student-table'
 import { InvitePanel } from './invite-panel'
 import { CoTeachers, type CoTeacherRow, type InviteRow } from './co-teachers'
 import { ClassroomAssignmentsTab, type ClassroomAssignmentRow } from './classroom-assignments-tab'
@@ -50,7 +50,7 @@ const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?
   { key: 'log',         label: 'ประวัติ',          icon: Activity },
 ]
 
-interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
+interface RealStudent { id: string; full_name: string; email: string }
 
 interface Props {
   classroom: Classroom
@@ -89,6 +89,17 @@ export function ClassroomDetailClient({
   const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
   const [activeTab, setActiveTab] = useState<Tab>(isHomeroom && canManage ? 'homeroom' : 'stream')
   const [codeCopied, setCodeCopied] = useState(false)
+
+  // Shared with the "คะแนนและการส่งงาน" tab so both show students in the
+  // same order — set here (not inside StudentTable) so it survives
+  // switching tabs and both consumers stay in sync.
+  const [studentSortKey, setStudentSortKey] = useState<StudentSortKey>('name')
+  const [studentSortDir, setStudentSortDir] = useState<StudentSortDir>('asc')
+
+  function toggleStudentSort(key: StudentSortKey) {
+    setStudentSortDir(d => (studentSortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
+    setStudentSortKey(key)
+  }
 
   function copyCode() {
     navigator.clipboard.writeText(classroom.class_code).then(() => {
@@ -210,6 +221,9 @@ export function ClassroomDetailClient({
             profiles={studentProfiles}
             showRoster={canManage}
             showProfiles={isHomeroom && canManage}
+            sortKey={studentSortKey}
+            sortDir={studentSortDir}
+            onToggleSort={toggleStudentSort}
           />
         )}
         {activeTab === 'assignments' && canManage && (
@@ -229,6 +243,10 @@ export function ClassroomDetailClient({
             assignments={classroomAssignments}
             submissions={classroomSubmissions}
             extensions={classroomExtensions}
+            profiles={studentProfiles}
+            sortKey={studentSortKey}
+            sortDir={studentSortDir}
+            onViewStudents={() => setActiveTab('students')}
           />
         )}
         {activeTab === 'homeroom' && canManage && (

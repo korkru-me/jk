@@ -7,7 +7,7 @@ import { StudentClassroomView, type StudentAssignmentRow } from './_components/s
 import { HomeroomStudentView } from './_components/homeroom-student-view'
 import { getClassroomPosts } from '@/lib/actions/classroom-posts'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
-import { selectOfficialAttempt } from '@/lib/scoring'
+import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
@@ -111,20 +111,26 @@ export default async function ClassroomDetailPage({
     const { data: assignmentRows } = assignmentIds.length > 0
       ? await admin
           .from('assignments')
-          .select('id, title, question_ids, end_at, duration_minutes, type, max_attempts, score_strategy, passing_type, passing_value')
+          .select('id, title, question_ids, end_at, duration_minutes, type, max_attempts, score_strategy, passing_type, passing_value, display_max_score')
           .in('id', assignmentIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false })
       : { data: [] }
     const publishedIds = (assignmentRows ?? []).map((a: any) => a.id)
 
-    const { data: subRows } = publishedIds.length > 0
+    const { data: rawSubRows } = publishedIds.length > 0
       ? await admin
           .from('submissions')
           .select('id, assignment_id, status, total_score, max_score, attempt_number, started_at')
           .in('assignment_id', publishedIds)
           .eq('student_id', authUser!.id)
       : { data: [] }
+
+    const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
+    const subRows = rescaleToDisplayMax(
+      (rawSubRows ?? []) as any[],
+      row => displayMaxByAssignment.get(row.assignment_id) ?? null
+    )
 
     // Multiple attempts are possible — reduce to the "official" score per
     // the assignment's own score_strategy, but also track the highest
@@ -135,7 +141,7 @@ export default async function ClassroomDetailPage({
     const attemptsByAssignment: Record<string, any[]> = {}
     const attemptsUsed: Record<string, number> = {}
     const hasInProgress: Record<string, boolean> = {}
-    for (const s of (subRows ?? []) as any[]) {
+    for (const s of subRows) {
       attemptsUsed[s.assignment_id] = Math.max(attemptsUsed[s.assignment_id] ?? 0, s.attempt_number)
       // An abandoned in-progress attempt whose timer already ran out gets
       // force-finalized by startSubmission() on the next visit rather than
@@ -225,21 +231,17 @@ export default async function ClassroomDetailPage({
     createdAt: i.created_at as string,
   }))
 
-  // Students in this classroom, in the advisor's custom roster order when
-  // set (nulls — i.e. not yet assigned an order — sort after, by name).
+  // Students in this classroom, always alphabetical by name — the roster
+  // display order is a fixed 1,2,3,... row position, not a stored/editable
+  // field, so there's nothing else to sort by here.
   const { data: memberships } = await admin
     .from('classroom_students')
-    .select('student_id, roster_order, users!inner(id, full_name, email)')
+    .select('student_id, users!inner(id, full_name, email)')
     .eq('classroom_id', id)
 
   const students = (memberships ?? [])
-    .map((m: any) => ({ ...m.users, roster_order: m.roster_order }))
-    .sort((a: any, b: any) => {
-      if (a.roster_order != null && b.roster_order != null) return a.roster_order - b.roster_order
-      if (a.roster_order != null) return -1
-      if (b.roster_order != null) return 1
-      return a.full_name.localeCompare(b.full_name, 'th')
-    }) as (Pick<User, 'id' | 'full_name' | 'email'> & { roster_order: number | null })[]
+    .map((m: any) => m.users)
+    .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name, 'th')) as Pick<User, 'id' | 'full_name' | 'email'>[]
 
   // Assignments linked to this classroom (via assignment_classrooms, not the
   // legacy single classroom_id column, so multi-classroom assignments count too)
@@ -272,7 +274,7 @@ export default async function ClassroomDetailPage({
     const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }] = await Promise.all([
       admin
         .from('assignments')
-        .select('id, title, type, mode, status, start_at, end_at, question_ids, created_at, passing_type, passing_value, max_attempts, score_strategy')
+        .select('id, title, type, mode, status, start_at, end_at, question_ids, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score')
         .in('id', linkedAssignmentIds)
         .order('created_at', { ascending: false }),
       admin
@@ -288,7 +290,11 @@ export default async function ClassroomDetailPage({
       ...a,
       display_order: displayOrderByAssignment.get(a.id) ?? null,
     }))
-    classroomSubmissions = submissionRows ?? []
+    const displayMaxByAssignment = new Map((assignmentRows ?? []).map(a => [a.id as string, (a as any).display_max_score as number | null]))
+    classroomSubmissions = rescaleToDisplayMax(
+      submissionRows ?? [],
+      row => displayMaxByAssignment.get(row.assignment_id) ?? null
+    )
     classroomExtensions = extensionRows ?? []
   }
 
