@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
-import { selectOfficialAttempt } from '@/lib/scoring'
+import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { AnalyticsClient } from './_components/analytics-client'
 
 export const metadata = { title: 'วิเคราะห์และประเมินผล — KorKru' }
@@ -58,8 +58,9 @@ export default async function AnalyticsPage({
 
   // A student may have multiple attempts — reduce to the "official" score
   // per the assignment's score_strategy, so retries don't skew the stats.
+  const rescaledSubmissions = rescaleToDisplayMax((submissions ?? []) as any[], () => a.display_max_score)
   const attemptsByStudent = new Map<string, any[]>()
-  for (const s of (submissions ?? []) as any[]) {
+  for (const s of rescaledSubmissions) {
     const arr = attemptsByStudent.get(s.student_id) ?? []
     arr.push(s)
     attemptsByStudent.set(s.student_id, arr)

@@ -7,7 +7,7 @@ import { CheckCircle2, XCircle, Clock, ChevronLeft, Trophy, RotateCcw, School, F
 import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
 import { getBlankType } from '@/lib/fill-blank'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
-import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
+import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax } from '@/lib/scoring'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -43,7 +43,7 @@ export default async function SubmissionResultPage({
     .from('submissions')
     .select(`
       *,
-      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, classrooms(name)),
+      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, display_max_score, classrooms(name)),
       submission_answers(*, questions(*))
     `)
     .eq('id', id)
@@ -70,12 +70,14 @@ export default async function SubmissionResultPage({
   }
 
   const pendingManualCount = answers.filter(isManualFillBlank).length
-  const pct = submission.max_score > 0
-    ? Math.round((submission.total_score / submission.max_score) * 100)
-    : 0
 
   const assignment = (submission as any).assignments
-  const passed = computePassed(submission.total_score, submission.max_score, assignment.passing_type, assignment.passing_value)
+  const [{ total_score: displayScore, max_score: displayMax }] = rescaleToDisplayMax(
+    [submission as { total_score: number | null; max_score: number }],
+    () => assignment.display_max_score
+  )
+  const pct = displayMax > 0 ? Math.round(((displayScore ?? 0) / displayMax) * 100) : 0
+  const passed = computePassed(displayScore, displayMax, assignment.passing_type, assignment.passing_value)
   const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
   const canShowAnswers =
     assignment.show_results !== 'after_due' ||
@@ -148,7 +150,7 @@ export default async function SubmissionResultPage({
             {pct}%
           </div>
 
-          <p className="text-4xl font-black">{submission.total_score}/{submission.max_score}</p>
+          <p className="text-4xl font-black">{displayScore}/{displayMax}</p>
           <p className="text-muted-foreground mt-1 text-sm">คะแนนที่ได้</p>
 
           <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">

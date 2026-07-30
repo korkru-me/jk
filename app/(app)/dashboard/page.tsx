@@ -8,6 +8,7 @@ import type { User } from '@/lib/types'
 import { TeacherDashboard } from './_components/teacher-dashboard'
 import { AssignmentCalendar, type CalendarEvent } from './_components/assignment-calendar'
 import { computePassed } from '@/lib/grading'
+import { rescaleToDisplayMax } from '@/lib/scoring'
 import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
@@ -75,7 +76,20 @@ export default async function DashboardPage() {
   ])
 
   const classroomIds = (membershipsRes.data ?? []).map((m: any) => m.classroom_id)
-  const allSubmissions = submissionsRes.data ?? []
+  const rawSubmissions = submissionsRes.data ?? []
+
+  // Submissions here span every assignment the student has ever attempted
+  // (not just currently-pending ones), so the display_max_score lookup has
+  // to cover that whole set rather than reusing `allAssignments` below.
+  const submittedAssignmentIds = Array.from(new Set(rawSubmissions.map((s: any) => s.assignment_id)))
+  const { data: scoreScaleRows } = submittedAssignmentIds.length > 0
+    ? await supabase.from('assignments').select('id, display_max_score').in('id', submittedAssignmentIds)
+    : { data: [] }
+  const displayMaxByAssignment = new Map((scoreScaleRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
+  const allSubmissions = rescaleToDisplayMax(
+    rawSubmissions as any[],
+    row => displayMaxByAssignment.get(row.assignment_id) ?? null
+  )
   const completed = allSubmissions.filter(
     (s: any) => s.status === 'submitted' || s.status === 'graded'
   )

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { rescaleToDisplayMax } from '@/lib/scoring'
 
 export interface HomeroomAssignmentRow {
   id: string
@@ -67,7 +68,7 @@ export async function getHomeroomAggregate(
   const [{ data: assignmentRows }, { data: submissionRows }] = await Promise.all([
     admin
       .from('assignments')
-      .select('id, title, end_at, status, passing_type, passing_value, score_strategy')
+      .select('id, title, end_at, status, passing_type, passing_value, score_strategy, display_max_score')
       .in('id', assignmentIds)
       .eq('status', 'published')
       .order('end_at', { ascending: true, nullsFirst: false }),
@@ -92,5 +93,11 @@ export async function getHomeroomAggregate(
     }
   })
 
-  return { assignments, submissions: (submissionRows ?? []) as HomeroomSubmissionRow[] }
+  const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
+  const submissions = rescaleToDisplayMax(
+    (submissionRows ?? []) as HomeroomSubmissionRow[],
+    row => displayMaxByAssignment.get(row.assignment_id) ?? null
+  )
+
+  return { assignments, submissions }
 }

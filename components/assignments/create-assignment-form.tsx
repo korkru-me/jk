@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import {
   Check, ChevronRight, ChevronLeft, Eye, Timer,
-  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target,
+  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale,
 } from 'lucide-react'
 import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy } from '@/lib/types'
 
@@ -56,14 +56,24 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   // questions back into the library as a new reusable set.
   const [saveAsSet, setSaveAsSet] = useState(false)
 
-  // Step 2
-  const [selectedIds, setSelectedIds] = useState<string[]>(preselectedSet?.question_ids ?? [])
+  // Step 2 — filter out any question_ids that no longer resolve to a real
+  // question (e.g. deleted since the set was saved). Otherwise a dangling id
+  // sails through into selectedIds, gets silently dropped later by
+  // previewQuestions (step 3 can only render questions it can find), and the
+  // teacher sees the count mysteriously shrink by however many are dangling.
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    (preselectedSet?.question_ids ?? []).filter(id => questions.some(q => q.id === id))
+  )
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
   // Step 3 (คะแนน) — every question defaults to 1 point; teacher can edit
   // individual questions and the total recalculates automatically.
   const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>({})
+  // Independent of the per-question points above — rescales what's
+  // *reported* only (never the underlying structure), and can be changed
+  // any time later from the edit page too, even after students finish.
+  const [displayMaxScore, setDisplayMaxScore] = useState('')
 
   // Step 4 (ตั้งค่า)
   const [duration, setDuration] = useState('')
@@ -87,8 +97,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   }
 
   function importSet(set: QuestionSet) {
-    setSelectedIds(prev => Array.from(new Set([...prev, ...set.question_ids])))
-    toast.success(`เพิ่ม ${set.question_ids.length} ข้อจากชุด "${set.title}"`)
+    const validIds = set.question_ids.filter(id => questions.some(q => q.id === id))
+    const missingCount = set.question_ids.length - validIds.length
+    setSelectedIds(prev => Array.from(new Set([...prev, ...validIds])))
+    if (missingCount > 0) {
+      toast.success(`เพิ่ม ${validIds.length} ข้อจากชุด "${set.title}" (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
+    } else {
+      toast.success(`เพิ่ม ${validIds.length} ข้อจากชุด "${set.title}"`)
+    }
   }
 
   function toggleClassroom(id: string) {
@@ -180,12 +196,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         })
       )
 
+      const parsedDisplayMax = Number.parseFloat(displayMaxScore)
+      const displayMax = displayMaxScore.trim() !== '' && Number.isFinite(parsedDisplayMax) && parsedDisplayMax > 0
+        ? parsedDisplayMax
+        : null
+
       const res = await createAssignment({
         classroom_ids: classroomIds,
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
         question_points: questionPoints,
+        display_max_score: displayMax,
         set_id: setId,
         start_at: effectiveStartAt || null,
         end_at: endAt || null,
@@ -241,7 +263,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             {preselectedSet && (
               <div className="flex items-center gap-2 text-sm bg-blue-50 text-blue-700 rounded-xl px-3 py-2.5">
                 <Layers className="w-4 h-4 shrink-0" />
-                ใช้ชุดโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({preselectedSet.question_ids.length} ข้อ) — ปรับโจทย์ที่เลือกได้ในขั้นตอนถัดไป
+                ใช้ชุดโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({selectedIds.length} ข้อ) — ปรับโจทย์ที่เลือกได้ในขั้นตอนถัดไป
               </div>
             )}
 
@@ -385,18 +407,21 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               </div>
               <p className="text-xs text-gray-400">เลือกชุดเพื่อเพิ่มโจทย์ทั้งหมดเข้ามา — ปรับเพิ่ม/ลดทีละข้อได้ด้านล่าง</p>
               <div className="flex flex-wrap gap-2">
-                {questionSets.map(s => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => importSet(s)}
-                    className="flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 px-3 py-1.5 rounded-lg transition-all"
-                  >
-                    <Layers className="w-3 h-3 text-gray-400" />
-                    {s.title}
-                    <span className="text-gray-400">({s.question_ids.length})</span>
-                  </button>
-                ))}
+                {questionSets.map(s => {
+                  const validCount = s.question_ids.filter(id => questions.some(q => q.id === id)).length
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => importSet(s)}
+                      className="flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      <Layers className="w-3 h-3 text-gray-400" />
+                      {s.title}
+                      <span className="text-gray-400">({validCount})</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -444,6 +469,33 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   <span className="text-xs text-gray-400 shrink-0">คะแนน</span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                <Scale className="w-4 h-4 text-gray-400" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900">คะแนนเต็มที่แสดงผล</h2>
+                <p className="text-xs text-gray-400">
+                  ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
+                  เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ปรับได้ภายหลังจากหน้าแก้ไขได้ตลอด แม้นักเรียนทำไปแล้ว
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pl-11">
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={displayMaxScore}
+                onChange={e => setDisplayMaxScore(e.target.value)}
+                placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
+                className="max-w-[160px]"
+              />
+              <span className="text-sm text-gray-500">คะแนน</span>
             </div>
           </div>
 
@@ -679,7 +731,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 },
                 { label: 'ประเภท',    value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
                 { label: 'โจทย์',     value: `${selectedIds.length} ข้อ` },
-                { label: 'คะแนนเต็ม', value: `${pointsSum} คะแนน` },
+                {
+                  label: 'คะแนนเต็ม',
+                  value: displayMaxScore.trim() && Number(displayMaxScore) > 0
+                    ? `${displayMaxScore} คะแนน (จริง ${pointsSum})`
+                    : `${pointsSum} คะแนน`,
+                },
                 { label: 'โหมด',      value: mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
                 ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
                 ...(passingEnabled && passingValue ? [{ label: 'เกณฑ์ผ่าน', value: passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน` }] : []),

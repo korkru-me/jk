@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,6 +51,15 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
     questions.reduce((sum, q) => sum + (Number.parseFloat(questionPointDrafts[q.id] ?? '1') || 0), 0) * 100
   ) / 100
 
+  // Independent from the per-question points above — this only rescales
+  // what's *reported* (gradebook, results, exports), never the underlying
+  // question structure. Safe to change any time, even after students have
+  // already finished, since it's applied at display time from each
+  // submission's already-stored raw score rather than being baked in.
+  const [displayMaxScore, setDisplayMaxScore] = useState(
+    a.display_max_score != null ? String(a.display_max_score) : ''
+  )
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรุณากรอกชื่อชุดข้อสอบ'); return }
@@ -61,6 +70,11 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         return [q.id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
       })
     )
+
+    const parsedDisplayMax = Number.parseFloat(displayMaxScore)
+    const displayMax = displayMaxScore.trim() !== '' && Number.isFinite(parsedDisplayMax) && parsedDisplayMax > 0
+      ? parsedDisplayMax
+      : null
 
     startTransition(async () => {
       const res = await updateAssignment(a.id, {
@@ -74,6 +88,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
         question_points: questionPoints,
+        display_max_score: displayMax,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -122,6 +137,34 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
               <span className="text-xs text-gray-400 shrink-0">คะแนน</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+            <Scale className="w-4 h-4 text-gray-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900">คะแนนเต็มที่แสดงผล</h2>
+            <p className="text-xs text-gray-400">
+              ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
+              เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ระบบจะคูณสัดส่วนคะแนนของนักเรียนแต่ละคนให้อัตโนมัติ
+              ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 pl-11">
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            value={displayMaxScore}
+            onChange={e => setDisplayMaxScore(e.target.value)}
+            placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
+            className="max-w-[160px]"
+          />
+          <span className="text-sm text-gray-500">คะแนน</span>
         </div>
       </div>
 
@@ -253,7 +296,8 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         <FileText className="w-4 h-4 shrink-0 mt-0.5" />
         <p>
           แก้ไขได้เฉพาะกำหนดการ รายละเอียด และคะแนน — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน
-          (การเปลี่ยนคะแนนเต็มจะมีผลกับการทำครั้งใหม่เท่านั้น ไม่กระทบคะแนนที่นักเรียนทำไปแล้ว)
+          (การเปลี่ยน &ldquo;คะแนนแต่ละข้อ&rdquo; จะมีผลกับการทำครั้งใหม่เท่านั้น ไม่กระทบคะแนนที่นักเรียนทำไปแล้ว
+          ส่วน &ldquo;คะแนนเต็มที่แสดงผล&rdquo; ปรับได้ตลอดและมีผลย้อนหลังกับทุกครั้งที่ทำไปแล้วทันที)
         </p>
       </div>
 

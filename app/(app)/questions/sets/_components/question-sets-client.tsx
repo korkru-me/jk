@@ -222,7 +222,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetWithCreator; currentU
         {set.description && (
           <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{set.description}</p>
         )}
-        <p className="text-xs text-gray-400 mt-1.5">{set.question_ids.length} ข้อ</p>
+        <p className="text-xs text-gray-400 mt-1.5">{set.valid_question_count ?? set.question_ids.length} ข้อ</p>
 
         {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
           <div className="flex items-center gap-1.5 flex-wrap mt-2">

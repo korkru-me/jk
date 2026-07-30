@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Assignment } from '@/lib/types'
-import { selectOfficialAttempt } from '@/lib/scoring'
+import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
 import { ExamDashboard } from './_components/exam-dashboard'
 
@@ -43,11 +43,17 @@ export default async function AssignmentsPage() {
   const pList = (published ?? []) as AssignmentRow[]
   const pIds = pList.map(a => a.id)
 
-  const { data: mySubs } = pIds.length > 0
+  const { data: rawMySubs } = pIds.length > 0
     ? await supabase
         .from('submissions').select('assignment_id, id, status, total_score, max_score, attempt_number, started_at')
         .in('assignment_id', pIds).eq('student_id', user.id)
     : { data: [] }
+
+  const displayMaxByAssignment = new Map(pList.map(a => [a.id, a.display_max_score]))
+  const mySubs = rescaleToDisplayMax(
+    (rawMySubs ?? []) as any[],
+    row => displayMaxByAssignment.get(row.assignment_id) ?? null
+  )
 
   // An assignment may have multiple attempts — reduce to the "official"
   // score per the assignment's own score_strategy, for the badge. Also
@@ -58,7 +64,7 @@ export default async function AssignmentsPage() {
   const attemptsByAssignment = new Map<string, any[]>()
   const attemptsUsed: Record<string, number> = {}
   const hasInProgress: Record<string, boolean> = {}
-  for (const s of (mySubs ?? []) as any[]) {
+  for (const s of mySubs) {
     attemptsUsed[s.assignment_id] = Math.max(attemptsUsed[s.assignment_id] ?? 0, s.attempt_number)
     // An abandoned in-progress attempt whose timer already ran out gets
     // force-finalized by startSubmission() on the next visit rather than

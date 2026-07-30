@@ -161,7 +161,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
       {activeTab === 'individual' && (
         <StudentScoreTable
           submissions={submissions}
-          maxScore={submissions[0]?.max_score ?? questions.length}
+          maxScore={submissions[0]?.max_score ?? assignment.display_max_score ?? questions.length}
           overrides={overrides}
           onOverride={handleOverride}
           teacherName={teacherName}
@@ -195,7 +195,7 @@ function OverviewSection({ assignment, questions, submissions }: {
   const max = scores.length > 0 ? scores[scores.length - 1] : 0
   const min = scores.length > 0 ? scores[0] : 0
 
-  const maxScore = submissions[0]?.max_score ?? questions.length
+  const maxScore = submissions[0]?.max_score ?? assignment.display_max_score ?? questions.length
   const passingPct = passingPercent(maxScore, assignment.passing_type, assignment.passing_value)
 
   return (

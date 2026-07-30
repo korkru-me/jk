@@ -5,7 +5,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { TrendingUp, CheckCircle2, XCircle, Clock, ChevronRight, ListTodo } from 'lucide-react'
 import { computePassed } from '@/lib/grading'
-import { selectOfficialAttempt } from '@/lib/scoring'
+import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 
 export const metadata = { title: 'ผลงานของฉัน — KorKru' }
 
@@ -16,11 +16,14 @@ export default async function MySubmissionsPage() {
 
   const { data: submissions } = await supabase
     .from('submissions')
-    .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy)')
+    .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy, display_max_score)')
     .eq('student_id', user.id)
     .order('created_at', { ascending: false })
 
-  const all = submissions ?? []
+  const all = rescaleToDisplayMax(
+    (submissions ?? []) as any[],
+    row => row.assignments?.display_max_score ?? null
+  )
   const completed = all.filter((s: any) => s.status === 'submitted' || s.status === 'graded')
   const inProgress = all.filter((s: any) => s.status === 'in_progress')
 

@@ -73,6 +73,18 @@ export function QuestionPicker({
     return true
   })
 
+  // Pin selected questions to the top, in the order they were picked — with
+  // a bank of hundreds/thousands of questions, scrolling to find whichever
+  // ones are already checked is painful, so piling them up front instead
+  // makes review/toggling fast regardless of list size.
+  const filteredIdSet = new Set(filteredQs.map(q => q.id))
+  const pinnedQs = selectedIds
+    .filter(id => filteredIdSet.has(id))
+    .map(id => filteredQs.find(q => q.id === id)!)
+  const pinnedIdSet = new Set(pinnedQs.map(q => q.id))
+  const restQs = filteredQs.filter(q => !pinnedIdSet.has(q.id))
+  const orderedQs = [...pinnedQs, ...restQs]
+
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
       <div className="flex items-center justify-between">
@@ -135,45 +147,55 @@ export function QuestionPicker({
       <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
         {filteredQs.length === 0 ? (
           <div className="text-center py-12 text-gray-400 text-sm">ไม่พบโจทย์ที่ตรงกัน</div>
-        ) : filteredQs.map(q => {
+        ) : orderedQs.map((q, i) => {
           const diff = DIFF_META[q.difficulty]
           const isSelected = selectedIds.includes(q.id)
+          // Divider right where the pinned (selected) block ends, only when
+          // both groups are present — makes the reordering self-explanatory
+          // instead of the list just silently jumping around.
+          const showDivider = i === pinnedQs.length && pinnedQs.length > 0 && restQs.length > 0
           return (
-            <label
-              key={q.id}
-              className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
-                isSelected ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-gray-50'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => onToggle(q.id)}
-                className="mt-0.5 accent-blue-600"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{q.title}</p>
-                <p className="text-xs text-gray-400 mt-0.5 truncate">{q.question_text}</p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className={`text-xs px-1.5 py-0.5 rounded border ${diff?.color ?? 'bg-gray-50 text-gray-500 border-gray-200'}`}>
-                  {diff?.label ?? q.difficulty}
-                </span>
-                <span className="text-xs text-gray-400">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
-                {q.question_type === 'written' && (
-                  <div
-                    className="flex items-center gap-1"
-                    onClick={e => { e.preventDefault(); e.stopPropagation() }}
-                    title="บังคับแนบรูปวิธีทำ"
-                  >
-                    <ToggleSwitch
-                      checked={workImageOverrides[q.id] ?? q.requires_work_image}
-                      onChange={next => handleToggleWorkImage(q.id, next)}
-                    />
-                  </div>
-                )}
-              </div>
-            </label>
+            <div key={q.id}>
+              {showDivider && (
+                <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide px-1 pt-1 pb-1.5">
+                  โจทย์อื่นๆ
+                </p>
+              )}
+              <label
+                className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
+                  isSelected ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggle(q.id)}
+                  className="mt-0.5 accent-blue-600"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{q.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">{q.question_text}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`text-xs px-1.5 py-0.5 rounded border ${diff?.color ?? 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                    {diff?.label ?? q.difficulty}
+                  </span>
+                  <span className="text-xs text-gray-400">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
+                  {q.question_type === 'written' && (
+                    <div
+                      className="flex items-center gap-1"
+                      onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                      title="บังคับแนบรูปวิธีทำ"
+                    >
+                      <ToggleSwitch
+                        checked={workImageOverrides[q.id] ?? q.requires_work_image}
+                        onChange={next => handleToggleWorkImage(q.id, next)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
           )
         })}
       </div>

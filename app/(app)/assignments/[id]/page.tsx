@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
-import { selectOfficialAttempt } from '@/lib/scoring'
+import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { AssignmentDetailClient } from './_components/assignment-detail-client'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
@@ -79,8 +79,12 @@ export default async function AssignmentDetailPage({
 
   // A student may have multiple submissions (retries) — reduce to the
   // "official" attempt per the assignment's own score_strategy.
+  const rescaledSubmissions = rescaleToDisplayMax(
+    (submissions ?? []) as unknown as SubmissionRow[],
+    () => a.display_max_score
+  )
   const attemptsByStudent = new Map<string, SubmissionRow[]>()
-  for (const s of (submissions ?? []) as unknown as SubmissionRow[]) {
+  for (const s of rescaledSubmissions) {
     const arr = attemptsByStudent.get(s.student_id) ?? []
     arr.push(s)
     attemptsByStudent.set(s.student_id, arr)

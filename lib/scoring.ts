@@ -1,5 +1,36 @@
 import type { ScoreStrategy } from '@/lib/types'
 
+interface ScoredRow {
+  total_score: number | null
+  max_score: number
+}
+
+// Proportionally rescales total_score/max_score to `displayMax` (an
+// assignment's display_max_score) — e.g. a structural total of 15 shown as
+// "out of 10". Pass `null` displayMax to leave rows untouched (the default,
+// pre-existing behavior). Call this immediately after fetching submission
+// rows, before any sorting/pass-fail/percentage math runs on them, so
+// everything downstream — computePassed, selectOfficialAttempt, CSV export,
+// etc — consumes the same already-rescaled numbers without needing to know
+// about display_max_score itself. Because it only reads each row's already-
+// stored raw score, this is safe to apply at any time, including to
+// submissions from students who finished long ago.
+export function rescaleToDisplayMax<T extends ScoredRow>(
+  rows: T[],
+  resolveDisplayMax: (row: T) => number | null
+): T[] {
+  return rows.map(row => {
+    const displayMax = resolveDisplayMax(row)
+    if (displayMax == null || row.max_score <= 0) return row
+    const scale = displayMax / row.max_score
+    return {
+      ...row,
+      total_score: row.total_score == null ? null : Math.round(row.total_score * scale * 100) / 100,
+      max_score: displayMax,
+    }
+  })
+}
+
 export const SCORE_STRATEGY_LABELS: Record<ScoreStrategy, string> = {
   best: 'คะแนนครั้งที่ดีที่สุด',
   average: 'คะแนนเฉลี่ยจากทุกครั้ง',

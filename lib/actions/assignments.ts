@@ -12,6 +12,7 @@ interface CreateAssignmentData {
   description: string
   question_ids: string[]
   question_points?: Record<string, number> | null
+  display_max_score?: number | null
   set_id?: string
   start_at: string | null
   end_at: string | null
@@ -62,6 +63,9 @@ export async function createAssignment(data: CreateAssignmentData) {
     )
   )
   const questionPoints = Object.keys(sanitizedPoints).length > 0 ? sanitizedPoints : null
+  const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
+    ? data.display_max_score
+    : null
 
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
@@ -76,6 +80,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       description: data.description.trim() || null,
       question_ids: questionIds,
       question_points: questionPoints,
+      display_max_score: displayMaxScore,
       set_id: data.set_id ?? null,
       start_at: data.start_at || null,
       end_at: data.end_at || null,
@@ -139,6 +144,7 @@ interface UpdateAssignmentData {
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   question_points?: Record<string, number> | null
+  display_max_score?: number | null
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -170,6 +176,9 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     )
   )
   const questionPoints = Object.keys(sanitizedPoints).length > 0 ? sanitizedPoints : null
+  const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
+    ? data.display_max_score
+    : null
 
   const { error } = await supabase
     .from('assignments')
@@ -184,6 +193,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       passing_type: data.passing_type,
       passing_value: data.passing_value,
       question_points: questionPoints,
+      display_max_score: displayMaxScore,
     })
     .eq('id', id)
 
@@ -255,6 +265,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       description: source.description,
       question_ids: source.question_ids,
       question_points: source.question_points,
+      display_max_score: source.display_max_score,
       set_id: null,
       start_at: null,
       end_at: null,

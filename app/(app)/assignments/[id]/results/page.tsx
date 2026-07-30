@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ExportButton } from '@/components/assignments/export-button'
 import { computePassed } from '@/lib/grading'
-import { selectOfficialAttempt } from '@/lib/scoring'
+import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 export const metadata = { title: 'ผลคะแนน — KorKru' }
@@ -37,8 +37,9 @@ export default async function ResultsPage({
     .eq('assignment_id', id)
     .order('total_score', { ascending: false })
 
-  const submittedAttempts = (submissions ?? []).filter(
-    (s: any) => s.status === 'submitted' || s.status === 'graded'
+  const submittedAttempts = rescaleToDisplayMax(
+    (submissions ?? []).filter((s: any) => s.status === 'submitted' || s.status === 'graded'),
+    () => assignment.display_max_score
   )
 
   // A student may have multiple attempts — reduce to the "official" score
@@ -61,7 +62,7 @@ export default async function ResultsPage({
     ? submitted.reduce((sum: number, s: any) => sum + (s.total_score ?? 0), 0) / submitted.length
     : null
 
-  const maxScore = submitted[0]?.max_score ?? assignment.question_ids.length
+  const maxScore = submitted[0]?.max_score ?? assignment.display_max_score ?? assignment.question_ids.length
 
   const hasPassingThreshold = assignment.passing_type != null && assignment.passing_value != null
   const passCount = submitted.filter(

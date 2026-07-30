@@ -282,6 +282,13 @@ export interface Assignment {
   /** Custom per-question point overrides, keyed by question_id. NULL = use
    *  each question's own structural point value (the pre-existing default). */
   question_points: Record<string, number> | null
+  /** Rescales every submission's reported total_score/max_score to this
+   *  target at display time (e.g. structural total 15 -> shown as "out of
+   *  10"). Unlike question_points, this is never frozen into a submission —
+   *  it's applied wherever scores are read, so changing it (even after
+   *  students have finished) retroactively rescales every past attempt too.
+   *  NULL = show the raw structural total. */
+  display_max_score: number | null
   set_id: string | null
   start_at: string | null
   end_at: string | null
@@ -313,6 +320,12 @@ export interface QuestionSet {
   title: string
   description: string | null
   question_ids: string[]
+  /** Count of question_ids that still resolve to an existing, visible
+   *  question — question_ids can go stale (dangling) once a question is
+   *  deleted, so this is never assumed equal to question_ids.length.
+   *  Only populated where explicitly computed — absent otherwise, in which
+   *  case fall back to question_ids.length. */
+  valid_question_count?: number
   tags: string[]
   created_at: string
   updated_at: string
