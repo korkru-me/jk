@@ -91,7 +91,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
       const res = initialSet
         ? await updateQuestionSet(initialSet.id, payload)
         : await createQuestionSet(payload)
-      if (res?.error) { toast.error(res.error); return }
+      if ('error' in res) { toast.error(res.error); return }
       if (!initialSet && 'id' in res) {
         toast.success('สร้างชุดโจทย์แล้ว')
         router.push('/questions/sets')
@@ -104,7 +104,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
     if (!confirm(`ลบชุดโจทย์ "${initialSet.title}"? ไม่สามารถกู้คืนได้`)) return
     startTransition(async () => {
       const res = await deleteQuestionSet(initialSet.id)
-      if (res?.error) { toast.error(res.error); return }
+      if ('error' in res) { toast.error(res.error); return }
       router.push('/questions/sets')
     })
   }
