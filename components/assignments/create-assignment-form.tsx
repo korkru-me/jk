@@ -180,9 +180,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           tags: classroomName ? [classroomName] : [],
           visibility: 'private',
         })
-        if (setRes?.error) {
+        if ('error' in setRes) {
           toast.error(`บันทึกชุดโจทย์ลงคลังไม่สำเร็จ: ${setRes.error} (จะมอบหมายต่อโดยไม่บันทึกลงคลัง)`)
-        } else if ('id' in setRes) {
+        } else {
           setId = setRes.id
         }
       }
