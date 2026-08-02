@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Shuffle, GripVertical, Zap, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -69,11 +69,27 @@ function genValues(template: FormulaTemplate) {
   return vals
 }
 
+function midValues(template: FormulaTemplate) {
+  const vals: Record<string, number> = {}
+  for (const v of template.vars) {
+    const steps = Math.round((v.max - v.min) / v.step / 2)
+    vals[v.key] = Math.round((v.min + steps * v.step) * 100) / 100
+  }
+  return vals
+}
+
 function PhysicsDemo() {
   const [tplIdx, setTplIdx] = useState(0)
   const tpl = FORMULAS[tplIdx]
-  const [vals, setVals] = useState<Record<string, number>>(() => genValues(FORMULAS[0]))
+  // Deterministic on first render so server and client markup match;
+  // real randomization happens client-only in the effect below.
+  const [vals, setVals] = useState<Record<string, number>>(() => midValues(FORMULAS[0]))
   const [revealed, setRevealed] = useState(false)
+
+  useEffect(() => {
+    setVals(genValues(FORMULAS[0]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const randomize = useCallback(() => {
     setVals(genValues(tpl))

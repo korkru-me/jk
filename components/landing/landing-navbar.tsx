@@ -7,9 +7,7 @@ import { useTheme } from 'next-themes'
 import { Moon, Sun, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const NAV_LINKS = [
-  { href: '/pricing', label: 'ราคา' },
-]
+const NAV_LINKS: { href: string; label: string }[] = []
 
 export function LandingNavbar() {
   const { theme, setTheme } = useTheme()
@@ -27,10 +25,10 @@ export function LandingNavbar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white shadow-sm">
             K
           </div>
-          <div>
+          <div className="flex items-center gap-2">
             <span className="text-base font-bold text-slate-900 dark:text-white">KorKru</span>
-            <span className="hidden text-xs text-slate-400 dark:text-slate-500 sm:block leading-none">
-              คลังข้อสอบอัจฉริยะ
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/60 dark:text-amber-300">
+              Demo
             </span>
           </div>
         </Link>
@@ -75,7 +73,7 @@ export function LandingNavbar() {
             href="/signup"
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shadow-sm"
           >
-            สมัครฟรี
+            สมัครสมาชิก
           </Link>
         </div>
 
@@ -125,7 +123,7 @@ export function LandingNavbar() {
               onClick={() => setMobileOpen(false)}
               className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-center text-sm font-semibold text-white"
             >
-              สมัครฟรี
+              สมัครสมาชิก
             </Link>
           </div>
         </div>
