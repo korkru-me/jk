@@ -23,6 +23,7 @@ const teacherNav: NavItem[] = [
 const studentNav: NavItem[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: '🏫' },
+  { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: '📋' },
   { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: '⚙️' },
 ]
 

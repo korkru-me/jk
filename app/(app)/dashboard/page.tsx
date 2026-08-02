@@ -228,7 +228,7 @@ function StudentDashboard({
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
         >
           <TrendingUp size={14} />
-          ดูผลงานของฉัน
+          ดูสรุปงานของฉัน
         </Link>
       </div>
 

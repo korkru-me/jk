@@ -3,11 +3,25 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { TrendingUp, CheckCircle2, XCircle, Clock, ChevronRight, ListTodo } from 'lucide-react'
+import { ListChecks, ListTodo, AlertTriangle, CheckCircle2, XCircle, Clock, ChevronRight } from 'lucide-react'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 
-export const metadata = { title: 'ผลงานของฉัน — KorKru' }
+export const metadata = { title: 'สรุปงานของฉัน — KorKru' }
+
+// Same urgency thresholds as the dashboard's due-date widget, so a deadline
+// reads the same way everywhere in the app.
+function getDueInfo(endAt: string | null): { label: string; urgent: boolean; overdue: boolean } {
+  if (!endAt) return { label: 'ไม่มีกำหนดส่ง', urgent: false, overdue: false }
+  const diff = new Date(endAt).getTime() - Date.now()
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (diff < 0) return { label: 'เลยกำหนดส่งแล้ว', urgent: true, overdue: true }
+  if (hours < 24) return { label: `ด่วน · เหลืออีก ${Math.max(1, hours)} ชม.`, urgent: true, overdue: false }
+  if (days <= 2) return { label: `ใกล้ครบกำหนด · อีก ${days} วัน`, urgent: true, overdue: false }
+  return { label: `ถึง ${new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'medium' })}`, urgent: false, overdue: false }
+}
 
 export default async function MySubmissionsPage() {
   const supabase = await createClient()
@@ -26,6 +40,7 @@ export default async function MySubmissionsPage() {
   )
   const completed = all.filter((s: any) => s.status === 'submitted' || s.status === 'graded')
   const inProgress = all.filter((s: any) => s.status === 'in_progress')
+  const inProgressIds = new Set(inProgress.map((s: any) => s.assignment_id))
 
   // Official (per the assignment's score_strategy) submitted/graded attempt
   // per assignment — used to decide per-assignment completion/pass state
@@ -63,6 +78,7 @@ export default async function MySubmissionsPage() {
 
   const doneAssignments = Array.from(bestByAssignment.values()).filter(isAssignmentDone)
   const doneCount = doneAssignments.length
+  const doneAssignmentIds = new Set(doneAssignments.map((s: any) => s.assignment_id))
 
   // "ต้องทำส่ง" = every published assignment across the student's classrooms
   // that isn't done yet — including ones never even started (no row in
@@ -84,28 +100,46 @@ export default async function MySubmissionsPage() {
   const { data: publishedAssignments } = assignedIds.length > 0
     ? await supabase
         .from('assignments')
-        .select('id')
+        .select('id, title, end_at, duration_minutes, classrooms(name)')
         .in('id', assignedIds)
         .eq('status', 'published')
     : { data: [] }
 
-  const doneAssignmentIds = new Set(doneAssignments.map((s: any) => s.assignment_id))
-  const pendingCount = (publishedAssignments ?? []).filter((a: any) => !doneAssignmentIds.has(a.id)).length
+  const pendingAssignments = (publishedAssignments ?? [])
+    .filter((a: any) => !doneAssignmentIds.has(a.id))
+    .map((a: any) => ({
+      ...a,
+      isInProgress: inProgressIds.has(a.id),
+      previousScore: bestByAssignment.get(a.id) ?? null,
+    }))
+    .sort((a: any, b: any) => {
+      const at = a.end_at ? new Date(a.end_at).getTime() : Infinity
+      const bt = b.end_at ? new Date(b.end_at).getTime() : Infinity
+      return at - bt
+    })
+
+  const pendingCount = pendingAssignments.length
+  const urgentCount = pendingAssignments.filter((a: any) => {
+    if (!a.end_at) return false
+    return new Date(a.end_at).getTime() - Date.now() <= 3 * 24 * 60 * 60 * 1000
+  }).length
+
+  const hasAnyData = pendingCount > 0 || all.length > 0
 
   return (
     <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <TrendingUp size={22} className="text-blue-600 dark:text-blue-400" />
-          ผลงานของฉัน
+          <ListChecks size={22} className="text-blue-600 dark:text-blue-400" />
+          สรุปงานของฉัน
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">งานที่ต้องทำ งานที่ส่งแล้ว และคะแนนที่ได้</p>
+        <p className="text-muted-foreground text-sm mt-1">งานที่ต้องทำ งานที่ใกล้กำหนดส่ง และประวัติคะแนน</p>
       </div>
 
-      {all.length === 0 ? (
+      {!hasAnyData ? (
         <div className="text-center py-20 border-2 border-dashed rounded-2xl">
           <p className="text-4xl mb-3">📝</p>
-          <p className="text-muted-foreground">ยังไม่มีประวัติการส่งงาน</p>
+          <p className="text-muted-foreground">ยังไม่มีชุดข้อสอบที่ได้รับ</p>
           <Link href="/assignments" className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}>
             ดูชุดข้อสอบ
           </Link>
@@ -113,10 +147,11 @@ export default async function MySubmissionsPage() {
       ) : (
         <>
           {/* Summary stats */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'ส่งงานแล้ว', value: String(doneCount), icon: <CheckCircle2 size={18} className="text-green-500" />, sub: 'ชุด' },
-              { label: 'ต้องทำส่ง', value: String(pendingCount), icon: <ListTodo size={18} className="text-amber-500" />, sub: 'ชุด' },
+              { label: 'ต้องทำส่ง', value: String(pendingCount), icon: <ListTodo size={18} className="text-amber-500" /> },
+              { label: 'ใกล้/เลยกำหนด', value: String(urgentCount), icon: <AlertTriangle size={18} className="text-red-500" /> },
+              { label: 'ส่งงานแล้ว', value: String(doneCount), icon: <CheckCircle2 size={18} className="text-green-500" /> },
             ].map(s => (
               <div key={s.label} className="bg-card border rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-1">
@@ -128,96 +163,141 @@ export default async function MySubmissionsPage() {
             ))}
           </div>
 
-          {/* History table */}
+          {/* Pending work, closest deadline first */}
           <div className="bg-card border rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b flex items-center justify-between">
-              <h2 className="font-semibold">ประวัติการสอบทั้งหมด</h2>
-              <span className="text-xs text-muted-foreground">{all.length} รายการ</span>
+              <h2 className="font-semibold flex items-center gap-2">
+                <ListTodo size={16} className="text-amber-500" />
+                งานที่ต้องทำ
+              </h2>
+              <span className="text-xs text-muted-foreground">{pendingCount} รายการ</span>
             </div>
 
-            {/* In-progress */}
-            {inProgress.length > 0 && (
-              <div className="border-b px-5 py-3 bg-amber-500/5">
-                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1">
-                  <Clock size={12} /> กำลังทำอยู่
-                </p>
-                <div className="space-y-2">
-                  {inProgress.map((s: any) => (
-                    <div key={s.id} className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{s.assignments?.title}</p>
-                        <p className="text-xs text-muted-foreground">{s.assignments?.classrooms?.name}</p>
+            {pendingCount === 0 ? (
+              <div className="text-center py-10">
+                <p className="text-3xl mb-2">🎉</p>
+                <p className="text-sm text-muted-foreground">ทำงานครบหมดแล้ว ไม่มีงานค้าง</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {pendingAssignments.map((a: any) => {
+                  const due = getDueInfo(a.end_at)
+                  return (
+                    <div
+                      key={a.id}
+                      className={cn(
+                        'px-5 py-4 flex items-center gap-4',
+                        due.overdue ? 'bg-red-500/5' : due.urgent ? 'bg-amber-500/5' : ''
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{a.title}</p>
+                          {a.isInProgress && (
+                            <span className="shrink-0 text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
+                              กำลังทำอยู่
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{a.classrooms?.name}</p>
+                        <p className={cn(
+                          'text-xs mt-1 flex items-center gap-1 font-medium',
+                          due.overdue ? 'text-red-500' : due.urgent ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+                        )}>
+                          <Clock size={11} /> {due.label}
+                        </p>
                       </div>
-                      <Link
-                        href={`/assignments/${s.assignment_id}/take`}
-                        className={cn(buttonVariants({ size: 'sm' }), 'shrink-0 text-xs')}
-                      >
-                        ทำต่อ →
-                      </Link>
+
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                        {a.previousScore && (
+                          <p className="text-xs text-muted-foreground">
+                            ครั้งก่อน {a.previousScore.total_score}/{a.previousScore.max_score}
+                          </p>
+                        )}
+                        <Link
+                          href={`/assignments/${a.id}/take`}
+                          className={cn(
+                            buttonVariants({ size: 'sm' }),
+                            'text-xs',
+                            (a.isInProgress || a.previousScore) ? 'bg-amber-500 hover:bg-amber-600 text-white border-0' : ''
+                          )}
+                        >
+                          {a.isInProgress ? 'ทำต่อ →' : a.previousScore ? 'ลองใหม่' : 'เริ่มทำ'}
+                        </Link>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             )}
+          </div>
 
-            {/* Completed list */}
-            <div className="divide-y">
-              {completed.map((s: any) => {
-                const pct = s.max_score > 0
-                  ? Math.round((s.total_score / s.max_score) * 100)
-                  : 0
+          {/* History */}
+          {completed.length > 0 && (
+            <div className="bg-card border rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b flex items-center justify-between">
+                <h2 className="font-semibold">ประวัติการสอบทั้งหมด</h2>
+                <span className="text-xs text-muted-foreground">{completed.length} รายการ</span>
+              </div>
 
-                const pctColor = pct >= 75
-                  ? 'text-green-600 dark:text-green-400'
-                  : pct >= 50
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-red-500'
+              <div className="divide-y">
+                {completed.map((s: any) => {
+                  const pct = s.max_score > 0
+                    ? Math.round((s.total_score / s.max_score) * 100)
+                    : 0
 
-                const bgBar = pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-400'
+                  const pctColor = pct >= 75
+                    ? 'text-green-600 dark:text-green-400'
+                    : pct >= 50
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-red-500'
 
-                return (
-                  <div key={s.id} className="px-5 py-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
-                    {/* Score ring */}
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
-                      pct >= 75
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                        : pct >= 50
-                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                    }`}>
-                      {pct >= 75 ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                    </div>
+                  const bgBar = pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-400'
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{s.assignments?.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {s.assignments?.classrooms?.name} · {new Date(s.created_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}
-                      </p>
-                      {/* Score bar */}
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden max-w-[120px]">
-                          <div className={`h-full rounded-full ${bgBar}`} style={{ width: `${pct}%` }} />
+                  return (
+                    <div key={s.id} className="px-5 py-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
+                      {/* Score ring */}
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
+                        pct >= 75
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                          : pct >= 50
+                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                      }`}>
+                        {pct >= 75 ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{s.assignments?.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {s.assignments?.classrooms?.name} · {new Date(s.created_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}
+                        </p>
+                        {/* Score bar */}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden max-w-[120px]">
+                            <div className={`h-full rounded-full ${bgBar}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className={`text-xs font-bold ${pctColor}`}>{s.total_score}/{s.max_score}</span>
                         </div>
-                        <span className={`text-xs font-bold ${pctColor}`}>{s.total_score}/{s.max_score}</span>
+                      </div>
+
+                      {/* Percentage + Link */}
+                      <div className="text-right shrink-0">
+                        <p className={`text-lg font-black ${pctColor}`}>{pct}%</p>
+                        <Link
+                          href={`/submissions/${s.id}`}
+                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 justify-end mt-0.5"
+                        >
+                          ดูเฉลย <ChevronRight size={12} />
+                        </Link>
                       </div>
                     </div>
-
-                    {/* Percentage + Link */}
-                    <div className="text-right shrink-0">
-                      <p className={`text-lg font-black ${pctColor}`}>{pct}%</p>
-                      <Link
-                        href={`/submissions/${s.id}`}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 justify-end mt-0.5"
-                      >
-                        ดูเฉลย <ChevronRight size={12} />
-                      </Link>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </div>
