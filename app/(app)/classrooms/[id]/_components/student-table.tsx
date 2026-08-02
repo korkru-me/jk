@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import {
-  Search, Filter, ChevronUp, ChevronDown, MoreVertical,
-  Mail, ArrowRightLeft, UserMinus, X, SlidersHorizontal, IdCard,
+  Search, ChevronUp, ChevronDown, MoreVertical,
+  Mail, ArrowRightLeft, UserMinus, X, IdCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { removeStudent } from '@/lib/actions/classrooms'
@@ -15,31 +15,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview'
 import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib/student-sort'
 
-// 'score'/'status' are extra local-only sort options on top of the shared
-// roster keys — they sort by this table's own sample data, which has no
-// counterpart on the scores page, so they're never lifted/synced.
-export type SortKey = StudentSortKey | 'score' | 'status'
+export type SortKey = StudentSortKey
 export type SortDir = StudentSortDir
-type StatusType = 'ปกติ' | 'ขาดส่งงาน' | 'ออฟไลน์นาน' | 'เสี่ยงสอบตก'
-
-const STATUS_CFG: Record<StatusType, { bg: string; text: string }> = {
-  ปกติ: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  ขาดส่งงาน: { bg: 'bg-amber-50', text: 'text-amber-700' },
-  ออฟไลน์นาน: { bg: 'bg-gray-100', text: 'text-gray-600' },
-  เสี่ยงสอบตก: { bg: 'bg-red-50', text: 'text-red-600' },
-}
-
-const MOCK_SCORES = [85, 72, 91, 48, 63, 77, 55, 88, 94, 41, 68, 79, 82, 56, 73, 89, 61, 95, 44, 78]
-const MOCK_STATUSES: StatusType[] = [
-  'ปกติ', 'ปกติ', 'ปกติ', 'ขาดส่งงาน', 'ปกติ', 'ออฟไลน์นาน', 'ปกติ', 'ปกติ',
-  'ปกติ', 'เสี่ยงสอบตก', 'ปกติ', 'ขาดส่งงาน', 'ปกติ', 'ปกติ', 'ปกติ', 'ปกติ',
-  'เสี่ยงสอบตก', 'ปกติ', 'ขาดส่งงาน', 'ปกติ',
-]
 
 interface RealStudent { id: string; full_name: string; email: string }
 interface Student extends RealStudent {
-  score: number
-  status: StatusType
   initials: string
 }
 
@@ -65,24 +45,20 @@ interface Props {
 // 1fr, each row's intrinsic width calc lets its own full_name+email length
 // push the track wider, so rows (and the header) end up different total
 // widths and the fixed columns after it drift out of alignment row to row.
-const GRID_COLS_DEFAULT = 'grid-cols-[auto_minmax(160px,1fr)_100px_110px_40px]'
-const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_100px_110px_40px]'
+const GRID_COLS_DEFAULT = 'grid-cols-[auto_minmax(160px,1fr)_40px]'
+const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
 
 export function StudentTable({
   classroomId, students, otherClassrooms, profiles = {}, showRoster = false, showProfiles = false,
   sortKey, sortDir, onToggleSort,
 }: Props) {
   const GRID_COLS = showRoster ? GRID_COLS_WITH_ROSTER : GRID_COLS_DEFAULT
-  const augmented: Student[] = students.map((s, i) => ({
+  const augmented: Student[] = students.map(s => ({
     ...s,
-    score: MOCK_SCORES[i % MOCK_SCORES.length],
-    status: MOCK_STATUSES[i % MOCK_STATUSES.length],
     initials: s.full_name.slice(0, 2),
   }))
 
   const [query, setQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState<StatusType | ''>('')
-  const [showFilters, setShowFilters] = useState(false)
   const [viewingProfile, setViewingProfile] = useState<Student | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -91,15 +67,7 @@ export function StudentTable({
       s.full_name.toLowerCase().includes(query.toLowerCase()) ||
       s.email.toLowerCase().includes(query.toLowerCase())
     )
-    .filter(s => activeFilter ? s.status === activeFilter : true)
-    .sort((a, b) => {
-      if (sortKey === 'score') return sortDir === 'asc' ? a.score - b.score : b.score - a.score
-      if (sortKey === 'status') {
-        const cmp = a.status.localeCompare(b.status)
-        return sortDir === 'asc' ? cmp : -cmp
-      }
-      return compareStudents(a, b, profiles, sortKey, sortDir)
-    })
+    .sort((a, b) => compareStudents(a, b, profiles, sortKey, sortDir))
 
   function handleRemove(studentId: string, name: string) {
     if (!confirm(`ลบ "${name}" ออกจากห้องเรียน?`)) return
@@ -125,7 +93,7 @@ export function StudentTable({
 
   return (
     <div className="space-y-3">
-      {/* Search + filter bar */}
+      {/* Search bar */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -141,53 +109,7 @@ export function StudentTable({
             </button>
           )}
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-1.5 px-3 py-2 text-sm border rounded-xl transition-colors ${
-            activeFilter ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-          }`}
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>กรอง</span>
-          {activeFilter && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
-        </button>
       </div>
-
-      {/* Filter chips */}
-      {showFilters && (
-        <div className="flex flex-wrap gap-2">
-          {(['ปกติ', 'ขาดส่งงาน', 'ออฟไลน์นาน', 'เสี่ยงสอบตก'] as StatusType[]).map(s => (
-            <button
-              key={s}
-              onClick={() => setActiveFilter(activeFilter === s ? '' : s)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                activeFilter === s
-                  ? `${STATUS_CFG[s].bg} ${STATUS_CFG[s].text} ring-1 ring-current`
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-          {activeFilter && (
-            <button onClick={() => setActiveFilter('')} className="px-3 py-1 rounded-full text-xs text-gray-500 hover:text-gray-700 underline">
-              ล้างตัวกรอง
-            </button>
-          )}
-          <p className="ml-auto text-xs text-gray-400 self-center">แสดง {filtered.length}/{augmented.length} คน</p>
-        </div>
-      )}
-
-      {/* Active filter reminder */}
-      {activeFilter && !showFilters && (
-        <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl">
-          <Filter className="w-3 h-3" />
-          <span>กรองเฉพาะสถานะ: <strong>{activeFilter}</strong></span>
-          <button onClick={() => setActiveFilter('')} className="ml-auto text-blue-400 hover:text-blue-600">
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-x-auto">
@@ -218,12 +140,6 @@ export function StudentTable({
               </button>
             </>
           )}
-          <button className={headerBtnClass('score')} onClick={() => onToggleSort('score')}>
-            คะแนน <SortIcon col="score" />
-          </button>
-          <button className={headerBtnClass('status')} onClick={() => onToggleSort('status')}>
-            สถานะ <SortIcon col="status" />
-          </button>
           <div />
         </div>
 
@@ -233,7 +149,6 @@ export function StudentTable({
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map((student, index) => {
-              const cfg = STATUS_CFG[student.status]
               const profile = profiles[student.id]
               return (
                 <div
@@ -270,22 +185,6 @@ export function StudentTable({
                       <span className="text-sm text-gray-700 truncate">{profile?.student_code || '—'}</span>
                     </>
                   )}
-
-                  {/* Score */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${student.score >= 70 ? 'bg-emerald-400' : student.score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
-                        style={{ width: `${student.score}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold text-gray-700 w-8 text-right">{student.score}%</span>
-                  </div>
-
-                  {/* Status badge */}
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text} text-center`}>
-                    {student.status}
-                  </span>
 
                   {/* Actions */}
                   <DropdownMenu>

@@ -342,15 +342,16 @@ export default async function ClassroomDetailPage({
       .from('student_profiles')
       .select(isHomeroomAdvisor
         ? 'student_id, nickname, date_of_birth, gender, food_allergy, chronic_disease, grade_level, section_number, school_name, student_code, class_number, address, phone, guardians'
-        : 'student_id, grade_level, section_number, class_number')
+        : 'student_id, grade_level, section_number, class_number, student_code')
       .in('student_id', students.map(s => s.id))
     studentProfiles = Object.fromEntries((profileRows ?? []).map((p: any) => [p.student_id, isHomeroomAdvisor ? p : {
       student_id: p.student_id,
       grade_level: p.grade_level,
       section_number: p.section_number,
       class_number: p.class_number,
+      student_code: p.student_code,
       nickname: null, date_of_birth: null, gender: null, food_allergy: null, chronic_disease: null,
-      school_name: null, student_code: null, address: null, phone: null, guardians: [],
+      school_name: null, address: null, phone: null, guardians: [],
     }]))
   }
 

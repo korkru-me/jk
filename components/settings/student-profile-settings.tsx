@@ -159,7 +159,7 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
         </p>
       </div>
 
-      <form onSubmit={handleInfoSave} className="space-y-5">
+      <form key={profile?.updated_at ?? 'new'} onSubmit={handleInfoSave} className="space-y-5">
         {/* ── Identity ────────────────────────────────────────────────────── */}
         <SectionCard title="ข้อมูลตัวตน" description="คำนำหน้าชื่อ ชื่อ สกุล ชื่อเล่น วันเกิด เพศสภาพ และข้อมูลสุขภาพ" icon={User}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[8.5rem_1fr_1fr] mb-4">
