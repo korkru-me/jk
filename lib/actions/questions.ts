@@ -28,6 +28,7 @@ export interface QuestionFormData {
   essay_rubric?: { criterion: string; points: number }[]
   extra_data?: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig
   solution_text: string
+  solution_image_urls?: string[]
   tags: string[]
   image_urls: string[]
   requires_work_image?: boolean
@@ -114,6 +115,7 @@ export async function createQuestion(data: QuestionFormData) {
     mcq_options: resolveMcqOptions(data),
     extra_data: data.extra_data ?? {},
     solution_text: data.solution_text || null,
+    solution_image_urls: data.solution_image_urls ?? [],
     tags: data.tags.length > 0 ? data.tags : null,
     image_urls: data.image_urls.length > 0 ? data.image_urls : [],
     requires_work_image: data.question_type === 'written' ? (data.requires_work_image ?? false) : false,
@@ -184,6 +186,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
       mcq_options: resolveMcqOptions(data),
       extra_data: data.extra_data ?? {},
       solution_text: data.solution_text || null,
+      solution_image_urls: data.solution_image_urls ?? [],
       tags: data.tags.length > 0 ? data.tags : null,
       image_urls: data.image_urls,
       requires_work_image: data.question_type === 'written' ? (data.requires_work_image ?? false) : false,

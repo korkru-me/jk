@@ -24,6 +24,7 @@ export interface PortableQuestion {
   mcq_options: MCQOption[] | null
   extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | Record<string, never>
   solution_text: string | null
+  solution_image_urls: string[]
   tags: string[] | null
   image_urls: string[]
   requires_work_image: boolean
@@ -59,6 +60,7 @@ export function toPortableQuestion(q: QuestionWithCategoryName): PortableQuestio
     mcq_options: q.mcq_options,
     extra_data: q.extra_data,
     solution_text: q.solution_text,
+    solution_image_urls: q.solution_image_urls,
     tags: q.tags,
     image_urls: q.image_urls,
     requires_work_image: q.requires_work_image,

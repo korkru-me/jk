@@ -3,15 +3,14 @@
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { ImagePlus, X, Loader2, PencilRuler } from 'lucide-react'
+import { ImagePlus, X, Loader2 } from 'lucide-react'
 
 interface QuestionImageUploadProps {
   value: string[]
   onChange: (urls: string[]) => void
-  onOpenWhiteboard?: () => void
 }
 
-export function QuestionImageUpload({ value, onChange, onOpenWhiteboard }: QuestionImageUploadProps) {
+export function QuestionImageUpload({ value, onChange }: QuestionImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -79,12 +78,6 @@ export function QuestionImageUpload({ value, onChange, onOpenWhiteboard }: Quest
           )}
           {uploading ? 'กำลังอัปโหลด...' : 'แทรกรูปภาพ'}
         </Button>
-        {onOpenWhiteboard && (
-          <Button type="button" variant="outline" size="sm" onClick={onOpenWhiteboard}>
-            <PencilRuler className="w-4 h-4 mr-2" />
-            เปิดกระดานวาด
-          </Button>
-        )}
         <span className="text-xs text-gray-500">JPG, PNG, GIF — สูงสุด 5 MB</span>
       </div>
 

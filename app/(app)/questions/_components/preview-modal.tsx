@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { DIFF_META, mockStats } from './question-card'
 import { QuestionPreviewContent } from '@/components/questions/question-preview'
+import { RichText } from '@/components/ui/rich-text'
 import type {
   Variable, MCQOption, MatchingPair, TrueFalseConfig, FillBlankConfig,
   OrderingConfig, FileUploadConfig, RandomQuestionConfig,
@@ -153,10 +154,19 @@ function InteractiveTab({ q }: { q: QuestionWithCategory }) {
       />
 
       {/* Solution text */}
-      {q.solution_text && (
-        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+      {(q.solution_text || (q.solution_image_urls ?? []).length > 0) && (
+        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 space-y-3">
           <p className="text-[11px] font-semibold text-amber-500 uppercase tracking-wide mb-2">วิธีทำ / คำอธิบาย</p>
-          <p className="text-sm text-amber-900 leading-relaxed">{q.solution_text}</p>
+          {q.solution_text && <RichText text={q.solution_text} className="text-sm text-amber-900 leading-relaxed block" />}
+          {(q.solution_image_urls ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {(q.solution_image_urls ?? []).map(url => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={url} src={url} alt="รูปประกอบเฉลย"
+                  className="max-h-40 rounded-lg border border-amber-200 object-contain" />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

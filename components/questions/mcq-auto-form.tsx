@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
 import { ChevronDown, RefreshCw, Image as ImageIcon } from 'lucide-react'
@@ -13,8 +12,8 @@ import { ChevronDown, RefreshCw, Image as ImageIcon } from 'lucide-react'
 import { GeneralInfoSection } from './general-info-section'
 import { SymbolPicker } from './special-char-input'
 import { QuestionImageUpload } from './question-image-upload'
+import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { WhiteboardModal } from './whiteboard-modal'
 import { createQuestion } from '@/lib/actions/questions'
 import { evaluateFormula } from '@/lib/math/evaluator'
 import type { Difficulty, Visibility, MCQOption, FormulaPreset, Variable } from '@/lib/types'
@@ -524,7 +523,6 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
   // Question content
   const [questionText, setQuestionText] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
-  const [showWhiteboard, setShowWhiteboard] = useState(false)
 
   // Option settings
   const [numOptions, setNumOptions] = useState(4)
@@ -539,6 +537,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
   const [optionImageUrl, setOptionImageUrl] = useState<string | undefined>(undefined)
 
   const [solutionText, setSolutionText] = useState('')
+  const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>([])
 
   const LABELS = OPTION_LABELS_MAP[optionStyle]
 
@@ -668,7 +667,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
       answer_parts: [],
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: mcqOptions,
-      solution_text: solutionText, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
     })
 
     if (result?.error) {
@@ -734,7 +733,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
         </div>
         <div className="space-y-1.5">
           <Label>รูปภาพประกอบโจทย์</Label>
-          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
+          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} />
         </div>
       </section>
 
@@ -892,11 +891,10 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
         })()}
       </section>
 
-      {/* เฉลย */}
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เฉลยวิธีทำ (ไม่บังคับ)</h2>
-        <Textarea value={solutionText} onChange={e => setSolutionText(e.target.value)} placeholder="อธิบายวิธีทำ..." rows={4} />
-      </section>
+      <SolutionSection
+        text={solutionText} onTextChange={setSolutionText}
+        imageUrls={solutionImageUrls} onImageUrlsChange={setSolutionImageUrls}
+      />
 
       <div className="flex items-center gap-3 pt-2 border-t">
         <QuestionPreview
@@ -919,13 +917,6 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
           ยกเลิก
         </Button>
       </div>
-
-      {showWhiteboard && (
-        <WhiteboardModal
-          onSave={url => { setImageUrls(prev => [...prev, url]); setShowWhiteboard(false) }}
-          onClose={() => setShowWhiteboard(false)}
-        />
-      )}
     </form>
   )
 }

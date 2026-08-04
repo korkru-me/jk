@@ -18,7 +18,8 @@ import { FormulaSheet } from './formula-sheet'
 import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
 import { partLabels } from '@/lib/part-labels'
-import { getBlankType } from '@/lib/fill-blank'
+import { getBlankType, splitFillBlankHtml } from '@/lib/fill-blank'
+import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -372,6 +373,17 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
 
+  // "written" questions may embed one or more numbered answer inputs directly
+  // in the main question text via [คำตอบ N], instead of the generic
+  // standalone "คำตอบ" box(es).
+  const currentQuestionText = interpolateValues(
+    current.questions.question_text,
+    current.random_values,
+    current.questions.variables,
+  )
+  const mainInlineBlank = current.questions.question_type === 'written'
+    && countAnswerBlanks(currentQuestionText) > 0
+
   // ── Toolbar buttons ───────────────────────────────────────────────────────────
 
   const toolBtn = (active: boolean) =>
@@ -416,14 +428,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             </div>
           </div>
 
-          {current.questions.question_type !== 'fill_blank' && (
-            <QuestionText
-              text={interpolateValues(
-                current.questions.question_text,
-                current.random_values,
-                current.questions.variables,
-              )}
-            />
+          {current.questions.question_type !== 'fill_blank' && !mainInlineBlank && (
+            <QuestionText text={currentQuestionText} />
           )}
 
           {(current.questions.image_urls ?? []).length > 0 && (
@@ -510,6 +516,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             <MultiPartAnswerInput
               answerId={current.id}
               parts={current.questions.answer_parts}
+              questionText={currentQuestionText}
               labels={partLabels((current.questions.extra_data as RandomQuestionConfig | null)?.part_label_style)}
               fallbackUnit={current.questions.answer_unit}
               rawValue={localAnswers[current.id] ?? ''}
@@ -1009,11 +1016,12 @@ function MCQInput({
 // ─── Multi-part numeric ───────────────────────────────────────────────────────
 
 function MultiPartAnswerInput({
-  answerId, parts, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
+  answerId, parts, questionText, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
   requiresWorkImage, workImages, onWorkImageChange,
 }: {
   answerId: string
   parts: AnswerPart[] | null
+  questionText?: string
   labels: string[]
   fallbackUnit: string | null
   rawValue: string
@@ -1024,16 +1032,80 @@ function MultiPartAnswerInput({
   onWorkImageChange: (partIndex: number, url: string | null) => void
 }) {
   const activeParts = parts && parts.length > 0 ? parts : null
-  if (!activeParts || activeParts.length === 1) {
-    const unit = activeParts?.[0]?.unit ?? fallbackUnit ?? ''
+
+  // One or more numbered [คำตอบ N] blanks embedded directly in the question
+  // stem — render the stem here (interleaved with inputs) instead of the
+  // generic "คำตอบ" box(es) below, whether there's 1 blank or several.
+  const mainBlanks = questionText ? splitNumberedAnswerBlanks(questionText) : null
+  const mainBlankCount = mainBlanks ? mainBlanks.numbers.length : 0
+  if (mainBlanks && mainBlankCount > 0 && activeParts && mainBlankCount <= activeParts.length) {
+    let inlineValues: string[] = []
+    if (activeParts.length > 1) {
+      try { inlineValues = JSON.parse(rawValue || '[]') } catch { inlineValues = [] }
+      while (inlineValues.length < activeParts.length) inlineValues.push('')
+    }
+    const getValue = (i: number) => activeParts.length > 1 ? (inlineValues[i] ?? '') : rawValue
+    const setValue = (i: number, val: string) => {
+      if (activeParts.length > 1) onPartChange(i, val, activeParts.length)
+      else onSingleChange(val)
+    }
+
     return (
       <div className="space-y-1">
-        <label className="text-sm font-medium">คำตอบ</label>
-        <div className="flex items-center gap-2">
-          <Input type="number" step="any" placeholder="ใส่คำตอบ..." value={rawValue}
-            onChange={e => onSingleChange(e.target.value)} className="max-w-[200px]" />
-          {unit && <UnitDisplay html={unit} />}
+        <div className="leading-loose text-sm">
+          {mainBlanks.parts.map((frag, i) => {
+            const num = mainBlanks.numbers[i]
+            const part = activeParts[i]
+            if (num === undefined || !part) return <RichText key={i} text={frag} className="[&_p]:inline" />
+            return (
+              <span key={i}>
+                {frag && <RichText text={frag} className="[&_p]:inline" />}
+                <span className="inline-flex items-center gap-1.5 mx-1 align-middle">
+                  <span className="text-xs font-semibold text-muted-foreground shrink-0">{num})</span>
+                  <Input type="text" inputMode="text" placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)" value={getValue(i)}
+                    onChange={e => setValue(i, e.target.value)} className="max-w-[140px] inline-block h-8" />
+                  {part.unit && <UnitDisplay html={part.unit} />}
+                </span>
+              </span>
+            )
+          })}
         </div>
+        {requiresWorkImage && (
+          <WorkImageUpload
+            value={workImages[0] ?? null}
+            onChange={url => onWorkImageChange(0, url)}
+            required
+          />
+        )}
+      </div>
+    )
+  }
+
+  if (!activeParts || activeParts.length === 1) {
+    const unit = activeParts?.[0]?.unit ?? fallbackUnit ?? ''
+    const blankSplit = questionText ? splitAnswerBlankHtml(questionText) : null
+    const inputEl = (
+      <Input type="text" inputMode="text" placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)" value={rawValue}
+        onChange={e => onSingleChange(e.target.value)} className="max-w-[200px]" />
+    )
+    return (
+      <div className="space-y-1">
+        {blankSplit ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm leading-loose">
+            {blankSplit[0] && <RichText text={blankSplit[0]} className="[&_p]:inline" />}
+            {inputEl}
+            {unit && <UnitDisplay html={unit} />}
+            {blankSplit[1] && <RichText text={blankSplit[1]} className="[&_p]:inline" />}
+          </div>
+        ) : (
+          <>
+            <label className="text-sm font-medium">คำตอบ</label>
+            <div className="flex items-center gap-2">
+              {inputEl}
+              {unit && <UnitDisplay html={unit} />}
+            </div>
+          </>
+        )}
         {requiresWorkImage && (
           <WorkImageUpload
             value={workImages[0] ?? null}
@@ -1056,7 +1128,7 @@ function MultiPartAnswerInput({
             {part.sub_text && <RichText text={part.sub_text} className="font-normal text-muted-foreground ml-1" />}
           </label>
           <div className="flex items-center gap-2">
-            <Input type="number" step="any" placeholder="ใส่คำตอบ..." value={partValues[i] ?? ''}
+            <Input type="text" inputMode="text" placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)" value={partValues[i] ?? ''}
               onChange={e => onPartChange(i, e.target.value, activeParts.length)} className="max-w-[200px]" />
             {part.unit && <UnitDisplay html={part.unit} />}
           </div>
@@ -1176,7 +1248,7 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
   questionText: string; config: FillBlankConfig | null; rawValue: string; onChange: (v: string) => void
 }) {
   const blanks = config?.blanks ?? []
-  const parts  = questionText.split('[___]')
+  const parts  = splitFillBlankHtml(questionText)
   let ans: string[] = []
   try { ans = JSON.parse(rawValue || '[]') } catch { ans = [] }
   while (ans.length < blanks.length) ans.push('')
@@ -1190,7 +1262,7 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
         const type = i < blanks.length ? getBlankType(config, blank) : null
         return (
           <span key={i}>
-            {part}
+            <RichText text={part} />
             {type === 'dropdown' ? (
               <select value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
                 className="inline-block mx-1 px-2 py-0.5 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600">

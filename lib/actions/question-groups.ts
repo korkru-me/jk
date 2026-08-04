@@ -16,6 +16,7 @@ export interface SubQuestionData {
   answer_unit: string
   answer_tolerance: number
   solution_text: string
+  solution_image_urls: string[]
 }
 
 export interface QuestionGroupPayload {
@@ -148,6 +149,7 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
       answer_unit: sq.answer_unit || null,
       answer_tolerance: sq.answer_tolerance,
       solution_text: sq.solution_text || null,
+      solution_image_urls: sq.solution_image_urls ?? [],
       parent_question_id: parentId,
       group_id: groupId,
       order_in_group: i + 1,

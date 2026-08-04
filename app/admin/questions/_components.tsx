@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { RichText } from '@/components/ui/rich-text'
 import { adminDeleteQuestion } from '@/lib/actions/admin'
 import type { Question, QuestionCategory } from '@/lib/types'
 import Link from 'next/link'
@@ -208,10 +209,18 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
                   <p className="font-mono text-blue-800">{preview.answer_formula} {preview.answer_unit}</p>
                 </div>
               )}
-              {preview.solution_text && (
-                <div className="border rounded-lg p-3">
+              {(preview.solution_text || (preview.solution_image_urls ?? []).length > 0) && (
+                <div className="border rounded-lg p-3 space-y-2">
                   <p className="text-xs text-gray-400 mb-1">เฉลย</p>
-                  <p className="text-gray-700 whitespace-pre-line">{preview.solution_text}</p>
+                  {preview.solution_text && <RichText text={preview.solution_text} className="text-gray-700 whitespace-pre-line block" />}
+                  {(preview.solution_image_urls ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {(preview.solution_image_urls ?? []).map(url => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={url} src={url} alt="รูปประกอบเฉลย" className="max-h-32 rounded-lg border object-contain" />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {preview.rejected_reason && (

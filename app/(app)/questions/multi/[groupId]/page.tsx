@@ -47,6 +47,7 @@ export default async function MultiStepEditPage({
     answer_unit: q.answer_unit ?? '',
     answer_tolerance: q.answer_tolerance ?? 0.05,
     solution_text: q.solution_text ?? '',
+    solution_image_urls: q.solution_image_urls ?? [],
   }))
 
   return (

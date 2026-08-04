@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
@@ -13,11 +12,11 @@ import { Plus, ChevronDown, ChevronRight, Info, Target, X } from 'lucide-react'
 import { GeneralInfoSection } from './general-info-section'
 import { QuestionPreview } from './question-preview'
 import { QuestionImageUpload } from './question-image-upload'
-import { WhiteboardModal } from './whiteboard-modal'
-import { SpecialCharInput } from './special-char-input'
+import { SolutionSection } from './solution-section'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { createQuestion, updateQuestion, createFormulaPreset } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
+import { numberedAnswerBlank, countAnswerBlanks, extractAnswerBlankNumbers, nextAnswerBlankNumber } from '@/lib/answer-blank'
 import { runTrials, PYTHAGOREAN_FAMILIES } from '@/lib/math/evaluator'
 import type { TrialSummary, TrialSample } from '@/lib/math/evaluator'
 import type {
@@ -1139,48 +1138,6 @@ function SubQuestionFromEquation({
   )
 }
 
-// ─── SubQuestionFixed ─────────────────────────────────────────────────────────
-// Sub question for "fixed" mode — literal numeric answer, no formula/variables.
-
-function SubQuestionFixed({
-  part, index, labels, onChange, onRemove,
-}: {
-  part: AnswerPart; index: number; labels: string[]
-  onChange: (patch: Partial<AnswerPart>) => void; onRemove: () => void
-}) {
-  const label = labels[index + 1] ?? String(index + 2)
-  const subTextEditorRef = useRef<RichTextEditorHandle>(null)
-
-  return (
-    <AnswerPartCard label={label} onRemove={onRemove}>
-      <div className="space-y-1.5">
-        <Label>คำถามย่อย / รูปแบบช่องคำตอบ *</Label>
-        <RichTextEditor
-          ref={subTextEditorRef}
-          value={part.sub_text}
-          onChange={v => onChange({ sub_text: v })}
-          placeholder="เช่น จงหาความเร่ง [คำตอบ] m/s²"
-          rows={1}
-        />
-        <Button type="button" variant="outline" size="sm" className="text-xs h-8"
-          onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}>
-          + [คำตอบ]
-        </Button>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
-          <SpecialCharInput value={part.formula} onChange={v => onChange({ formula: v })} placeholder="เช่น 9.8" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-gray-500">หน่วย</Label>
-          <SpecialCharInput value={part.unit} onChange={v => onChange({ unit: v })} placeholder="เช่น m/s²" />
-        </div>
-      </div>
-    </AnswerPartCard>
-  )
-}
-
 // ─── AnswerStepField ──────────────────────────────────────────────────────────
 
 const STEP_PRESETS = [
@@ -1550,7 +1507,6 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
-  const [showWhiteboard, setShowWhiteboard] = useState(false)
 
   const [variables, setVariables] = useState<Variable[]>(question?.variables ?? [])
   const [logicRules, setLogicRules] = useState<LogicRule[]>(question?.logic_rules ?? [])
@@ -1564,6 +1520,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const [pythagoreanEnabled, setPythagoreanEnabled] = useState((existingConfig?.pythagorean_groups ?? []).length > 0)
   const [pythagoreanGroups, setPythagoreanGroups] = useState<PythagoreanGroup[]>(existingConfig?.pythagorean_groups ?? [])
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
   const [requireWorkImage, setRequireWorkImage] = useState(question?.requires_work_image ?? false)
   const [initialEquationText, setInitialEquationText] = useState<string | undefined>(() => equationTextFromQuestion(question))
 
@@ -1579,6 +1536,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
     setQuestionText(seed.question_text)
     setImageUrls(seed.image_urls ?? [])
     setSolutionText(seed.solution_text ?? '')
+    setSolutionImageUrls(seed.solution_image_urls ?? [])
     setRequireWorkImage(seed.requires_work_image ?? false)
 
     setCreationMode(seed.is_random ? 'from-equation' : 'fixed')
@@ -1612,6 +1570,23 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
     setAnswerParts(parts => parts.filter((_, idx) => idx !== i))
   }
 
+  // Fixed mode: the number of answer parts is driven entirely by how many
+  // [คำตอบ N] blanks are in the main question text — keeps answerParts[0..count-1]
+  // in sync (extending/truncating) every time that text changes.
+  function syncMainAnswerParts(count: number) {
+    setAnswerParts(prev => {
+      const target = Math.max(count, 1)
+      if (prev.length === target) return prev
+      if (target > prev.length) return [...prev, ...Array.from({ length: target - prev.length }, newPart)]
+      return prev.slice(0, target)
+    })
+  }
+
+  function handleFixedQuestionTextChange(v: string) {
+    setQuestionText(v)
+    syncMainAnswerParts(countAnswerBlanks(v))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
@@ -1625,22 +1600,21 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         toast.error(`เลือกสมการสำหรับข้อย่อย ${labels[badSub + 1] ?? badSub + 2} ด้วย`)
         return
       }
-    } else {
-      const emptyIdx = answerParts.findIndex(p => !p.formula.trim())
-      if (emptyIdx !== -1) {
+      const emptySubTextIdx = answerParts.findIndex(p => !(p.sub_text ?? '').replace(/<[^>]*>/g, '').trim())
+      if (emptySubTextIdx !== -1) {
         toast.error(answerParts.length > 1
-          ? `กรอกสมการคำตอบข้อย่อย ${labels[emptyIdx] ?? emptyIdx + 1} ด้วย`
-          : 'กรอกสมการคำตอบด้วย')
+          ? `กรอกรูปแบบคำถาม/ช่องคำตอบข้อย่อย ${labels[emptySubTextIdx] ?? emptySubTextIdx + 1} ด้วย`
+          : 'กรอกรูปแบบคำถาม/ช่องคำตอบด้วย')
         return
       }
-    }
-
-    const emptySubTextIdx = answerParts.findIndex(p => !(p.sub_text ?? '').replace(/<[^>]*>/g, '').trim())
-    if (emptySubTextIdx !== -1) {
-      toast.error(answerParts.length > 1
-        ? `กรอกรูปแบบคำถาม/ช่องคำตอบข้อย่อย ${labels[emptySubTextIdx] ?? emptySubTextIdx + 1} ด้วย`
-        : 'กรอกรูปแบบคำถาม/ช่องคำตอบด้วย')
-      return
+    } else {
+      const mainBlankNumbers = extractAnswerBlankNumbers(questionText)
+      if (mainBlankNumbers.length === 0) { toast.error('กดแทรกคำตอบในคำถามหลักอย่างน้อย 1 ตำแหน่งก่อนบันทึก'); return }
+      const emptyIdx = answerParts.slice(0, mainBlankNumbers.length).findIndex(p => !p.formula.trim())
+      if (emptyIdx !== -1) {
+        toast.error(mainBlankNumbers.length > 1 ? `กรอกคำตอบที่ถูกต้อง ${mainBlankNumbers[emptyIdx]} ด้วย` : 'กรอกคำตอบที่ถูกต้องด้วย')
+        return
+      }
     }
 
     setSaving(true)
@@ -1663,7 +1637,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         pythagorean_groups: pythagoreanGroups.length > 0 ? pythagoreanGroups : undefined,
         part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
       },
-      solution_text: solutionText, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
       requires_work_image: requireWorkImage,
       redirect_to: returnTo,
     }
@@ -1711,38 +1685,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
     </>
   )
 
-  const fixedMainContent = (
-    <>
-      <div className="space-y-1.5">
-        <Label className="text-sm">รูปแบบคำถาม / ช่องคำตอบ *</Label>
-        <RichTextEditor
-          ref={subTextEditorRef}
-          value={answerParts[0].sub_text ?? ''}
-          onChange={v => updatePart(0, { sub_text: v })}
-          placeholder="เช่น  ใช้เวลาทั้งหมด [คำตอบ] วินาที"
-          rows={1}
-        />
-        <Button
-          type="button" variant="outline" size="sm"
-          className="text-xs h-8"
-          onClick={() => subTextEditorRef.current?.insertText('[คำตอบ]')}
-        >
-          + แทรก [คำตอบ]
-        </Button>
-        <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง *</Label>
-          <SpecialCharInput value={answerParts[0].formula} onChange={v => updatePart(0, { formula: v })} placeholder="เช่น 9.8" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-gray-500">หน่วย</Label>
-          <SpecialCharInput value={answerParts[0].unit} onChange={v => updatePart(0, { unit: v })} placeholder="เช่น m/s²" />
-        </div>
-      </div>
-    </>
-  )
+  const mainBlankNumbers = creationMode === 'fixed' ? extractAnswerBlankNumbers(questionText) : []
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl">
@@ -1750,8 +1693,8 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       {/* Mode selection */}
       <div className="flex gap-3">
         {([
-          { value: 'from-equation' as const, label: 'สร้างโจทย์จากสมการ', desc: 'เลือกสมการสำเร็จรูป หรือพิมพ์สมการเอง ระบบคำนวณคำตอบให้อัตโนมัติ' },
           { value: 'fixed' as const, label: 'กำหนดคำตอบด้วยตัวเอง', desc: 'ไม่มีสมการ ไม่มีการสุ่ม นักเรียนทุกคนได้โจทย์และคำตอบเดียวกัน' },
+          { value: 'from-equation' as const, label: 'สร้างโจทย์สุ่มตัวเลขจากสมการ', desc: 'เลือกสมการสำเร็จรูป หรือพิมพ์สมการเอง ระบบคำนวณคำตอบให้อัตโนมัติ' },
         ]).map(opt => (
           <button
             key={opt.value}
@@ -1836,7 +1779,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
             </div>
             <div className="space-y-1.5">
               <Label>รูปภาพประกอบโจทย์</Label>
-              <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
+              <QuestionImageUpload value={imageUrls} onChange={setImageUrls} />
             </div>
           </section>
 
@@ -1870,42 +1813,45 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
           <section className="space-y-4">
             <h2 className="text-base font-semibold text-gray-900 border-b pb-2">สร้างโจทย์</h2>
             <div className="space-y-1.5">
-              <Label>โจทย์ *</Label>
+              <Label>คำถามหลัก *</Label>
               <RichTextEditor
                 ref={editorRef}
                 value={questionText}
-                onChange={setQuestionText}
+                onChange={handleFixedQuestionTextChange}
                 placeholder="พิมพ์เนื้อหาโจทย์ที่นี่..."
                 rows={5}
               />
+              <Button
+                type="button" variant="outline" size="sm"
+                className="text-xs h-8"
+                onClick={() => editorRef.current?.insertText(numberedAnswerBlank(nextAnswerBlankNumber(questionText)))}
+              >
+                + แทรกคำตอบ
+              </Button>
+              <p className="text-[11px] text-gray-400">แทรกได้หลายช่อง แต่ละช่องจะมีเลขกำกับ พร้อมช่อง &quot;คำตอบที่ถูกต้อง&quot; เลขเดียวกันโผล่ขึ้นด้านล่างให้กรอก</p>
             </div>
             <div className="space-y-1.5">
               <Label>รูปภาพประกอบโจทย์</Label>
-              <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
+              <QuestionImageUpload value={imageUrls} onChange={setImageUrls} />
             </div>
           </section>
 
-          {/* 3. ชุดคำตอบ */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h2 className="text-base font-semibold text-gray-900">ชุดคำตอบ</h2>
-              {subParts.length > 0 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
-            </div>
-            {subParts.length > 0
-              ? <AnswerPartCard label={labels[0]} locked>{fixedMainContent}</AnswerPartCard>
-              : fixedMainContent}
-            {subParts.map((part, i) => (
-              <SubQuestionFixed
-                key={part.id}
-                part={part}
-                index={i}
-                labels={labels}
-                onChange={patch => updatePart(i + 1, patch)}
-                onRemove={() => removeSubQuestion(i + 1)}
-              />
-            ))}
-            <AddSubItemButton onClick={addSubQuestion} />
-          </section>
+          {/* 3. คำตอบที่ถูกต้อง — จำนวนช่องและเลขกำกับอิงตาม [คำตอบ N] ที่แทรกไว้ในคำถามหลัก */}
+          {mainBlankNumbers.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold text-gray-900 border-b pb-2">คำตอบที่ถูกต้อง</h2>
+              {mainBlankNumbers.map((num, i) => (
+                <div key={i} className="space-y-1.5">
+                  <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง {num} *</Label>
+                  <Input
+                    value={answerParts[i]?.formula ?? ''}
+                    onChange={e => updatePart(i, { formula: e.target.value })}
+                    placeholder="เช่น 9.8"
+                  />
+                </div>
+              ))}
+            </section>
+          )}
         </>
       )}
 
@@ -1952,16 +1898,10 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         </div>
       </section>
 
-      {/* เฉลยวิธีทำ */}
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เฉลยวิธีทำ (ไม่บังคับ)</h2>
-        <Textarea
-          value={solutionText}
-          onChange={e => setSolutionText(e.target.value)}
-          placeholder="อธิบายวิธีทำ..."
-          rows={4}
-        />
-      </section>
+      <SolutionSection
+        text={solutionText} onTextChange={setSolutionText}
+        imageUrls={solutionImageUrls} onImageUrlsChange={setSolutionImageUrls}
+      />
 
       <div className="flex items-center gap-3 pt-2 border-t">
         <QuestionPreview
@@ -1980,13 +1920,6 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
           ยกเลิก
         </Button>
       </div>
-
-      {showWhiteboard && (
-        <WhiteboardModal
-          onSave={url => { setImageUrls(prev => [...prev, url]); setShowWhiteboard(false) }}
-          onClose={() => setShowWhiteboard(false)}
-        />
-      )}
     </form>
   )
 }

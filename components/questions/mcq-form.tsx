@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
 import { Plus, X, Image as ImageIcon, ListChecks, Calculator } from 'lucide-react'
@@ -13,8 +12,8 @@ import { Plus, X, Image as ImageIcon, ListChecks, Calculator } from 'lucide-reac
 import { GeneralInfoSection } from './general-info-section'
 import { SpecialCharInput } from './special-char-input'
 import { QuestionImageUpload } from './question-image-upload'
+import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { WhiteboardModal } from './whiteboard-modal'
 import { McqAutoForm } from './mcq-auto-form'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
@@ -131,7 +130,6 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
-  const [showWhiteboard, setShowWhiteboard] = useState(false)
 
   const [options, setOptions] = useState<MCQOption[]>(
     question?.mcq_options ?? [
@@ -143,6 +141,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
   )
   const [showImageForOption, setShowImageForOption] = useState<Record<number, boolean>>({})
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
 
   useEffect(() => {
     if (mode !== 'create' || question) return
@@ -157,6 +156,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
     setImageUrls(seed.image_urls ?? [])
     setOptions(seed.mcq_options ?? [])
     setSolutionText(seed.solution_text ?? '')
+    setSolutionImageUrls(seed.solution_image_urls ?? [])
   })
 
   function updateOption(i: number, field: keyof MCQOption, value: string | boolean | undefined) {
@@ -209,7 +209,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
       answer_parts: [],
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: options,
-      solution_text: solutionText, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -251,7 +251,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
         </div>
         <div className="space-y-1.5">
           <Label>รูปภาพประกอบโจทย์</Label>
-          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
+          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} />
         </div>
       </section>
 
@@ -320,15 +320,10 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
         )}
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เฉลยวิธีทำ (ไม่บังคับ)</h2>
-        <Textarea
-          value={solutionText}
-          onChange={(e) => setSolutionText(e.target.value)}
-          placeholder="อธิบายวิธีทำ..."
-          rows={4}
-        />
-      </section>
+      <SolutionSection
+        text={solutionText} onTextChange={setSolutionText}
+        imageUrls={solutionImageUrls} onImageUrlsChange={setSolutionImageUrls}
+      />
 
       <div className="flex items-center gap-3 pt-2 border-t">
         <QuestionPreview
@@ -347,13 +342,6 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
           ยกเลิก
         </Button>
       </div>
-
-      {showWhiteboard && (
-        <WhiteboardModal
-          onSave={(url) => { setImageUrls(prev => [...prev, url]); setShowWhiteboard(false) }}
-          onClose={() => setShowWhiteboard(false)}
-        />
-      )}
     </form>
   )
 }

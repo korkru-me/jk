@@ -171,6 +171,7 @@ async function insertPortableQuestion(
     mcq_options: pq.mcq_options,
     extra_data: pq.extra_data ?? {},
     solution_text: pq.solution_text,
+    solution_image_urls: pq.solution_image_urls ?? [],
     tags: pq.tags,
     image_urls: pq.image_urls ?? [],
     requires_work_image: pq.requires_work_image,

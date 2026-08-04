@@ -5,14 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
 
 import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
+import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { WhiteboardModal } from './whiteboard-modal'
 import { AnswerPartCard, LabelStyleToggle, AddSubItemButton } from './answer-set-controls'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
@@ -40,13 +39,12 @@ function newStatement(): TrueFalseStatement {
 // is added, then wrapped in AnswerPartCard by the caller.
 function TrueFalseMainItem({
   editorRef, questionText, onQuestionTextChange,
-  imageUrls, onImageUrlsChange, onOpenWhiteboard,
+  imageUrls, onImageUrlsChange,
   correctAnswer, onCorrectAnswerChange,
 }: {
   editorRef: React.RefObject<RichTextEditorHandle | null>
   questionText: string; onQuestionTextChange: (v: string) => void
   imageUrls: string[]; onImageUrlsChange: (v: string[]) => void
-  onOpenWhiteboard: () => void
   correctAnswer: boolean; onCorrectAnswerChange: (v: boolean) => void
 }) {
   return (
@@ -63,7 +61,7 @@ function TrueFalseMainItem({
       </div>
       <div className="space-y-1.5">
         <Label>รูปภาพประกอบ (ไม่บังคับ)</Label>
-        <QuestionImageUpload value={imageUrls} onChange={onImageUrlsChange} onOpenWhiteboard={onOpenWhiteboard} />
+        <QuestionImageUpload value={imageUrls} onChange={onImageUrlsChange} />
       </div>
       <div>
         <p className="text-sm text-gray-600 mb-2">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
@@ -109,8 +107,6 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
-  const [showWhiteboard, setShowWhiteboard] = useState(false)
-
   const [correctAnswer, setCorrectAnswer] = useState<boolean>(existingConfig?.correct_answer ?? true)
   const [statements, setStatements] = useState<TrueFalseStatement[]>(existingConfig?.statements ?? [])
   const [labelStyle, setLabelStyle] = useState<PartLabelStyle>(existingConfig?.part_label_style ?? 'thai')
@@ -118,6 +114,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
   const [scoreAnswer, setScoreAnswer] = useState(existingConfig?.score_answer ?? 1)
   const [scoreExplanation, setScoreExplanation] = useState(existingConfig?.score_explanation ?? 1)
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
 
   useEffect(() => {
     if (mode !== 'create' || question) return
@@ -131,6 +128,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
     setQuestionText(seed.question_text)
     setImageUrls(seed.image_urls ?? [])
     setSolutionText(seed.solution_text ?? '')
+    setSolutionImageUrls(seed.solution_image_urls ?? [])
 
     const config = (seed.extra_data ?? {}) as TrueFalseConfig
     setCorrectAnswer(config.correct_answer ?? true)
@@ -187,7 +185,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: [],
       extra_data: trueFalseConfig,
-      solution_text: solutionText, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -228,7 +226,6 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
               editorRef={editorRef}
               questionText={questionText} onQuestionTextChange={setQuestionText}
               imageUrls={imageUrls} onImageUrlsChange={setImageUrls}
-              onOpenWhiteboard={() => setShowWhiteboard(true)}
               correctAnswer={correctAnswer} onCorrectAnswerChange={setCorrectAnswer}
             />
           </AnswerPartCard>
@@ -237,7 +234,6 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
             editorRef={editorRef}
             questionText={questionText} onQuestionTextChange={setQuestionText}
             imageUrls={imageUrls} onImageUrlsChange={setImageUrls}
-            onOpenWhiteboard={() => setShowWhiteboard(true)}
             correctAnswer={correctAnswer} onCorrectAnswerChange={setCorrectAnswer}
           />
         )}
@@ -351,15 +347,13 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
         )}
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เฉลยอ้างอิงสำหรับครู (ไม่บังคับ)</h2>
-        <Textarea
-          value={solutionText}
-          onChange={(e) => setSolutionText(e.target.value)}
-          placeholder="อธิบายว่าทำไมถึงถูกหรือผิด..."
-          rows={3}
-        />
-      </section>
+      <SolutionSection
+        text={solutionText} onTextChange={setSolutionText}
+        imageUrls={solutionImageUrls} onImageUrlsChange={setSolutionImageUrls}
+        label="เฉลยอ้างอิงสำหรับครู (ไม่บังคับ)"
+        placeholder="อธิบายว่าทำไมถึงถูกหรือผิด..."
+        rows={3}
+      />
 
       <div className="flex items-center gap-3 pt-2 border-t">
         <QuestionPreview
@@ -379,12 +373,6 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
         </Button>
       </div>
 
-      {showWhiteboard && (
-        <WhiteboardModal
-          onSave={(url) => { setImageUrls(prev => [...prev, url]); setShowWhiteboard(false) }}
-          onClose={() => setShowWhiteboard(false)}
-        />
-      )}
     </form>
   )
 }

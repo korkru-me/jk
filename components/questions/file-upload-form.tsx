@@ -9,6 +9,7 @@ import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-
 
 import { GeneralInfoSection } from './general-info-section'
 import { QuestionFileUpload } from './question-file-upload'
+import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
@@ -42,6 +43,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
   const [attachmentUrls, setAttachmentUrls] = useState<string[]>(existingConfig?.attachment_urls ?? [])
 
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
 
   useEffect(() => {
     if (mode !== 'create' || question) return
@@ -54,6 +56,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
     setTags(seed.tags ?? [])
     setQuestionText(seed.question_text)
     setSolutionText(seed.solution_text ?? '')
+    setSolutionImageUrls(seed.solution_image_urls ?? [])
 
     const config = (seed.extra_data ?? {}) as FileUploadConfig
     setAttachmentUrls(config.attachment_urls ?? [])
@@ -76,7 +79,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: [],
       extra_data: { attachment_urls: attachmentUrls } as FileUploadConfig,
-      solution_text: solutionText, tags, image_urls: [],
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: [],
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -123,16 +126,13 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
         </div>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">หมายเหตุสำหรับครู (ไม่บังคับ)</h2>
-        <p className="text-xs text-gray-500">นักเรียนจะไม่เห็นส่วนนี้ ใช้เป็นแนวทางตอนตรวจงานด้วยตา</p>
-        <RichTextEditor
-          value={solutionText}
-          onChange={setSolutionText}
-          placeholder="เช่น สิ่งที่ควรปรากฏในไฟล์ที่นักเรียนส่งมา..."
-          rows={4}
-        />
-      </section>
+      <SolutionSection
+        text={solutionText} onTextChange={setSolutionText}
+        imageUrls={solutionImageUrls} onImageUrlsChange={setSolutionImageUrls}
+        label="หมายเหตุสำหรับครู (ไม่บังคับ)"
+        description="นักเรียนจะไม่เห็นส่วนนี้ ใช้เป็นแนวทางตอนตรวจงานด้วยตา"
+        placeholder="เช่น สิ่งที่ควรปรากฏในไฟล์ที่นักเรียนส่งมา..."
+      />
 
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
         นักเรียนจะแนบไฟล์รูปภาพหรือ PDF เป็นคำตอบ ระบบให้คะแนนเต็มอัตโนมัติทันทีที่มีการแนบไฟล์อย่างน้อย 1 ไฟล์ — ไม่มีการตรวจเนื้อหาไฟล์ ครูสามารถเข้าไปดูไฟล์ที่ส่งได้จากหน้าผลการสอบของนักเรียน

@@ -12,6 +12,7 @@ import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { VariableEditor } from '@/components/questions/variable-editor'
 import { FormulaEditor } from '@/components/questions/formula-editor'
 import { TeamShareChips } from '@/components/questions/general-info-section'
+import { SolutionSection } from '@/components/questions/solution-section'
 import { evaluateMultiStep } from '@/lib/math/evaluator'
 import { saveQuestionGroup, deleteQuestionGroup } from '@/lib/actions/question-groups'
 import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
@@ -53,6 +54,7 @@ function emptySubQuestion(): SubQuestionData {
     answer_unit: '',
     answer_tolerance: 0.05,
     solution_text: '',
+    solution_image_urls: [],
   }
 }
 
@@ -558,15 +560,12 @@ function SubQuestionCard({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label>เฉลย / แนวคิด (ไม่บังคับ)</Label>
-            <Textarea
-              value={sq.solution_text}
-              onChange={(e) => onChange({ solution_text: e.target.value })}
-              placeholder="อธิบายวิธีทำ..."
-              rows={2}
-            />
-          </div>
+          <SolutionSection
+            text={sq.solution_text} onTextChange={(v) => onChange({ solution_text: v })}
+            imageUrls={sq.solution_image_urls} onImageUrlsChange={(urls) => onChange({ solution_image_urls: urls })}
+            label="เฉลย / แนวคิด (ไม่บังคับ)"
+            rows={2}
+          />
         </div>
       )}
     </div>

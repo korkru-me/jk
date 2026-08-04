@@ -5,15 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
 import { Plus, X, Image as ImageIcon } from 'lucide-react'
 
 import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
+import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { WhiteboardModal } from './whiteboard-modal'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, MatchingPair, Question } from '@/lib/types'
@@ -83,10 +82,10 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
-  const [showWhiteboard, setShowWhiteboard] = useState(false)
 
   const [pairs, setPairs] = useState<PairState[]>(pairsFromQuestion(question) ?? [newPair(), newPair(), newPair()])
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
 
   useEffect(() => {
     if (mode !== 'create' || question) return
@@ -100,6 +99,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
     setQuestionText(seed.question_text)
     setImageUrls(seed.image_urls ?? [])
     setSolutionText(seed.solution_text ?? '')
+    setSolutionImageUrls(seed.solution_image_urls ?? [])
 
     const seedPairs = (seed.mcq_options ?? []) as unknown as MatchingPair[]
     setPairs(seedPairs.map(p => ({
@@ -152,7 +152,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: [],
       matching_pairs: matchingPairs,
-      solution_text: solutionText, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -194,7 +194,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
         </div>
         <div className="space-y-1.5">
           <Label>รูปภาพประกอบโจทย์</Label>
-          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
+          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} />
         </div>
       </section>
 
@@ -283,15 +283,12 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
         <p className="text-xs text-gray-400">นักเรียนจะเห็นคอลัมน์ขวาถูกสลับลำดับแบบสุ่ม และต้องจับคู่ให้ถูกต้อง</p>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เฉลยวิธีทำ (ไม่บังคับ)</h2>
-        <Textarea
-          value={solutionText}
-          onChange={(e) => setSolutionText(e.target.value)}
-          placeholder="อธิบายเพิ่มเติม..."
-          rows={3}
-        />
-      </section>
+      <SolutionSection
+        text={solutionText} onTextChange={setSolutionText}
+        imageUrls={solutionImageUrls} onImageUrlsChange={setSolutionImageUrls}
+        placeholder="อธิบายเพิ่มเติม..."
+        rows={3}
+      />
 
       <div className="flex items-center gap-3 pt-2 border-t">
         <QuestionPreview
@@ -312,13 +309,6 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
           ยกเลิก
         </Button>
       </div>
-
-      {showWhiteboard && (
-        <WhiteboardModal
-          onSave={(url) => { setImageUrls(prev => [...prev, url]); setShowWhiteboard(false) }}
-          onClose={() => setShowWhiteboard(false)}
-        />
-      )}
     </form>
   )
 }

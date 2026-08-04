@@ -11,8 +11,8 @@ import { Plus, X } from 'lucide-react'
 
 import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
+import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { WhiteboardModal } from './whiteboard-modal'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, Question } from '@/lib/types'
@@ -53,9 +53,9 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
-  const [showWhiteboard, setShowWhiteboard] = useState(false)
 
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
+  const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
   const [rubric, setRubric] = useState<RubricItem[]>(rubricFromQuestion(question) ?? [])
 
   useEffect(() => {
@@ -70,6 +70,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
     setQuestionText(seed.question_text)
     setImageUrls(seed.image_urls ?? [])
     setSolutionText(seed.solution_text ?? '')
+    setSolutionImageUrls(seed.solution_image_urls ?? [])
 
     const seedRubric = (seed.mcq_options ?? []) as unknown as { criterion: string; points: number }[]
     setRubric(seedRubric.map(r => ({ id: Math.random().toString(36).slice(2), criterion: r.criterion, points: r.points })))
@@ -112,7 +113,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
       essay_rubric: rubric.length > 0
         ? rubric.map(r => ({ criterion: r.criterion, points: r.points }))
         : undefined,
-      solution_text: solutionText, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -154,20 +155,17 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
         </div>
         <div className="space-y-1.5">
           <Label>รูปภาพประกอบโจทย์</Label>
-          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} onOpenWhiteboard={() => setShowWhiteboard(true)} />
+          <QuestionImageUpload value={imageUrls} onChange={setImageUrls} />
         </div>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เฉลยอ้างอิงสำหรับครู (ไม่บังคับ)</h2>
-        <p className="text-xs text-gray-500">นักเรียนจะไม่เห็นส่วนนี้ ใช้เป็นแนวทางตอนตรวจงาน</p>
-        <RichTextEditor
-          value={solutionText}
-          onChange={setSolutionText}
-          placeholder="เขียนแนวคำตอบหรือเกณฑ์การให้คะแนนโดยย่อ..."
-          rows={4}
-        />
-      </section>
+      <SolutionSection
+        text={solutionText} onTextChange={setSolutionText}
+        imageUrls={solutionImageUrls} onImageUrlsChange={setSolutionImageUrls}
+        label="เฉลยอ้างอิงสำหรับครู (ไม่บังคับ)"
+        description="นักเรียนจะไม่เห็นส่วนนี้ ใช้เป็นแนวทางตอนตรวจงาน"
+        placeholder="เขียนแนวคำตอบหรือเกณฑ์การให้คะแนนโดยย่อ..."
+      />
 
       <section className="space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
@@ -230,13 +228,6 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
           ยกเลิก
         </Button>
       </div>
-
-      {showWhiteboard && (
-        <WhiteboardModal
-          onSave={(url) => { setImageUrls(prev => [...prev, url]); setShowWhiteboard(false) }}
-          onClose={() => setShowWhiteboard(false)}
-        />
-      )}
     </form>
   )
 }

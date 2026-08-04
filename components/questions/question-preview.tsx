@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
+import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { RichText } from '@/components/ui/rich-text'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
-import { getBlankType } from '@/lib/fill-blank'
+import { getBlankType, splitFillBlankHtml } from '@/lib/fill-blank'
+import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
 import {
   Dialog,
@@ -57,43 +58,6 @@ function renderUnit(unit: string) {
 
 function isHtml(text: string) {
   return /<[a-z][\s\S]*>/i.test(text)
-}
-
-const ANSWER_BLANK = '[คำตอบ]'
-
-// Splitting the raw (possibly HTML) sub_text string on the placeholder by plain string
-// slicing can cut a tag in half — e.g. "<p>...[คำตอบ]</p>" leaves a dangling "</p>"
-// fragment — and stripping tags instead loses formatting like superscript/subscript.
-// Use a DOM Range to split at the placeholder so each half keeps only its own
-// (correctly closed) formatting tags.
-function splitAtAnswerBlank(html: string): [string, string] | null {
-  if (typeof document === 'undefined') return null
-  const container = document.createElement('div')
-  container.innerHTML = html
-
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  let target: Text | null = null
-  let idx = -1
-  let node: Node | null
-  while ((node = walker.nextNode())) {
-    const i = (node as Text).data.indexOf(ANSWER_BLANK)
-    if (i !== -1) { target = node as Text; idx = i; break }
-  }
-  if (!target) return null
-
-  const beforeRange = document.createRange()
-  beforeRange.setStart(container, 0)
-  beforeRange.setEnd(target, idx)
-  const beforeDiv = document.createElement('div')
-  beforeDiv.appendChild(beforeRange.cloneContents())
-
-  const afterRange = document.createRange()
-  afterRange.setStart(target, idx + ANSWER_BLANK.length)
-  afterRange.setEnd(container, container.childNodes.length)
-  const afterDiv = document.createElement('div')
-  afterDiv.appendChild(afterRange.cloneContents())
-
-  return [beforeDiv.innerHTML, afterDiv.innerHTML]
 }
 
 function formatAnswer(n: number): string {
@@ -200,8 +164,8 @@ export function QuestionPreviewContent({
     const results = answerParts.map((part, i) => {
       const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
       if (correctAnswer === null || typeof correctAnswer !== 'number') return null
-      const studentInput = parseFloat(writtenInputs[i])
-      if (isNaN(studentInput)) return null
+      const studentInput = evaluateStudentAnswer(writtenInputs[i])
+      if (studentInput === null) return null
       return isClose(studentInput, correctAnswer)
     })
     setWrittenResults(results)
@@ -211,6 +175,13 @@ export function QuestionPreviewContent({
   const renderedText = questionText
     ? (Object.keys(values).length > 0 ? substituteVars(questionText, values) : questionText)
     : ''
+
+  // "written" questions may embed one or more numbered answer inputs directly
+  // in the main question text via [คำตอบ N] — same marker/mechanic as a
+  // sub-question's own sub_text, just placed in the stem and supporting more
+  // than one blank per block of text.
+  const mainBlanks = questionType === 'written' ? splitNumberedAnswerBlanks(renderedText) : null
+  const mainBlankCount = mainBlanks ? mainBlanks.numbers.length : 0
 
   const correctOptions = mcqOptions.map((o, i) => ({ ...o, idx: i })).filter(o => o.is_correct)
   const allWrittenFilled = writtenInputs.length > 0 && writtenInputs.every(v => v !== '')
@@ -243,8 +214,8 @@ export function QuestionPreviewContent({
         </button>
       </div>
 
-      {/* Question text */}
-      <RenderText text={renderedText} />
+      {/* Question text — fill_blank and single-part written-with-inline-blank render their own copy below, interleaved with the input(s) */}
+      {questionType !== 'fill_blank' && mainBlankCount === 0 && <RenderText text={renderedText} />}
 
       {/* Question images */}
       {imageUrls.length > 0 && (
@@ -465,56 +436,87 @@ export function QuestionPreviewContent({
       )}
 
       {/* ── Written (fixed / random) ── */}
-      {questionType === 'written' && (
+      {questionType === 'written' && (() => {
+        function renderInputAndFeedback(i: number, part: AnswerPart) {
+          const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
+          const result = writtenResults[i]
+          const inputEl = (
+            <input
+              type="text"
+              inputMode="text"
+              value={writtenInputs[i] ?? ''}
+              onChange={(e) => {
+                if (writtenChecked) return
+                const next = [...writtenInputs]
+                next[i] = e.target.value
+                setWrittenInputs(next)
+              }}
+              readOnly={writtenChecked}
+              placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)"
+              className={`h-9 w-36 border rounded-lg px-3 text-sm bg-white font-mono ${
+                result === true ? 'border-green-400' :
+                result === false ? 'border-red-400' :
+                'border-gray-300'
+              }`}
+            />
+          )
+          const feedback = (
+            <>
+              {result === true && (
+                <span className="text-green-600 text-sm font-medium">✓ ถูก!</span>
+              )}
+              {result === false && correctAnswer !== null && typeof correctAnswer === 'number' && (
+                <span className="text-red-500 text-sm">
+                  ✗ เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
+                </span>
+              )}
+              {result === false && (correctAnswer === null || typeof correctAnswer !== 'number') && (
+                <span className="text-red-500 text-sm">✗ ผิด</span>
+              )}
+            </>
+          )
+          return { inputEl, feedback }
+        }
+
+        const restParts = answerParts.slice(mainBlankCount)
+
+        return (
         <div className="space-y-3">
           <p className="text-xs text-gray-500 font-medium">กรอกคำตอบ:</p>
-          {answerParts.map((part, i) => {
-            const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
-            const result = writtenResults[i]
-            const blankSplit = part.sub_text ? splitAtAnswerBlank(part.sub_text) : null
 
-            const inputEl = (
-              <input
-                type="number"
-                value={writtenInputs[i] ?? ''}
-                onChange={(e) => {
-                  if (writtenChecked) return
-                  const next = [...writtenInputs]
-                  next[i] = e.target.value
-                  setWrittenInputs(next)
-                }}
-                readOnly={writtenChecked}
-                placeholder="กรอกตัวเลข"
-                className={`h-9 w-36 border rounded-lg px-3 text-sm bg-white font-mono ${
-                  result === true ? 'border-green-400' :
-                  result === false ? 'border-red-400' :
-                  'border-gray-300'
-                }`}
-              />
-            )
-
-            const feedback = (
-              <>
-                {result === true && (
-                  <span className="text-green-600 text-sm font-medium">✓ ถูก!</span>
-                )}
-                {result === false && correctAnswer !== null && typeof correctAnswer === 'number' && (
-                  <span className="text-red-500 text-sm">
-                    ✗ เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
+          {mainBlankCount > 0 && mainBlanks && (
+            <div className="leading-loose text-gray-900 text-[15px]">
+              {mainBlanks.parts.map((frag, i) => {
+                const num = mainBlanks.numbers[i]
+                const part = answerParts[i]
+                if (num === undefined || !part) return <RichText key={i} text={frag} className="[&_p]:inline" />
+                const { inputEl, feedback } = renderInputAndFeedback(i, part)
+                return (
+                  <span key={i}>
+                    {frag && <RichText text={frag} className="[&_p]:inline" />}
+                    <span className="inline-flex items-center gap-1.5 mx-1 align-middle">
+                      <span className="text-xs font-semibold text-gray-400 shrink-0">{num})</span>
+                      {inputEl}
+                      {part.unit && <span className="text-gray-600">{renderUnit(part.unit)}</span>}
+                      {feedback}
+                    </span>
                   </span>
-                )}
-                {result === false && (correctAnswer === null || typeof correctAnswer !== 'number') && (
-                  <span className="text-red-500 text-sm">✗ ผิด</span>
-                )}
-              </>
-            )
+                )
+              })}
+            </div>
+          )}
+
+          {restParts.map((part, relI) => {
+            const i = mainBlankCount + relI
+            const { inputEl, feedback } = renderInputAndFeedback(i, part)
+            const blankSplit = part.sub_text ? splitAnswerBlankHtml(part.sub_text) : null
 
             return (
               <div key={part.id} className="space-y-1.5">
                 {blankSplit ? (
                   <div className={`flex flex-wrap items-center gap-2 p-3 rounded-lg border text-sm text-gray-800 ${
-                    result === true ? 'bg-green-50 border-green-300' :
-                    result === false ? 'bg-red-50 border-red-300' :
+                    writtenResults[i] === true ? 'bg-green-50 border-green-300' :
+                    writtenResults[i] === false ? 'bg-red-50 border-red-300' :
                     'bg-gray-50 border-gray-200'
                   }`}>
                     {answerParts.length > 1 && <span className="font-medium shrink-0">{labels[i] ?? i + 1})</span>}
@@ -533,8 +535,8 @@ export function QuestionPreviewContent({
                       </p>
                     )}
                     <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                      result === true ? 'bg-green-50 border-green-300' :
-                      result === false ? 'bg-red-50 border-red-300' :
+                      writtenResults[i] === true ? 'bg-green-50 border-green-300' :
+                      writtenResults[i] === false ? 'bg-red-50 border-red-300' :
                       'bg-gray-50 border-gray-200'
                     }`}>
                       {inputEl}
@@ -572,7 +574,8 @@ export function QuestionPreviewContent({
             </div>
           )}
         </div>
-      )}
+        )
+      })()}
 
       {/* ── Essay ── */}
       {questionType === 'essay' && (
@@ -696,7 +699,7 @@ export function QuestionPreviewContent({
 
       {/* ── Fill Blank ── */}
       {questionType === 'fill_blank' && fillBlankConfig && (() => {
-        const parts = questionText.split('[___]')
+        const parts = splitFillBlankHtml(questionText)
         const blanks = fillBlankConfig.blanks
         const types = blanks.map(b => getBlankType(fillBlankConfig, b))
         const autoIdx = types.reduce<number[]>((acc, t, i) => { if (t !== 'text') acc.push(i); return acc }, [])
@@ -709,7 +712,7 @@ export function QuestionPreviewContent({
                 const type = types[i]
                 return (
                   <span key={i}>
-                    {part}
+                    <RichText text={part} />
                     {type === 'dropdown' ? (
                       <select
                         value={fillAnswers[i] ?? ''}
