@@ -252,6 +252,7 @@ export interface Question {
   answer_parts: AnswerPart[] | null
   mcq_options: MCQOption[] | null
   solution_text: string | null
+  solution_image_urls: string[]
   tags: string[] | null
   rejected_reason: string | null
   image_urls: string[]
@@ -440,6 +441,8 @@ export interface SubmissionAnswer {
   order_index: number
   option_order: number[] | null
   work_images: (string | null)[] | null
+  score_edited_by: string | null
+  score_edited_at: string | null
   created_at: string
 }
 

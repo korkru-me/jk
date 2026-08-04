@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
-import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
+import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
 import { AssignmentDetailClient } from './_components/assignment-detail-client'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
@@ -83,19 +83,11 @@ export default async function AssignmentDetailPage({
     (submissions ?? []) as unknown as SubmissionRow[],
     () => a.display_max_score
   )
-  const attemptsByStudent = new Map<string, SubmissionRow[]>()
-  for (const s of rescaledSubmissions) {
-    const arr = attemptsByStudent.get(s.student_id) ?? []
-    arr.push(s)
-    attemptsByStudent.set(s.student_id, arr)
-  }
+  const normalizedSubmissions = rescaledSubmissions.map(s => ({ ...s, attempt_number: s.attempt_number ?? 1 }))
+  const officialByStudent = officialSubmissionsByStudent(normalizedSubmissions, a.score_strategy)
   const bestByStudent = new Map<string, SubmissionRow>()
-  for (const [studentId, attempts] of attemptsByStudent) {
-    const normalized = attempts.map(s => ({ ...s, attempt_number: s.attempt_number ?? 1 }))
-    const official = selectOfficialAttempt(normalized, a.score_strategy)
-    if (official) {
-      bestByStudent.set(studentId, { ...official.representative, total_score: official.total_score, max_score: official.max_score })
-    }
+  for (const [studentId, official] of officialByStudent) {
+    bestByStudent.set(studentId, { ...official.representative, total_score: official.total_score, max_score: official.max_score })
   }
 
   // Merge: every enrolled student gets a row, even with zero submissions —

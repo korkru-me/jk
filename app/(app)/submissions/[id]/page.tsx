@@ -1,13 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { StudyPathPanel } from '@/components/student/study-path-panel'
-import { CheckCircle2, XCircle, Clock, ChevronLeft, Trophy, RotateCcw, School, FileText } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Trophy, RotateCcw, School, FileText } from 'lucide-react'
 import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
 import { getBlankType } from '@/lib/fill-blank'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
-import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax } from '@/lib/scoring'
+import { evaluateStudentAnswer } from '@/lib/math/evaluator'
+import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStudent } from '@/lib/scoring'
+import { sortStudents } from '@/lib/student-sort'
+import { ScoreEditor } from '@/components/assignments/score-editor'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -43,6 +47,7 @@ export default async function SubmissionResultPage({
     .from('submissions')
     .select(`
       *,
+      users(full_name),
       assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, display_max_score, classrooms(name)),
       submission_answers(*, questions(*))
     `)
@@ -52,10 +57,55 @@ export default async function SubmissionResultPage({
   if (!submission) notFound()
 
   const isOwnSubmission = submission.student_id === user.id
+  const isTeacherViewer = !isOwnSubmission
 
   if (submission.status === 'in_progress') {
     if (!isOwnSubmission) notFound()
     redirect(`/assignments/${submission.assignment_id}/take`)
+  }
+
+  // Prev/next student navigation, teacher-only — same "official attempt per
+  // student" reduction the results/classroom-scores pages use, sorted by
+  // name so paging through a class is predictable. Only students who have
+  // at least one submission for this assignment are included (there's
+  // nothing to page to for a non-starter).
+  let studentName: string | null = null
+  let prevNav: { submissionId: string; label: string } | null = null
+  let nextNav: { submissionId: string; label: string } | null = null
+  if (isTeacherViewer) {
+    const assignmentInfo = (submission as any).assignments
+    studentName = (submission as any).users?.full_name ?? null
+
+    const { data: siblingSubs } = await supabase
+      .from('submissions')
+      .select('id, student_id, status, total_score, max_score, attempt_number, users(full_name)')
+      .eq('assignment_id', submission.assignment_id)
+
+    const normalized = (siblingSubs ?? []).map((s: any) => ({ ...s, attempt_number: s.attempt_number ?? 1 }))
+    const officialByStudent = officialSubmissionsByStudent(normalized, assignmentInfo.score_strategy)
+
+    const admin = createAdminClient()
+    const studentIds = Array.from(officialByStudent.keys())
+    const { data: profileRows } = studentIds.length > 0
+      ? await admin
+          .from('student_profiles')
+          .select('student_id, grade_level, section_number, class_number, student_code')
+          .in('student_id', studentIds)
+      : { data: [] }
+    const profiles = Object.fromEntries((profileRows ?? []).map((p: any) => [p.student_id, p]))
+
+    const roster = studentIds.map(sid => {
+      const official = officialByStudent.get(sid)!
+      return {
+        id: sid,
+        full_name: (official.representative as any).users?.full_name ?? '',
+        submissionId: official.representative.id as string,
+      }
+    })
+    const sorted = sortStudents(roster, profiles, 'name', 'asc')
+    const idx = sorted.findIndex(s => s.id === submission.student_id)
+    if (idx > 0) prevNav = { submissionId: sorted[idx - 1].submissionId, label: sorted[idx - 1].full_name }
+    if (idx >= 0 && idx < sorted.length - 1) nextNav = { submissionId: sorted[idx + 1].submissionId, label: sorted[idx + 1].full_name }
   }
 
   const answers = (submission as any).submission_answers as any[]
@@ -79,13 +129,16 @@ export default async function SubmissionResultPage({
   const pct = displayMax > 0 ? Math.round(((displayScore ?? 0) / displayMax) * 100) : 0
   const passed = computePassed(displayScore, displayMax, assignment.passing_type, assignment.passing_value)
   const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
+  // Teachers always see/grade answers regardless of the student-facing
+  // show_results timing — that setting only controls what students see.
   const canShowAnswers =
+    isTeacherViewer ||
     assignment.show_results !== 'after_due' ||
     !assignment.end_at ||
     new Date(assignment.end_at) < new Date()
 
   const attemptsRemaining = assignment.max_attempts == null || submission.attempt_number < assignment.max_attempts
-  const canRetry = attemptsRemaining && assignment.status === 'published' &&
+  const canRetry = isOwnSubmission && attemptsRemaining && assignment.status === 'published' &&
     (!assignment.end_at || new Date(assignment.end_at) > new Date())
 
   // Extract wrong answers for study path
@@ -99,14 +152,39 @@ export default async function SubmissionResultPage({
   return (
     <div className="max-w-3xl space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2">
-        <Link href="/my-submissions" className="text-sm text-muted-foreground hover:text-blue-600 flex items-center gap-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Link
+          href={isTeacherViewer ? `/assignments/${submission.assignment_id}/results` : '/my-submissions'}
+          className="text-sm text-muted-foreground hover:text-blue-600 flex items-center gap-1"
+        >
           <ChevronLeft size={15} />
-          ผลงานทั้งหมด
+          {isTeacherViewer ? 'ผลคะแนนทั้งหมด' : 'ผลงานทั้งหมด'}
         </Link>
         <span className="text-muted-foreground">/</span>
         <span className="text-sm font-medium truncate">{assignment.title}</span>
+        {isTeacherViewer && studentName && (
+          <>
+            <span className="text-muted-foreground">/</span>
+            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">{studentName}</span>
+          </>
+        )}
       </div>
+
+      {/* Prev/next student — teacher only */}
+      {isTeacherViewer && (prevNav || nextNav) && (
+        <div className="flex items-center justify-between text-sm bg-card border rounded-xl px-4 py-2.5">
+          {prevNav ? (
+            <Link href={`/submissions/${prevNav.submissionId}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-blue-600 min-w-0">
+              <ChevronLeft size={15} className="shrink-0" /> <span className="truncate">{prevNav.label}</span>
+            </Link>
+          ) : <span />}
+          {nextNav ? (
+            <Link href={`/submissions/${nextNav.submissionId}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-blue-600 ml-auto min-w-0">
+              <span className="truncate">{nextNav.label}</span> <ChevronRight size={15} className="shrink-0" />
+            </Link>
+          ) : <span />}
+        </div>
+      )}
 
       {/* Score summary */}
       <div className="bg-card border rounded-2xl p-8 text-center relative overflow-hidden">
@@ -267,11 +345,17 @@ export default async function SubmissionResultPage({
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-sm">ข้อ {i + 1}</p>
                         {q.title && <p className="text-xs text-muted-foreground truncate">{q.title}</p>}
-                        <Badge variant="outline" className={`text-xs ml-auto shrink-0 ${
-                          isPendingManual ? 'border-amber-300 text-amber-600 dark:text-amber-400' : ''
-                        }`}>
-                          {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
-                        </Badge>
+                        <div className="ml-auto shrink-0">
+                          {isTeacherViewer ? (
+                            <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
+                          ) : (
+                            <Badge variant="outline" className={`text-xs ${
+                              isPendingManual ? 'border-amber-300 text-amber-600 dark:text-amber-400' : ''
+                            }`}>
+                              {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <QuestionText
                         text={substituteVars(q.question_text, a.random_values)}
@@ -512,7 +596,7 @@ function AnswerReview({
           const student = studentArr[i] ?? '—'
           const part = answerParts?.[i]
           const unit = part?.unit ?? answerUnit ?? ''
-          const sv = parseFloat(student)
+          const sv = evaluateStudentAnswer(student) ?? NaN
           const cv = parseFloat(correct)
           const tol = part?.tolerance ?? 0.1
           const absTol = tol < 0 ? Math.abs(cv) * (Math.abs(tol) / 100) : tol

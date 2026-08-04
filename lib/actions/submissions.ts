@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { randomizeVariables, evaluateFormula, evaluatePartsChained } from '@/lib/math/evaluator'
+import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { getMyOrgId } from '@/lib/actions/org'
 import { isAttemptExpired } from '@/lib/grading'
 import { getBlankType } from '@/lib/fill-blank'
@@ -390,6 +390,64 @@ export async function saveFileSubmission(submissionAnswerId: string, files: Subm
   return { success: true }
 }
 
+// Manual score override for a teacher grading (or re-grading) one student's
+// answer to one question — e.g. bumping an auto-graded 0 up to partial/full
+// credit, or resolving a pending-manual fill-blank. Bounded to
+// [0, max_score] both here (readable error) and in the RLS WITH CHECK
+// (submission_answers_org_teacher_update, the real security boundary).
+export async function updateSubmissionAnswerScore(submissionAnswerId: string, newScore: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  if (!Number.isFinite(newScore) || newScore < 0) return { error: 'คะแนนไม่ถูกต้อง' }
+
+  const { data: sa } = await supabase
+    .from('submission_answers')
+    .select('id, submission_id, max_score, submissions(id, status, assignment_id, assignments(created_by))')
+    .eq('id', submissionAnswerId)
+    .maybeSingle()
+
+  if (!sa) return { error: 'ไม่พบคำตอบ' }
+  const submission = (sa as any).submissions
+  const assignment = submission?.assignments
+  if (assignment?.created_by !== user.id) return { error: 'ไม่มีสิทธิ์แก้ไขคะแนนนี้' }
+  if (submission?.status === 'in_progress') return { error: 'นักเรียนยังทำไม่เสร็จ แก้คะแนนไม่ได้' }
+  if (newScore > sa.max_score) return { error: `คะแนนต้องไม่เกิน ${sa.max_score}` }
+
+  const { error: updateError } = await supabase
+    .from('submission_answers')
+    .update({
+      score: newScore,
+      is_correct: newScore >= sa.max_score,
+      score_edited_by: user.id,
+      score_edited_at: new Date().toISOString(),
+    })
+    .eq('id', submissionAnswerId)
+
+  if (updateError) return { error: updateError.message }
+
+  const { data: allAnswers } = await supabase
+    .from('submission_answers')
+    .select('score')
+    .eq('submission_id', sa.submission_id)
+
+  const totalScore = (allAnswers ?? []).reduce((sum: number, a: any) => sum + (a.score ?? 0), 0)
+
+  const { error: subError } = await supabase
+    .from('submissions')
+    .update({ total_score: totalScore, status: 'graded' })
+    .eq('id', sa.submission_id)
+
+  if (subError) return { error: subError.message }
+
+  revalidatePath(`/submissions/${sa.submission_id}`)
+  revalidatePath(`/assignments/${submission.assignment_id}`)
+  revalidatePath(`/assignments/${submission.assignment_id}/results`)
+
+  return { success: true, newTotalScore: totalScore }
+}
+
 // Shared by submitSubmission (student-initiated) and startSubmission's
 // stale-attempt handling (server-initiated, when a resumed in-progress
 // attempt's time limit already elapsed). `enforceWorkImage` is only turned
@@ -546,7 +604,9 @@ async function gradeAndFinalizeSubmission(
       const parts: Array<{ tolerance: number }> = a.questions?.answer_parts ?? []
       let correctCount = 0
       for (let i = 0; i < correctAnswers.length; i++) {
-        const sv = parseFloat(studentAnswers[i] ?? '')
+        // Students may answer with a plain number or a simple arithmetic
+        // expression (e.g. "9+1") — see evaluateStudentAnswer.
+        const sv = evaluateStudentAnswer(studentAnswers[i] ?? '') ?? NaN
         const cv = parseFloat(correctAnswers[i] ?? '')
         const tol = parts[i]?.tolerance ?? a.questions?.answer_tolerance ?? 0.1
         if (!isNaN(sv) && !isNaN(cv) && gradeValue(sv, cv, tol)) correctCount++
@@ -555,8 +615,9 @@ async function gradeAndFinalizeSubmission(
       return { id: a.id, is_correct: correctCount === correctAnswers.length, score: scaleScore(correctCount, structuralMax, a.max_score) }
     }
 
-    // Single-part (backwards compat)
-    const studentVal = parseFloat(studentAns)
+    // Single-part (backwards compat) — students may answer with a plain
+    // number or a simple arithmetic expression (e.g. "9+1").
+    const studentVal = evaluateStudentAnswer(studentAns) ?? NaN
     const correctVal = parseFloat(correctAns)
     let isCorrect = false
     let score = 0

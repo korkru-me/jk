@@ -194,7 +194,7 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
           </Link>
           <Link href={`/assignments/${a.id}/results`}>
             <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-white/10 hover:text-white bg-transparent">
-              <BarChart2 className="w-3.5 h-3.5" /> ดูคะแนนเต็ม
+              <BarChart2 className="w-3.5 h-3.5" /> ดูคำตอบ &amp; คะแนน
             </Button>
           </Link>
           <Link href={`/assignments/${a.id}/analytics`}>

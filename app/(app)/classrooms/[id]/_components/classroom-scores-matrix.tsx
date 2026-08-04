@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
 import { setAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { computePassed } from '@/lib/grading'
-import { selectOfficialAttempt } from '@/lib/scoring'
+import { officialSubmissionsByStudent } from '@/lib/scoring'
 import { downloadTextFile, toCsv, safeFilenamePart } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel,
@@ -116,19 +116,18 @@ export function ClassroomScoresMatrix({
   // (assignmentId, studentId) -> official submission per that assignment's score_strategy
   const subKey = (aId: string, sId: string) => `${aId}::${sId}`
   const strategyByAssignment = new Map(assignments.map(a => [a.id, a.score_strategy]))
-  const attemptsByKey = new Map<string, SubmissionRow[]>()
+  const submissionsByAssignment = new Map<string, SubmissionRow[]>()
   for (const s of submissions) {
-    const key = subKey(s.assignment_id, s.student_id)
-    const arr = attemptsByKey.get(key) ?? []
+    const arr = submissionsByAssignment.get(s.assignment_id) ?? []
     arr.push(s)
-    attemptsByKey.set(key, arr)
+    submissionsByAssignment.set(s.assignment_id, arr)
   }
   const bestSubmission = new Map<string, SubmissionRow>()
-  for (const [key, attempts] of attemptsByKey) {
-    const strategy = strategyByAssignment.get(attempts[0].assignment_id) ?? 'best'
-    const official = selectOfficialAttempt(attempts, strategy)
-    if (official) {
-      bestSubmission.set(key, { ...official.representative, total_score: official.total_score, max_score: official.max_score })
+  for (const [assignmentId, subs] of submissionsByAssignment) {
+    const strategy = strategyByAssignment.get(assignmentId) ?? 'best'
+    const officialByStudent = officialSubmissionsByStudent(subs, strategy)
+    for (const [studentId, official] of officialByStudent) {
+      bestSubmission.set(subKey(assignmentId, studentId), { ...official.representative, total_score: official.total_score, max_score: official.max_score })
     }
   }
 
@@ -348,14 +347,17 @@ export function ClassroomScoresMatrix({
                   return (
                     <td key={a.id} className="px-3 py-2.5 text-center group relative border-b border-gray-50">
                       {submitted ? (
-                        <div className={`flex items-center justify-center gap-1 ${
-                          passed === false ? 'text-red-500' : 'text-emerald-600'
-                        }`}>
+                        <Link
+                          href={`/submissions/${sub!.id}`}
+                          className={`flex items-center justify-center gap-1 hover:underline ${
+                            passed === false ? 'text-red-500' : 'text-emerald-600'
+                          }`}
+                        >
                           {passed === false ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                           <span className="text-xs font-semibold">
                             {sub!.total_score ?? 0}/{sub!.max_score}
                           </span>
-                        </div>
+                        </Link>
                       ) : inProgress ? (
                         <div className="flex items-center justify-center gap-1 text-blue-500">
                           <CircleDashed className="w-3.5 h-3.5" />

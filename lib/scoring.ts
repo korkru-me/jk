@@ -37,7 +37,7 @@ export const SCORE_STRATEGY_LABELS: Record<ScoreStrategy, string> = {
   latest: 'คะแนนครั้งล่าสุด',
 }
 
-interface AttemptRow {
+export interface AttemptRow {
   status: string
   total_score: number | null
   max_score: number
@@ -87,4 +87,26 @@ export function selectOfficialAttempt<T extends AttemptRow>(
   const avg = graded.reduce((sum, s) => sum + (s.total_score as number), 0) / graded.length
   const representative = graded.reduce((prev, s) => (s.attempt_number > prev.attempt_number ? s : prev))
   return { representative, total_score: avg, max_score: representative.max_score }
+}
+
+// Groups a flat list of submissions (every attempt, every student) by
+// student_id and reduces each group to its "official" attempt — the loop
+// every per-assignment scores view (assignment detail, results, classroom
+// scores matrix) otherwise re-implements by hand.
+export function officialSubmissionsByStudent<T extends AttemptRow & { student_id: string }>(
+  rows: T[],
+  strategy: ScoreStrategy
+): Map<string, OfficialScore<T>> {
+  const byStudent = new Map<string, T[]>()
+  for (const r of rows) {
+    const arr = byStudent.get(r.student_id) ?? []
+    arr.push(r)
+    byStudent.set(r.student_id, arr)
+  }
+  const result = new Map<string, OfficialScore<T>>()
+  for (const [studentId, attempts] of byStudent) {
+    const official = selectOfficialAttempt(attempts, strategy)
+    if (official) result.set(studentId, official)
+  }
+  return result
 }
