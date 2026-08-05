@@ -11,6 +11,7 @@ import {
 import { deleteQuestion, setRequiresWorkImage } from '@/lib/actions/questions'
 import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
+import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { downloadTextFile } from '@/lib/utils'
 import type { QuestionWithCategory } from '../page'
@@ -68,7 +69,8 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
 
   function handleDuplicate() {
     storeDuplicateSeed(q)
-    router.push(`/questions/new/${NEW_QUESTION_ROUTE_BY_TYPE[q.question_type]}`)
+    const route = isTrueFalseGroupQuestion(q) ? TRUE_FALSE_GROUP_ROUTE : NEW_QUESTION_ROUTE_BY_TYPE[q.question_type]
+    router.push(`/questions/new/${route}`)
   }
 
   function handleExport() {

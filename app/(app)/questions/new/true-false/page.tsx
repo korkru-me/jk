@@ -18,6 +18,12 @@ export default async function NewTrueFalsePage() {
           <p className="text-sm text-gray-500 mt-1">ครูใส่ข้อความ นักเรียนติ๊กถูกหรือผิด พร้อมเลือกเงื่อนไขการให้เหตุผล</p>
         </div>
       </div>
+      <div className="flex gap-2 border-b">
+        <span className="px-3 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">ถูก-ผิด (เดี่ยว)</span>
+        <Link href="/questions/new/true-false-group" className="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+          ถูก-ผิดแบบชุด (มีคำถามย่อย) →
+        </Link>
+      </div>
       <TrueFalseForm allTags={allTags} />
     </div>
   )

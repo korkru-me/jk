@@ -42,8 +42,9 @@ function naturalMaxScore(questionType: string, extraData: any, answerParts: unkn
   }
   if (questionType === 'file_upload') return 1
   if (questionType === 'composite') {
-    const parts: unknown[] = extraData?.parts ?? []
-    return parts.length || 1
+    const parts: any[] = extraData?.parts ?? []
+    if (parts.length === 0) return 1
+    return parts.reduce((sum, p) => sum + (typeof p?.score === 'number' && p.score > 0 ? p.score : 1), 0)
   }
   if (answerParts && answerParts.length > 1) return answerParts.length
   return 1
@@ -195,15 +196,22 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
 
     if (q.question_type === 'true_false') {
       const statements: import('@/lib/types').TrueFalseStatement[] = extraData?.statements ?? []
+      // 'select_matching' re-targets what counts as "the answer": the student
+      // ticks matching statements instead of judging each one, so the target
+      // is `select_target === 'wrong'` ? the false statements : the true ones
+      // — flipped here once, so the rest of grading (TF: comparison below)
+      // stays byte-for-byte the same as classic 'judge_each' mode.
+      const flip = extraData?.answer_mode === 'select_matching' && extraData?.select_target === 'wrong'
+      const target = (isTrue: boolean) => (flip ? !isTrue : isTrue)
       if (statements.length > 0) {
-        const correctAnswers = [extraData?.correct_answer, ...statements.map(s => s.correct_answer)]
+        const correctAnswers = [target(!!extraData?.correct_answer), ...statements.map(s => target(s.correct_answer))]
         return {
           question_id: q.id, random_values: {},
           correct_answer: 'TF:' + JSON.stringify(correctAnswers.map(b => b ? 'true' : 'false')),
           max_score: naturalMaxScore(q.question_type, extraData, null),
         }
       }
-      return { question_id: q.id, random_values: {}, correct_answer: extraData?.correct_answer ? 'true' : 'false', max_score: naturalMaxScore(q.question_type, extraData, null) }
+      return { question_id: q.id, random_values: {}, correct_answer: target(!!extraData?.correct_answer) ? 'true' : 'false', max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
 
     if (q.question_type === 'fill_blank') {
@@ -226,7 +234,18 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
     if (q.question_type === 'composite') {
       const compParts: import('@/lib/types').CompositePart[] = extraData?.parts ?? []
       const answers = compParts.map((p) => {
-        if (p.type === 'true_false') return { type: 'true_false', correct: p.correct_answer ? 'true' : 'false' }
+        const score = typeof p.score === 'number' && p.score > 0 ? p.score : 1
+        if (p.type === 'true_false') {
+          // Grouped sub-question (ก/ข/ค/ง choices, from the "ถูก-ผิดแบบชุด"
+          // page) — target is which choices the student should tick,
+          // resolved the same way as the standalone select_matching mode.
+          if (Array.isArray(p.choices) && p.choices.length > 0) {
+            const flip = p.select_target === 'wrong'
+            const correct = p.choices.map((c) => ((flip ? !c.correct_answer : c.correct_answer) ? 'true' : 'false'))
+            return { type: 'true_false', correct, score }
+          }
+          return { type: 'true_false', correct: p.correct_answer ? 'true' : 'false', score }
+        }
         if (p.type === 'fill_blank') {
           const blank = p.blanks?.[0]
           const manual = !blank || getBlankType(undefined, blank) === 'text'
@@ -235,11 +254,12 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
             correct: manual ? [] : acceptedAnswers(blank),
             blankType: blank?.type ?? 'fixed',
             caseSensitive: blank?.case_sensitive ?? false,
+            score,
           }
         }
-        if (p.type === 'mcq') return { type: 'mcq', correct: (p.options ?? []).find((o) => o.is_correct)?.text ?? '' }
-        if (p.type === 'ordering') return { type: 'ordering', correct: (p.items ?? []).map((it) => it.id) }
-        return { type: p.type, correct: null }
+        if (p.type === 'mcq') return { type: 'mcq', correct: (p.options ?? []).find((o) => o.is_correct)?.text ?? '', score }
+        if (p.type === 'ordering') return { type: 'ordering', correct: (p.items ?? []).map((it) => it.id), score }
+        return { type: p.type, correct: null, score }
       })
       return { question_id: q.id, random_values: {}, correct_answer: 'COMP:' + JSON.stringify(answers), max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
@@ -614,22 +634,36 @@ async function gradeAndFinalizeSubmission(
     // its manually-graded 'text' sub-type, same "leave pending" behavior as
     // FILL: above.
     if (correctAns.startsWith('COMP:')) {
-      type CompCorrectPart = { type: string; correct: unknown; blankType?: import('@/lib/types').FillBlankType; caseSensitive?: boolean }
+      type CompCorrectPart = { type: string; correct: unknown; blankType?: import('@/lib/types').FillBlankType; caseSensitive?: boolean; score?: number }
       const correctParts: CompCorrectPart[] = JSON.parse(correctAns.slice(5))
       let studentAnswers: string[] = []
       try { studentAnswers = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
 
       let hasManual = false
-      let autoCount = 0
-      let autoCorrect = 0
+      let earned = 0
       for (let i = 0; i < correctParts.length; i++) {
         const cp = correctParts[i]
         const sa = studentAnswers[i] ?? ''
+        const partScore = typeof cp.score === 'number' && cp.score > 0 ? cp.score : 1
         if (cp.type === 'fill_blank' && Array.isArray(cp.correct) && cp.correct.length === 0) {
           hasManual = true
           continue
         }
-        autoCount++
+        // Grouped true/false sub-question — `correct` is one 'true'/'false'
+        // per choice, student ticks are stored the same way (JSON array of
+        // 'true'/'false' strings), scored proportionally like the
+        // standalone multi-statement true_false grading above.
+        if (cp.type === 'true_false' && Array.isArray(cp.correct)) {
+          const targets = cp.correct as string[]
+          let studentChoices: string[] = []
+          try { studentChoices = JSON.parse(sa || '[]') } catch { /* keep empty */ }
+          let matched = 0
+          for (let j = 0; j < targets.length; j++) {
+            if ((studentChoices[j] ?? '').trim() === targets[j]) matched++
+          }
+          earned += targets.length > 0 ? (matched / targets.length) * partScore : 0
+          continue
+        }
         let ok = false
         if (cp.type === 'true_false' || cp.type === 'mcq') {
           ok = sa === cp.correct
@@ -641,10 +675,11 @@ async function gradeAndFinalizeSubmission(
           try { studentOrder = JSON.parse(sa || '[]') } catch { /* keep empty */ }
           ok = correctOrder.length > 0 && studentOrder.length === correctOrder.length && correctOrder.every((id, idx) => studentOrder[idx] === id)
         }
-        if (ok) autoCorrect++
+        if (ok) earned += partScore
       }
       const structuralMax = naturalMaxScore('composite', a.questions?.extra_data, null)
-      return { id: a.id, is_correct: hasManual ? null : autoCorrect === autoCount, score: scaleScore(autoCorrect, structuralMax, a.max_score) }
+      const isFullyCorrect = Math.round(earned * 1000) === Math.round(structuralMax * 1000)
+      return { id: a.id, is_correct: hasManual ? null : isFullyCorrect, score: scaleScore(earned, structuralMax, a.max_score) }
     }
 
     // Ordering grading

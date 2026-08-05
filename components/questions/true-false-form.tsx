@@ -16,7 +16,7 @@ import { AnswerPartCard, LabelStyleToggle, AddSubItemButton } from './answer-set
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
-import type { Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement, Question } from '@/lib/types'
+import type { Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement, TrueFalseAnswerMode, TrueFalseSelectTarget, Question } from '@/lib/types'
 
 interface TrueFalseFormProps {
   allTags: string[]
@@ -82,7 +82,7 @@ function TrueFalseMainItem({
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-2">เลือกว่าคำตอบที่ถูกต้องคืออะไร นักเรียนจะเห็นปุ่มทั้งสองปุ่มเสมอ</p>
+        <p className="text-xs text-gray-400 mt-2">เลือกว่าข้อความนี้จริงๆ แล้วถูกหรือผิด — ใช้เป็นเฉลยสำหรับให้คะแนน ไม่ว่าจะเลือกโหมดการตอบแบบไหนก็ตาม</p>
       </div>
     </>
   )
@@ -109,6 +109,8 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
   const [correctAnswer, setCorrectAnswer] = useState<boolean>(existingConfig?.correct_answer ?? true)
   const [statements, setStatements] = useState<TrueFalseStatement[]>(existingConfig?.statements ?? [])
+  const [answerMode, setAnswerMode] = useState<TrueFalseAnswerMode>(existingConfig?.answer_mode ?? 'judge_each')
+  const [selectTarget, setSelectTarget] = useState<TrueFalseSelectTarget>(existingConfig?.select_target ?? 'correct')
   const [labelStyle, setLabelStyle] = useState<PartLabelStyle>(existingConfig?.part_label_style ?? 'thai')
   const [explanationMode, setExplanationMode] = useState<TrueFalseExplanationMode>(existingConfig?.explanation_mode ?? 'none')
   const [scoreAnswer, setScoreAnswer] = useState(existingConfig?.score_answer ?? 1)
@@ -137,6 +139,8 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
     setScoreAnswer(config.score_answer ?? 1)
     setScoreExplanation(config.score_explanation ?? 1)
     setLabelStyle(config.part_label_style ?? 'thai')
+    setAnswerMode(config.answer_mode ?? 'judge_each')
+    setSelectTarget(config.select_target ?? 'correct')
   })
 
   const labels = PART_LABEL_SETS[labelStyle]
@@ -158,6 +162,8 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
     score_explanation: scoreExplanation,
     statements: statements.length > 0 ? statements : undefined,
     part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
+    answer_mode: answerMode === 'select_matching' ? 'select_matching' : undefined,
+    select_target: answerMode === 'select_matching' && selectTarget === 'wrong' ? 'wrong' : undefined,
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -219,6 +225,48 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
           {statements.length > 0 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
         </div>
         <p className="text-xs text-gray-500">พิมพ์ข้อความที่นักเรียนจะต้องตัดสินว่าถูกหรือผิด — กดเพิ่มข้อย่อยได้ถ้าอยากให้มีหลายข้อความในโจทย์เดียว</p>
+
+        <div className="space-y-2 bg-gray-50 border border-gray-200 rounded-xl p-3">
+          <Label className="text-xs text-gray-500">โหมดการตอบ</Label>
+          <div className="flex gap-2 flex-wrap">
+            {([
+              { value: 'judge_each' as const, label: 'ตัดสินทีละข้อ (แบบเดิม)' },
+              { value: 'select_matching' as const, label: 'เลือกข้อที่ถูก/ผิดจากรายการ' },
+            ]).map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setAnswerMode(opt.value)}
+                className={`px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-colors ${
+                  answerMode === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {answerMode === 'select_matching' && (
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-gray-500">ถามหา:</span>
+              {([
+                { value: 'correct' as const, label: '✓ ข้อที่ถูก' },
+                { value: 'wrong' as const, label: '✗ ข้อที่ผิด' },
+              ]).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSelectTarget(opt.value)}
+                  className={`px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-colors ${
+                    selectTarget === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <span className="text-[11px] text-gray-400">นักเรียนจะเห็นรายการทั้งหมด แล้วติ๊กเฉพาะข้อที่ตรงกับที่เลือกไว้ (เลือกได้มากกว่า 1 ข้อ)</span>
+            </div>
+          )}
+        </div>
 
         {statements.length > 0 ? (
           <AnswerPartCard label={labels[0]} locked>

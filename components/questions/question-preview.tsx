@@ -179,6 +179,12 @@ export function QuestionPreviewContent({
   }
 
   function checkCompositePart(part: CompositePart, i: number): boolean | null {
+    if (part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0) {
+      let ticks: string[] = []
+      try { ticks = JSON.parse(compositeAnswers[i] || '[]') } catch { ticks = [] }
+      const flip = part.select_target === 'wrong'
+      return part.choices.every((c, ci) => (ticks[ci] === 'true') === (flip ? !c.correct_answer : c.correct_answer))
+    }
     if (part.type === 'true_false') return compositeAnswers[i] === String(part.correct_answer ?? true)
     if (part.type === 'fill_blank') {
       const blank = part.blanks?.[0]
@@ -650,7 +656,88 @@ export function QuestionPreviewContent({
       )}
 
       {/* ── True/False ── */}
-      {questionType === 'true_false' && trueFalseConfig && (() => {
+      {questionType === 'true_false' && trueFalseConfig && trueFalseConfig.answer_mode === 'select_matching' && (() => {
+        const subStatements = trueFalseConfig.statements ?? []
+        const labels = partLabels(trueFalseConfig.part_label_style)
+        const items = [{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...subStatements]
+        const isTarget = (correct: boolean) => trueFalseConfig.select_target === 'wrong' ? !correct : correct
+        const correctCount = items.reduce((n, st, i) => n + (((tfAnswers[i] === 'true') === isTarget(st.correct_answer)) ? 1 : 0), 0)
+        const total = items.length
+        return (
+          <div className="space-y-4">
+            <p className="text-xs text-gray-500 font-medium">
+              ข้อใดต่อไปนี้{trueFalseConfig.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)
+            </p>
+            <div className="space-y-2">
+              {items.map((st, i) => {
+                const ticked = tfAnswers[i] === 'true'
+                let cls = 'border-gray-200 bg-white'
+                if (tfChecked) {
+                  cls = isTarget(st.correct_answer) ? 'border-green-400 bg-green-50' : ticked ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'
+                } else if (ticked) {
+                  cls = 'border-indigo-400 bg-indigo-50'
+                }
+                return (
+                  <label key={i} className={`flex items-start gap-2.5 p-2.5 rounded-lg border-2 ${cls} ${tfChecked ? 'cursor-default' : 'cursor-pointer'}`}>
+                    <input
+                      type="checkbox"
+                      checked={ticked}
+                      disabled={tfChecked}
+                      onChange={() => { if (!tfChecked) setTfAnswers(a => a.map((v, ai) => ai === i ? (v === 'true' ? 'false' : 'true') : v)) }}
+                      className="mt-0.5"
+                    />
+                    <span className="flex items-center gap-1.5 flex-wrap text-sm text-gray-800">
+                      <span className="text-xs font-bold text-gray-500">{labels[i] ?? i + 1})</span>
+                      {i > 0 && <RenderText text={st.text} />}
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+
+            {trueFalseConfig.explanation_mode !== 'none' && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">
+                  {trueFalseConfig.explanation_mode === 'wrong_only'
+                    ? 'ให้เหตุผล (กรณีตอบผิด):'
+                    : 'ให้เหตุผล:'}
+                </p>
+                <textarea
+                  value={tfExplanation}
+                  onChange={(e) => { if (!tfChecked) setTfExplanation(e.target.value) }}
+                  readOnly={tfChecked}
+                  rows={3}
+                  placeholder="พิมพ์เหตุผลที่นี่..."
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-lg">
+                  ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
+                </p>
+              </div>
+            )}
+
+            {!tfChecked ? (
+              <button
+                type="button"
+                onClick={() => setTfChecked(true)}
+                className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium transition-colors"
+              >
+                ตรวจคำตอบ
+              </button>
+            ) : (
+              <div className={`p-3 rounded-lg text-sm font-medium border ${
+                correctCount === total
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : 'bg-red-50 text-red-700 border-red-200'
+              }`}>
+                {correctCount === total ? '🎉 ถูกต้องทุกข้อ!' : `ถูก ${correctCount}/${total} ข้อ`}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {questionType === 'true_false' && trueFalseConfig && trueFalseConfig.answer_mode !== 'select_matching' && (() => {
         const subStatements = trueFalseConfig.statements ?? []
         const labels = partLabels(trueFalseConfig.part_label_style)
         const hasSubs = subStatements.length > 0
@@ -957,7 +1044,40 @@ export function QuestionPreviewContent({
                     {result === null && compositeChecked && <span className="text-xs text-amber-600 font-medium">รอครูตรวจ</span>}
                   </div>
 
-                  {part.type === 'true_false' && (
+                  {part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0 && (() => {
+                    let ticks: string[] = []
+                    try { ticks = JSON.parse(compositeAnswers[i] || '[]') } catch { ticks = [] }
+                    const flip = part.select_target === 'wrong'
+                    function toggleChoice(ci: number) {
+                      if (compositeChecked) return
+                      const next = [...ticks]
+                      next[ci] = next[ci] === 'true' ? 'false' : 'true'
+                      setAnswer(JSON.stringify(next))
+                    }
+                    return (
+                      <>
+                        <RichText text={part.text} className="text-[15px] text-gray-900" />
+                        <p className="text-xs text-gray-500">ข้อใดต่อไปนี้{part.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
+                        <div className="space-y-1.5">
+                          {part.choices!.map((c, ci) => {
+                            const ticked = ticks[ci] === 'true'
+                            const isTargetChoice = flip ? !c.correct_answer : c.correct_answer
+                            let cls = 'border-gray-200'
+                            if (compositeChecked) cls = isTargetChoice ? 'border-green-400 bg-green-50' : ticked ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                            else if (ticked) cls = 'border-indigo-400 bg-indigo-50'
+                            return (
+                              <label key={c.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${cls} ${compositeChecked ? 'cursor-not-allowed opacity-90' : ''}`}>
+                                <input type="checkbox" checked={ticked} disabled={compositeChecked} onChange={() => toggleChoice(ci)} />
+                                <RichText text={c.text} />
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )
+                  })()}
+
+                  {part.type === 'true_false' && !(Array.isArray(part.choices) && part.choices.length > 0) && (
                     <>
                       <RichText text={part.text} className="text-[15px] text-gray-900" />
                       <div className="flex gap-3">

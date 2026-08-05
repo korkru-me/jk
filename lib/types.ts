@@ -85,6 +85,15 @@ export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_fals
 
 export type TrueFalseExplanationMode = 'none' | 'wrong_only' | 'always'
 
+// 'judge_each' (default/legacy): the student judges every statement's truth
+// value independently (✓ถูก/✗ผิด per statement).
+// 'select_matching': the student instead sees the whole list once and ticks
+// only the statement(s) matching `select_target` — the per-statement
+// `correct_answer` values are unchanged (still "is this statement true"),
+// they're just re-interpreted as the target set instead of graded directly.
+export type TrueFalseAnswerMode = 'judge_each' | 'select_matching'
+export type TrueFalseSelectTarget = 'correct' | 'wrong'
+
 export interface TrueFalseStatement {
   id: string
   text: string   // rich text (HTML) — the statement to judge true/false
@@ -98,6 +107,8 @@ export interface TrueFalseConfig {
   score_explanation: number
   statements?: TrueFalseStatement[]   // additional statements beyond the main one — ข, ค, ...
   part_label_style?: PartLabelStyle
+  answer_mode?: TrueFalseAnswerMode        // undefined = 'judge_each' (backward compatible)
+  select_target?: TrueFalseSelectTarget    // used when answer_mode === 'select_matching'; undefined = 'correct'
 }
 
 // 'text': student may answer anything, teacher grades manually
@@ -163,7 +174,14 @@ export interface CompositePart {
   image_urls?: string[]
   score: number
 
-  correct_answer?: boolean          // type === 'true_false'
+  correct_answer?: boolean          // type === 'true_false', used when no `choices`
+  // type === 'true_false' "grouped" sub-question (ก/ข/ค/ง choices the student
+  // ticks 1+ of) — same shape/semantics as TrueFalseConfig.statements +
+  // answer_mode: 'select_matching'. Present only on parts built by the
+  // dedicated "ถูก-ผิดแบบชุด" page (see lib/true-false-group.ts); a plain
+  // composite true_false part never has this.
+  choices?: TrueFalseStatement[]
+  select_target?: TrueFalseSelectTarget   // used when `choices` present
   blanks?: FillBlankItem[]          // type === 'fill_blank' — same shape/marker convention as FillBlankConfig.blanks
   items?: OrderingItem[]            // type === 'ordering'
   options?: MCQOption[]             // type === 'mcq'

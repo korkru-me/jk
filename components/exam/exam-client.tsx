@@ -20,7 +20,7 @@ import { RichText } from '@/components/ui/rich-text'
 import { partLabels } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
+import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, CompositePart } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1153,11 +1153,72 @@ function MultiPartAnswerInput({
 
 // ─── True/False ───────────────────────────────────────────────────────────────
 
+// The student ticks whichever statements match `select_target` (any number,
+// including zero) instead of judging each one individually — used when
+// config.answer_mode === 'select_matching'. Reuses the same
+// { answers: string[], explanation } encoding as the classic multi-statement
+// mode below: answers[i] === 'true' means "ticked", compared directly
+// against the pre-flipped target built in submissions.ts.
+function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChange }: {
+  config: TrueFalseConfig | null; subStatements: TrueFalseStatement[]; mode: TrueFalseExplanationMode
+  rawValue: string; onChange: (v: string) => void
+}) {
+  let answers: string[] = []; let explanation = ''
+  if (rawValue) {
+    try { const p = JSON.parse(rawValue); answers = p.answers ?? []; explanation = p.explanation ?? '' } catch { /* */ }
+  }
+  const labels = partLabels(config?.part_label_style)
+  const target = config?.select_target ?? 'correct'
+  function toggle(i: number) {
+    const next = [...answers]
+    next[i] = next[i] === 'true' ? 'false' : 'true'
+    onChange(JSON.stringify({ answers: next, explanation }))
+  }
+  function updateExplanation(exp: string) {
+    onChange(JSON.stringify({ answers, explanation: exp }))
+  }
+  const items = [null, ...subStatements]
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">
+        ข้อใดต่อไปนี้{target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? <span className="text-xs text-muted-foreground font-normal">(เลือกได้มากกว่า 1 ข้อ)</span>
+      </p>
+      <div className="space-y-2">
+        {items.map((st, i) => (
+          <label key={i} className={`flex items-start gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-colors ${
+            answers[i] === 'true' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' : 'border-border hover:border-muted-foreground'
+          }`}>
+            <input type="checkbox" className="mt-0.5" checked={answers[i] === 'true'} onChange={() => toggle(i)} />
+            <span className="flex items-center gap-1.5 flex-wrap text-sm">
+              <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
+              {st && <RichText text={st.text} />}
+            </span>
+          </label>
+        ))}
+      </div>
+      {mode !== 'none' && (
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">
+            {mode === 'wrong_only' ? 'เหตุผล (กรณีตอบผิด):' : 'เหตุผล:'}
+          </label>
+          <textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
+            placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
+          <p className="text-xs text-amber-600">ครูจะตรวจและให้คะแนนด้วยมือ</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TrueFalseAnswerInput({ config, rawValue, onChange }: {
   answerId: string; config: TrueFalseConfig | null; rawValue: string; onChange: (v: string) => void
 }) {
   const mode = config?.explanation_mode ?? 'none'
   const subStatements = config?.statements ?? []
+
+  if (config?.answer_mode === 'select_matching') {
+    return <TrueFalseSelectMatching config={config} subStatements={subStatements} mode={mode} rawValue={rawValue} onChange={onChange} />
+  }
 
   if (subStatements.length === 0) {
     let tfAnswer = rawValue; let explanation = ''
@@ -1383,7 +1444,34 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
         <div key={part.id} className="space-y-2 pb-4 border-b last:border-b-0 last:pb-0">
           <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
 
-          {part.type === 'true_false' && (
+          {part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0 && (() => {
+            let choiceAnswers: string[] = []
+            try { choiceAnswers = JSON.parse(answers[i] || '[]') } catch { choiceAnswers = [] }
+            function toggleChoice(ci: number) {
+              const next = [...choiceAnswers]
+              next[ci] = next[ci] === 'true' ? 'false' : 'true'
+              updatePart(i, JSON.stringify(next))
+            }
+            const target = part.select_target ?? 'correct'
+            return (
+              <>
+                <RichText text={part.text} className="text-sm block" />
+                <p className="text-xs text-muted-foreground">ข้อใดต่อไปนี้{target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
+                <div className="space-y-1.5">
+                  {part.choices!.map((c, ci) => (
+                    <label key={c.id} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
+                      choiceAnswers[ci] === 'true' ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30' : 'border-border'
+                    }`}>
+                      <input type="checkbox" className="mt-0.5" checked={choiceAnswers[ci] === 'true'} onChange={() => toggleChoice(ci)} />
+                      <RichText text={c.text} />
+                    </label>
+                  ))}
+                </div>
+              </>
+            )
+          })()}
+
+          {part.type === 'true_false' && !(Array.isArray(part.choices) && part.choices.length > 0) && (
             <>
               <RichText text={part.text} className="text-sm block" />
               <div className="flex gap-3">
