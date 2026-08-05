@@ -15,7 +15,7 @@ import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
-import { getBlankType, BLANK_MARKER } from '@/lib/fill-blank'
+import { getBlankType, numberedBlankMarker, countBlanks, extractBlankNumbers, nextBlankNumber, acceptedAnswers } from '@/lib/fill-blank'
 import type { Difficulty, Visibility, FillBlankConfig, FillBlankItem, FillBlankType, Question } from '@/lib/types'
 
 interface FillBlankFormProps {
@@ -25,30 +25,37 @@ interface FillBlankFormProps {
   isOwner?: boolean
 }
 
-function parseBlankCount(text: string): number {
-  return (text.match(/\[___\]/g) ?? []).length
-}
-
 // Local editable draft for a blank. Dropdown correctness is tracked by
-// index (not by matching option text) so editing an option's label can't
-// silently desync it from being "the correct one".
+// option index (not by matching option text) so editing an option's label
+// can't silently desync it from being "one of the correct ones" — and more
+// than one index may be marked correct.
 interface BlankDraft {
   type: FillBlankType
-  answer: string
+  refAnswer: string        // 'text' type only: optional reference answer for the teacher (ungraded)
+  answers: string[]        // 'fixed' type only: accepted correct answers, one or more
   case_sensitive: boolean
-  options: string[]
-  correctIndex: number
+  options: string[]        // 'dropdown' type only
+  correctIndexes: number[] // 'dropdown' type only: option indexes marked correct, one or more
 }
 
 function newBlankDraft(): BlankDraft {
-  return { type: 'text', answer: '', case_sensitive: false, options: ['', ''], correctIndex: 0 }
+  return { type: 'text', refAnswer: '', answers: [''], case_sensitive: false, options: ['', ''], correctIndexes: [0] }
 }
 
 function draftFromExisting(config: FillBlankConfig | undefined, item: FillBlankItem): BlankDraft {
   const type = getBlankType(config, item)
   const options = item.options?.length ? item.options : ['', '']
-  const correctIndex = Math.max(0, options.indexOf(item.answer))
-  return { type, answer: item.answer ?? '', case_sensitive: item.case_sensitive ?? false, options, correctIndex }
+  const accepted = acceptedAnswers(item)
+  let correctIndexes = accepted.map(a => options.indexOf(a)).filter(idx => idx >= 0)
+  if (correctIndexes.length === 0) correctIndexes = [0]
+  return {
+    type,
+    refAnswer: type === 'text' ? (item.answer ?? '') : '',
+    answers: type === 'fixed' && accepted.length ? accepted : [''],
+    case_sensitive: item.case_sensitive ?? false,
+    options,
+    correctIndexes,
+  }
 }
 
 const BLANK_TYPES: Array<{ value: FillBlankType; label: string; desc: string; icon: typeof PenLine; activeClass: string }> = [
@@ -101,7 +108,8 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
     setBlanks((config.blanks ?? []).map(b => draftFromExisting(config, b)))
   })
 
-  const blankCount = parseBlankCount(questionText)
+  const blankCount = countBlanks(questionText)
+  const blankNumbers = extractBlankNumbers(questionText)
 
   // Sync blanks length with blankCount
   function syncBlanks(count: number) {
@@ -116,15 +124,30 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
 
   function handleQuestionTextChange(val: string) {
     setQuestionText(val)
-    syncBlanks(parseBlankCount(val))
+    syncBlanks(countBlanks(val))
   }
 
   function insertBlank() {
-    editorRef.current?.insertText(BLANK_MARKER)
+    editorRef.current?.insertText(numberedBlankMarker(nextBlankNumber(questionText)))
   }
 
-  function updateBlank(i: number, field: 'type' | 'answer' | 'case_sensitive', value: string | boolean) {
+  function updateBlank(i: number, field: 'type' | 'refAnswer' | 'case_sensitive', value: string | boolean) {
     setBlanks(prev => prev.map((b, idx) => idx === i ? { ...b, [field]: value } : b))
+  }
+
+  function updateFixedAnswer(i: number, ai: number, value: string) {
+    setBlanks(prev => prev.map((b, idx) => idx === i ? { ...b, answers: b.answers.map((a, j) => j === ai ? value : a) } : b))
+  }
+
+  function addFixedAnswer(i: number) {
+    setBlanks(prev => prev.map((b, idx) => idx === i ? { ...b, answers: [...b.answers, ''] } : b))
+  }
+
+  function removeFixedAnswer(i: number, ai: number) {
+    setBlanks(prev => prev.map((b, idx) => {
+      if (idx !== i || b.answers.length <= 1) return b
+      return { ...b, answers: b.answers.filter((_, j) => j !== ai) }
+    }))
   }
 
   function updateOption(i: number, oi: number, value: string) {
@@ -139,25 +162,41 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
     setBlanks(prev => prev.map((b, idx) => {
       if (idx !== i || b.options.length <= 2) return b
       const options = b.options.filter((_, j) => j !== oi)
-      let correctIndex = b.correctIndex
-      if (oi === b.correctIndex) correctIndex = 0
-      else if (oi < b.correctIndex) correctIndex -= 1
-      return { ...b, options, correctIndex }
+      const correctIndexes = b.correctIndexes.filter(ci => ci !== oi).map(ci => ci > oi ? ci - 1 : ci)
+      return { ...b, options, correctIndexes: correctIndexes.length ? correctIndexes : [0] }
     }))
   }
 
-  function setCorrectOption(i: number, oi: number) {
-    setBlanks(prev => prev.map((b, idx) => idx === i ? { ...b, correctIndex: oi } : b))
+  // Toggles whether an option counts as correct — more than one option may
+  // be marked correct, but at least one must remain.
+  function toggleCorrectOption(i: number, oi: number) {
+    setBlanks(prev => prev.map((b, idx) => {
+      if (idx !== i) return b
+      const has = b.correctIndexes.includes(oi)
+      if (has) {
+        if (b.correctIndexes.length <= 1) return b
+        return { ...b, correctIndexes: b.correctIndexes.filter(ci => ci !== oi) }
+      }
+      return { ...b, correctIndexes: [...b.correctIndexes, oi].sort((a, c) => a - c) }
+    }))
   }
 
   const fillBlankConfig: FillBlankConfig = {
-    blanks: blanks.map((b, i): FillBlankItem => ({
-      id: i + 1,
-      type: b.type,
-      answer: b.type === 'dropdown' ? (b.options[b.correctIndex] ?? '') : b.answer,
-      case_sensitive: b.case_sensitive,
-      ...(b.type === 'dropdown' ? { options: b.options } : {}),
-    })),
+    blanks: blanks.map((b, i): FillBlankItem => {
+      const accepted = b.type === 'dropdown'
+        ? b.correctIndexes.map(ci => b.options[ci]).filter((v): v is string => !!v?.trim())
+        : b.type === 'fixed'
+          ? b.answers.map(a => a.trim()).filter(Boolean)
+          : []
+      return {
+        id: i + 1,
+        type: b.type,
+        answer: b.type === 'text' ? b.refAnswer : (accepted[0] ?? ''),
+        ...(accepted.length ? { answers: accepted } : {}),
+        case_sensitive: b.case_sensitive,
+        ...(b.type === 'dropdown' ? { options: b.options } : {}),
+      }
+    }),
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -169,18 +208,19 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
 
     for (let i = 0; i < blanks.length; i++) {
       const b = blanks[i]
-      if (b.type === 'fixed' && !b.answer.trim()) {
-        toast.error(`กรอกคำตอบที่ถูกต้องของช่องที่ ${i + 1} ด้วย`)
+      const num = blankNumbers[i] ?? i + 1
+      if (b.type === 'fixed' && !b.answers.some(a => a.trim())) {
+        toast.error(`กรอกคำตอบที่ถูกต้องของช่องที่ ${num} อย่างน้อย 1 คำตอบ`)
         return
       }
       if (b.type === 'dropdown') {
         const filledOptions = b.options.filter(o => o.trim())
         if (filledOptions.length < 2) {
-          toast.error(`ช่องที่ ${i + 1} ต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก`)
+          toast.error(`ช่องที่ ${num} ต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก`)
           return
         }
-        if (!b.options[b.correctIndex]?.trim()) {
-          toast.error(`เลือกคำตอบที่ถูกต้องของช่องที่ ${i + 1} ด้วย`)
+        if (!b.correctIndexes.some(ci => b.options[ci]?.trim())) {
+          toast.error(`เลือกคำตอบที่ถูกต้องของช่องที่ ${num} อย่างน้อย 1 ตัวเลือก`)
           return
         }
       }
@@ -231,15 +271,15 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
         <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาโจทย์</h2>
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700 space-y-1">
           <p className="font-medium">วิธีใส่ช่องกรอก:</p>
-          <p>พิมพ์ข้อความ แล้วกดปุ่ม <strong>"แทรกช่องกรอก"</strong> หรือพิมพ์ <code className="bg-blue-100 px-1 rounded">[___]</code> ตรงที่ต้องการให้นักเรียนกรอกคำตอบ</p>
-          <p className="text-blue-500">ตัวอย่าง: "แสงเดินทางด้วยความเร็ว [___] m/s ในสุญญากาศ"</p>
+          <p>กดปุ่ม <strong>"+ แทรกช่องกรอก"</strong> ตรงที่ต้องการให้นักเรียนกรอกคำตอบ — แทรกได้หลายช่อง แต่ละช่องจะมีเลขกำกับ (เช่น <code className="bg-blue-100 px-1 rounded">[___1]</code>) ตรงกับการ์ดตั้งค่าคำตอบเลขเดียวกันด้านล่าง</p>
+          <p className="text-blue-500">ตัวอย่าง: "แสงเดินทางด้วยความเร็ว [___1] m/s ในสุญญากาศ"</p>
         </div>
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label>ข้อความโจทย์ *</Label>
             <Button type="button" variant="outline" size="sm" onClick={insertBlank}>
-              + แทรกช่องกรอก [___]
+              + แทรกช่องกรอก
             </Button>
           </div>
           <RichTextEditor
@@ -267,11 +307,13 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
           </h2>
 
           <div className="space-y-3">
-            {blanks.map((b, i) => (
+            {blanks.map((b, i) => {
+              const num = blankNumbers[i] ?? i + 1
+              return (
               <div key={i} className="p-3 rounded-xl border bg-gray-50 space-y-2.5">
                 <div className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mt-0.5">
-                    {i + 1}
+                    {num}
                   </div>
                   <div className="flex-1 space-y-2">
                     {/* Type selector */}
@@ -299,19 +341,34 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                     {/* Type-specific fields */}
                     {b.type === 'text' && (
                       <Input
-                        value={b.answer}
-                        onChange={(e) => updateBlank(i, 'answer', e.target.value)}
+                        value={b.refAnswer}
+                        onChange={(e) => updateBlank(i, 'refAnswer', e.target.value)}
                         placeholder="คำตอบอ้างอิงสำหรับครู (ไม่บังคับ)"
                       />
                     )}
 
                     {b.type === 'fixed' && (
                       <div className="space-y-1.5">
-                        <Input
-                          value={b.answer}
-                          onChange={(e) => updateBlank(i, 'answer', e.target.value)}
-                          placeholder={`คำตอบที่ถูกต้องของช่องที่ ${i + 1}`}
-                        />
+                        {b.answers.map((ans, ai) => (
+                          <div key={ai} className="flex items-center gap-2">
+                            <Input
+                              value={ans}
+                              onChange={(e) => updateFixedAnswer(i, ai, e.target.value)}
+                              placeholder={ai === 0 ? `คำตอบที่ถูกต้องของช่องที่ ${num}` : `คำตอบที่ถูกต้องอีกแบบของช่องที่ ${num}`}
+                              className="flex-1 h-8 text-sm"
+                            />
+                            {b.answers.length > 1 && (
+                              <button type="button" onClick={() => removeFixedAnswer(i, ai)} className="flex-shrink-0 text-gray-400 hover:text-red-500">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <Button type="button" variant="outline" size="sm" onClick={() => addFixedAnswer(i)}>
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          เพิ่มคำตอบที่ถูกต้อง
+                        </Button>
+                        <p className="text-[11px] text-gray-400">นักเรียนตอบตรงกับคำตอบใดคำตอบหนึ่งในนี้ ถือว่าถูกต้อง</p>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -330,13 +387,13 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                           <div key={oi} className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => setCorrectOption(i, oi)}
-                              title="ตั้งเป็นคำตอบที่ถูกต้อง"
-                              className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                                b.correctIndex === oi ? 'border-green-500 bg-green-500' : 'border-gray-300 hover:border-green-400'
+                              onClick={() => toggleCorrectOption(i, oi)}
+                              title="ติ๊กเพื่อกำหนดเป็นคำตอบที่ถูกต้อง (เลือกได้มากกว่า 1)"
+                              className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                                b.correctIndexes.includes(oi) ? 'border-green-500 bg-green-500' : 'border-gray-300 hover:border-green-400'
                               }`}
                             >
-                              {b.correctIndex === oi && <Check className="w-3 h-3 text-white" />}
+                              {b.correctIndexes.includes(oi) && <Check className="w-3 h-3 text-white" />}
                             </button>
                             <Input
                               value={opt}
@@ -355,13 +412,14 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                           <Plus className="w-3.5 h-3.5 mr-1" />
                           เพิ่มตัวเลือก
                         </Button>
-                        <p className="text-[11px] text-gray-400">กดวงกลมหน้าตัวเลือกเพื่อกำหนดคำตอบที่ถูกต้อง</p>
+                        <p className="text-[11px] text-gray-400">ติ๊กช่องหน้าตัวเลือกเพื่อกำหนดคำตอบที่ถูกต้อง (เลือกได้มากกว่า 1 ตัวเลือก)</p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
           <p className="text-xs text-gray-400">
             {manualCount === 0

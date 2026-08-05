@@ -101,14 +101,17 @@ export interface TrueFalseConfig {
 }
 
 // 'text': student may answer anything, teacher grades manually
-// 'fixed': student types freely, system auto-grades against `answer`
-// 'dropdown': student picks from `options`, system auto-grades against `answer`
+// 'fixed': student types freely, system auto-grades against `answers`
+// 'dropdown': student picks from `options`, system auto-grades against `answers`
 export type FillBlankType = 'text' | 'fixed' | 'dropdown'
 
 export interface FillBlankItem {
   id: number
   type: FillBlankType
+  /** @deprecated superseded by `answers` (supports multiple accepted values); kept as `answers[0]` for old readers */
   answer: string
+  /** accepted correct value(s) for 'fixed' (any exact/case-folded match) or 'dropdown' (any matching option text) */
+  answers?: string[]
   case_sensitive: boolean
   options?: string[]   // only used when type === 'dropdown'
 }
