@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, FileUp } from 'lucide-react'
+import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, FileUp, Blocks } from 'lucide-react'
 
 const QUESTION_TYPES = [
   {
@@ -65,6 +65,14 @@ const QUESTION_TYPES = [
     desc: 'แนบไฟล์รูปภาพหรือ PDF พร้อมคำสั่ง ให้นักเรียนส่งไฟล์คำตอบกลับมา',
     color: 'bg-sky-50 border-sky-200 text-sky-700',
     iconColor: 'text-sky-500',
+  },
+  {
+    href: '/questions/new/composite',
+    icon: Blocks,
+    title: 'โจทย์ผสม (หลายรูปแบบ)',
+    desc: 'รวมคำถามถูก-ผิด เติมคำ เรียงลำดับ ปรนัย ฯลฯ ไว้ในโจทย์เดียวกัน ภายใต้โจทย์หลักเดียว',
+    color: 'bg-slate-50 border-slate-200 text-slate-700',
+    iconColor: 'text-slate-500',
   },
 ]
 

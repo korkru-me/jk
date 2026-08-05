@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { getMyTeamOrgs } from '@/lib/actions/team-org'
-import type { Variable, LogicRule, MCQOption, AnswerPart, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig } from '@/lib/types'
+import type { Variable, LogicRule, MCQOption, AnswerPart, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
 
 export interface QuestionFormData {
   title: string
@@ -26,7 +26,7 @@ export interface QuestionFormData {
   mcq_options: MCQOption[]
   matching_pairs?: MatchingPair[]
   essay_rubric?: { criterion: string; points: number }[]
-  extra_data?: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig
+  extra_data?: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig
   solution_text: string
   solution_image_urls?: string[]
   tags: string[]

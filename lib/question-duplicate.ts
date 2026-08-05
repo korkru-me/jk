@@ -11,6 +11,7 @@ export const NEW_QUESTION_ROUTE_BY_TYPE: Record<QuestionType, string> = {
   essay: 'essay',
   written: 'random',
   file_upload: 'file-upload',
+  composite: 'composite',
 }
 
 export function storeDuplicateSeed(question: Question) {

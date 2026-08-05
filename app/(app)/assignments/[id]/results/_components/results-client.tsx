@@ -76,7 +76,7 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
     } catch { return studentAnswer }
   }
 
-  if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:')) {
+  if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:') || correctAnswer.startsWith('COMP:')) {
     try {
       const arr = JSON.parse(studentAnswer)
       return Array.isArray(arr) ? arr.map(v => (v === '' || v == null ? '—' : String(v))).join(', ') : studentAnswer

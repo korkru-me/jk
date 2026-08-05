@@ -18,9 +18,9 @@ import { FormulaSheet } from './formula-sheet'
 import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
 import { partLabels } from '@/lib/part-labels'
-import { getBlankType, splitFillBlankHtml } from '@/lib/fill-blank'
+import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile } from '@/lib/types'
+import type { AnswerPart, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -511,6 +511,12 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             <FileUploadAnswerInput
               rawValue={localAnswers[current.id] ?? ''}
               onChange={files => handleFileSubmissionChange(current.id, files)}
+            />
+          ) : current.questions.question_type === 'composite' ? (
+            <CompositeAnswerInput
+              config={current.questions.extra_data as CompositeConfig}
+              rawValue={localAnswers[current.id] ?? ''}
+              onChange={val => handleAnswerChange(current.id, val)}
             />
           ) : (
             <MultiPartAnswerInput
@@ -1249,6 +1255,7 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
 }) {
   const blanks = config?.blanks ?? []
   const parts  = splitFillBlankHtml(questionText)
+  const blankNumbers = extractBlankNumbers(questionText)
   let ans: string[] = []
   try { ans = JSON.parse(rawValue || '[]') } catch { ans = [] }
   while (ans.length < blanks.length) ans.push('')
@@ -1274,7 +1281,7 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
             ) : type !== null ? (
               <input type="text" value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
                 className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600"
-                placeholder={`ช่อง ${i + 1}`} />
+                placeholder={`ช่อง ${blankNumbers[i] ?? i + 1}`} />
             ) : null}
           </span>
         )
@@ -1330,6 +1337,145 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
       </div>
       {hasdup     && <p className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 rounded-lg">⚠️ มีลำดับซ้ำ</p>}
       {allFilled && !hasdup && <p className="text-xs text-green-600 dark:text-green-400">✓ เลือกครบแล้ว</p>}
+    </div>
+  )
+}
+
+// ─── Composite ────────────────────────────────────────────────────────────────
+// Renders each part (true_false / fill_blank / mcq / ordering) with the same
+// input style its standalone question type uses. The whole answer is stored
+// as one JSON array, one entry per part, in part order — see the 'COMP:'
+// grading branch in lib/actions/submissions.ts for the matching shape.
+
+function orderSelFromRaw(raw: string): Record<string, string> {
+  if (raw.startsWith('{')) { try { return JSON.parse(raw) } catch { return {} } }
+  if (raw.startsWith('[')) {
+    try {
+      const a: string[] = JSON.parse(raw)
+      const sel: Record<string, string> = {}
+      a.forEach((id, i) => { if (id) sel[id] = String(i + 1) })
+      return sel
+    } catch { return {} }
+  }
+  return {}
+}
+
+function CompositeAnswerInput({ config, rawValue, onChange }: {
+  config: CompositeConfig | null; rawValue: string; onChange: (v: string) => void
+}) {
+  const parts = config?.parts ?? []
+  const labels = partLabels(config?.part_label_style)
+  let answers: string[] = []
+  try { answers = JSON.parse(rawValue || '[]') } catch { answers = [] }
+  while (answers.length < parts.length) answers.push('')
+
+  const [shuffledByPart] = useState<OrderingItem[][]>(
+    () => parts.map(p => p.items?.length ? [...p.items].sort(() => Math.random() - 0.5) : [])
+  )
+
+  function updatePart(i: number, val: string) {
+    const next = [...answers]; next[i] = val; onChange(JSON.stringify(next))
+  }
+
+  return (
+    <div className="space-y-5">
+      {parts.map((part, i) => (
+        <div key={part.id} className="space-y-2 pb-4 border-b last:border-b-0 last:pb-0">
+          <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
+
+          {part.type === 'true_false' && (
+            <>
+              <RichText text={part.text} className="text-sm block" />
+              <div className="flex gap-3">
+                {([
+                  { val: 'true', label: '✓ ถูก', cls: 'border-green-500 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400' },
+                  { val: 'false', label: '✗ ผิด', cls: 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' },
+                ] as const).map(({ val, label, cls }) => (
+                  <button key={val} type="button" onClick={() => updatePart(i, val)}
+                    className={`flex-1 py-2.5 rounded-xl border-2 font-semibold text-sm transition-colors ${
+                      answers[i] === val ? cls : 'border-border text-muted-foreground hover:border-muted-foreground'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {part.type === 'fill_blank' && part.blanks?.[0] && (() => {
+            const blank = part.blanks![0]
+            const split = splitAnswerBlankHtml(part.text)
+            const type = getBlankType(undefined, blank)
+            if (!split) return <RichText text={part.text} className="text-sm block" />
+            return (
+              <p className="text-sm leading-loose">
+                <RichText text={split[0]} />
+                {type === 'dropdown' ? (
+                  <select value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
+                    className="inline-block mx-1 px-2 py-0.5 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600">
+                    <option value="">เลือกคำตอบ</option>
+                    {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
+                  </select>
+                ) : (
+                  <input type="text" value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
+                    className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600" />
+                )}
+                <RichText text={split[1]} />
+              </p>
+            )
+          })()}
+
+          {part.type === 'mcq' && (
+            <>
+              <RichText text={part.text} className="text-sm block" />
+              <div className="space-y-1.5">
+                {(part.options ?? []).map((opt, oi) => (
+                  <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
+                    answers[i] === opt.text ? 'border-purple-400 bg-purple-50 dark:bg-purple-950/30' : 'border-border'
+                  }`}>
+                    <input type="radio" name={`composite-${part.id}`} checked={answers[i] === opt.text} onChange={() => updatePart(i, opt.text)} />
+                    <RichText text={opt.text} />
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          {part.type === 'ordering' && (() => {
+            const items = shuffledByPart[i] ?? []
+            const n = items.length
+            const sel = orderSelFromRaw(answers[i] ?? '')
+            function updateSel(itemId: string, pos: string) {
+              const next = { ...sel }
+              if (pos) next[itemId] = pos; else delete next[itemId]
+              const filled = items.every(it => next[it.id])
+              const noDup = Object.values(next).length === new Set(Object.values(next)).size
+              if (filled && noDup) {
+                const arr: string[] = Array(n).fill('')
+                for (const [id, p] of Object.entries(next)) { const idx = parseInt(p) - 1; if (idx >= 0 && idx < n) arr[idx] = id }
+                updatePart(i, JSON.stringify(arr))
+              } else { updatePart(i, JSON.stringify(next)) }
+            }
+            return (
+              <>
+                <RichText text={part.text} className="text-sm block" />
+                <div className="space-y-2">
+                  {items.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 p-2 rounded-xl border bg-card">
+                      <RichText text={item.text} className="flex-1 text-sm" />
+                      <select value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)}
+                        className="h-8 w-20 border border-input rounded-lg px-1 text-sm text-center bg-background">
+                        <option value="">ลำดับ</option>
+                        {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )
+          })()}
+        </div>
+      ))}
     </div>
   )
 }

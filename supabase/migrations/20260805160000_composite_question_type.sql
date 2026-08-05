@@ -1,0 +1,11 @@
+-- New question type: "โจทย์ผสม" (composite) — combines several existing
+-- question types (true_false, fill_blank, ordering, mcq) as ordered "parts"
+-- under one shared stem. The shared stem lives in the existing
+-- `question_text` field (same convention as true_false/ordering); each
+-- part's own prompt, type, and answer config are stored in
+-- `extra_data.parts` (see CompositePart/CompositeConfig in lib/types.ts).
+-- No new columns or storage buckets are needed — parts reuse the existing
+-- `question-images` bucket for any per-part images, and grading
+-- re-dispatches each part into its own type's existing grading logic (see
+-- the 'composite' branches in lib/actions/submissions.ts).
+ALTER TYPE question_type ADD VALUE IF NOT EXISTS 'composite';

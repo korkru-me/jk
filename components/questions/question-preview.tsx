@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { RichText } from '@/components/ui/rich-text'
+
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
-import { getBlankType, splitFillBlankHtml } from '@/lib/fill-blank'
+import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem } from '@/lib/types'
+import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart } from '@/lib/types'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ interface QuestionPreviewProps {
   trueFalseConfig?: TrueFalseConfig
   fillBlankConfig?: FillBlankConfig
   orderingConfig?: OrderingConfig
+  compositeConfig?: CompositeConfig
   partLabelStyle?: PartLabelStyle
   attachmentUrls?: string[]
 }
@@ -96,6 +98,7 @@ export function QuestionPreviewContent({
   trueFalseConfig,
   fillBlankConfig,
   orderingConfig,
+  compositeConfig,
   partLabelStyle,
   attachmentUrls = [],
 }: QuestionPreviewProps) {
@@ -135,6 +138,17 @@ export function QuestionPreviewContent({
   const [orderSelections, setOrderSelections] = useState<Record<string, string>>({})
   const [orderChecked, setOrderChecked] = useState(false)
 
+  // composite — one answer slot per part; ordering-type parts store their
+  // per-item position selections as a JSON-encoded {itemId: position} object
+  // (same shape as orderSelections above), everything else stores a plain string.
+  const compositeParts = compositeConfig?.parts ?? []
+  const [compositeAnswers, setCompositeAnswers] = useState<string[]>(() => compositeParts.map(() => ''))
+  const [compositeShuffledItems, setCompositeShuffledItems] = useState<OrderingItem[][]>(
+    () => compositeParts.map(p => p.items?.length ? [...p.items].sort(() => Math.random() - 0.5) : [])
+  )
+  const [compositeChecked, setCompositeChecked] = useState(false)
+  const [compositeResults, setCompositeResults] = useState<(boolean | null)[]>([])
+
   function generate() {
     setValues(randomizeVariables(variables))
     setShuffledRight(matchingPairs.length > 0 ? shuffleIndices(matchingPairs.length) : [])
@@ -158,6 +172,36 @@ export function QuestionPreviewContent({
       setOrderSelections({})
       setOrderChecked(false)
     }
+    setCompositeAnswers(compositeParts.map(() => ''))
+    setCompositeShuffledItems(compositeParts.map(p => p.items?.length ? [...p.items].sort(() => Math.random() - 0.5) : []))
+    setCompositeChecked(false)
+    setCompositeResults([])
+  }
+
+  function checkCompositePart(part: CompositePart, i: number): boolean | null {
+    if (part.type === 'true_false') return compositeAnswers[i] === String(part.correct_answer ?? true)
+    if (part.type === 'fill_blank') {
+      const blank = part.blanks?.[0]
+      if (!blank) return null
+      if (getBlankType(undefined, blank) === 'text') return null
+      return isBlankCorrect(compositeAnswers[i] ?? '', acceptedAnswers(blank), blank.type, blank.case_sensitive)
+    }
+    if (part.type === 'mcq') {
+      const correct = part.options?.find(o => o.is_correct)
+      return !!correct && compositeAnswers[i] === correct.text
+    }
+    if (part.type === 'ordering') {
+      const items = part.items ?? []
+      let sel: Record<string, string> = {}
+      try { sel = JSON.parse(compositeAnswers[i] || '{}') } catch { sel = {} }
+      return items.every((it, idx) => sel[it.id] === String(idx + 1))
+    }
+    return null
+  }
+
+  function checkComposite() {
+    setCompositeResults(compositeParts.map((p, i) => checkCompositePart(p, i)))
+    setCompositeChecked(true)
   }
 
   function checkWritten() {
@@ -700,6 +744,7 @@ export function QuestionPreviewContent({
       {/* ── Fill Blank ── */}
       {questionType === 'fill_blank' && fillBlankConfig && (() => {
         const parts = splitFillBlankHtml(questionText)
+        const blankNumbers = extractBlankNumbers(questionText)
         const blanks = fillBlankConfig.blanks
         const types = blanks.map(b => getBlankType(fillBlankConfig, b))
         const autoIdx = types.reduce<number[]>((acc, t, i) => { if (t !== 'text') acc.push(i); return acc }, [])
@@ -767,7 +812,9 @@ export function QuestionPreviewContent({
                   <div className="space-y-1">
                     {blanks.map((b, i) => types[i] === 'text' ? null : (
                       <p key={i} className={`text-xs px-2 py-1 rounded ${fillResults[i] ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                        {fillResults[i] ? `✓ ช่อง ${i + 1}: ถูกต้อง` : `✗ ช่อง ${i + 1}: เฉลยคือ "${b.answer}"`}
+                        {fillResults[i]
+                          ? `✓ ช่อง ${blankNumbers[i] ?? i + 1}: ถูกต้อง`
+                          : `✗ ช่อง ${blankNumbers[i] ?? i + 1}: เฉลยคือ "${acceptedAnswers(b).join(' หรือ ')}"`}
                       </p>
                     ))}
                   </div>
@@ -778,9 +825,7 @@ export function QuestionPreviewContent({
                     onClick={() => {
                       const results = blanks.map((b, i) => {
                         if (types[i] === 'text') return false
-                        const sa = (fillAnswers[i] ?? '').trim()
-                        const ca = b.answer.trim()
-                        return types[i] === 'dropdown' ? sa === ca : (b.case_sensitive ? sa === ca : sa.toLowerCase() === ca.toLowerCase())
+                        return isBlankCorrect(fillAnswers[i] ?? '', acceptedAnswers(b), types[i], b.case_sensitive)
                       })
                       setFillResults(results)
                       setFillChecked(true)
@@ -884,6 +929,137 @@ export function QuestionPreviewContent({
                   'bg-red-50 text-red-700 border-red-200'
                 }`}>
                   {correct === n ? '🎉 ถูกต้องทุกรายการ!' : `✅ ถูก ${correct}/${n} รายการ`}
+                </div>
+              )
+            })()}
+          </div>
+        )
+      })()}
+
+      {/* ── Composite ── */}
+      {questionType === 'composite' && compositeParts.length > 0 && (() => {
+        const labels = partLabels(compositeConfig?.part_label_style)
+        const autoCount = compositeParts.filter(p => !(p.type === 'fill_blank' && getBlankType(undefined, p.blanks?.[0]) === 'text')).length
+        return (
+          <div className="space-y-4">
+            {compositeParts.map((part, i) => {
+              const result = compositeChecked ? compositeResults[i] : null
+              const boxClass = result === true ? 'border-green-300 bg-green-50' : result === false ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'
+              function setAnswer(v: string) {
+                setCompositeAnswers(prev => { const next = [...prev]; next[i] = v; return next })
+              }
+              return (
+                <div key={part.id} className={`rounded-xl border p-3.5 space-y-2.5 ${boxClass}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center justify-center">{labels[i] ?? i + 1}</span>
+                    {result === true && <span className="text-xs text-green-600 font-medium">✓ ถูก</span>}
+                    {result === false && <span className="text-xs text-red-500 font-medium">✗ ผิด</span>}
+                    {result === null && compositeChecked && <span className="text-xs text-amber-600 font-medium">รอครูตรวจ</span>}
+                  </div>
+
+                  {part.type === 'true_false' && (
+                    <>
+                      <RichText text={part.text} className="text-[15px] text-gray-900" />
+                      <div className="flex gap-3">
+                        {[{ val: true, label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' }, { val: false, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' }].map(({ val, label, cls }) => (
+                          <button key={String(val)} type="button" disabled={compositeChecked}
+                            onClick={() => setAnswer(String(val))}
+                            className={`flex-1 py-2 rounded-lg border-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${compositeAnswers[i] === String(val) ? cls : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {part.type === 'fill_blank' && part.blanks?.[0] && (() => {
+                    const blank = part.blanks![0]
+                    const split = splitAnswerBlankHtml(part.text)
+                    const type = getBlankType(undefined, blank)
+                    if (!split) return <RichText text={part.text} className="text-[15px] text-gray-900" />
+                    return (
+                      <p className="leading-loose text-[15px] text-gray-900">
+                        <RichText text={split[0]} />
+                        {type === 'dropdown' ? (
+                          <select value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
+                            onChange={e => setAnswer(e.target.value)}
+                            className="inline-block mx-1 px-2 py-0.5 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600">
+                            <option value="">เลือกคำตอบ</option>
+                            {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input type="text" value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
+                            onChange={e => setAnswer(e.target.value)}
+                            className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600" />
+                        )}
+                        <RichText text={split[1]} />
+                      </p>
+                    )
+                  })()}
+
+                  {part.type === 'mcq' && (
+                    <>
+                      <RichText text={part.text} className="text-[15px] text-gray-900" />
+                      <div className="space-y-1.5">
+                        {(part.options ?? []).map((opt, oi) => (
+                          <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${compositeAnswers[i] === opt.text ? 'border-purple-400 bg-purple-50' : 'border-gray-200'} ${compositeChecked ? 'cursor-not-allowed opacity-80' : ''}`}>
+                            <input type="radio" name={`composite-mcq-${part.id}`} disabled={compositeChecked}
+                              checked={compositeAnswers[i] === opt.text}
+                              onChange={() => setAnswer(opt.text)} />
+                            <RichText text={opt.text} />
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {part.type === 'ordering' && (() => {
+                    const items = compositeShuffledItems[i] ?? []
+                    const n = items.length
+                    let sel: Record<string, string> = {}
+                    try { sel = JSON.parse(compositeAnswers[i] || '{}') } catch { sel = {} }
+                    function setSel(itemId: string, pos: string) {
+                      const next = { ...sel, [itemId]: pos }
+                      setAnswer(JSON.stringify(next))
+                    }
+                    return (
+                      <>
+                        <RichText text={part.text} className="text-[15px] text-gray-900" />
+                        <div className="space-y-2">
+                          {items.map(item => (
+                            <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg border border-gray-200 bg-white">
+                              <RichText text={item.text} className="flex-1 text-sm text-gray-800" />
+                              <select value={sel[item.id] ?? ''} disabled={compositeChecked}
+                                onChange={e => setSel(item.id, e.target.value)}
+                                className="h-8 w-16 border border-gray-300 rounded-lg px-1 text-sm text-center">
+                                <option value="">—</option>
+                                {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              )
+            })}
+
+            {!compositeChecked ? (
+              <button type="button" onClick={checkComposite}
+                className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium transition-colors">
+                ตรวจคำตอบ
+              </button>
+            ) : (() => {
+              const gradable = compositeResults.filter(r => r !== null)
+              const correctCount = gradable.filter(Boolean).length
+              return (
+                <div className={`p-3 rounded-lg text-sm font-medium border ${
+                  correctCount === autoCount ? 'bg-green-50 text-green-700 border-green-200' :
+                  correctCount > 0 ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                  'bg-red-50 text-red-700 border-red-200'
+                }`}>
+                  {correctCount === autoCount ? '🎉 ถูกต้องทุกข้อ (ที่ตรวจอัตโนมัติ)!' : `✅ ถูก ${correctCount}/${autoCount} ข้อ (ที่ตรวจอัตโนมัติ)`}
                 </div>
               )
             })()}

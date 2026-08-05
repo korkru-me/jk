@@ -25,7 +25,7 @@ export const DIFF_META: Record<string, { label: string; color: string; bar: stri
 export const TYPE_LABEL: Record<string, string> = {
   mcq: 'ปรนัย', written: 'อัตนัย', essay: 'บรรยาย',
   true_false: 'ถ/ผ', fill_blank: 'เติมคำ', matching: 'จับคู่', ordering: 'เรียงลำดับ',
-  file_upload: 'ไฟล์งาน',
+  file_upload: 'ไฟล์งาน', composite: 'โจทย์ผสม',
 }
 
 export function mockStats(id: string) {

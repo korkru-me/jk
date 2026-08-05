@@ -10,7 +10,7 @@ import { QuestionPreviewContent } from '@/components/questions/question-preview'
 import { RichText } from '@/components/ui/rich-text'
 import type {
   Variable, MCQOption, MatchingPair, TrueFalseConfig, FillBlankConfig,
-  OrderingConfig, FileUploadConfig, RandomQuestionConfig,
+  OrderingConfig, FileUploadConfig, RandomQuestionConfig, CompositeConfig,
 } from '@/lib/types'
 import type { QuestionWithCategory } from '../page'
 
@@ -149,6 +149,7 @@ function InteractiveTab({ q }: { q: QuestionWithCategory }) {
         trueFalseConfig={q.question_type === 'true_false' ? (extraData as TrueFalseConfig) : undefined}
         fillBlankConfig={q.question_type === 'fill_blank' ? (extraData as FillBlankConfig) : undefined}
         orderingConfig={q.question_type === 'ordering' ? (extraData as OrderingConfig) : undefined}
+        compositeConfig={q.question_type === 'composite' ? (extraData as CompositeConfig) : undefined}
         partLabelStyle={(extraData as RandomQuestionConfig)?.part_label_style}
         attachmentUrls={q.question_type === 'file_upload' ? ((extraData as FileUploadConfig)?.attachment_urls ?? []) : []}
       />

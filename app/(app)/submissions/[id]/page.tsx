@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { StudyPathPanel } from '@/components/student/study-path-panel'
 import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Trophy, RotateCcw, School, FileText } from 'lucide-react'
 import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
-import { getBlankType } from '@/lib/fill-blank'
+import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
 import { evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStudent } from '@/lib/scoring'
@@ -537,7 +537,7 @@ function AnswerReview({
   // ─── Fill-blank — per-blank type (text / fixed / dropdown) ───────────────
   if (correctAnswer.startsWith('FILL:')) {
     let studentAnswers: string[] = []
-    let correctAnswers: string[] = []
+    let correctAnswers: string[][] = []
     try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { /* */ }
     try { correctAnswers = JSON.parse(correctAnswer.slice(5)) } catch { /* */ }
 
@@ -561,9 +561,7 @@ function AnswerReview({
           }
 
           const cs = blanks[i]?.case_sensitive ?? false
-          const partCorrect = cs
-            ? student.trim() === correct.trim()
-            : student.trim().toLowerCase() === correct.trim().toLowerCase()
+          const partCorrect = isBlankCorrect(student, correct, type, cs)
           return (
             <div key={i} className="pl-3 border-l-2 border-border space-y-0.5">
               <p className="text-xs font-semibold text-muted-foreground">ช่อง {i + 1}</p>
@@ -573,8 +571,80 @@ function AnswerReview({
               </div>
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
-                <span className="font-medium">{correct}</span>
+                <span className="font-medium">{correct.join(' หรือ ')}</span>
               </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // ─── Composite — each part re-dispatches to its own type's display ───────
+  if (correctAnswer.startsWith('COMP:')) {
+    type CompCorrectPart = { type: string; correct: unknown; caseSensitive?: boolean }
+    let correctParts: CompCorrectPart[] = []
+    let studentAnswers: string[] = []
+    try { correctParts = JSON.parse(correctAnswer.slice(5)) } catch { correctParts = [] }
+    try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { studentAnswers = [] }
+
+    return (
+      <div className="mt-2 space-y-2 text-sm">
+        {correctParts.map((cp, i) => {
+          const student = studentAnswers[i] ?? ''
+          const label = PART_LABELS[i] ?? String(i + 1)
+
+          if (cp.type === 'fill_blank' && Array.isArray(cp.correct) && cp.correct.length === 0) {
+            return (
+              <div key={i} className="pl-3 border-l-2 border-amber-300 space-y-0.5">
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">ข้อ {label} — รอครูตรวจ</p>
+                <div className="flex gap-2">
+                  <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
+                  <span className="font-medium">{student || '—'}</span>
+                </div>
+              </div>
+            )
+          }
+
+          let partCorrect = false
+          let correctDisplay = ''
+          let studentDisplay = student || '—'
+          let showCorrectRow = true
+
+          if (cp.type === 'true_false') {
+            partCorrect = student === cp.correct
+            correctDisplay = cp.correct === 'true' ? 'ถูก' : 'ผิด'
+            studentDisplay = student === 'true' ? 'ถูก' : student === 'false' ? 'ผิด' : '—'
+          } else if (cp.type === 'mcq') {
+            partCorrect = student === cp.correct
+            correctDisplay = String(cp.correct ?? '—')
+          } else if (cp.type === 'fill_blank') {
+            const accepted = (cp.correct as string[]) ?? []
+            const cs = !!cp.caseSensitive
+            partCorrect = accepted.some(a => cs ? student.trim() === a.trim() : student.trim().toLowerCase() === a.trim().toLowerCase())
+            correctDisplay = accepted.join(' หรือ ')
+          } else if (cp.type === 'ordering') {
+            const correctOrder = (cp.correct as string[]) ?? []
+            let studentOrder: string[] = []
+            try { studentOrder = JSON.parse(student || '[]') } catch { studentOrder = [] }
+            partCorrect = correctOrder.length > 0 && studentOrder.length === correctOrder.length && correctOrder.every((id, idx) => studentOrder[idx] === id)
+            studentDisplay = studentOrder.length > 0 ? (partCorrect ? 'เรียงถูกต้อง' : 'เรียงไม่ถูกต้อง') : '—'
+            showCorrectRow = false
+          }
+
+          return (
+            <div key={i} className="pl-3 border-l-2 border-border space-y-0.5">
+              <p className="text-xs font-semibold text-muted-foreground">ข้อ {label}</p>
+              <div className="flex gap-2">
+                <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
+                <span className={`font-medium ${partCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{studentDisplay}</span>
+              </div>
+              {showCorrectRow && (
+                <div className="flex gap-2">
+                  <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
+                  <span className="font-medium">{correctDisplay}</span>
+                </div>
+              )}
             </div>
           )
         })}

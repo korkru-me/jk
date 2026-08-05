@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { getMyOrgId } from '@/lib/actions/org'
 import { isAttemptExpired } from '@/lib/grading'
-import { getBlankType } from '@/lib/fill-blank'
+import { getBlankType, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import type { Question, Variable, LogicRule, SubmittedFile } from '@/lib/types'
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -41,6 +41,10 @@ function naturalMaxScore(questionType: string, extraData: any, answerParts: unkn
     return items.length || 1
   }
   if (questionType === 'file_upload') return 1
+  if (questionType === 'composite') {
+    const parts: unknown[] = extraData?.parts ?? []
+    return parts.length || 1
+  }
   if (answerParts && answerParts.length > 1) return answerParts.length
   return 1
 }
@@ -204,13 +208,40 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
 
     if (q.question_type === 'fill_blank') {
       const blanks: import('@/lib/types').FillBlankItem[] = extraData?.blanks ?? []
-      const answers = blanks.map((b) => getBlankType(extraData, b) === 'text' ? '' : b.answer)
+      const answers = blanks.map((b) => getBlankType(extraData, b) === 'text' ? [] : acceptedAnswers(b))
       return { question_id: q.id, random_values: {}, correct_answer: 'FILL:' + JSON.stringify(answers), max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
 
     if (q.question_type === 'ordering') {
       const items: import('@/lib/types').OrderingItem[] = extraData?.items ?? []
       return { question_id: q.id, random_values: {}, correct_answer: 'ORDER:' + JSON.stringify(items.map((i) => i.id)), max_score: naturalMaxScore(q.question_type, extraData, null) }
+    }
+
+    // Composite: each part is graded independently by re-dispatching into
+    // its own type's comparison rule (see the 'COMP:' branch below), so the
+    // correct answer captures one { type, correct, ... } record per part —
+    // a 'fill_blank' part whose blank is manually-graded ('text' type)
+    // records an empty `correct` array, the same "pending" signal FILL:
+    // uses for a manual blank.
+    if (q.question_type === 'composite') {
+      const compParts: import('@/lib/types').CompositePart[] = extraData?.parts ?? []
+      const answers = compParts.map((p) => {
+        if (p.type === 'true_false') return { type: 'true_false', correct: p.correct_answer ? 'true' : 'false' }
+        if (p.type === 'fill_blank') {
+          const blank = p.blanks?.[0]
+          const manual = !blank || getBlankType(undefined, blank) === 'text'
+          return {
+            type: 'fill_blank',
+            correct: manual ? [] : acceptedAnswers(blank),
+            blankType: blank?.type ?? 'fixed',
+            caseSensitive: blank?.case_sensitive ?? false,
+          }
+        }
+        if (p.type === 'mcq') return { type: 'mcq', correct: (p.options ?? []).find((o) => o.is_correct)?.text ?? '' }
+        if (p.type === 'ordering') return { type: 'ordering', correct: (p.items ?? []).map((it) => it.id) }
+        return { type: p.type, correct: null }
+      })
+      return { question_id: q.id, random_values: {}, correct_answer: 'COMP:' + JSON.stringify(answers), max_score: naturalMaxScore(q.question_type, extraData, null) }
     }
 
     // File-upload: no meaningful correct answer to precompute — grading
@@ -559,7 +590,7 @@ async function gradeAndFinalizeSubmission(
     // types leaves it pending while still banking the auto-graded score.
     if (correctAns.startsWith('FILL:')) {
       const extraData = a.questions?.extra_data as any
-      const correctAnswers: string[] = JSON.parse(correctAns.slice(5))
+      const correctAnswers: string[][] = JSON.parse(correctAns.slice(5))
       const blanks: import('@/lib/types').FillBlankItem[] = extraData?.blanks ?? []
       let studentAnswers: string[] = []
       try { studentAnswers = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
@@ -571,13 +602,48 @@ async function gradeAndFinalizeSubmission(
         const type = getBlankType(extraData, blanks[i])
         if (type === 'text') { hasManual = true; continue }
         autoCount++
-        const ca = correctAnswers[i]?.trim() ?? ''
-        const sa = (studentAnswers[i] ?? '').trim()
         const cs = blanks[i]?.case_sensitive ?? false
-        const isBlankCorrect = type === 'dropdown' ? sa === ca : (cs ? sa === ca : sa.toLowerCase() === ca.toLowerCase())
-        if (isBlankCorrect) autoCorrect++
+        if (isBlankCorrect(studentAnswers[i] ?? '', correctAnswers[i] ?? [], type, cs)) autoCorrect++
       }
       const structuralMax = naturalMaxScore('fill_blank', extraData, null)
+      return { id: a.id, is_correct: hasManual ? null : autoCorrect === autoCount, score: scaleScore(autoCorrect, structuralMax, a.max_score) }
+    }
+
+    // Composite grading — each part re-dispatches into its own type's
+    // comparison rule; a 'fill_blank' part with an empty `correct` array is
+    // its manually-graded 'text' sub-type, same "leave pending" behavior as
+    // FILL: above.
+    if (correctAns.startsWith('COMP:')) {
+      type CompCorrectPart = { type: string; correct: unknown; blankType?: import('@/lib/types').FillBlankType; caseSensitive?: boolean }
+      const correctParts: CompCorrectPart[] = JSON.parse(correctAns.slice(5))
+      let studentAnswers: string[] = []
+      try { studentAnswers = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
+
+      let hasManual = false
+      let autoCount = 0
+      let autoCorrect = 0
+      for (let i = 0; i < correctParts.length; i++) {
+        const cp = correctParts[i]
+        const sa = studentAnswers[i] ?? ''
+        if (cp.type === 'fill_blank' && Array.isArray(cp.correct) && cp.correct.length === 0) {
+          hasManual = true
+          continue
+        }
+        autoCount++
+        let ok = false
+        if (cp.type === 'true_false' || cp.type === 'mcq') {
+          ok = sa === cp.correct
+        } else if (cp.type === 'fill_blank') {
+          ok = isBlankCorrect(sa, (cp.correct as string[]) ?? [], cp.blankType ?? 'fixed', !!cp.caseSensitive)
+        } else if (cp.type === 'ordering') {
+          const correctOrder = (cp.correct as string[]) ?? []
+          let studentOrder: string[] = []
+          try { studentOrder = JSON.parse(sa || '[]') } catch { /* keep empty */ }
+          ok = correctOrder.length > 0 && studentOrder.length === correctOrder.length && correctOrder.every((id, idx) => studentOrder[idx] === id)
+        }
+        if (ok) autoCorrect++
+      }
+      const structuralMax = naturalMaxScore('composite', a.questions?.extra_data, null)
       return { id: a.id, is_correct: hasManual ? null : autoCorrect === autoCount, score: scaleScore(autoCorrect, structuralMax, a.max_score) }
     }
 

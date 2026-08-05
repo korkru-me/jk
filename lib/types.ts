@@ -81,7 +81,7 @@ export interface QuestionCategory {
   created_at: string
 }
 
-export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering' | 'file_upload'
+export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering' | 'file_upload' | 'composite'
 
 export type TrueFalseExplanationMode = 'none' | 'wrong_only' | 'always'
 
@@ -146,6 +146,32 @@ export interface SubmittedFile {
   url: string
   name: string
   type: string
+}
+
+// A composite question stitches several existing question types together
+// under one shared stem (`question_text`) — each part is one atomic
+// sub-question of a given type (want two true/false judgments? add two
+// parts of type 'true_false'), graded by re-dispatching into that type's
+// own existing grading logic. `score` lets a part outweigh the others;
+// the question's total is the sum of every part's `score`.
+export type CompositePartType = 'true_false' | 'fill_blank' | 'ordering' | 'mcq'
+
+export interface CompositePart {
+  id: string
+  type: CompositePartType
+  text: string           // rich text (HTML) — this part's own prompt/statement
+  image_urls?: string[]
+  score: number
+
+  correct_answer?: boolean          // type === 'true_false'
+  blanks?: FillBlankItem[]          // type === 'fill_blank' — same shape/marker convention as FillBlankConfig.blanks
+  items?: OrderingItem[]            // type === 'ordering'
+  options?: MCQOption[]             // type === 'mcq'
+}
+
+export interface CompositeConfig {
+  parts: CompositePart[]
+  part_label_style?: PartLabelStyle
 }
 
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'analytical'
@@ -260,7 +286,7 @@ export interface Question {
   rejected_reason: string | null
   image_urls: string[]
   requires_work_image: boolean
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | Record<string, never>
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | Record<string, never>
   parent_question_id: string | null
   group_id: string | null
   order_in_group: number | null
