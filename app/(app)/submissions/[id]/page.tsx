@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { StudyPathPanel } from '@/components/student/study-path-panel'
-import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Trophy, RotateCcw, School, FileText } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Trophy, RotateCcw, School, FileText, EyeOff } from 'lucide-react'
 import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
 import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
@@ -129,13 +129,17 @@ export default async function SubmissionResultPage({
   const pct = displayMax > 0 ? Math.round(((displayScore ?? 0) / displayMax) * 100) : 0
   const passed = computePassed(displayScore, displayMax, assignment.passing_type, assignment.passing_value)
   const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
-  // Teachers always see/grade answers regardless of the student-facing
-  // show_results timing — that setting only controls what students see.
+  // Teachers always see/grade results regardless of the student-facing
+  // policy. `never` hides both the score summary and answer review from the
+  // student, while `after_due` keeps the existing behavior of showing the
+  // overall score immediately but withholding answer details until due.
+  const canShowScore = isTeacherViewer || assignment.show_results !== 'never'
   const canShowAnswers =
     isTeacherViewer ||
-    assignment.show_results !== 'after_due' ||
-    !assignment.end_at ||
-    new Date(assignment.end_at) < new Date()
+    assignment.show_results === 'immediate' ||
+    (assignment.show_results === 'after_due' && (
+      !assignment.end_at || new Date(assignment.end_at) < new Date()
+    ))
 
   const attemptsRemaining = assignment.max_attempts == null || submission.attempt_number < assignment.max_attempts
   const canRetry = isOwnSubmission && attemptsRemaining && assignment.status === 'published' &&
@@ -190,79 +194,93 @@ export default async function SubmissionResultPage({
       <div className="bg-card border rounded-2xl p-8 text-center relative overflow-hidden">
         {/* Background decoration */}
         <div className={`absolute inset-0 opacity-5 ${
-          pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'
+          !canShowScore ? 'bg-blue-500' : pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'
         }`} />
 
         <div className="relative">
-          {passed !== null && (
-            <div className="flex flex-col items-center gap-1 mb-3">
-              <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border ${
-                passed
-                  ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
-                  : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-              }`}>
-                {passed ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                {passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}
-              </div>
-              {passingThreshold && (
-                <p className="text-xs text-muted-foreground">เกณฑ์ผ่าน: ต้องได้ {passingThreshold} ขึ้นไป</p>
+          {canShowScore ? (
+            <>
+              {passed !== null && (
+                <div className="flex flex-col items-center gap-1 mb-3">
+                  <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border ${
+                    passed
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+                  }`}>
+                    {passed ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                    {passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}
+                  </div>
+                  {passingThreshold && (
+                    <p className="text-xs text-muted-foreground">เกณฑ์ผ่าน: ต้องได้ {passingThreshold} ขึ้นไป</p>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-          {pct >= 90 && (
-            <div className="flex justify-center mb-3">
-              <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full px-3 py-1 text-xs font-semibold">
-                <Trophy size={13} />
-                ยอดเยี่ยม!
+              {pct >= 90 && (
+                <div className="flex justify-center mb-3">
+                  <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full px-3 py-1 text-xs font-semibold">
+                    <Trophy size={13} />
+                    ยอดเยี่ยม!
+                  </div>
+                </div>
+              )}
+
+              <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-3xl font-black mb-4 ${
+                pct >= 75
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                  : pct >= 50
+                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                  : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+              }`}>
+                {pct}%
               </div>
+
+              <p className="text-4xl font-black">{displayScore}/{displayMax}</p>
+              <p className="text-muted-foreground mt-1 text-sm">คะแนนที่ได้</p>
+
+              <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <CheckCircle2 size={13} />
+                  ถูก {sortedAnswers.filter(a => a.is_correct === true).length} ข้อ
+                </span>
+                <span className="flex items-center gap-1 text-red-500">
+                  <XCircle size={13} />
+                  ผิด {sortedAnswers.filter(a => a.is_correct === false).length} ข้อ
+                </span>
+                {pendingManualCount > 0 && (
+                  <span className="flex items-center gap-1 text-amber-600">
+                    <Clock size={13} />
+                    รอตรวจ {pendingManualCount} ข้อ
+                  </span>
+                )}
+              </div>
+
+              {pendingManualCount > 0 && (
+                <div className="mt-3 inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-medium px-3 py-1.5 rounded-full">
+                  ⏳ มี {pendingManualCount} ข้อรอครูตรวจ — คะแนนจะอัปเดตภายหลัง
+                </div>
+              )}
+
+              {assignment.max_attempts !== 1 && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  {`การเก็บคะแนน: ${SCORE_STRATEGY_LABELS[assignment.score_strategy as 'best' | 'average' | 'latest']} (จากทั้งหมด ${submission.attempt_number} ครั้งที่ทำ)`}
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center">
+              <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+                <EyeOff size={32} />
+              </div>
+              <h2 className="text-xl font-bold">ส่งคำตอบเรียบร้อยแล้ว</h2>
+              <p className="text-sm text-muted-foreground mt-2 max-w-md">
+                ครูกำหนดไม่แสดงคะแนนและเฉลยสำหรับงานนี้
+              </p>
             </div>
           )}
-
-          <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-3xl font-black mb-4 ${
-            pct >= 75
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-              : pct >= 50
-              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-              : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-          }`}>
-            {pct}%
-          </div>
-
-          <p className="text-4xl font-black">{displayScore}/{displayMax}</p>
-          <p className="text-muted-foreground mt-1 text-sm">คะแนนที่ได้</p>
-
-          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-              <CheckCircle2 size={13} />
-              ถูก {sortedAnswers.filter(a => a.is_correct === true).length} ข้อ
-            </span>
-            <span className="flex items-center gap-1 text-red-500">
-              <XCircle size={13} />
-              ผิด {sortedAnswers.filter(a => a.is_correct === false).length} ข้อ
-            </span>
-            {pendingManualCount > 0 && (
-              <span className="flex items-center gap-1 text-amber-600">
-                <Clock size={13} />
-                รอตรวจ {pendingManualCount} ข้อ
-              </span>
-            )}
-          </div>
 
           {submission.submitted_at && (
             <p className="text-xs text-muted-foreground mt-3">
               ส่งเมื่อ {new Date(submission.submitted_at).toLocaleString('th-TH')}
-            </p>
-          )}
-
-          {pendingManualCount > 0 && (
-            <div className="mt-3 inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-medium px-3 py-1.5 rounded-full">
-              ⏳ มี {pendingManualCount} ข้อรอครูตรวจ — คะแนนจะอัปเดตภายหลัง
-            </div>
-          )}
-
-          {assignment.max_attempts !== 1 && (
-            <p className="text-xs text-muted-foreground mt-3">
-              {`การเก็บคะแนน: ${SCORE_STRATEGY_LABELS[assignment.score_strategy as 'best' | 'average' | 'latest']} (จากทั้งหมด ${submission.attempt_number} ครั้งที่ทำ)`}
             </p>
           )}
 
@@ -294,9 +312,15 @@ export default async function SubmissionResultPage({
       {/* Answer review */}
       {!canShowAnswers && (
         <div className="bg-card border border-dashed rounded-2xl p-6 text-center text-sm text-muted-foreground">
-          🔒 เฉลยและคะแนนรายข้อจะแสดงหลังพ้นกำหนดส่งงาน
-          {assignment.end_at && (
-            <> ({new Date(assignment.end_at).toLocaleString('th-TH')})</>
+          {assignment.show_results === 'never' ? (
+            <>🔒 ครูกำหนดไม่แสดงคะแนนและเฉลยสำหรับงานนี้</>
+          ) : (
+            <>
+              🔒 เฉลยและคะแนนรายข้อจะแสดงหลังพ้นกำหนดส่งงาน
+              {assignment.end_at && (
+                <> ({new Date(assignment.end_at).toLocaleString('th-TH')})</>
+              )}
+            </>
           )}
         </div>
       )}

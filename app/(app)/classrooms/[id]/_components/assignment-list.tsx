@@ -131,6 +131,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
   // retry is never hidden behind an older finished attempt's score.
   const isDone = a.submission?.status === 'submitted' || a.submission?.status === 'graded'
   const isInProgress = a.has_in_progress
+  const canShowResults = a.show_results !== 'never'
 
   const passed = isDone
     ? computePassed(a.submission?.total_score ?? null, a.submission?.max_score ?? 0, a.passing_type, a.passing_value)
@@ -194,7 +195,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           {isDone && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-medium">คะแนนครั้งก่อนหน้า</span>
-              {a.submission?.total_score != null && (
+              {canShowResults && a.submission?.total_score != null && (
                 <span className="text-sm font-bold">{a.submission.total_score}/{a.submission.max_score}</span>
               )}
             </div>
@@ -211,16 +212,16 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           <div className="flex items-center justify-between">
             <span className={cn(
               'text-xs font-medium flex items-center gap-1',
-              passed === false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+              canShowResults && passed === false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
             )}>
-              {passed === false ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
-              {passed === false ? 'ยังไม่ผ่านเกณฑ์' : passed === true ? 'ผ่านเกณฑ์' : 'ส่งแล้ว ✓'}
+              {canShowResults && passed === false ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
+              {!canShowResults ? 'ส่งแล้ว ✓' : passed === false ? 'ยังไม่ผ่านเกณฑ์' : passed === true ? 'ผ่านเกณฑ์' : 'ส่งแล้ว ✓'}
             </span>
-            {a.submission?.total_score != null && (
+            {canShowResults && a.submission?.total_score != null && (
               <span className="text-lg font-bold">{a.submission.total_score}/{a.submission.max_score}</span>
             )}
           </div>
-          {passed === false && passingThreshold && (
+          {canShowResults && passed === false && passingThreshold && (
             <p className="text-[11px] text-muted-foreground -mt-1">ต้องได้ {passingThreshold} ขึ้นไปจึงจะผ่าน</p>
           )}
           <Link
@@ -236,16 +237,16 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           <div className="flex items-center justify-between">
             <span className={cn(
               'text-xs font-medium flex items-center gap-1',
-              passed === false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+              canShowResults && passed === false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
             )}>
-              {passed === false ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
-              {passed === null ? 'ส่งแล้ว ✓' : passed ? 'ผ่านเกณฑ์' : 'ไม่ผ่านเกณฑ์'}
+              {canShowResults && passed === false ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
+              {!canShowResults ? 'ส่งแล้ว ✓' : passed === null ? 'ส่งแล้ว ✓' : passed ? 'ผ่านเกณฑ์' : 'ไม่ผ่านเกณฑ์'}
             </span>
-            {a.submission?.total_score != null && (
+            {canShowResults && a.submission?.total_score != null && (
               <span className="text-lg font-bold">{a.submission.total_score}/{a.submission.max_score}</span>
             )}
           </div>
-          {passed === false && passingThreshold && (
+          {canShowResults && passed === false && passingThreshold && (
             <p className="text-[11px] text-muted-foreground">เกณฑ์ผ่าน: ต้องได้ {passingThreshold} ขึ้นไป</p>
           )}
         </div>

@@ -78,6 +78,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
         <div className="space-y-3">
           {filtered.map(a => {
             const sub = mySubMap[a.id]
+            const canShowResults = a.show_results !== 'never'
             const isDone = sub?.status === 'submitted' || sub?.status === 'graded'
             const used = attemptsUsed[a.id] ?? 0
             // `sub` reflects the best/official-strategy attempt for score
@@ -100,7 +101,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                   </div>
                   {isInProgress ? (
                     <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                      {isDone && sub.total_score != null && (
+                      {isDone && canShowResults && sub.total_score != null && (
                         <p className="text-xs text-muted-foreground">ครั้งก่อนหน้า {sub.total_score}/{sub.max_score}</p>
                       )}
                       <Link
@@ -113,7 +114,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                   ) : canRetry ? (
                     <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                       <p className="text-xs text-green-600 dark:text-green-400 font-medium">ส่งแล้ว ✓</p>
-                      {sub.total_score != null && (
+                      {canShowResults && sub.total_score != null && (
                         <p className="text-lg font-bold">{sub.total_score}/{sub.max_score}</p>
                       )}
                       <Link
@@ -127,7 +128,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                   ) : isDone ? (
                     <div className="text-right shrink-0">
                       <p className="text-xs text-green-600 dark:text-green-400 font-medium">ส่งแล้ว ✓</p>
-                      {sub.total_score != null && (
+                      {canShowResults && sub.total_score != null && (
                         <p className="text-lg font-bold">{sub.total_score}/{sub.max_score}</p>
                       )}
                     </div>

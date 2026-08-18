@@ -316,7 +316,7 @@ export type AssignmentStatus = 'draft' | 'published' | 'closed'
 export type AssignmentMode = 'online' | 'print'
 export type AssignmentType = 'exercise' | 'exam'
 
-export type ShowResultsMode = 'immediate' | 'after_due'
+export type ShowResultsMode = 'immediate' | 'after_due' | 'never'
 export type ScoreStrategy = 'best' | 'average' | 'latest'
 
 export interface Assignment {

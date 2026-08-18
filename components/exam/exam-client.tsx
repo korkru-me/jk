@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { saveAnswer, saveWorkImage, saveFileSubmission, submitSubmission } from '@/lib/actions/submissions'
 import { WorkImageUpload } from './work-image-upload'
@@ -85,8 +84,6 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
 }
 
 export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config }: Props) {
-  const router = useRouter()
-
   // ── Core state ──────────────────────────────────────────────────────────────
   const [localAnswers, setLocalAnswers] = useState<Record<string, string>>(
     () => initLocalAnswers(answers)
@@ -310,7 +307,12 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     }
     localStorage.removeItem(LS_KEY(submissionId))
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
-    router.push(`/submissions/${submissionId}`)
+    // The result route redirects in-progress submissions back to the exam.
+    // A client-side transition can reuse a stale prefetched result and briefly
+    // see the just-submitted attempt as in_progress, which starts a new retry.
+    // Reload the document so the summary always reads the committed server state,
+    // and replace history so Back cannot reopen the completed attempt.
+    window.location.replace(`/submissions/${submissionId}`)
   }
 
   function findMissingWorkImage(): number | null {

@@ -57,6 +57,7 @@
 - มี draft/published/closed, online/print และ exercise/exam
 - เชื่อมหลายห้องผ่าน `assignment_classrooms`
 - มีเวลาเปิดปิด จำกัดเวลา access code attempts score strategy passing threshold และ score overrides
+- ครูเลือกการแสดงผลลัพธ์ได้ทั้งทันที หลังพ้นกำหนด หรือไม่แสดงแก่นักเรียน และแก้ไขนโยบายนี้ภายหลังได้
 - มีหน้า create/edit/detail/take/results/analytics/print/export
 - ต้องทดสอบ flow ครูและนักเรียนแบบครบเส้นทาง รวม expiry/retry/concurrent save
 
@@ -65,6 +66,7 @@
 - สร้าง attempt, ตรึง random/answer/order, autosave และบังคับเวลาฝั่ง server
 - Attempt และ answer snapshot รับ `org_id` จาก assignment โดยตรง จึงรองรับนักเรียนที่เข้าห้องแต่ไม่ได้เป็น `organization_members`
 - มี auto-grading หลาย question types, manual score edit, feedback และ work images/files
+- หลังส่งคำตอบจะโหลดหน้าสรุปจากสถานะล่าสุดของ server และอยู่ที่หน้าสรุปจนกว่านักเรียนจะเลือกกลับหรือเริ่มทำใหม่เอง
 - ต้องเพิ่ม regression tests สำหรับทุก question type และการ rescale/attempt strategy
 - ต้องยืนยันคำจำกัดความของ `submitted` เทียบกับ `graded` สำหรับคำตอบ manual
 

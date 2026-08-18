@@ -30,7 +30,7 @@ export default async function MySubmissionsPage() {
 
   const { data: submissions } = await supabase
     .from('submissions')
-    .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy, display_max_score)')
+    .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results)')
     .eq('student_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -209,7 +209,7 @@ export default async function MySubmissionsPage() {
                       </div>
 
                       <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                        {a.previousScore && (
+                        {a.previousScore && a.previousScore.assignments?.show_results !== 'never' && (
                           <p className="text-xs text-muted-foreground">
                             ครั้งก่อน {a.previousScore.total_score}/{a.previousScore.max_score}
                           </p>
@@ -242,6 +242,7 @@ export default async function MySubmissionsPage() {
 
               <div className="divide-y">
                 {completed.map((s: any) => {
+                  const canShowResults = s.assignments?.show_results !== 'never'
                   const pct = s.max_score > 0
                     ? Math.round((s.total_score / s.max_score) * 100)
                     : 0
@@ -258,13 +259,15 @@ export default async function MySubmissionsPage() {
                     <div key={s.id} className="px-5 py-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
                       {/* Score ring */}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
-                        pct >= 75
+                        !canShowResults
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                          : pct >= 75
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                           : pct >= 50
                           ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
                           : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                       }`}>
-                        {pct >= 75 ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                        {!canShowResults || pct >= 75 ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                       </div>
 
                       {/* Info */}
@@ -273,23 +276,26 @@ export default async function MySubmissionsPage() {
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {s.assignments?.classrooms?.name} · {new Date(s.created_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}
                         </p>
-                        {/* Score bar */}
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden max-w-[120px]">
-                            <div className={`h-full rounded-full ${bgBar}`} style={{ width: `${pct}%` }} />
+                        {canShowResults ? (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden max-w-[120px]">
+                              <div className={`h-full rounded-full ${bgBar}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className={`text-xs font-bold ${pctColor}`}>{s.total_score}/{s.max_score}</span>
                           </div>
-                          <span className={`text-xs font-bold ${pctColor}`}>{s.total_score}/{s.max_score}</span>
-                        </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground mt-1.5">ครูกำหนดไม่แสดงผลลัพธ์</p>
+                        )}
                       </div>
 
                       {/* Percentage + Link */}
                       <div className="text-right shrink-0">
-                        <p className={`text-lg font-black ${pctColor}`}>{pct}%</p>
+                        {canShowResults && <p className={`text-lg font-black ${pctColor}`}>{pct}%</p>}
                         <Link
                           href={`/submissions/${s.id}`}
                           className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 justify-end mt-0.5"
                         >
-                          ดูเฉลย <ChevronRight size={12} />
+                          {canShowResults ? 'ดูเฉลย' : 'ดูสถานะ'} <ChevronRight size={12} />
                         </Link>
                       </div>
                     </div>

@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
-import type { AssignmentStatus, ScoreStrategy } from '@/lib/types'
+import type { AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+
+const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'after_due', 'never']
 
 interface CreateAssignmentData {
   classroom_ids: string[]
@@ -21,7 +23,7 @@ interface CreateAssignmentData {
   type?: 'exercise' | 'exam'
   shuffle_questions?: boolean
   shuffle_options?: boolean
-  show_results?: 'immediate' | 'after_due'
+  show_results?: ShowResultsMode
   max_attempts?: number | null
   score_strategy?: ScoreStrategy
   access_code?: string | null
@@ -53,6 +55,9 @@ export async function createAssignment(data: CreateAssignmentData) {
   }
 
   if (questionIds.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
+
+  const showResults = data.show_results ?? 'immediate'
+  if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
 
   // Only keep overrides for questions actually in this assignment, with a
   // valid positive point value — drops anything a tampered client might add.
@@ -89,7 +94,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       ...(data.type ? { type: data.type } : {}),
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? false,
-      show_results: data.show_results ?? 'immediate',
+      show_results: showResults,
       max_attempts: data.max_attempts || null,
       score_strategy: data.score_strategy ?? 'best',
       access_code: data.access_code?.trim() || null,
@@ -145,6 +150,7 @@ interface UpdateAssignmentData {
   passing_value: number | null
   question_points?: Record<string, number> | null
   display_max_score?: number | null
+  show_results: ShowResultsMode
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -156,6 +162,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   if (data.start_at && data.end_at && data.start_at > data.end_at) {
     return { error: 'วันเปิดรับต้องอยู่ก่อนวันปิดรับ' }
   }
+  if (!SHOW_RESULTS_MODES.includes(data.show_results)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
 
   // No explicit created_by filter — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all) already restricts this update to owner or
@@ -194,6 +201,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       passing_value: data.passing_value,
       question_points: questionPoints,
       display_max_score: displayMaxScore,
+      show_results: data.show_results,
     })
     .eq('id', id)
 

@@ -83,9 +83,10 @@ export default async function DashboardPage() {
   // to cover that whole set rather than reusing `allAssignments` below.
   const submittedAssignmentIds = Array.from(new Set(rawSubmissions.map((s: any) => s.assignment_id)))
   const { data: scoreScaleRows } = submittedAssignmentIds.length > 0
-    ? await supabase.from('assignments').select('id, display_max_score').in('id', submittedAssignmentIds)
+    ? await supabase.from('assignments').select('id, display_max_score, show_results').in('id', submittedAssignmentIds)
     : { data: [] }
   const displayMaxByAssignment = new Map((scoreScaleRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
+  const showResultsByAssignment = new Map((scoreScaleRows ?? []).map((a: any) => [a.id as string, a.show_results as string]))
   const allSubmissions = rescaleToDisplayMax(
     rawSubmissions as any[],
     row => displayMaxByAssignment.get(row.assignment_id) ?? null
@@ -93,11 +94,14 @@ export default async function DashboardPage() {
   const completed = allSubmissions.filter(
     (s: any) => s.status === 'submitted' || s.status === 'graded'
   )
-  const avgPct = completed.length > 0
+  const completedWithVisibleResults = completed.filter(
+    (s: any) => showResultsByAssignment.get(s.assignment_id) !== 'never'
+  )
+  const avgPct = completedWithVisibleResults.length > 0
     ? Math.round(
-        completed.reduce((sum: number, s: any) =>
+        completedWithVisibleResults.reduce((sum: number, s: any) =>
           sum + (s.max_score > 0 ? (s.total_score ?? 0) / s.max_score : 0), 0
-        ) / completed.length * 100
+        ) / completedWithVisibleResults.length * 100
       )
     : null
 

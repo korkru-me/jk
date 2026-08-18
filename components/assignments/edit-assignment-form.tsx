@@ -3,14 +3,14 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
-import type { Assignment, Question, ScoreStrategy } from '@/lib/types'
+import type { Assignment, Question, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -37,6 +37,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
     a.max_attempts ? String(a.max_attempts) : a.type === 'exam' ? '1' : ''
   )
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(a.score_strategy)
+  const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
@@ -89,6 +90,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
         question_points: questionPoints,
         display_max_score: displayMax,
+        show_results: showResults,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -255,6 +257,33 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
         <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5">
+            <Eye className="w-4 h-4 text-gray-400" /> แสดงผลลัพธ์
+          </Label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {([
+              { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนน+เฉลยทันที' },
+              { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนเฉลยจนกว่าจะหมดเขต' },
+              { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
+            ] as const).map(option => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setShowResults(option.key)}
+                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                  showResults === option.key
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <p className="font-medium text-sm text-gray-900">{option.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
           <Label htmlFor="edit-attempts" className="flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-gray-400" /> จำกัดจำนวนครั้งที่ทำได้
           </Label>
@@ -295,7 +324,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2 text-sm text-amber-800">
         <FileText className="w-4 h-4 shrink-0 mt-0.5" />
         <p>
-          แก้ไขได้เฉพาะกำหนดการ รายละเอียด และคะแนน — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน
+          แก้ไขได้เฉพาะกำหนดการ รายละเอียด คะแนน และการแสดงผลลัพธ์ — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน
           (การเปลี่ยน &ldquo;คะแนนแต่ละข้อ&rdquo; จะมีผลกับการทำครั้งใหม่เท่านั้น ไม่กระทบคะแนนที่นักเรียนทำไปแล้ว
           ส่วน &ldquo;คะแนนเต็มที่แสดงผล&rdquo; ปรับได้ตลอดและมีผลย้อนหลังกับทุกครั้งที่ทำไปแล้วทันที)
         </p>
