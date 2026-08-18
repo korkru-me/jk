@@ -131,8 +131,8 @@ export default async function SubmissionResultPage({
   const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
   // Teachers always see/grade results regardless of the student-facing
   // policy. `never` hides both the score summary and answer review from the
-  // student, while `after_due` keeps the existing behavior of showing the
-  // overall score immediately but withholding answer details until due.
+  // student, `score_only` permanently withholds the answer review, and
+  // `after_due` withholds answer details only until the deadline passes.
   const canShowScore = isTeacherViewer || assignment.show_results !== 'never'
   const canShowAnswers =
     isTeacherViewer ||
@@ -314,6 +314,8 @@ export default async function SubmissionResultPage({
         <div className="bg-card border border-dashed rounded-2xl p-6 text-center text-sm text-muted-foreground">
           {assignment.show_results === 'never' ? (
             <>🔒 ครูกำหนดไม่แสดงคะแนนและเฉลยสำหรับงานนี้</>
+          ) : assignment.show_results === 'score_only' ? (
+            <>🔒 งานนี้แสดงเฉพาะคะแนนรวม โดยไม่แสดงคำตอบรายข้อและเฉลย</>
           ) : (
             <>
               🔒 เฉลยและคะแนนรายข้อจะแสดงหลังพ้นกำหนดส่งงาน

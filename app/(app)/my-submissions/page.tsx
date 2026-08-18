@@ -295,7 +295,11 @@ export default async function MySubmissionsPage() {
                           href={`/submissions/${s.id}`}
                           className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 justify-end mt-0.5"
                         >
-                          {canShowResults ? 'ดูเฉลย' : 'ดูสถานะ'} <ChevronRight size={12} />
+                          {s.assignments?.show_results === 'never'
+                            ? 'ดูสถานะ'
+                            : s.assignments?.show_results === 'score_only'
+                              ? 'ดูคะแนน'
+                              : 'ดูเฉลย'} <ChevronRight size={12} />
                         </Link>
                       </div>
                     </div>

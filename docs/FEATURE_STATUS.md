@@ -57,7 +57,7 @@
 - มี draft/published/closed, online/print และ exercise/exam
 - เชื่อมหลายห้องผ่าน `assignment_classrooms`
 - มีเวลาเปิดปิด จำกัดเวลา access code attempts score strategy passing threshold และ score overrides
-- ครูเลือกการแสดงผลลัพธ์ได้ทั้งทันที หลังพ้นกำหนด หรือไม่แสดงแก่นักเรียน และแก้ไขนโยบายนี้ภายหลังได้
+- ครูเลือกการแสดงผลลัพธ์ได้ทั้งคะแนนพร้อมเฉลย แสดงเฉพาะคะแนน หลังพ้นกำหนด หรือไม่แสดงแก่นักเรียน และแก้ไขนโยบายนี้ภายหลังได้
 - มีหน้า create/edit/detail/take/results/analytics/print/export
 - ต้องทดสอบ flow ครูและนักเรียนแบบครบเส้นทาง รวม expiry/retry/concurrent save
 

@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import type { AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 
-const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'after_due', 'never']
+const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
 interface CreateAssignmentData {
   classroom_ids: string[]
