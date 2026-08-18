@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KorKru / ก่อครู
 
-## Getting Started
+KorKru คือแพลตฟอร์มคลังโจทย์และห้องเรียนออนไลน์สำหรับครู ภายใต้แนวคิด **“ก่อ…โดยครู”** ครูสามารถสร้างโจทย์ จัดชุดงานหรือข้อสอบ มอบหมายให้นักเรียน และตรวจคำตอบได้ทั้งแบบอัตโนมัติและโดยครู
 
-First, run the development server:
+เป้าหมายระยะแรกคือทำให้ 5 ส่วนนี้ใช้งานได้ครบเส้นทาง:
+
+1. คลังโจทย์
+2. ห้องเรียนรายวิชา
+3. งานและข้อสอบ
+4. การส่งคำตอบและตรวจคะแนน
+5. ห้องโฮมรูมที่รวมภาระงานข้ามรายวิชา
+
+> สถานะปัจจุบันเป็นระบบระหว่างพัฒนา หลายฟีเจอร์มีโค้ดรองรับแล้ว แต่ยังไม่ถือว่าพร้อมใช้งานจริงจนกว่าจะผ่านการทดสอบครบเส้นทาง ดูรายละเอียดใน [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md)
+
+## เทคโนโลยีหลัก
+
+- Next.js 16 App Router และ React 19
+- TypeScript แบบ `strict`
+- Tailwind CSS 4 และชุด UI ภายในโปรเจกต์
+- Supabase Auth, PostgreSQL, Row Level Security และ Storage
+- Server Actions สำหรับการเปลี่ยนแปลงข้อมูลหลัก
+
+## เริ่มใช้งานในเครื่อง
+
+ต้องมี Node.js รุ่นที่รองรับ Next.js 16 และโปรเจกต์ Supabase ที่มี schema/migrations ตรงกับโค้ด
 
 ```bash
+npm ci
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+จากนั้นเปิด [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+ตัวแปรแวดล้อมที่ต้องใช้ดูได้จาก `.env.example` ห้าม commit `.env.local` หรือ `SUPABASE_SERVICE_ROLE_KEY`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## คำสั่งที่มี
 
-## Learn More
+```bash
+npm run dev       # development server
+npx tsc --noEmit  # ตรวจ TypeScript
+npm run build     # production build
+npm run start     # รัน production build
+```
 
-To learn more about Next.js, take a look at the following resources:
+ปัจจุบันยังไม่มีคำสั่ง `lint` และยังไม่มี automated test suite
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## เอกสารสำหรับคนและ AI
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [AGENTS.md](AGENTS.md) — กฎหลักที่ AI ต้องอ่านก่อนทำงาน
+- [docs/PRODUCT.md](docs/PRODUCT.md) — วิสัยทัศน์ แบรนด์ ผู้ใช้ และรูปแบบธุรกิจ
+- [docs/SCOPE.md](docs/SCOPE.md) — ขอบเขต MVP และสิ่งที่ยังไม่ทำ
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — โครงสร้างและการไหลของระบบ
+- [docs/DOMAIN.md](docs/DOMAIN.md) — คำศัพท์ บทบาท และกฎทางธุรกิจ
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — แบบจำลองข้อมูลและขอบเขต tenant
+- [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md) — สถานะฟีเจอร์จากโค้ดจริง
+- [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — หลักภาษา แบรนด์ และ UI
+- [docs/SECURITY.md](docs/SECURITY.md) — กฎความปลอดภัยและข้อมูลนักเรียน
 
-## Deploy on Vercel
+## กฎฐานข้อมูลสำคัญ
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `supabase/migrations/` บันทึกวิวัฒนาการของฐานข้อมูล อย่าคิดว่า `supabase/schema.sql` เพียงไฟล์เดียวคือสถานะล่าสุด
+- ก่อนเปลี่ยน schema ต้องตรวจ migration ที่ถูกใช้กับฐานข้อมูลเป้าหมายจริง
+- ห้ามแก้ migration ที่ถูกใช้งานแล้วเพื่อเปลี่ยนพฤติกรรม ให้สร้าง migration ใหม่
+- ห้ามแก้ปัญหาสิทธิ์ด้วยการปิดหรือลดความเข้มงวดของ RLS
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## การร่วมพัฒนา
+
+ก่อนแก้โค้ดให้อ่าน [AGENTS.md](AGENTS.md) และเอกสารที่เกี่ยวข้อง รักษาการเปลี่ยนแปลงเดิมของผู้อื่น ทำงานเป็นส่วนเล็ก และบันทึกสถานะฟีเจอร์เมื่อพฤติกรรมเปลี่ยน

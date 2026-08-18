@@ -1,0 +1,18 @@
+---
+description: Supabase, database, server-action, and tenant-security rules
+globs: "{supabase/**/*.sql,lib/supabase/**/*.ts,lib/actions/**/*.ts}"
+alwaysApply: false
+---
+
+# Supabase and server security
+
+- Read `docs/SECURITY.md` and `docs/DATA_MODEL.md` before editing.
+- Prefer the session-bound server client so RLS remains active.
+- Before using the admin client, authenticate the user, authorize the exact resource/action, and scope the query to the verified tenant/resource.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` or import the admin client into client code.
+- Never disable or weaken RLS as a shortcut; test users from different organizations.
+- Never edit an applied migration. Check live migration state and add a new migration.
+- Use fixed `search_path` and intentional execute permissions for security-definer functions.
+- Preserve `org_id` isolation and immutable ownership rules.
+- Validate untrusted input server-side; do not rely on form controls or TypeScript types.
+- Explain the plan before changing auth, RLS, migrations, scoring, or billing entitlements.

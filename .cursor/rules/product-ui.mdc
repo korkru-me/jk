@@ -1,0 +1,16 @@
+---
+description: KorKru brand, Thai copy, accessibility, and prototype-truth rules
+globs: "{app/**/*.tsx,components/**/*.tsx}"
+alwaysApply: false
+---
+
+# Product UI
+
+- Read `docs/PRODUCT.md`, `docs/SCOPE.md`, `docs/FEATURE_STATUS.md`, and `docs/DESIGN_SYSTEM.md` before changing user-facing UI.
+- Use **KorKru / ก่อครู** and the adaptable line **“ก่อ…โดยครู”**; do not lock “ก่อการเรียนรู้ โดยครู” as the permanent slogan.
+- Write user-facing copy in clear Thai. Keep code identifiers and standard technical terms in English.
+- Do not present mock analytics, invoices, usage, pricing, compliance, security, or unfinished actions as real.
+- State clearly which answers are auto-graded and which require teacher review.
+- Keep forms keyboard-accessible with visible labels, useful errors, and pending states.
+- Respect responsive layouts, color contrast, and `prefers-reduced-motion`.
+- Use existing UI primitives and visual tokens before introducing one-off patterns.
