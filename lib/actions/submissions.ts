@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
-import { getMyOrgId } from '@/lib/actions/org'
 import { isAttemptExpired } from '@/lib/grading'
 import { getBlankType, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import type { Question, Variable, LogicRule, SubmittedFile } from '@/lib/types'
@@ -305,8 +304,11 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
 
   const totalMaxScore = skeletons.reduce((sum, s) => sum + s.max_score, 0)
 
-  const orgId = await getMyOrgId()
-  if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน' }
+  // A submission belongs to the same immutable tenant as its assignment.
+  // Do not derive this from the student's "primary" organization: students
+  // can join a classroom without being organization_members, and even when
+  // they have a personal workspace it is not the assignment's tenant.
+  const orgId = assignment.org_id
 
   // Create submission with correct total max_score
   const { data: submission, error: subError } = await supabase
