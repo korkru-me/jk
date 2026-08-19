@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
 import { QuestionBankClient } from './_components/question-bank-client'
@@ -34,7 +35,7 @@ export type QuestionWithCreator = QuestionWithCategory & {
 
 export default async function QuestionsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, created_at'

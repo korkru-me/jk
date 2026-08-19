@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import { getQuestionSet, getMyQuestionSets, getQuestionSetShareOrgIds } from '@/lib/actions/question-sets'
 import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
@@ -13,7 +14,7 @@ interface Props {
 export default async function EditQuestionSetPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const set = await getQuestionSet(id)

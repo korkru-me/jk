@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthUser } from '@/lib/auth/server'
 import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Home, GraduationCap, ArrowRight } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
@@ -9,28 +11,49 @@ import { TeacherViewClient } from './_components/teacher-view-client'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียน — KorKru' }
 
+type ClassroomListRow = Classroom & {
+  classroom_students: { count: number }[]
+  assignment_classrooms: { count: number }[]
+}
+
+type StudentClassroom = Pick<Classroom, 'id' | 'name' | 'description' | 'status' | 'classroom_type'>
+
 export default async function ClassroomsPage() {
   const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authUser = await getAuthUser()
+  if (!authUser) redirect('/login')
   const admin = createAdminClient()
 
   const { data: profile } = await supabase
-    .from('users').select('role').eq('id', authUser!.id).single()
+    .from('users').select('role').eq('id', authUser.id).single()
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
 
   if (isTeacher) {
     const [activeRes, archivedRes, trashedRes] = await Promise.all([
-      admin.from('classrooms').select('*').eq('teacher_id', authUser!.id).eq('status', 'active').order('created_at', { ascending: false }),
-      admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser!.id).eq('status', 'archived'),
-      admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser!.id).eq('status', 'deleted'),
+      admin
+        .from('classrooms')
+        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, deleted_at, created_at, updated_at, classroom_students(count), assignment_classrooms(count)')
+        .eq('teacher_id', authUser.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false }),
+      admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser.id).eq('status', 'archived'),
+      admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser.id).eq('status', 'deleted'),
     ])
 
-    const rawClassrooms = (activeRes.data ?? []) as Classroom[]
+    const rawClassrooms = (activeRes.data ?? []) as unknown as ClassroomListRow[]
+    const studentCountMap: Record<string, number> = {}
+    const assignmentCountMap: Record<string, number> = {}
+    const classrooms = rawClassrooms.map(({ classroom_students, assignment_classrooms, ...classroom }) => {
+      studentCountMap[classroom.id] = classroom_students?.[0]?.count ?? 0
+      assignmentCountMap[classroom.id] = assignment_classrooms?.[0]?.count ?? 0
+      return classroom
+    })
+
     // Homeroom classrooms lead the list (there are only ever a handful);
     // subject classrooms follow, most-recently-pinned first.
     const cls = [
-      ...rawClassrooms.filter(c => c.classroom_type === 'homeroom'),
-      ...rawClassrooms
+      ...classrooms.filter(c => c.classroom_type === 'homeroom'),
+      ...classrooms
         .filter(c => c.classroom_type !== 'homeroom')
         .sort((a, b) => {
           const pinDiff = (b.pinned_at ? new Date(b.pinned_at).getTime() : 0) - (a.pinned_at ? new Date(a.pinned_at).getTime() : 0)
@@ -38,21 +61,6 @@ export default async function ClassroomsPage() {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         }),
     ]
-    const classroomIds = cls.map(c => c.id)
-
-    const [membershipRes, assignmentRes] = await Promise.all([
-      classroomIds.length > 0
-        ? admin.from('classroom_students').select('classroom_id').in('classroom_id', classroomIds)
-        : { data: [] },
-      classroomIds.length > 0
-        ? admin.from('assignments').select('id, classroom_id').in('classroom_id', classroomIds)
-        : { data: [] },
-    ])
-
-    const studentCountMap: Record<string, number> = {}
-    const assignmentCountMap: Record<string, number> = {}
-    for (const m of membershipRes.data ?? []) studentCountMap[m.classroom_id] = (studentCountMap[m.classroom_id] ?? 0) + 1
-    for (const a of assignmentRes.data ?? []) assignmentCountMap[(a as any).classroom_id] = (assignmentCountMap[(a as any).classroom_id] ?? 0) + 1
 
     return (
       <TeacherViewClient
@@ -70,34 +78,36 @@ export default async function ClassroomsPage() {
   // Student view
   const { data: memberships } = await admin
     .from('classroom_students')
-    .select('classroom_id, classrooms(*)')
-    .eq('student_id', authUser!.id)
+    .select('classroom_id, classrooms(id, name, description, status, classroom_type)')
+    .eq('student_id', authUser.id)
 
   const classrooms = (memberships ?? [])
     .map((m: any) => m.classrooms)
-    .filter((c: any) => c && c.status === 'active') as Classroom[]
+    .filter((c: any) => c && c.status === 'active') as StudentClassroom[]
 
   const classroomIds = classrooms.map(c => c.id)
-  const { data: links } = classroomIds.length > 0
-    ? await admin.from('assignment_classrooms').select('assignment_id, classroom_id').in('classroom_id', classroomIds)
-    : { data: [] }
-  const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+  const [{ data: links }, { data: subRows }] = classroomIds.length > 0
+    ? await Promise.all([
+        admin
+          .from('assignment_classrooms')
+          .select('assignment_id, classroom_id, assignments!inner(status)')
+          .in('classroom_id', classroomIds)
+          .eq('assignments.status', 'published'),
+        admin
+          .from('submissions')
+          .select('assignment_id, status')
+          .eq('student_id', authUser.id)
+          .in('status', ['submitted', 'graded']),
+      ])
+    : [{ data: [] }, { data: [] }]
 
-  const { data: assignmentRows } = assignmentIds.length > 0
-    ? await admin.from('assignments').select('id, status').in('id', assignmentIds).eq('status', 'published')
-    : { data: [] }
-  const publishedIds = new Set((assignmentRows ?? []).map((a: any) => a.id))
-
-  const { data: subRows } = assignmentIds.length > 0
-    ? await admin.from('submissions').select('assignment_id, status').eq('student_id', authUser!.id).in('assignment_id', assignmentIds)
-    : { data: [] }
   const doneAssignmentIds = new Set(
-    (subRows ?? []).filter((s: any) => s.status === 'submitted' || s.status === 'graded').map((s: any) => s.assignment_id)
+    (subRows ?? []).map((s: any) => s.assignment_id)
   )
 
   const pendingCountMap: Record<string, number> = {}
   for (const l of (links ?? []) as any[]) {
-    if (publishedIds.has(l.assignment_id) && !doneAssignmentIds.has(l.assignment_id)) {
+    if (!doneAssignmentIds.has(l.assignment_id)) {
       pendingCountMap[l.classroom_id] = (pendingCountMap[l.classroom_id] ?? 0) + 1
     }
   }
@@ -105,7 +115,7 @@ export default async function ClassroomsPage() {
   return <StudentView classrooms={classrooms} pendingCountMap={pendingCountMap} />
 }
 
-function StudentView({ classrooms, pendingCountMap }: { classrooms: Classroom[]; pendingCountMap: Record<string, number> }) {
+function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClassroom[]; pendingCountMap: Record<string, number> }) {
   const homeroomClassrooms = classrooms.filter(c => c.classroom_type === 'homeroom')
   const subjectClassrooms = classrooms.filter(c => c.classroom_type !== 'homeroom')
 

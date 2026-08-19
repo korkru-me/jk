@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import { getMyQuestionSets } from '@/lib/actions/question-sets'
 import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
@@ -8,7 +9,7 @@ export const metadata = { title: 'สร้างชุดโจทย์ — Ko
 
 export default async function NewQuestionSetPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase

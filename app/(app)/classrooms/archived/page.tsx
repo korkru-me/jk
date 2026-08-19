@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ArchivedActionsClient } from './_components/archived-actions-client'
@@ -10,10 +11,10 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียนที่เก็บถาวร — KorKru' }
 
 export default async function ArchivedClassroomsPage() {
-  const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authUser = await getAuthUser()
   if (!authUser) notFound()
 
+  const supabase = await createClient()
   const { data: profile } = await supabase
     .from('users').select('role').eq('id', authUser.id).single()
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'

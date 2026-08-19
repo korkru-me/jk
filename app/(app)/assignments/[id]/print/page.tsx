@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import { PrintWorksheet } from '@/components/exam/print-worksheet'
 import type { Question } from '@/lib/types'
@@ -12,7 +13,7 @@ export default async function PrintPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   // No explicit created_by filter — RLS (assignments_org_teacher_all /

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
 import type { AssignmentClassroomOption, AssignmentQuestionOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
@@ -13,7 +14,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   const { classroom: classroomParam, set: setParam } = await searchParams
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const preselectedSetQuery = setParam

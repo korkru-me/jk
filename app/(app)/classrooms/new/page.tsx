@@ -1,14 +1,16 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { CreateCourseWizard } from './_components/create-course-wizard'
 
 export const metadata = { title: 'สร้างห้องเรียนใหม่ — KorKru' }
 
 export default async function NewClassroomPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
+  if (!user) redirect('/login')
   const { data: profile } = await supabase
-    .from('users').select('role').eq('id', user!.id).single()
+    .from('users').select('role').eq('id', user.id).single()
 
   if (profile?.role === 'student') redirect('/classrooms')
 

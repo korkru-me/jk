@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import { QuestionSetsClient } from './_components/question-sets-client'
 import type { QuestionSet } from '@/lib/types'
@@ -40,7 +41,7 @@ async function withValidCounts<T extends { question_ids: string[] }>(
 
 export default async function QuestionSetsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const summaryFields = 'id, created_by, title, description, question_ids, tags'

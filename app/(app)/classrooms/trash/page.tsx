@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { TrashActionsClient } from './_components/trash-actions-client'
@@ -12,10 +13,10 @@ export const metadata = { title: 'ถังขยะ — KorKru' }
 const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000
 
 export default async function TrashPage() {
-  const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authUser = await getAuthUser()
   if (!authUser) notFound()
 
+  const supabase = await createClient()
   const { data: profile } = await supabase
     .from('users').select('role').eq('id', authUser.id).single()
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'

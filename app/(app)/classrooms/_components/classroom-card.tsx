@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { Users, BookOpen, TrendingUp, Check, Pin, PinOff } from 'lucide-react'
-import { BarChart, Bar, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 import type { Classroom } from '@/lib/types'
 
@@ -28,16 +27,6 @@ function getPisaData(classroomId: string) {
     { name: 'ออกแบบการสืบเสาะ', score: Math.round(45 + seedRand(classroomId, 1) * 40) },
     { name: 'แปลความหมายข้อมูล', score: Math.round(50 + seedRand(classroomId, 2) * 38) },
   ]
-}
-
-const CustomTooltip = ({ active, payload }: any) => {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-gray-900 text-white text-[10px] px-2 py-1 rounded-lg shadow-lg">
-      <p className="font-semibold">{payload[0].payload.name}</p>
-      <p>{payload[0].value}%</p>
-    </div>
-  )
 }
 
 interface Props {
@@ -127,13 +116,23 @@ export function ClassroomCard({
         </div>
 
         <div className="mb-3">
-          <p className="text-[10px] text-gray-400 mb-1.5 font-medium uppercase tracking-wide">ทักษะ PISA</p>
-          <ResponsiveContainer width="100%" height={52}>
-            <BarChart data={pisaData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barSize={18}>
-              <Bar dataKey="score" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-            </BarChart>
-          </ResponsiveContainer>
+          <p className="text-[10px] text-gray-400 mb-1.5 font-medium uppercase tracking-wide">
+            ทักษะ PISA · ข้อมูลตัวอย่าง
+          </p>
+          <div
+            className="h-[52px] flex items-end justify-around gap-3 px-2"
+            role="img"
+            aria-label={`ข้อมูลตัวอย่างทักษะ PISA: ${pisaData.map(item => `${item.name} ${item.score}%`).join(', ')}`}
+          >
+            {pisaData.map(item => (
+              <div
+                key={item.name}
+                className="w-[18px] rounded-t-[3px] bg-blue-500"
+                style={{ height: `${item.score}%` }}
+                title={`${item.name}: ${item.score}% (ข้อมูลตัวอย่าง)`}
+              />
+            ))}
+          </div>
           <div className="flex justify-between mt-1">
             {pisaData.map((d) => (
               <p key={d.name} className="text-[9px] text-gray-400 text-center" style={{ width: '33%' }}>

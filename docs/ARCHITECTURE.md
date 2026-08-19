@@ -35,6 +35,8 @@
 
 ใช้ `lib/supabase/server.ts` เพื่อให้ query ทำงานภายใต้ session และ RLS ของผู้ใช้ นี่ควรเป็นค่าเริ่มต้น
 
+`lib/auth/server.ts` memoize ผล `auth.getUser()` ด้วย React `cache()` ภายใน server render request เดียว เพื่อให้ layout และ page ไม่ตรวจ session ซ้ำกัน ผลนี้ไม่ถูกเก็บข้าม request หรือข้ามผู้ใช้
+
 ### Privileged server
 
 `lib/supabase/admin.ts` ใช้ `SUPABASE_SERVICE_ROLE_KEY` และข้าม RLS ได้ เรียกได้เฉพาะ server และต้องตรวจ authentication/authorization ก่อนทุกครั้ง การมี session อย่างเดียวไม่เพียงพอ
@@ -97,6 +99,7 @@
 
 ## Database performance
 
+- App shell ดึงเฉพาะ `id`, `email`, `full_name` และ `role`; หน้ารวมห้องเรียนใช้ embedded relation counts สำหรับ roster และ `assignment_classrooms` แทน query ตาม `assignments.classroom_id` รุ่นเก่า
 - Migration `20260819090000_core_query_indexes.sql` เติม index สำหรับ query หลักและ `SECURITY DEFINER` RLS helpers โดยไม่เปลี่ยนขอบเขตสิทธิ์
 - Migration `20260819091000_rls_initplan_performance.sql` ทำให้ direct `auth.uid()` ใน policy หลักถูกคำนวณครั้งเดียวต่อ query โดยรักษาเงื่อนไขสิทธิ์เดิม
 - `classroom_students` ต้องมี index ที่ขึ้นต้นด้วย `student_id`; unique index เดิมขึ้นต้นด้วย `classroom_id` และใช้แทนกันไม่ได้

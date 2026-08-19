@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { getMyTeamOrgs, getTeamOrgData } from '@/lib/actions/team-org'
 import { TeamOrgClient } from './_components'
 
@@ -7,7 +8,7 @@ export const metadata = { title: 'ทีมของฉัน — KorKru' }
 
 export default async function TeamOrgPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()

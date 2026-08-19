@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { getAllTags, getFormulaPresets, getQuestionShareOrgIds } from '@/lib/actions/questions'
 import { McqForm } from '@/components/questions/mcq-form'
 import { TrueFalseForm } from '@/components/questions/true-false-form'
@@ -21,7 +22,8 @@ interface EditQuestionPageProps {
 export default async function EditQuestionPage({ params }: EditQuestionPageProps) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
+  if (!user) redirect('/login')
 
   const [{ data: question }, allTags, presets] = await Promise.all([
     supabase
@@ -35,7 +37,7 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
 
   if (!question) notFound()
 
-  const isOwner = question.created_by === user!.id
+  const isOwner = question.created_by === user.id
   if (!isOwner && !question.team_edit_allowed) notFound()
 
   const sharedOrgIds = await getQuestionShareOrgIds(id)

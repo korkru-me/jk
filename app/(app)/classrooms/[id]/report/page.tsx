@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthUser } from '@/lib/auth/server'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
@@ -14,10 +14,9 @@ export default async function HomeroomReportPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
   const admin = createAdminClient()
-  const [{ data: { user: authUser } }, { data: classroom }] = await Promise.all([
-    supabase.auth.getUser(),
+  const [authUser, { data: classroom }] = await Promise.all([
+    getAuthUser(),
     admin.from('classrooms').select('id, name, teacher_id, classroom_type').eq('id', id).maybeSingle(),
   ])
   if (!authUser) redirect('/login')

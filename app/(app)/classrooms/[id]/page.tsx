@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthUser } from '@/lib/auth/server'
 import type { Classroom, User } from '@/lib/types'
 import { ClassroomDetailClient } from './_components/classroom-detail-client'
 import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
@@ -19,7 +20,7 @@ export default async function ClassroomDetailPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authUser = await getAuthUser()
   if (!authUser) redirect('/login')
 
   // Use admin client to bypass RLS recursion on classrooms ↔ classroom_students

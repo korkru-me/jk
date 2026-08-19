@@ -11,10 +11,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { NotificationsBell } from '@/components/layout/notifications-bell'
-import type { User } from '@/lib/types'
+import type { ShellUser } from './shell-client'
 
 interface TopbarProps {
-  user: User
+  user: ShellUser
   initialUnreadCount: number
   onMenuToggle?: () => void
   sidebarCollapsed?: boolean

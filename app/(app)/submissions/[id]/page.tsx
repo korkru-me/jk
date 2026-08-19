@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -53,8 +54,8 @@ export default async function SubmissionResultPage({
   // RLS reads the auth cookie directly, so the secured submission lookup can
   // run alongside getUser instead of waiting for a separate network round
   // trip first. An unauthenticated lookup simply returns no visible row.
-  const [userRes, submissionRes] = await Promise.all([
-    supabase.auth.getUser(),
+  const [user, submissionRes] = await Promise.all([
+    getAuthUser(),
     supabase
       .from('submissions')
       .select(`
@@ -66,7 +67,6 @@ export default async function SubmissionResultPage({
       .eq('id', id)
       .maybeSingle(),
   ])
-  const user = userRes.data.user
   if (!user) redirect('/login')
   const submission = submissionRes.data
 

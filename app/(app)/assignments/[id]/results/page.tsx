@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
@@ -23,8 +24,8 @@ export default async function ResultsPage({
     .eq('id', id)
     .maybeSingle()
 
-  const [{ data: { user } }, { data: assignment }] = await Promise.all([
-    supabase.auth.getUser(),
+  const [user, { data: assignment }] = await Promise.all([
+    getAuthUser(),
     assignmentQuery,
   ])
   if (!user) redirect('/login')

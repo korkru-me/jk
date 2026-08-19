@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { MultiStepEditor } from '@/components/questions/multi-step-editor'
 import { getQuestionShareOrgIds } from '@/lib/actions/questions'
 import type { QuestionCategory, FormulaPreset, Question, Difficulty, Visibility } from '@/lib/types'
@@ -12,7 +13,8 @@ export default async function MultiStepEditPage({
 }) {
   const { groupId } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
+  if (!user) redirect('/login')
 
   const [{ data: groupQuestions }, { data: categories }, { data: presets }] = await Promise.all([
     supabase
@@ -29,7 +31,7 @@ export default async function MultiStepEditPage({
   const parent = (groupQuestions as Question[]).find((q) => q.order_in_group === 0)
   if (!parent) notFound()
 
-  const isOwner = parent.created_by === user!.id
+  const isOwner = parent.created_by === user.id
   if (!isOwner && !parent.team_edit_allowed) notFound()
 
   const sharedOrgIds = await getQuestionShareOrgIds(parent.id)

@@ -1,12 +1,12 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { ShellClient } from '@/components/layout/shell-client'
-import type { User } from '@/lib/types'
+import { ShellClient, type ShellUser } from '@/components/layout/shell-client'
+import { getAuthUser } from '@/lib/auth/server'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authUser = await getAuthUser()
 
   if (!authUser) redirect('/login')
 
@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [profileRes, unreadRes] = await Promise.all([
     admin
       .from('users')
-      .select('*')
+      .select('id, email, full_name, role')
       .eq('id', authUser.id)
       .single(),
     supabase
@@ -40,12 +40,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     })
     const { data: newProfile } = await admin
       .from('users')
-      .select('*')
+      .select('id, email, full_name, role')
       .eq('id', authUser.id)
       .single()
     if (!newProfile) redirect('/login')
-    return <ShellClient user={newProfile as User} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
+    return <ShellClient user={newProfile as ShellUser} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
   }
 
-  return <ShellClient user={profile as User} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
+  return <ShellClient user={profile as ShellUser} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
 }

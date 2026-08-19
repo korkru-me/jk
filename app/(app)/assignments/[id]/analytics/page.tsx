@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
@@ -44,8 +45,8 @@ export default async function AnalyticsPage({
     .eq('id', id)
     .maybeSingle()
 
-  const [{ data: { user } }, { data: assignment }] = await Promise.all([
-    supabase.auth.getUser(),
+  const [user, { data: assignment }] = await Promise.all([
+    getAuthUser(),
     assignmentQuery,
   ])
   if (!user) redirect('/login')

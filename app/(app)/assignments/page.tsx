@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import type { Assignment } from '@/lib/types'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
@@ -11,7 +12,7 @@ export type AssignmentRow = Assignment & { classrooms: { name: string } | null }
 
 export default async function AssignmentsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   // Role, memberships, and the student's attempts are independent once the

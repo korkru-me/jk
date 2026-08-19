@@ -7,12 +7,14 @@ import type { User } from '@/lib/types'
 
 const SIDEBAR_COLLAPSE_KEY = 'korkru:sidebar-collapsed'
 
+export type ShellUser = Pick<User, 'id' | 'email' | 'full_name' | 'role'>
+
 export function ShellClient({
   user,
   initialUnreadCount,
   children,
 }: {
-  user: User
+  user: ShellUser
   initialUnreadCount: number
   children: React.ReactNode
 }) {

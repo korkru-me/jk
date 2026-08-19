@@ -1,10 +1,11 @@
 import { SettingsNav } from '@/components/settings/settings-nav'
 import { Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authUser = await getAuthUser()
   const { data: profile } = authUser
     ? await supabase.from('users').select('role').eq('id', authUser.id).maybeSingle()
     : { data: null }

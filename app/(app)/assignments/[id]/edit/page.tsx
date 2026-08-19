@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
@@ -24,8 +25,8 @@ export default async function EditAssignmentPage({
     .eq('id', id)
     .maybeSingle()
 
-  const [{ data: { user } }, { data: assignment }] = await Promise.all([
-    supabase.auth.getUser(),
+  const [user, { data: assignment }] = await Promise.all([
+    getAuthUser(),
     assignmentQuery,
   ])
   if (!user) redirect('/login')
