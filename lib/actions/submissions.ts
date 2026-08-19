@@ -61,15 +61,39 @@ function scaleScore(rawScore: number, structuralMax: number, storedMax: number):
 export async function startSubmission(assignmentId: string, accessCode?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
 
-  // Check assignment is published and accessible
-  const { data: assignment } = await supabase
-    .from('assignments')
-    .select('*')
-    .eq('id', assignmentId)
-    .eq('status', 'published')
-    .maybeSingle()
+  // Assignment metadata, classroom links, an individual extension, and the
+  // latest attempt are independent after authentication. Fetch them in one
+  // stage instead of a four-query waterfall on every exam resume.
+  const [assignmentRes, linksRes, extensionRes, existingRes] = await Promise.all([
+    supabase
+      .from('assignments')
+      .select('*')
+      .eq('id', assignmentId)
+      .eq('status', 'published')
+      .maybeSingle(),
+    supabase
+      .from('assignment_classrooms')
+      .select('classroom_id')
+      .eq('assignment_id', assignmentId),
+    supabase
+      .from('assignment_extensions')
+      .select('extended_end_at')
+      .eq('assignment_id', assignmentId)
+      .eq('student_id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('submissions')
+      .select('id, status, attempt_number, started_at')
+      .eq('assignment_id', assignmentId)
+      .eq('student_id', user.id)
+      .order('attempt_number', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  const assignment = assignmentRes.data
 
   if (!assignment) return { error: 'ไม่พบชุดข้อสอบ' }
 
@@ -80,10 +104,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   // Check student is in one of the classrooms this assignment is linked to
   // (not just the legacy single classroom_id column — an assignment may now
   // target multiple classrooms via assignment_classrooms).
-  const { data: links } = await supabase
-    .from('assignment_classrooms')
-    .select('classroom_id')
-    .eq('assignment_id', assignmentId)
+  const links = linksRes.data
   const classroomIds = (links ?? []).map((l: any) => l.classroom_id)
 
   const { data: membership } = classroomIds.length > 0
@@ -98,12 +119,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องเรียนนี้' }
 
   // Check deadline — a per-student extension overrides the assignment's end_at
-  const { data: extension } = await supabase
-    .from('assignment_extensions')
-    .select('extended_end_at')
-    .eq('assignment_id', assignmentId)
-    .eq('student_id', user.id)
-    .maybeSingle()
+  const extension = extensionRes.data
 
   const effectiveEndAt = extension?.extended_end_at ?? assignment.end_at
   if (effectiveEndAt && new Date(effectiveEndAt) < new Date()) {
@@ -111,14 +127,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   }
 
   // Return existing in-progress submission, or decide on a retry
-  const { data: existing } = await supabase
-    .from('submissions')
-    .select('id, status, attempt_number, started_at')
-    .eq('assignment_id', assignmentId)
-    .eq('student_id', user.id)
-    .order('attempt_number', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const existing = existingRes.data
 
   let attemptNumber = 1
   if (existing) {
@@ -737,12 +746,17 @@ async function gradeAndFinalizeSubmission(
     return { id: a.id, is_correct: isCorrect, score }
   })
 
-  // Batch update answers
-  for (const u of updates) {
-    await supabase
-      .from('submission_answers')
-      .update({ is_correct: u.is_correct, score: u.score })
-      .eq('id', u.id)
+  // Each answer row is independent. Grade writes can run in small concurrent
+  // batches instead of one-by-one, while avoiding a request spike for a long
+  // exam on the free Supabase tier.
+  const gradeWriteConcurrency = 10
+  for (let i = 0; i < updates.length; i += gradeWriteConcurrency) {
+    await Promise.all(updates.slice(i, i + gradeWriteConcurrency).map(u =>
+      supabase
+        .from('submission_answers')
+        .update({ is_correct: u.is_correct, score: u.score })
+        .eq('id', u.id)
+    ))
   }
 
   const totalScore = updates.reduce((sum: number, u: any) => sum + u.score, 0)

@@ -14,8 +14,23 @@ export default async function AssignmentsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users').select('role').eq('id', user.id).single()
+  // Role, memberships, and the student's attempts are independent once the
+  // auth user is known. Pull them together instead of waiting on three
+  // separate database round trips.
+  const [profileRes, membershipsRes, submissionsRes] = await Promise.all([
+    supabase.from('users').select('role').eq('id', user.id).single(),
+    supabase
+      .from('classroom_students')
+      .select('classroom_id')
+      .eq('student_id', user.id),
+    supabase
+      .from('submissions')
+      .select('assignment_id, id, status, total_score, max_score, attempt_number, started_at, assignments!inner(status)')
+      .eq('student_id', user.id)
+      .eq('assignments.status', 'published'),
+  ])
+
+  const profile = profileRes.data
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
 
   // Teachers manage assignments from within each classroom's "งานที่มอบหมาย"
@@ -23,35 +38,27 @@ export default async function AssignmentsPage() {
   if (isTeacher) redirect('/classrooms')
 
   // Student view
-  const { data: memberships } = await supabase
-    .from('classroom_students').select('classroom_id').eq('student_id', user.id)
+  const memberships = membershipsRes.data
   const cids = (memberships ?? []).map((m: any) => m.classroom_id)
 
-  // Route through assignment_classrooms (not the legacy single classroom_id
-  // column) so assignments assigned to multiple classrooms are visible too.
-  const { data: links } = cids.length > 0
-    ? await supabase.from('assignment_classrooms').select('assignment_id').in('classroom_id', cids)
-    : { data: [] }
-  const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
-
-  const { data: published } = assignmentIds.length > 0
+  // Join assignment_classrooms directly so multi-classroom assignments stay
+  // correct without a links -> ids -> assignments waterfall.
+  const { data: published } = cids.length > 0
     ? await supabase
-        .from('assignments').select('*, classrooms(name)')
-        .in('id', assignmentIds).eq('status', 'published').order('created_at', { ascending: false })
+        .from('assignments')
+        .select('*, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .in('assignment_classrooms.classroom_id', cids)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
     : { data: [] }
 
   const pList = (published ?? []) as AssignmentRow[]
-  const pIds = pList.map(a => a.id)
-
-  const { data: rawMySubs } = pIds.length > 0
-    ? await supabase
-        .from('submissions').select('assignment_id, id, status, total_score, max_score, attempt_number, started_at')
-        .in('assignment_id', pIds).eq('student_id', user.id)
-    : { data: [] }
+  const publishedIds = new Set(pList.map(a => a.id))
+  const rawMySubs = (submissionsRes.data ?? []).filter((s: any) => publishedIds.has(s.assignment_id))
 
   const displayMaxByAssignment = new Map(pList.map(a => [a.id, a.display_max_score]))
   const mySubs = rescaleToDisplayMax(
-    (rawMySubs ?? []) as any[],
+    rawMySubs as any[],
     row => displayMaxByAssignment.get(row.assignment_id) ?? null
   )
 

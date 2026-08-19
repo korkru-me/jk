@@ -12,12 +12,13 @@ export default async function TakeExamPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   // Start or resume submission
   const result = await startSubmission(id)
+
+  if ('unauthenticated' in result && result.unauthenticated) {
+    redirect('/login')
+  }
 
   if (result.requiresAccessCode) {
     return <AccessCodeForm assignmentId={id} />
@@ -39,18 +40,24 @@ export default async function TakeExamPage({
     redirect(`/submissions/${result.submissionId}`)
   }
 
-  // Load submission + answers + questions
-  const { data: submission } = await supabase
-    .from('submissions')
-    .select('*, assignments(title, duration_minutes, end_at, require_work_image)')
-    .eq('id', result.submissionId!)
-    .single()
-
-  const { data: answers } = await supabase
-    .from('submission_answers')
-    .select('*, questions(title, question_text, question_type, answer_unit, mcq_options, variables, answer_parts, extra_data, image_urls, requires_work_image)')
-    .eq('submission_id', result.submissionId!)
-    .order('order_index')
+  // The submission header and its answer snapshots are independent once we
+  // know the attempt id. Load them together instead of paying two serial
+  // database round trips on every resume/reload.
+  const supabase = await createClient()
+  const [submissionRes, answersRes] = await Promise.all([
+    supabase
+      .from('submissions')
+      .select('*, assignments(title, duration_minutes, end_at, require_work_image)')
+      .eq('id', result.submissionId!)
+      .single(),
+    supabase
+      .from('submission_answers')
+      .select('*, questions(title, question_text, question_type, answer_unit, mcq_options, variables, answer_parts, extra_data, image_urls, requires_work_image)')
+      .eq('submission_id', result.submissionId!)
+      .order('order_index'),
+  ])
+  const submission = submissionRes.data
+  const answers = answersRes.data
 
   // Reorder MCQ options per the persisted shuffle (option_order) and strip
   // is_correct — the exam-taking client must never receive the answer key

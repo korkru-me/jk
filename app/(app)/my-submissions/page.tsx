@@ -28,11 +28,21 @@ export default async function MySubmissionsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: submissions } = await supabase
-    .from('submissions')
-    .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results)')
-    .eq('student_id', user.id)
-    .order('created_at', { ascending: false })
+  // Submission history and classroom memberships are independent. Loading
+  // them together removes a full round trip from this student landing page.
+  const [submissionsRes, membershipsRes] = await Promise.all([
+    supabase
+      .from('submissions')
+      .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results)')
+      .eq('student_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('classroom_students')
+      .select('classroom_id')
+      .eq('student_id', user.id),
+  ])
+
+  const submissions = submissionsRes.data
 
   const all = rescaleToDisplayMax(
     (submissions ?? []) as any[],
@@ -83,32 +93,27 @@ export default async function MySubmissionsPage() {
   // "ต้องทำส่ง" = every published assignment across the student's classrooms
   // that isn't done yet — including ones never even started (no row in
   // `submissions` at all), not just the ones currently in_progress.
-  const { data: memberships } = await supabase
-    .from('classroom_students')
-    .select('classroom_id')
-    .eq('student_id', user.id)
+  const memberships = membershipsRes.data
   const classroomIds = (memberships ?? []).map((m: any) => m.classroom_id)
 
-  const { data: links } = classroomIds.length > 0
-    ? await supabase
-        .from('assignment_classrooms')
-        .select('assignment_id')
-        .in('classroom_id', classroomIds)
-    : { data: [] }
-  const assignedIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
-
-  const { data: publishedAssignments } = assignedIds.length > 0
+  // Use assignment_classrooms as the authoritative relation in the same
+  // query, avoiding a separate link lookup before loading published work.
+  const { data: publishedAssignments } = classroomIds.length > 0
     ? await supabase
         .from('assignments')
-        .select('id, title, end_at, duration_minutes, classrooms(name)')
-        .in('id', assignedIds)
+        .select('id, title, end_at, duration_minutes, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .in('assignment_classrooms.classroom_id', classroomIds)
         .eq('status', 'published')
     : { data: [] }
 
   const pendingAssignments = (publishedAssignments ?? [])
     .filter((a: any) => !doneAssignmentIds.has(a.id))
     .map((a: any) => ({
-      ...a,
+      id: a.id,
+      title: a.title,
+      end_at: a.end_at,
+      duration_minutes: a.duration_minutes,
+      classrooms: a.classrooms,
       isInProgress: inProgressIds.has(a.id),
       previousScore: bestByAssignment.get(a.id) ?? null,
     }))

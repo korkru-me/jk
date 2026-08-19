@@ -60,6 +60,7 @@
 - มีเวลาเปิดปิด จำกัดเวลา access code attempts score strategy passing threshold และ score overrides
 - ครูเลือกการแสดงผลลัพธ์ได้ทั้งคะแนนพร้อมเฉลย แสดงเฉพาะคะแนน หลังพ้นกำหนด หรือไม่แสดงแก่นักเรียน และแก้ไขนโยบายนี้ภายหลังได้
 - มีหน้า create/edit/detail/take/results/analytics/print/export
+- หน้าชุดข้อสอบและสรุปงานของนักเรียนโหลดข้อมูลอิสระพร้อมกัน และดึงงานผ่าน `assignment_classrooms` โดยตรงเพื่อลด query ที่ต้องรอต่อกัน
 - ต้องทดสอบ flow ครูและนักเรียนแบบครบเส้นทาง รวม expiry/retry/concurrent save
 
 ### การส่งคำตอบและตรวจคะแนน — มีโค้ดรองรับ
@@ -67,6 +68,7 @@
 - สร้าง attempt, ตรึง random/answer/order, autosave และบังคับเวลาฝั่ง server
 - Attempt และ answer snapshot รับ `org_id` จาก assignment โดยตรง จึงรองรับนักเรียนที่เข้าห้องแต่ไม่ได้เป็น `organization_members`
 - มี auto-grading หลาย question types, manual score edit, feedback และ work images/files
+- หน้าทำข้อสอบโหลดข้อมูลเริ่ม attempt และ answer snapshot แบบคู่ขนาน, รวม autosave ขณะพิมพ์ภายในช่วงสั้น และเขียนผลตรวจเป็นชุดย่อยพร้อมกันเพื่อลดเวลารอโดยยัง flush คำตอบล่าสุดก่อนส่ง
 - หลังส่งคำตอบจะโหลดหน้าสรุปจากสถานะล่าสุดของ server และอยู่ที่หน้าสรุปจนกว่านักเรียนจะเลือกกลับหรือเริ่มทำใหม่เอง
 - ต้องเพิ่ม regression tests สำหรับทุก question type และการ rescale/attempt strategy
 - ต้องยืนยันคำจำกัดความของ `submitted` เทียบกับ `graded` สำหรับคำตอบ manual

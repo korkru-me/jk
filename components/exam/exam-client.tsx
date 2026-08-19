@@ -109,6 +109,15 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [showFormulaSheet, setShowFormulaSheet] = useState(false)
   const [showScratchpad, setShowScratchpad] = useState(false)
 
+  // Text-like answers used to call a server action on every keystroke. Keep
+  // the UI instant, but coalesce rapid edits per answer before persisting.
+  // Saves for the same answer are also chained so an older response can never
+  // arrive after a newer one and overwrite it.
+  const localAnswersRef = useRef(localAnswers)
+  const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const pendingAnswerValuesRef = useRef<Map<string, string>>(new Map())
+  const inFlightSavesRef = useRef<Map<string, Promise<boolean>>>(new Map())
+
   // ── Anti-cheat state ────────────────────────────────────────────────────────
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -116,6 +125,65 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [isOnline, setIsOnline] = useState(true)
   const tabWarningTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showTabWarning, setShowTabWarning] = useState(false)
+
+  const refreshSavingState = useCallback(() => {
+    setSaving(
+      saveTimersRef.current.size > 0
+      || pendingAnswerValuesRef.current.size > 0
+      || inFlightSavesRef.current.size > 0
+    )
+  }, [])
+
+  const flushAnswer = useCallback((answerId: string): Promise<boolean> => {
+    const timer = saveTimersRef.current.get(answerId)
+    if (timer) clearTimeout(timer)
+    saveTimersRef.current.delete(answerId)
+
+    const value = pendingAnswerValuesRef.current.get(answerId)
+    const existing = inFlightSavesRef.current.get(answerId)
+    if (value === undefined) return existing ?? Promise.resolve(true)
+    pendingAnswerValuesRef.current.delete(answerId)
+
+    const task = (existing ?? Promise.resolve(true))
+      .catch(() => false)
+      .then(async () => {
+        const result = await saveAnswer(answerId, value)
+        if (result?.error) throw new Error(result.error)
+        if (pendingAnswerValuesRef.current.get(answerId) === value) {
+          pendingAnswerValuesRef.current.delete(answerId)
+        }
+        setPendingSync(prev => {
+          if (!prev.has(answerId)) return prev
+          const next = new Set(prev)
+          next.delete(answerId)
+          return next
+        })
+        return true
+      })
+      .catch(() => {
+        if (!pendingAnswerValuesRef.current.has(answerId)) {
+          pendingAnswerValuesRef.current.set(answerId, localAnswersRef.current[answerId] ?? value)
+        }
+        setPendingSync(prev => new Set(prev).add(answerId))
+        return false
+      })
+      .finally(() => {
+        if (inFlightSavesRef.current.get(answerId) === task) {
+          inFlightSavesRef.current.delete(answerId)
+        }
+        refreshSavingState()
+      })
+
+    inFlightSavesRef.current.set(answerId, task)
+    setSaving(true)
+    return task
+  }, [refreshSavingState])
+
+  const flushQueuedAnswers = useCallback(async () => {
+    const queuedIds = [...pendingAnswerValuesRef.current.keys()]
+    await Promise.all(queuedIds.map(id => flushAnswer(id)))
+    await Promise.all([...inFlightSavesRef.current.values()])
+  }, [flushAnswer])
 
   // ── 1. Restore answers from LocalStorage on mount ───────────────────────────
   useEffect(() => {
@@ -137,6 +205,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
   // ── 2. Persist to LocalStorage whenever answers change ──────────────────────
   useEffect(() => {
+    localAnswersRef.current = localAnswers
     try {
       localStorage.setItem(LS_KEY(submissionId), JSON.stringify(localAnswers))
     } catch { /* ignore quota errors */ }
@@ -149,14 +218,14 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       if (pendingSync.size === 0) return
       toast.info(`กำลังซิงก์คำตอบ ${pendingSync.size} ข้อ...`)
       const ids = [...pendingSync]
-      for (const id of ids) {
-        const val = localAnswers[id]
-        if (val !== undefined) {
-          await saveAnswer(id, val).catch(() => null)
-        }
-      }
       setPendingSync(new Set())
-      toast.success('ซิงก์คำตอบสำเร็จ ✓')
+      for (const id of ids) {
+        const value = localAnswersRef.current[id]
+        if (value !== undefined) pendingAnswerValuesRef.current.set(id, value)
+      }
+      const results = await Promise.all(ids.map(id => flushAnswer(id)))
+      if (results.every(Boolean)) toast.success('ซิงก์คำตอบสำเร็จ ✓')
+      else toast.warning('ยังมีบางคำตอบที่รอซิงก์ ระบบจะลองอีกครั้งเมื่อเชื่อมต่อใหม่')
     }
     const onOffline = () => {
       setIsOnline(false)
@@ -169,8 +238,14 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingSync, localAnswers])
+  }, [flushAnswer, pendingSync])
+
+  // A timer must not outlive this attempt view. The latest value is always in
+  // localStorage as a recovery fallback if the tab is closed mid-debounce.
+  useEffect(() => () => {
+    for (const timer of saveTimersRef.current.values()) clearTimeout(timer)
+    saveTimersRef.current.clear()
+  }, [])
 
   // ── 4. Countdown timer ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -232,29 +307,37 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleAnswerChange = useCallback(async (answerId: string, value: string) => {
+  const handleAnswerChange = useCallback((answerId: string, value: string) => {
+    localAnswersRef.current = { ...localAnswersRef.current, [answerId]: value }
     setLocalAnswers(prev => ({ ...prev, [answerId]: value }))
+    pendingAnswerValuesRef.current.set(answerId, value)
+
+    const existingTimer = saveTimersRef.current.get(answerId)
+    if (existingTimer) clearTimeout(existingTimer)
+
     if (!navigator.onLine) {
       setPendingSync(prev => new Set([...prev, answerId]))
+      saveTimersRef.current.delete(answerId)
+      refreshSavingState()
       return
     }
-    setSaving(true)
-    try {
-      await saveAnswer(answerId, value)
-    } catch {
-      setPendingSync(prev => new Set([...prev, answerId]))
-    }
-    setSaving(false)
-  }, [])
 
-  const handlePartAnswerChange = useCallback(async (
+    setSaving(true)
+    const timer = setTimeout(() => {
+      saveTimersRef.current.delete(answerId)
+      void flushAnswer(answerId)
+    }, 500)
+    saveTimersRef.current.set(answerId, timer)
+  }, [flushAnswer, refreshSavingState])
+
+  const handlePartAnswerChange = useCallback((
     answerId: string, partIndex: number, value: string, totalParts: number, currentRaw: string,
   ) => {
     let arr: string[] = []
     try { arr = JSON.parse(currentRaw || '[]') } catch { arr = [] }
     while (arr.length < totalParts) arr.push('')
     arr[partIndex] = value
-    await handleAnswerChange(answerId, JSON.stringify(arr))
+    handleAnswerChange(answerId, JSON.stringify(arr))
   }, [handleAnswerChange])
 
   const handleWorkImageChange = useCallback(async (answerId: string, partIndex: number, url: string | null) => {
@@ -299,6 +382,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   async function handleSubmit() {
     if (submitting) return
     setSubmitting(true)
+    // Do not grade against stale DB values when the student confirms within
+    // the debounce window or while an earlier save is still in flight.
+    await flushQueuedAnswers()
     const result = await submitSubmission(submissionId)
     if (result?.error) {
       toast.error(result.error)
