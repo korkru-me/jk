@@ -1,17 +1,35 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
-import { getMyTeamOrgs } from '@/lib/actions/team-org'
 import { QuestionBankClient } from './_components/question-bank-client'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
 
-export type QuestionWithCategory = Question & { question_categories: { name: string } | null }
+export type QuestionSummary = Pick<
+  Question,
+  | 'id'
+  | 'created_by'
+  | 'org_id'
+  | 'title'
+  | 'question_text'
+  | 'question_type'
+  | 'difficulty'
+  | 'tags'
+  | 'requires_work_image'
+  | 'group_id'
+  | 'order_in_group'
+  | 'team_edit_allowed'
+  | 'created_at'
+>
+
+export type QuestionWithCategory = QuestionSummary & { question_categories: { name: string } | null }
+export type QuestionDetailWithCategory = Question & { question_categories: { name: string } | null }
 export type QuestionWithCreator = QuestionWithCategory & {
   users: { full_name: string } | null
   organizations: { name: string } | null
   /** Names of teams this question was additionally shared to, beyond its home org. */
   shared_org_names?: string[]
+  shared_org_ids?: string[]
 }
 
 export default async function QuestionsPage() {
@@ -19,16 +37,27 @@ export default async function QuestionsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: questions, error } = await supabase
-    .from('questions')
-    .select('*, question_categories(name)')
-    .eq('created_by', user.id)
-    .or('group_id.is.null,order_in_group.eq.0')
-    .order('created_at', { ascending: false })
+  const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, created_at'
+  const [{ data: questions, error }, { data: membershipRows }] = await Promise.all([
+    supabase
+      .from('questions')
+      .select(`${summaryFields}, question_categories(name)`)
+      .eq('created_by', user.id)
+      .or('group_id.is.null,order_in_group.eq.0')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('organization_members')
+      .select('org_role, organizations!inner(id, name, is_personal)')
+      .eq('user_id', user.id)
+      .eq('organizations.is_personal', false),
+  ])
 
   if (error) console.error('[questions/page] query failed:', error)
 
-  const myTeams = await getMyTeamOrgs()
+  const myTeams = (membershipRows ?? []).map((row: any) => ({
+    id: row.organizations.id as string,
+    name: row.organizations.name as string,
+  }))
   const teamOrgIds = myTeams.map(t => t.id)
 
   let teamQuestions: QuestionWithCreator[] = []
@@ -36,7 +65,7 @@ export default async function QuestionsPage() {
     const [{ data: primaryData, error: primaryError }, { data: shareRows, error: shareError }] = await Promise.all([
       supabase
         .from('questions')
-        .select('*, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)')
+        .select(`${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`)
         .in('org_id', teamOrgIds)
         .in('visibility', ['organization', 'school'])
         .or('group_id.is.null,order_in_group.eq.0')
@@ -67,16 +96,16 @@ export default async function QuestionsPage() {
     if (sharedOnlyIds.length > 0) {
       const { data, error: sharedOnlyError } = await supabase
         .from('questions')
-        .select('*, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)')
+        .select(`${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`)
         .in('id', sharedOnlyIds)
         .or('group_id.is.null,order_in_group.eq.0')
         .order('created_at', { ascending: false })
       if (sharedOnlyError) console.error('[questions/page] shared-only query failed:', sharedOnlyError)
-      sharedOnlyData = (data ?? []) as QuestionWithCreator[]
+      sharedOnlyData = (data ?? []) as unknown as QuestionWithCreator[]
     }
 
     const byId = new Map<string, QuestionWithCreator>()
-    for (const q of [...(primaryData ?? []), ...sharedOnlyData] as QuestionWithCreator[]) {
+    for (const q of [...(primaryData ?? []), ...sharedOnlyData] as unknown as QuestionWithCreator[]) {
       byId.set(q.id, {
         ...q,
         shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
@@ -90,7 +119,7 @@ export default async function QuestionsPage() {
 
   return (
     <QuestionBankClient
-      questions={(questions ?? []) as QuestionWithCategory[]}
+      questions={(questions ?? []) as unknown as QuestionWithCategory[]}
       teamQuestions={teamQuestions}
       hasTeamOrg={teamOrgIds.length > 0}
       hasMultipleTeams={teamOrgIds.length > 1}

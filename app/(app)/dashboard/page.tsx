@@ -49,6 +49,7 @@ export default async function DashboardPage() {
         user={user}
         questionsCount={questionsRes.count ?? 0}
         studentsCount={studentsRes.count ?? 0}
+        heatmapAnchorDate={new Date().toISOString().slice(0, 10)}
       />
     )
   }

@@ -8,7 +8,7 @@ import {
   Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download,
   Users, TrendingUp, BookOpen,
 } from 'lucide-react'
-import { deleteQuestion, setRequiresWorkImage } from '@/lib/actions/questions'
+import { deleteQuestion, getQuestionClientDetail, setRequiresWorkImage } from '@/lib/actions/questions'
 import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
 import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
@@ -68,9 +68,16 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   }
 
   function handleDuplicate() {
-    storeDuplicateSeed(q)
-    const route = isTrueFalseGroupQuestion(q) ? TRUE_FALSE_GROUP_ROUTE : NEW_QUESTION_ROUTE_BY_TYPE[q.question_type]
-    router.push(`/questions/new/${route}`)
+    startTransition(async () => {
+      const result = await getQuestionClientDetail(q.id)
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      storeDuplicateSeed(result.data)
+      const route = isTrueFalseGroupQuestion(result.data) ? TRUE_FALSE_GROUP_ROUTE : NEW_QUESTION_ROUTE_BY_TYPE[q.question_type]
+      router.push(`/questions/new/${route}`)
+    })
   }
 
   function handleExport() {

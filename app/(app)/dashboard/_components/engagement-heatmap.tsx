@@ -1,33 +1,47 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
-function generateHeatmapData() {
-  const today = new Date()
+function seededFraction(seed: string): number {
+  let hash = 2166136261
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0) / 4294967295
+}
+
+function generateHeatmapData(anchorDate: string) {
+  // Use midday UTC so subtracting days never crosses into a different local
+  // date, and use the server-provided anchor for identical SSR/client output.
+  const today = new Date(`${anchorDate}T12:00:00.000Z`)
   const data: { date: string; count: number; label: string }[] = []
 
   for (let i = 29; i >= 0; i--) {
     const d = new Date(today)
-    d.setDate(today.getDate() - i)
+    d.setUTCDate(today.getUTCDate() - i)
 
-    const dateStr = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
+    const date = d.toISOString().slice(0, 10)
+    const dateStr = d.toLocaleDateString('th-TH', {
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'Asia/Bangkok',
+    })
+    const random = seededFraction(`${anchorDate}:${date}`)
 
     // Midterm was ~14 days ago: spike before it (days 16–18 ago), low after, high at end
-    let count = Math.floor(Math.random() * 12) + 2
-    if (i >= 15 && i <= 18) count = Math.floor(Math.random() * 20) + 30 // pre-midterm peak
-    else if (i >= 10 && i <= 14) count = Math.floor(Math.random() * 8) + 1  // post-exam lull
-    else if (i <= 3) count = Math.floor(Math.random() * 15) + 15 // recent activity
+    let count = Math.floor(random * 12) + 2
+    if (i >= 15 && i <= 18) count = Math.floor(random * 20) + 30 // pre-midterm peak
+    else if (i >= 10 && i <= 14) count = Math.floor(random * 8) + 1  // post-exam lull
+    else if (i <= 3) count = Math.floor(random * 15) + 15 // recent activity
 
-    data.push({ date: d.toISOString().split('T')[0], count, label: dateStr })
+    data.push({ date, count, label: dateStr })
   }
   return data
 }
 
-const DATA = generateHeatmapData()
-const MAX = Math.max(...DATA.map(d => d.count))
-
-function getColor(count: number): string {
-  const ratio = count / MAX
+function getColor(count: number, max: number): string {
+  const ratio = count / max
   if (ratio > 0.8) return 'bg-blue-600'
   if (ratio > 0.6) return 'bg-blue-500'
   if (ratio > 0.4) return 'bg-blue-300'
@@ -35,8 +49,10 @@ function getColor(count: number): string {
   return 'bg-gray-100'
 }
 
-export function EngagementHeatmap() {
+export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; count: number } | null>(null)
+  const data = useMemo(() => generateHeatmapData(anchorDate), [anchorDate])
+  const max = useMemo(() => Math.max(...data.map(day => day.count)), [data])
 
   return (
     <div className="bg-white rounded-xl ring-1 ring-black/5 p-4">
@@ -56,10 +72,10 @@ export function EngagementHeatmap() {
 
       <div className="relative">
         <div className="flex gap-1 flex-wrap">
-          {DATA.map((day, i) => (
+          {data.map(day => (
             <div
-              key={i}
-              className={`w-7 h-7 rounded-md cursor-pointer transition-all hover:scale-110 hover:ring-2 hover:ring-blue-400 ${getColor(day.count)}`}
+              key={day.date}
+              className={`w-7 h-7 rounded-md cursor-pointer transition-all hover:scale-110 hover:ring-2 hover:ring-blue-400 ${getColor(day.count, max)}`}
               onMouseEnter={e => {
                 const rect = (e.target as HTMLElement).getBoundingClientRect()
                 setTooltip({ x: rect.left, y: rect.top - 40, label: day.label, count: day.count })
@@ -83,7 +99,7 @@ export function EngagementHeatmap() {
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
         <div className="w-2 h-2 rounded-full bg-blue-600" />
         <p className="text-xs text-gray-500">
-          ยอดสูงสุดช่วง <span className="font-semibold text-gray-700">ก่อนสอบกลางภาค</span> ({MAX} คน/วัน)
+          ยอดสูงสุดช่วง <span className="font-semibold text-gray-700">ก่อนสอบกลางภาค</span> ({max} คน/วัน)
         </p>
       </div>
     </div>

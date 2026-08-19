@@ -2,7 +2,9 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 import {
   Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye,
 } from 'lucide-react'
@@ -11,9 +13,14 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { QuestionCard, TYPE_LABEL, DIFF_META, type Teacher } from './question-card'
-import { PreviewModal } from './preview-modal'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
-import type { QuestionWithCategory, QuestionWithCreator } from '../page'
+import { getQuestionClientDetail } from '@/lib/actions/questions'
+import type { QuestionDetailWithCategory, QuestionWithCategory, QuestionWithCreator } from '../page'
+
+const PreviewModal = dynamic(
+  () => import('./preview-modal').then(mod => mod.PreviewModal),
+  { loading: () => <PreviewLoadingOverlay /> }
+)
 
 // ── Mock constants ─────────────────────────────────────────────────────────────
 
@@ -48,11 +55,24 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
   const [typeFilter,   setTypeFilter]   = useState('all')
   const [activeTag,    setActiveTag]    = useState<string | null>(null)
   const [viewMode,     setViewMode]     = useState<'list' | 'grid'>('list')
-  const [previewQ,     setPreviewQ]     = useState<QuestionWithCategory | null>(null)
+  const [previewQ,     setPreviewQ]     = useState<QuestionDetailWithCategory | null>(null)
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
   const [teamSearch,   setTeamSearch]   = useState('')
   const [teamFilter,   setTeamFilter]   = useState('all')
   const [flaggedIds,   setFlaggedIds]   = useState<Set<string>>(new Set())
   const [showFilters,  setShowFilters]  = useState(false)
+
+  async function openPreview(questionId: string) {
+    if (previewLoadingId) return
+    setPreviewLoadingId(questionId)
+    const result = await getQuestionClientDetail(questionId)
+    setPreviewLoadingId(null)
+    if ('error' in result) {
+      toast.error(result.error)
+      return
+    }
+    setPreviewQ(result.data as QuestionDetailWithCategory)
+  }
 
   function toggleFlag(id: string) {
     setFlaggedIds(prev => {
@@ -314,7 +334,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                 key={q.id}
                 question={q}
                 isFlagged={flaggedIds.has(q.id)}
-                onPreview={() => setPreviewQ(q)}
+                onPreview={() => void openPreview(q.id)}
                 onToggleFlag={() => toggleFlag(q.id)}
                 teachers={MOCK_TEACHERS}
               />
@@ -383,7 +403,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                 ) : (
                   <div className="space-y-2.5">
                     {filteredTeam.map(q => (
-                      <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => setPreviewQ(q)} />
+                      <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
                     ))}
                   </div>
                 )}
@@ -393,6 +413,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
         )}
 
       {/* Preview modal */}
+      {previewLoadingId && <PreviewLoadingOverlay />}
       {previewQ && (
         <PreviewModal
           question={previewQ}
@@ -401,6 +422,14 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
           onToggleFlag={() => toggleFlag(previewQ.id)}
         />
       )}
+    </div>
+  )
+}
+
+function PreviewLoadingOverlay() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-label="กำลังโหลดตัวอย่างโจทย์">
+      <div className="h-80 w-full max-w-2xl animate-pulse rounded-2xl bg-white" />
     </div>
   )
 }

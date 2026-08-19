@@ -28,9 +28,10 @@ interface Props {
   user: Pick<User, 'id' | 'full_name' | 'role'>
   questionsCount: number
   studentsCount: number
+  heatmapAnchorDate: string
 }
 
-export function TeacherDashboard({ user, questionsCount, studentsCount }: Props) {
+export function TeacherDashboard({ user, questionsCount, studentsCount, heatmapAnchorDate }: Props) {
   return (
     <div className="space-y-6 max-w-[1400px]">
       <CommandPalette />
@@ -67,7 +68,7 @@ export function TeacherDashboard({ user, questionsCount, studentsCount }: Props)
           <ClassInsights />
           <StudentsAtRisk />
           <DeferredCompetencyRadar />
-          <EngagementHeatmap />
+          <EngagementHeatmap anchorDate={heatmapAnchorDate} />
           <QuestionHealth />
           <RecentSubmissions />
         </div>

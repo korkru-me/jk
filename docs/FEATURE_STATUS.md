@@ -23,6 +23,8 @@
 ### คลังโจทย์ — มีโค้ดรองรับ
 
 - มี create/edit/list/preview/delete, tags, categories, visibility และ sharing
+- หน้าคลังดึงเฉพาะข้อมูลสรุปบนการ์ดและข้อมูลทีมพร้อมกัน ส่วนเฉลย สูตร ตัวแปร รูป และ JavaScript หน้าลองทำโจทย์จะโหลดเมื่อกดดูตัวอย่างหรือทำสำเนาเท่านั้น
+- คลังชุดโจทย์ใช้ session/query ชุดเดียวของหน้าและตรวจจำนวนโจทย์ที่ยังมีอยู่ของทุกชุดใน query เดียว
 - Application types รองรับ written/random numeric, MCQ, true/false, fill blank, ordering, matching, essay, file upload และ composite
 - มี question sets, team sharing และ duplicate/remix-related UI
 - สถิติการใช้งานโจทย์และประวัติเวอร์ชันบางส่วนยังเป็น mock data
@@ -89,6 +91,7 @@
 - Dashboard ครูโหลดจำนวนโจทย์และจำนวนนักเรียนพร้อมกัน โดยนับสมาชิกผ่าน relation ของห้องเรียนโดยตรงและไม่ยิง query ที่ UI ไม่ได้ใช้งาน
 - Dashboard นักเรียนดึงการตั้งค่าคะแนนพร้อม submission และดึงงานผ่าน `assignment_classrooms` โดยตรง พร้อมโหลดประกาศคู่ขนาน เพื่อลด query ที่รอต่อกัน
 - กราฟสมรรถนะที่ใช้ chart library จะโหลดเมื่อผู้ใช้เลื่อนเข้าใกล้ ลด JavaScript ที่ต้องประมวลผลก่อนเห็นข้อมูลส่วนบน
+- Heatmap ข้อมูลสาธิตใช้วันที่อ้างอิงจาก server และค่าที่สร้างซ้ำได้ จึงไม่เกิด hydration mismatch หรือบังคับให้ React render ส่วนนี้ใหม่หลังเปิดหน้า
 - มี migration เติม index สำหรับ question/classroom/assignment/submission read paths และลดการประเมิน `auth.uid()` ซ้ำใน RLS โดยคงขอบเขตสิทธิ์เดิม
 - App shell โหลดจำนวนแจ้งเตือนพร้อมโปรไฟล์จาก server เพื่อตัด request หลังเปิดหน้า, polling เฉพาะเมื่อแท็บมองเห็น และไม่ขอนับซ้ำหลังอ่านทีละรายการ
 - การ์ดและบทวิเคราะห์หลายส่วนยังเป็นข้อมูลจำลอง ต้องเชื่อมข้อมูลจริงก่อนใช้ประกอบการตัดสินใจ

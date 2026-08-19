@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { getMyTeamOrgs } from '@/lib/actions/team-org'
-import type { Variable, LogicRule, MCQOption, AnswerPart, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
+import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
 
 export interface QuestionFormData {
   title: string
@@ -63,6 +63,31 @@ export async function getQuestionShareOrgIds(questionId: string): Promise<string
   const supabase = await createClient()
   const { data } = await supabase.from('question_shares').select('org_id').eq('question_id', questionId)
   return (data ?? []).map((r) => r.org_id)
+}
+
+/** Full question payload for interactions that need it (preview/duplicate).
+ *  The question-bank list deliberately ships only lightweight summaries;
+ *  RLS still decides whether the current user may read this row. */
+export async function getQuestionClientDetail(questionId: string): Promise<
+  | { data: Question & { question_categories: { name: string } | null } }
+  | { error: string }
+> {
+  const supabase = await createClient()
+  const questionQuery = supabase
+    .from('questions')
+    .select('*, question_categories(name)')
+    .eq('id', questionId)
+    .maybeSingle()
+
+  const [{ data: { user } }, { data, error }] = await Promise.all([
+    supabase.auth.getUser(),
+    questionQuery,
+  ])
+
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (error) return { error: error.message }
+  if (!data) return { error: 'ไม่พบโจทย์นี้หรือคุณไม่มีสิทธิ์เข้าถึง' }
+  return { data: data as unknown as Question & { question_categories: { name: string } | null } }
 }
 
 /** 'organization'/'school' (legacy) visibility shares to a specific team org (chosen

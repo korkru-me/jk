@@ -12,7 +12,7 @@ import type {
   Variable, MCQOption, MatchingPair, TrueFalseConfig, FillBlankConfig,
   OrderingConfig, FileUploadConfig, RandomQuestionConfig, CompositeConfig,
 } from '@/lib/types'
-import type { QuestionWithCategory } from '../page'
+import type { QuestionDetailWithCategory } from '../page'
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ function mockVersions(id: string) {
 type Tab = 'content' | 'history' | 'stats'
 
 interface Props {
-  question: QuestionWithCategory
+  question: QuestionDetailWithCategory
   isFlagged: boolean
   onClose: () => void
   onToggleFlag: () => void
@@ -132,7 +132,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
 // fill_blank/ordering) reveal correct/incorrect plus the right answer on check;
 // essay/file_upload have no auto-grading, so it's just a free try with no verdict.
 
-function InteractiveTab({ q }: { q: QuestionWithCategory }) {
+function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
   const extraData = q.extra_data as any
 
   return (

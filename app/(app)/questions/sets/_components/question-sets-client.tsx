@@ -7,15 +7,15 @@ import { toast } from 'sonner'
 import { Plus, Search, Tag, Layers, Trash2, Edit2, Send, Download, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { deleteQuestionSet, type QuestionSetWithCreator } from '@/lib/actions/question-sets'
+import { deleteQuestionSet } from '@/lib/actions/question-sets'
 import { exportQuestionSet } from '@/lib/actions/question-export'
 import { downloadTextFile, cn } from '@/lib/utils'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
-import type { QuestionSet } from '@/lib/types'
+import type { QuestionSetSummary, QuestionSetSummaryWithCreator } from '../page'
 
 interface Props {
-  mySets: QuestionSet[]
-  teamSets: QuestionSetWithCreator[]
+  mySets: QuestionSetSummary[]
+  teamSets: QuestionSetSummaryWithCreator[]
   currentUserId: string
 }
 
@@ -31,7 +31,7 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
     [mySets, teamSets]
   )
 
-  function matches(s: QuestionSet) {
+  function matches(s: QuestionSetSummary) {
     if (search && !s.title.toLowerCase().includes(search.toLowerCase())) return false
     if (activeTag && !s.tags.includes(activeTag)) return false
     return true
@@ -164,7 +164,7 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
   )
 }
 
-function SetCard({ set, currentUserId }: { set: QuestionSetWithCreator; currentUserId: string }) {
+function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; currentUserId: string }) {
   const [isPending, startTransition] = useTransition()
   const [deleted, setDeleted] = useState(false)
   const isOwner = set.created_by === currentUserId
