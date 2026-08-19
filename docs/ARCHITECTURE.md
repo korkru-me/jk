@@ -1,6 +1,6 @@
 # Architecture
 
-อัปเดตล่าสุด: 18 สิงหาคม 2026
+อัปเดตล่าสุด: 19 สิงหาคม 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
 
@@ -94,6 +94,16 @@
 - สถานะความพร้อม: `docs/FEATURE_STATUS.md`
 
 อย่าสร้าง migration จาก `supabase/schema.sql` เพียงไฟล์เดียว และอย่าคิดว่า local migration ทุกไฟล์ถูก apply แล้ว
+
+## Database performance
+
+- Migration `20260819090000_core_query_indexes.sql` เติม index สำหรับ query หลักและ `SECURITY DEFINER` RLS helpers โดยไม่เปลี่ยนขอบเขตสิทธิ์
+- Migration `20260819091000_rls_initplan_performance.sql` ทำให้ direct `auth.uid()` ใน policy หลักถูกคำนวณครั้งเดียวต่อ query โดยรักษาเงื่อนไขสิทธิ์เดิม
+- `classroom_students` ต้องมี index ที่ขึ้นต้นด้วย `student_id`; unique index เดิมขึ้นต้นด้วย `classroom_id` และใช้แทนกันไม่ได้
+- ตาราง submissions มีทั้งเส้นทางอ่านตามนักเรียนและตามงาน จึงต้องรักษา index ทั้งสองทิศทาง
+- `sprint5_exam_system.sql` ไม่มี timestamp ตามรูปแบบ Supabase CLI และถูกข้าม จึงห้ามถือว่า index ในไฟล์นั้นมีอยู่บนฐานข้อมูลจริง
+- Remote migration history มี migration แบบ out-of-band ที่ไม่มีไฟล์ local และ local รุ่นเก่าหลายรายการไม่ได้ถูกบันทึกเป็น applied ห้ามใช้ `db push --include-all` จนกว่าจะทำ migration-history reconciliation แยกต่างหาก
+- Recovery ของรอบนี้ไม่แตะข้อมูล: index ใหม่ย้อนกลับได้ด้วย `DROP INDEX` ตามชื่อ และ RLS optimization ย้อนกลับได้ด้วยการคืน `(SELECT auth.uid())` เป็น `auth.uid()` ใน policy เดิม
 
 ## คุณภาพและการทดสอบ
 
