@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
-import type { Assignment, Question } from '@/lib/types'
 import { EditAssignmentForm } from '@/components/assignments/edit-assignment-form'
+import type { EditableAssignment, EditableAssignmentQuestion } from '@/components/assignments/edit-assignment-form'
 
 export const metadata = { title: 'แก้ไขชุดข้อสอบ — KorKru' }
 
@@ -14,20 +14,24 @@ export default async function EditAssignmentPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   // No explicit ownership check — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all) already scopes this; a null result means
   // unauthorized and is handled by notFound() below.
-  const { data: assignment } = await supabase
+  const assignmentQuery = supabase
     .from('assignments')
-    .select('*')
+    .select('id, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, type, score_strategy, passing_type, passing_value, show_results')
     .eq('id', id)
     .maybeSingle()
 
+  const [{ data: { user } }, { data: assignment }] = await Promise.all([
+    supabase.auth.getUser(),
+    assignmentQuery,
+  ])
+  if (!user) redirect('/login')
+
   if (!assignment) notFound()
-  const a = assignment as Assignment
+  const a = assignment as EditableAssignment
 
   const { data: questionRows } = await supabase
     .from('questions')
@@ -39,7 +43,7 @@ export default async function EditAssignmentPage({
   const questionsById = new Map((questionRows ?? []).map(q => [q.id, q]))
   const questions = a.question_ids
     .map(id => questionsById.get(id))
-    .filter((q): q is NonNullable<typeof q> => !!q) as Question[]
+    .filter((q): q is NonNullable<typeof q> => !!q) as EditableAssignmentQuestion[]
 
   return (
     <div className="max-w-2xl space-y-6">

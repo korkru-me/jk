@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   Users, BookOpen, Copy, Check, Settings,
   GraduationCap, UserPlus, Grid3x3, Mail, GitBranch, Activity, ChevronLeft,
@@ -13,17 +14,34 @@ import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomStream } from './classroom-stream'
-import { StudentTable, type SortKey as StudentSortKey, type SortDir as StudentSortDir } from './student-table'
-import { InvitePanel } from './invite-panel'
-import { CoTeachers, type CoTeacherRow, type InviteRow } from './co-teachers'
-import { ClassroomAssignmentsTab, type ClassroomAssignmentRow } from './classroom-assignments-tab'
-import { ClassroomScoresMatrix } from './classroom-scores-matrix'
+import type { SortKey as StudentSortKey, SortDir as StudentSortDir } from './student-table'
+import type { CoTeacherRow, InviteRow } from './co-teachers'
+import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { HomeroomOverview, type StudentNoteRow, type StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
-import { ParentPortal } from './parent-portal'
-import { LearningPaths } from './learning-paths'
-import { AuditLog } from './audit-log'
-import { BreakoutGroups } from './breakout-groups'
+
+function TabLoading() {
+  return <div className="h-32 rounded-2xl bg-gray-100 animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
+}
+
+// Stream and homeroom are the two possible initial tabs. Everything else is
+// downloaded only when a teacher opens that tab, keeping the first classroom
+// bundle focused on the content that is actually visible.
+const StudentTable = dynamic(() => import('./student-table').then(module => module.StudentTable), { loading: TabLoading })
+const InvitePanel = dynamic(() => import('./invite-panel').then(module => module.InvitePanel), { loading: TabLoading })
+const CoTeachers = dynamic(() => import('./co-teachers').then(module => module.CoTeachers), { loading: TabLoading })
+const ClassroomAssignmentsTab = dynamic(
+  () => import('./classroom-assignments-tab').then(module => module.ClassroomAssignmentsTab),
+  { loading: TabLoading },
+)
+const ClassroomScoresMatrix = dynamic(
+  () => import('./classroom-scores-matrix').then(module => module.ClassroomScoresMatrix),
+  { loading: TabLoading },
+)
+const ParentPortal = dynamic(() => import('./parent-portal').then(module => module.ParentPortal), { loading: TabLoading })
+const LearningPaths = dynamic(() => import('./learning-paths').then(module => module.LearningPaths), { loading: TabLoading })
+const AuditLog = dynamic(() => import('./audit-log').then(module => module.AuditLog), { loading: TabLoading })
+const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 
 type Tab = 'stream' | 'students' | 'assignments' | 'scores' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
 

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
@@ -10,28 +11,32 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { QuestionPicker } from '@/components/assignments/question-picker'
 import {
   Check, ChevronRight, ChevronLeft, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale,
 } from 'lucide-react'
 import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 
+const QuestionPicker = dynamic(
+  () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
+  { loading: () => <div className="h-96 animate-pulse rounded-2xl bg-gray-100" aria-label="กำลังโหลดคลังโจทย์" /> }
+)
+
 const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
-interface PreselectedSet {
-  id: string
-  title: string
-  description: string | null
-  question_ids: string[]
-}
+export type AssignmentClassroomOption = Pick<Classroom, 'id' | 'name' | 'description'>
+export type AssignmentQuestionOption = Pick<
+  Question,
+  'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'requires_work_image' | 'tags'
+>
+export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'description' | 'question_ids'>
 
 interface Props {
-  classrooms: Classroom[]
-  questions: Question[]
-  questionSets?: QuestionSet[]
+  classrooms: AssignmentClassroomOption[]
+  questions: AssignmentQuestionOption[]
+  questionSets?: AssignmentQuestionSetOption[]
   preselectedClassroomId?: string
-  preselectedSet?: PreselectedSet
+  preselectedSet?: AssignmentQuestionSetOption
 }
 
 export function CreateAssignmentForm({ classrooms, questions, questionSets = [], preselectedClassroomId, preselectedSet }: Props) {
@@ -96,7 +101,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
-  function importSet(set: QuestionSet) {
+  function importSet(set: AssignmentQuestionSetOption) {
     const validIds = set.question_ids.filter(id => questions.some(q => q.id === id))
     const missingCount = set.question_ids.length - validIds.length
     setSelectedIds(prev => Array.from(new Set([...prev, ...validIds])))
@@ -113,7 +118,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
-    .filter((q): q is Question => !!q)
+    .filter((q): q is AssignmentQuestionOption => !!q)
   const pointsSum = Math.round(
     previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(questionPointDrafts[q.id] ?? '1') || 0), 0) * 100
   ) / 100

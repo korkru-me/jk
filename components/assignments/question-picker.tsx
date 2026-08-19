@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { setRequiresWorkImage } from '@/lib/actions/questions'
-import type { Question } from '@/lib/types'
+import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
 
 export const DIFF_META: Record<string, { label: string; color: string }> = {
   easy:       { label: 'ง่าย',      color: 'bg-green-50 text-green-700 border-green-200' },
@@ -22,7 +22,7 @@ export const TYPE_SHORT: Record<string, string> = {
 }
 
 interface Props {
-  questions: Question[]
+  questions: AssignmentQuestionOption[]
   selectedIds: string[]
   onToggle: (id: string) => void
   search: string

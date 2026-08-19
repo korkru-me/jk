@@ -49,7 +49,13 @@ export default async function ClassroomDetailPage({
     // personal calendar/compliance view aggregated from their other
     // (subject) classrooms instead of an assignment list.
     if (c.classroom_type === 'homeroom') {
-      const [{ data: teacherProfile }, { count: studentCount }, { data: classmateRows }, posts] = await Promise.all([
+      const [
+        { data: teacherProfile },
+        { count: studentCount },
+        { data: classmateRows },
+        posts,
+        { assignments, submissions },
+      ] = await Promise.all([
         admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
         admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
         admin
@@ -58,10 +64,9 @@ export default async function ClassroomDetailPage({
           .eq('classroom_id', id)
           .neq('student_id', authUser!.id),
         getClassroomPosts(id),
+        getHomeroomAggregate(admin, id, [authUser!.id]),
       ])
       const classmates = (classmateRows ?? []).map((m: any) => ({ id: m.users.id as string, full_name: m.users.full_name as string }))
-
-      const { assignments, submissions } = await getHomeroomAggregate(admin, id, [authUser!.id])
 
       const now = Date.now()
       const isDone = (status?: string) => status === 'submitted' || status === 'graded'
@@ -232,10 +237,12 @@ export default async function ClassroomDetailPage({
       .from('classroom_students')
       .select('student_id, users!inner(id, full_name, email)')
       .eq('classroom_id', id),
-    admin
-      .from('assignment_classrooms')
-      .select('assignment_id, display_order')
-      .eq('classroom_id', id),
+    c.classroom_type === 'subject'
+      ? admin
+          .from('assignment_classrooms')
+          .select('assignment_id, display_order')
+          .eq('classroom_id', id)
+      : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null }[] }),
     admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
     isOwner
       ? admin
@@ -296,7 +303,7 @@ export default async function ClassroomDetailPage({
   let classroomExtensions: {
     id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
   }[] = []
-  if (canManage && linkedAssignmentIds.length > 0) {
+  if (c.classroom_type === 'subject' && canManage && linkedAssignmentIds.length > 0) {
     const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }] = await Promise.all([
       admin
         .from('assignments')
@@ -324,36 +331,45 @@ export default async function ClassroomDetailPage({
     classroomExtensions = extensionRows ?? []
   }
 
-  // Homeroom aggregate: pull assignments/submissions from the *other*
-  // (subject) classrooms this roster's students belong to, since a homeroom
-  // classroom has no assignments of its own — it only monitors them.
-  const { assignments: homeroomAssignments, submissions: homeroomSubmissions } =
-    c.classroom_type === 'homeroom' && canManage
-      ? await getHomeroomAggregate(admin, id, students.map(s => s.id))
-      : { assignments: [], submissions: [] }
+  const isHomeroomAdvisor = c.classroom_type === 'homeroom' && canManage
+  const studentIds = students.map(s => s.id)
 
-  // Homeroom advisor's private per-student notes (health/family/behavior),
-  // kept separate from grades.
-  let studentNotes: StudentNoteRow[] = []
-  if (c.classroom_type === 'homeroom' && canManage) {
-    const { data: noteRows } = await admin
-      .from('student_notes')
-      .select('id, student_id, author_id, body, created_at')
-      .eq('classroom_id', id)
-      .order('created_at', { ascending: false })
-    const authorIds = Array.from(new Set((noteRows ?? []).map((n: any) => n.author_id)))
-    const { data: authorRows } = authorIds.length > 0
-      ? await admin.from('users').select('id, full_name').in('id', authorIds)
-      : { data: [] }
-    const authorNameMap = new Map((authorRows ?? []).map((u: any) => [u.id as string, u.full_name as string]))
-    studentNotes = (noteRows ?? []).map((n: any) => ({
-      id: n.id as string,
-      student_id: n.student_id as string,
-      author_name: authorNameMap.get(n.author_id) ?? 'ครู',
-      body: n.body as string,
-      created_at: n.created_at as string,
-    }))
-  }
+  // Once the roster is known, aggregate work, private notes, and profile
+  // rows are independent. Load them together rather than in three serial
+  // stages. The explicit author relationship also removes the old follow-up
+  // users query for note author names.
+  const [
+    { assignments: homeroomAssignments, submissions: homeroomSubmissions },
+    { data: noteRows },
+    { data: profileRows },
+  ] = await Promise.all([
+    isHomeroomAdvisor
+      ? getHomeroomAggregate(admin, id, studentIds)
+      : Promise.resolve({ assignments: [], submissions: [] }),
+    isHomeroomAdvisor
+      ? admin
+          .from('student_notes')
+          .select('id, student_id, body, created_at, author:users!student_notes_author_id_fkey(full_name)')
+          .eq('classroom_id', id)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as any[] }),
+    canManage && studentIds.length > 0
+      ? admin
+          .from('student_profiles')
+          .select(isHomeroomAdvisor
+            ? 'student_id, nickname, date_of_birth, gender, food_allergy, chronic_disease, grade_level, section_number, school_name, student_code, class_number, address, phone, guardians'
+            : 'student_id, grade_level, section_number, class_number, student_code')
+          .in('student_id', studentIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  const studentNotes: StudentNoteRow[] = (noteRows ?? []).map((n: any) => ({
+    id: n.id as string,
+    student_id: n.student_id as string,
+    author_name: n.author?.full_name ?? 'ครู',
+    body: n.body as string,
+    created_at: n.created_at as string,
+  }))
 
   // Roster columns (grade/section/class number) go to any teacher who can
   // manage this classroom, subject or homeroom, so they can see and sort by
@@ -361,16 +377,8 @@ export default async function ClassroomDetailPage({
   // sensitive and only ever leaves the server for the homeroom advisor —
   // subject teachers get those fields nulled out before this ever reaches
   // the client bundle, not just hidden in the UI.
-  let studentProfiles: Record<string, StudentProfileRow> = {}
-  if (canManage && students.length > 0) {
-    const isHomeroomAdvisor = c.classroom_type === 'homeroom'
-    const { data: profileRows } = await admin
-      .from('student_profiles')
-      .select(isHomeroomAdvisor
-        ? 'student_id, nickname, date_of_birth, gender, food_allergy, chronic_disease, grade_level, section_number, school_name, student_code, class_number, address, phone, guardians'
-        : 'student_id, grade_level, section_number, class_number, student_code')
-      .in('student_id', students.map(s => s.id))
-    studentProfiles = Object.fromEntries((profileRows ?? []).map((p: any) => [p.student_id, isHomeroomAdvisor ? p : {
+  const studentProfiles: Record<string, StudentProfileRow> = Object.fromEntries(
+    (profileRows ?? []).map((p: any) => [p.student_id, isHomeroomAdvisor ? p : {
       student_id: p.student_id,
       grade_level: p.grade_level,
       section_number: p.section_number,
@@ -378,8 +386,8 @@ export default async function ClassroomDetailPage({
       student_code: p.student_code,
       nickname: null, date_of_birth: null, gender: null, food_allergy: null, chronic_disease: null,
       school_name: null, address: null, phone: null, guardians: [],
-    }]))
-  }
+    }])
+  )
 
   // Other classrooms for "move student" feature (owners only).
   const otherClassrooms = (otherClassroomRows ?? []) as { id: string; name: string }[]

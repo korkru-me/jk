@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
-import type { Classroom } from '@/lib/types'
+import { PrintReportButton } from './_components/print-report-button'
 
 export const metadata = { title: 'รายงานผู้ปกครอง — KorKru' }
 
@@ -15,30 +15,33 @@ export default async function HomeroomReportPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-  if (!authUser) redirect('/login')
-
   const admin = createAdminClient()
-  const { data: classroom } = await admin.from('classrooms').select('*').eq('id', id).maybeSingle()
+  const [{ data: { user: authUser } }, { data: classroom }] = await Promise.all([
+    supabase.auth.getUser(),
+    admin.from('classrooms').select('id, name, teacher_id, classroom_type').eq('id', id).maybeSingle(),
+  ])
+  if (!authUser) redirect('/login')
   if (!classroom) notFound()
-  const c = classroom as Classroom
+  const c = classroom
   if (c.classroom_type !== 'homeroom') notFound()
 
   const isOwner = c.teacher_id === authUser.id
-  const { data: myCoTeacherRow } = await admin
-    .from('classroom_co_teachers')
-    .select('permission')
-    .eq('classroom_id', id)
-    .eq('user_id', authUser.id)
-    .maybeSingle()
+  const myCoTeacherRow = isOwner
+    ? null
+    : (await admin
+        .from('classroom_co_teachers')
+        .select('permission')
+        .eq('classroom_id', id)
+        .eq('user_id', authUser.id)
+        .maybeSingle()).data
   const canManage = isOwner || myCoTeacherRow?.permission === 'admin' || myCoTeacherRow?.permission === 'manage'
   if (!canManage) notFound()
 
   const { data: memberships } = await admin
     .from('classroom_students')
-    .select('student_id, users!inner(id, full_name, email)')
+    .select('student_id, users!inner(id, full_name)')
     .eq('classroom_id', id)
-  const students = (memberships ?? []).map((m: any) => m.users) as { id: string; full_name: string; email: string }[]
+  const students = (memberships ?? []).map((m: any) => m.users) as { id: string; full_name: string }[]
 
   const { assignments, submissions } = await getHomeroomAggregate(admin, id, students.map(s => s.id))
 
@@ -82,12 +85,7 @@ export default async function HomeroomReportPage({
           <h1 className="text-xl font-bold">รายงานสำหรับผู้ปกครอง: {c.name}</h1>
           <p className="text-sm text-gray-500 mt-0.5">{students.length} คน · {assignments.length} รายการงาน</p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          🖨️ พิมพ์ (Ctrl+P)
-        </button>
+        <PrintReportButton />
       </div>
 
       {students.length === 0 ? (

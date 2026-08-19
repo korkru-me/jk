@@ -20,9 +20,30 @@ function toLocalInputValue(iso: string | null): string {
 }
 
 interface Props {
-  assignment: Assignment
-  questions: Question[]
+  assignment: EditableAssignment
+  questions: EditableAssignmentQuestion[]
 }
+
+export type EditableAssignment = Pick<
+  Assignment,
+  | 'id'
+  | 'title'
+  | 'description'
+  | 'question_ids'
+  | 'question_points'
+  | 'display_max_score'
+  | 'start_at'
+  | 'end_at'
+  | 'duration_minutes'
+  | 'max_attempts'
+  | 'type'
+  | 'score_strategy'
+  | 'passing_type'
+  | 'passing_value'
+  | 'show_results'
+>
+
+export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text'>
 
 export function EditAssignmentForm({ assignment: a, questions }: Props) {
   const router = useRouter()

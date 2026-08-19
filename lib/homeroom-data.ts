@@ -33,54 +33,48 @@ export async function getHomeroomAggregate(
 ): Promise<{ assignments: HomeroomAssignmentRow[]; submissions: HomeroomSubmissionRow[] }> {
   if (rosterStudentIds.length === 0) return { assignments: [], submissions: [] }
 
+  // Join the subject classroom while reading memberships. This replaces the
+  // old membership -> classroom lookup waterfall with one round-trip and
+  // prevents inactive/non-subject rooms from entering the rest of the query.
   const { data: otherMemberships } = await admin
     .from('classroom_students')
-    .select('classroom_id')
+    .select('classroom_id, classrooms!inner(id, name, classroom_type, status)')
     .in('student_id', rosterStudentIds)
     .neq('classroom_id', homeroomClassroomId)
-  const otherClassroomIds = Array.from(new Set((otherMemberships ?? []).map((m: any) => m.classroom_id)))
-  if (otherClassroomIds.length === 0) return { assignments: [], submissions: [] }
+    .eq('classrooms.classroom_type', 'subject')
+    .eq('classrooms.status', 'active')
 
-  const { data: subjectClassrooms } = await admin
-    .from('classrooms')
-    .select('id, name')
-    .in('id', otherClassroomIds)
-    .eq('classroom_type', 'subject')
-    .eq('status', 'active')
-  const classroomNameMap = new Map((subjectClassrooms ?? []).map((cr: any) => [cr.id as string, cr.name as string]))
+  const classroomNameMap = new Map<string, string>()
+  for (const membership of (otherMemberships ?? []) as any[]) {
+    classroomNameMap.set(membership.classroom_id, membership.classrooms.name)
+  }
   const subjectClassroomIds = Array.from(classroomNameMap.keys())
   if (subjectClassroomIds.length === 0) return { assignments: [], submissions: [] }
 
-  const { data: linkRows } = await admin
-    .from('assignment_classrooms')
-    .select('assignment_id, classroom_id')
-    .in('classroom_id', subjectClassroomIds)
+  // Pull the assignment-classroom links as a nested relation so discovering
+  // links and loading published assignments is one query instead of two.
+  const { data: assignmentRows } = await admin
+    .from('assignments')
+    .select('id, title, end_at, status, passing_type, passing_value, score_strategy, display_max_score, assignment_classrooms!inner(classroom_id)')
+    .in('assignment_classrooms.classroom_id', subjectClassroomIds)
+    .eq('status', 'published')
+    .order('end_at', { ascending: true, nullsFirst: false })
 
-  // An assignment can be linked to several classrooms; keep the first one
-  // that overlaps this roster as the label source.
-  const assignmentClassroomMap = new Map<string, string>()
-  for (const l of (linkRows ?? []) as any[]) {
-    if (!assignmentClassroomMap.has(l.assignment_id)) assignmentClassroomMap.set(l.assignment_id, l.classroom_id)
-  }
-  const assignmentIds = Array.from(assignmentClassroomMap.keys())
-  if (assignmentIds.length === 0) return { assignments: [], submissions: [] }
+  const publishedAssignmentIds = (assignmentRows ?? []).map((a: any) => a.id as string)
+  if (publishedAssignmentIds.length === 0) return { assignments: [], submissions: [] }
 
-  const [{ data: assignmentRows }, { data: submissionRows }] = await Promise.all([
-    admin
-      .from('assignments')
-      .select('id, title, end_at, status, passing_type, passing_value, score_strategy, display_max_score')
-      .in('id', assignmentIds)
-      .eq('status', 'published')
-      .order('end_at', { ascending: true, nullsFirst: false }),
-    admin
-      .from('submissions')
-      .select('id, assignment_id, student_id, status, total_score, max_score, submitted_at, attempt_number')
-      .in('assignment_id', assignmentIds)
-      .in('student_id', rosterStudentIds),
-  ])
+  const { data: submissionRows } = await admin
+    .from('submissions')
+    .select('id, assignment_id, student_id, status, total_score, max_score, submitted_at, attempt_number')
+    .in('assignment_id', publishedAssignmentIds)
+    .in('student_id', rosterStudentIds)
 
   const assignments: HomeroomAssignmentRow[] = (assignmentRows ?? []).map((a: any) => {
-    const clsId = assignmentClassroomMap.get(a.id)!
+    // An assignment can be linked to several classrooms; keep the first one
+    // that overlaps this roster as the label source.
+    const clsId = a.assignment_classrooms
+      .map((link: any) => link.classroom_id as string)
+      .find((classroomId: string) => classroomNameMap.has(classroomId))!
     return {
       id: a.id as string,
       title: a.title as string,
