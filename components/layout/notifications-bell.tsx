@@ -28,20 +28,28 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hr / 24)} วันที่แล้ว`
 }
 
-export function NotificationsBell() {
-  const [unreadCount, setUnreadCount] = useState(0)
+export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: number }) {
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const refreshCount = useCallback(() => {
-    getUnreadNotificationCount().then(setUnreadCount)
+    getUnreadNotificationCount().then(setUnreadCount).catch(() => {})
   }, [])
 
   useEffect(() => {
-    refreshCount()
-    const interval = setInterval(refreshCount, POLL_MS)
-    return () => clearInterval(interval)
+    // The server-rendered layout already supplied the initial count. Poll only
+    // while the tab is visible, and refresh once when the user comes back.
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshCount()
+    }
+    const interval = setInterval(refreshWhenVisible, POLL_MS)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
   }, [refreshCount])
 
   async function handleOpenChange(next: boolean) {
@@ -55,9 +63,11 @@ export function NotificationsBell() {
   }
 
   async function handleItemClick(id: string) {
-    await markNotificationRead(id)
+    const wasUnread = notifications.some(n => n.id === id && !n.is_read)
+    const result = await markNotificationRead(id)
+    if (result.error) return
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
-    refreshCount()
+    if (wasUnread) setUnreadCount(prev => Math.max(0, prev - 1))
   }
 
   async function handleMarkAllRead() {

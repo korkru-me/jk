@@ -7,7 +7,15 @@ import type { User } from '@/lib/types'
 
 const SIDEBAR_COLLAPSE_KEY = 'korkru:sidebar-collapsed'
 
-export function ShellClient({ user, children }: { user: User; children: React.ReactNode }) {
+export function ShellClient({
+  user,
+  initialUnreadCount,
+  children,
+}: {
+  user: User
+  initialUnreadCount: number
+  children: React.ReactNode
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -41,6 +49,7 @@ export function ShellClient({ user, children }: { user: User; children: React.Re
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Topbar
           user={user}
+          initialUnreadCount={initialUnreadCount}
           onMenuToggle={() => setSidebarOpen(o => !o)}
           sidebarCollapsed={sidebarCollapsed}
           onSidebarCollapseToggle={toggleSidebarCollapsed}

@@ -5,44 +5,46 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getMyOrgId } from '@/lib/actions/org'
 import type { Notification } from '@/lib/types'
 
-async function getAuthUser() {
-  const supabase = await createClient()
+async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   return user
 }
 
 export async function getMyNotifications(limit = 20): Promise<Notification[]> {
   const supabase = await createClient()
-  const user = await getAuthUser()
-  if (!user) return []
+  // RLS scopes the list to auth.uid(), so auth validation and the read can run
+  // together instead of paying two serial network round trips.
+  const [userRes, listRes] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  ])
+  if (!userRes.data.user) return []
 
-  const { data } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('recipient_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-
-  return (data ?? []) as Notification[]
+  return (listRes.data ?? []) as Notification[]
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
   const supabase = await createClient()
-  const user = await getAuthUser()
-  if (!user) return 0
+  // Recipient RLS makes the count query safe to start before getUser returns.
+  const [userRes, countRes] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_read', false),
+  ])
+  if (!userRes.data.user) return 0
 
-  const { count } = await supabase
-    .from('notifications')
-    .select('id', { count: 'exact', head: true })
-    .eq('recipient_id', user.id)
-    .eq('is_read', false)
-
-  return count ?? 0
+  return countRes.count ?? 0
 }
 
 export async function markNotificationRead(id: string) {
   const supabase = await createClient()
-  const user = await getAuthUser()
+  const user = await getAuthUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { error } = await supabase
@@ -57,7 +59,7 @@ export async function markNotificationRead(id: string) {
 
 export async function markAllNotificationsRead() {
   const supabase = await createClient()
-  const user = await getAuthUser()
+  const user = await getAuthUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { error } = await supabase
@@ -72,7 +74,7 @@ export async function markAllNotificationsRead() {
 
 export async function notifyNonSubmitters(assignmentId: string, classroomId: string) {
   const supabase = await createClient()
-  const user = await getAuthUser()
+  const user = await getAuthUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   // Re-fetch the assignment via the user-scoped client — RLS doubles as the

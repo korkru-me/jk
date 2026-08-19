@@ -15,12 +15,13 @@ import type { User } from '@/lib/types'
 
 interface TopbarProps {
   user: User
+  initialUnreadCount: number
   onMenuToggle?: () => void
   sidebarCollapsed?: boolean
   onSidebarCollapseToggle?: () => void
 }
 
-export function Topbar({ user, onMenuToggle, sidebarCollapsed = false, onSidebarCollapseToggle }: TopbarProps) {
+export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, onSidebarCollapseToggle }: TopbarProps) {
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
 
@@ -48,7 +49,7 @@ export function Topbar({ user, onMenuToggle, sidebarCollapsed = false, onSidebar
 
       <div className="flex items-center gap-3">
         {/* Notifications */}
-        <NotificationsBell />
+        <NotificationsBell initialUnreadCount={initialUnreadCount} />
 
         {/* Dark / Light toggle switch */}
         <div className="flex items-center gap-1.5">

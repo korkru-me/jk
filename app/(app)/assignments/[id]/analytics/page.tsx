@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
-import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
+import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
 import { AnalyticsClient } from './_components/analytics-client'
 
 export const metadata = { title: 'วิเคราะห์และประเมินผล — KorKru' }
@@ -17,6 +17,19 @@ export type AnalyticsSubmissionRow = {
   users: { full_name: string; avatar_url: string | null } | null
 }
 
+export type AnalyticsAssignment = Pick<
+  Assignment,
+  | 'id'
+  | 'title'
+  | 'question_ids'
+  | 'score_strategy'
+  | 'display_max_score'
+  | 'passing_type'
+  | 'passing_value'
+> & {
+  classrooms: { name: string } | null
+}
+
 export default async function AnalyticsPage({
   params,
 }: {
@@ -24,18 +37,22 @@ export default async function AnalyticsPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
-  const { data: assignment } = await supabase
+  const assignmentQuery = supabase
     .from('assignments')
-    .select('*, classrooms(name)')
+    .select('id, title, question_ids, score_strategy, display_max_score, passing_type, passing_value, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
+  const [{ data: { user } }, { data: assignment }] = await Promise.all([
+    supabase.auth.getUser(),
+    assignmentQuery,
+  ])
+  if (!user) redirect('/login')
+
   if (!assignment) notFound()
 
-  const a = assignment as Assignment & { classrooms: { name: string } | null }
+  const a = assignment as unknown as AnalyticsAssignment
   // No explicit ownership check here — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all) already scoped the row above; a null result
   // means unauthorized and is handled by notFound() before this point.
@@ -43,7 +60,7 @@ export default async function AnalyticsPage({
   const [{ data: questions }, { data: submissions }] = await Promise.all([
     supabase
       .from('questions')
-      .select('id, title, question_type, difficulty, question_text, tags, mcq_options')
+      .select('id, title, difficulty, question_text, mcq_options')
       .in('id', a.question_ids),
     supabase
       .from('submissions')
@@ -59,18 +76,13 @@ export default async function AnalyticsPage({
   // A student may have multiple attempts — reduce to the "official" score
   // per the assignment's score_strategy, so retries don't skew the stats.
   const rescaledSubmissions = rescaleToDisplayMax((submissions ?? []) as any[], () => a.display_max_score)
-  const attemptsByStudent = new Map<string, any[]>()
-  for (const s of rescaledSubmissions) {
-    const arr = attemptsByStudent.get(s.student_id) ?? []
-    arr.push(s)
-    attemptsByStudent.set(s.student_id, arr)
-  }
-  const dedupedSubmissions = Array.from(attemptsByStudent.values())
-    .map(attempts => {
-      const official = selectOfficialAttempt(attempts, a.score_strategy)
-      return official ? { ...official.representative, total_score: official.total_score, max_score: official.max_score } : null
-    })
-    .filter((s): s is NonNullable<typeof s> => s !== null)
+  const officialByStudent = officialSubmissionsByStudent(rescaledSubmissions, a.score_strategy)
+  const dedupedSubmissions = Array.from(officialByStudent.values())
+    .map(official => ({
+      ...official.representative,
+      total_score: official.total_score,
+      max_score: official.max_score,
+    }))
     .sort((x, y) => (y.total_score ?? 0) - (x.total_score ?? 0))
 
   return (

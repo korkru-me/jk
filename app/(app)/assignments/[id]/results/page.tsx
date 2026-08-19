@@ -14,27 +14,31 @@ export default async function ResultsPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   // No explicit created_by filter — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all) already scopes this to owner or co-teacher.
-  const { data: assignment } = await supabase
+  const assignmentQuery = supabase
     .from('assignments')
-    .select('*, classrooms(name)')
+    .select('title, question_ids, score_strategy, display_max_score, passing_type, passing_value, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
+
+  const [{ data: { user } }, { data: assignment }] = await Promise.all([
+    supabase.auth.getUser(),
+    assignmentQuery,
+  ])
+  if (!user) redirect('/login')
 
   if (!assignment) notFound()
 
   const [{ data: submissions }, { data: questionRows }] = await Promise.all([
     supabase
       .from('submissions')
-      .select('*, users(full_name, email)')
+      .select('id, student_id, status, total_score, max_score, submitted_at, attempt_number, users(full_name, email)')
       .eq('assignment_id', id),
     supabase
       .from('questions')
-      .select('id, title, question_text, question_type, mcq_options, answer_parts, answer_unit, extra_data')
+      .select('id, title, question_text, question_type')
       .in('id', assignment.question_ids),
   ])
 
@@ -58,24 +62,31 @@ export default async function ResultsPage({
 
   const officialSubmissionIds = submitted.map(s => s.id)
 
-  const { data: answerRows } = officialSubmissionIds.length > 0
-    ? await supabase
+  const answerRowsQuery = officialSubmissionIds.length > 0
+    ? supabase
         .from('submission_answers')
         .select('id, submission_id, question_id, student_answer, correct_answer, is_correct, score, max_score, option_order, order_index')
         .in('submission_id', officialSubmissionIds)
-    : { data: [] as AnswerRow[] }
+    : Promise.resolve({ data: [] as AnswerRow[] })
 
   // Roster columns (grade/section/class number) only — same non-sensitive
   // subset a subject teacher gets on the classroom "นักเรียน" tab, used here
   // purely for the same sort options, not for any other student-profile data.
   const admin = createAdminClient()
   const studentIds = submitted.map(s => s.student_id)
-  const { data: profileRows } = studentIds.length > 0
-    ? await admin
+  const profileRowsQuery = studentIds.length > 0
+    ? admin
         .from('student_profiles')
         .select('student_id, grade_level, section_number, class_number, student_code')
         .in('student_id', studentIds)
-    : { data: [] }
+    : Promise.resolve({ data: [] })
+
+  // Answer details and roster sort metadata are independent once the
+  // official attempts are known, so do not make one wait for the other.
+  const [{ data: answerRows }, { data: profileRows }] = await Promise.all([
+    answerRowsQuery,
+    profileRowsQuery,
+  ])
   const profiles = Object.fromEntries((profileRows ?? []).map((p: any) => [p.student_id, p]))
 
   const inProgressCount = (submissions ?? []).filter((s: any) => s.status === 'in_progress').length

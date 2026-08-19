@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { StudyPathPanel } from '@/components/student/study-path-panel'
@@ -29,6 +30,14 @@ function formatAnswer(n: number): string {
   return parseFloat(n.toPrecision(4)).toString()
 }
 
+// Fill-blank is the only question type that can grade to a pending
+// (null) is_correct — a whole-manual blank, or a mix of manual + auto
+// blanks where the auto ones are already scored but the row still
+// awaits a teacher's review of the manual blank(s).
+function isManualFillBlank(a: any): boolean {
+  return String(a.correct_answer ?? '').startsWith('FILL') && a.is_correct === null
+}
+
 export default async function SubmissionResultPage({
   params,
 }: {
@@ -36,23 +45,30 @@ export default async function SubmissionResultPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   // No student_id filter here — RLS (submissions_student_own /
   // submissions_org_teacher_select) already scopes this to the owning
   // student or the assignment's teacher, so a teacher can review a
   // student's submission (including any attached work-images) too.
-  const { data: submission } = await supabase
-    .from('submissions')
-    .select(`
-      *,
-      users(full_name),
-      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, display_max_score, classrooms(name)),
-      submission_answers(*, questions(*))
-    `)
-    .eq('id', id)
-    .maybeSingle()
+  // RLS reads the auth cookie directly, so the secured submission lookup can
+  // run alongside getUser instead of waiting for a separate network round
+  // trip first. An unauthenticated lookup simply returns no visible row.
+  const [userRes, submissionRes] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from('submissions')
+      .select(`
+        id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
+        users(full_name),
+        assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, display_max_score),
+        submission_answers(id, correct_answer, is_correct)
+      `)
+      .eq('id', id)
+      .maybeSingle(),
+  ])
+  const user = userRes.data.user
+  if (!user) redirect('/login')
+  const submission = submissionRes.data
 
   if (!submission) notFound()
 
@@ -108,19 +124,6 @@ export default async function SubmissionResultPage({
     if (idx >= 0 && idx < sorted.length - 1) nextNav = { submissionId: sorted[idx + 1].submissionId, label: sorted[idx + 1].full_name }
   }
 
-  const answers = (submission as any).submission_answers as any[]
-  const sortedAnswers = [...answers].sort((a, b) => a.order_index - b.order_index)
-
-  // Fill-blank is the only question type that can grade to a pending
-  // (null) is_correct — a whole-manual blank, or a mix of manual + auto
-  // blanks where the auto ones are already scored but the row still
-  // awaits a teacher's review of the manual blank(s).
-  function isManualFillBlank(a: any): boolean {
-    return String(a.correct_answer ?? '').startsWith('FILL') && a.is_correct === null
-  }
-
-  const pendingManualCount = answers.filter(isManualFillBlank).length
-
   const assignment = (submission as any).assignments
   const [{ total_score: displayScore, max_score: displayMax }] = rescaleToDisplayMax(
     [submission as { total_score: number | null; max_score: number }],
@@ -141,17 +144,12 @@ export default async function SubmissionResultPage({
       !assignment.end_at || new Date(assignment.end_at) < new Date()
     ))
 
+  const answers = (submission as any).submission_answers as any[]
+  const pendingManualCount = answers.filter(isManualFillBlank).length
+
   const attemptsRemaining = assignment.max_attempts == null || submission.attempt_number < assignment.max_attempts
   const canRetry = isOwnSubmission && attemptsRemaining && assignment.status === 'published' &&
     (!assignment.end_at || new Date(assignment.end_at) > new Date())
-
-  // Extract wrong answers for study path
-  const wrongAnswers = sortedAnswers
-    .filter(a => a.is_correct === false && !isManualFillBlank(a))
-    .map(a => ({
-      title: a.questions?.title ?? '',
-      questionText: substituteVars(a.questions?.question_text ?? '', a.random_values ?? {}),
-    }))
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -240,11 +238,11 @@ export default async function SubmissionResultPage({
               <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
                   <CheckCircle2 size={13} />
-                  ถูก {sortedAnswers.filter(a => a.is_correct === true).length} ข้อ
+                  ถูก {answers.filter(a => a.is_correct === true).length} ข้อ
                 </span>
                 <span className="flex items-center gap-1 text-red-500">
                   <XCircle size={13} />
-                  ผิด {sortedAnswers.filter(a => a.is_correct === false).length} ข้อ
+                  ผิด {answers.filter(a => a.is_correct === false).length} ข้อ
                 </span>
                 {pendingManualCount > 0 && (
                   <span className="flex items-center gap-1 text-amber-600">
@@ -327,114 +325,147 @@ export default async function SubmissionResultPage({
         </div>
       )}
       {canShowAnswers && (
-        <div className="space-y-3">
-          <h2 className="font-semibold flex items-center gap-2">
-            <span>📋</span> ตรวจเฉลยทีละข้อ
-          </h2>
-          {sortedAnswers.map((a: any, i: number) => {
-            const q = a.questions
-            const isCorrect = a.is_correct
-            const isPendingManual = isManualFillBlank(a)
+        <Suspense fallback={(
+          <div className="bg-card border rounded-2xl p-6 text-center text-sm text-muted-foreground">
+            กำลังโหลดรายละเอียดคำตอบ...
+          </div>
+        )}>
+          <SubmissionAnswerDetails submissionId={id} isTeacherViewer={isTeacherViewer} />
+        </Suspense>
+      )}
+    </div>
+  )
+}
 
-            return (
-              <div
-                key={a.id}
-                className={`bg-card border-l-4 rounded-2xl overflow-hidden ${
-                  isPendingManual
-                    ? 'border-l-amber-400'
-                    : isCorrect === true
-                    ? 'border-l-green-500'
-                    : isCorrect === false
-                    ? 'border-l-red-400'
-                    : 'border-l-border'
-                }`}
-              >
-                <div className="p-5">
-                  {/* Question header */}
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                      isPendingManual
-                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
-                        : isCorrect === true
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                        : isCorrect === false
-                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {isPendingManual ? '⏳' : isCorrect === true
-                        ? <CheckCircle2 size={16} />
-                        : isCorrect === false
-                        ? <XCircle size={16} />
-                        : '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-sm">ข้อ {i + 1}</p>
-                        {q.title && <p className="text-xs text-muted-foreground truncate">{q.title}</p>}
-                        <div className="ml-auto shrink-0">
-                          {isTeacherViewer ? (
-                            <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
-                          ) : (
-                            <Badge variant="outline" className={`text-xs ${
-                              isPendingManual ? 'border-amber-300 text-amber-600 dark:text-amber-400' : ''
-                            }`}>
-                              {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <QuestionText
-                        text={substituteVars(q.question_text, a.random_values)}
-                        className="text-sm text-muted-foreground mt-1"
-                      />
-                    </div>
+async function SubmissionAnswerDetails({
+  submissionId,
+  isTeacherViewer,
+}: {
+  submissionId: string
+  isTeacherViewer: boolean
+}) {
+  const supabase = await createClient()
+  const { data: answers } = await supabase
+    .from('submission_answers')
+    .select(`
+      id, correct_answer, is_correct, max_score, option_order, order_index,
+      random_values, score, student_answer, work_images,
+      questions(title, question_text, answer_parts, answer_unit, question_type, extra_data, mcq_options)
+    `)
+    .eq('submission_id', submissionId)
+    .order('order_index')
+
+  const sortedAnswers = (answers ?? []) as any[]
+  const wrongAnswers = sortedAnswers
+    .filter(a => a.is_correct === false && !isManualFillBlank(a))
+    .map(a => ({
+      title: a.questions?.title ?? '',
+      questionText: substituteVars(a.questions?.question_text ?? '', a.random_values ?? {}),
+    }))
+
+  return (
+    <>
+      <div className="space-y-3">
+        <h2 className="font-semibold flex items-center gap-2">
+          <span>📋</span> ตรวจเฉลยทีละข้อ
+        </h2>
+        {sortedAnswers.map((a: any, i: number) => {
+          const q = a.questions
+          const isCorrect = a.is_correct
+          const isPendingManual = isManualFillBlank(a)
+
+          return (
+            <div
+              key={a.id}
+              className={`bg-card border-l-4 rounded-2xl overflow-hidden ${
+                isPendingManual
+                  ? 'border-l-amber-400'
+                  : isCorrect === true
+                  ? 'border-l-green-500'
+                  : isCorrect === false
+                  ? 'border-l-red-400'
+                  : 'border-l-border'
+              }`}
+            >
+              <div className="p-5">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                    isPendingManual
+                      ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                      : isCorrect === true
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                      : isCorrect === false
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {isPendingManual ? '⏳' : isCorrect === true
+                      ? <CheckCircle2 size={16} />
+                      : isCorrect === false
+                      ? <XCircle size={16} />
+                      : '?'}
                   </div>
-
-                  {/* Variable values */}
-                  {Object.keys(a.random_values as Record<string, number>).length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-3 pl-11">
-                      {Object.entries(a.random_values as Record<string, number>).map(([k, v]) => (
-                        <span key={k} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded font-mono">
-                          {k} = {v}
-                        </span>
-                      ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-sm">ข้อ {i + 1}</p>
+                      {q.title && <p className="text-xs text-muted-foreground truncate">{q.title}</p>}
+                      <div className="ml-auto shrink-0">
+                        {isTeacherViewer ? (
+                          <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
+                        ) : (
+                          <Badge variant="outline" className={`text-xs ${
+                            isPendingManual ? 'border-amber-300 text-amber-600 dark:text-amber-400' : ''
+                          }`}>
+                            {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  )}
-
-                  {/* Answer review */}
-                  <div className="pl-11">
-                    <AnswerReview
-                      studentAnswer={a.student_answer}
-                      correctAnswer={a.correct_answer}
-                      isCorrect={isCorrect}
-                      answerParts={q.answer_parts ?? null}
-                      answerUnit={q.answer_unit}
-                      questionType={q.question_type}
-                      extraData={q.extra_data}
-                      mcqOptions={reorderOptions(q.mcq_options, a.option_order)}
-                      workImages={a.work_images ?? null}
+                    <QuestionText
+                      text={substituteVars(q.question_text, a.random_values)}
+                      className="text-sm text-muted-foreground mt-1"
                     />
                   </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
-      {/* Study path panel */}
-      {wrongAnswers.length >= 0 && canShowAnswers && (
-        <div className="space-y-2">
-          <h2 className="font-semibold flex items-center gap-2">
-            <span>🗺️</span> เส้นทางการซ่อมเสริม
-          </h2>
-          <StudyPathPanel
-            wrongQuestions={wrongAnswers}
-            totalQuestions={sortedAnswers.filter(a => !isManualFillBlank(a)).length}
-          />
-        </div>
-      )}
-    </div>
+                {Object.keys(a.random_values as Record<string, number>).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3 pl-11">
+                    {Object.entries(a.random_values as Record<string, number>).map(([k, v]) => (
+                      <span key={k} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded font-mono">
+                        {k} = {v}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="pl-11">
+                  <AnswerReview
+                    studentAnswer={a.student_answer}
+                    correctAnswer={a.correct_answer}
+                    isCorrect={isCorrect}
+                    answerParts={q.answer_parts ?? null}
+                    answerUnit={q.answer_unit}
+                    questionType={q.question_type}
+                    extraData={q.extra_data}
+                    mcqOptions={reorderOptions(q.mcq_options, a.option_order)}
+                    workImages={a.work_images ?? null}
+                  />
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="font-semibold flex items-center gap-2">
+          <span>🗺️</span> เส้นทางการซ่อมเสริม
+        </h2>
+        <StudyPathPanel
+          wrongQuestions={wrongAnswers}
+          totalQuestions={sortedAnswers.filter(a => !isManualFillBlank(a)).length}
+        />
+      </div>
+    </>
   )
 }
 

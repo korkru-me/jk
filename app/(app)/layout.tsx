@@ -11,11 +11,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!authUser) redirect('/login')
 
   const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('*')
-    .eq('id', authUser.id)
-    .single()
+  // The profile and unread count are independent after authentication. Feed
+  // the count into the persistent app shell so the client does not need a
+  // second server-action request immediately after every full page load.
+  const [profileRes, unreadRes] = await Promise.all([
+    admin
+      .from('users')
+      .select('*')
+      .eq('id', authUser.id)
+      .single(),
+    supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipient_id', authUser.id)
+      .eq('is_read', false),
+  ])
+  const profile = profileRes.data
+  const initialUnreadCount = unreadRes.count ?? 0
 
   if (!profile) {
     // Auto-create profile if missing (orphaned auth user)
@@ -32,8 +44,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .eq('id', authUser.id)
       .single()
     if (!newProfile) redirect('/login')
-    return <ShellClient user={newProfile as User}>{children}</ShellClient>
+    return <ShellClient user={newProfile as User} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
   }
 
-  return <ShellClient user={profile as User}>{children}</ShellClient>
+  return <ShellClient user={profile as User} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
 }

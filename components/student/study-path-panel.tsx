@@ -1,5 +1,3 @@
-'use client'
-
 import { BookOpen, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 interface WrongQuestion {

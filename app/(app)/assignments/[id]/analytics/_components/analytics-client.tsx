@@ -2,19 +2,28 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   ChevronLeft, BarChart2, Search, TrendingUp, Users,
   Download, FileSpreadsheet, FileText as FilePdf,
 } from 'lucide-react'
-import type { Assignment, Question } from '@/lib/types'
+import type { Question } from '@/lib/types'
 import { passingPercent } from '@/lib/grading'
-import type { AnalyticsSubmissionRow } from '../page'
+import type { AnalyticsAssignment, AnalyticsSubmissionRow } from '../page'
 import { StatCards } from './stat-cards'
 import { CompetencyRadarChart } from './competency-radar'
 import { GrowthTracker } from './growth-tracker'
 import { PercentileBenchmark } from './percentile-benchmark'
-import { ItemAnalysisSection } from './item-analysis-chart'
-import { StudentScoreTable } from './student-score-table'
+
+const ItemAnalysisSection = dynamic(
+  () => import('./item-analysis-chart').then(mod => mod.ItemAnalysisSection),
+  { loading: () => <AnalyticsTabLoading /> }
+)
+
+const StudentScoreTable = dynamic(
+  () => import('./student-score-table').then(mod => mod.StudentScoreTable),
+  { loading: () => <AnalyticsTabLoading /> }
+)
 
 type Tab = 'overview' | 'item-analysis' | 'individual'
 
@@ -25,10 +34,14 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart2 }[] = [
 ]
 
 interface Props {
-  assignment: Assignment & { classrooms: { name: string } | null }
+  assignment: AnalyticsAssignment
   questions: Question[]
   submissions: AnalyticsSubmissionRow[]
   teacherName: string
+}
+
+function AnalyticsTabLoading() {
+  return <div className="h-48 rounded-2xl bg-gray-100 animate-pulse" aria-label="กำลังโหลดข้อมูลวิเคราะห์" />
 }
 
 export type ScoreOverride = {
@@ -178,7 +191,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
 // ─── Overview Section ─────────────────────────────────────────────────────────
 
 function OverviewSection({ assignment, questions, submissions }: {
-  assignment: Assignment & { classrooms: { name: string } | null }
+  assignment: AnalyticsAssignment
   questions: Question[]
   submissions: AnalyticsSubmissionRow[]
 }) {
