@@ -61,22 +61,23 @@ export default async function DashboardPage() {
       .eq('student_id', user.id),
     supabase
       .from('submissions')
-      .select('id, total_score, max_score, status, assignment_id, created_at')
+      .select('id, total_score, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results)')
       .eq('student_id', user.id),
   ])
 
   const classroomIds = (membershipsRes.data ?? []).map((m: any) => m.classroom_id)
   const rawSubmissions = submissionsRes.data ?? []
 
-  // Submissions here span every assignment the student has ever attempted
-  // (not just currently-pending ones), so the display_max_score lookup has
-  // to cover that whole set rather than reusing `allAssignments` below.
-  const submittedAssignmentIds = Array.from(new Set(rawSubmissions.map((s: any) => s.assignment_id)))
-  const { data: scoreScaleRows } = submittedAssignmentIds.length > 0
-    ? await supabase.from('assignments').select('id, display_max_score, show_results').in('id', submittedAssignmentIds)
-    : { data: [] }
-  const displayMaxByAssignment = new Map((scoreScaleRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
-  const showResultsByAssignment = new Map((scoreScaleRows ?? []).map((a: any) => [a.id as string, a.show_results as string]))
+  // Fetch score-display settings through the submission relation so every
+  // attempt can be rescaled without a second assignment lookup.
+  const displayMaxByAssignment = new Map(rawSubmissions.map((s: any) => [
+    s.assignment_id as string,
+    (s.assignments?.display_max_score ?? null) as number | null,
+  ]))
+  const showResultsByAssignment = new Map(rawSubmissions.map((s: any) => [
+    s.assignment_id as string,
+    s.assignments?.show_results as string | undefined,
+  ]))
   const allSubmissions = rescaleToDisplayMax(
     rawSubmissions as any[],
     row => displayMaxByAssignment.get(row.assignment_id) ?? null
@@ -94,6 +95,30 @@ export default async function DashboardPage() {
         ) / completedWithVisibleResults.length * 100
       )
     : null
+
+  // Once memberships are known, assignments and announcements are
+  // independent and can be loaded in the same database round-trip window.
+  // The inner join replaces the old links -> assignment-id -> assignments
+  // waterfall while still using assignment_classrooms as the source of truth.
+  const [assignmentsRes, recentPostsRes] = classroomIds.length > 0
+    ? await Promise.all([
+        supabase
+          .from('assignments')
+          .select('id, title, question_ids, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
+          .in('assignment_classrooms.classroom_id', classroomIds)
+          .eq('status', 'published')
+          .order('end_at', { ascending: true, nullsFirst: false }),
+        supabase
+          .from('classroom_posts')
+          .select('id, classroom_id, body, created_at, users(full_name), classrooms(name)')
+          .in('classroom_id', classroomIds)
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ])
+    : [{ data: [] }, { data: [] }]
+
+  const allAssignments = assignmentsRes.data ?? []
+  const recentPosts = recentPostsRes.data ?? []
 
   let pendingAssignments: any[] = []
   let calendarEvents: CalendarEvent[] = []
@@ -114,24 +139,6 @@ export default async function DashboardPage() {
       }
     }
 
-    // Route through assignment_classrooms (not the legacy single
-    // assignments.classroom_id column) so multi-classroom assignments show
-    // up here regardless of which classroom they were "primarily" created in.
-    const { data: links } = await supabase
-      .from('assignment_classrooms')
-      .select('assignment_id')
-      .in('classroom_id', classroomIds)
-    const assignedIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
-
-    const { data: allAssignments } = assignedIds.length > 0
-      ? await supabase
-          .from('assignments')
-          .select('id, title, question_ids, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value')
-          .in('id', assignedIds)
-          .eq('status', 'published')
-          .order('end_at', { ascending: true, nullsFirst: false })
-      : { data: [] }
-
     // An exercise submission that hasn't cleared its passing threshold isn't
     // "done" yet — the student is expected to retry. Exams count once submitted.
     function isDone(a: any): boolean {
@@ -147,7 +154,12 @@ export default async function DashboardPage() {
       .filter((a: any) => !isDone(a))
       .slice(0, 6)
       .map((a: any) => ({
-        ...a,
+        id: a.id,
+        title: a.title,
+        question_ids: a.question_ids,
+        classrooms: a.classrooms,
+        end_at: a.end_at,
+        duration_minutes: a.duration_minutes,
         inProgress: inProgressMap.has(a.id),
         submissionId: inProgressMap.get(a.id)?.id ?? null,
       }))
@@ -164,15 +176,6 @@ export default async function DashboardPage() {
       }))
   }
 
-  const { data: recentPosts } = classroomIds.length > 0
-    ? await supabase
-        .from('classroom_posts')
-        .select('id, classroom_id, body, created_at, users(full_name), classrooms(name)')
-        .in('classroom_id', classroomIds)
-        .order('created_at', { ascending: false })
-        .limit(5)
-    : { data: [] }
-
   return (
     <StudentDashboard
       user={user}
@@ -181,7 +184,7 @@ export default async function DashboardPage() {
       completedCount={completed.length}
       pendingAssignments={pendingAssignments}
       calendarEvents={calendarEvents}
-      recentPosts={recentPosts ?? []}
+      recentPosts={recentPosts}
     />
   )
 }
