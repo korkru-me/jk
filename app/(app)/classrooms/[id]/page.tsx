@@ -22,17 +22,17 @@ export default async function ClassroomDetailPage({
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users').select('role, full_name').eq('id', authUser!.id).single()
-  const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
-
   // Use admin client to bypass RLS recursion on classrooms ↔ classroom_students
   const admin = createAdminClient()
-
-  const { data: classroom } = await admin
-    .from('classrooms').select('*').eq('id', id).maybeSingle()
+  // Profile and classroom are independent. Fetching them together removes a
+  // full database round-trip from every classroom page load.
+  const [{ data: profile }, { data: classroom }] = await Promise.all([
+    supabase.from('users').select('role, full_name').eq('id', authUser.id).single(),
+    admin.from('classrooms').select('*').eq('id', id).maybeSingle(),
+  ])
   if (!classroom) notFound()
 
+  const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
   const c = classroom as Classroom
 
   // ─── Student path ─────────────────────────────────────────────────────────
@@ -192,21 +192,62 @@ export default async function ClassroomDetailPage({
   const isOwner = c.teacher_id === authUser!.id
 
   // Co-teacher permission for the current user (null if not a co-teacher)
-  const { data: myCoTeacherRow } = await admin
-    .from('classroom_co_teachers')
-    .select('permission')
-    .eq('classroom_id', id)
-    .eq('user_id', authUser!.id)
-    .maybeSingle()
+  // The owner is always allowed to manage the room and does not need a
+  // redundant co-teacher permission lookup.
+  const myCoTeacherRow = isOwner
+    ? null
+    : (await admin
+        .from('classroom_co_teachers')
+        .select('permission')
+        .eq('classroom_id', id)
+        .eq('user_id', authUser.id)
+        .maybeSingle()).data
   const myCoTeacherPermission = myCoTeacherRow?.permission as 'admin' | 'manage' | 'view' | undefined
   const canManage = isOwner || myCoTeacherPermission === 'admin' || myCoTeacherPermission === 'manage'
 
+  // These datasets are independent after authorization. Start them together
+  // instead of waiting for six sequential network round-trips.
+  const [
+    { data: coTeacherRows },
+    { data: inviteRows },
+    { data: memberships },
+    { data: assignmentLinkRows },
+    { data: ownerProfile },
+    { data: otherClassroomRows },
+    posts,
+  ] = await Promise.all([
+    admin
+      .from('classroom_co_teachers')
+      .select('id, user_id, permission, created_at, users(id, full_name, email)')
+      .eq('classroom_id', id)
+      .order('created_at', { ascending: true }),
+    admin
+      .from('classroom_invitations')
+      .select('id, token, permission, email, expires_at, created_at')
+      .eq('classroom_id', id)
+      .is('used_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false }),
+    admin
+      .from('classroom_students')
+      .select('student_id, users!inner(id, full_name, email)')
+      .eq('classroom_id', id),
+    admin
+      .from('assignment_classrooms')
+      .select('assignment_id, display_order')
+      .eq('classroom_id', id),
+    admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
+    isOwner
+      ? admin
+          .from('classrooms')
+          .select('id, name')
+          .eq('teacher_id', authUser.id)
+          .neq('id', id)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    getClassroomPosts(id),
+  ])
+
   // Co-teacher roster + active invites
-  const { data: coTeacherRows } = await admin
-    .from('classroom_co_teachers')
-    .select('id, user_id, permission, created_at, users(id, full_name, email)')
-    .eq('classroom_id', id)
-    .order('created_at', { ascending: true })
   const coTeachers = (coTeacherRows ?? []).map((t: any) => ({
     id: t.id as string,
     userId: t.user_id as string,
@@ -216,13 +257,6 @@ export default async function ClassroomDetailPage({
     email: t.users?.email ?? '',
   }))
 
-  const { data: inviteRows } = await admin
-    .from('classroom_invitations')
-    .select('id, token, permission, email, expires_at, created_at')
-    .eq('classroom_id', id)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
   const invites = (inviteRows ?? []).map((i: any) => ({
     id: i.id as string,
     token: i.token as string,
@@ -235,21 +269,12 @@ export default async function ClassroomDetailPage({
   // Students in this classroom, always alphabetical by name — the roster
   // display order is a fixed 1,2,3,... row position, not a stored/editable
   // field, so there's nothing else to sort by here.
-  const { data: memberships } = await admin
-    .from('classroom_students')
-    .select('student_id, users!inner(id, full_name, email)')
-    .eq('classroom_id', id)
-
   const students = (memberships ?? [])
     .map((m: any) => m.users)
     .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name, 'th')) as Pick<User, 'id' | 'full_name' | 'email'>[]
 
   // Assignments linked to this classroom (via assignment_classrooms, not the
   // legacy single classroom_id column, so multi-classroom assignments count too)
-  const { data: assignmentLinkRows } = await admin
-    .from('assignment_classrooms')
-    .select('assignment_id, display_order')
-    .eq('classroom_id', id)
   const linkedAssignmentIds = Array.from(new Set((assignmentLinkRows ?? []).map((l: any) => l.assignment_id)))
   const displayOrderByAssignment = new Map(
     (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, l.display_order as number | null])
@@ -356,22 +381,8 @@ export default async function ClassroomDetailPage({
     }]))
   }
 
-  // Other classrooms for "move student" feature
-  let otherClassrooms: { id: string; name: string }[] = []
-  if (isOwner) {
-    const { data: others } = await admin
-      .from('classrooms')
-      .select('id, name')
-      .eq('teacher_id', authUser!.id)
-      .neq('id', id)
-    otherClassrooms = (others ?? []) as { id: string; name: string }[]
-  }
-
-  // Owner's full name for co-teachers display
-  const { data: ownerProfile } = await admin
-    .from('users').select('full_name').eq('id', c.teacher_id).single()
-
-  const posts = await getClassroomPosts(id)
+  // Other classrooms for "move student" feature (owners only).
+  const otherClassrooms = (otherClassroomRows ?? []) as { id: string; name: string }[]
 
   return (
     <ClassroomDetailClient

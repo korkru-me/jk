@@ -1,5 +1,7 @@
 'use client'
 
+import dynamic from 'next/dynamic'
+import { useEffect, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import type { User } from '@/lib/types'
 
@@ -7,7 +9,6 @@ import { CommandPalette } from './command-palette'
 import { QuickStats } from './quick-stats'
 import { ClassInsights } from './class-insights'
 import { StudentsAtRisk } from './students-at-risk'
-import { CompetencyRadar } from './competency-radar'
 import { RecentSubmissions } from './recent-submissions'
 import { QuickCreate } from './quick-create'
 import { RecentDrafts } from './recent-drafts'
@@ -18,11 +19,15 @@ import { EngagementHeatmap } from './engagement-heatmap'
 import { ResourceUsage } from './resource-usage'
 import { DailyTips } from './daily-tips'
 
+const CompetencyRadar = dynamic(
+  () => import('./competency-radar').then(module => module.CompetencyRadar),
+  { ssr: false }
+)
+
 interface Props {
-  user: User
+  user: Pick<User, 'id' | 'full_name' | 'role'>
   questionsCount: number
   studentsCount: number
-  assignmentsCount: number
 }
 
 export function TeacherDashboard({ user, questionsCount, studentsCount }: Props) {
@@ -61,7 +66,7 @@ export function TeacherDashboard({ user, questionsCount, studentsCount }: Props)
         <div className="space-y-5">
           <ClassInsights />
           <StudentsAtRisk />
-          <CompetencyRadar />
+          <DeferredCompetencyRadar />
           <EngagementHeatmap />
           <QuestionHealth />
           <RecentSubmissions />
@@ -78,6 +83,45 @@ export function TeacherDashboard({ user, questionsCount, studentsCount }: Props)
         </div>
 
       </div>
+    </div>
+  )
+}
+
+function DeferredCompetencyRadar() {
+  const [shouldRender, setShouldRender] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element || !('IntersectionObserver' in window)) {
+      setShouldRender(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          setShouldRender(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '320px' }
+    )
+
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={containerRef}>
+      {shouldRender ? (
+        <CompetencyRadar />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="h-[309px] animate-pulse rounded-xl bg-white ring-1 ring-black/5"
+        />
+      )}
     </div>
   )
 }

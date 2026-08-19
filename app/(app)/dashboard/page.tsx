@@ -21,44 +21,34 @@ export default async function DashboardPage() {
   const admin = createAdminClient()
   const { data: profile } = await admin
     .from('users')
-    .select('*')
+    .select('id, full_name, role')
     .eq('id', authUser.id)
     .single()
 
   if (!profile) redirect('/login')
 
-  const user = profile as User
+  const user = profile as Pick<User, 'id' | 'full_name' | 'role'>
 
   if (user.role === 'teacher' || user.role === 'admin') {
-    const [questionsRes, classroomsRes, assignmentsRes] = await Promise.all([
+    const [questionsRes, studentsRes] = await Promise.all([
       supabase
         .from('questions')
         .select('id', { count: 'exact', head: true })
         .eq('created_by', user.id),
-      supabase
-        .from('classrooms')
-        .select('id')
-        .eq('teacher_id', user.id),
-      supabase
-        .from('assignments')
-        .select('id', { count: 'exact', head: true })
-        .eq('created_by', user.id),
+      // Count roster memberships through the classroom relation directly.
+      // This preserves the existing "students across all rooms" semantics
+      // without first waiting for a separate classroom-id query.
+      admin
+        .from('classroom_students')
+        .select('id, classrooms!inner(teacher_id)', { count: 'exact', head: true })
+        .eq('classrooms.teacher_id', user.id),
     ])
-
-    const classroomIds = (classroomsRes.data ?? []).map((c: any) => c.id)
-    const studentsRes = classroomIds.length > 0
-      ? await supabase
-          .from('classroom_students')
-          .select('id', { count: 'exact', head: true })
-          .in('classroom_id', classroomIds)
-      : { count: 0 as number | null }
 
     return (
       <TeacherDashboard
         user={user}
         questionsCount={questionsRes.count ?? 0}
         studentsCount={studentsRes.count ?? 0}
-        assignmentsCount={assignmentsRes.count ?? 0}
       />
     )
   }
@@ -207,7 +197,7 @@ function StudentDashboard({
   calendarEvents,
   recentPosts,
 }: {
-  user: User
+  user: Pick<User, 'id' | 'full_name' | 'role'>
   classroomsCount: number
   avgPct: number | null
   completedCount: number
