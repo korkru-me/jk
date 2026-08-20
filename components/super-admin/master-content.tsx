@@ -13,6 +13,7 @@ import {
   Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
 type ContentStatus = 'public' | 'draft' | 'pushed'
 
@@ -126,7 +127,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
   const StatusIcon = sc.icon
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
+    <Card radius="md" padding="lg">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
@@ -194,7 +195,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
           </span>
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -255,13 +256,10 @@ export function MasterContent() {
           { label: 'Push แล้ว', value: pushedCount.toString() },
           { label: 'ข้อที่แจกจ่ายแล้ว', value: totalQuestions.toLocaleString() },
         ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900"
-          >
+          <Card radius="md" padding="md" key={item.label}>
             <p className="text-2xl font-bold text-foreground">{item.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{item.label}</p>
-          </div>
+          </Card>
         ))}
       </div>
 
@@ -313,7 +311,7 @@ export function MasterContent() {
 
       {/* Create Form */}
       {showCreateForm && (
-        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900 space-y-4">
+        <Card radius="md" padding="lg" className=" space-y-4">
           <h3 className="font-semibold text-foreground">
             สร้างชุดข้อสอบมาตรฐานใหม่
           </h3>
@@ -361,7 +359,7 @@ export function MasterContent() {
               ยกเลิก
             </button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Bundle List */}
@@ -370,16 +368,16 @@ export function MasterContent() {
           <BundleCard key={bundle.id} bundle={bundle} onPush={handlePush} />
         ))}
         {filtered.length === 0 && (
-          <div className="rounded-xl border border-border bg-card p-12 text-center dark:border-slate-700/60 dark:bg-slate-900">
+          <Card radius="md" className="p-12 text-center">
             <p className="text-sm text-muted-foreground">ไม่พบชุดข้อสอบที่ตรงกับเงื่อนไข</p>
-          </div>
+          </Card>
         )}
       </div>
 
       {/* Confirm Push Dialog */}
       {pushConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <Card padding="xl" elevation="xl" className="w-full max-w-md">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                 <Send className="h-5 w-5 text-primary" />
@@ -410,7 +408,7 @@ export function MasterContent() {
                 ยกเลิก
               </button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

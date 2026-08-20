@@ -89,7 +89,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
             const isInProgress = hasInProgress[a.id] ?? false
             const canRetry = !isInProgress && isDone && (a.max_attempts == null || used < a.max_attempts)
             return (
-              <div key={a.id} className="bg-card border rounded-2xl p-4 hover:border-primary/20 dark:hover:border-blue-800 transition-colors">
+              <Card padding="md" className="hover:border-primary/20 dark:hover:border-blue-800 transition-colors" key={a.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold">{a.title}</p>
@@ -142,7 +142,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                     </Link>
                   )}
                 </div>
-              </div>
+              </Card>
             )
           })}
         </div>

@@ -16,6 +16,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
 type Plan = 'Enterprise' | 'Pro' | 'Basic'
 type TenantStatus = 'active' | 'suspended' | 'trial'
@@ -375,10 +376,7 @@ export function TenantManager() {
         ].map((item) => {
           const Icon = item.icon
           return (
-            <div
-              key={item.label}
-              className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900"
-            >
+            <Card radius="md" padding="md" key={item.label}>
               <div className="flex items-center gap-2">
                 <Icon className="h-4 w-4 text-primary" />
                 <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -386,7 +384,7 @@ export function TenantManager() {
               <p className="mt-1.5 text-2xl font-bold text-foreground">
                 {item.value}
               </p>
-            </div>
+            </Card>
           )
         })}
       </div>

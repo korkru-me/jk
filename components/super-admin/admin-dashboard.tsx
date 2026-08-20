@@ -13,6 +13,7 @@ import {
   Legend,
 } from 'recharts'
 import { chartColors, chartTooltipStyle } from '@/lib/chart-colors'
+import { Card } from '@/components/ui/card'
 import {
   TrendingUp,
   Users,
@@ -132,10 +133,7 @@ export function AdminDashboard() {
         {STAT_CARDS.map((card) => {
           const Icon = card.icon
           return (
-            <div
-              key={card.label}
-              className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900"
-            >
+            <Card radius="md" padding="md" key={card.label}>
               <div className="flex items-start justify-between">
                 <p className="text-xs font-medium text-muted-foreground">
                   {card.label}
@@ -158,7 +156,7 @@ export function AdminDashboard() {
               >
                 {card.delta}
               </p>
-            </div>
+            </Card>
           )
         })}
       </div>
@@ -166,7 +164,7 @@ export function AdminDashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {/* MRR Chart */}
-        <div className="xl:col-span-2 rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
+        <Card radius="md" padding="lg" className="xl:col-span-2">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h3 className="font-semibold text-foreground">
@@ -219,10 +217,10 @@ export function AdminDashboard() {
               />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
         {/* Tenant Growth */}
-        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
+        <Card radius="md" padding="lg">
           <div className="mb-4">
             <h3 className="font-semibold text-foreground">
               Tenant Growth
@@ -252,11 +250,11 @@ export function AdminDashboard() {
               <Bar dataKey="tenants" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
       </div>
 
       {/* Weekly Exam Activity */}
-      <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
+      <Card radius="md" padding="lg">
         <div className="mb-4">
           <h3 className="font-semibold text-foreground">
             กิจกรรมการสอบรายสัปดาห์
@@ -310,7 +308,7 @@ export function AdminDashboard() {
             />
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
     </div>
   )
 }

@@ -174,7 +174,7 @@ function BrandPreview({ logoPreview, primaryColor, orgName }: {
   orgName: string
 }) {
   return (
-    <Card elevation="sm" className="dark:bg-zinc-900 overflow-hidden">
+    <Card elevation="sm" className=" overflow-hidden">
       {/* Mock topbar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b" style={{ backgroundColor: primaryColor + '18' }}>
         {logoPreview ? (

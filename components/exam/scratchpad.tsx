@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Trash2, Type, Pen, Download } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 type Mode = 'text' | 'draw'
 
@@ -96,7 +97,7 @@ export function Scratchpad({ onClose }: ScratchpadProps) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: '520px' }}>
+    <Card elevation="xl" className="fixed bottom-4 right-4 z-50 w-96 flex flex-col overflow-hidden" style={{ maxHeight: '520px' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30 shrink-0">
         <div className="flex items-center gap-2">
@@ -195,6 +196,6 @@ export function Scratchpad({ onClose }: ScratchpadProps) {
           {mode === 'text' ? `${text.length} ตัวอักษร · บันทึกอัตโนมัติ` : 'วาดบนผ้าใบ · ข้อมูลบันทึกในเบราว์เซอร์'}
         </p>
       </div>
-    </div>
+    </Card>
   )
 }

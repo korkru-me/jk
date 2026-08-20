@@ -126,7 +126,7 @@ function PhysicsDemo() {
       </div>
 
       {/* Question card */}
-      <Card radius="md" padding="md" className="dark:border-slate-700 dark:bg-slate-900">
+      <Card radius="md" padding="md">
         <div className="flex items-start justify-between mb-3">
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary dark:bg-indigo-950/60">
             <Calculator className="h-3 w-3" />

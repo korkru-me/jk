@@ -8,6 +8,7 @@ import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -1147,7 +1148,7 @@ export function QuestionPreviewContent({
                         <RichText text={part.text} className="text-[15px] text-foreground" />
                         <div className="space-y-2">
                           {items.map(item => (
-                            <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg border border-border bg-card">
+                            <Card radius="sm" className="flex items-center gap-3 p-2" key={item.id}>
                               <RichText text={item.text} className="flex-1 text-sm text-foreground" />
                               <select value={sel[item.id] ?? ''} disabled={compositeChecked}
                                 onChange={e => setSel(item.id, e.target.value)}
@@ -1155,7 +1156,7 @@ export function QuestionPreviewContent({
                                 <option value="">—</option>
                                 {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
                               </select>
-                            </div>
+                            </Card>
                           ))}
                         </div>
                       </>

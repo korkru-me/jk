@@ -137,7 +137,7 @@ function StudentNotesPanel({
       ) : (
         <div className="space-y-2">
           {notes.map(n => (
-            <div key={n.id} className="flex items-start justify-between gap-2 bg-card rounded-lg px-3 py-2 ring-1 ring-border">
+            <Card radius="sm" edge="ring" className="flex items-start justify-between gap-2 px-3 py-2" key={n.id}>
               <div className="min-w-0">
                 <p className="text-sm text-foreground whitespace-pre-wrap break-words">{n.body}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{n.author_name} · {formatDateTime(n.created_at)}</p>
@@ -150,7 +150,7 @@ function StudentNotesPanel({
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-            </div>
+            </Card>
           ))}
         </div>
       )}

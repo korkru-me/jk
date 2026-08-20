@@ -160,13 +160,13 @@ export default async function MySubmissionsPage() {
               { label: 'ใกล้/เลยกำหนด', value: String(urgentCount), icon: <AlertTriangle size={18} className="text-destructive" /> },
               { label: 'ส่งงานแล้ว', value: String(doneCount), icon: <CheckCircle2 size={18} className="text-success" /> },
             ].map(s => (
-              <div key={s.label} className="bg-card border rounded-2xl p-4">
+              <Card padding="md" key={s.label}>
                 <div className="flex items-center justify-between mb-1">
                   {s.icon}
                   <span className="text-xl font-black">{s.value}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">{s.label}</p>
-              </div>
+              </Card>
             ))}
           </div>
 

@@ -287,7 +287,7 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
         {stats.map(s => {
           const Icon = s.icon
           return (
-            <div key={s.label} className="bg-card rounded-2xl ring-1 ring-border p-4 flex items-center gap-3">
+            <Card edge="ring" padding="md" className="flex items-center gap-3" key={s.label}>
               <div className={`w-9 h-9 rounded-xl ${s.color} flex items-center justify-center shrink-0`}>
                 <Icon className="w-4 h-4" />
               </div>
@@ -295,7 +295,7 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
                 <p className="text-2xl font-bold text-foreground leading-none">{s.value}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
               </div>
-            </div>
+            </Card>
           )
         })}
       </div>

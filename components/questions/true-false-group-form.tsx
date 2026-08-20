@@ -18,6 +18,7 @@ import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { isTrueFalseGroupQuestion } from '@/lib/true-false-group'
 import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
+import { Card } from '@/components/ui/card'
 import type {
   Difficulty, Visibility, Question,
   CompositeConfig, CompositePart, TrueFalseStatement, TrueFalseSelectTarget,
@@ -129,7 +130,7 @@ function SubQuestionCard({
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">ตัวเลือก</Label>
           {subQuestion.choices.map((choice, ci) => (
-            <div key={choice.id} className="flex items-start gap-2 bg-card border border-border rounded-lg p-2.5">
+            <Card radius="sm" className="flex items-start gap-2 p-2.5" key={choice.id}>
               <span className="text-xs font-bold text-muted-foreground mt-2.5 w-4 flex-shrink-0">{ci + 1}.</span>
               <div className="flex-1 space-y-1.5 min-w-0">
                 <RichTextEditor
@@ -161,7 +162,7 @@ function SubQuestionCard({
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
-            </div>
+            </Card>
           ))}
           <Button type="button" variant="outline" size="sm" onClick={onAddChoice}>
             <Plus className="w-3.5 h-3.5 mr-1" /> เพิ่มตัวเลือก

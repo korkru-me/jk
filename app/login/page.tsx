@@ -19,7 +19,7 @@ export default function LoginPage() {
         </div>
       </Link>
 
-      <Card padding="2xl" elevation="sm" className="w-full max-w-md dark:border-slate-700/60 dark:bg-slate-900">
+      <Card padding="2xl" elevation="sm" className="w-full max-w-md">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-foreground">ยินดีต้อนรับกลับมา</h1>
           <p className="mt-1 text-sm text-muted-foreground">เข้าสู่ระบบเพื่อจัดการโจทย์และห้องเรียน</p>

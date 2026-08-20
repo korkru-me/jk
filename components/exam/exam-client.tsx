@@ -1436,7 +1436,7 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
       <p className="text-sm font-medium">เลือกลำดับสำหรับแต่ละรายการ:</p>
       <div className="space-y-2">
         {shuffled.map(item => (
-          <div key={item.id} className="flex items-center gap-3 p-2.5 rounded-xl border bg-card">
+          <Card radius="md" className="flex items-center gap-3 p-2.5" key={item.id}>
             {item.image_url && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border flex-shrink-0" />
@@ -1447,7 +1447,7 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
               <option value="">ลำดับ</option>
               {Array.from({ length: n }, (_, i) => <option key={i + 1} value={String(i + 1)}>ที่ {i + 1}</option>)}
             </select>
-          </div>
+          </Card>
         ))}
       </div>
       {hasdup     && <p className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 rounded-lg">⚠️ มีลำดับซ้ำ</p>}
@@ -1603,14 +1603,14 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
                 <RichText text={part.text} className="text-sm block" />
                 <div className="space-y-2">
                   {items.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 p-2 rounded-xl border bg-card">
+                    <Card radius="md" className="flex items-center gap-3 p-2" key={item.id}>
                       <RichText text={item.text} className="flex-1 text-sm" />
                       <select value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)}
                         className="h-8 w-20 border border-input rounded-lg px-1 text-sm text-center bg-background">
                         <option value="">ลำดับ</option>
                         {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
                       </select>
-                    </div>
+                    </Card>
                   ))}
                 </div>
               </>

@@ -5,6 +5,7 @@ import { Plus, Lock, Unlock, Trash2, ChevronRight, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 interface Rule {
   id: string
@@ -80,7 +81,7 @@ export function LearningPaths() {
       ) : (
         <div className="space-y-3">
           {rules.map((rule, idx) => (
-            <div key={rule.id} className="bg-card rounded-2xl ring-1 ring-border p-4">
+            <Card edge="ring" padding="md" key={rule.id}>
               <div className="flex items-start gap-3">
                 {/* Step number */}
                 <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
@@ -139,7 +140,7 @@ export function LearningPaths() {
                   <Trash2 />
                 </IconButton>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

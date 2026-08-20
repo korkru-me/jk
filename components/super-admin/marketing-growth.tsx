@@ -24,6 +24,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { chartColors, chartTooltipStyle } from '@/lib/chart-colors'
+import { Card } from '@/components/ui/card'
 
 type AnnouncementType = 'maintenance' | 'feature' | 'promo' | 'urgent'
 type AnnouncementStatus = 'active' | 'scheduled' | 'expired'
@@ -252,7 +253,7 @@ export function MarketingGrowth() {
         </div>
 
         {/* Compose Form */}
-        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900 space-y-4">
+        <Card radius="md" padding="lg" className=" space-y-4">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Megaphone className="h-4 w-4 text-primary" />
             สร้างประกาศใหม่
@@ -316,7 +317,7 @@ export function MarketingGrowth() {
               </span>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Announcement List */}
         <div className="space-y-2">
@@ -399,10 +400,7 @@ export function MarketingGrowth() {
           ].map((item) => {
             const Icon = item.icon
             return (
-              <div
-                key={item.label}
-                className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900"
-              >
+              <Card radius="md" padding="md" key={item.label}>
                 <div className="flex items-center gap-2 mb-1">
                   <Icon className="h-4 w-4 text-primary" />
                   <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -410,13 +408,13 @@ export function MarketingGrowth() {
                 <p className="text-2xl font-bold text-foreground">
                   {item.value}
                 </p>
-              </div>
+              </Card>
             )
           })}
         </div>
 
         {/* Referral Chart */}
-        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
+        <Card radius="md" padding="lg">
           <h3 className="text-sm font-semibold text-foreground mb-4">
             Referrals รายเดือน (ปี 2569)
           </h3>
@@ -441,7 +439,7 @@ export function MarketingGrowth() {
               <Bar dataKey="referrals" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
         {/* Referral Table */}
         <div className="overflow-x-auto rounded-xl border border-border/60">

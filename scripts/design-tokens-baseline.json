@@ -1,7 +1,7 @@
 {
   "app/(app)/assignments/[id]/_components/assignment-detail-client.tsx": {
     "palette": 14,
-    "card": 1
+    "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/analytics-client.tsx": {
     "palette": 2,
@@ -49,7 +49,7 @@
   },
   "app/(app)/assignments/_components/exam-dashboard.tsx": {
     "palette": 1,
-    "card": 1
+    "card": 0
   },
   "app/(app)/assignments/new/page.tsx": {
     "palette": 1,
@@ -97,7 +97,7 @@
   },
   "app/(app)/classrooms/[id]/_components/homeroom-overview.tsx": {
     "palette": 5,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/homeroom-student-view.tsx": {
     "palette": 4,
@@ -109,7 +109,7 @@
   },
   "app/(app)/classrooms/[id]/_components/learning-paths.tsx": {
     "palette": 3,
-    "card": 2
+    "card": 1
   },
   "app/(app)/classrooms/[id]/_components/parent-portal.tsx": {
     "palette": 2,
@@ -133,7 +133,7 @@
   },
   "app/(app)/classrooms/_components/teacher-view-client.tsx": {
     "palette": 5,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/archived/page.tsx": {
     "palette": 1,
@@ -161,7 +161,7 @@
   },
   "app/(app)/dashboard/_components/command-palette.tsx": {
     "palette": 4,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/daily-tips.tsx": {
     "palette": 2,
@@ -210,10 +210,6 @@
   "app/(app)/dashboard/page.tsx": {
     "palette": 14,
     "card": 0
-  },
-  "app/(app)/my-submissions/page.tsx": {
-    "palette": 0,
-    "card": 1
   },
   "app/(app)/questions/_components/preview-modal.tsx": {
     "palette": 9,
@@ -264,11 +260,11 @@
     "card": 0
   },
   "app/forgot-password/page.tsx": {
-    "palette": 3,
+    "palette": 1,
     "card": 0
   },
   "app/login/page.tsx": {
-    "palette": 3,
+    "palette": 1,
     "card": 0
   },
   "app/pricing/page.tsx": {
@@ -276,7 +272,7 @@
     "card": 0
   },
   "app/signup/page.tsx": {
-    "palette": 3,
+    "palette": 1,
     "card": 0
   },
   "app/super-admin/layout.tsx": {
@@ -309,22 +305,18 @@
   },
   "components/exam/exam-client.tsx": {
     "palette": 37,
-    "card": 2
+    "card": 0
   },
   "components/exam/formula-sheet.tsx": {
     "palette": 15,
     "card": 0
-  },
-  "components/exam/scratchpad.tsx": {
-    "palette": 0,
-    "card": 1
   },
   "components/landing/cookie-consent.tsx": {
     "palette": 2,
     "card": 0
   },
   "components/landing/interactive-demo.tsx": {
-    "palette": 25,
+    "palette": 23,
     "card": 0
   },
   "components/landing/landing-footer.tsx": {
@@ -385,7 +377,7 @@
   },
   "components/questions/question-preview.tsx": {
     "palette": 24,
-    "card": 5
+    "card": 4
   },
   "components/questions/random-numeric/index.tsx": {
     "palette": 1,
@@ -427,10 +419,6 @@
     "palette": 2,
     "card": 0
   },
-  "components/questions/true-false-group-form.tsx": {
-    "palette": 0,
-    "card": 1
-  },
   "components/questions/variable-editor.tsx": {
     "palette": 10,
     "card": 1
@@ -440,7 +428,7 @@
     "card": 0
   },
   "components/settings/branding-settings.tsx": {
-    "palette": 2,
+    "palette": 1,
     "card": 0
   },
   "components/settings/profile-settings.tsx": {
@@ -456,39 +444,39 @@
     "card": 0
   },
   "components/super-admin/admin-dashboard.tsx": {
-    "palette": 26,
-    "card": 4
+    "palette": 18,
+    "card": 0
   },
   "components/super-admin/audit-trail.tsx": {
-    "palette": 19,
-    "card": 3
+    "palette": 17,
+    "card": 2
   },
   "components/super-admin/marketing-growth.tsx": {
-    "palette": 30,
-    "card": 6
+    "palette": 24,
+    "card": 3
   },
   "components/super-admin/master-content.tsx": {
-    "palette": 39,
-    "card": 13
+    "palette": 29,
+    "card": 8
   },
   "components/super-admin/super-sidebar.tsx": {
     "palette": 12,
     "card": 0
   },
   "components/super-admin/system-health.tsx": {
-    "palette": 7,
-    "card": 2
+    "palette": 3,
+    "card": 0
   },
   "components/super-admin/tenant-manager.tsx": {
-    "palette": 37,
-    "card": 5
+    "palette": 35,
+    "card": 4
   },
   "components/super-admin/topbar.tsx": {
     "palette": 4,
     "card": 0
   },
   "components/super-admin/user-support.tsx": {
-    "palette": 32,
-    "card": 5
+    "palette": 28,
+    "card": 3
   }
 }

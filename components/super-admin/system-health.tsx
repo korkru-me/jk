@@ -12,6 +12,7 @@ import {
 import { chartColors, chartTooltipStyle } from '@/lib/chart-colors'
 import { AlertTriangle, CheckCircle2, Database, HardDrive, Cpu, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
 const API_USAGE_DATA = [
   { time: '00:00', rps: 48, latency: 11 },
@@ -100,7 +101,7 @@ function QuotaBar({
   const warning = !critical && (warn || pct >= 75)
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900">
+    <Card radius="md" padding="md">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <div
@@ -180,7 +181,7 @@ function QuotaBar({
             : 'ใกล้ถึง 80% — ติดตามอย่างใกล้ชิด'}
         </p>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -204,7 +205,7 @@ export function SystemHealth() {
       </div>
 
       {/* API Usage Chart */}
-      <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
+      <Card radius="md" padding="lg">
         <div className="flex items-start justify-between mb-4">
           <div>
             <h3 className="font-semibold text-foreground">
@@ -272,7 +273,7 @@ export function SystemHealth() {
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
     </div>
   )
 }

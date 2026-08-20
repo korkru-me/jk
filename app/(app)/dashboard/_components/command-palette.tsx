@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { Card } from '@/components/ui/card'
 import {
   Search, BookOpen, Users, Zap, ArrowRight,
   FileText, Plus, Settings, X
@@ -79,10 +80,7 @@ export function CommandPalette() {
       onClick={() => setOpen(false)}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-xl mx-4 bg-card rounded-2xl shadow-2xl ring-1 ring-border overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
+      <Card edge="ring" elevation="xl" className="relative w-full max-w-xl mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -160,7 +158,7 @@ export function CommandPalette() {
             {' '}ปิด
           </span>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

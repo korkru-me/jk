@@ -14,6 +14,7 @@ import {
   Filter,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
 type UserRole = 'teacher' | 'student' | 'admin'
 type UserStatus = 'active' | 'suspended'
@@ -330,7 +331,7 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
   const StatusIcon = sc.icon
 
   return (
-    <div className="rounded-xl border border-border bg-card dark:border-slate-700/60 dark:bg-slate-900 overflow-hidden">
+    <Card radius="md" className=" overflow-hidden">
       <div
         className="flex items-start gap-3 p-4 cursor-pointer"
         onClick={() => setExpanded((v) => !v)}
@@ -386,7 +387,7 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
           )}
         />
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -513,9 +514,9 @@ export function UserSupport() {
             <TicketCard key={t.id} ticket={t} />
           ))}
           {filteredTickets.length === 0 && (
-            <div className="rounded-xl border border-border bg-card p-10 text-center dark:border-slate-700/60 dark:bg-slate-900">
+            <Card radius="md" className="p-10 text-center">
               <p className="text-sm text-muted-foreground">ไม่มี Ticket ในสถานะนี้</p>
-            </div>
+            </Card>
           )}
         </div>
       </section>

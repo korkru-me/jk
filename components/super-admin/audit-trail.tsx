@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Search, ShieldAlert, Info, AlertTriangle, Filter } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
 type Severity = 'info' | 'warning' | 'critical'
 type ActionCategory = 'auth' | 'content' | 'billing' | 'data' | 'admin'
@@ -273,13 +274,10 @@ export function AuditTrail() {
           { label: 'Warning', count: LOGS.filter((l) => l.severity === 'warning').length, cls: 'text-warning' },
           { label: 'Info', count: LOGS.filter((l) => l.severity === 'info').length, cls: 'text-muted-foreground' },
         ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-xl border border-border bg-card p-3 dark:border-slate-700/60 dark:bg-slate-900"
-          >
+          <Card radius="md" padding="sm" key={item.label}>
             <p className={cn('text-2xl font-bold', item.cls)}>{item.count}</p>
             <p className="text-xs text-muted-foreground">{item.label}</p>
-          </div>
+          </Card>
         ))}
       </div>
 
