@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Moon, Sun, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { IconButton } from '@/components/ui/icon-button'
 
 const NAV_LINKS: { href: string; label: string }[] = []
 
@@ -53,13 +54,13 @@ export function LandingNavbar() {
           <div className="mx-2 h-5 w-px bg-muted" />
 
           {mounted && (
-            <button
+            <IconButton
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-muted-foreground transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-200"
-              aria-label="Toggle theme"
+              label="สลับธีมสว่าง/มืด"
+              size="lg"
             >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+              {theme === 'dark' ? <Sun /> : <Moon />}
+            </IconButton>
           )}
           {!mounted && <div className="h-9 w-9" />}
 
@@ -80,20 +81,23 @@ export function LandingNavbar() {
         {/* Mobile menu button */}
         <div className="flex items-center gap-2 sm:hidden">
           {mounted && (
-            <button
+            <IconButton
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted dark:hover:bg-slate-800"
+              label="สลับธีมสว่าง/มืด"
+              size="lg"
             >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+              {theme === 'dark' ? <Sun /> : <Moon />}
+            </IconButton>
           )}
           {!mounted && <div className="h-9 w-9" />}
-          <button
+          <IconButton
             onClick={() => setMobileOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted dark:hover:bg-slate-800"
+            label={mobileOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
+            size="lg"
+            className="[&_svg:not([class*=size-])]:size-5"
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+            {mobileOpen ? <X /> : <Menu />}
+          </IconButton>
         </div>
       </div>
 

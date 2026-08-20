@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Cookie, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 
 const STORAGE_KEY = 'korkru_cookie_consent'
 
@@ -62,25 +64,15 @@ export function CookieConsent() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={decline}
-            className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
+          <Button onClick={decline} variant="outline" size="lg">
             ปฏิเสธ
-          </button>
-          <button
-            onClick={accept}
-            className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
-          >
+          </Button>
+          <Button onClick={accept} size="lg" className="font-semibold">
             ยอมรับทั้งหมด
-          </button>
-          <button
-            onClick={decline}
-            aria-label="ปิด"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-muted-foreground transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-200"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          </Button>
+          <IconButton onClick={decline} label="ปิด">
+            <X />
+          </IconButton>
         </div>
       </div>
     </div>
