@@ -10,6 +10,7 @@ import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
 import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { Card } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { cn, downloadTextFile } from '@/lib/utils'
@@ -91,9 +92,13 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   }
 
   return (
-    <div className={`@container bg-card rounded-2xl ring-1 transition-all hover:shadow-sm group ${
-      isFlagged ? 'ring-orange-300 hover:ring-orange-400' : 'ring-border hover:ring-blue-200'
-    }`}>
+    <Card
+      edge="ring"
+      className={cn(
+        '@container group transition-all hover:shadow-sm',
+        isFlagged ? 'ring-orange-300 hover:ring-orange-400' : 'hover:ring-primary/30',
+      )}
+    >
       {/* Flagged banner */}
       {isFlagged && (
         <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 rounded-t-2xl border-b border-orange-100">
@@ -301,6 +306,6 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

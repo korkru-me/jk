@@ -1,4 +1,5 @@
 import { ShieldCheck, Award, Globe, Users } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 const SCHOOLS = [
   { abbr: 'PCCR', name: 'จุฬาภรณราชวิทยาลัย เชียงราย', color: 'indigo' },
@@ -97,10 +98,7 @@ export function TrustBadges() {
           {TRUST_ITEMS.map((item) => {
             const Icon = item.icon
             return (
-              <div
-                key={item.title}
-                className="rounded-2xl border border-border bg-card p-6 dark:border-slate-700/60 dark:bg-slate-900"
-              >
+              <Card key={item.title} padding="xl">
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
@@ -108,7 +106,7 @@ export function TrustBadges() {
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                   {item.desc}
                 </p>
-              </div>
+              </Card>
             )
           })}
         </div>

@@ -1,18 +1,85 @@
-import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-function Card({
+/**
+ * The app's card surface.
+ *
+ * This file previously held the stock shadcn Card with its header/content/
+ * footer slot system. Nothing in the app ever imported it — 563 card surfaces
+ * were hand-written instead, in 82 distinct class combinations. It is
+ * redefined here to match how cards are actually built in this codebase, so
+ * adopting it is a small edit per call site rather than a restructure.
+ *
+ * Defaults are the most common combination measured across those 227 outer
+ * surfaces: rounded-2xl (120 of them), a border edge (159), no shadow (193).
+ * `padding` has no default because most cards pad their inner sections
+ * instead of the surface.
+ */
+const cardVariants = cva("bg-card text-card-foreground", {
+  variants: {
+    radius: {
+      sm: "rounded-lg",
+      md: "rounded-xl",
+      lg: "rounded-2xl",
+    },
+    /**
+     * How the edge is drawn. `border` and `ring` look nearly identical; both
+     * exist because the codebase uses both. Prefer `border`.
+     */
+    edge: {
+      border: "border border-border",
+      ring: "ring-1 ring-border",
+      dashed: "border border-dashed border-border",
+      none: "",
+    },
+    padding: {
+      none: "",
+      sm: "p-3",
+      md: "p-4",
+      lg: "p-5",
+      xl: "p-6",
+      "2xl": "p-8",
+    },
+    elevation: {
+      none: "",
+      sm: "shadow-sm",
+      md: "shadow-md",
+      lg: "shadow-lg",
+      xl: "shadow-xl",
+    },
+    /** Lift on hover — for cards that are themselves a link or button. */
+    interactive: {
+      true: "transition-shadow hover:shadow-md",
+      false: "",
+    },
+  },
+  defaultVariants: {
+    radius: "lg",
+    edge: "border",
+    padding: "none",
+    elevation: "none",
+    interactive: false,
+  },
+})
+
+export type CardProps = React.ComponentProps<"div"> &
+  VariantProps<typeof cardVariants>
+
+export function Card({
   className,
-  size = "default",
+  radius,
+  edge,
+  padding,
+  elevation,
+  interactive,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: CardProps) {
   return (
     <div
       data-slot="card"
-      data-size={size}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        cardVariants({ radius, edge, padding, elevation, interactive }),
         className
       )}
       {...props}
@@ -20,84 +87,4 @@ function Card({
   )
 }
 
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-header"
-      className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-4 group-data-[size=sm]/card:px-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-4 group-data-[size=sm]/card:[.border-b]:pb-3",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-title"
-      className={cn(
-        "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-content"
-      className={cn("px-4 group-data-[size=sm]/card:px-3", className)}
-      {...props}
-    />
-  )
-}
-
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-4 group-data-[size=sm]/card:p-3",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
-  CardAction,
-  CardDescription,
-  CardContent,
-}
+export { cardVariants }

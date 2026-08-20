@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { LandingNavbar } from '@/components/landing/landing-navbar'
 import { LandingFooter } from '@/components/landing/landing-footer'
 import { PricingTable } from '@/components/landing/pricing-table'
+import { Card } from '@/components/ui/card'
 import { MessageCircle } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -59,13 +60,10 @@ export default function PricingPage() {
           </h2>
           <div className="space-y-4">
             {FAQS.map((faq) => (
-              <div
-                key={faq.q}
-                className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900"
-              >
+              <Card key={faq.q} radius="md" padding="lg">
                 <p className="font-semibold text-foreground mb-1.5">{faq.q}</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
