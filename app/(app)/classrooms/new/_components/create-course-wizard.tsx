@@ -386,7 +386,7 @@ function GradientAdvancedControls({
           max={360}
           value={angle}
           onChange={(e) => onAngleChange(Number(e.target.value))}
-          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-muted accent-blue-600"
+          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-muted accent-primary"
         />
         <div className="flex gap-1.5">
           {[{ l: '→', d: 90 }, { l: '↘', d: 135 }, { l: '↓', d: 180 }, { l: '↗', d: 45 }, { l: '↙', d: 225 }, { l: '←', d: 270 }].map((it) => (

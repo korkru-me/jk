@@ -346,7 +346,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   type="checkbox"
                   checked={saveAsSet}
                   onChange={e => setSaveAsSet(e.target.checked)}
-                  className="accent-blue-600 w-4 h-4 shrink-0"
+                  className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
             )}
@@ -523,7 +523,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 type="checkbox"
                 checked={passingEnabled}
                 onChange={e => setPassingEnabled(e.target.checked)}
-                className="accent-blue-600 w-4 h-4 shrink-0"
+                className="accent-primary w-4 h-4 shrink-0"
               />
             </label>
 
@@ -617,7 +617,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     type="checkbox"
                     checked={opt.value}
                     onChange={e => opt.set(e.target.checked)}
-                    className="accent-blue-600 w-4 h-4 shrink-0"
+                    className="accent-primary w-4 h-4 shrink-0"
                   />
                 </label>
               )

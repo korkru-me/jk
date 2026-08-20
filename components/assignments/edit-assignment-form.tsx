@@ -210,7 +210,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
             type="checkbox"
             checked={passingEnabled}
             onChange={e => setPassingEnabled(e.target.checked)}
-            className="accent-blue-600 w-4 h-4 shrink-0"
+            className="accent-primary w-4 h-4 shrink-0"
           />
         </label>
 

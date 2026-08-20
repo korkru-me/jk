@@ -30,6 +30,8 @@ export default function RootLayout({
     <html
       lang="th"
       suppressHydrationWarning
+      // Style preset — see [data-style] at the bottom of app/globals.css.
+      data-style="playful"
       className={`${ibmPlexSansThai.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">

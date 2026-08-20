@@ -9,7 +9,7 @@ export function VarChip({ name, active, onClick }: { name: string; active: boole
       onClick={onClick}
       className={`relative font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-150 ${
         active
-          ? 'bg-primary text-white border-primary shadow-md shadow-blue-100'
+          ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
           : 'bg-card text-muted-foreground border-border hover:border-primary hover:text-primary hover:bg-primary/10'
       }`}
     >

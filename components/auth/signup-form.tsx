@@ -247,7 +247,7 @@ export function SignupForm() {
           <input
             type="checkbox"
             {...reg('agreed')}
-            className="mt-0.5 h-4 w-4 rounded border-border accent-indigo-600 dark:border-slate-600"
+            className="mt-0.5 h-4 w-4 rounded border-border accent-primary dark:border-slate-600"
           />
           <span className="text-sm text-muted-foreground leading-relaxed">
             ฉันยอมรับ{' '}

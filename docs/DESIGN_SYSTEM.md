@@ -27,7 +27,7 @@
 
 ## Visual language ที่มีอยู่
 
-- Primary ปัจจุบันอยู่ในโทน indigo/violet
+- Primary ปัจจุบันอยู่ในโทน magenta/violet (preset `playful` — ตั้งไว้ที่ `app/layout.tsx`) ค่าเริ่มต้นของระบบยังเป็น indigo
 - Success ใช้ emerald/green, warning ใช้ amber, destructive ใช้ red
 - ใช้ rounded cards, borders และ spacing แบบค่อนข้างโปร่ง
 - ใช้ Lucide icons และ primitives ใน `components/ui/`
@@ -60,7 +60,9 @@ preset ที่มีให้:
 | `minimal` | เกือบขาวดำ น้ำหนักตัวอักษรเบา เส้นขอบบาง |
 | `playful` | หนา มนมาก เงาทึบแบบ offset |
 
-ไม่ใส่ = ค่าเริ่มต้น (indigo, มนปานกลาง)
+ไม่ใส่ = ค่าเริ่มต้น (indigo, มนปานกลาง) — ปัจจุบันแอปตั้ง `data-style="playful"` ไว้
+
+ทุก preset ผ่าน WCAG AA (ตัวอักษรบนปุ่ม primary ≥ 4.5:1) ทั้งโหมดสว่างและมืด ถ้าเพิ่ม preset ใหม่ต้องวัด contrast ก่อนใช้
 
 preset ปรับได้ 5 แกน: สี, `--radius`, `--spacing`, `--elevation-*` และ typography (`--font-weight-*`, `--text-*`, `--tracking-*`) — Tailwind v4 คำนวณ utility จากตัวแปรเหล่านี้อยู่แล้ว จึงไม่ต้องแก้ component
 

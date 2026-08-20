@@ -158,7 +158,7 @@ export function QuestionPicker({
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggle(q.id)}
-                  className="mt-0.5 accent-blue-600"
+                  className="mt-0.5 accent-primary"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{q.title}</p>

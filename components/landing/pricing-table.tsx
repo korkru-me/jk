@@ -266,7 +266,7 @@ export function PricingTable() {
               className={cn(
                 'relative flex flex-col rounded-2xl border p-7 transition-shadow',
                 plan.highlighted
-                  ? 'border-primary shadow-xl shadow-indigo-500/20 ring-1 ring-primary/50 dark:border-primary dark:shadow-indigo-900/40'
+                  ? 'border-primary shadow-xl shadow-primary/20 ring-1 ring-primary/50 dark:border-primary dark:shadow-primary/40'
                   : 'border-border hover:shadow-md dark:border-slate-700/60',
                 'bg-card',
               )}
@@ -305,7 +305,7 @@ export function PricingTable() {
                 className={cn(
                   'mb-6 block w-full rounded-xl py-3 text-center text-sm font-semibold transition-colors',
                   plan.highlighted
-                    ? 'bg-primary text-white hover:bg-primary/90 shadow-md shadow-indigo-500/20'
+                    ? 'bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/20'
                     : 'border border-border text-muted-foreground hover:bg-muted dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800',
                 )}
               >

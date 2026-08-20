@@ -363,10 +363,6 @@
     "palette": 2,
     "card": 0
   },
-  "components/landing/hero-section.tsx": {
-    "palette": 4,
-    "card": 0
-  },
   "components/landing/interactive-demo.tsx": {
     "palette": 25,
     "card": 1

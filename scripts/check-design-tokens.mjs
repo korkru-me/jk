@@ -44,7 +44,7 @@ const SKIP_FILES = [
 const HUES =
   'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose'
 const PALETTE = new RegExp(
-  String.raw`\b(?:bg|text|border|ring|divide|from|to|via)-(?:${HUES})-\d{2,3}\b`,
+  String.raw`\b(?:bg|text|border|ring|divide|from|to|via|shadow|outline|decoration|accent|caret|fill|stroke)-(?:${HUES})-\d{2,3}\b`,
   'g'
 )
 const CLASS_ATTR = /className="([^"]*)"/g

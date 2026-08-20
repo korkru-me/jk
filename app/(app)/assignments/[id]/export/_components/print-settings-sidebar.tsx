@@ -164,7 +164,7 @@ export function PrintSettingsSidebar({
                 max={60}
                 value={settings.watermarkOpacity}
                 onChange={e => onPatch({ watermarkOpacity: Number(e.target.value) })}
-                className="w-full accent-gray-900 cursor-pointer"
+                className="w-full accent-foreground cursor-pointer"
               />
               <div className="flex justify-between text-[10px] text-gray-300 mt-0.5">
                 <span>จาง</span><span>เข้ม</span>
@@ -295,7 +295,7 @@ export function PrintSettingsSidebar({
         {/* Primary: Generate ZIP */}
         <button
           onClick={onGenerateZip}
-          className="w-full flex items-center justify-center gap-2.5 py-3 bg-gray-900 text-white text-sm font-bold rounded-2xl hover:bg-gray-800 active:scale-[0.98] transition-all shadow-lg shadow-gray-900/20"
+          className="w-full flex items-center justify-center gap-2.5 py-3 bg-gray-900 text-white text-sm font-bold rounded-2xl hover:bg-gray-800 active:scale-[0.98] transition-all shadow-lg shadow-foreground/20"
         >
           <ArchiveIcon className="w-4 h-4" />
           Generate &amp; Download All (ZIP)

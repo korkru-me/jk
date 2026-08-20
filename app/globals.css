@@ -127,7 +127,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.585 0.233 277.117);
+  /* L tuned so --primary-foreground clears WCAG AA on it; 0.585 gave 4.38. */
+  --primary: oklch(0.57 0.233 277.117);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -178,7 +179,7 @@
 [data-style="soft"] {
   --radius: 1rem;
   --spacing: 0.28rem;
-  --primary: oklch(0.58 0.19 265);
+  --primary: oklch(0.56 0.19 265);
   --ring: oklch(0.65 0.16 265);
   --elevation-sm: 0 2px 8px -2px rgb(0 0 0 / 0.08);
   --elevation-md: 0 8px 20px -6px rgb(0 0 0 / 0.10);
@@ -187,6 +188,8 @@
 }
 [data-style="soft"].dark {
   --primary: oklch(0.68 0.16 265);
+  /* light primary in dark mode needs dark text, not white (2.82:1 -> 6.6:1) */
+  --primary-foreground: oklch(0.16 0 0);
   --ring: oklch(0.72 0.14 265);
 }
 
@@ -224,6 +227,7 @@
   --background: oklch(0.16 0.008 60);
   --card: oklch(0.21 0.008 60);
   --primary: oklch(0.68 0.14 45);
+  --primary-foreground: oklch(0.16 0 0);
   --ring: oklch(0.72 0.12 45);
   --border: oklch(1 0 0 / 12%);
 }
@@ -259,7 +263,7 @@
 [data-style="playful"] {
   --radius: 1.25rem;
   --spacing: 0.3rem;
-  --primary: oklch(0.62 0.21 320);
+  --primary: oklch(0.56 0.21 320);
   --ring: oklch(0.68 0.19 320);
   --success: oklch(0.66 0.19 145);
   --warning: oklch(0.78 0.17 75);
@@ -275,6 +279,7 @@
 }
 [data-style="playful"].dark {
   --primary: oklch(0.72 0.18 320);
+  --primary-foreground: oklch(0.16 0 0);
   --ring: oklch(0.76 0.16 320);
 }
 

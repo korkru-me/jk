@@ -369,7 +369,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                     : 'border-border text-muted-foreground hover:border-orange-400 hover:text-orange-500'
                 }`}
               >
-                <Flag size={11} className={isFlagged ? 'fill-orange-500' : ''} />
+                <Flag size={11} className={isFlagged ? 'fill-flag' : ''} />
                 {isFlagged ? 'ยกเลิกธง' : 'ปักธง'}
               </button>
             </div>
@@ -549,7 +549,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           <div className="flex gap-2 text-[10px] text-muted-foreground pt-0.5">
             {flaggedCount > 0 && (
               <span className="flex items-center gap-0.5 text-orange-500">
-                <Flag size={9} className="fill-orange-500" /> {flaggedCount}
+                <Flag size={9} className="fill-flag" /> {flaggedCount}
               </span>
             )}
             {saving && <span className="ml-auto animate-pulse">กำลังบันทึก...</span>}
@@ -570,7 +570,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               const isAns = hasAnswered(a.id)
               const isFlg = flagged.has(a.id)
               let cls = 'bg-muted text-muted-foreground'
-              if (isCur)      cls = 'bg-primary text-white shadow-md shadow-blue-600/40 scale-110 z-10'
+              if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
               else if (isFlg) cls = 'bg-orange-500 text-white'
               else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-green-900/30'
               return (
