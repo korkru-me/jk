@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { CreditCard, Download, Zap, HardDrive, Crown, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-card border rounded-2xl overflow-hidden">
+    <Card className="overflow-hidden">
       <div className="px-6 py-4 border-b bg-muted/20 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
           <Icon size={15} className="text-primary" />
@@ -25,7 +26,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
         </div>
       </div>
       <div className="p-6">{children}</div>
-    </div>
+    </Card>
   )
 }
 

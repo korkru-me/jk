@@ -18,6 +18,7 @@ import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import type { StudentProfileRow } from './homeroom-overview'
 import type { SortKey as StudentTableSortKey, SortDir as StudentTableSortDir } from './student-table'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey } from '@/lib/student-sort'
+import { Card } from '@/components/ui/card'
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'ส่งแล้ว', graded: 'ส่งแล้ว', in_progress: 'กำลังทำ',
@@ -200,9 +201,9 @@ export function ClassroomScoresMatrix({
 
   if (assignments.length === 0) {
     return (
-      <div className="bg-card rounded-2xl ring-1 ring-border py-12 text-center text-sm text-muted-foreground">
+      <Card edge="ring" className="py-12 text-center text-sm text-muted-foreground">
         ยังไม่มีงานที่มอบหมายให้ห้องนี้
-      </div>
+      </Card>
     )
   }
 
@@ -265,11 +266,11 @@ export function ClassroomScoresMatrix({
       </p>
 
       {visibleAssignments.length === 0 ? (
-        <div className="bg-card rounded-2xl ring-1 ring-border py-12 text-center text-sm text-muted-foreground">
+        <Card edge="ring" className="py-12 text-center text-sm text-muted-foreground">
           ไม่พบงานที่ตรงกับตัวกรอง
-        </div>
+        </Card>
       ) : (
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-x-auto">
+      <Card edge="ring" className="overflow-x-auto">
         {/* border-separate (not -collapse): sticky positioning on table
             cells doesn't reliably paint over a collapsed border seam, which
             let scrolled-under content show through the gap between the
@@ -388,7 +389,7 @@ export function ClassroomScoresMatrix({
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
       )}
 
       {dialogTarget && (() => {

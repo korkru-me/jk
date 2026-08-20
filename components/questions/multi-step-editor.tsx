@@ -18,6 +18,7 @@ import { saveQuestionGroup, deleteQuestionGroup } from '@/lib/actions/question-g
 import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import type { SubQuestionData, QuestionGroupPayload } from '@/lib/actions/question-groups'
 import type { Variable, Difficulty, Visibility, QuestionCategory, FormulaPreset } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 interface MultiStepEditorProps {
   mode: 'create' | 'edit'
@@ -230,7 +231,7 @@ export function MultiStepEditor({
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Group header */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <Card radius="md" padding="xl" className="space-y-4">
         <h2 className="font-semibold text-foreground">ข้อมูลชุดโจทย์</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -330,7 +331,7 @@ export function MultiStepEditor({
             />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Sub-questions */}
       <div className="space-y-3">
@@ -359,7 +360,7 @@ export function MultiStepEditor({
       </div>
 
       {/* Preview section */}
-      <div className="bg-card border border-border rounded-xl p-5">
+      <Card radius="md" padding="lg">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-foreground">ดูตัวอย่างเฉลย</h2>
           <Button type="button" variant="outline" size="sm" onClick={handlePreview}>
@@ -392,7 +393,7 @@ export function MultiStepEditor({
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Actions */}
       <div className="flex items-center gap-3 pb-8">
@@ -442,7 +443,7 @@ function SubQuestionCard({
   const availableReferences = Array.from({ length: index }, (_, i) => i + 1)
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
+    <Card radius="md" className="overflow-hidden">
       {/* Card header */}
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted transition-colors"
@@ -568,6 +569,6 @@ function SubQuestionCard({
           />
         </div>
       )}
-    </div>
+    </Card>
   )
 }

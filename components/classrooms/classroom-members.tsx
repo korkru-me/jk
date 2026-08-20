@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { removeStudent, leaveClassroom } from '@/lib/actions/classrooms'
 import type { User } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 interface ClassroomMembersProps {
   classroomId: string
@@ -61,7 +62,7 @@ function StudentRow({
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-card border border-border rounded-xl">
+    <Card radius="md" className="flex items-center gap-3 px-4 py-3">
       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold shrink-0">
         {student.full_name.charAt(0)}
       </div>
@@ -86,6 +87,6 @@ function StudentRow({
           ออก
         </button>
       )}
-    </div>
+    </Card>
   )
 }

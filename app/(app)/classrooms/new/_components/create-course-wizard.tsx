@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { createClassroom } from '@/lib/actions/classrooms'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { ClassroomType } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -955,7 +956,7 @@ function Step1Content({
         />
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+      <Card padding="lg" className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -983,9 +984,9 @@ function Step1Content({
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+      <Card padding="lg" className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
             <CalendarDays className="w-4 h-4 text-warning" />
@@ -1015,7 +1016,7 @@ function Step1Content({
             <p>เมื่อถึงวันปิดคอร์ส ระบบจะเปลี่ยนเป็น <strong>Read-only</strong> — นักเรียนดูประวัติได้แต่ส่งคำตอบไม่ได้</p>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
@@ -1096,7 +1097,7 @@ export function CreateCourseWizard() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-8 items-start">
       {/* ── Left: Form ── */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+      <Card elevation="sm" className="overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-border">
           <div className="mb-5">
@@ -1165,13 +1166,13 @@ export function CreateCourseWizard() {
             )}
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* ── Right: Live Preview ── */}
       <div className="hidden lg:block">
-        <div className="sticky top-8 bg-card border border-border rounded-2xl shadow-sm p-5">
+        <Card elevation="sm" padding="lg" className="sticky top-8">
           <ClassroomPreviewCard values={values} />
-        </div>
+        </Card>
       </div>
     </div>
   )

@@ -7,6 +7,7 @@ import { MethodBuilder } from './method-builder'
 import { MethodCopy } from './method-copy'
 import { PreviewPanel } from './preview-panel'
 import type { Variable, FormulaPreset } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 interface FormulaEditorProps {
   variables: Variable[]
@@ -41,7 +42,7 @@ export function FormulaEditor({
   }
 
   return (
-    <div className="border rounded-xl overflow-hidden bg-card">
+    <Card radius="md" className="overflow-hidden">
       <Tabs defaultValue="auto">
         <div className="border-b bg-muted px-3 pt-2">
           <TabsList variant="line" className="w-full justify-start gap-0">
@@ -97,6 +98,6 @@ export function FormulaEditor({
       <div className="border-t">
         <PreviewPanel formula={value} variables={variables} unit={unit} />
       </div>
-    </div>
+    </Card>
   )
 }

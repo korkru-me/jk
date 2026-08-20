@@ -14,6 +14,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview'
 import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib/student-sort'
+import { Card } from '@/components/ui/card'
 
 export type SortKey = StudentSortKey
 export type SortDir = StudentSortDir
@@ -112,7 +113,7 @@ export function StudentTable({
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-x-auto">
+      <Card edge="ring" className="overflow-x-auto">
         {/* Header */}
         <div className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-muted border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
           {showRoster && (
@@ -227,7 +228,7 @@ export function StudentTable({
             })}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Student personal-info dialog (homeroom advisor only) */}
       <Dialog open={!!viewingProfile} onOpenChange={open => !open && setViewingProfile(null)}>

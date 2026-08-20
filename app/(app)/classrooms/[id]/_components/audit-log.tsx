@@ -1,6 +1,7 @@
 'use client'
 
 import { UserPlus, FileEdit, CheckSquare, LogIn, Bell, Trash2, Upload } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 type EventType = 'join' | 'submit' | 'edit' | 'login' | 'notify' | 'remove' | 'upload'
 interface LogEvent { id: string; type: EventType; message: string; time: string; actor: string }
@@ -28,7 +29,7 @@ const MOCK_EVENTS: LogEvent[] = [
 
 export function AuditLog() {
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+    <Card edge="ring" className="overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <p className="text-sm font-semibold text-foreground">ประวัติกิจกรรม</p>
         <span className="text-xs text-muted-foreground">{MOCK_EVENTS.length} รายการ</span>
@@ -58,6 +59,6 @@ export function AuditLog() {
           )
         })}
       </div>
-    </div>
+    </Card>
   )
 }

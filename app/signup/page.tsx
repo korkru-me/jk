@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { SignupForm } from '@/components/auth/signup-form'
+import { Card } from '@/components/ui/card'
 
 export const metadata: Metadata = { title: 'สมัครสมาชิก — KorKru' }
 
@@ -18,7 +19,7 @@ export default function SignupPage() {
         </div>
       </Link>
 
-      <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm dark:border-slate-700/60 dark:bg-slate-900">
+      <Card padding="2xl" elevation="sm" className="w-full max-w-lg dark:border-slate-700/60 dark:bg-slate-900">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-foreground">สมัครสมาชิก</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -26,7 +27,7 @@ export default function SignupPage() {
           </p>
         </div>
         <SignupForm />
-      </div>
+      </Card>
 
       <p className="mt-6 text-xs text-muted-foreground">
         © 2026 KorKru — ก่อการเรียนรู้ โดยครู

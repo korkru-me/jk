@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getClassroomInviteInfo } from '@/lib/actions/co-teachers'
 import { JoinClassroomClient } from './_client'
+import { Card } from '@/components/ui/card'
 
 interface Props {
   searchParams: Promise<{ token?: string }>
@@ -15,7 +16,7 @@ export default async function JoinClassroomPage({ searchParams }: Props) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted px-4">
-      <div className="w-full max-w-sm bg-card rounded-xl shadow-sm border p-8 space-y-6">
+      <Card radius="md" elevation="sm" padding="2xl" className="w-full max-w-sm space-y-6">
         {info ? (
           <JoinClassroomClient token={token} classroomName={info.classroomName} permission={info.permission} />
         ) : (
@@ -28,7 +29,7 @@ export default async function JoinClassroomPage({ searchParams }: Props) {
             </a>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

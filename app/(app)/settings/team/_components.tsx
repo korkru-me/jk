@@ -7,6 +7,7 @@ import type { OrgType, TeamOrg, TeamOrgMember } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -246,7 +247,7 @@ function TeamCard({ team }: { team: TeamOrgData }) {
   }
 
   return (
-    <div className="rounded-2xl border bg-card overflow-hidden">
+    <Card className="overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
@@ -289,7 +290,7 @@ function TeamCard({ team }: { team: TeamOrgData }) {
           </section>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 

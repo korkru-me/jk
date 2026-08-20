@@ -5,6 +5,7 @@ import { detectAnswerVar, extractRHS, parseVarsFromEquation } from './shared'
 import { Input } from '@/components/ui/input'
 import { useEffect, useRef, useState } from 'react'
 import type { PresetWithCat } from './shared'
+import { Card } from '@/components/ui/card'
 
 // ─── SubEquationPicker ────────────────────────────────────────────────────────
 // Lighter equation picker for sub questions — derives formula only, no variable management.
@@ -103,7 +104,7 @@ export function SubEquationPicker({
   }
 
   return (
-    <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+    <Card radius="md" elevation="sm" className="overflow-hidden">
       <div className="p-4 space-y-3">
         <SelectField
           label="สมการสำเร็จรูป"
@@ -191,6 +192,6 @@ export function SubEquationPicker({
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

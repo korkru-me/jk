@@ -1,31 +1,27 @@
 {
   "app/(app)/assignments/[id]/_components/assignment-detail-client.tsx": {
     "palette": 14,
-    "card": 7
+    "card": 1
   },
   "app/(app)/assignments/[id]/analytics/_components/analytics-client.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/competency-radar.tsx": {
     "palette": 1,
-    "card": 2
-  },
-  "app/(app)/assignments/[id]/analytics/_components/distractor-chart.tsx": {
-    "palette": 0,
-    "card": 2
+    "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/growth-tracker.tsx": {
     "palette": 1,
-    "card": 2
+    "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/item-analysis-chart.tsx": {
     "palette": 2,
-    "card": 3
+    "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/percentile-benchmark.tsx": {
     "palette": 8,
-    "card": 1
+    "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/score-override-modal.tsx": {
     "palette": 7,
@@ -37,7 +33,7 @@
   },
   "app/(app)/assignments/[id]/analytics/_components/student-score-table.tsx": {
     "palette": 10,
-    "card": 1
+    "card": 0
   },
   "app/(app)/assignments/[id]/export/_components/export-progress-modal.tsx": {
     "palette": 8,
@@ -49,11 +45,11 @@
   },
   "app/(app)/assignments/[id]/results/_components/results-client.tsx": {
     "palette": 5,
-    "card": 7
+    "card": 0
   },
   "app/(app)/assignments/_components/exam-dashboard.tsx": {
     "palette": 1,
-    "card": 3
+    "card": 1
   },
   "app/(app)/assignments/new/page.tsx": {
     "palette": 1,
@@ -61,11 +57,11 @@
   },
   "app/(app)/classrooms/[id]/_components/assignment-list.tsx": {
     "palette": 8,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/audit-log.tsx": {
     "palette": 4,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/breakout-groups.tsx": {
     "palette": 12,
@@ -73,7 +69,7 @@
   },
   "app/(app)/classrooms/[id]/_components/classroom-assignments-tab.tsx": {
     "palette": 3,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/classroom-detail-client.tsx": {
     "palette": 7,
@@ -81,15 +77,15 @@
   },
   "app/(app)/classrooms/[id]/_components/classroom-scores-matrix.tsx": {
     "palette": 7,
-    "card": 3
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/classroom-stream.tsx": {
     "palette": 2,
-    "card": 3
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/co-teachers.tsx": {
     "palette": 4,
-    "card": 5
+    "card": 1
   },
   "app/(app)/classrooms/[id]/_components/extension-dialog.tsx": {
     "palette": 7,
@@ -97,19 +93,19 @@
   },
   "app/(app)/classrooms/[id]/_components/homeroom-calendar.tsx": {
     "palette": 1,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/homeroom-overview.tsx": {
     "palette": 5,
-    "card": 4
+    "card": 1
   },
   "app/(app)/classrooms/[id]/_components/homeroom-student-view.tsx": {
     "palette": 4,
-    "card": 3
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/invite-panel.tsx": {
     "palette": 1,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/learning-paths.tsx": {
     "palette": 3,
@@ -117,15 +113,11 @@
   },
   "app/(app)/classrooms/[id]/_components/parent-portal.tsx": {
     "palette": 2,
-    "card": 2
-  },
-  "app/(app)/classrooms/[id]/_components/student-classroom-view.tsx": {
-    "palette": 0,
-    "card": 4
+    "card": 0
   },
   "app/(app)/classrooms/[id]/_components/student-table.tsx": {
     "palette": 4,
-    "card": 2
+    "card": 1
   },
   "app/(app)/classrooms/_components/classroom-card.tsx": {
     "palette": 14,
@@ -145,23 +137,23 @@
   },
   "app/(app)/classrooms/archived/page.tsx": {
     "palette": 1,
-    "card": 1
+    "card": 0
   },
   "app/(app)/classrooms/new/_components/create-course-wizard.tsx": {
     "palette": 8,
-    "card": 4
+    "card": 0
   },
   "app/(app)/classrooms/page.tsx": {
     "palette": 6,
-    "card": 2
+    "card": 1
   },
   "app/(app)/classrooms/trash/page.tsx": {
     "palette": 1,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/assignment-calendar.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/class-insights.tsx": {
     "palette": 3,
@@ -171,21 +163,17 @@
     "palette": 4,
     "card": 1
   },
-  "app/(app)/dashboard/_components/competency-radar.tsx": {
-    "palette": 0,
-    "card": 2
-  },
   "app/(app)/dashboard/_components/daily-tips.tsx": {
     "palette": 2,
     "card": 0
   },
   "app/(app)/dashboard/_components/engagement-heatmap.tsx": {
     "palette": 3,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/fork-remix.tsx": {
     "palette": 7,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/question-health.tsx": {
     "palette": 3,
@@ -193,43 +181,39 @@
   },
   "app/(app)/dashboard/_components/quick-create.tsx": {
     "palette": 5,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/quick-stats.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/recent-drafts.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/recent-submissions.tsx": {
     "palette": 1,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/resource-usage.tsx": {
     "palette": 3,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/students-at-risk.tsx": {
     "palette": 4,
-    "card": 1
+    "card": 0
   },
   "app/(app)/dashboard/_components/teacher-dashboard.tsx": {
     "palette": 1,
     "card": 2
   },
-  "app/(app)/dashboard/_components/upcoming-tasks.tsx": {
-    "palette": 0,
-    "card": 1
-  },
   "app/(app)/dashboard/page.tsx": {
     "palette": 14,
-    "card": 3
+    "card": 0
   },
   "app/(app)/my-submissions/page.tsx": {
     "palette": 0,
-    "card": 3
+    "card": 1
   },
   "app/(app)/questions/_components/preview-modal.tsx": {
     "palette": 9,
@@ -249,11 +233,7 @@
   },
   "app/(app)/questions/sets/_components/question-sets-client.tsx": {
     "palette": 8,
-    "card": 4
-  },
-  "app/(app)/settings/layout.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0
   },
   "app/(app)/settings/organization/_components.tsx": {
     "palette": 5,
@@ -261,11 +241,11 @@
   },
   "app/(app)/settings/team/_components.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "app/(app)/submissions/[id]/page.tsx": {
     "palette": 2,
-    "card": 4
+    "card": 0
   },
   "app/admin/dashboard/page.tsx": {
     "palette": 6,
@@ -285,19 +265,11 @@
   },
   "app/forgot-password/page.tsx": {
     "palette": 3,
-    "card": 1
-  },
-  "app/join-classroom/page.tsx": {
-    "palette": 0,
-    "card": 1
-  },
-  "app/join-org/page.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0
   },
   "app/login/page.tsx": {
     "palette": 3,
-    "card": 1
+    "card": 0
   },
   "app/pricing/page.tsx": {
     "palette": 5,
@@ -305,7 +277,7 @@
   },
   "app/signup/page.tsx": {
     "palette": 3,
-    "card": 1
+    "card": 0
   },
   "app/super-admin/layout.tsx": {
     "palette": 1,
@@ -313,19 +285,15 @@
   },
   "components/assignments/create-assignment-form.tsx": {
     "palette": 4,
-    "card": 11
-  },
-  "components/assignments/create-question-set-form.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0
   },
   "components/assignments/edit-assignment-form.tsx": {
     "palette": 1,
-    "card": 6
+    "card": 0
   },
   "components/assignments/question-picker.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "components/assignments/score-editor.tsx": {
     "palette": 2,
@@ -339,17 +307,9 @@
     "palette": 4,
     "card": 0
   },
-  "components/classrooms/classroom-members.tsx": {
-    "palette": 0,
-    "card": 1
-  },
-  "components/exam/calculator.tsx": {
-    "palette": 0,
-    "card": 1
-  },
   "components/exam/exam-client.tsx": {
     "palette": 37,
-    "card": 9
+    "card": 2
   },
   "components/exam/formula-sheet.tsx": {
     "palette": 15,
@@ -365,7 +325,7 @@
   },
   "components/landing/interactive-demo.tsx": {
     "palette": 25,
-    "card": 1
+    "card": 0
   },
   "components/landing/landing-footer.tsx": {
     "palette": 3,
@@ -395,10 +355,6 @@
     "palette": 6,
     "card": 0
   },
-  "components/questions/formula-editor/index.tsx": {
-    "palette": 0,
-    "card": 1
-  },
   "components/questions/formula-editor/method-auto.tsx": {
     "palette": 2,
     "card": 0
@@ -411,10 +367,6 @@
     "palette": 1,
     "card": 0
   },
-  "components/questions/general-info-section.tsx": {
-    "palette": 0,
-    "card": 1
-  },
   "components/questions/import-duplicate-dialog.tsx": {
     "palette": 1,
     "card": 0
@@ -425,15 +377,11 @@
   },
   "components/questions/mcq-auto-form.tsx": {
     "palette": 11,
-    "card": 5
+    "card": 4
   },
   "components/questions/mcq-form.tsx": {
     "palette": 7,
     "card": 0
-  },
-  "components/questions/multi-step-editor.tsx": {
-    "palette": 0,
-    "card": 3
   },
   "components/questions/question-preview.tsx": {
     "palette": 24,
@@ -449,11 +397,11 @@
   },
   "components/questions/random-numeric/preset-equation-selector.tsx": {
     "palette": 1,
-    "card": 2
+    "card": 0
   },
   "components/questions/random-numeric/pythagorean-mode-panel.tsx": {
     "palette": 19,
-    "card": 2
+    "card": 1
   },
   "components/questions/random-numeric/save-preset-control.tsx": {
     "palette": 1,
@@ -465,11 +413,7 @@
   },
   "components/questions/random-numeric/sub-equation-picker.tsx": {
     "palette": 2,
-    "card": 1
-  },
-  "components/questions/random-numeric/test-run-panel.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0
   },
   "components/questions/random-numeric/value-card.tsx": {
     "palette": 3,
@@ -481,7 +425,7 @@
   },
   "components/questions/special-char-input.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "components/questions/true-false-group-form.tsx": {
     "palette": 0,
@@ -489,35 +433,27 @@
   },
   "components/questions/variable-editor.tsx": {
     "palette": 10,
-    "card": 3
+    "card": 1
   },
   "components/settings/billing-settings.tsx": {
     "palette": 9,
-    "card": 1
+    "card": 0
   },
   "components/settings/branding-settings.tsx": {
     "palette": 2,
-    "card": 2
-  },
-  "components/settings/exam-defaults-settings.tsx": {
-    "palette": 0,
-    "card": 2
-  },
-  "components/settings/notification-settings.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0
   },
   "components/settings/profile-settings.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "components/settings/student-profile-settings.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0
   },
   "components/student/study-path-panel.tsx": {
     "palette": 18,
-    "card": 2
+    "card": 0
   },
   "components/super-admin/admin-dashboard.tsx": {
     "palette": 26,

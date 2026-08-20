@@ -14,6 +14,7 @@ import {
 } from '@/lib/actions/classroom-posts'
 import type { ClassroomPost } from '@/lib/types'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 interface Props {
   classroomId: string
@@ -42,7 +43,7 @@ export function ClassroomStream({ classroomId, canPost, initialPosts }: Props) {
   return (
     <div className="space-y-3">
       {canPost && (
-        <div className="bg-card border rounded-2xl p-4 space-y-3">
+        <Card padding="md" className="space-y-3">
           <Textarea
             placeholder="ประกาศอะไรถึงห้องเรียนนี้..."
             value={draft}
@@ -54,17 +55,17 @@ export function ClassroomStream({ classroomId, canPost, initialPosts }: Props) {
               <Send className="w-3.5 h-3.5" /> โพสต์ประกาศ
             </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {initialPosts.length === 0 ? (
-        <div className="bg-card border border-dashed rounded-2xl p-8 text-center">
+        <Card edge="dashed" padding="2xl" className="text-center">
           <p className="text-3xl mb-3">📣</p>
           <p className="font-semibold">ยังไม่มีประกาศ</p>
           <p className="text-sm text-muted-foreground mt-1">
             {canPost ? 'โพสต์ประกาศแรกถึงห้องเรียนนี้ได้เลย' : 'ครูจะประกาศข่าวสารต่าง ๆ ที่นี่'}
           </p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-3">
           {initialPosts.map(post => (
@@ -170,7 +171,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-8 z-20 bg-card border rounded-xl shadow-lg py-1 min-w-[160px]">
+                <Card radius="md" elevation="lg" className="absolute right-0 top-8 z-20 py-1 min-w-[160px]">
                   <button
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted transition-colors"
                     onClick={togglePin}
@@ -192,7 +193,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
                   >
                     <Trash2 className="w-3.5 h-3.5" /> ลบ
                   </button>
-                </div>
+                </Card>
               </>
             )}
           </div>

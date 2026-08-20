@@ -1,6 +1,7 @@
 'use client'
 
 import { Trophy, Users } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 function seedRand(seed: string, index: number): number {
   const h = [...seed].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
@@ -38,7 +39,7 @@ export function PercentileBenchmark({ mean, assignmentId, passingPercent = null 
   ]
 
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+    <Card edge="ring" padding="lg">
       <div className="flex items-center gap-3 mb-5">
         <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
           <Trophy className="w-5 h-5 text-warning" />
@@ -100,6 +101,6 @@ export function PercentileBenchmark({ mean, assignmentId, passingPercent = null 
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

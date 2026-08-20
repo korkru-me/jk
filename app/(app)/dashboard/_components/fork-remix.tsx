@@ -1,6 +1,7 @@
 'use client'
 
 import { GitFork, Tag } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 const TEMPLATES = [
   {
@@ -37,7 +38,7 @@ const TEMPLATES = [
 
 export function ForkRemix() {
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border overflow-hidden">
+    <Card radius="md" edge="ring" className="overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <GitFork className="w-4 h-4 text-muted-foreground" />
@@ -75,6 +76,6 @@ export function ForkRemix() {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

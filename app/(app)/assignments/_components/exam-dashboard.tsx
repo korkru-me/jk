@@ -9,6 +9,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { AssignmentRow } from '../page'
+import { Card } from '@/components/ui/card'
 
 type StudentSub = { id: string; status: string; total_score: number | null; max_score: number }
 
@@ -40,7 +41,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
 
       {assignments.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-card border rounded-2xl p-4 flex items-center gap-3">
+          <Card padding="md" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center">
               <Clock className="w-4 h-4 text-warning" />
             </div>
@@ -48,8 +49,8 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
               <p className="text-2xl font-bold leading-none">{pendingCount}</p>
               <p className="text-xs text-muted-foreground mt-0.5">รอทำ</p>
             </div>
-          </div>
-          <div className="bg-card border rounded-2xl p-4 flex items-center gap-3">
+          </Card>
+          <Card padding="md" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-success" />
             </div>
@@ -57,7 +58,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
               <p className="text-2xl font-bold leading-none">{doneCount}</p>
               <p className="text-xs text-muted-foreground mt-0.5">ส่งแล้ว</p>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 

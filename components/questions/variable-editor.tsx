@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import type { Variable, FormulaPreset } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ export function VariableEditor({
     <div className="space-y-5">
 
       {/* ══════════════ PICKER PANEL ══════════════ */}
-      <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+      <Card radius="md" elevation="sm" className="overflow-hidden">
 
         {/* Mode tabs */}
         <div className="flex border-b border-border">
@@ -321,7 +322,7 @@ export function VariableEditor({
             </div>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* ══════════════ VARIABLE LIST ══════════════ */}
       {variables.length > 0 && (
@@ -442,7 +443,7 @@ function ValueCard({ v, index, onUpdate, onRemove }: {
   onRemove: (i: number) => void
 }) {
   return (
-    <div className="group border border-border rounded-xl p-3.5 bg-card hover:border-primary/20 hover:shadow-sm transition-all">
+    <Card radius="md" className="group p-3.5 hover:border-primary/20 hover:shadow-sm transition-all">
       <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2.5 items-end">
         {/* Variable badge */}
         <div className="flex items-end pb-0.5">
@@ -480,7 +481,7 @@ function ValueCard({ v, index, onUpdate, onRemove }: {
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 

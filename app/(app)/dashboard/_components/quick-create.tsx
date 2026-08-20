@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { Plus, Library, ChevronRight } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 export function QuickCreate() {
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border p-4 space-y-3">
+    <Card radius="md" edge="ring" padding="md" className="space-y-3">
       <p className="text-sm font-semibold text-foreground">สร้างด่วน</p>
       <Link
         href="/questions/new"
@@ -33,6 +34,6 @@ export function QuickCreate() {
         </div>
         <ChevronRight className="w-4 h-4 text-blue-300 group-hover:text-primary transition-colors" />
       </Link>
-    </div>
+    </Card>
   )
 }

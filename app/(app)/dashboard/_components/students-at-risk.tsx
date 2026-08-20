@@ -2,6 +2,7 @@
 
 import { Mail, TrendingDown } from 'lucide-react'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 const AT_RISK_STUDENTS = [
   {
@@ -41,7 +42,7 @@ const AT_RISK_STUDENTS = [
 
 export function StudentsAtRisk() {
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border overflow-hidden">
+    <Card radius="md" edge="ring" className="overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div>
           <p className="text-sm font-semibold text-foreground">นักเรียนที่ต้องดูแลพิเศษ</p>
@@ -79,6 +80,6 @@ export function StudentsAtRisk() {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

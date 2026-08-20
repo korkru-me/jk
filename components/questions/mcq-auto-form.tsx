@@ -17,6 +17,7 @@ import { QuestionPreview } from './question-preview'
 import { createQuestion } from '@/lib/actions/questions'
 import { evaluateFormula } from '@/lib/math/evaluator'
 import type { Difficulty, Visibility, MCQOption, FormulaPreset, Variable } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url?: string) => void }) {
   return (
@@ -419,7 +420,7 @@ function EquationSection({
   }
 
   return (
-    <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+    <Card radius="md" elevation="sm" className="overflow-hidden">
       <div className="p-4 space-y-3">
         <SelectField
           label="สมการสำเร็จรูป"
@@ -494,7 +495,7 @@ function EquationSection({
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { BookOpen, Shuffle, Hash, Percent, ListOrdered } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-card border rounded-2xl overflow-hidden">
+    <Card className="overflow-hidden">
       <div className="px-6 py-4 border-b bg-muted/20 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
           <Icon size={15} className="text-primary" />
@@ -54,7 +55,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
         </div>
       </div>
       <div className="px-6">{children}</div>
-    </div>
+    </Card>
   )
 }
 
@@ -216,7 +217,7 @@ export function ExamDefaultsSettings() {
       </SectionCard>
 
       {/* ── Quick preset buttons ──────────────────────────────────────────── */}
-      <div className="bg-card border rounded-2xl p-5">
+      <Card padding="lg">
         <div className="flex items-center gap-2 mb-3">
           <ListOrdered size={14} className="text-muted-foreground" />
           <p className="text-sm font-medium">ตั้งค่าด่วนตามระดับ</p>
@@ -237,7 +238,7 @@ export function ExamDefaultsSettings() {
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Card } from '@/components/ui/card'
 
 function seededFraction(seed: string): number {
   let hash = 2166136261
@@ -55,7 +56,7 @@ export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
   const max = useMemo(() => Math.max(...data.map(day => day.count)), [data])
 
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border p-4">
+    <Card radius="md" edge="ring" padding="md">
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="text-sm font-semibold text-foreground">การเข้าใช้งาน 30 วันที่ผ่านมา</p>
@@ -102,6 +103,6 @@ export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
           ยอดสูงสุดช่วง <span className="font-semibold text-muted-foreground">ก่อนสอบกลางภาค</span> ({max} คน/วัน)
         </p>
       </div>
-    </div>
+    </Card>
   )
 }

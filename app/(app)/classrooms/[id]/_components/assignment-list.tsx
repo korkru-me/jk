@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
+import { Card } from '@/components/ui/card'
 
 export type { StudentAssignmentRow }
 
@@ -94,7 +95,7 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
       </div>
 
       {visible.length === 0 ? (
-        <div className="bg-card border border-dashed rounded-2xl p-8 text-center">
+        <Card edge="dashed" padding="2xl" className="text-center">
           <p className="text-3xl mb-3">{statusFilter === 'pending' && typeFilter === 'all' ? '🎉' : '📝'}</p>
           <p className="font-semibold">
             {statusFilter === 'pending' && typeFilter === 'all'
@@ -103,7 +104,7 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
               ? 'ยังไม่มีงานที่ส่งแล้ว'
               : 'ไม่มีงานในหมวดที่เลือก'}
           </p>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visible.map(a => (

@@ -16,6 +16,7 @@ import {
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale,
 } from 'lucide-react'
 import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -262,7 +263,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* ── Step 1: ข้อมูลพื้นฐาน ─────────────────────────────────────── */}
       {step === 0 && (
         <div className="space-y-4">
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <Card padding="xl" className="space-y-4">
             <h2 className="font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
 
             {preselectedSet && (
@@ -350,9 +351,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 />
               </label>
             )}
-          </div>
+          </Card>
 
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+          <Card padding="xl" className="space-y-3">
             <h2 className="font-semibold text-foreground">ประเภทงาน</h2>
             <div className="grid grid-cols-2 gap-3">
               {(['exercise', 'exam'] as const).map(t => (
@@ -375,9 +376,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 </button>
               ))}
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+          <Card padding="xl" className="space-y-3">
             <h2 className="font-semibold text-foreground">โหมดการสอบ</h2>
             <div className="grid grid-cols-2 gap-3">
               {(['online', 'print'] as const).map(m => (
@@ -397,7 +398,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 </button>
               ))}
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -405,7 +406,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {step === 1 && (
         <div className="space-y-4">
           {questionSets.length > 0 && (
-            <div className="bg-card border border-border rounded-2xl p-4 space-y-2.5">
+            <Card padding="md" className="space-y-2.5">
               <div className="flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-muted-foreground" />
                 <h3 className="text-sm font-semibold text-foreground">เพิ่มจากชุดโจทย์ที่มีอยู่</h3>
@@ -428,7 +429,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   )
                 })}
               </div>
-            </div>
+            </Card>
           )}
 
           <QuestionPicker
@@ -446,7 +447,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* ── Step 3: คะแนน ────────────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <Card padding="xl" className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-foreground">คะแนนแต่ละข้อ</h2>
               <span className="text-sm font-semibold text-primary">รวม {pointsSum} คะแนน</span>
@@ -475,9 +476,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+          <Card padding="xl" className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
                 <Scale className="w-4 h-4 text-muted-foreground" />
@@ -502,9 +503,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               />
               <span className="text-sm text-muted-foreground">คะแนน</span>
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-1.5">
+          <Card padding="xl" className="space-y-1.5">
             <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -557,13 +558,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 </span>
               </div>
             )}
-          </div>
+          </Card>
         </div>
       )}
 
       {/* ── Step 4: ตั้งค่า ──────────────────────────────────────────── */}
       {step === 3 && (
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
+        <Card padding="xl" className="space-y-5">
           <h2 className="font-semibold text-foreground">ตั้งค่าการสอบ</h2>
 
           <div className="space-y-1.5">
@@ -702,13 +703,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               className="max-w-[200px]"
             />
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Step 5: กำหนดการสอบ ───────────────────────────────────────── */}
       {step === 4 && (
         <div className="space-y-4">
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <Card padding="xl" className="space-y-4">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
               <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการสอบ (ไม่บังคับ)
             </h2>
@@ -722,7 +723,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 <Input id="eat" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Summary */}
           <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
@@ -802,7 +803,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* Work-image enforcement confirm dialog */}
       {showWorkImageConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+          <Card padding="xl" elevation="xl" className="max-w-sm w-full">
             <h3 className="font-bold text-lg text-foreground">บังคับแนบรูปวิธีทำหรือไม่?</h3>
             <p className="text-sm text-muted-foreground mt-2">
               ชุดข้อสอบนี้มีโจทย์ที่ตั้งค่าไว้ให้นักเรียนต้องแนบรูปวิธีทำ
@@ -825,14 +826,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ยกเลิก
               </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Publish timing dialog */}
       {showPublishDialog && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+          <Card padding="xl" elevation="xl" className="max-w-sm w-full">
             <h3 className="font-bold text-lg text-foreground">เผยแพร่{assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?</h3>
             <p className="text-sm text-muted-foreground mt-2">
               เลือกได้ว่าจะให้นักเรียนเห็นและเริ่มทำได้ทันที ตั้งเวลาให้เปิดล่วงหน้า หรือเก็บไว้เป็นร่างก่อนแล้วค่อยเผยแพร่ทีหลัง
@@ -881,7 +882,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 </div>
               </div>
             )}
-          </div>
+          </Card>
         </div>
       )}
     </div>

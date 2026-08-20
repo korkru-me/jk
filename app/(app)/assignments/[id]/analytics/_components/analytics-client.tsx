@@ -14,6 +14,7 @@ import { StatCards } from './stat-cards'
 import { CompetencyRadarChart } from './competency-radar'
 import { GrowthTracker } from './growth-tracker'
 import { PercentileBenchmark } from './percentile-benchmark'
+import { Card } from '@/components/ui/card'
 
 const ItemAnalysisSection = dynamic(
   () => import('./item-analysis-chart').then(mod => mod.ItemAnalysisSection),
@@ -122,7 +123,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
           {showExport && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
-              <div className="absolute right-0 mt-1.5 w-48 bg-card rounded-xl ring-1 ring-border shadow-lg z-20 py-1 overflow-hidden">
+              <Card radius="md" edge="ring" elevation="lg" className="absolute right-0 mt-1.5 w-48 z-20 py-1 overflow-hidden">
                 <button
                   onClick={exportCsv}
                   className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
@@ -137,7 +138,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
                   <FilePdf className="w-4 h-4 text-destructive" />
                   Export as PDF
                 </button>
-              </div>
+              </Card>
             </>
           )}
         </div>

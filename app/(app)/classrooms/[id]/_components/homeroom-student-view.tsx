@@ -3,6 +3,7 @@ import { ChevronLeft, GraduationCap, Users, Home, Megaphone } from 'lucide-react
 import { ClassroomStream } from './classroom-stream'
 import { AssignmentCalendar, type CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import type { Classroom, ClassroomPost } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 interface Classmate { id: string; full_name: string }
 
@@ -57,7 +58,7 @@ export function HomeroomStudentView({
       </div>
 
       {/* Personal compliance — visible only to this student, never to classmates */}
-      <div className="bg-card border rounded-2xl p-5">
+      <Card padding="lg">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold">ภาพรวมของฉัน</p>
@@ -77,7 +78,7 @@ export function HomeroomStudentView({
             </p>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* Calendar — due dates aggregated from every subject classroom this
           student belongs to, since the homeroom itself has no assignments. */}
@@ -89,11 +90,11 @@ export function HomeroomStudentView({
           <Users className="w-4 h-4 text-muted-foreground" /> เพื่อนร่วมห้อง
         </h2>
         {classmates.length === 0 ? (
-          <div className="bg-card border border-dashed rounded-2xl p-6 text-center text-sm text-muted-foreground">
+          <Card edge="dashed" padding="xl" className="text-center text-sm text-muted-foreground">
             ยังไม่มีเพื่อนคนอื่นในห้องนี้
-          </div>
+          </Card>
         ) : (
-          <div className="bg-card border rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Card padding="md" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {classmates.map(s => (
               <div key={s.id} className="flex items-center gap-2 min-w-0">
                 <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
@@ -102,7 +103,7 @@ export function HomeroomStudentView({
                 <span className="text-sm truncate">{s.full_name}</span>
               </div>
             ))}
-          </div>
+          </Card>
         )}
       </div>
 

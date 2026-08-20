@@ -14,6 +14,7 @@ import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@
 import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { Assignment, Question } from '@/lib/types'
 import type { SubmissionRow } from '../page'
+import { Card } from '@/components/ui/card'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-gray-400' },
@@ -301,7 +302,7 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
 
       {/* Progress bar */}
       {totalSubs > 0 && (
-        <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+        <Card edge="ring" padding="lg">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="font-medium text-muted-foreground">ความคืบหน้าการส่ง</span>
             <span className="text-muted-foreground">{submittedCount} / {totalSubs} คน</span>
@@ -315,11 +316,11 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
           <p className="text-xs text-muted-foreground mt-2">
             {inProgressCount > 0 && `${inProgressCount} คนกำลังทำอยู่`}
           </p>
-        </div>
+        </Card>
       )}
 
       {/* Info */}
-      <div className="bg-card rounded-2xl ring-1 ring-border p-5 space-y-3">
+      <Card edge="ring" padding="lg" className="space-y-3">
         <h3 className="font-semibold text-foreground text-sm">ข้อมูลชุดข้อสอบ</h3>
         <div className="divide-y divide-border">
           {[
@@ -338,7 +339,7 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
             </div>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
@@ -365,7 +366,7 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
         <span className="text-xs text-muted-foreground self-center ml-auto">{questions.length} ข้อรวม</span>
       </div>
 
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+      <Card edge="ring" className="overflow-hidden">
         {questions.map((q, i) => {
           const diff = DIFF_META[q.difficulty]
           return (
@@ -389,7 +390,7 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }
@@ -436,7 +437,7 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
         </div>
       </div>
 
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+      <Card edge="ring" className="overflow-hidden">
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-0 text-xs font-medium text-muted-foreground px-5 py-2.5 border-b border-border">
           <span>ชื่อนักเรียน</span>
           <span className="text-right w-20">สถานะ</span>
@@ -479,7 +480,7 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }
@@ -520,7 +521,7 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
   return (
     <div className="space-y-5">
       {/* Score distribution */}
-      <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+      <Card edge="ring" padding="lg">
         <h3 className="font-semibold text-foreground text-sm mb-4">การกระจายคะแนน ({submissions.length} คน)</h3>
         <div className="flex items-end gap-3 h-32">
           {buckets.map((count, i) => {
@@ -540,10 +541,10 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
             )
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Per-question accuracy */}
-      <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+      <Card edge="ring" padding="lg">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-foreground text-sm">ความแม่นยำรายข้อ</h3>
           <span className="text-xs text-muted-foreground">เฉลี่ย {avgAcc}%</span>
@@ -571,7 +572,7 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
             )
           })}
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

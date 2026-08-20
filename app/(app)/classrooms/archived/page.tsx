@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ArchivedActionsClient } from './_components/archived-actions-client'
 import type { Classroom } from '@/lib/types'
 import { Archive, ArrowLeft } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียนที่เก็บถาวร — KorKru' }
@@ -54,7 +55,7 @@ export default async function ArchivedClassroomsPage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+        <Card edge="ring" className="overflow-hidden">
           <div className="p-4 border-b border-border bg-warning/10">
             <p className="text-sm text-warning">
               ห้องเรียนที่เก็บถาวรยังคงดูข้อมูลย้อนหลังได้ แต่ไม่รับงานใหม่
@@ -65,7 +66,7 @@ export default async function ArchivedClassroomsPage() {
               <ArchivedActionsClient key={c.id} classroom={c} />
             ))}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   )

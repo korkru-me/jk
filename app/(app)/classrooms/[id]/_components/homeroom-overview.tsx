@@ -12,6 +12,7 @@ import { selectOfficialAttempt } from '@/lib/scoring'
 import { addStudentNote, deleteStudentNote } from '@/lib/actions/homeroom-notes'
 import { HomeroomCalendar, type HomeroomCalendarEvent } from './homeroom-calendar'
 import type { HomeroomAssignmentRow, HomeroomSubmissionRow as SubmissionRow } from '@/lib/homeroom-data'
+import { Card } from '@/components/ui/card'
 
 export interface StudentNoteRow {
   id: string
@@ -237,15 +238,15 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
       </div>
 
       {assignments.length === 0 ? (
-        <div className="bg-card rounded-2xl ring-1 ring-border py-10 text-center text-sm text-muted-foreground">
+        <Card edge="ring" className="py-10 text-center text-sm text-muted-foreground">
           ยังไม่มีการบ้านจากห้องเรียนวิชาของนักเรียนกลุ่มนี้
-        </div>
+        </Card>
       ) : (
         <>
           <HomeroomCalendar events={calendarEvents} />
 
           {/* Matrix */}
-          <div className="bg-card rounded-2xl ring-1 ring-border overflow-x-auto">
+          <Card edge="ring" className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border">
@@ -310,12 +311,12 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
         </>
       )}
 
       {/* Compliance + private notes */}
-      <div className="bg-card rounded-2xl ring-1 ring-border p-4">
+      <Card edge="ring" padding="md">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
           <AlertTriangle className="w-3.5 h-3.5" /> ความรับผิดชอบในการส่งงาน, ข้อมูลส่วนตัว และบันทึกครูที่ปรึกษา
         </div>
@@ -363,7 +364,7 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
             )
           })}
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

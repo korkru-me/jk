@@ -8,6 +8,7 @@ import type { AnalyticsSubmissionRow } from '../page'
 import type { ScoreOverride } from './analytics-client'
 import { ScoreOverrideModal } from './score-override-modal'
 import { computePassed } from '@/lib/grading'
+import { Card } from '@/components/ui/card'
 
 function getInitials(name: string): string {
   return name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
@@ -136,7 +137,7 @@ export function StudentScoreTable({
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+      <Card edge="ring" className="overflow-hidden">
         {/* Header */}
         <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-0 px-5 py-3 border-b border-border bg-muted/80">
           <button
@@ -248,7 +249,7 @@ export function StudentScoreTable({
             </div>
           )
         })}
-      </div>
+      </Card>
 
       {/* Override modal */}
       {editingId && editingSub && (

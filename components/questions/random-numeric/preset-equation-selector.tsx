@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { useEffect, useMemo, useState } from 'react'
 import type { PresetWithCat } from './shared'
 import type { LogicRule, Variable } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 // ─── PresetEquationSelector ───────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ export function PresetEquationSelector({
   const exactMatch = presets.some(p => normalizeEq(p.equation) === normalizeEq(equationText))
 
   return (
-    <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+    <Card radius="md" elevation="sm" className="overflow-hidden">
       <div className="p-4 space-y-3">
         <div className="space-y-1">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">สมการ</p>
@@ -150,7 +151,7 @@ export function PresetEquationSelector({
               className="h-9 text-sm font-mono"
             />
             {showSuggestions && matches.length > 0 && (
-              <div className="absolute z-10 top-full left-0 mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+              <Card radius="sm" elevation="lg" className="absolute z-10 top-full left-0 mt-1 w-full overflow-hidden max-h-60 overflow-y-auto">
                 {matches.map(p => (
                   <button
                     key={p.id}
@@ -163,7 +164,7 @@ export function PresetEquationSelector({
                     <p className="text-xs font-mono text-muted-foreground">{p.equation}</p>
                   </button>
                 ))}
-              </div>
+              </Card>
             )}
           </div>
           <p className="text-[11px] text-primary">
@@ -236,6 +237,6 @@ export function PresetEquationSelector({
           />
         </div>
       )}
-    </div>
+    </Card>
   )
 }

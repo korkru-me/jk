@@ -2,6 +2,7 @@ import { SettingsNav } from '@/components/settings/settings-nav'
 import { Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
+import { Card } from '@/components/ui/card'
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -26,9 +27,9 @@ export default async function SettingsLayout({ children }: { children: React.Rea
       <div className="flex gap-6 items-start">
         {/* Left: Settings sidebar nav */}
         <aside className="w-60 shrink-0 sticky top-0">
-          <div className="bg-card border rounded-2xl p-2">
+          <Card className="p-2">
             <SettingsNav role={profile?.role} />
-          </div>
+          </Card>
         </aside>
 
         {/* Right: Content */}

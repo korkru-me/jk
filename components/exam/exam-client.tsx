@@ -26,6 +26,7 @@ import { partLabels } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, CompositePart } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -349,7 +350,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-y-auto">
 
         {/* Question card */}
-        <div className="bg-card border rounded-2xl p-5 space-y-4">
+        <Card padding="lg" className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="font-mono text-xs">ข้อ {currentIndex + 1} / {answers.length}</Badge>
             {current.questions.question_type === 'mcq' && (
@@ -420,10 +421,10 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               </div>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Answer inputs */}
-        <div className="bg-card border rounded-2xl p-5">
+        <Card padding="lg">
           {current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
             <MCQInput
               answerId={current.id}
@@ -481,7 +482,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
             />
           )}
-        </div>
+        </Card>
 
         {/* Prev / Next */}
         <div className="flex items-center gap-3 pb-2">
@@ -535,7 +536,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         )}
 
         {/* Progress */}
-        <div className="bg-card border rounded-2xl p-4 space-y-2">
+        <Card padding="md" className="space-y-2">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>คืบหน้า</span>
             <span className="font-semibold text-foreground">{answeredCount}/{answers.length}</span>
@@ -559,10 +560,10 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               </span>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Nav grid */}
-        <div className="bg-card border rounded-2xl p-4 flex-1">
+        <Card padding="md" className="flex-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">นำทางข้อ</p>
           <div className="grid grid-cols-5 gap-1.5">
             {answers.map((a, i) => {
@@ -597,7 +598,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
         {/* Anti-cheat counter */}
         {tabSwitchCount > 0 && (
@@ -770,7 +771,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       {/* ── Submit confirmation dialog ──────────────────────────────────────── */}
       {showSubmitConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-card border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+          <Card padding="xl" elevation="xl" className="max-w-sm w-full mx-4">
             <div className="text-center mb-5">
               <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 size={28} className="text-success" />
@@ -831,7 +832,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                   : 'ยืนยันส่งเลย'}
               </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </>
@@ -857,7 +858,7 @@ function PreviewResultSummary({
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 py-4">
-      <div className="bg-card border rounded-2xl p-8 text-center">
+      <Card padding="2xl" className="text-center">
         <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-3xl font-black mb-4 ${
           pct >= 75 ? 'bg-success/10 text-success'
           : pct >= 50 ? 'bg-warning/10 text-warning'
@@ -886,7 +887,7 @@ function PreviewResultSummary({
         >
           กลับไปหน้าชุดข้อสอบ
         </a>
-      </div>
+      </Card>
 
       <div className="space-y-2">
         <h2 className="font-semibold text-sm px-1">ตรวจเฉลยทีละข้อ</h2>
@@ -945,7 +946,7 @@ function ExamToolbar({
   toolBtn: (active: boolean) => string
 }) {
   return (
-    <div className="bg-card border rounded-2xl px-4 py-2.5 flex items-center gap-2 flex-wrap">
+    <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
       {/* Left: Tool buttons */}
       <div className="flex items-center gap-2">
         {config.isCalculatorEnabled && (
@@ -999,7 +1000,7 @@ function ExamToolbar({
         <Maximize2 size={13} />
         <span className="hidden sm:inline">โฟกัส</span>
       </button>
-    </div>
+    </Card>
   )
 }
 

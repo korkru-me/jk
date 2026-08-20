@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Upload, Palette, Image as ImageIcon, X, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-card border rounded-2xl overflow-hidden">
+    <Card className="overflow-hidden">
       <div className="px-6 py-4 border-b bg-muted/20 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
           <Icon size={15} className="text-primary" />
@@ -25,7 +26,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
         </div>
       </div>
       <div className="p-6">{children}</div>
-    </div>
+    </Card>
   )
 }
 
@@ -173,7 +174,7 @@ function BrandPreview({ logoPreview, primaryColor, orgName }: {
   orgName: string
 }) {
   return (
-    <div className="rounded-2xl border bg-card dark:bg-zinc-900 overflow-hidden shadow-sm">
+    <Card elevation="sm" className="dark:bg-zinc-900 overflow-hidden">
       {/* Mock topbar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b" style={{ backgroundColor: primaryColor + '18' }}>
         {logoPreview ? (
@@ -199,7 +200,7 @@ function BrandPreview({ logoPreview, primaryColor, orgName }: {
           ดูตัวอย่างปุ่ม
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 

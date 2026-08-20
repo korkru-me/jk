@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { X, Delete, History, RotateCcw } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 interface CalculatorProps {
   onClose: () => void
@@ -130,7 +131,7 @@ export function Calculator({ onClose }: CalculatorProps) {
   }
 
   return (
-    <div className="w-72 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+    <Card elevation="xl" className="w-72 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
@@ -254,6 +255,6 @@ export function Calculator({ onClose }: CalculatorProps) {
           <button onClick={() => append('+')} className={BTN_OP}>+</button>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

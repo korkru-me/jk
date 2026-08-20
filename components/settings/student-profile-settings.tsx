@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { StudentProfile, StudentGuardian, NamePrefix } from '@/lib/types'
 import { buildFullName } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 import {
   User, Lock, GraduationCap, Phone, Info, Eye, EyeOff, Plus, X,
 } from 'lucide-react'
@@ -25,7 +26,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-card border rounded-2xl overflow-hidden">
+    <Card className="overflow-hidden">
       <div className="px-6 py-4 border-b bg-muted/20 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
           <Icon size={15} className="text-primary" />
@@ -36,7 +37,7 @@ function SectionCard({ title, description, icon: Icon, children }: {
         </div>
       </div>
       <div className="p-6">{children}</div>
-    </div>
+    </Card>
   )
 }
 

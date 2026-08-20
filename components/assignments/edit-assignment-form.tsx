@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import type { Assignment, Question, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -121,7 +122,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <Card padding="xl" className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="edit-title">ชื่อชุดข้อสอบ</Label>
           <Input id="edit-title" value={title} onChange={e => setTitle(e.target.value)} />
@@ -130,9 +131,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
           <Label htmlFor="edit-desc">คำอธิบาย</Label>
           <Textarea id="edit-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
         </div>
-      </div>
+      </Card>
 
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <Card padding="xl" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-foreground">คะแนนแต่ละข้อ</h2>
           <span className="text-sm font-semibold text-primary">รวม {pointsSum} คะแนน</span>
@@ -161,9 +162,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+      <Card padding="xl" className="space-y-3">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
             <Scale className="w-4 h-4 text-muted-foreground" />
@@ -189,9 +190,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
           />
           <span className="text-sm text-muted-foreground">คะแนน</span>
         </div>
-      </div>
+      </Card>
 
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-1.5">
+      <Card padding="xl" className="space-y-1.5">
         <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -244,9 +245,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
             </span>
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <Card padding="xl" className="space-y-4">
         <h2 className="font-semibold text-foreground flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการ
         </h2>
@@ -274,9 +275,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
             className="max-w-[200px]"
           />
         </div>
-      </div>
+      </Card>
 
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <Card padding="xl" className="space-y-4">
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5">
             <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
@@ -341,7 +342,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-start gap-2 text-sm text-amber-800">
         <FileText className="w-4 h-4 shrink-0 mt-0.5" />

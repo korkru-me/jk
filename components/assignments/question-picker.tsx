@@ -8,6 +8,7 @@ import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { setRequiresWorkImage } from '@/lib/actions/questions'
 import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
+import { Card } from '@/components/ui/card'
 
 interface Props {
   questions: AssignmentQuestionOption[]
@@ -74,7 +75,7 @@ export function QuestionPicker({
   const orderedQs = [...pinnedQs, ...restQs]
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+    <Card padding="xl" className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-foreground">{title}</h2>
         <span className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
@@ -209,6 +210,6 @@ export function QuestionPicker({
           </div>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

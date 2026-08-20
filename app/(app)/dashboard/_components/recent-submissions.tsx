@@ -1,6 +1,7 @@
 'use client'
 
 import { Clock, CheckCircle2, AlertCircle, FileText } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 const SUBMISSIONS = [
   {
@@ -63,7 +64,7 @@ const STATUS_CONFIG = {
 
 export function RecentSubmissions() {
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border overflow-hidden">
+    <Card radius="md" edge="ring" className="overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <p className="text-sm font-semibold text-foreground">การส่งงานล่าสุด</p>
         <button className="text-xs text-primary hover:underline">ดูทั้งหมด</button>
@@ -106,6 +107,6 @@ export function RecentSubmissions() {
           )
         })}
       </div>
-    </div>
+    </Card>
   )
 }

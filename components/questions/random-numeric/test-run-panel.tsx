@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import type { TrialSummary } from '@/lib/math/evaluator'
 import type { LogicRule, PythagoreanGroup, Variable } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 // ─── TestRunPanel ─────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export function TestRunPanel({ variables, logicRules, formula, answerStep, pytha
       </button>
 
       {summary && (
-        <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+        <Card radius="md" elevation="sm" className="overflow-hidden">
           <div className="p-4 space-y-3 bg-muted border-b border-border">
             <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
@@ -110,7 +111,7 @@ export function TestRunPanel({ variables, logicRules, formula, answerStep, pytha
               )}
             </div>
           )}
-        </div>
+        </Card>
       )}
     </div>
   )

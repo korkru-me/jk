@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { Link2, Hash, Upload, Copy, Check, FileText, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 interface Props {
   classCode: string
@@ -42,7 +43,7 @@ export function InvitePanel({ classCode, classroomId }: Props) {
   ] as const
 
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+    <Card edge="ring" className="overflow-hidden">
       {/* Tab bar */}
       <div className="flex border-b border-border">
         {TABS.map(t => {
@@ -169,6 +170,6 @@ export function InvitePanel({ classCode, classroomId }: Props) {
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

@@ -12,6 +12,7 @@ import { exportQuestionSet } from '@/lib/actions/question-export'
 import { downloadTextFile, cn } from '@/lib/utils'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import type { QuestionSetSummary, QuestionSetSummaryWithCreator } from '../page'
+import { Card } from '@/components/ui/card'
 
 interface Props {
   mySets: QuestionSetSummary[]
@@ -129,10 +130,10 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
               {mySets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">ยังไม่มีชุดโจทย์ของคุณ</p>
               ) : filteredMine.length === 0 ? (
-                <div className="text-center py-16 bg-card rounded-2xl ring-1 ring-border">
+                <Card edge="ring" className="text-center py-16">
                   <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                   <p className="text-muted-foreground font-medium">ไม่พบชุดโจทย์ที่ตรงกัน</p>
-                </div>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {filteredMine.map(set => <SetCard key={set.id} set={set} currentUserId={currentUserId} />)}
@@ -147,10 +148,10 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
               {teamSets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">ยังไม่มีชุดโจทย์ที่ทีมแชร์ไว้</p>
               ) : filteredTeam.length === 0 ? (
-                <div className="text-center py-16 bg-card rounded-2xl ring-1 ring-border">
+                <Card edge="ring" className="text-center py-16">
                   <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                   <p className="text-muted-foreground font-medium">ไม่พบชุดโจทย์ที่ตรงกัน</p>
-                </div>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {filteredTeam.map(set => <SetCard key={set.id} set={set} currentUserId={currentUserId} />)}
@@ -190,7 +191,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
   if (deleted) return null
 
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border p-4 space-y-3 flex flex-col">
+    <Card edge="ring" padding="md" className="space-y-3 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
           <Layers className="w-4 h-4 text-primary" />
@@ -267,13 +268,13 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
           </Button>
         </Link>
       </div>
-    </div>
+    </Card>
   )
 }
 
 function EmptyState() {
   return (
-    <div className="text-center py-24 bg-card rounded-2xl ring-1 ring-border">
+    <Card edge="ring" className="text-center py-24">
       <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
         <Layers className="w-8 h-8 text-primary" />
       </div>
@@ -286,6 +287,6 @@ function EmptyState() {
           <Plus className="w-4 h-4" /> สร้างชุดโจทย์แรก
         </Button>
       </Link>
-    </div>
+    </Card>
   )
 }

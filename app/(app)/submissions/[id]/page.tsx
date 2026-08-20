@@ -14,6 +14,7 @@ import { evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStudent } from '@/lib/scoring'
 import { sortStudents } from '@/lib/student-sort'
 import { ScoreEditor } from '@/components/assignments/score-editor'
+import { Card } from '@/components/ui/card'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -174,7 +175,7 @@ export default async function SubmissionResultPage({
 
       {/* Prev/next student — teacher only */}
       {isTeacherViewer && (prevNav || nextNav) && (
-        <div className="flex items-center justify-between text-sm bg-card border rounded-xl px-4 py-2.5">
+        <Card radius="md" className="flex items-center justify-between text-sm px-4 py-2.5">
           {prevNav ? (
             <Link href={`/submissions/${prevNav.submissionId}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary min-w-0">
               <ChevronLeft size={15} className="shrink-0" /> <span className="truncate">{prevNav.label}</span>
@@ -185,11 +186,11 @@ export default async function SubmissionResultPage({
               <span className="truncate">{nextNav.label}</span> <ChevronRight size={15} className="shrink-0" />
             </Link>
           ) : <span />}
-        </div>
+        </Card>
       )}
 
       {/* Score summary */}
-      <div className="bg-card border rounded-2xl p-8 text-center relative overflow-hidden">
+      <Card padding="2xl" className="text-center relative overflow-hidden">
         {/* Background decoration */}
         <div className={`absolute inset-0 opacity-5 ${
           !canShowScore ? 'bg-primary' : pct >= 75 ? 'bg-success' : pct >= 50 ? 'bg-warning' : 'bg-destructive'
@@ -305,11 +306,11 @@ export default async function SubmissionResultPage({
             </div>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* Answer review */}
       {!canShowAnswers && (
-        <div className="bg-card border border-dashed rounded-2xl p-6 text-center text-sm text-muted-foreground">
+        <Card edge="dashed" padding="xl" className="text-center text-sm text-muted-foreground">
           {assignment.show_results === 'never' ? (
             <>🔒 ครูกำหนดไม่แสดงคะแนนและเฉลยสำหรับงานนี้</>
           ) : assignment.show_results === 'score_only' ? (
@@ -322,13 +323,13 @@ export default async function SubmissionResultPage({
               )}
             </>
           )}
-        </div>
+        </Card>
       )}
       {canShowAnswers && (
         <Suspense fallback={(
-          <div className="bg-card border rounded-2xl p-6 text-center text-sm text-muted-foreground">
+          <Card padding="xl" className="text-center text-sm text-muted-foreground">
             กำลังโหลดรายละเอียดคำตอบ...
-          </div>
+          </Card>
         )}>
           <SubmissionAnswerDetails submissionId={id} isTeacherViewer={isTeacherViewer} />
         </Suspense>

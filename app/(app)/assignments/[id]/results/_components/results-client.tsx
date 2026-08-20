@@ -8,6 +8,7 @@ import { ScoreEditor } from '@/components/assignments/score-editor'
 import { computePassed } from '@/lib/grading'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSortDir, type SortableStudentProfile } from '@/lib/student-sort'
 import type { Question } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 export interface SubmittedRow {
   id: string
@@ -139,22 +140,22 @@ export function ResultsClient({
 
       {/* Summary cards */}
       <div className={`grid gap-3 ${hasPassingThreshold ? 'grid-cols-4' : 'grid-cols-3'}`}>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
+        <Card radius="md" padding="md" className="text-center">
           <p className="text-xs text-muted-foreground">ส่งแล้ว</p>
           <p className="text-2xl font-bold text-foreground mt-1">{submitted.length}</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
+        </Card>
+        <Card radius="md" padding="md" className="text-center">
           <p className="text-xs text-muted-foreground">คะแนนเฉลี่ย</p>
           <p className="text-2xl font-bold text-foreground mt-1">
             {avgScore !== null ? avgScore.toFixed(1) : '—'}/{maxScore}
           </p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
+        </Card>
+        <Card radius="md" padding="md" className="text-center">
           <p className="text-xs text-muted-foreground">กำลังทำ</p>
           <p className="text-2xl font-bold text-foreground mt-1">{inProgressCount}</p>
-        </div>
+        </Card>
         {hasPassingThreshold && (
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <Card radius="md" padding="md" className="text-center">
             <p className="text-xs text-muted-foreground">
               ผ่านเกณฑ์ ({passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน`})
             </p>
@@ -163,7 +164,7 @@ export function ResultsClient({
               <span className="text-gray-300"> / </span>
               <span className="text-destructive">{submitted.length - passCount}</span>
             </p>
-          </div>
+          </Card>
         )}
       </div>
 
@@ -231,7 +232,7 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
   passingValue: number | null
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden overflow-x-auto">
+    <Card radius="md" className="overflow-hidden overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted border-b border-border">
           <tr>
@@ -298,7 +299,7 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
           )}
         </tbody>
       </table>
-    </div>
+    </Card>
   )
 }
 
@@ -327,7 +328,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
   return (
     <div className="space-y-3">
       {/* Question stepper */}
-      <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+      <Card radius="md" padding="md" className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => onChangeIndex(Math.max(0, activeQuestionIndex - 1))}
@@ -349,10 +350,10 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
         </div>
         {activeQuestion.title && <p className="text-sm font-medium text-foreground">{activeQuestion.title}</p>}
         <QuestionText text={activeQuestion.question_text} />
-      </div>
+      </Card>
 
       {/* Per-student answer grid */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden overflow-x-auto">
+      <Card radius="md" className="overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted border-b border-border">
             <tr>
@@ -407,7 +408,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   )
 }

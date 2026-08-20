@@ -3,6 +3,7 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { chartColors, chartSeries } from '@/lib/chart-colors'
 import type { Question } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 function seedRand(seed: string, index: number): number {
   const h = [...seed].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
@@ -31,10 +32,10 @@ const CustomTooltip = ({ active, payload }: any) => {
     ? 'คำตอบที่ถูกต้อง'
     : DISTRACTOR_NOTES_WRONG[item.payload.distractorIdx % DISTRACTOR_NOTES_WRONG.length]
   return (
-    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-xs max-w-[200px]">
+    <Card radius="md" elevation="lg" className="px-3 py-2 text-xs max-w-[200px]">
       <p className="font-bold text-foreground mb-1">{item.name}: {item.value}%</p>
       <p className="text-muted-foreground leading-relaxed">{note}</p>
-    </div>
+    </Card>
   )
 }
 
@@ -84,7 +85,7 @@ export function DistractorChart({ question, qLabel, assignmentId }: Props) {
   const topDistractor = data.filter(d => !d.isCorrect).sort((a, b) => b.value - a.value)[0]
 
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border p-5 h-full">
+    <Card edge="ring" padding="lg" className="h-full">
       <p className="text-sm font-semibold text-foreground mb-0.5">Distractor Analysis</p>
       <p className="text-xs text-muted-foreground mb-1">{qLabel} — สัดส่วนการเลือกตอบ</p>
 
@@ -131,6 +132,6 @@ export function DistractorChart({ question, qLabel, assignmentId }: Props) {
           </p>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

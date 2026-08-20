@@ -15,6 +15,7 @@ import { SmartTagInput } from '@/components/ui/smart-tag-input'
 import { TeamShareChips } from '@/components/questions/general-info-section'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import type { Question, QuestionSet, Visibility } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 interface Props {
   questions: Question[]
@@ -111,7 +112,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
 
   return (
     <div className="space-y-4">
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <Card padding="xl" className="space-y-4">
         <h2 className="font-semibold text-foreground">ข้อมูลชุดโจทย์</h2>
 
         <div className="space-y-1.5">
@@ -190,7 +191,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
             />
           )}
         </div>
-      </div>
+      </Card>
 
       <QuestionPicker
         questions={questions}

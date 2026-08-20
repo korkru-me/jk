@@ -1,6 +1,7 @@
 'use client'
 
 import { Clock, FileEdit, ChevronRight } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 const DRAFTS = [
   {
@@ -31,7 +32,7 @@ const DRAFTS = [
 
 export function RecentDrafts() {
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border overflow-hidden">
+    <Card radius="md" edge="ring" className="overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <FileEdit className="w-4 h-4 text-muted-foreground" />
@@ -74,6 +75,6 @@ export function RecentDrafts() {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

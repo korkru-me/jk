@@ -4,6 +4,7 @@ import { ClassroomStream } from './classroom-stream'
 import { AssignmentList } from './assignment-list'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
 import type { Classroom, ClassroomPost } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 export type { StudentAssignmentRow }
 
@@ -28,7 +29,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
       </Link>
 
       {/* Header card */}
-      <div className="bg-card border rounded-2xl p-6">
+      <Card padding="xl">
         <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
         {classroom.description && (
           <p className="text-muted-foreground text-sm mt-1">{classroom.description}</p>
@@ -46,7 +47,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
             <span className="text-muted-foreground">คนในห้องนี้</span>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Stream */}
       <div>
@@ -56,31 +57,31 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card border rounded-2xl p-4 flex flex-col gap-2">
+        <Card padding="md" className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <BookOpen size={18} className="text-primary" />
             <span className="text-xl font-black">{assignments.length}</span>
           </div>
           <p className="text-xs text-muted-foreground">งานที่มอบหมายทั้งหมด</p>
-        </div>
-        <div className="bg-card border rounded-2xl p-4 flex flex-col gap-2">
+        </Card>
+        <Card padding="md" className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-2xl">✅</span>
             <span className="text-xl font-black text-success">{doneCount}</span>
           </div>
           <p className="text-xs text-muted-foreground">ส่งงานแล้ว</p>
-        </div>
+        </Card>
       </div>
 
       {/* Assignments */}
       <div>
         <h2 className="font-semibold mb-3">งานที่มอบหมายในห้องนี้</h2>
         {assignments.length === 0 ? (
-          <div className="bg-card border border-dashed rounded-2xl p-8 text-center">
+          <Card edge="dashed" padding="2xl" className="text-center">
             <p className="text-3xl mb-3">📝</p>
             <p className="font-semibold">ยังไม่มีงานที่มอบหมาย</p>
             <p className="text-sm text-muted-foreground mt-1">ครูจะมอบหมายแบบฝึกหัดหรือข้อสอบให้ที่นี่</p>
-          </div>
+          </Card>
         ) : (
           <AssignmentList assignments={assignments} />
         )}

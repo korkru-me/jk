@@ -10,6 +10,7 @@ import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import { cn } from '@/lib/utils'
 import type { Difficulty, Visibility } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 const difficultyLabels: Record<string, string> = {
   easy: 'ง่าย',
@@ -118,7 +119,7 @@ function SubjectAutocomplete({ value, onChange }: {
         className="text-sm"
       />
       {showDropdown && (
-        <div className="absolute z-50 top-full mt-1 w-full border border-border rounded-lg bg-card shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+        <Card radius="sm" elevation="lg" className="absolute z-50 top-full mt-1 w-full overflow-hidden max-h-48 overflow-y-auto">
           {filtered.map(s => (
             <button
               key={s}
@@ -129,7 +130,7 @@ function SubjectAutocomplete({ value, onChange }: {
               {s}
             </button>
           ))}
-        </div>
+        </Card>
       )}
     </div>
   )

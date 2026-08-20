@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
 // ─── Same symbol data as RichTextEditor ───────────────────────────────────────
 
@@ -123,7 +124,7 @@ export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void })
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-card border border-border rounded-xl shadow-xl p-3 w-80">
+        <Card radius="md" elevation="xl" padding="sm" className="absolute top-full left-0 mt-1 z-50 w-80">
           <div className="space-y-3 overflow-y-auto" style={{ maxHeight: '60vh' }}>
             {SYMBOL_GROUPS.map((group) => (
               <div key={group.label}>
@@ -153,7 +154,7 @@ export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void })
           <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
             วางเมาส์บนสัญลักษณ์เพื่อดูคำอธิบาย
           </p>
-        </div>
+        </Card>
       )}
     </div>
   )

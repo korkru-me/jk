@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { ListChecks, ListTodo, AlertTriangle, CheckCircle2, XCircle, Clock, ChevronRight } from 'lucide-react'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
+import { Card } from '@/components/ui/card'
 
 export const metadata = { title: 'สรุปงานของฉัน — KorKru' }
 
@@ -170,7 +171,7 @@ export default async function MySubmissionsPage() {
           </div>
 
           {/* Pending work, closest deadline first */}
-          <div className="bg-card border rounded-2xl overflow-hidden">
+          <Card className="overflow-hidden">
             <div className="px-5 py-4 border-b flex items-center justify-between">
               <h2 className="font-semibold flex items-center gap-2">
                 <ListTodo size={16} className="text-warning" />
@@ -236,11 +237,11 @@ export default async function MySubmissionsPage() {
                 })}
               </div>
             )}
-          </div>
+          </Card>
 
           {/* History */}
           {completed.length > 0 && (
-            <div className="bg-card border rounded-2xl overflow-hidden">
+            <Card className="overflow-hidden">
               <div className="px-5 py-4 border-b flex items-center justify-between">
                 <h2 className="font-semibold">ประวัติการสอบทั้งหมด</h2>
                 <span className="text-xs text-muted-foreground">{completed.length} รายการ</span>
@@ -312,7 +313,7 @@ export default async function MySubmissionsPage() {
                   )
                 })}
               </div>
-            </div>
+            </Card>
           )}
         </>
       )}

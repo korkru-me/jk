@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Bell, Mail, BellRing } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ export function NotificationSettings() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-card border rounded-2xl overflow-hidden">
+      <Card className="overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b bg-muted/20 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -170,7 +171,7 @@ export function NotificationSettings() {
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {/* Info box */}
       <div className="bg-primary/8 border border-primary/20 rounded-xl px-5 py-4 flex items-start gap-3">

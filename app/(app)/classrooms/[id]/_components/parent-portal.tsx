@@ -5,6 +5,7 @@ import { Mail, Key, CheckCircle2, AlertCircle, RefreshCw, Copy, Check } from 'lu
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 const MOCK_OBSERVER_CODES = [
   { studentName: 'ธนภัทร สุขใส', code: 'OBS-7K2M' },
@@ -30,7 +31,7 @@ export function ParentPortal({ studentCount }: { studentCount: number }) {
   return (
     <div className="space-y-4">
       {/* Weekly report toggle */}
-      <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+      <Card edge="ring" padding="lg">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
@@ -68,10 +69,10 @@ export function ParentPortal({ studentCount }: { studentCount: number }) {
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Observer codes */}
-      <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+      <Card edge="ring" padding="lg">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
@@ -109,7 +110,7 @@ export function ParentPortal({ studentCount }: { studentCount: number }) {
             </Button>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

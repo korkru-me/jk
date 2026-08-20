@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { TrashActionsClient } from './_components/trash-actions-client'
 import type { Classroom } from '@/lib/types'
 import { Trash2, ArrowLeft } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ถังขยะ — KorKru' }
@@ -66,7 +67,7 @@ export default async function TrashPage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+        <Card edge="ring" className="overflow-hidden">
           <div className="p-4 border-b border-border bg-destructive/10">
             <p className="text-sm text-destructive">
               ห้องเรียนในถังขยะจะถูกลบถาวรอัตโนมัติหลังจาก 3 เดือน
@@ -82,7 +83,7 @@ export default async function TrashPage() {
               )
             })}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   )

@@ -3,6 +3,7 @@
 import { PYTHAGOREAN_FAMILIES } from '@/lib/math/evaluator'
 import { Plus, X } from 'lucide-react'
 import type { PythagoreanGroup } from '@/lib/types'
+import { Card } from '@/components/ui/card'
 
 // ─── PythagoreanModePanel ─────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
   }
 
   return (
-    <div className="border border-purple-200 rounded-xl overflow-hidden bg-card shadow-sm">
+    <Card radius="md" elevation="sm" className="border-purple-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-purple-50 border-b border-purple-100">
         <div>
           <p className="text-sm font-bold text-purple-800">โหมดชุดตัวเลขพิเศษ (Pythagorean)</p>
@@ -121,7 +122,7 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 

@@ -10,6 +10,7 @@ import {
 } from '@/lib/calendar-display'
 import { buttonVariants } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 export interface CalendarEvent {
   id: string
@@ -75,7 +76,7 @@ export function AssignmentCalendar({ events }: { events: CalendarEvent[] }) {
   const selectedEvents = eventsByDay.get(dateKey(selected)) ?? []
 
   return (
-    <div className="bg-card border rounded-2xl p-5 space-y-4">
+    <Card padding="lg" className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="font-semibold flex items-center gap-2">
@@ -199,6 +200,6 @@ export function AssignmentCalendar({ events }: { events: CalendarEvent[] }) {
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

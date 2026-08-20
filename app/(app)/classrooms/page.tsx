@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 import { Home, GraduationCap, ArrowRight } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
+import { Card } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียน — KorKru' }
@@ -126,10 +127,10 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
         <p className="text-sm text-muted-foreground mt-0.5">{classrooms.length} ห้องเรียน</p>
       </div>
 
-      <div className="bg-card border rounded-2xl p-5">
+      <Card padding="lg">
         <p className="text-sm font-medium mb-3">เข้าร่วมห้องเรียนใหม่</p>
         <JoinClassroomForm />
-      </div>
+      </Card>
 
       {classrooms.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed rounded-2xl">

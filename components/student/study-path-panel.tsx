@@ -1,4 +1,5 @@
 import { BookOpen, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 interface WrongQuestion {
   title: string
@@ -77,18 +78,18 @@ export function StudyPathPanel({ wrongQuestions, totalQuestions }: StudyPathPane
 
   if (wrongQuestions.length === 0) {
     return (
-      <div className="bg-card border rounded-2xl p-6 text-center">
+      <Card padding="xl" className="text-center">
         <CheckCircle2 size={40} className="text-success mx-auto mb-3" />
         <p className="font-semibold text-success">ยอดเยี่ยม! ตอบถูกทั้งหมด</p>
         <p className="text-sm text-muted-foreground mt-1">ไม่มีหัวข้อที่ต้องทบทวนในชุดนี้</p>
-      </div>
+      </Card>
     )
   }
 
   const weakTopics = extractTopics(wrongQuestions)
 
   return (
-    <div className="bg-card border rounded-2xl overflow-hidden">
+    <Card className="overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b bg-warning/5">
         <div className="flex items-center gap-2">
@@ -154,6 +155,6 @@ export function StudyPathPanel({ wrongQuestions, totalQuestions }: StudyPathPane
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

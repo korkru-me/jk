@@ -9,6 +9,7 @@ import {
   type Severity,
 } from '@/lib/calendar-display'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 export interface HomeroomCalendarEvent {
   id: string
@@ -73,7 +74,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
   const selectedEvents = eventsByDay.get(dateKey(selected)) ?? []
 
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border p-4 space-y-4">
+    <Card edge="ring" padding="md" className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
@@ -195,6 +196,6 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

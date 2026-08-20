@@ -1,6 +1,7 @@
 'use client'
 
 import { HardDrive, Image, FileQuestion, Users } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 const RESOURCES = [
   {
@@ -40,7 +41,7 @@ function getTextColor(pct: number) {
 
 export function ResourceUsage() {
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border p-4">
+    <Card radius="md" edge="ring" padding="md">
       <div className="flex items-center gap-2 mb-4">
         <HardDrive className="w-4 h-4 text-muted-foreground" />
         <p className="text-sm font-semibold text-foreground">การใช้ทรัพยากร</p>
@@ -76,6 +77,6 @@ export function ResourceUsage() {
           )
         })}
       </div>
-    </div>
+    </Card>
   )
 }

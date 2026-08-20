@@ -12,6 +12,7 @@ import {
 } from '@/lib/actions/co-teachers'
 import type { CoTeacherPermission } from '@/lib/types'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 const PERM_CFG: Record<CoTeacherPermission, { label: string; desc: string; icon: typeof Crown; color: string }> = {
   admin: { label: 'แอดมินเต็มตัว', desc: 'จัดการทุกอย่างได้', icon: Crown, color: 'text-warning' },
@@ -105,7 +106,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
       </div>
 
       {/* Co-teacher list */}
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+      <Card edge="ring" className="overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <p className="text-sm font-semibold text-foreground">ผู้ช่วยสอน ({coTeachers.length} คน)</p>
           {canManage && (
@@ -141,10 +142,10 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">ส่งลิงก์นี้ให้ครูที่ต้องการเชิญ (ผ่าน Line, Email ฯลฯ)</p>
-                <div className="flex items-center gap-2 bg-card border border-border rounded-xl p-2.5">
+                <Card radius="md" className="flex items-center gap-2 p-2.5">
                   <Link2 className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-xs text-muted-foreground truncate flex-1 font-mono">{pendingLink}</p>
-                </div>
+                </Card>
                 <div className="flex gap-2">
                   <Button size="sm" className="gap-1.5" onClick={() => copyLink(pendingLink, 'new')}>
                     {copied === 'new' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -187,7 +188,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
                     {openPerm === t.id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setOpenPerm(null)} />
-                        <div className="absolute right-0 top-9 z-20 bg-card rounded-xl shadow-lg ring-1 ring-border py-1 min-w-[180px]">
+                        <Card radius="md" edge="ring" elevation="lg" className="absolute right-0 top-9 z-20 py-1 min-w-[180px]">
                           {(Object.keys(PERM_CFG) as CoTeacherPermission[]).map(p => {
                             const cfg = PERM_CFG[p]
                             const Icon = cfg.icon
@@ -205,7 +206,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
                               </button>
                             )
                           })}
-                        </div>
+                        </Card>
                       </>
                     )}
                   </div>
@@ -224,11 +225,11 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
             })}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Active invite links */}
       {canManage && invites.length > 0 && (
-        <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+        <Card edge="ring" className="overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-semibold text-foreground">คำเชิญที่ยังไม่ถูกใช้ ({invites.length})</p>
           </div>
@@ -261,7 +262,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
               )
             })}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   )

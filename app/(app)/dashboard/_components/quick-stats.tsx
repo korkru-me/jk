@@ -1,6 +1,7 @@
 'use client'
 
 import { TrendingUp, TrendingDown, BookOpen, Users, FileText, Activity } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 interface StatItem {
   label: string
@@ -64,7 +65,7 @@ export function QuickStats({ questionsCount, studentsCount }: QuickStatsProps) {
 function StatCard({ stat }: { stat: StatItem }) {
   const Icon = stat.icon
   return (
-    <div className="bg-card rounded-xl p-4 ring-1 ring-border hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
+    <Card radius="md" edge="ring" padding="md" className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
       <div className="flex items-start justify-between mb-3">
         <div className={`w-9 h-9 rounded-lg ${stat.iconBg} flex items-center justify-center`}>
           <Icon className={`w-4.5 h-4.5 ${stat.iconColor}`} />
@@ -86,6 +87,6 @@ function StatCard({ stat }: { stat: StatItem }) {
       <p className="text-[10px] text-muted-foreground mt-0.5">
         {stat.trend?.up ? 'เพิ่มขึ้นจากสัปดาห์ที่แล้ว' : 'ลดลงจากสัปดาห์ที่แล้ว'}
       </p>
-    </div>
+    </Card>
   )
 }

@@ -5,6 +5,7 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { chartColors } from '@/lib/chart-colors'
+import { Card } from '@/components/ui/card'
 
 function seedRand(seed: string, index: number): number {
   const h = [...seed].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
@@ -21,7 +22,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   const isLatest = label === 'ล่าสุด'
   return (
-    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
+    <Card radius="md" elevation="lg" className="px-3 py-2 text-xs">
       <p className="font-semibold text-muted-foreground mb-1">{label}</p>
       <div className="flex items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-primary" />
@@ -29,7 +30,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <span className="font-bold text-foreground">{payload[0].value}%</span>
         {isLatest && <span className="text-primary">(การสอบนี้)</span>}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -50,7 +51,7 @@ export function GrowthTracker({ assignmentId, currentMean, assignmentTitle }: Pr
   ]
 
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+    <Card edge="ring" padding="lg">
       <div className="flex items-start justify-between mb-4">
         <div>
           <p className="text-sm font-semibold text-foreground">พัฒนาการย้อนหลัง 5 ครั้ง</p>
@@ -95,6 +96,6 @@ export function GrowthTracker({ assignmentId, currentMean, assignmentTitle }: Pr
       <p className="text-[10px] text-gray-300 mt-1 text-right">
         เส้นสีแดง = เกณฑ์ผ่าน 60%
       </p>
-    </div>
+    </Card>
   )
 }

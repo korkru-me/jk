@@ -10,6 +10,7 @@ import { ChevronRight, AlertTriangle } from 'lucide-react'
 import type { Question } from '@/lib/types'
 import type { AnalyticsSubmissionRow } from '../page'
 import { DistractorChart } from './distractor-chart'
+import { Card } from '@/components/ui/card'
 
 function seedRand(seed: string, index: number): number {
   const h = [...seed].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
@@ -25,10 +26,10 @@ interface Props {
 const CustomTooltip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
+    <Card radius="md" elevation="lg" className="px-3 py-2 text-xs">
       <p className="text-muted-foreground mb-0.5">อัตราการตอบผิด</p>
       <p className="font-bold text-destructive text-base">{payload[0].value}%</p>
-    </div>
+    </Card>
   )
 }
 
@@ -73,7 +74,7 @@ export function ItemAnalysisSection({ questions, submissions, assignmentId }: Pr
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-5">
         {/* Main chart */}
-        <div className="bg-card rounded-2xl ring-1 ring-border p-5">
+        <Card edge="ring" padding="lg">
           <p className="text-sm font-semibold text-foreground mb-1">อัตราการตอบผิดรายข้อ (Top 5)</p>
           <p className="text-xs text-muted-foreground mb-4">ยิ่งสูง = นักเรียนตอบผิดมากกว่า → ควรทบทวน</p>
 
@@ -118,7 +119,7 @@ export function ItemAnalysisSection({ questions, submissions, assignmentId }: Pr
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
         {/* Distractor chart panel */}
         {selectedItem && (
@@ -129,7 +130,7 @@ export function ItemAnalysisSection({ questions, submissions, assignmentId }: Pr
       </div>
 
       {/* Question detail cards */}
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+      <Card edge="ring" className="overflow-hidden">
         <div className="px-5 py-3 border-b border-border">
           <p className="text-sm font-semibold text-foreground">รายละเอียด 5 ข้อที่ควรทบทวน</p>
         </div>
@@ -165,7 +166,7 @@ export function ItemAnalysisSection({ questions, submissions, assignmentId }: Pr
             }`} />
           </button>
         ))}
-      </div>
+      </Card>
     </div>
   )
 }

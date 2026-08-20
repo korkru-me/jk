@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 
 import { chartColors } from '@/lib/chart-colors'
+import { Card } from '@/components/ui/card'
 
 const DATA = [
   { subject: 'อธิบายปรากฏการณ์', class: 72, national: 65, fullMark: 100 },
@@ -18,7 +19,7 @@ const DATA = [
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
+    <Card radius="md" elevation="lg" className="px-3 py-2 text-xs">
       <p className="font-semibold text-muted-foreground mb-1">{label}</p>
       {payload.map((p: any) => (
         <div key={p.name} className="flex items-center gap-2">
@@ -27,13 +28,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <span className="font-bold text-foreground">{p.value}</span>
         </div>
       ))}
-    </div>
+    </Card>
   )
 }
 
 export function CompetencyRadar() {
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border p-4">
+    <Card radius="md" edge="ring" padding="md">
       <div className="mb-3">
         <p className="text-sm font-semibold text-foreground">กราฟสมรรถนะตามกรอบ PISA</p>
         <p className="text-xs text-muted-foreground mt-0.5">เปรียบเทียบห้องเรียนกับค่าเฉลี่ยระดับประเทศ</p>
@@ -75,6 +76,6 @@ export function CompetencyRadar() {
           <Tooltip content={<CustomTooltip />} />
         </RadarChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   )
 }

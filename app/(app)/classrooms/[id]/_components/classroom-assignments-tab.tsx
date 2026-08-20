@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS, selectOfficialAttempt } from '@/lib/scoring'
 import { formatPassingThreshold, computePassed } from '@/lib/grading'
+import { Card } from '@/components/ui/card'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -126,7 +127,7 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
       </div>
 
       {/* List */}
-      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+      <Card edge="ring" className="overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-sm text-muted-foreground">
             {assignments.length === 0 ? 'ยังไม่มีงานที่มอบหมายให้ห้องนี้' : 'ไม่พบงานที่ตรงกับตัวกรอง'}
@@ -222,7 +223,7 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

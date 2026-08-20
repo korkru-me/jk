@@ -11,6 +11,7 @@ import { AssignmentCalendar, type CalendarEvent } from './_components/assignment
 import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
 import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
 
@@ -280,11 +281,11 @@ function StudentDashboard({
           </div>
         </div>
       ) : classroomsCount > 0 ? (
-        <div className="bg-card border border-dashed rounded-2xl p-8 text-center">
+        <Card edge="dashed" padding="2xl" className="text-center">
           <p className="text-3xl mb-3">🎉</p>
           <p className="font-semibold">ทำงานครบหมดแล้ว!</p>
           <p className="text-sm text-muted-foreground mt-1">ไม่มีชุดข้อสอบที่ค้างอยู่ในตอนนี้</p>
-        </div>
+        </Card>
       ) : (
         <div className="bg-card border-2 border-dashed border-primary/20 bg-primary/10 dark:bg-blue-950/20 rounded-2xl p-10 text-center">
           <p className="text-4xl mb-3">🏫</p>
@@ -303,7 +304,7 @@ function StudentDashboard({
             <Megaphone size={16} className="text-violet-600 dark:text-violet-400" />
             ประกาศล่าสุด
           </h2>
-          <div className="bg-card border rounded-2xl divide-y">
+          <Card className="divide-y">
             {recentPosts.map((p: any) => (
               <Link
                 key={p.id}
@@ -323,7 +324,7 @@ function StudentDashboard({
                 </div>
               </Link>
             ))}
-          </div>
+          </Card>
         </div>
       )}
     </div>
@@ -361,13 +362,13 @@ function StatCard({
   }[accent]
 
   const inner = (
-    <div className="bg-card border rounded-2xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow h-full">
+    <Card padding="md" className="flex flex-col gap-2 hover:shadow-md transition-shadow h-full">
       <div className="flex items-center justify-between">
         {icon}
         <span className={`text-xl font-black ${accentClass}`}>{value}</span>
       </div>
       <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
+    </Card>
   )
 
   if (href) return <Link href={href} className="block">{inner}</Link>
