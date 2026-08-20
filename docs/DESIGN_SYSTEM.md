@@ -35,6 +35,29 @@
 
 การเปลี่ยน palette หรือ component language หลักต้องเป็นการตัดสินใจระดับระบบ ไม่ปรับทีละหน้าโดยไม่มีแผน
 
+## Style presets
+
+สไตล์ทั้งเว็บคุมด้วย CSS variable ใน `app/globals.css` ไม่ใช่ class ในแต่ละไฟล์ แกนที่หมุนได้:
+
+- `--primary`, `--success`, `--warning`, `--flag`, `--destructive` และ token สีอื่น — ความหมาย ไม่ใช่การตกแต่ง
+- `--radius` — ความมนทั้งเว็บ (Tailwind คำนวณ `rounded-*` จากค่านี้)
+- `--spacing` — ความโปร่ง/แน่น (Tailwind คำนวณ `p-*`, `gap-*`, `m-*` จากค่านี้)
+- `--elevation-sm|md|lg|xl` — เงา
+
+เปลี่ยนสไตล์ทั้งเว็บด้วยการใส่ `data-style` บน `<html>` ใน `app/layout.tsx`:
+
+```
+<html lang="th" data-style="warm">
+```
+
+preset ที่มีให้: `soft` (มน โปร่ง เงานุ่ม), `sharp` (เหลี่ยม แน่น ไม่มีเงา), `warm` (โทนอุ่น) ถ้าไม่ใส่ = ค่าเริ่มต้น
+
+เพิ่ม preset ใหม่โดยคัดลอกบล็อก `[data-style="..."]` ท้าย `globals.css` แล้วแก้ค่า ไม่ต้องแก้ไฟล์อื่น
+
+**preset เปลี่ยนได้เฉพาะการตกแต่ง** ห้ามเปลี่ยนว่าสีไหนหมายถึงอะไร — เขียวยังคงหมายถึงสำเร็จ ส้มยังคงหมายถึงโจทย์ที่ถูกรายงาน ในทุก preset
+
+องค์ประกอบใหม่ต้องใช้ token และ primitive ใน `components/ui/` ไม่เขียน class สีหรือทรงเอง — `npm run lint:tokens` ตรวจข้อนี้
+
 ## UI behavior
 
 - Mobile-first และใช้งานได้อย่างน้อยบน mobile/tablet/desktop

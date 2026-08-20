@@ -46,6 +46,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-xl: var(--elevation-xl);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -90,7 +94,22 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.606 0.25 292.717);
   --chart-5: oklch(0.715 0.143 215.221);
+
+  /* ── Style axes ────────────────────────────────────────────────────────────
+     Tailwind v4 already routes spacing, radius and the type scale through
+     variables (p-4 is calc(var(--spacing) * 4), rounded-xl is
+     calc(var(--radius) * 1.4)), so overriding these three restyles every
+     utility in the app at once. Shadows are literal by default, hence
+     --elevation-*, wired into --shadow-* in the @theme block above.
+
+     A preset below overrides these; see [data-style] at the end of this file. */
   --radius: 0.625rem;
+  --spacing: 0.25rem;
+  --elevation-sm: 0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10);
+  --elevation-md: 0 4px 6px -1px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.10);
+  --elevation-lg: 0 10px 15px -3px rgb(0 0 0 / 0.10), 0 4px 6px -4px rgb(0 0 0 / 0.10);
+  --elevation-xl: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10);
+
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.511 0.262 276.966);
@@ -141,6 +160,72 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.673 0.182 276.935);
+}
+
+/* ── Style presets ──────────────────────────────────────────────────────────
+   Set data-style on <html> to restyle the whole app:
+
+     <html lang="th" data-style="sharp">
+
+   Each preset only overrides the axes it cares about; anything it leaves out
+   keeps the default. These are decoration only — they never change which
+   colour means "success" or "flagged", so meaning survives a restyle.
+
+   Add a preset by copying a block and changing the values. Nothing else in the
+   codebase needs to know it exists. */
+
+/* Rounder, airier, softer — the friendly-SaaS look. */
+[data-style="soft"] {
+  --radius: 1rem;
+  --spacing: 0.28rem;
+  --primary: oklch(0.58 0.19 265);
+  --ring: oklch(0.65 0.16 265);
+  --elevation-sm: 0 2px 8px -2px rgb(0 0 0 / 0.08);
+  --elevation-md: 0 8px 20px -6px rgb(0 0 0 / 0.10);
+  --elevation-lg: 0 16px 32px -10px rgb(0 0 0 / 0.12);
+  --elevation-xl: 0 28px 48px -16px rgb(0 0 0 / 0.14);
+}
+[data-style="soft"].dark {
+  --primary: oklch(0.68 0.16 265);
+  --ring: oklch(0.72 0.14 265);
+}
+
+/* Square, dense, flat — crisp edges instead of shadow. */
+[data-style="sharp"] {
+  --radius: 0rem;
+  --spacing: 0.22rem;
+  --primary: oklch(0.32 0.02 260);
+  --ring: oklch(0.45 0.02 260);
+  --border: oklch(0.78 0 0);
+  --elevation-sm: none;
+  --elevation-md: none;
+  --elevation-lg: none;
+  --elevation-xl: none;
+}
+[data-style="sharp"].dark {
+  --primary: oklch(0.92 0 0);
+  --primary-foreground: oklch(0.16 0 0);
+  --border: oklch(1 0 0 / 22%);
+}
+
+/* Warm and roomy, for a calmer classroom feel. */
+[data-style="warm"] {
+  --radius: 0.75rem;
+  --spacing: 0.3rem;
+  --background: oklch(0.985 0.008 85);
+  --card: oklch(0.995 0.005 85);
+  --primary: oklch(0.55 0.15 35);
+  --ring: oklch(0.62 0.13 35);
+  --border: oklch(0.9 0.012 80);
+  --muted: oklch(0.96 0.01 85);
+  --accent: oklch(0.93 0.014 85);
+}
+[data-style="warm"].dark {
+  --background: oklch(0.16 0.008 60);
+  --card: oklch(0.21 0.008 60);
+  --primary: oklch(0.68 0.14 45);
+  --ring: oklch(0.72 0.12 45);
+  --border: oklch(1 0 0 / 12%);
 }
 
 @layer base {
