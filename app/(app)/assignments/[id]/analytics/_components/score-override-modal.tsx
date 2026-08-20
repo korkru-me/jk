@@ -120,7 +120,7 @@ export function ScoreOverrideModal({
                 <p className="text-2xl font-black text-foreground tabular-nums">{currentScore}</p>
                 <p className="text-xs text-muted-foreground">/{maxScore}</p>
               </div>
-              <div className="text-gray-300 text-xl">→</div>
+              <div className="text-muted-foreground/40 text-xl">→</div>
               <div className="text-center flex-1">
                 <p className="text-xs text-muted-foreground mb-0.5">คะแนนใหม่</p>
                 <input
@@ -145,7 +145,7 @@ export function ScoreOverrideModal({
                 onChange={e => { setReason(e.target.value); setError('') }}
                 placeholder="เช่น นักเรียนแสดงวิธีทำถูกต้องแต่ระบบตรวจคะแนนผิดพลาด..."
                 rows={3}
-                className="w-full text-sm text-muted-foreground bg-muted border border-border rounded-xl px-3 py-2.5 focus:outline-none focus:border-gray-400 resize-none placeholder:text-gray-300"
+                className="w-full text-sm text-muted-foreground bg-muted border border-border rounded-xl px-3 py-2.5 focus:outline-none focus:border-gray-400 resize-none placeholder:text-muted-foreground/40"
               />
             </div>
 

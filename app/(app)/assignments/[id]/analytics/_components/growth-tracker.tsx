@@ -93,7 +93,7 @@ export function GrowthTracker({ assignmentId, currentMean, assignmentTitle }: Pr
           />
         </LineChart>
       </ResponsiveContainer>
-      <p className="text-[10px] text-gray-300 mt-1 text-right">
+      <p className="text-[10px] text-muted-foreground/40 mt-1 text-right">
         เส้นสีแดง = เกณฑ์ผ่าน 60%
       </p>
     </Card>

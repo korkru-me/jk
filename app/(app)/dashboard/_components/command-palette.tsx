@@ -134,7 +134,7 @@ export function CommandPalette() {
                         <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{item.sub}</p>
                       </div>
-                      <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-muted-foreground shrink-0" />
+                      <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0" />
                     </button>
                   )
                 })}

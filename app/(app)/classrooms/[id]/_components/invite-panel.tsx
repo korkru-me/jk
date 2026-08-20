@@ -150,7 +150,7 @@ export function InvitePanel({ classCode, classroomId }: Props) {
                 </div>
               ) : (
                 <>
-                  <Upload className={`w-10 h-10 mx-auto mb-3 ${dragOver ? 'text-primary' : 'text-gray-300'}`} />
+                  <Upload className={`w-10 h-10 mx-auto mb-3 ${dragOver ? 'text-primary' : 'text-muted-foreground/40'}`} />
                   <p className="text-sm font-medium text-muted-foreground">ลากไฟล์มาวางที่นี่</p>
                   <p className="text-xs text-muted-foreground mt-1">หรือคลิกเพื่อเลือกไฟล์ .csv</p>
                 </>

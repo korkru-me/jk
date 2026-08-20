@@ -46,9 +46,9 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 const ROLE_COLOR: Record<string, string> = {
-  owner: 'bg-warning/10 text-amber-800',
+  owner: 'bg-warning/10 text-warning',
   admin: 'bg-purple-100 text-purple-800',
-  teacher: 'bg-primary/10 text-blue-800',
+  teacher: 'bg-primary/10 text-primary',
   student: 'bg-success/10 text-green-800',
 }
 

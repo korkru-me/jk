@@ -344,7 +344,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         )}
       </Card>
 
-      <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-start gap-2 text-sm text-amber-800">
+      <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-start gap-2 text-sm text-warning">
         <FileText className="w-4 h-4 shrink-0 mt-0.5" />
         <p>
           แก้ไขได้เฉพาะกำหนดการ รายละเอียด คะแนน และการแสดงผลลัพธ์ — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน

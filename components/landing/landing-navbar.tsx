@@ -28,7 +28,7 @@ export function LandingNavbar() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-base font-bold text-foreground">KorKru</span>
-            <span className="rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning dark:border-amber-800/60 dark:bg-amber-950/60">
+            <span className="rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning dark:border-amber-800/60">
               Demo
             </span>
           </div>

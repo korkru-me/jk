@@ -166,22 +166,22 @@ const ANN_TYPE_CONFIG: Record<
 > = {
   maintenance: {
     label: 'ปิดปรับปรุง',
-    cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
+    cls: 'bg-warning/10 text-warning',
     icon: Clock,
   },
   feature: {
     label: 'ฟีเจอร์ใหม่',
-    cls: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
+    cls: 'bg-primary/10 text-primary',
     icon: Star,
   },
   promo: {
     label: 'โปรโมชั่น',
-    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
+    cls: 'bg-success/10 text-success',
     icon: Gift,
   },
   urgent: {
     label: 'ด่วน',
-    cls: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
+    cls: 'bg-destructive/10 text-destructive',
     icon: AlertCircle,
   },
 }
@@ -192,11 +192,11 @@ const ANN_STATUS_CONFIG: Record<
 > = {
   active: {
     label: 'กำลังแสดง',
-    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
+    cls: 'bg-success/10 text-success',
   },
   scheduled: {
     label: 'กำหนดการ',
-    cls: 'bg-primary/10 text-primary dark:bg-blue-950/60',
+    cls: 'bg-primary/10 text-primary',
   },
   expired: {
     label: 'หมดอายุ',
@@ -506,7 +506,7 @@ export function MarketingGrowth() {
                       className={cn(
                         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                         r.status === 'active'
-                          ? 'bg-success/10 text-success dark:bg-emerald-950/60'
+                          ? 'bg-success/10 text-success'
                           : 'bg-muted text-muted-foreground dark:bg-slate-800',
                       )}
                     >

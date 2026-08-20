@@ -47,7 +47,7 @@ export function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRul
                 <button
                   type="button"
                   onClick={() => onSetAnswer(null)}
-                  className="text-[10px] text-gray-300 hover:text-destructive transition-colors ml-auto"
+                  className="text-[10px] text-muted-foreground/40 hover:text-destructive transition-colors ml-auto"
                 >
                   ยกเลิก
                 </button>
@@ -67,7 +67,7 @@ export function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRul
                   <button
                     type="button"
                     onClick={() => onUpdate(index, 'is_constant', true)}
-                    className={`px-3 py-1 font-medium transition-colors ${isConstant ? 'bg-orange-500 text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+                    className={`px-3 py-1 font-medium transition-colors ${isConstant ? 'bg-flag text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
                   >
                     ค่าคงที่
                   </button>
@@ -144,7 +144,7 @@ export function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRul
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-destructive hover:bg-destructive/10 transition-colors mt-0.5 shrink-0 opacity-0 group-hover:opacity-100"
+          className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors mt-0.5 shrink-0 opacity-0 group-hover:opacity-100"
         >
           ✕
         </button>

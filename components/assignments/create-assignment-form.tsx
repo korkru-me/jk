@@ -298,7 +298,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             <div className="space-y-1.5">
               <Label>ห้องเรียน <span className="text-destructive">*</span> {classroomIds.length > 1 && <span className="text-muted-foreground font-normal">({classroomIds.length} ห้อง)</span>}</Label>
               {classrooms.length === 0 ? (
-                <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-amber-800">
+                <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
                   ยังไม่มีห้องเรียน กรุณา{' '}
                   <a href="/classrooms" className="underline font-medium">สร้างห้องเรียน</a> ก่อน
                 </div>

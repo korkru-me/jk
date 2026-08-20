@@ -82,7 +82,7 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
             <div key={g.id} className="border border-purple-200 rounded-xl p-3 space-y-2 bg-purple-50/30">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-purple-700">กลุ่มที่ {gi + 1}</p>
-                <button type="button" onClick={() => removeGroup(g.id)} className="text-gray-300 hover:text-destructive transition-colors">
+                <button type="button" onClick={() => removeGroup(g.id)} className="text-muted-foreground/40 hover:text-destructive transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>

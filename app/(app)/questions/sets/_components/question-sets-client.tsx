@@ -201,7 +201,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
             <button
               onClick={handleExport}
               disabled={isPending}
-              className="text-gray-300 hover:text-primary transition-colors p-1"
+              className="text-muted-foreground/40 hover:text-primary transition-colors p-1"
               title="ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)"
             >
               <Download className="w-4 h-4" />
@@ -209,7 +209,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
             <button
               onClick={handleDelete}
               disabled={isPending}
-              className="text-gray-300 hover:text-destructive transition-colors p-1"
+              className="text-muted-foreground/40 hover:text-destructive transition-colors p-1"
               title="ลบชุดโจทย์"
             >
               <Trash2 className="w-4 h-4" />

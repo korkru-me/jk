@@ -75,7 +75,7 @@ export function LearningPaths() {
         <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl">
           <Lock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground font-medium">ยังไม่มีเงื่อนไข</p>
-          <p className="text-xs text-gray-300 mt-1 mb-4">กดเพิ่มเงื่อนไขเพื่อสร้างเส้นทางการเรียน</p>
+          <p className="text-xs text-muted-foreground/40 mt-1 mb-4">กดเพิ่มเงื่อนไขเพื่อสร้างเส้นทางการเรียน</p>
           <Button size="sm" onClick={addRule}><Plus className="w-3.5 h-3.5 mr-1" /> เพิ่มเงื่อนไข</Button>
         </div>
       ) : (
@@ -118,7 +118,7 @@ export function LearningPaths() {
 
                   {/* Arrow */}
                   <div className="flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
                     <Zap className="w-3.5 h-3.5 text-success" />
                     <span className="text-xs font-semibold text-success bg-success/10 px-2 py-1 rounded-lg whitespace-nowrap">ปลดล็อก</span>
                     <select

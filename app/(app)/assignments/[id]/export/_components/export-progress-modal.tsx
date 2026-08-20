@@ -142,9 +142,9 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
                 />
               </div>
               <div className="flex justify-between mt-1">
-                <span className="text-[10px] text-gray-300">0%</span>
+                <span className="text-[10px] text-muted-foreground/40">0%</span>
                 <span className="text-xs font-bold text-muted-foreground">{pct}%</span>
-                <span className="text-[10px] text-gray-300">100%</span>
+                <span className="text-[10px] text-muted-foreground/40">100%</span>
               </div>
             </div>
           )}
@@ -177,7 +177,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
                           </p>
                         )}
                       </div>
-                      <span className="text-[10px] text-gray-300 shrink-0">
+                      <span className="text-[10px] text-muted-foreground/40 shrink-0">
                         {isLast ? '...' : `${Math.round(80 + Math.random() * 120)} KB`}
                       </span>
                     </div>

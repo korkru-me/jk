@@ -147,7 +147,7 @@ export function PrintSettingsSidebar({
               value={settings.watermarkText}
               onChange={e => onPatch({ watermarkText: e.target.value })}
               placeholder="เช่น ห้ามถ่ายเอกสาร หรือ DRAFT"
-              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-gray-400 placeholder:text-gray-300"
+              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-gray-400 placeholder:text-muted-foreground/40"
             />
           </div>
 
@@ -166,7 +166,7 @@ export function PrintSettingsSidebar({
                 onChange={e => onPatch({ watermarkOpacity: Number(e.target.value) })}
                 className="w-full accent-foreground cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-gray-300 mt-0.5">
+              <div className="flex justify-between text-[10px] text-muted-foreground/40 mt-0.5">
                 <span>จาง</span><span>เข้ม</span>
               </div>
             </div>

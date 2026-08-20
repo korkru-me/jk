@@ -91,8 +91,8 @@ const ACCESS_LABEL: Record<string, string> = {
 }
 
 const ACCESS_BADGE: Record<string, string> = {
-  open: 'bg-success/10 text-success dark:bg-emerald-900/40',
-  request: 'bg-primary/10 text-primary dark:bg-blue-900/40',
+  open: 'bg-success/10 text-success',
+  request: 'bg-primary/10 text-primary',
   closed: 'bg-muted text-muted-foreground dark:bg-gray-800',
 }
 
@@ -208,7 +208,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
       onClick={() => inputRef.current?.focus()}
     >
       {tags.map((tag) => (
-        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-blue-800 text-sm font-medium">
+        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-sm font-medium">
           {tag}
           <button type="button" onClick={(e) => { e.stopPropagation(); onChange(tags.filter((t) => t !== tag)) }} className="hover:text-destructive transition-colors">
             <X className="w-3 h-3" />
@@ -574,7 +574,7 @@ function StepIndicator({
                   done
                     ? 'bg-primary border-primary text-white dark:bg-primary dark:border-primary cursor-pointer hover:bg-primary/90 hover:border-blue-700 hover:scale-105'
                     : active
-                    ? 'border-primary text-primary bg-primary/10 dark:border-primary dark:bg-blue-950/40'
+                    ? 'border-primary text-primary bg-primary/10 dark:border-primary'
                     : 'border-border text-muted-foreground bg-background cursor-default',
                 )}
                 title={done ? `กลับไปขั้นตอน: ${step.label}` : undefined}

@@ -357,7 +357,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               <Badge variant="outline" className="text-xs">ปรนัย</Badge>
             )}
             {isFlagged && (
-              <Badge className="text-xs bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30">
+              <Badge className="text-xs bg-flag/15 text-flag dark:text-flag border-flag/30">
                 🚩 ปักธงไว้
               </Badge>
             )}
@@ -366,8 +366,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                 onClick={() => toggleFlag(current.id)}
                 className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
                   isFlagged
-                    ? 'bg-orange-500/15 border-orange-500/30 text-orange-600 dark:text-orange-400'
-                    : 'border-border text-muted-foreground hover:border-orange-400 hover:text-orange-500'
+                    ? 'bg-flag/15 border-flag/30 text-flag dark:text-flag'
+                    : 'border-border text-muted-foreground hover:border-flag hover:text-flag'
                 }`}
               >
                 <Flag size={11} className={isFlagged ? 'fill-flag' : ''} />
@@ -517,18 +517,18 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             timerDanger
               ? 'border-destructive bg-destructive/10 animate-pulse'
               : timerUrgent
-              ? 'border-orange-400 bg-orange-500/8'
+              ? 'border-flag bg-flag/8'
               : 'bg-card'
           }`}>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">เวลาที่เหลือ</p>
             <p className={`text-3xl font-black font-mono ${
               timerDanger ? 'text-destructive' :
-              timerUrgent ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+              timerUrgent ? 'text-flag dark:text-flag' : 'text-foreground'
             }`}>
               {formatTime(secondsLeft)}
             </p>
             {timerUrgent && (
-              <p className="text-[10px] text-orange-500 mt-1 flex items-center justify-center gap-1">
+              <p className="text-[10px] text-flag mt-1 flex items-center justify-center gap-1">
                 <AlertTriangle size={9} /> เหลือน้อยแล้ว
               </p>
             )}
@@ -549,7 +549,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           </div>
           <div className="flex gap-2 text-[10px] text-muted-foreground pt-0.5">
             {flaggedCount > 0 && (
-              <span className="flex items-center gap-0.5 text-orange-500">
+              <span className="flex items-center gap-0.5 text-flag">
                 <Flag size={9} className="fill-flag" /> {flaggedCount}
               </span>
             )}
@@ -572,7 +572,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               const isFlg = flagged.has(a.id)
               let cls = 'bg-muted text-muted-foreground'
               if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
-              else if (isFlg) cls = 'bg-orange-500 text-white'
+              else if (isFlg) cls = 'bg-flag text-white'
               else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-green-900/30'
               return (
                 <button
@@ -589,7 +589,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             {[
               { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
               { cls: 'bg-success/10 border border-success/20 dark:bg-green-900/30', label: 'ตอบแล้ว' },
-              { cls: 'bg-orange-500', label: 'ปักธง' },
+              { cls: 'bg-flag', label: 'ปักธง' },
               { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2">
@@ -792,7 +792,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                 {flaggedCount > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">ปักธงไว้</span>
-                    <span className="font-semibold text-orange-500">{flaggedCount} ข้อ</span>
+                    <span className="font-semibold text-flag">{flaggedCount} ข้อ</span>
                   </div>
                 )}
                 {tabSwitchCount > 0 && (
@@ -1450,7 +1450,7 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
           </Card>
         ))}
       </div>
-      {hasdup     && <p className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 rounded-lg">⚠️ มีลำดับซ้ำ</p>}
+      {hasdup     && <p className="text-xs text-flag bg-flag/10 px-3 py-1.5 rounded-lg">⚠️ มีลำดับซ้ำ</p>}
       {allFilled && !hasdup && <p className="text-xs text-success">✓ เลือกครบแล้ว</p>}
     </div>
   )

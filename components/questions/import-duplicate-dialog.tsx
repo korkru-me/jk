@@ -25,7 +25,7 @@ export function ImportDuplicateDialog({ duplicates, isPending, onCancel, onSkip,
 
         <ul className="max-h-48 overflow-y-auto space-y-1 text-sm">
           {duplicates.map(d => (
-            <li key={d.index} className="px-2.5 py-1.5 rounded-lg bg-warning/10 text-amber-800 truncate">
+            <li key={d.index} className="px-2.5 py-1.5 rounded-lg bg-warning/10 text-warning truncate">
               {d.title}
             </li>
           ))}

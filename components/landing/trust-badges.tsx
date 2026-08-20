@@ -11,12 +11,12 @@ const SCHOOLS = [
 ]
 
 const COLOR_MAP: Record<string, string> = {
-  indigo: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
+  indigo: 'bg-primary/10 text-primary',
   violet: 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
-  emerald: 'bg-success/10 text-success dark:bg-emerald-950/60',
-  amber: 'bg-warning/10 text-warning dark:bg-amber-950/60',
+  emerald: 'bg-success/10 text-success',
+  amber: 'bg-warning/10 text-warning',
   cyan: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300',
-  rose: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
+  rose: 'bg-rose-100 text-rose-700',
 }
 
 const STATS = [

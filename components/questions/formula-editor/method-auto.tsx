@@ -75,7 +75,7 @@ export function MethodAuto({ variables, value, onChange, unit }: MethodAutoProps
                 key={v.name}
                 type="button"
                 onClick={() => appendVar(v.name)}
-                className="px-3 py-1 rounded-lg border border-primary/20 bg-primary/10 text-blue-800 text-sm font-mono hover:bg-primary/10 transition-colors"
+                className="px-3 py-1 rounded-lg border border-primary/20 bg-primary/10 text-primary text-sm font-mono hover:bg-primary/10 transition-colors"
               >
                 {v.name}
                 {v.unit && <span className="ml-1 text-xs opacity-60">({v.unit})</span>}

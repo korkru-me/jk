@@ -80,7 +80,7 @@ export function StudentTable({
   }
 
   function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ChevronUp className="w-3 h-3 text-gray-300" />
+    if (sortKey !== col) return <ChevronUp className="w-3 h-3 text-muted-foreground/40" />
     return sortDir === 'asc'
       ? <ChevronUp className="w-3 h-3 text-primary" />
       : <ChevronDown className="w-3 h-3 text-primary" />

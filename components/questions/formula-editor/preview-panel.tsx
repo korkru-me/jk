@@ -46,7 +46,7 @@ export function PreviewPanel({ formula, variables, unit }: PreviewPanelProps) {
             <p className="text-xs text-muted-foreground mb-1">ค่าตัวแปรที่สุ่มได้:</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(values).map(([k, v]) => (
-                <span key={k} className="bg-primary/10 text-blue-800 px-2 py-0.5 rounded text-xs font-mono">
+                <span key={k} className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-mono">
                   {k} = {v}
                 </span>
               ))}

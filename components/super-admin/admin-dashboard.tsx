@@ -100,12 +100,12 @@ const STAT_CARDS = [
 ]
 
 const COLOR_MAP: Record<string, string> = {
-  indigo: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
-  emerald: 'bg-success/10 text-success dark:bg-emerald-950/60',
-  amber: 'bg-warning/10 text-warning dark:bg-amber-950/60',
+  indigo: 'bg-primary/10 text-primary',
+  emerald: 'bg-success/10 text-success',
+  amber: 'bg-warning/10 text-warning',
   violet: 'bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
   cyan: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300',
-  rose: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
+  rose: 'bg-rose-50 text-rose-700',
 }
 
 const ICON_COLOR: Record<string, string> = {

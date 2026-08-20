@@ -222,7 +222,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl">
           <span className="font-mono font-bold text-success text-sm">{'{'}{answerVarName}{'}'}</span>
           <span className="text-success">=</span>
-          <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{answerParts[0].formula}</span>
+          <span className="font-mono text-success text-sm font-medium flex-1 truncate">{answerParts[0].formula}</span>
           <span className="text-[10px] text-success shrink-0">จากสมการที่เลือกด้านบน</span>
         </div>
       )}

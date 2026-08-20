@@ -107,12 +107,12 @@ const BUNDLES: MasterBundle[] = [
 const STATUS_CONFIG: Record<ContentStatus, { label: string; cls: string; icon: React.ElementType }> = {
   pushed: {
     label: 'Push แล้ว',
-    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
+    cls: 'bg-success/10 text-success',
     icon: CheckCircle2,
   },
   public: {
     label: 'Public',
-    cls: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
+    cls: 'bg-primary/10 text-primary',
     icon: Globe,
   },
   draft: {
@@ -264,10 +264,10 @@ export function MasterContent() {
       </div>
 
       {/* Info Banner */}
-      <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+      <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 dark:border-indigo-900/50">
         <Layers className="h-5 w-5 text-primary shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-indigo-800">
+          <p className="text-sm font-semibold text-primary">
             Public Bank คืออะไร?
           </p>
           <p className="text-xs text-primary mt-0.5">

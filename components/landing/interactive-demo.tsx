@@ -128,7 +128,7 @@ function PhysicsDemo() {
       {/* Question card */}
       <Card radius="md" padding="md">
         <div className="flex items-start justify-between mb-3">
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary dark:bg-indigo-950/60">
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
             <Calculator className="h-3 w-3" />
             {tpl.name}
           </span>
@@ -150,7 +150,7 @@ function PhysicsDemo() {
           {tpl.vars.map((v) => (
             <span
               key={v.key}
-              className="inline-flex items-center gap-1 rounded-lg border border-success/20 bg-success/10 px-2.5 py-1 text-xs font-mono font-semibold text-success dark:border-emerald-800/50 dark:bg-emerald-950/40"
+              className="inline-flex items-center gap-1 rounded-lg border border-success/20 bg-success/10 px-2.5 py-1 text-xs font-mono font-semibold text-success dark:border-emerald-800/50"
             >
               {v.key} = {vals[v.key]} {v.unit}
             </span>
@@ -166,7 +166,7 @@ function PhysicsDemo() {
             กดเพื่อดูเฉลย
           </button>
         ) : (
-          <div className="flex items-center gap-3 rounded-lg bg-success/10 px-4 py-3 dark:bg-emerald-950/30">
+          <div className="flex items-center gap-3 rounded-lg bg-success/10 px-4 py-3">
             <Zap className="h-4 w-4 text-success" />
             <span className="text-sm text-muted-foreground">คำตอบ:</span>
             <span className="text-lg font-bold text-success">
@@ -193,9 +193,9 @@ const INITIAL_CARDS = [
 ]
 
 const LEVEL_CLS: Record<string, string> = {
-  ง่าย: 'bg-success/10 text-success dark:bg-emerald-950/60',
-  ปานกลาง: 'bg-warning/10 text-warning dark:bg-amber-950/60',
-  ยาก: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
+  ง่าย: 'bg-success/10 text-success',
+  ปานกลาง: 'bg-warning/10 text-warning',
+  ยาก: 'bg-destructive/10 text-destructive',
 }
 
 function DragDemo() {
@@ -250,7 +250,7 @@ function DragDemo() {
           )}
         >
           <GripVertical className="h-4 w-4 shrink-0 text-slate-300" />
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary dark:bg-indigo-950/60">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
             {idx + 1}
           </span>
           <div className="flex-1 min-w-0">

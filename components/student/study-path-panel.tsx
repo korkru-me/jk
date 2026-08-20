@@ -55,7 +55,7 @@ const TOPIC_MAP: Record<string, { label: string; topics: string[]; color: string
   ความร้อน: {
     label: 'ความร้อนและอุณหพลศาสตร์',
     topics: ['กฎข้อที่ 1-2 ของอุณหพลศาสตร์', 'การถ่ายเทความร้อน', 'แก๊สอุดมคติ'],
-    color: 'bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-300',
+    color: 'bg-flag/10 border-flag/20 text-flag',
   },
 }
 

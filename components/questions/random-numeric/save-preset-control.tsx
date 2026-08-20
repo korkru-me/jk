@@ -47,7 +47,7 @@ export function SavePresetControl({ equation, targetVariable, variables, onSaved
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="flex items-center gap-1.5 text-xs text-primary hover:text-blue-800 font-medium transition-colors"
+        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary font-medium transition-colors"
       >
         <Plus className="w-3.5 h-3.5" /> บันทึกสมการนี้ลงคลังสมการ
       </button>

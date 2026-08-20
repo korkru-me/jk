@@ -10,8 +10,8 @@ export function ClassInsights() {
           <AlertTriangle className="w-4 h-4 text-warning" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-amber-900 mb-0.5">วิเคราะห์ผลการเรียน</p>
-          <p className="text-sm text-amber-800 leading-relaxed">
+          <p className="text-sm font-semibold text-warning mb-0.5">วิเคราะห์ผลการเรียน</p>
+          <p className="text-sm text-warning leading-relaxed">
             นักเรียนชั้น <span className="font-semibold">ม.4/1</span> มีคะแนนเฉลี่ยด้านทักษะ
             การเขียนกราฟผลการทดลองต่ำกว่าเกณฑ์มาตรฐาน PISA (เฉลี่ย 48 คะแนน จากคะแนนเต็ม 100)
             แนะนำให้มอบหมายแบบฝึกหัดเสริม

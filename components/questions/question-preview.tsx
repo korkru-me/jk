@@ -475,7 +475,7 @@ export function QuestionPreviewContent({
               matchingScore === matchingPairs.length
                 ? 'bg-success/10 text-success border-success/20'
                 : matchingScore > 0
-                  ? 'bg-orange-50 text-orange-700 border-orange-200'
+                  ? 'bg-flag/10 text-flag border-flag/20'
                   : 'bg-destructive/10 text-destructive border-destructive/20'
             }`}>
               {matchingScore === matchingPairs.length
@@ -613,7 +613,7 @@ export function QuestionPreviewContent({
               writtenResults.every(r => r === true)
                 ? 'bg-success/10 text-success border-success/20'
                 : writtenResults.some(r => r === true)
-                  ? 'bg-orange-50 text-orange-700 border-orange-200'
+                  ? 'bg-flag/10 text-flag border-flag/20'
                   : 'bg-destructive/10 text-destructive border-destructive/20'
             }`}>
               {writtenResults.every(r => r === true)
@@ -889,7 +889,7 @@ export function QuestionPreviewContent({
             </div>
 
             {hasManual && (
-              <p className="text-xs text-orange-600 font-medium">
+              <p className="text-xs text-flag font-medium">
                 {hasAuto ? 'บางช่องครูผู้สอนจะเป็นผู้ตรวจและให้คะแนนเอง' : 'ครูผู้สอนจะเป็นผู้ตรวจและให้คะแนน'}
               </p>
             )}
@@ -928,7 +928,7 @@ export function QuestionPreviewContent({
                     autoIdx.every(i => fillResults[i])
                       ? 'bg-success/10 text-success border-success/20'
                       : autoIdx.some(i => fillResults[i])
-                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        ? 'bg-flag/10 text-flag border-flag/20'
                         : 'bg-destructive/10 text-destructive border-destructive/20'
                   }`}>
                     {autoIdx.every(i => fillResults[i])
@@ -996,7 +996,7 @@ export function QuestionPreviewContent({
             </div>
 
             {hasDuplicate && !orderChecked && (
-              <p className="text-xs text-orange-600">⚠️ มีลำดับซ้ำกัน กรุณาเลือกใหม่</p>
+              <p className="text-xs text-flag">⚠️ มีลำดับซ้ำกัน กรุณาเลือกใหม่</p>
             )}
 
             {!orderChecked ? (
@@ -1013,7 +1013,7 @@ export function QuestionPreviewContent({
               return (
                 <div className={`p-3 rounded-lg text-sm font-medium border ${
                   correct === n ? 'bg-success/10 text-success border-success/20' :
-                  correct > 0 ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                  correct > 0 ? 'bg-flag/10 text-flag border-flag/20' :
                   'bg-destructive/10 text-destructive border-destructive/20'
                 }`}>
                   {correct === n ? '🎉 ถูกต้องทุกรายการ!' : `✅ ถูก ${correct}/${n} รายการ`}
@@ -1177,7 +1177,7 @@ export function QuestionPreviewContent({
               return (
                 <div className={`p-3 rounded-lg text-sm font-medium border ${
                   correctCount === autoCount ? 'bg-success/10 text-success border-success/20' :
-                  correctCount > 0 ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                  correctCount > 0 ? 'bg-flag/10 text-flag border-flag/20' :
                   'bg-destructive/10 text-destructive border-destructive/20'
                 }`}>
                   {correctCount === autoCount ? '🎉 ถูกต้องทุกข้อ (ที่ตรวจอัตโนมัติ)!' : `✅ ถูก ${correctCount}/${autoCount} ข้อ (ที่ตรวจอัตโนมัติ)`}

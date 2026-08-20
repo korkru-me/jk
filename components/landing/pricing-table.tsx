@@ -250,7 +250,7 @@ export function PricingTable() {
           รายปี
         </span>
         {yearly && (
-          <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success dark:bg-emerald-950/60">
+          <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">
             ประหยัด 20%
           </span>
         )}

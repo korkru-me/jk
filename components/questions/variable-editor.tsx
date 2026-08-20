@@ -315,7 +315,7 @@ export function VariableEditor({
               <button
                 type="button"
                 onClick={() => onChange([...variables, { ...EMPTY_REF }])}
-                className="text-xs text-primary font-semibold hover:text-indigo-800 hover:underline"
+                className="text-xs text-primary font-semibold hover:text-primary hover:underline"
               >
                 + เพิ่มตัวแปรอ้างอิงคำตอบ (multi-step)
               </button>
@@ -475,7 +475,7 @@ function ValueCard({ v, index, onUpdate, onRemove }: {
             type="button"
             onClick={() => onRemove(index)}
             title="ลบตัวแปรนี้"
-            className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-300 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
           >
             ✕
           </button>

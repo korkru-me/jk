@@ -145,7 +145,7 @@ function StudentNotesPanel({
               <button
                 onClick={() => handleDelete(n.id)}
                 disabled={isPending}
-                className="shrink-0 text-gray-300 hover:text-destructive transition-colors disabled:opacity-50"
+                className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors disabled:opacity-50"
                 title="ลบบันทึก"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -299,7 +299,7 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
                               <span className="text-xs">เลยกำหนด</span>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center gap-1 text-gray-300">
+                            <div className="flex items-center justify-center gap-1 text-muted-foreground/40">
                               <MinusCircle className="w-3.5 h-3.5" />
                               <span className="text-xs">ยังไม่ทำ</span>
                             </div>

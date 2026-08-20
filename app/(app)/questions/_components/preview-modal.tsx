@@ -77,7 +77,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
 
         {/* Flagged warning */}
         {isFlagged && (
-          <div className="flex items-center gap-2 px-6 py-2.5 bg-flag/10 border-b border-orange-100 shrink-0">
+          <div className="flex items-center gap-2 px-6 py-2.5 bg-flag/10 border-b border-flag/20 shrink-0">
             <AlertTriangle className="w-4 h-4 text-flag shrink-0" />
             <p className="text-sm text-flag font-medium">
               โจทย์ข้อนี้ถูกรายงานว่าเฉลยอาจผิดพลาด กรุณาตรวจสอบ
@@ -151,7 +151,7 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
       {(q.solution_text || (q.solution_image_urls ?? []).length > 0) && (
         <div className="bg-warning/10 rounded-xl p-4 border border-amber-100 space-y-3">
           <p className="text-[11px] font-semibold text-warning uppercase tracking-wide mb-2">วิธีทำ / คำอธิบาย</p>
-          {q.solution_text && <RichText text={q.solution_text} className="text-sm text-amber-900 leading-relaxed block" />}
+          {q.solution_text && <RichText text={q.solution_text} className="text-sm text-warning leading-relaxed block" />}
           {(q.solution_image_urls ?? []).length > 0 && (
             <div className="flex flex-wrap gap-3">
               {(q.solution_image_urls ?? []).map(url => (

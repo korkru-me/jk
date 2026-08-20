@@ -206,7 +206,7 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
               {preview.question_type === 'written' && preview.answer_formula && (
                 <div className="border rounded-lg p-3 bg-primary/10">
                   <p className="text-xs text-primary mb-1">สูตรคำตอบ</p>
-                  <p className="font-mono text-blue-800">{preview.answer_formula} {preview.answer_unit}</p>
+                  <p className="font-mono text-primary">{preview.answer_formula} {preview.answer_unit}</p>
                 </div>
               )}
               {(preview.solution_text || (preview.solution_image_urls ?? []).length > 0) && (

@@ -166,9 +166,9 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                           </span>
                         )}
                         {a.mode === 'online' ? (
-                          <Monitor className="w-3 h-3 text-gray-300" />
+                          <Monitor className="w-3 h-3 text-muted-foreground/40" />
                         ) : (
-                          <Printer className="w-3 h-3 text-gray-300" />
+                          <Printer className="w-3 h-3 text-muted-foreground/40" />
                         )}
                         {a.end_at && (
                           <span className="flex items-center gap-0.5 text-xs text-muted-foreground">

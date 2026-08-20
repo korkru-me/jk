@@ -409,7 +409,7 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
   if (submissions.length === 0) {
     return (
       <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
-        <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <AlertCircle className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
         <p className="text-muted-foreground font-medium">ยังไม่มีการส่ง</p>
         <p className="text-sm text-muted-foreground mt-1">เมื่อนักเรียนส่งงาน ข้อมูลจะปรากฏที่นี่</p>
       </div>
@@ -471,7 +471,7 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
                     )}
                   </div>
                 ) : (
-                  <span className="text-sm text-gray-300">—</span>
+                  <span className="text-sm text-muted-foreground/40">—</span>
                 )}
               </div>
               <span className="text-xs text-muted-foreground text-right w-28">
@@ -495,7 +495,7 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
   if (submissions.length === 0) {
     return (
       <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
-        <BarChart2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <BarChart2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
         <p className="text-muted-foreground font-medium">ยังไม่มีข้อมูลเพียงพอ</p>
         <p className="text-sm text-muted-foreground mt-1">ต้องมีการส่งอย่างน้อย 1 ครั้ง</p>
       </div>

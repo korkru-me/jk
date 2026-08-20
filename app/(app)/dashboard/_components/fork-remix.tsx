@@ -65,7 +65,7 @@ export function ForkRemix() {
                   <Tag className="w-2.5 h-2.5" />
                   {tpl.subject}
                 </span>
-                <span className="text-[10px] text-gray-300">·</span>
+                <span className="text-[10px] text-muted-foreground/40">·</span>
                 <span className="text-[10px] text-muted-foreground">{tpl.questions} ข้อ</span>
               </div>
             </div>

@@ -106,7 +106,7 @@ export function StudentScoreTable({
   if (submissions.length === 0) {
     return (
       <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
-        <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <AlertCircle className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
         <p className="text-muted-foreground font-medium">ยังไม่มีการส่ง</p>
         <p className="text-sm text-muted-foreground mt-1">เมื่อนักเรียนส่งงาน ข้อมูลจะปรากฏที่นี่</p>
       </div>
@@ -201,7 +201,7 @@ export function StudentScoreTable({
               {/* Score */}
               <div className="text-center">
                 <p className={`text-lg font-black tabular-nums ${pass ? 'text-foreground' : 'text-destructive'}`}>
-                  {effectiveScore}<span className="text-xs font-normal text-gray-300">/{maxScore}</span>
+                  {effectiveScore}<span className="text-xs font-normal text-muted-foreground/40">/{maxScore}</span>
                 </p>
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1 mx-auto w-20">
                   <div
@@ -221,7 +221,7 @@ export function StudentScoreTable({
                     {realPass ? 'ผ่าน' : 'ไม่ผ่าน'}
                   </span>
                 ) : (
-                  <span className="text-xs text-gray-300">—</span>
+                  <span className="text-xs text-muted-foreground/40">—</span>
                 )}
               </div>
 

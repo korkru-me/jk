@@ -161,7 +161,7 @@ export function ResultsClient({
             </p>
             <p className="text-2xl font-bold mt-1">
               <span className="text-success">{passCount}</span>
-              <span className="text-gray-300"> / </span>
+              <span className="text-muted-foreground/40"> / </span>
               <span className="text-destructive">{submitted.length - passCount}</span>
             </p>
           </Card>
@@ -386,7 +386,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
                     </td>
                     <td className="px-4 py-3 text-center">
                       {!answer ? (
-                        <span className="text-gray-300 text-xs">—</span>
+                        <span className="text-muted-foreground/40 text-xs">—</span>
                       ) : isPending ? (
                         <Clock className="w-4 h-4 text-warning inline" />
                       ) : answer.is_correct ? (
@@ -399,7 +399,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
                       {answer ? (
                         <ScoreEditor submissionAnswerId={answer.id} score={answer.score} maxScore={answer.max_score} />
                       ) : (
-                        <span className="text-gray-300 text-xs">—</span>
+                        <span className="text-muted-foreground/40 text-xs">—</span>
                       )}
                     </td>
                   </tr>

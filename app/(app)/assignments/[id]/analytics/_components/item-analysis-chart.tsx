@@ -39,7 +39,7 @@ export function ItemAnalysisSection({ questions, submissions, assignmentId }: Pr
   if (questions.length === 0) {
     return (
       <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
-        <AlertTriangle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <AlertTriangle className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
         <p className="text-muted-foreground font-medium">ไม่มีข้อมูลโจทย์</p>
       </div>
     )
@@ -162,7 +162,7 @@ export function ItemAnalysisSection({ questions, submissions, assignmentId }: Pr
               <p className="text-[10px] text-muted-foreground">ตอบผิด</p>
             </div>
             <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${
-              i === selectedIdx ? 'rotate-90 text-destructive' : 'text-gray-300'
+              i === selectedIdx ? 'rotate-90 text-destructive' : 'text-muted-foreground/40'
             }`} />
           </button>
         ))}

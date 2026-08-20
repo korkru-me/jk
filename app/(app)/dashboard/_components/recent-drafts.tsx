@@ -50,7 +50,7 @@ export function RecentDrafts() {
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-muted-foreground">{draft.subject}</span>
-                  <span className="text-xs text-gray-300">·</span>
+                  <span className="text-xs text-muted-foreground/40">·</span>
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="w-3 h-3" />
                     {draft.updatedAt}
@@ -59,7 +59,7 @@ export function RecentDrafts() {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <span className="text-xs font-semibold text-muted-foreground">{draft.progress}%</span>
-                <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary transition-colors" />
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
               </div>
             </div>
             {/* Progress bar */}

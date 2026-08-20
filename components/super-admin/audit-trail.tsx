@@ -207,12 +207,12 @@ const LOGS: AuditLog[] = [
 const SEVERITY_CONFIG: Record<Severity, { cls: string; icon: React.ElementType; label: string }> =
   {
     critical: {
-      cls: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
+      cls: 'bg-destructive/10 text-destructive',
       icon: ShieldAlert,
       label: 'Critical',
     },
     warning: {
-      cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
+      cls: 'bg-warning/10 text-warning',
       icon: AlertTriangle,
       label: 'Warning',
     },
@@ -258,7 +258,7 @@ export function AuditTrail() {
     <div className="space-y-5">
       {/* Alert Banner */}
       {criticalCount > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30">
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 dark:border-red-900/50">
           <ShieldAlert className="h-5 w-5 text-destructive shrink-0" />
           <p className="text-sm font-medium text-destructive">
             พบ {criticalCount} รายการที่มีระดับความรุนแรง Critical ในช่วง 48 ชั่วโมงที่ผ่านมา
@@ -370,7 +370,7 @@ export function AuditTrail() {
                   className={cn(
                     'border-t border-border/60 transition-colors',
                     log.severity === 'critical'
-                      ? 'bg-destructive/10 dark:bg-red-950/10'
+                      ? 'bg-destructive/10'
                       : 'hover:bg-muted dark:hover:bg-slate-800/40',
                   )}
                 >
@@ -413,8 +413,8 @@ export function AuditTrail() {
                       className={cn(
                         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                         log.result === 'success'
-                          ? 'bg-success/10 text-success dark:bg-emerald-950/60'
-                          : 'bg-destructive/10 text-destructive dark:bg-red-950/60',
+                          ? 'bg-success/10 text-success'
+                          : 'bg-destructive/10 text-destructive',
                       )}
                     >
                       {log.result === 'success' ? 'Success' : 'Failed'}

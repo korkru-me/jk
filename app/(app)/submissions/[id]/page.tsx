@@ -547,7 +547,7 @@ function AnswerReview({
         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
           submitted
             ? 'bg-success/10 text-success dark:bg-green-950/30'
-            : 'bg-destructive/10 text-destructive dark:bg-red-950/30'
+            : 'bg-destructive/10 text-destructive'
         }`}>
           {submitted ? '✓ ส่งแล้ว' : '✗ ไม่ได้ส่งไฟล์'}
         </span>

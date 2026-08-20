@@ -119,7 +119,7 @@ export function SignupForm() {
               className={[
                 'flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-sm font-medium transition-all',
                 selectedRole === r.value
-                  ? 'border-primary bg-primary/10 text-primary dark:border-primary dark:bg-indigo-950/40'
+                  ? 'border-primary bg-primary/10 text-primary dark:border-primary'
                   : 'border-border text-muted-foreground hover:border-ring dark:hover:border-slate-600',
               ].join(' ')}
             >

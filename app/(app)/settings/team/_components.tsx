@@ -27,8 +27,8 @@ interface TeamOrgData {
 const TYPE_LABEL: Record<OrgType, string> = { school: 'โรงเรียน', team: 'ทีม' }
 const ROLE_LABEL: Record<string, string> = { owner: 'เจ้าของ', teacher: 'สมาชิก' }
 const ROLE_COLOR: Record<string, string> = {
-  owner: 'bg-warning/10 text-amber-800',
-  teacher: 'bg-primary/10 text-blue-800',
+  owner: 'bg-warning/10 text-warning',
+  teacher: 'bg-primary/10 text-primary',
 }
 
 // ─── Create Org Modal ───────────────────────────────────────────────────────

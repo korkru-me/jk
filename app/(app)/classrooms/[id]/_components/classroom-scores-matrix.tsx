@@ -315,7 +315,7 @@ export function ClassroomScoresMatrix({
                       className={`mt-1.5 mx-auto flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
                         hasNonSubmitter
                           ? 'bg-warning/10 text-warning hover:bg-warning/10'
-                          : 'bg-muted text-gray-300 cursor-default'
+                          : 'bg-muted text-muted-foreground/40 cursor-default'
                       }`}
                     >
                       <Bell className="w-2.5 h-2.5" />
@@ -365,7 +365,7 @@ export function ClassroomScoresMatrix({
                           <span className="text-xs">กำลังทำ</span>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-1 text-gray-300">
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground/40">
                           <MinusCircle className="w-3.5 h-3.5" />
                           <span className="text-xs">ยังไม่ทำ</span>
                         </div>
@@ -375,7 +375,7 @@ export function ClassroomScoresMatrix({
                         <button
                           onClick={() => setDialogTarget({ assignmentId: a.id, studentId: student.id })}
                           className={`mt-0.5 flex items-center gap-0.5 mx-auto text-[10px] transition-colors ${
-                            extension ? 'text-violet-600 font-medium' : 'text-gray-300 opacity-0 group-hover:opacity-100 hover:text-violet-500'
+                            extension ? 'text-violet-600 font-medium' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-violet-500'
                           }`}
                         >
                           <Clock className="w-2.5 h-2.5" />

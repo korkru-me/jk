@@ -93,7 +93,7 @@ export function RecentSubmissions() {
                         <FileText className="w-3 h-3" />
                         {sub.type} · {sub.count} คน
                       </span>
-                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-muted-foreground/40">·</span>
                       <span className="text-xs text-muted-foreground">{sub.time}</span>
                     </div>
                   </div>

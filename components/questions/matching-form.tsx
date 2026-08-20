@@ -265,7 +265,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
                   type="button"
                   onClick={() => removePair(i)}
                   disabled={pairs.length <= 3}
-                  className="mt-2 text-gray-300 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="mt-2 text-muted-foreground/40 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <X className="w-4 h-4" />
                 </button>

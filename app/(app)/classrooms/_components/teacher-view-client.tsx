@@ -144,7 +144,7 @@ export function TeacherViewClient({
           </span>
           <button
             onClick={selected.size === classrooms.length ? () => setSelected(new Set()) : selectAll}
-            className="text-xs text-primary underline hover:text-blue-800"
+            className="text-xs text-primary underline hover:text-primary"
           >
             {selected.size === classrooms.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
           </button>

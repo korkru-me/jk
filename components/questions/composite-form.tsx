@@ -436,10 +436,10 @@ function CompositePartCard({ part, label, update, onRemove, onMoveUp, onMoveDown
     <div className="border rounded-xl overflow-hidden bg-muted">
       <div className="flex items-center gap-2.5 px-3 py-2.5 border-b bg-card">
         <div className="flex flex-col gap-0.5 flex-shrink-0">
-          <button type="button" onClick={onMoveUp} className="p-0.5 rounded text-gray-300 hover:text-muted-foreground">
+          <button type="button" onClick={onMoveUp} className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground">
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
-          <button type="button" onClick={onMoveDown} className="p-0.5 rounded text-gray-300 hover:text-muted-foreground">
+          <button type="button" onClick={onMoveDown} className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground">
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -473,7 +473,7 @@ function EquationSection({
               <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl">
                 <span className="font-mono font-bold text-success text-sm">{'{' + answerVarName + '}'}</span>
                 <span className="text-success">=</span>
-                <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{derivedFormula}</span>
+                <span className="font-mono text-success text-sm font-medium flex-1 truncate">{derivedFormula}</span>
                 <span className="text-[10px] text-success shrink-0">คำนวณอัตโนมัติ</span>
               </div>
             )}
@@ -712,7 +712,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
         {derivedFormula.trim() && (
           <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${
             correctAnswer !== null
-              ? 'bg-success/10 border-success/20 text-emerald-800'
+              ? 'bg-success/10 border-success/20 text-success'
               : 'bg-warning/10 border-warning/20 text-warning'
           }`}>
             <span className="font-medium shrink-0">คำตอบที่ถูกต้อง:</span>
@@ -855,7 +855,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
                   /* Wrong option — value on top, compact formula input below */
                   <div className="flex-1 min-w-0 space-y-1">
                     <span className={`text-sm font-semibold block ${
-                      opt.value !== null ? 'text-foreground' : showWarning ? 'text-destructive' : 'text-gray-300'
+                      opt.value !== null ? 'text-foreground' : showWarning ? 'text-destructive' : 'text-muted-foreground/40'
                     }`}>
                       {opt.value !== null
                         ? applyTemplate(opt.value)

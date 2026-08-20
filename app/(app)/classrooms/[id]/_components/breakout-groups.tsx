@@ -153,7 +153,7 @@ export function BreakoutGroups({ students }: Props) {
           <div className="flex flex-wrap gap-1.5">
             {unassigned.map(s => <StudentChip key={s.id} s={s} fromGroupId={null} />)}
             {unassigned.length === 0 && (
-              <p className="text-xs text-gray-300 italic">นักเรียนทุกคนอยู่ในกลุ่มแล้ว</p>
+              <p className="text-xs text-muted-foreground/40 italic">นักเรียนทุกคนอยู่ในกลุ่มแล้ว</p>
             )}
           </div>
         </div>
@@ -186,7 +186,7 @@ export function BreakoutGroups({ students }: Props) {
               <div className="flex flex-wrap gap-1">
                 {group.students.map(s => <StudentChip key={s.id} s={s} fromGroupId={group.id} />)}
                 {group.students.length === 0 && (
-                  <p className="text-[10px] text-gray-300 italic">ลากนักเรียนมาวางที่นี่</p>
+                  <p className="text-[10px] text-muted-foreground/40 italic">ลากนักเรียนมาวางที่นี่</p>
                 )}
               </div>
             </div>

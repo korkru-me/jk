@@ -91,7 +91,7 @@ export function InlineConditionPanel({ varName, allVars, rules, onRulesChange }:
           <button
             type="button"
             onClick={() => removeRule(rule.id)}
-            className="text-gray-300 hover:text-destructive transition-colors shrink-0"
+            className="text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
           >
             <X className="w-3 h-3" />
           </button>
@@ -101,7 +101,7 @@ export function InlineConditionPanel({ varName, allVars, rules, onRulesChange }:
       <button
         type="button"
         onClick={addRule}
-        className="flex items-center gap-1 text-[11px] text-primary hover:text-blue-800 font-medium transition-colors"
+        className="flex items-center gap-1 text-[11px] text-primary hover:text-primary font-medium transition-colors"
       >
         <Plus className="w-3 h-3" /> เพิ่มเงื่อนไข
       </button>

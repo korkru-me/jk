@@ -96,7 +96,7 @@ export function MethodBuilder({ variables, value, unit, onChange }: MethodBuilde
                 key={v.name}
                 type="button"
                 onClick={() => push(v.name)}
-                className="px-3 py-1.5 rounded-lg border border-primary/20 bg-primary/10 text-blue-800 text-sm font-mono hover:bg-primary/10 transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-primary/20 bg-primary/10 text-primary text-sm font-mono hover:bg-primary/10 transition-colors"
               >
                 {v.name}
               </button>
@@ -158,7 +158,7 @@ export function MethodBuilder({ variables, value, unit, onChange }: MethodBuilde
               key={c}
               type="button"
               onClick={() => push(CONST_VALUES[c] === 'π' ? 'pi' : CONST_VALUES[c])}
-              className="px-3 py-1.5 rounded-lg border border-warning/20 bg-warning/10 text-amber-800 text-sm font-mono hover:bg-warning/10 transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-warning/20 bg-warning/10 text-warning text-sm font-mono hover:bg-warning/10 transition-colors"
             >
               {CONST_VALUES[c]}
             </button>

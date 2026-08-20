@@ -84,7 +84,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       </div>
 
       {classrooms.length === 0 && (
-        <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-amber-800">
+        <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
           คุณยังไม่มีห้องเรียน กรุณา{' '}
           <a href="/classrooms/new" className="underline font-medium">สร้างห้องเรียน</a>
           {' '}ก่อน

@@ -19,7 +19,7 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
   const days = Math.floor(diff / 86400000)
 
   if (diff < 0) return { label: 'เลยกำหนดส่งแล้ว', urgent: true, color: 'text-destructive', bg: 'bg-destructive/10' }
-  if (hours < 24) return { label: `เหลือเวลาอีก ${hours} ชม. จะหมดเขตส่งงาน`, urgent: true, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' }
+  if (hours < 24) return { label: `เหลือเวลาอีก ${hours} ชม. จะหมดเขตส่งงาน`, urgent: true, color: 'text-flag dark:text-flag', bg: 'bg-flag/10' }
   if (days <= 2) return { label: `เหลือเวลาอีก ${days} วัน จะหมดเขตส่งงาน`, urgent: true, color: 'text-warning', bg: 'bg-warning/10' }
   return {
     label: `กำหนดส่งภายใน ${new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' })}`,
@@ -140,11 +140,11 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
   return (
     <div className={cn(
       'bg-card border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-all',
-      due.urgent && !isDone ? 'border-orange-300 dark:border-orange-800' : ''
+      due.urgent && !isDone ? 'border-flag/20 dark:border-orange-800' : ''
     )}>
       <div className="flex items-start gap-2">
         {due.urgent && !isDone && (
-          <AlertCircle size={15} className="text-orange-500 shrink-0 mt-0.5" />
+          <AlertCircle size={15} className="text-flag shrink-0 mt-0.5" />
         )}
         <div className="flex-1 min-w-0">
           <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full mb-1', typeCfg.bg, typeCfg.text)}>

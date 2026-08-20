@@ -126,7 +126,7 @@ export function SubEquationPicker({
                   key={name}
                   type="button"
                   onClick={() => insertIntoEquation(name)}
-                  className="font-mono text-xs px-2.5 py-1 rounded-lg border-2 border-warning/20 bg-warning/10 text-amber-800 font-bold hover:bg-warning/10 transition-colors"
+                  className="font-mono text-xs px-2.5 py-1 rounded-lg border-2 border-warning/20 bg-warning/10 text-warning font-bold hover:bg-warning/10 transition-colors"
                 >
                   {name}
                   <span className="ml-1.5 font-normal text-warning text-[10px]">คำตอบ {labels[i]})</span>
@@ -185,7 +185,7 @@ export function SubEquationPicker({
               <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl">
                 <span className="font-mono font-bold text-success text-sm">{'{' + answerVarName + '}'}</span>
                 <span className="text-success">=</span>
-                <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{derivedFormula}</span>
+                <span className="font-mono text-success text-sm font-medium flex-1 truncate">{derivedFormula}</span>
                 <span className="text-[10px] text-success shrink-0">คำนวณอัตโนมัติ</span>
               </div>
             )}

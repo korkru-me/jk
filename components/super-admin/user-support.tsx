@@ -210,17 +210,17 @@ const TICKET_STATUS_CONFIG: Record<
 > = {
   open: {
     label: 'รอการตอบกลับ',
-    cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
+    cls: 'bg-warning/10 text-warning',
     icon: Clock,
   },
   in_progress: {
     label: 'กำลังดำเนินการ',
-    cls: 'bg-primary/10 text-primary dark:bg-blue-950/60',
+    cls: 'bg-primary/10 text-primary',
     icon: MessageSquare,
   },
   resolved: {
     label: 'แก้ไขแล้ว',
-    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
+    cls: 'bg-success/10 text-success',
     icon: CheckCircle2,
   },
 }
@@ -228,15 +228,15 @@ const TICKET_STATUS_CONFIG: Record<
 const PRIORITY_CONFIG: Record<TicketPriority, { label: string; cls: string }> = {
   critical: {
     label: 'Critical',
-    cls: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
+    cls: 'bg-destructive/10 text-destructive',
   },
   high: {
     label: 'High',
-    cls: 'bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-400',
+    cls: 'bg-flag/10 text-flag dark:text-flag',
   },
   medium: {
     label: 'Medium',
-    cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
+    cls: 'bg-warning/10 text-warning',
   },
   low: {
     label: 'Low',
@@ -272,8 +272,8 @@ function UserRow({ user }: { user: AppUser }) {
           className={cn(
             'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
             suspended
-              ? 'bg-destructive/10 text-destructive dark:bg-red-950/60'
-              : 'bg-success/10 text-success dark:bg-emerald-950/60',
+              ? 'bg-destructive/10 text-destructive'
+              : 'bg-success/10 text-success',
           )}
         >
           {suspended ? 'Suspended' : 'Active'}
@@ -304,8 +304,8 @@ function UserRow({ user }: { user: AppUser }) {
             className={cn(
               'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
               suspended
-                ? 'border-success/20 bg-success/10 text-success hover:bg-success/10 dark:bg-emerald-950/40'
-                : 'border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/10 dark:bg-red-950/40',
+                ? 'border-success/20 bg-success/10 text-success hover:bg-success/10'
+                : 'border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/10',
             )}
           >
             {suspended ? (

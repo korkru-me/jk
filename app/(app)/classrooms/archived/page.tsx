@@ -48,7 +48,7 @@ export default async function ArchivedClassroomsPage() {
 
       {classrooms.length === 0 ? (
         <div className="text-center py-24 border-2 border-dashed border-border rounded-2xl">
-          <Archive className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <Archive className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-muted-foreground font-medium">ไม่มีห้องเรียนที่เก็บถาวร</p>
           <Link href="/classrooms" className="text-sm text-primary hover:underline mt-1 block">
             กลับหน้าหลัก

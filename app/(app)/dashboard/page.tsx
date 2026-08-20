@@ -287,7 +287,7 @@ function StudentDashboard({
           <p className="text-sm text-muted-foreground mt-1">ไม่มีชุดข้อสอบที่ค้างอยู่ในตอนนี้</p>
         </Card>
       ) : (
-        <div className="bg-card border-2 border-dashed border-primary/20 bg-primary/10 dark:bg-blue-950/20 rounded-2xl p-10 text-center">
+        <div className="bg-card border-2 border-dashed border-primary/20 bg-primary/10 rounded-2xl p-10 text-center">
           <p className="text-4xl mb-3">🏫</p>
           <h3 className="font-semibold mb-1">เข้าร่วมห้องเรียนแรกของคุณ</h3>
           <p className="text-sm text-muted-foreground mb-4">ขอรหัส Class Code จากครู แล้วกรอกในหน้าห้องเรียน</p>
@@ -382,7 +382,7 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
   const days = Math.floor(diff / 86400000)
 
   if (diff < 0) return { label: 'เลยกำหนด', urgent: true, color: 'text-destructive' }
-  if (hours < 24) return { label: `อีก ${hours} ชม.`, urgent: true, color: 'text-orange-600 dark:text-orange-400' }
+  if (hours < 24) return { label: `อีก ${hours} ชม.`, urgent: true, color: 'text-flag dark:text-flag' }
   if (days <= 2) return { label: `อีก ${days} วัน`, urgent: true, color: 'text-warning' }
   return {
     label: new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' }),
@@ -397,11 +397,11 @@ function AssignmentCard({ assignment: a }: { assignment: any }) {
 
   return (
     <div className={`bg-card border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-all ${
-      due.urgent ? 'border-orange-300 dark:border-orange-800' : ''
+      due.urgent ? 'border-flag/20 dark:border-orange-800' : ''
     }`}>
       <div className="flex items-start gap-2">
         {due.urgent && (
-          <AlertCircle size={15} className="text-orange-500 shrink-0 mt-0.5" />
+          <AlertCircle size={15} className="text-flag shrink-0 mt-0.5" />
         )}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm line-clamp-2 leading-snug">{a.title}</p>

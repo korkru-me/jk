@@ -47,8 +47,8 @@ const QUESTION_TYPES = [
     icon: ArrowLeftRight,
     title: 'จับคู่',
     desc: 'นักเรียนจับคู่รายการสองชุดที่สัมพันธ์กัน',
-    color: 'bg-orange-50 border-orange-200 text-orange-700',
-    iconColor: 'text-orange-500',
+    color: 'bg-flag/10 border-flag/20 text-flag',
+    iconColor: 'text-flag',
   },
   {
     href: '/questions/new/essay',

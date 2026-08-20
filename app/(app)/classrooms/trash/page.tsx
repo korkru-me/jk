@@ -60,7 +60,7 @@ export default async function TrashPage() {
 
       {classrooms.length === 0 ? (
         <div className="text-center py-24 border-2 border-dashed border-border rounded-2xl">
-          <Trash2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <Trash2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-muted-foreground font-medium">ถังขยะว่างเปล่า</p>
           <Link href="/classrooms" className="text-sm text-primary hover:underline mt-1 block">
             กลับหน้าหลัก

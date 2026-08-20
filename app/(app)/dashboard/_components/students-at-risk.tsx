@@ -25,7 +25,7 @@ const AT_RISK_STUDENTS = [
     topic: 'แรงและอันตรกิริยาของอนุภาค',
     drop: 2,
     initials: 'ปส',
-    color: 'bg-orange-100 text-orange-600',
+    color: 'bg-flag/10 text-flag',
   },
   {
     id: 3,
@@ -36,7 +36,7 @@ const AT_RISK_STUDENTS = [
     topic: 'ควาร์กและเลปตอน',
     drop: 2,
     initials: 'นจ',
-    color: 'bg-orange-100 text-orange-600',
+    color: 'bg-flag/10 text-flag',
   },
 ]
 

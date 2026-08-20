@@ -170,17 +170,17 @@ const TENANTS: Tenant[] = [
 const PLAN_BADGE: Record<Plan, string> = {
   Enterprise:
     'bg-violet-100 text-violet-700 ring-1 ring-violet-300 dark:bg-violet-950/60 dark:text-violet-300 dark:ring-violet-700',
-  Pro: 'bg-primary/10 text-primary ring-1 ring-indigo-300 dark:bg-indigo-950/60 dark:ring-indigo-700',
+  Pro: 'bg-primary/10 text-primary ring-1 ring-indigo-300 dark:ring-indigo-700',
   Basic:
     'bg-muted text-muted-foreground ring-1 ring-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600',
 }
 
 const STATUS_BADGE: Record<TenantStatus, string> = {
   active:
-    'bg-success/10 text-success dark:bg-emerald-950/60',
-  suspended: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
+    'bg-success/10 text-success',
+  suspended: 'bg-destructive/10 text-destructive',
   trial:
-    'bg-warning/10 text-warning dark:bg-amber-950/60',
+    'bg-warning/10 text-warning',
 }
 
 const STATUS_LABEL: Record<TenantStatus, string> = {

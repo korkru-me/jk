@@ -28,13 +28,13 @@ const RESOURCES = [
 ]
 
 function getBarColor(pct: number) {
-  if (pct >= 85) return 'bg-orange-500'
+  if (pct >= 85) return 'bg-flag'
   if (pct >= 60) return 'bg-warning'
   return 'bg-success'
 }
 
 function getTextColor(pct: number) {
-  if (pct >= 85) return 'text-orange-600'
+  if (pct >= 85) return 'text-flag'
   if (pct >= 60) return 'text-warning'
   return 'text-success'
 }
@@ -71,7 +71,7 @@ export function ResourceUsage() {
                 />
               </div>
               {pct >= 85 && (
-                <p className="text-[10px] text-orange-500 mt-1">⚠ ใกล้เต็ม — พิจารณาอัปเกรดแพ็กเกจ</p>
+                <p className="text-[10px] text-flag mt-1">⚠ ใกล้เต็ม — พิจารณาอัปเกรดแพ็กเกจ</p>
               )}
             </div>
           )

@@ -37,9 +37,9 @@ export function DailyTips() {
           <Lightbulb className="w-3.5 h-3.5 text-warning" />
         </div>
         <div>
-          <p className="text-xs font-semibold text-amber-800 mb-1">เทคนิคของวันนี้</p>
+          <p className="text-xs font-semibold text-warning mb-1">เทคนิคของวันนี้</p>
           <p className="text-xs text-warning leading-relaxed">{tip.text}</p>
-          <button className="flex items-center gap-1 text-xs font-semibold text-warning hover:text-amber-900 mt-2 transition-colors">
+          <button className="flex items-center gap-1 text-xs font-semibold text-warning hover:text-warning mt-2 transition-colors">
             {tip.cta} <ChevronRight className="w-3 h-3" />
           </button>
         </div>

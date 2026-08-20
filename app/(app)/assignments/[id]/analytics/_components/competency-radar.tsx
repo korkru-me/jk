@@ -105,7 +105,7 @@ export function CompetencyRadarChart({ assignmentId, questions }: Props) {
             <span className={`font-semibold ${d.class >= d.system ? 'text-primary' : 'text-warning'}`}>
               {d.class}
             </span>
-            <span className="text-gray-300">/</span>
+            <span className="text-muted-foreground/40">/</span>
             <span className="text-muted-foreground">{d.subject}</span>
           </div>
         ))}
