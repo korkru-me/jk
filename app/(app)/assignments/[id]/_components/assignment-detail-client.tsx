@@ -11,21 +11,9 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
+import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { Assignment, Question } from '@/lib/types'
 import type { SubmissionRow } from '../page'
-
-const DIFF_META: Record<string, { label: string; color: string; bar: string }> = {
-  easy:       { label: 'ง่าย',      color: 'bg-success/10 text-success',   bar: 'bg-success' },
-  medium:     { label: 'กลาง',      color: 'bg-warning/10 text-warning',   bar: 'bg-warning' },
-  hard:       { label: 'ยาก',       color: 'bg-destructive/10 text-destructive',       bar: 'bg-destructive' },
-  analytical: { label: 'วิเคราะห์', color: 'bg-purple-100 text-purple-700', bar: 'bg-purple-400' },
-}
-
-const TYPE_SHORT: Record<string, string> = {
-  mcq: 'MCQ', written: 'เขียน', matching: 'จับคู่', essay: 'บรรยาย',
-  true_false: 'ถ/ผ', fill_blank: 'เติมคำ', ordering: 'เรียง',
-  file_upload: 'ไฟล์งาน',
-}
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-gray-400' },
@@ -369,8 +357,8 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
         {Object.entries(diffCounts).map(([d, count]) => {
           const m = DIFF_META[d]
           return (
-            <span key={d} className={`text-xs font-medium px-3 py-1.5 rounded-full ${m?.color ?? 'bg-muted text-muted-foreground'}`}>
-              {m?.label ?? d} · {count} ข้อ
+            <span key={d} className={`text-xs font-medium px-3 py-1.5 rounded-full ${m?.badge ?? 'bg-muted text-muted-foreground'}`}>
+              {m?.shortLabel ?? d} · {count} ข้อ
             </span>
           )
         })}
@@ -391,8 +379,8 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">{q.question_text}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${diff?.color ?? 'bg-muted text-muted-foreground'}`}>
-                  {diff?.label ?? q.difficulty}
+                <span className={`text-xs px-2 py-0.5 rounded-full ${diff?.badge ?? 'bg-muted text-muted-foreground'}`}>
+                  {diff?.shortLabel ?? q.difficulty}
                 </span>
                 <span className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-full">
                   {TYPE_SHORT[q.question_type] ?? q.question_type}
@@ -576,8 +564,8 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
                     <div className={`h-full ${barColor} rounded-full`} style={{ width: `${acc}%` }} />
                   </div>
                 </div>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${diff?.color ?? ''}`}>
-                  {diff?.label}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${diff?.badge ?? ''}`}>
+                  {diff?.shortLabel}
                 </span>
               </div>
             )

@@ -6,20 +6,8 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { setRequiresWorkImage } from '@/lib/actions/questions'
+import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
-
-export const DIFF_META: Record<string, { label: string; color: string }> = {
-  easy:       { label: 'ง่าย',      color: 'bg-success/10 text-success border-success/20' },
-  medium:     { label: 'กลาง',      color: 'bg-warning/10 text-warning border-warning/20' },
-  hard:       { label: 'ยาก',       color: 'bg-destructive/10 text-destructive border-destructive/20' },
-  analytical: { label: 'วิเคราะห์', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-}
-
-export const TYPE_SHORT: Record<string, string> = {
-  mcq: 'MCQ', written: 'เขียน', matching: 'จับคู่', essay: 'บรรยาย',
-  true_false: 'ถ/ผ', fill_blank: 'เติมคำ', ordering: 'เรียง',
-  file_upload: 'ไฟล์งาน',
-}
 
 interface Props {
   questions: AssignmentQuestionOption[]
@@ -114,7 +102,7 @@ export function QuestionPicker({
                 diffFilter === d ? 'bg-gray-900 text-white border-gray-900' : 'border-border text-muted-foreground hover:border-ring'
               }`}
             >
-              {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.label ?? d}
+              {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.shortLabel ?? d}
             </button>
           ))}
         </div>
@@ -177,8 +165,8 @@ export function QuestionPicker({
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{q.question_text}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`text-xs px-1.5 py-0.5 rounded border ${diff?.color ?? 'bg-muted text-muted-foreground border-border'}`}>
-                    {diff?.label ?? q.difficulty}
+                  <span className={`text-xs px-1.5 py-0.5 rounded border ${diff ? `${diff.badge} ${diff.border}` : 'bg-muted text-muted-foreground border-border'}`}>
+                    {diff?.shortLabel ?? q.difficulty}
                   </span>
                   <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
                   {q.question_type === 'written' && (

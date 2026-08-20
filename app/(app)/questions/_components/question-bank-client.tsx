@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { QuestionCard, TYPE_LABEL, DIFF_META, type Teacher } from './question-card'
+import { QuestionCard, type Teacher } from './question-card'
+import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
 import type { QuestionDetailWithCategory, QuestionWithCategory, QuestionWithCreator } from '../page'
@@ -472,7 +473,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
         {isGroup && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
         )}
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.color}`}>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.badge}`}>
           {diff?.label}
         </span>
         <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">

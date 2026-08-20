@@ -4,6 +4,10 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  MONTH_LABELS, SEVERITY_BADGE, SEVERITY_DOT, SEVERITY_ORDER, WEEKDAY_LABELS,
+  type Severity,
+} from '@/lib/calendar-display'
 
 export interface HomeroomCalendarEvent {
   id: string
@@ -14,12 +18,6 @@ export interface HomeroomCalendarEvent {
   totalStudents: number
 }
 
-const WEEKDAY_LABELS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']
-const MONTH_LABELS = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
-]
-
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
@@ -28,21 +26,6 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
-type Severity = 'overdue' | 'soon' | 'later' | 'done'
-
-const SEVERITY_ORDER: Record<Severity, number> = { overdue: 0, soon: 1, later: 2, done: 3 }
-const SEVERITY_DOT: Record<Severity, string> = {
-  overdue: 'bg-destructive',
-  soon: 'bg-warning',
-  later: 'bg-primary',
-  done: 'bg-success',
-}
-const SEVERITY_BADGE: Record<Severity, string> = {
-  overdue: 'bg-destructive/10 text-destructive',
-  soon: 'bg-warning/10 text-warning',
-  later: 'bg-primary/10 text-primary',
-  done: 'bg-success/10 text-success',
-}
 const SEVERITY_LABEL: Record<Severity, string> = {
   overdue: 'มีคนยังไม่ส่ง (เลยกำหนด)',
   soon: 'ใกล้ครบกำหนด',

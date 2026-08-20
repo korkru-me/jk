@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, FileText, Repeat, Clock, MoreVertical, Copy, BarChart3, Monitor, Printer, Pencil, RefreshCw, Target, Users, CheckCircle2 } from 'lucide-react'
+import { Plus, Clock, MoreVertical, Copy, BarChart3, Monitor, Printer, Pencil, RefreshCw, Target, Users, CheckCircle2 } from 'lucide-react'
+import { TYPE_CFG } from '@/lib/assignment-display'
 import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS, selectOfficialAttempt } from '@/lib/scoring'
@@ -74,11 +75,6 @@ const STATUS_CFG: Record<string, { label: string; bg: string; text: string }> = 
   draft:     { label: 'ฉบับร่าง',    bg: 'bg-muted',    text: 'text-muted-foreground' },
   published: { label: 'เผยแพร่แล้ว', bg: 'bg-success/10',  text: 'text-success' },
   closed:    { label: 'ปิดแล้ว',     bg: 'bg-destructive/10',       text: 'text-destructive' },
-}
-
-const TYPE_CFG: Record<string, { label: string; bg: string; text: string; icon: typeof FileText }> = {
-  exam:     { label: 'ข้อสอบ',     bg: 'bg-primary/10',   text: 'text-primary',   icon: FileText },
-  exercise: { label: 'แบบฝึกหัด', bg: 'bg-violet-50', text: 'text-violet-700', icon: Repeat },
 }
 
 interface Props {

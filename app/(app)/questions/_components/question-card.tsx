@@ -14,20 +14,8 @@ import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-d
 import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { downloadTextFile } from '@/lib/utils'
+import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import type { QuestionWithCategory } from '../page'
-
-export const DIFF_META: Record<string, { label: string; color: string; bar: string }> = {
-  easy:       { label: 'ง่าย',       color: 'bg-success/10 text-success',   bar: 'bg-success' },
-  medium:     { label: 'ปานกลาง',   color: 'bg-warning/10 text-warning',   bar: 'bg-warning' },
-  hard:       { label: 'ยาก',        color: 'bg-destructive/10 text-destructive',       bar: 'bg-destructive' },
-  analytical: { label: 'วิเคราะห์',  color: 'bg-purple-100 text-purple-700', bar: 'bg-purple-400' },
-}
-
-export const TYPE_LABEL: Record<string, string> = {
-  mcq: 'ปรนัย', written: 'อัตนัย', essay: 'บรรยาย',
-  true_false: 'ถ/ผ', fill_blank: 'เติมคำ', matching: 'จับคู่', ordering: 'เรียงลำดับ',
-  file_upload: 'ไฟล์งาน', composite: 'โจทย์ผสม',
-}
 
 export function mockStats(id: string) {
   const h = [...id].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
@@ -124,7 +112,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
               {isGroup && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
               )}
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.color}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.badge}`}>
                 {diff?.label}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">

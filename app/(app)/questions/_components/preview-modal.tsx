@@ -5,7 +5,8 @@ import {
   X, Flag, AlertTriangle, BookOpen, GitBranch, BarChart2, Clock,
   CheckCircle2, TrendingUp, Activity,
 } from 'lucide-react'
-import { DIFF_META, mockStats } from './question-card'
+import { mockStats } from './question-card'
+import { DIFF_META } from '@/lib/question-display'
 import { QuestionPreviewContent } from '@/components/questions/question-preview'
 import { RichText } from '@/components/ui/rich-text'
 import type {
@@ -57,7 +58,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
         <div className="flex items-start gap-4 px-6 pt-5 pb-4 border-b border-border shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.color}`}>{diff?.label}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.badge}`}>{diff?.label}</span>
               {q.question_categories?.name && (
                 <span className="text-xs text-muted-foreground">{q.question_categories.name}</span>
               )}

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { BookOpen, Clock, AlertCircle, CheckCircle2, XCircle, RotateCcw, Target, FileText, Repeat } from 'lucide-react'
+import { TYPE_CFG } from '@/lib/assignment-display'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
@@ -25,11 +26,6 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
     color: 'text-muted-foreground',
     bg: 'bg-muted/40',
   }
-}
-
-const TYPE_CFG: Record<string, { label: string; bg: string; text: string; icon: typeof FileText }> = {
-  exam:     { label: 'ข้อสอบ',     bg: 'bg-primary/10',   text: 'text-primary',   icon: FileText },
-  exercise: { label: 'แบบฝึกหัด', bg: 'bg-violet-50 dark:bg-violet-950/30', text: 'text-violet-700 dark:text-violet-400', icon: Repeat },
 }
 
 type StatusFilterKey = 'all' | 'pending' | 'done'
