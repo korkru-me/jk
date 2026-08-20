@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { QuestionCard } from './question-card'
+import { Card } from '@/components/ui/card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import type { QuestionStats } from '@/lib/question-stats'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
@@ -218,7 +219,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
 
         {/* Expanded filter panel */}
         {showFilters && (
-          <div className="bg-card rounded-2xl ring-1 ring-border p-4 space-y-4">
+          <Card edge="ring" padding="md" className="space-y-4">
             <div className="flex gap-8 flex-wrap">
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-2">ระดับความยาก</p>
@@ -229,7 +230,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                       onClick={() => setDiffFilter(d)}
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         diffFilter === d
-                          ? 'bg-gray-900 text-white border-gray-900'
+                          ? 'bg-foreground text-background border-foreground'
                           : 'border-border text-muted-foreground hover:border-ring'
                       }`}
                     >
@@ -248,7 +249,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                       onClick={() => setTypeFilter(t)}
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         typeFilter === t
-                          ? 'bg-gray-900 text-white border-gray-900'
+                          ? 'bg-foreground text-background border-foreground'
                           : 'border-border text-muted-foreground hover:border-ring'
                       }`}
                     >
@@ -288,7 +289,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                 <X className="w-3 h-3" /> ล้างตัวกรองทั้งหมด
               </button>
             )}
-          </div>
+          </Card>
         )}
 
         {/* Active filter chips */}
@@ -320,11 +321,11 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
         {questions.length === 0 ? (
           <EmptyState />
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 bg-card rounded-2xl ring-1 ring-border">
-            <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <Card edge="ring" className="text-center py-16">
+            <Search className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
             <p className="text-sm text-muted-foreground mt-1">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
-          </div>
+          </Card>
         ) : (
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'space-y-2.5'}>
             {filtered.map(q => (
@@ -347,7 +348,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
           <div className="space-y-4">
             {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">โจทย์ที่แชร์ในทีม</h2>}
             {!hasTeamOrg ? (
-              <div className="text-center py-24 bg-card rounded-2xl ring-1 ring-border">
+              <Card edge="ring" className="text-center py-24">
                 <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-primary" />
                 </div>
@@ -356,7 +357,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                 <Link href="/settings/team">
                   <Button className="gap-2 shadow-sm">ไปที่หน้าทีมของฉัน</Button>
                 </Link>
-              </div>
+              </Card>
             ) : (
               <>
                 <div className="flex gap-2">
@@ -387,18 +388,18 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                 </div>
 
                 {teamQuestions.length === 0 ? (
-                  <div className="text-center py-24 bg-card rounded-2xl ring-1 ring-border">
+                  <Card edge="ring" className="text-center py-24">
                     <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                       <Users className="w-8 h-8 text-primary" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีโจทย์ที่แชร์ในทีม</h3>
                     <p className="text-sm text-muted-foreground max-w-xs mx-auto">เมื่อสมาชิกในทีมสร้างโจทย์และเลือก &ldquo;ทีมของฉัน&rdquo; โจทย์จะปรากฏที่นี่</p>
-                  </div>
+                  </Card>
                 ) : filteredTeam.length === 0 ? (
-                  <div className="text-center py-16 bg-card rounded-2xl ring-1 ring-border">
-                    <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <Card edge="ring" className="text-center py-16">
+                    <Search className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                     <p className="text-muted-foreground font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
-                  </div>
+                  </Card>
                 ) : (
                   <div className="space-y-2.5">
                     {filteredTeam.map(q => (
@@ -436,7 +437,7 @@ function PreviewLoadingOverlay() {
 
 function EmptyState() {
   return (
-    <div className="text-center py-24 bg-card rounded-2xl ring-1 ring-border">
+    <Card edge="ring" className="text-center py-24">
       <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
         <BookOpen className="w-8 h-8 text-primary" />
       </div>
@@ -447,7 +448,7 @@ function EmptyState() {
           <Plus className="w-4 h-4" /> สร้างโจทย์แรก
         </Button>
       </Link>
-    </div>
+    </Card>
   )
 }
 
@@ -467,7 +468,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
   const canEdit = isOwner || q.team_edit_allowed
 
   return (
-    <div className="bg-card rounded-2xl ring-1 ring-border hover:ring-blue-200 transition-all p-4">
+    <Card edge="ring" padding="md" className="hover:ring-primary/30 transition-all">
       <div className="flex items-center gap-1.5 flex-wrap mb-2">
         {isGroup && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
@@ -484,12 +485,12 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
           </span>
         )}
         {showTeamName && q.organizations?.name && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-600">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
             {q.organizations.name}
           </span>
         )}
         {q.shared_org_names?.map((name) => (
-          <span key={name} className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-600">
+          <span key={name} className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
             + {name}
           </span>
         ))}
@@ -524,6 +525,6 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

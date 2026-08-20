@@ -15,6 +15,7 @@ import type {
 } from '@/lib/types'
 import type { QuestionDetailWithCategory } from '../page'
 import { IconButton } from '@/components/ui/icon-button'
+import { Card } from '@/components/ui/card'
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
               {q.question_categories?.name && (
                 <span className="text-xs text-muted-foreground">{q.question_categories.name}</span>
               )}
-              <span className="text-xs text-gray-300">·</span>
+              <span className="text-xs text-muted-foreground/40">·</span>
               <span className="text-xs text-muted-foreground">{q.question_type}</span>
             </div>
             <h2 className="font-bold text-foreground text-base leading-snug line-clamp-2">{q.title}</h2>
@@ -63,7 +64,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
               onClick={onToggleFlag}
               title={isFlagged ? 'ยกเลิกการรายงาน' : 'รายงานปัญหา'}
               className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-                isFlagged ? 'bg-orange-50 text-orange-500' : 'text-muted-foreground hover:text-orange-500 hover:bg-orange-50'
+                isFlagged ? 'bg-flag/10 text-flag' : 'text-muted-foreground hover:text-flag hover:bg-flag/10'
               }`}
             >
               <Flag className="w-4 h-4" />
@@ -76,9 +77,9 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
 
         {/* Flagged warning */}
         {isFlagged && (
-          <div className="flex items-center gap-2 px-6 py-2.5 bg-orange-50 border-b border-orange-100 shrink-0">
-            <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
-            <p className="text-sm text-orange-700 font-medium">
+          <div className="flex items-center gap-2 px-6 py-2.5 bg-flag/10 border-b border-orange-100 shrink-0">
+            <AlertTriangle className="w-4 h-4 text-flag shrink-0" />
+            <p className="text-sm text-flag font-medium">
               โจทย์ข้อนี้ถูกรายงานว่าเฉลยอาจผิดพลาด กรุณาตรวจสอบ
             </p>
           </div>
@@ -252,7 +253,7 @@ function StatsTab({ stats }: { stats?: QuestionStats }) {
   const correct = Math.round(stats.pValue * stats.attempts)
 
   const pLabel = difficultyLabel(stats.pValue)
-  const pColor = pPct <= 30 ? 'text-destructive' : pPct <= 50 ? 'text-orange-600' : pPct <= 70 ? 'text-warning' : 'text-success'
+  const pColor = pPct <= 30 ? 'text-destructive' : pPct <= 50 ? 'text-flag' : pPct <= 70 ? 'text-warning' : 'text-success'
   const rMeta = r != null ? discriminationLabel(r) : null
   const rBarColor = r == null ? 'bg-muted-foreground'
     : r >= 0.4 ? 'bg-success' : r >= 0.3 ? 'bg-primary' : r >= 0.2 ? 'bg-warning' : 'bg-destructive'
@@ -300,7 +301,7 @@ function StatsTab({ stats }: { stats?: QuestionStats }) {
       </div>
 
       {/* Usage stats */}
-      <div className="bg-card rounded-2xl ring-1 ring-border p-4">
+      <Card edge="ring" padding="md">
         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">สถิติการใช้งาน</p>
         <div className="grid grid-cols-3 gap-4 text-center">
           {[
@@ -318,7 +319,7 @@ function StatsTab({ stats }: { stats?: QuestionStats }) {
             )
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Guide */}
       <div className="p-4 bg-primary/10 rounded-xl border border-blue-100 text-xs text-primary space-y-1 leading-relaxed">

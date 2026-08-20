@@ -232,16 +232,16 @@
     "card": 3
   },
   "app/(app)/questions/_components/preview-modal.tsx": {
-    "palette": 18,
-    "card": 1
+    "palette": 9,
+    "card": 0
   },
   "app/(app)/questions/_components/question-bank-client.tsx": {
-    "palette": 11,
-    "card": 7
+    "palette": 8,
+    "card": 0
   },
   "app/(app)/questions/_components/question-card.tsx": {
-    "palette": 15,
-    "card": 1
+    "palette": 4,
+    "card": 0
   },
   "app/(app)/questions/new/page.tsx": {
     "palette": 24,

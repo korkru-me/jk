@@ -96,14 +96,14 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
       edge="ring"
       className={cn(
         '@container group transition-all hover:shadow-sm',
-        isFlagged ? 'ring-orange-300 hover:ring-orange-400' : 'hover:ring-primary/30',
+        isFlagged ? 'ring-flag/40 hover:ring-flag/60' : 'hover:ring-primary/30',
       )}
     >
       {/* Flagged banner */}
       {isFlagged && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 rounded-t-2xl border-b border-orange-100">
-          <AlertTriangle className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-          <p className="text-xs text-orange-700 font-medium">
+        <div className="flex items-center gap-2 px-4 py-2 bg-flag/10 rounded-t-2xl border-b border-flag/20">
+          <AlertTriangle className="w-3.5 h-3.5 text-flag shrink-0" />
+          <p className="text-xs text-flag font-medium">
             โจทย์ข้อนี้ถูกรายงานว่าเฉลยอาจผิดพลาด กรุณาตรวจสอบ
           </p>
         </div>
@@ -218,14 +218,14 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                   onClick={() => setShareOpen(o => !o)}
                   label="แชร์ให้ครูท่านอื่น"
                   size="sm"
-                  className="hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/40"
+                  className="hover:text-violet-600 hover:bg-violet-50 dark:hover:text-violet-300 dark:hover:bg-violet-950/40"
                 >
                   <Share2 />
                 </IconButton>
                 {shareOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShareOpen(false)} />
-                    <div className="absolute right-0 top-8 z-40 bg-card rounded-xl shadow-xl ring-1 ring-border w-52 overflow-hidden">
+                    <Card radius="md" edge="ring" elevation="xl" className="absolute right-0 top-8 z-40 w-52 overflow-hidden">
                       <div className="px-3 py-2.5 border-b border-border">
                         <p className="text-xs font-semibold text-muted-foreground">แชร์ให้ครูท่านอื่น</p>
                       </div>
@@ -260,7 +260,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                           </button>
                         ))
                       )}
-                    </div>
+                    </Card>
                   </>
                 )}
               </div>
@@ -270,9 +270,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                 onClick={onToggleFlag}
                 label={isFlagged ? 'ยกเลิกการรายงาน' : 'รายงานปัญหา'}
                 size="sm"
-                className={isFlagged
-                  ? 'text-orange-500 bg-orange-50 dark:bg-orange-950/40'
-                  : 'hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/40'}
+                className={isFlagged ? 'text-flag bg-flag/10' : 'hover:text-flag hover:bg-flag/10'}
               >
                 <Flag />
               </IconButton>
