@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { getAllTags, getFormulaPresets } from '@/lib/actions/questions'
-import { RandomNumericForm } from '@/components/questions/random-numeric-form'
+import { RandomNumericForm } from '@/components/questions/random-numeric'
 
 export default async function NewRandomQuestionPage() {
   const [allTags, presets] = await Promise.all([getAllTags(), getFormulaPresets()])
