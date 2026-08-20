@@ -31,6 +31,7 @@
 - Inspect the relevant route, server action, types, migrations, and RLS policies before implementation.
 - Prefer small, reversible changes and validate authorization on the server, not only in the UI.
 - Run `npx tsc --noEmit` for TypeScript changes and `npm run build` for material application changes.
+- Run `npm run lint:tokens` after touching UI. It fails when a file gains raw Tailwind palette classes (`bg-gray-100`, `text-blue-600`) instead of the semantic tokens in `app/globals.css`, or a hand-written card surface instead of `<Card>`. Existing debt is baselined per file, so only a file getting worse fails; update the baseline with `-- --update` only for a deliberate increase.
 - There is no automated test suite yet; state what was and was not verified.
 - Update `docs/FEATURE_STATUS.md` and any affected domain/architecture document when behavior or scope changes.
 
