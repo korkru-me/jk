@@ -5,8 +5,8 @@ import {
   X, Flag, AlertTriangle, BookOpen, GitBranch, BarChart2, Clock,
   CheckCircle2, TrendingUp, Activity,
 } from 'lucide-react'
-import { mockStats } from './question-card'
 import { DIFF_META } from '@/lib/question-display'
+import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import { QuestionPreviewContent } from '@/components/questions/question-preview'
 import { RichText } from '@/components/ui/rich-text'
 import type {
@@ -36,15 +36,16 @@ interface Props {
   isFlagged: boolean
   onClose: () => void
   onToggleFlag: () => void
+  /** Item analysis, absent until the question has been answered in a graded attempt. */
+  stats?: QuestionStats
 }
 
 // ── Main Modal ─────────────────────────────────────────────────────────────────
 
-export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: Props) {
+export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, stats }: Props) {
   const [tab, setTab] = useState<Tab>('content')
   const diff = DIFF_META[q.difficulty]
   const versions = mockVersions(q.id)
-  const stats = mockStats(q.id)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -238,15 +239,28 @@ function HistoryTab({ versions }: { versions: ReturnType<typeof mockVersions> })
 
 // ── Stats Tab ──────────────────────────────────────────────────────────────────
 
-function StatsTab({ stats }: { stats: ReturnType<typeof mockStats> }) {
-  const pPct = Math.round(stats.pVal * 100)
-  const rPct = Math.round(stats.rVal * 100)
-  const correct = Math.round(stats.pVal * stats.attempts)
+function StatsTab({ stats }: { stats?: QuestionStats }) {
+  if (!stats) {
+    return (
+      <div className="bg-muted rounded-2xl p-8 text-center">
+        <p className="text-sm font-medium text-foreground">ยังไม่มีสถิติสำหรับโจทย์ข้อนี้</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          ค่าความยากและอำนาจจำแนกจะคำนวณจากคำตอบจริง หลังจากนักเรียนส่งข้อสอบที่มีโจทย์ข้อนี้
+        </p>
+      </div>
+    )
+  }
 
-  const pLabel = pPct <= 30 ? 'ยากมาก' : pPct <= 50 ? 'ยาก' : pPct <= 70 ? 'ปานกลาง' : 'ง่าย'
+  const pPct = Math.round(stats.pValue * 100)
+  const r = stats.discrimination
+  const rPct = r != null ? Math.round(Math.max(0, r) * 100) : 0
+  const correct = Math.round(stats.pValue * stats.attempts)
+
+  const pLabel = difficultyLabel(stats.pValue)
   const pColor = pPct <= 30 ? 'text-destructive' : pPct <= 50 ? 'text-orange-600' : pPct <= 70 ? 'text-warning' : 'text-success'
-  const rLabel = stats.rVal >= 0.4 ? 'ดีมาก' : stats.rVal >= 0.3 ? 'ดี' : stats.rVal >= 0.2 ? 'พอใช้' : 'ต่ำ'
-  const rBarColor = stats.rVal >= 0.4 ? 'bg-success' : stats.rVal >= 0.3 ? 'bg-primary' : stats.rVal >= 0.2 ? 'bg-warning' : 'bg-destructive'
+  const rMeta = r != null ? discriminationLabel(r) : null
+  const rBarColor = r == null ? 'bg-muted-foreground'
+    : r >= 0.4 ? 'bg-success' : r >= 0.3 ? 'bg-primary' : r >= 0.2 ? 'bg-warning' : 'bg-destructive'
 
   return (
     <div className="space-y-4">
@@ -254,7 +268,7 @@ function StatsTab({ stats }: { stats: ReturnType<typeof mockStats> }) {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-muted rounded-2xl p-4">
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">ค่าความยาก (p-value)</p>
-          <p className={`text-4xl font-black leading-none ${pColor}`}>{stats.pVal.toFixed(2)}</p>
+          <p className={`text-4xl font-black leading-none ${pColor}`}>{stats.pValue.toFixed(2)}</p>
           <p className={`text-sm font-semibold mt-1 ${pColor}`}>ระดับ{pLabel}</p>
           {/* Gradient bar */}
           <div className="mt-3 relative">
@@ -272,8 +286,12 @@ function StatsTab({ stats }: { stats: ReturnType<typeof mockStats> }) {
 
         <div className="bg-muted rounded-2xl p-4">
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">อำนาจจำแนก (r-value)</p>
-          <p className={`text-4xl font-black leading-none ${stats.rVal >= 0.4 ? 'text-success' : stats.rVal >= 0.3 ? 'text-primary' : stats.rVal >= 0.2 ? 'text-warning' : 'text-destructive'}`}>{stats.rVal.toFixed(2)}</p>
-          <p className={`text-sm font-semibold mt-1 ${stats.rVal >= 0.4 ? 'text-success' : stats.rVal >= 0.3 ? 'text-primary' : stats.rVal >= 0.2 ? 'text-warning' : 'text-destructive'}`}>{rLabel}</p>
+          <p className={`text-4xl font-black leading-none ${rMeta?.color ?? 'text-muted-foreground'}`}>
+            {r != null ? r.toFixed(2) : '—'}
+          </p>
+          <p className={`text-sm font-semibold mt-1 ${rMeta?.color ?? 'text-muted-foreground'}`}>
+            {rMeta?.label ?? 'ข้อมูลยังไม่พอ'}
+          </p>
           <div className="mt-3">
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div className={`h-full ${rBarColor} rounded-full transition-all`} style={{ width: `${rPct}%` }} />

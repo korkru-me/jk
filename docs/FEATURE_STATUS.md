@@ -27,7 +27,8 @@
 - คลังชุดโจทย์ใช้ session/query ชุดเดียวของหน้าและตรวจจำนวนโจทย์ที่ยังมีอยู่ของทุกชุดใน query เดียว
 - Application types รองรับ written/random numeric, MCQ, true/false, fill blank, ordering, matching, essay, file upload และ composite
 - มี question sets, team sharing และ duplicate/remix-related UI
-- สถิติการใช้งานโจทย์และประวัติเวอร์ชันบางส่วนยังเป็น mock data
+- สถิติรายข้อ (ค่าความยาก p, อำนาจจำแนก r, จำนวนครั้งที่ตอบ, ใช้ในกี่ชุดสอบ) คำนวณจาก `submission_answers` จริงแล้ว โจทย์ที่ยังไม่มีใครตอบจะแสดงว่ายังไม่มีสถิติ ไม่ใช่เลขสุ่ม
+- ประวัติเวอร์ชันของโจทย์ยังเป็น mock data
 
 ### โจทย์สุ่มตัวเลข — มีโค้ดรองรับ
 
@@ -142,9 +143,16 @@
 
 - UI ประวัติการใช้งานใช้ `MOCK_HISTORY`
 
-### Question stats/version history — ต้นแบบ
+### Question stats — มีโค้ดรองรับ
 
-- การใช้งาน สถิติ และ version history ใน card/preview ใช้ mock-generated values
+- สถิติรายข้อบน card/preview คำนวณจริงใน `lib/question-stats.ts` จาก `submission_answers` ที่ผูกกับ attempt สถานะ submitted/graded
+- ค่า p คือสัดส่วนคะแนนเฉลี่ยที่ทำได้ ค่า r คือ point-biserial correlation ระหว่างคะแนนข้อนั้นกับคะแนนรวมของ attempt
+- ขอบเขตข้อมูลมาจาก RLS — ครูเห็นเฉพาะ attempt ของชุดข้อสอบที่ตัวเองสร้าง
+- r จะไม่คำนวณเมื่อมีน้อยกว่า 5 attempt หรือคะแนนไม่มีความแปรปรวน และจะแสดงว่า "ข้อมูลยังไม่พอ"
+
+### Question version history — ต้นแบบ
+
+- version history ใน card/preview ยังใช้ mock-generated values
 
 ### Classroom audit log — ต้นแบบ
 

@@ -14,6 +14,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { cn } from '@/lib/utils'
 import { QuestionCard, type Teacher } from './question-card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
+import type { QuestionStats } from '@/lib/question-stats'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
 import type { QuestionDetailWithCategory, QuestionWithCategory, QuestionWithCreator } from '../page'
@@ -37,6 +38,8 @@ const TAGS = ['อนุภาคมูลฐาน', 'กลศาสตร์'
 
 interface Props {
   questions: QuestionWithCategory[]
+  /** Item analysis per question id; a question absent here has no graded answers yet. */
+  stats: Record<string, QuestionStats>
   teamQuestions: QuestionWithCreator[]
   hasTeamOrg: boolean
   hasMultipleTeams: boolean
@@ -44,7 +47,7 @@ interface Props {
   currentUserId: string
 }
 
-export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId }: Props) {
+export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialScopeParam = searchParams.get('tab')
@@ -338,6 +341,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                 onPreview={() => void openPreview(q.id)}
                 onToggleFlag={() => toggleFlag(q.id)}
                 teachers={MOCK_TEACHERS}
+                stats={stats[q.id]}
               />
             ))}
           </div>
@@ -421,6 +425,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
           isFlagged={flaggedIds.has(previewQ.id)}
           onClose={() => setPreviewQ(null)}
           onToggleFlag={() => toggleFlag(previewQ.id)}
+          stats={stats[previewQ.id]}
         />
       )}
     </div>

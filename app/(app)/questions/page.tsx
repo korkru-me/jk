@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
+import { computeQuestionStats, type GradedAnswerRow, type QuestionStats } from '@/lib/question-stats'
 import { QuestionBankClient } from './_components/question-bank-client'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
@@ -31,6 +32,42 @@ export type QuestionWithCreator = QuestionWithCategory & {
   /** Names of teams this question was additionally shared to, beyond its home org. */
   shared_org_names?: string[]
   shared_org_ids?: string[]
+}
+
+/**
+ * Item-analysis stats for the listed questions.
+ *
+ * RLS on submission_answers already limits this to attempts on assignments the
+ * signed-in teacher created, which is the scope we want: "how has this question
+ * performed in my classes". Only submitted/graded attempts count — an
+ * in-progress one has no meaningful score yet.
+ */
+async function fetchQuestionStats(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  questionIds: string[],
+): Promise<Record<string, QuestionStats>> {
+  if (questionIds.length === 0) return {}
+
+  const { data, error } = await supabase
+    .from('submission_answers')
+    .select('question_id, score, max_score, submissions!inner(assignment_id, total_score, status)')
+    .in('question_id', questionIds)
+    .in('submissions.status', ['submitted', 'graded'])
+
+  if (error) {
+    console.error('[questions/page] stats query failed:', error)
+    return {}
+  }
+
+  const rows: GradedAnswerRow[] = (data ?? []).map((row: any) => ({
+    question_id: row.question_id,
+    score: Number(row.score ?? 0),
+    max_score: Number(row.max_score ?? 0),
+    submission_total: Number(row.submissions?.total_score ?? 0),
+    assignment_id: row.submissions?.assignment_id ?? '',
+  }))
+
+  return Object.fromEntries(computeQuestionStats(rows))
 }
 
 export default async function QuestionsPage() {
@@ -118,9 +155,16 @@ export default async function QuestionsPage() {
     )
   }
 
+  const ownQuestions = (questions ?? []) as unknown as QuestionWithCategory[]
+  const stats = await fetchQuestionStats(
+    supabase,
+    [...ownQuestions, ...teamQuestions].map(q => q.id),
+  )
+
   return (
     <QuestionBankClient
-      questions={(questions ?? []) as unknown as QuestionWithCategory[]}
+      questions={ownQuestions}
+      stats={stats}
       teamQuestions={teamQuestions}
       hasTeamOrg={teamOrgIds.length > 0}
       hasMultipleTeams={teamOrgIds.length > 1}

@@ -15,16 +15,8 @@ import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-fal
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { downloadTextFile } from '@/lib/utils'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
+import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import type { QuestionWithCategory } from '../page'
-
-export function mockStats(id: string) {
-  const h = [...id].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
-  const pVal = (((h * 2654435761) >>> 0) % 71 + 20) / 100
-  const rVal = (((h * 1234567891) >>> 0) % 46 + 20) / 100
-  const usedIn = (((h * 987654321) >>> 0) % 8)
-  const attempts = (((h * 111111111) >>> 0) % 50 + 10)
-  return { pVal, rVal, usedIn, attempts }
-}
 
 export interface Teacher { id: string; name: string; initials: string; color: string }
 
@@ -34,21 +26,20 @@ interface Props {
   onPreview: () => void
   onToggleFlag: () => void
   teachers: Teacher[]
+  /** Item analysis, absent until the question has been answered in a graded attempt. */
+  stats?: QuestionStats
 }
 
-export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, teachers }: Props) {
+export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, teachers, stats }: Props) {
   const router = useRouter()
   const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [requiresWorkImage, setRequiresWorkImageLocal] = useState(q.requires_work_image)
-  const { pVal, rVal, usedIn } = mockStats(q.id)
   const diff = DIFF_META[q.difficulty]
   const isGroup = q.order_in_group === 0
 
-  const pPercent = Math.round(pVal * 100)
-  const pDiffLabel = pPercent <= 30 ? 'ยากมาก' : pPercent <= 50 ? 'ยาก' : pPercent <= 70 ? 'ปานกลาง' : 'ง่าย'
-  const rLabel = rVal >= 0.4 ? 'ดีมาก' : rVal >= 0.3 ? 'ดี' : rVal >= 0.2 ? 'พอใช้' : 'ต่ำ'
-  const rColor = rVal >= 0.4 ? 'text-success' : rVal >= 0.3 ? 'text-primary' : rVal >= 0.2 ? 'text-warning' : 'text-destructive'
+  const pPercent = stats ? Math.round(stats.pValue * 100) : null
+  const rMeta = stats?.discrimination != null ? discriminationLabel(stats.discrimination) : null
 
   function handleDelete() {
     if (!confirm('ลบโจทย์นี้? ไม่สามารถกู้คืนได้')) return
@@ -149,36 +140,50 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             {/* Question text preview */}
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{q.question_text}</p>
 
-            {/* Stats row */}
+            {/* Stats row — measured from graded attempts, so absent on a question
+                nobody has answered yet */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-border">
-              {/* p-value bar */}
-              <div className="flex-1 min-w-0 max-w-[180px]">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-muted-foreground">ความยาก (p={pVal.toFixed(2)})</span>
-                  <span className="text-[10px] font-semibold text-muted-foreground">{pPercent}% · {pDiffLabel}</span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${diff?.bar}`}
-                    style={{ width: `${pPercent}%` }}
-                  />
-                </div>
-              </div>
+              {!stats || pPercent === null ? (
+                <p className="text-[10px] text-muted-foreground">ยังไม่มีสถิติ — จะคำนวณให้เมื่อมีนักเรียนส่งคำตอบข้อนี้</p>
+              ) : (
+                <>
+                  {/* p-value bar */}
+                  <div className="flex-1 min-w-0 max-w-[180px]">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-muted-foreground">ความยาก (p={stats.pValue.toFixed(2)})</span>
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        {pPercent}% · {difficultyLabel(stats.pValue)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${diff?.bar}`}
+                        style={{ width: `${pPercent}%` }}
+                      />
+                    </div>
+                  </div>
 
-              {/* r-value */}
-              <div className="shrink-0 text-right">
-                <p className="text-[10px] text-muted-foreground">อำนาจจำแนก</p>
-                <p className={`text-xs font-bold ${rColor}`}>
-                  r={rVal.toFixed(2)} <span className="font-normal text-muted-foreground">({rLabel})</span>
-                </p>
-              </div>
+                  {/* r-value */}
+                  <div className="shrink-0 text-right">
+                    <p className="text-[10px] text-muted-foreground">อำนาจจำแนก</p>
+                    {stats.discrimination != null && rMeta ? (
+                      <p className={`text-xs font-bold ${rMeta.color}`}>
+                        r={stats.discrimination.toFixed(2)}{' '}
+                        <span className="font-normal text-muted-foreground">({rMeta.label})</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">ข้อมูลยังไม่พอ</p>
+                    )}
+                  </div>
 
-              {/* Usage count */}
-              {usedIn > 0 && (
-                <div className="shrink-0 text-right">
-                  <p className="text-[10px] text-muted-foreground">ใช้ใน</p>
-                  <p className="text-xs font-bold text-muted-foreground">{usedIn} ชุดสอบ</p>
-                </div>
+                  {/* Usage count */}
+                  {stats.usedIn > 0 && (
+                    <div className="shrink-0 text-right">
+                      <p className="text-[10px] text-muted-foreground">ใช้ใน</p>
+                      <p className="text-xs font-bold text-muted-foreground">{stats.usedIn} ชุดสอบ</p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
