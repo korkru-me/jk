@@ -1,9 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { saveAnswer, saveWorkImage, saveFileSubmission, submitSubmission } from '@/lib/actions/submissions'
+import { saveWorkImage, saveFileSubmission, submitSubmission } from '@/lib/actions/submissions'
 import { gradeAnswer, type GradedAnswer } from '@/lib/assignment-attempt'
+import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
+import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
+import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
+import { useExamTimer } from '@/hooks/use-exam-timer'
+import { useOnlineStatus } from '@/hooks/use-online-status'
 import { WorkImageUpload } from './work-image-upload'
 import { FileSubmissionUpload } from './file-submission-upload'
 import { Button } from '@/components/ui/button'
@@ -25,7 +30,6 @@ import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanat
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
-const LS_KEY = (id: string) => `korkru_exam_${id}`
 
 interface AnswerRow {
   id: string
@@ -98,16 +102,19 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
 
 export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, previewMode = false, previewReturnHref }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
-  const [localAnswers, setLocalAnswers] = useState<Record<string, string>>(
-    () => initLocalAnswers(answers)
-  )
+  const {
+    localAnswers, setLocalAnswers, localAnswersRef,
+    setAnswer, flushQueuedAnswers, retryPending, clearSavedAnswers,
+    saving, pendingCount,
+  } = useAnswerAutosave({
+    submissionId,
+    initialAnswers: () => initLocalAnswers(answers),
+    previewMode,
+  })
   const [workImages, setWorkImages] = useState<Record<string, (string | null)[]>>(
     () => initWorkImages(answers)
   )
-  const [pendingSync, setPendingSync] = useState<Set<string>>(new Set())
-  const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   // Preview-only: the client-side (never persisted) grading result shown
   // after a teacher clicks submit in previewMode, in place of the real
@@ -126,196 +133,28 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [showFormulaSheet, setShowFormulaSheet] = useState(false)
   const [showScratchpad, setShowScratchpad] = useState(false)
 
-  // Text-like answers used to call a server action on every keystroke. Keep
-  // the UI instant, but coalesce rapid edits per answer before persisting.
-  // Saves for the same answer are also chained so an older response can never
-  // arrive after a newer one and overwrite it.
-  const localAnswersRef = useRef(localAnswers)
-  const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
-  const pendingAnswerValuesRef = useRef<Map<string, string>>(new Map())
-  const inFlightSavesRef = useRef<Map<string, Promise<boolean>>>(new Map())
+  // ── Anti-cheat ──────────────────────────────────────────────────────────────
+  const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
+  const { showFullscreenWarning, requestFullscreen } = useFullscreenGuard(config.isFullscreenEnforced)
 
-  // ── Anti-cheat state ────────────────────────────────────────────────────────
-  const [tabSwitchCount, setTabSwitchCount] = useState(0)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [showFullscreenWarning, setShowFullscreenWarning] = useState(false)
-  const [isOnline, setIsOnline] = useState(true)
-  const tabWarningTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [showTabWarning, setShowTabWarning] = useState(false)
-
-  const refreshSavingState = useCallback(() => {
-    setSaving(
-      saveTimersRef.current.size > 0
-      || pendingAnswerValuesRef.current.size > 0
-      || inFlightSavesRef.current.size > 0
-    )
-  }, [])
-
-  const flushAnswer = useCallback((answerId: string): Promise<boolean> => {
-    const timer = saveTimersRef.current.get(answerId)
-    if (timer) clearTimeout(timer)
-    saveTimersRef.current.delete(answerId)
-
-    const value = pendingAnswerValuesRef.current.get(answerId)
-    const existing = inFlightSavesRef.current.get(answerId)
-    if (value === undefined) return existing ?? Promise.resolve(true)
-    pendingAnswerValuesRef.current.delete(answerId)
-
-    const task = (existing ?? Promise.resolve(true))
-      .catch(() => false)
-      .then(async () => {
-        const result: { error?: string } = previewMode ? {} : await saveAnswer(answerId, value)
-        if (result.error) throw new Error(result.error)
-        if (pendingAnswerValuesRef.current.get(answerId) === value) {
-          pendingAnswerValuesRef.current.delete(answerId)
-        }
-        setPendingSync(prev => {
-          if (!prev.has(answerId)) return prev
-          const next = new Set(prev)
-          next.delete(answerId)
-          return next
-        })
-        return true
-      })
-      .catch(() => {
-        if (!pendingAnswerValuesRef.current.has(answerId)) {
-          pendingAnswerValuesRef.current.set(answerId, localAnswersRef.current[answerId] ?? value)
-        }
-        setPendingSync(prev => new Set(prev).add(answerId))
-        return false
-      })
-      .finally(() => {
-        if (inFlightSavesRef.current.get(answerId) === task) {
-          inFlightSavesRef.current.delete(answerId)
-        }
-        refreshSavingState()
-      })
-
-    inFlightSavesRef.current.set(answerId, task)
-    setSaving(true)
-    return task
-  }, [refreshSavingState, previewMode])
-
-  const flushQueuedAnswers = useCallback(async () => {
-    const queuedIds = [...pendingAnswerValuesRef.current.keys()]
-    await Promise.all(queuedIds.map(id => flushAnswer(id)))
-    await Promise.all([...inFlightSavesRef.current.values()])
-  }, [flushAnswer])
-
-  // ── 1. Restore answers from LocalStorage on mount ───────────────────────────
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LS_KEY(submissionId))
-      if (saved) {
-        const savedAnswers: Record<string, string> = JSON.parse(saved)
-        // Merge: DB value takes priority, localStorage fills gaps
-        setLocalAnswers(prev => {
-          const merged: Record<string, string> = { ...savedAnswers }
-          for (const [k, v] of Object.entries(prev)) {
-            if (v !== '') merged[k] = v
-          }
-          return merged
-        })
-      }
-    } catch { /* ignore corrupt data */ }
-  }, [submissionId])
-
-  // ── 2. Persist to LocalStorage whenever answers change ──────────────────────
-  useEffect(() => {
-    localAnswersRef.current = localAnswers
-    try {
-      localStorage.setItem(LS_KEY(submissionId), JSON.stringify(localAnswers))
-    } catch { /* ignore quota errors */ }
-  }, [localAnswers, submissionId])
-
-  // ── 3. Online / Offline detection + auto-sync ───────────────────────────────
-  useEffect(() => {
-    const onOnline = async () => {
-      setIsOnline(true)
-      if (pendingSync.size === 0) return
-      toast.info(`กำลังซิงก์คำตอบ ${pendingSync.size} ข้อ...`)
-      const ids = [...pendingSync]
-      setPendingSync(new Set())
-      for (const id of ids) {
-        const value = localAnswersRef.current[id]
-        if (value !== undefined) pendingAnswerValuesRef.current.set(id, value)
-      }
-      const results = await Promise.all(ids.map(id => flushAnswer(id)))
-      if (results.every(Boolean)) toast.success('ซิงก์คำตอบสำเร็จ ✓')
+  // ── Auto-sync whatever went unsaved while offline ───────────────────────────
+  const isOnline = useOnlineStatus({
+    onOnline: async () => {
+      if (pendingCount === 0) return
+      toast.info(`กำลังซิงก์คำตอบ ${pendingCount} ข้อ...`)
+      const allSynced = await retryPending()
+      if (allSynced) toast.success('ซิงก์คำตอบสำเร็จ ✓')
       else toast.warning('ยังมีบางคำตอบที่รอซิงก์ ระบบจะลองอีกครั้งเมื่อเชื่อมต่อใหม่')
-    }
-    const onOffline = () => {
-      setIsOnline(false)
+    },
+    onOffline: () => {
       toast.warning('อินเทอร์เน็ตหลุด — บันทึกในเครื่องแล้ว จะซิงก์อัตโนมัติเมื่อเน็ตกลับมา')
-    }
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
-    setIsOnline(navigator.onLine)
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-    }
-  }, [flushAnswer, pendingSync])
+    },
+  })
 
-  // A timer must not outlive this attempt view. The latest value is always in
-  // localStorage as a recovery fallback if the tab is closed mid-debounce.
-  useEffect(() => () => {
-    for (const timer of saveTimersRef.current.values()) clearTimeout(timer)
-    saveTimersRef.current.clear()
-  }, [])
+  // ── Countdown timer ─────────────────────────────────────────────────────────
+  const secondsLeft = useExamTimer(durationMinutes, startedAt, () => handleSubmit())
 
-  // ── 4. Countdown timer ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!durationMinutes) return
-    const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
-    const remaining = Math.max(0, durationMinutes * 60 - elapsed)
-    setSecondsLeft(remaining)
-    const interval = setInterval(() => {
-      setSecondsLeft(prev => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval)
-          handleSubmit()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ── 5. Anti-cheat: tab visibility ───────────────────────────────────────────
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        setTabSwitchCount(n => n + 1)
-        setShowTabWarning(true)
-        if (tabWarningTimer.current) clearTimeout(tabWarningTimer.current)
-        tabWarningTimer.current = setTimeout(() => setShowTabWarning(false), 4000)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      if (tabWarningTimer.current) clearTimeout(tabWarningTimer.current)
-    }
-  }, [])
-
-  // ── 6. Anti-cheat: fullscreen monitoring ────────────────────────────────────
-  useEffect(() => {
-    if (!config.isFullscreenEnforced) return
-    const onChange = () => {
-      const inFS = !!document.fullscreenElement
-      setIsFullscreen(inFS)
-      if (!inFS) setShowFullscreenWarning(true)
-    }
-    document.addEventListener('fullscreenchange', onChange)
-    // Trigger fullscreen on mount
-    document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {})
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [config.isFullscreenEnforced])
-
-  // ── 7. Submit countdown ─────────────────────────────────────────────────────
+  // ── 5. Submit countdown ─────────────────────────────────────────────────────
   useEffect(() => {
     if (submitCountdown <= 0) return
     const t = setTimeout(() => setSubmitCountdown(c => c - 1), 1000)
@@ -324,28 +163,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleAnswerChange = useCallback((answerId: string, value: string) => {
-    localAnswersRef.current = { ...localAnswersRef.current, [answerId]: value }
-    setLocalAnswers(prev => ({ ...prev, [answerId]: value }))
-    pendingAnswerValuesRef.current.set(answerId, value)
-
-    const existingTimer = saveTimersRef.current.get(answerId)
-    if (existingTimer) clearTimeout(existingTimer)
-
-    if (!navigator.onLine) {
-      setPendingSync(prev => new Set([...prev, answerId]))
-      saveTimersRef.current.delete(answerId)
-      refreshSavingState()
-      return
-    }
-
-    setSaving(true)
-    const timer = setTimeout(() => {
-      saveTimersRef.current.delete(answerId)
-      void flushAnswer(answerId)
-    }, 500)
-    saveTimersRef.current.set(answerId, timer)
-  }, [flushAnswer, refreshSavingState])
+  const handleAnswerChange = setAnswer
 
   const handlePartAnswerChange = useCallback((
     answerId: string, partIndex: number, value: string, totalParts: number, currentRaw: string,
@@ -422,7 +240,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       }))
       const totalScore = graded.reduce((sum, g) => sum + g.score, 0)
       const totalMax = answers.reduce((sum, a) => sum + (a.max_score ?? 0), 0)
-      localStorage.removeItem(LS_KEY(submissionId))
+      clearSavedAnswers()
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
       setPreviewResult({ graded, totalScore, totalMax })
       setSubmitting(false)
@@ -434,7 +252,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       setSubmitting(false)
       return
     }
-    localStorage.removeItem(LS_KEY(submissionId))
+    clearSavedAnswers()
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
     // The result route redirects in-progress submissions back to the exam.
     // A client-side transition can reuse a stale prefetched result and briefly
@@ -468,9 +286,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   }
 
   function enterFullscreen() {
-    document.documentElement.requestFullscreen()
-      .then(() => { setIsFullscreen(true); setShowFullscreenWarning(false) })
-      .catch(() => toast.error('ไม่สามารถเข้าสู่โหมดเต็มจอได้'))
+    requestFullscreen().catch(() => toast.error('ไม่สามารถเข้าสู่โหมดเต็มจอได้'))
   }
 
   // ── Derived values ────────────────────────────────────────────────────────────
@@ -878,7 +694,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           <ExamToolbar
             saving={saving}
             isOnline={isOnline}
-            pendingSync={pendingSync.size}
+            pendingSync={pendingCount}
             tabSwitchCount={tabSwitchCount}
             config={config}
             showCalculator={showCalculator}
