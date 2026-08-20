@@ -11,10 +11,11 @@ interface IconButtonProps extends Omit<ButtonProps, "size" | "children"> {
    * it doubles as the tooltip.
    */
   label: string
-  size?: "xs" | "sm" | "default" | "lg"
+  size?: "2xs" | "xs" | "sm" | "default" | "lg"
 }
 
 const SIZE_MAP = {
+  "2xs": "icon-2xs",
   xs: "icon-xs",
   sm: "icon-sm",
   default: "icon",

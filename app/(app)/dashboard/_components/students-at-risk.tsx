@@ -1,6 +1,7 @@
 'use client'
 
 import { Mail, TrendingDown } from 'lucide-react'
+import { IconButton } from '@/components/ui/icon-button'
 
 const AT_RISK_STUDENTS = [
   {
@@ -71,9 +72,9 @@ export function StudentsAtRisk() {
                 </div>
                 <p className="text-[10px] text-muted-foreground">ตกหนัก {student.drop} ครั้ง</p>
               </div>
-              <button className="w-7 h-7 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-colors text-muted-foreground">
-                <Mail className="w-3.5 h-3.5" />
-              </button>
+              <IconButton label="ส่งอีเมลถึงผู้ปกครอง" size="sm" className="bg-muted hover:bg-primary/10 hover:text-primary">
+                <Mail />
+              </IconButton>
             </div>
           </div>
         ))}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus, Lock, Unlock, Trash2, ChevronRight, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Rule {
   id: string
@@ -129,12 +130,14 @@ export function LearningPaths() {
                   </div>
                 </div>
 
-                <button
+                <IconButton
                   onClick={() => deleteRule(rule.id)}
-                  className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-gray-300 transition-colors shrink-0"
+                  label="ลบเงื่อนไข"
+                  size="sm"
+                  className="hover:bg-destructive/10 hover:text-destructive"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                  <Trash2 />
+                </IconButton>
               </div>
             </div>
           ))}

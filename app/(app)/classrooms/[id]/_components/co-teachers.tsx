@@ -11,6 +11,7 @@ import {
   updateCoTeacherPermission,
 } from '@/lib/actions/co-teachers'
 import type { CoTeacherPermission } from '@/lib/types'
+import { IconButton } from '@/components/ui/icon-button'
 
 const PERM_CFG: Record<CoTeacherPermission, { label: string; desc: string; icon: typeof Crown; color: string }> = {
   admin: { label: 'แอดมินเต็มตัว', desc: 'จัดการทุกอย่างได้', icon: Crown, color: 'text-warning' },
@@ -209,12 +210,14 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
                     )}
                   </div>
                   {canManage && (
-                    <button
+                    <IconButton
                       onClick={() => removeTeacher(t.id)}
-                      className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-gray-300 transition-colors"
+                      label="ลบครูผู้ช่วยสอน"
+                      size="sm"
+                      className="hover:bg-destructive/10 hover:text-destructive"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <Trash2 />
+                    </IconButton>
                   )}
                 </div>
               )
@@ -238,18 +241,22 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
                     <p className="text-xs font-mono text-muted-foreground truncate">{link}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">สิทธิ์: {PERM_CFG[inv.permission].label}</p>
                   </div>
-                  <button
+                  <IconButton
                     onClick={() => copyLink(link, inv.id)}
-                    className="w-7 h-7 rounded-lg hover:bg-primary/10 hover:text-primary flex items-center justify-center text-gray-300 transition-colors"
+                    label="คัดลอกลิงก์เชิญ"
+                    size="sm"
+                    className="hover:bg-primary/10 hover:text-primary"
                   >
-                    {copied === inv.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
+                    {copied === inv.id ? <Check /> : <Copy />}
+                  </IconButton>
+                  <IconButton
                     onClick={() => handleRevoke(inv.id)}
-                    className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-gray-300 transition-colors"
+                    label="ยกเลิกคำเชิญ"
+                    size="sm"
+                    className="hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                    <X />
+                  </IconButton>
                 </div>
               )
             })}

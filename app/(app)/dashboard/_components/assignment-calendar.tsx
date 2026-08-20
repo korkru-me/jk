@@ -9,6 +9,7 @@ import {
   type Severity,
 } from '@/lib/calendar-display'
 import { buttonVariants } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 
 export interface CalendarEvent {
   id: string
@@ -82,21 +83,21 @@ export function AssignmentCalendar({ events }: { events: CalendarEvent[] }) {
           ปฏิทินกำหนดส่งงาน
         </h2>
         <div className="flex items-center gap-1">
-          <button
+          <IconButton
             onClick={() => setViewDate(new Date(year, month - 1, 1))}
-            className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
-            aria-label="เดือนก่อนหน้า"
+            label="เดือนก่อนหน้า"
+            size="sm"
           >
-            <ChevronLeft size={16} />
-          </button>
+            <ChevronLeft />
+          </IconButton>
           <span className="text-sm font-medium w-32 text-center">{MONTH_LABELS[month]} {year + 543}</span>
-          <button
+          <IconButton
             onClick={() => setViewDate(new Date(year, month + 1, 1))}
-            className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
-            aria-label="เดือนถัดไป"
+            label="เดือนถัดไป"
+            size="sm"
           >
-            <ChevronRight size={16} />
-          </button>
+            <ChevronRight />
+          </IconButton>
           <button
             onClick={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today) }}
             className="ml-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-muted hover:bg-muted/70 text-muted-foreground transition-colors"

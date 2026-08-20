@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Mail, Key, CheckCircle2, AlertCircle, RefreshCw, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 
 const MOCK_OBSERVER_CODES = [
   { studentName: 'ธนภัทร สุขใส', code: 'OBS-7K2M' },
@@ -98,12 +99,9 @@ export function ParentPortal({ studentCount }: { studentCount: number }) {
                   <p className="text-sm text-muted-foreground">{item.studentName}</p>
                   <p className="font-mono text-xs font-bold text-muted-foreground mt-0.5 tracking-widest">{item.code}</p>
                 </div>
-                <button
-                  onClick={() => copyCode(item.code)}
-                  className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-muted-foreground transition-colors"
-                >
-                  {copiedCode === item.code ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
+                <IconButton onClick={() => copyCode(item.code)} label="คัดลอกรหัส" size="sm">
+                  {copiedCode === item.code ? <Check className="text-success" /> : <Copy />}
+                </IconButton>
               </div>
             ))}
             <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => toast.success('สร้างรหัสสำหรับทุกคนแล้ว (ฟีเจอร์กำลังพัฒนา)')}>

@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, FileText, ScanLine, Eye } from 'lucide-react
 import type { Question, MCQOption, Variable } from '@/lib/types'
 import type { PrintSettings } from './export-client'
 import { OMRSheetPreview } from './omr-sheet-preview'
+import { IconButton } from '@/components/ui/icon-button'
 
 // ─── Mock physics questions (fallback when no questions loaded) ────────────────
 
@@ -302,23 +303,27 @@ export function PDFPreview({ settings, onPatch, questions, assignmentTitle, clas
 
         {/* Copy navigator */}
         <div className="flex items-center gap-1.5 ml-auto bg-slate-800/60 rounded-lg px-2 py-1">
-          <button
+          <IconButton
             onClick={() => onPatch({ previewCopy: Math.max(1, settings.previewCopy - 1) })}
             disabled={settings.previewCopy <= 1}
-            className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-600 disabled:opacity-30 transition-colors"
+            label="สำเนาก่อนหน้า"
+            size="2xs"
+            className="hover:bg-slate-600"
           >
-            <ChevronLeft className="w-3 h-3" />
-          </button>
+            <ChevronLeft />
+          </IconButton>
           <span className="text-slate-200 font-mono text-[11px] tabular-nums w-16 text-center">
             ชุด {settings.previewCopy}/{totalCopies}
           </span>
-          <button
+          <IconButton
             onClick={() => onPatch({ previewCopy: Math.min(totalCopies, settings.previewCopy + 1) })}
             disabled={settings.previewCopy >= totalCopies}
-            className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-600 disabled:opacity-30 transition-colors"
+            label="สำเนาถัดไป"
+            size="2xs"
+            className="hover:bg-slate-600"
           >
-            <ChevronRight className="w-3 h-3" />
-          </button>
+            <ChevronRight />
+          </IconButton>
         </div>
 
         <div className="flex items-center gap-1 text-slate-400 text-[10px]">

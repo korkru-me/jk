@@ -13,6 +13,7 @@ import {
   createClassroomPost, updateClassroomPost, togglePinClassroomPost, deleteClassroomPost, addComment,
 } from '@/lib/actions/classroom-posts'
 import type { ClassroomPost } from '@/lib/types'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Props {
   classroomId: string
@@ -163,12 +164,9 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
 
         {canManage && !isEditing && (
           <div className="relative shrink-0">
-            <button
-              onClick={() => setMenuOpen(o => !o)}
-              className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
-            >
-              <MoreVertical className="w-3.5 h-3.5" />
-            </button>
+            <IconButton onClick={() => setMenuOpen(o => !o)} label="ตัวเลือกเพิ่มเติม" size="sm">
+              <MoreVertical />
+            </IconButton>
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />

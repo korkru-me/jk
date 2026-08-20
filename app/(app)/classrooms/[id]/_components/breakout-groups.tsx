@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Users, Plus, Shuffle, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Student { id: string; name: string; initials: string }
 interface Group { id: string; name: string; students: Student[] }
@@ -173,12 +174,14 @@ export function BreakoutGroups({ students }: Props) {
                   {group.name}
                 </span>
                 <span className="text-[10px] text-muted-foreground ml-1">{group.students.length} คน</span>
-                <button
+                <IconButton
                   onClick={() => removeGroup(group.id)}
-                  className="ml-auto w-5 h-5 rounded flex items-center justify-center text-gray-300 hover:text-destructive transition-colors"
+                  label="ลบกลุ่ม"
+                  size="2xs"
+                  className="ml-auto hover:text-destructive"
                 >
-                  <X className="w-3 h-3" />
-                </button>
+                  <X />
+                </IconButton>
               </div>
               <div className="flex flex-wrap gap-1">
                 {group.students.map(s => <StudentChip key={s.id} s={s} fromGroupId={group.id} />)}

@@ -8,6 +8,7 @@ import {
   MONTH_LABELS, SEVERITY_BADGE, SEVERITY_DOT, SEVERITY_ORDER, WEEKDAY_LABELS,
   type Severity,
 } from '@/lib/calendar-display'
+import { IconButton } from '@/components/ui/icon-button'
 
 export interface HomeroomCalendarEvent {
   id: string
@@ -79,21 +80,21 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
           <CalendarDays className="w-3.5 h-3.5" /> ปฏิทินกำหนดส่งงาน
         </h2>
         <div className="flex items-center gap-1">
-          <button
+          <IconButton
             onClick={() => setViewDate(new Date(year, month - 1, 1))}
-            className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
-            aria-label="เดือนก่อนหน้า"
+            label="เดือนก่อนหน้า"
+            size="sm"
           >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+            <ChevronLeft />
+          </IconButton>
           <span className="text-sm font-medium w-32 text-center text-foreground">{MONTH_LABELS[month]} {year + 543}</span>
-          <button
+          <IconButton
             onClick={() => setViewDate(new Date(year, month + 1, 1))}
-            className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
-            aria-label="เดือนถัดไป"
+            label="เดือนถัดไป"
+            size="sm"
           >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+            <ChevronRight />
+          </IconButton>
           <button
             onClick={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today) }}
             className="ml-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-muted hover:bg-accent text-muted-foreground transition-colors"

@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { X, Clock, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { grantExtension, revokeExtension } from '@/lib/actions/extensions'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Props {
   assignmentId: string
@@ -55,9 +56,9 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">{studentName} — {assignmentTitle}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground">
-            <X className="w-4 h-4" />
-          </button>
+          <IconButton onClick={onClose} label="ปิด">
+            <X />
+          </IconButton>
         </div>
 
         <div className="p-5 space-y-4">

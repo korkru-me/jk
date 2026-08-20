@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Printer, CalendarClock } from 'lucide-react'
+import { IconButton } from '@/components/ui/icon-button'
 
 const INITIAL_TASKS = [
   {
@@ -81,9 +82,9 @@ export function UpcomingTasks() {
                   <span className="text-[10px] text-muted-foreground">{task.time}</span>
                 </div>
               </div>
-              <button className="w-7 h-7 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-colors text-muted-foreground shrink-0">
-                <Printer className="w-3.5 h-3.5" />
-              </button>
+              <IconButton label="พิมพ์" size="sm" className="bg-muted hover:bg-primary/10 hover:text-primary">
+                <Printer />
+              </IconButton>
             </div>
           )
         })}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { X, CheckCircle2, FileText, Loader2, Download, ExternalLink } from 'lucide-react'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Props {
   assignmentId: string
@@ -116,9 +117,9 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
               </div>
             </div>
             {stage !== 'running' && (
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-black/5 text-muted-foreground transition-colors">
-                <X className="w-4 h-4" />
-              </button>
+              <IconButton onClick={onClose} label="ปิด">
+                <X />
+              </IconButton>
             )}
           </div>
         </div>

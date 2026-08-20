@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Pencil, History, Save, AlertCircle } from 'lucide-react'
 import type { ScoreOverride } from './analytics-client'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Props {
   submissionId: string
@@ -80,12 +81,9 @@ export function ScoreOverrideModal({
             <p className="text-sm font-bold text-foreground">แก้ไขคะแนน</p>
             <p className="text-xs text-muted-foreground mt-0.5">{studentName}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <IconButton onClick={onClose} label="ปิด">
+            <X />
+          </IconButton>
         </div>
 
         {/* Tabs */}

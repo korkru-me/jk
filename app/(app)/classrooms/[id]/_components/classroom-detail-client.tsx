@@ -19,6 +19,7 @@ import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { HomeroomOverview, type StudentNoteRow, type StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
+import { IconButton } from '@/components/ui/icon-button'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -173,12 +174,9 @@ export function ClassroomDetailClient({
             <p className="text-xs text-muted-foreground mb-1">รหัสห้องเรียน</p>
             <div className="flex items-center gap-2">
               <p className="font-mono font-black text-2xl tracking-[0.3em] text-white">{classroom.class_code}</p>
-              <button
-                onClick={copyCode}
-                className="w-8 h-8 rounded-lg bg-card/10 hover:bg-card/20 flex items-center justify-center transition-colors"
-              >
-                {codeCopied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
+              <IconButton onClick={copyCode} label="คัดลอกรหัสห้องเรียน" className="bg-card/10 hover:bg-card/20">
+                {codeCopied ? <Check className="text-success" /> : <Copy />}
+              </IconButton>
             </div>
           </div>
         </div>

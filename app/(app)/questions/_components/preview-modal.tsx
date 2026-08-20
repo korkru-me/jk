@@ -14,6 +14,7 @@ import type {
   OrderingConfig, FileUploadConfig, RandomQuestionConfig, CompositeConfig,
 } from '@/lib/types'
 import type { QuestionDetailWithCategory } from '../page'
+import { IconButton } from '@/components/ui/icon-button'
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
 
@@ -67,9 +68,9 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
             >
               <Flag className="w-4 h-4" />
             </button>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-muted-foreground hover:bg-muted transition-all">
-              <X className="w-4 h-4" />
-            </button>
+            <IconButton onClick={onClose} label="ปิด">
+              <X />
+            </IconButton>
           </div>
         </div>
 
