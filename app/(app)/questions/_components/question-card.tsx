@@ -4,11 +4,8 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import {
-  Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download,
-  Users, TrendingUp, BookOpen,
-} from 'lucide-react'
-import { deleteQuestion, getQuestionClientDetail, setRequiresWorkImage } from '@/lib/actions/questions'
+import { Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download, Users } from 'lucide-react'
+import { deleteQuestion, getQuestionClientDetail, setRequiresWorkImage, shareQuestionToOrg } from '@/lib/actions/questions'
 import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
 import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
@@ -18,19 +15,18 @@ import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import type { QuestionWithCategory } from '../page'
 
-export interface Teacher { id: string; name: string; initials: string; color: string }
-
 interface Props {
   question: QuestionWithCategory
   isFlagged: boolean
   onPreview: () => void
   onToggleFlag: () => void
-  teachers: Teacher[]
+  /** Teams the signed-in teacher belongs to — the real targets a question can be shared to. */
+  myTeams: { id: string; name: string }[]
   /** Item analysis, absent until the question has been answered in a graded attempt. */
   stats?: QuestionStats
 }
 
-export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, teachers, stats }: Props) {
+export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats }: Props) {
   const router = useRouter()
   const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -44,6 +40,18 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   function handleDelete() {
     if (!confirm('ลบโจทย์นี้? ไม่สามารถกู้คืนได้')) return
     startTransition(async () => { await deleteQuestion(q.id) })
+  }
+
+  function handleShareToTeam(orgId: string, teamName: string) {
+    startTransition(async () => {
+      const res = await shareQuestionToOrg(q.id, orgId)
+      if (res?.error) toast.error(res.error)
+      else {
+        toast.success(`แชร์ให้ทีม ${teamName} แล้ว`)
+        setShareOpen(false)
+        router.refresh()
+      }
+    })
   }
 
   function handleDuplicate() {
@@ -228,21 +236,25 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                           <span className="text-sm text-muted-foreground">ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)</span>
                         </button>
                       )}
-                      {teachers.map(t => (
-                        <button
-                          key={t.id}
-                          onClick={() => {
-                            toast.success(`แชร์ให้ ${t.name} แล้ว`)
-                            setShareOpen(false)
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left"
-                        >
-                          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${t.color}`}>
-                            {t.initials}
-                          </span>
-                          <span className="text-sm text-muted-foreground">{t.name}</span>
-                        </button>
-                      ))}
+                      {myTeams.length === 0 ? (
+                        <p className="px-3 py-2.5 text-xs text-muted-foreground">
+                          ยังไม่ได้อยู่ในทีมใด — สร้างหรือเข้าร่วมทีมก่อนจึงจะแชร์ให้ครูท่านอื่นได้
+                        </p>
+                      ) : (
+                        myTeams.map(team => (
+                          <button
+                            key={team.id}
+                            onClick={() => handleShareToTeam(team.id, team.name)}
+                            disabled={isPending}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left disabled:opacity-50"
+                          >
+                            <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-primary/10 text-primary">
+                              <Users className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-sm text-muted-foreground">{team.name}</span>
+                          </button>
+                        ))
+                      )}
                     </div>
                   </>
                 )}

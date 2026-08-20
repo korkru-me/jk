@@ -234,6 +234,34 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
   redirect(data.redirect_to || '/questions')
 }
 
+/**
+ * Share one question into one team, on top of whatever it is already shared to.
+ *
+ * `syncQuestionShares` above replaces the whole set, which is what the edit form
+ * wants; this is the additive version used by the share menu on a question card.
+ *
+ * Authorization is the question_shares_owner_all policy: the row only inserts if
+ * the caller created the question and belongs to the target org. A failure here
+ * is genuinely a refusal, so it must surface rather than report success.
+ */
+export async function shareQuestionToOrg(questionId: string, orgId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const { error } = await supabase
+    .from('question_shares')
+    .upsert({ question_id: questionId, org_id: orgId }, { onConflict: 'question_id,org_id' })
+
+  if (error) {
+    console.error('[shareQuestionToOrg] failed:', error)
+    return { error: 'แชร์ไม่สำเร็จ — แชร์ได้เฉพาะโจทย์ที่คุณสร้างเอง และเฉพาะทีมที่คุณเป็นสมาชิก' }
+  }
+
+  revalidatePath('/questions')
+  return {}
+}
+
 export async function setRequiresWorkImage(id: string, value: boolean) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

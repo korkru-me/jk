@@ -17,16 +17,6 @@ import type { QuestionDetailWithCategory } from '../page'
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
 
-function mockVersions(id: string) {
-  const h = [...id].reduce((a, c) => a + c.charCodeAt(0), 0)
-  const count = (h % 2) + 2
-  return [
-    { ver: '1.0', date: '1 มี.ค. 2568',    author: 'คุณครู',              change: 'สร้างโจทย์ครั้งแรก',              type: 'create' },
-    { ver: '1.1', date: '15 เม.ย. 2568',   author: 'ครูวิชัย สมบูรณ์',  change: 'แก้ไขข้อความโจทย์และตัวเลือก',   type: 'edit' },
-    { ver: '1.2', date: '10 พ.ค. 2569',    author: 'คุณครู',              change: 'แก้ไขตัวเลือกข้อ ก',             type: 'edit' },
-  ].slice(0, count)
-}
-
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Tab = 'content' | 'history' | 'stats'
@@ -45,7 +35,6 @@ interface Props {
 export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, stats }: Props) {
   const [tab, setTab] = useState<Tab>('content')
   const diff = DIFF_META[q.difficulty]
-  const versions = mockVersions(q.id)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -121,7 +110,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {tab === 'content' && <InteractiveTab key={q.id} q={q} />}
-          {tab === 'history' && <HistoryTab versions={versions} />}
+          {tab === 'history' && <HistoryTab question={q} />}
           {tab === 'stats'   && <StatsTab stats={stats} />}
         </div>
       </div>
@@ -190,37 +179,42 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
 
 // ── History Tab ────────────────────────────────────────────────────────────────
 
-function HistoryTab({ versions }: { versions: ReturnType<typeof mockVersions> }) {
+function HistoryTab({ question: q }: { question: QuestionDetailWithCategory }) {
+  // There is no per-edit history table yet, so the only trustworthy events are
+  // the two timestamps on the row itself. Anything richer would be invented.
+  const created = new Date(q.created_at)
+  const updated = new Date(q.updated_at)
+  const wasEdited = updated.getTime() - created.getTime() > 1000
+
+  const fmt = (d: Date) =>
+    d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
+
+  const events = [
+    ...(wasEdited ? [{ label: 'แก้ไขล่าสุด', at: updated, latest: true }] : []),
+    { label: 'สร้างโจทย์', at: created, latest: !wasEdited },
+  ]
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-foreground text-sm">ประวัติการแก้ไข</h3>
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{versions.length} เวอร์ชัน</span>
-      </div>
+      <h3 className="font-semibold text-foreground text-sm">ประวัติการแก้ไข</h3>
 
       <div className="relative">
         <div className="absolute left-3.5 top-4 bottom-4 w-0.5 bg-muted" />
         <div className="space-y-4">
-          {versions.map((v, i) => (
-            <div key={i} className="flex gap-4">
+          {events.map(ev => (
+            <div key={ev.label} className="flex gap-4">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 ${
-                i === 0 ? 'bg-primary text-white shadow-sm shadow-blue-200' : 'bg-card ring-2 ring-gray-200 text-muted-foreground'
+                ev.latest ? 'bg-primary text-primary-foreground' : 'bg-card ring-2 ring-border text-muted-foreground'
               }`}>
                 <GitBranch className="w-3.5 h-3.5" />
               </div>
               <div className={`flex-1 p-3.5 rounded-xl border ${
-                i === 0 ? 'border-blue-100 bg-primary/10' : 'border-border bg-muted'
+                ev.latest ? 'border-primary/20 bg-primary/10' : 'border-border bg-muted'
               }`}>
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${
-                    i === 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                  }`}>v{v.ver}</span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {v.date}
-                  </span>
-                </div>
-                <p className="text-sm text-foreground font-medium">{v.change}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">โดย {v.author}</p>
+                <p className="text-sm text-foreground font-medium">{ev.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> {fmt(ev.at)}
+                </p>
               </div>
             </div>
           ))}
@@ -230,7 +224,7 @@ function HistoryTab({ versions }: { versions: ReturnType<typeof mockVersions> })
       <div className="p-4 bg-muted rounded-xl border border-border flex items-start gap-3">
         <Activity className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground leading-relaxed">
-          ระบบล็อกทุกการเปลี่ยนแปลงโดยอัตโนมัติ เพื่อป้องกันการแก้ไขโจทย์หลังการสอบผ่านไปแล้ว และใช้ตรวจสอบความสมบูรณ์ของข้อสอบ
+          ขณะนี้ระบบเก็บเฉพาะเวลาที่สร้างและเวลาที่แก้ไขล่าสุด ยังไม่ได้บันทึกรายละเอียดของการแก้ไขแต่ละครั้งหรือผู้ที่แก้ไข
         </p>
       </div>
     </div>

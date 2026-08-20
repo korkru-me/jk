@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { QuestionCard, type Teacher } from './question-card'
+import { QuestionCard } from './question-card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import type { QuestionStats } from '@/lib/question-stats'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
@@ -25,12 +25,6 @@ const PreviewModal = dynamic(
 )
 
 // ── Mock constants ─────────────────────────────────────────────────────────────
-
-export const MOCK_TEACHERS: Teacher[] = [
-  { id: 't1', name: 'ครูพัชรีญา ส่งแสง', initials: 'พ', color: 'bg-pink-100 text-pink-700' },
-  { id: 't2', name: 'ครูวิชัย สมบูรณ์',  initials: 'ว', color: 'bg-primary/10 text-primary' },
-  { id: 't3', name: 'ครูสุภาพร ใจดี',    initials: 'ส', color: 'bg-success/10 text-success' },
-]
 
 const TAGS = ['อนุภาคมูลฐาน', 'กลศาสตร์', 'เวกเตอร์', 'คลื่น', 'ไฟฟ้า', 'แม่เหล็ก', 'ควอนตัม', 'สัมพัทธภาพ']
 
@@ -340,7 +334,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                 isFlagged={flaggedIds.has(q.id)}
                 onPreview={() => void openPreview(q.id)}
                 onToggleFlag={() => toggleFlag(q.id)}
-                teachers={MOCK_TEACHERS}
+                myTeams={myTeams}
                 stats={stats[q.id]}
               />
             ))}
