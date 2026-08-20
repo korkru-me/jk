@@ -4,6 +4,7 @@ import { AnswerPartCard } from '../answer-set-controls'
 import { SubEquationPicker } from './sub-equation-picker'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { UnitField } from './unit-field'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { useRef } from 'react'
 import type { PresetWithCat } from './shared'
@@ -53,6 +54,7 @@ export function SubQuestionFromEquation({
           + [คำตอบ]
         </Button>
       </div>
+      <UnitField value={part.unit ?? ''} onChange={unit => onChange({ unit })} />
     </AnswerPartCard>
   )
 }

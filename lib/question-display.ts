@@ -9,10 +9,8 @@
  */
 
 export interface DifficultyMeta {
-  /** Full label — filter menus and roomy badges. */
+  /** Label shown wherever this difficulty appears. */
   label: string
-  /** Compact label — dense lists where the full one would wrap. */
-  shortLabel: string
   /** Badge background + text colour. */
   badge: string
   /** Border to pair with `badge` when the badge is outlined. */
@@ -24,28 +22,24 @@ export interface DifficultyMeta {
 export const DIFF_META: Record<string, DifficultyMeta> = {
   easy: {
     label: 'ง่าย',
-    shortLabel: 'ง่าย',
     badge: 'bg-success/10 text-success',
     border: 'border-success/20',
     bar: 'bg-success',
   },
   medium: {
     label: 'ปานกลาง',
-    shortLabel: 'กลาง',
     badge: 'bg-warning/10 text-warning',
     border: 'border-warning/20',
     bar: 'bg-warning',
   },
   hard: {
     label: 'ยาก',
-    shortLabel: 'ยาก',
     badge: 'bg-destructive/10 text-destructive',
     border: 'border-destructive/20',
     bar: 'bg-destructive',
   },
   analytical: {
     label: 'วิเคราะห์',
-    shortLabel: 'วิเคราะห์',
     // The other three ride on semantic tokens and follow the theme on their
     // own; purple has no token, so it needs explicit dark values or the badge
     // stays light-on-light in dark mode.

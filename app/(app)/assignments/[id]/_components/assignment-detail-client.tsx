@@ -358,7 +358,7 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
           const m = DIFF_META[d]
           return (
             <span key={d} className={`text-xs font-medium px-3 py-1.5 rounded-full ${m?.badge ?? 'bg-muted text-muted-foreground'}`}>
-              {m?.shortLabel ?? d} · {count} ข้อ
+              {m?.label ?? d} · {count} ข้อ
             </span>
           )
         })}
@@ -380,7 +380,7 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${diff?.badge ?? 'bg-muted text-muted-foreground'}`}>
-                  {diff?.shortLabel ?? q.difficulty}
+                  {diff?.label ?? q.difficulty}
                 </span>
                 <span className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-full">
                   {TYPE_SHORT[q.question_type] ?? q.question_type}
@@ -565,7 +565,7 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
                   </div>
                 </div>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${diff?.badge ?? ''}`}>
-                  {diff?.shortLabel}
+                  {diff?.label}
                 </span>
               </div>
             )

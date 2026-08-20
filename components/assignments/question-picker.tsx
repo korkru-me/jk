@@ -102,7 +102,7 @@ export function QuestionPicker({
                 diffFilter === d ? 'bg-gray-900 text-white border-gray-900' : 'border-border text-muted-foreground hover:border-ring'
               }`}
             >
-              {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.shortLabel ?? d}
+              {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.label ?? d}
             </button>
           ))}
         </div>
@@ -166,7 +166,7 @@ export function QuestionPicker({
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`text-xs px-1.5 py-0.5 rounded border ${diff ? `${diff.badge} ${diff.border}` : 'bg-muted text-muted-foreground border-border'}`}>
-                    {diff?.shortLabel ?? q.difficulty}
+                    {diff?.label ?? q.difficulty}
                   </span>
                   <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
                   {q.question_type === 'written' && (
