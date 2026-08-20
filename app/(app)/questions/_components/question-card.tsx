@@ -10,7 +10,9 @@ import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
 import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
-import { downloadTextFile } from '@/lib/utils'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
+import { cn, downloadTextFile } from '@/lib/utils'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import type { QuestionWithCategory } from '../page'
@@ -199,24 +201,22 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
           {/* Right: actions (always visible on hover) */}
           <div className="flex flex-wrap items-center justify-between @md:flex-col @md:items-end @md:justify-start gap-1.5 @md:shrink-0">
             {/* Primary action: preview */}
-            <button
-              onClick={onPreview}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/10 rounded-lg transition-all"
-            >
-              <Eye className="w-3.5 h-3.5" /> ดูตัวอย่าง
-            </button>
+            <Button onClick={onPreview} size="sm" className="bg-primary/10 text-primary hover:bg-primary/20">
+              <Eye /> ดูตัวอย่าง
+            </Button>
 
             {/* Secondary actions row */}
             <div className="flex items-center flex-wrap gap-0.5">
               {/* Share */}
               <div className="relative">
-                <button
+                <IconButton
                   onClick={() => setShareOpen(o => !o)}
-                  title="แชร์ให้ครูท่านอื่น"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-violet-500 hover:bg-violet-50 transition-all"
+                  label="แชร์ให้ครูท่านอื่น"
+                  size="sm"
+                  className="hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/40"
                 >
-                  <Share2 className="w-3.5 h-3.5" />
-                </button>
+                  <Share2 />
+                </IconButton>
                 {shareOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShareOpen(false)} />
@@ -261,48 +261,41 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
               </div>
 
               {/* Flag */}
-              <button
+              <IconButton
                 onClick={onToggleFlag}
-                title={isFlagged ? 'ยกเลิกการรายงาน' : 'รายงานปัญหา'}
-                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
-                  isFlagged
-                    ? 'text-orange-500 bg-orange-50'
-                    : 'text-muted-foreground hover:text-orange-500 hover:bg-orange-50'
-                }`}
+                label={isFlagged ? 'ยกเลิกการรายงาน' : 'รายงานปัญหา'}
+                size="sm"
+                className={isFlagged
+                  ? 'text-orange-500 bg-orange-50 dark:bg-orange-950/40'
+                  : 'hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/40'}
               >
-                <Flag className="w-3.5 h-3.5" />
-              </button>
+                <Flag />
+              </IconButton>
 
               {/* Duplicate (non-group only) */}
               {!isGroup && (
-                <button
-                  onClick={handleDuplicate}
-                  title="ทำสำเนาเพื่อแก้ไข"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
+                <IconButton onClick={handleDuplicate} label="ทำสำเนาเพื่อแก้ไข" size="sm"
+                  className="hover:text-primary hover:bg-primary/10">
+                  <Copy />
+                </IconButton>
               )}
 
               {/* Edit */}
               <Link
                 href={isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`}
                 title="แก้ไข"
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-muted-foreground hover:bg-muted transition-all"
+                aria-label="แก้ไข"
+                className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
               >
-                <Edit2 className="w-3.5 h-3.5" />
+                <Edit2 />
               </Link>
 
               {/* Delete (non-group only) */}
               {!isGroup && (
-                <button
-                  onClick={handleDelete}
-                  disabled={isPending}
-                  title="ลบโจทย์"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <IconButton onClick={handleDelete} disabled={isPending} label="ลบโจทย์" size="sm"
+                  className="hover:text-destructive hover:bg-destructive/10">
+                  <Trash2 />
+                </IconButton>
               )}
             </div>
           </div>
