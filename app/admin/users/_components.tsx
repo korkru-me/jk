@@ -16,8 +16,8 @@ const ROLE_LABEL: Record<string, string> = {
   teacher: 'ครู', student: 'นักเรียน', admin: 'Admin',
 }
 const ROLE_STYLE: Record<string, string> = {
-  teacher: 'bg-blue-100 text-blue-700',
-  student: 'bg-gray-100 text-gray-600',
+  teacher: 'bg-primary/10 text-primary',
+  student: 'bg-muted text-muted-foreground',
   admin:   'bg-purple-100 text-purple-700',
 }
 
@@ -111,40 +111,40 @@ export function UsersTable({ users }: { users: Row[] }) {
     <>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-muted border-b">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">ชื่อ / อีเมล</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">โจทย์</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">สมัครเมื่อ</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อ / อีเมล</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">โจทย์</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">สมัครเมื่อ</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y">
             {users.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-12 text-gray-400">ไม่พบผู้ใช้</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">ไม่พบผู้ใช้</td></tr>
             )}
             {users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={u.id} className="hover:bg-muted transition-colors">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-gray-900">{u.full_name}</p>
-                  <p className="text-xs text-gray-400">{u.email}</p>
+                  <p className="font-medium text-foreground">{u.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{u.email}</p>
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_STYLE[u.role]}`}>
                     {ROLE_LABEL[u.role]}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{u.question_count}</td>
+                <td className="px-4 py-3 text-muted-foreground">{u.question_count}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    u.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                    u.status === 'suspended' ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
                   }`}>
                     {u.status === 'suspended' ? 'ระงับ' : 'Active'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">
+                <td className="px-4 py-3 text-muted-foreground text-xs">
                   {new Date(u.created_at).toLocaleDateString('th-TH')}
                 </td>
                 <td className="px-4 py-3">
@@ -152,7 +152,7 @@ export function UsersTable({ users }: { users: Row[] }) {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => { setRoleTarget(u); setNewRole(u.role === 'teacher' ? 'student' : 'teacher') }}
-                        className="text-xs text-blue-600 hover:underline"
+                        className="text-xs text-primary hover:underline"
                       >
                         เปลี่ยน Role
                       </button>
@@ -160,7 +160,7 @@ export function UsersTable({ users }: { users: Row[] }) {
                         onClick={() => handleSuspend(u)}
                         disabled={isPending}
                         className={`text-xs hover:underline disabled:opacity-50 ${
-                          u.status === 'suspended' ? 'text-green-600' : 'text-yellow-600'
+                          u.status === 'suspended' ? 'text-success' : 'text-yellow-600'
                         }`}
                       >
                         {u.status === 'suspended' ? 'คืนสิทธิ์' : 'ระงับ'}
@@ -168,7 +168,7 @@ export function UsersTable({ users }: { users: Row[] }) {
                       <button
                         onClick={() => handleDelete(u)}
                         disabled={isPending}
-                        className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                        className="text-xs text-destructive hover:underline disabled:opacity-50"
                       >
                         ลบ
                       </button>
@@ -188,8 +188,8 @@ export function UsersTable({ users }: { users: Row[] }) {
             <DialogTitle>เปลี่ยน Role</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            <p className="text-gray-600">ผู้ใช้: <strong>{roleTarget?.full_name}</strong></p>
-            <p className="text-gray-600">Role ปัจจุบัน: <strong>{ROLE_LABEL[roleTarget?.role ?? '']}</strong></p>
+            <p className="text-muted-foreground">ผู้ใช้: <strong>{roleTarget?.full_name}</strong></p>
+            <p className="text-muted-foreground">Role ปัจจุบัน: <strong>{ROLE_LABEL[roleTarget?.role ?? '']}</strong></p>
             <Select value={newRole} onValueChange={(v) => v !== null && setNewRole(v as typeof newRole)}>
               <SelectTrigger>
                 <SelectValue />

@@ -60,7 +60,7 @@ function draftFromExisting(config: FillBlankConfig | undefined, item: FillBlankI
 
 const BLANK_TYPES: Array<{ value: FillBlankType; label: string; desc: string; icon: typeof PenLine; activeClass: string }> = [
   { value: 'text', label: 'ช่องว่าง', desc: 'นักเรียนตอบอะไรก็ได้ ครูกลับมาตรวจให้คะแนนเอง', icon: PenLine, activeClass: 'bg-orange-50 border-orange-400 text-orange-700' },
-  { value: 'fixed', label: 'ฟิกคำตอบ', desc: 'นักเรียนพิมพ์คำตอบ ระบบตรวจให้อัตโนมัติตามคำตอบที่ครูกำหนด', icon: CheckCircle2, activeClass: 'bg-blue-50 border-blue-400 text-blue-700' },
+  { value: 'fixed', label: 'ฟิกคำตอบ', desc: 'นักเรียนพิมพ์คำตอบ ระบบตรวจให้อัตโนมัติตามคำตอบที่ครูกำหนด', icon: CheckCircle2, activeClass: 'bg-primary/10 border-primary text-primary' },
   { value: 'dropdown', label: 'ดรอปดาวน์', desc: 'นักเรียนเลือกคำตอบจากตัวเลือกที่ครูกำหนด ระบบตรวจให้อัตโนมัติ', icon: ChevronDownSquare, activeClass: 'bg-purple-50 border-purple-400 text-purple-700' },
 ]
 
@@ -268,11 +268,11 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาโจทย์</h2>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700 space-y-1">
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">เนื้อหาโจทย์</h2>
+        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-3 text-xs text-primary space-y-1">
           <p className="font-medium">วิธีใส่ช่องกรอก:</p>
-          <p>กดปุ่ม <strong>"+ แทรกช่องกรอก"</strong> ตรงที่ต้องการให้นักเรียนกรอกคำตอบ — แทรกได้หลายช่อง แต่ละช่องจะมีเลขกำกับ (เช่น <code className="bg-blue-100 px-1 rounded">[___1]</code>) ตรงกับการ์ดตั้งค่าคำตอบเลขเดียวกันด้านล่าง</p>
-          <p className="text-blue-500">ตัวอย่าง: "แสงเดินทางด้วยความเร็ว [___1] m/s ในสุญญากาศ"</p>
+          <p>กดปุ่ม <strong>"+ แทรกช่องกรอก"</strong> ตรงที่ต้องการให้นักเรียนกรอกคำตอบ — แทรกได้หลายช่อง แต่ละช่องจะมีเลขกำกับ (เช่น <code className="bg-primary/10 px-1 rounded">[___1]</code>) ตรงกับการ์ดตั้งค่าคำตอบเลขเดียวกันด้านล่าง</p>
+          <p className="text-primary">ตัวอย่าง: "แสงเดินทางด้วยความเร็ว [___1] m/s ในสุญญากาศ"</p>
         </div>
 
         <div className="space-y-1.5">
@@ -290,7 +290,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
             rows={5}
           />
           {blankCount > 0 && (
-            <p className="text-xs text-green-600 font-medium">พบช่องกรอก {blankCount} ช่อง</p>
+            <p className="text-xs text-success font-medium">พบช่องกรอก {blankCount} ช่อง</p>
           )}
         </div>
 
@@ -302,7 +302,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
 
       {blankCount > 0 && (
         <section className="space-y-4">
-          <h2 className="text-base font-semibold text-gray-900 border-b pb-2">
+          <h2 className="text-base font-semibold text-foreground border-b pb-2">
             ตั้งค่าแต่ละช่องกรอก
           </h2>
 
@@ -310,9 +310,9 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
             {blanks.map((b, i) => {
               const num = blankNumbers[i] ?? i + 1
               return (
-              <div key={i} className="p-3 rounded-xl border bg-gray-50 space-y-2.5">
+              <div key={i} className="p-3 rounded-xl border bg-muted space-y-2.5">
                 <div className="flex items-start gap-2.5">
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mt-0.5">
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
                     {num}
                   </div>
                   <div className="flex-1 space-y-2">
@@ -327,7 +327,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                             type="button"
                             onClick={() => updateBlank(i, 'type', t.value)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${
-                              active ? t.activeClass : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                              active ? t.activeClass : 'bg-card border-border text-muted-foreground hover:border-ring'
                             }`}
                           >
                             <Icon className="w-3.5 h-3.5" />
@@ -336,7 +336,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                         )
                       })}
                     </div>
-                    <p className="text-[11px] text-gray-400">{BLANK_TYPES.find(t => t.value === b.type)?.desc}</p>
+                    <p className="text-[11px] text-muted-foreground">{BLANK_TYPES.find(t => t.value === b.type)?.desc}</p>
 
                     {/* Type-specific fields */}
                     {b.type === 'text' && (
@@ -358,7 +358,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                               className="flex-1 h-8 text-sm"
                             />
                             {b.answers.length > 1 && (
-                              <button type="button" onClick={() => removeFixedAnswer(i, ai)} className="flex-shrink-0 text-gray-400 hover:text-red-500">
+                              <button type="button" onClick={() => removeFixedAnswer(i, ai)} className="flex-shrink-0 text-muted-foreground hover:text-destructive">
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             )}
@@ -368,7 +368,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                           <Plus className="w-3.5 h-3.5 mr-1" />
                           เพิ่มคำตอบที่ถูกต้อง
                         </Button>
-                        <p className="text-[11px] text-gray-400">นักเรียนตอบตรงกับคำตอบใดคำตอบหนึ่งในนี้ ถือว่าถูกต้อง</p>
+                        <p className="text-[11px] text-muted-foreground">นักเรียนตอบตรงกับคำตอบใดคำตอบหนึ่งในนี้ ถือว่าถูกต้อง</p>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -376,7 +376,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                             onChange={(e) => updateBlank(i, 'case_sensitive', e.target.checked)}
                             className="w-3.5 h-3.5 rounded"
                           />
-                          <span className="text-xs text-gray-600">ตรวจสอบตัวพิมพ์เล็ก-ใหญ่ (Case-sensitive)</span>
+                          <span className="text-xs text-muted-foreground">ตรวจสอบตัวพิมพ์เล็ก-ใหญ่ (Case-sensitive)</span>
                         </label>
                       </div>
                     )}
@@ -390,7 +390,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                               onClick={() => toggleCorrectOption(i, oi)}
                               title="ติ๊กเพื่อกำหนดเป็นคำตอบที่ถูกต้อง (เลือกได้มากกว่า 1)"
                               className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                                b.correctIndexes.includes(oi) ? 'border-green-500 bg-green-500' : 'border-gray-300 hover:border-green-400'
+                                b.correctIndexes.includes(oi) ? 'border-success bg-success' : 'border-border hover:border-success/50'
                               }`}
                             >
                               {b.correctIndexes.includes(oi) && <Check className="w-3 h-3 text-white" />}
@@ -402,7 +402,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                               className="flex-1 h-8 text-sm"
                             />
                             {b.options.length > 2 && (
-                              <button type="button" onClick={() => removeOption(i, oi)} className="flex-shrink-0 text-gray-400 hover:text-red-500">
+                              <button type="button" onClick={() => removeOption(i, oi)} className="flex-shrink-0 text-muted-foreground hover:text-destructive">
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             )}
@@ -412,7 +412,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
                           <Plus className="w-3.5 h-3.5 mr-1" />
                           เพิ่มตัวเลือก
                         </Button>
-                        <p className="text-[11px] text-gray-400">ติ๊กช่องหน้าตัวเลือกเพื่อกำหนดคำตอบที่ถูกต้อง (เลือกได้มากกว่า 1 ตัวเลือก)</p>
+                        <p className="text-[11px] text-muted-foreground">ติ๊กช่องหน้าตัวเลือกเพื่อกำหนดคำตอบที่ถูกต้อง (เลือกได้มากกว่า 1 ตัวเลือก)</p>
                       </div>
                     )}
                   </div>
@@ -421,7 +421,7 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
               )
             })}
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted-foreground">
             {manualCount === 0
               ? `คะแนนรวม: ${blankCount} คะแนน (ตรวจอัตโนมัติทุกช่อง)`
               : autoCount === 0

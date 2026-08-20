@@ -41,7 +41,7 @@ interface Props {
 }
 
 function AnalyticsTabLoading() {
-  return <div className="h-48 rounded-2xl bg-gray-100 animate-pulse" aria-label="กำลังโหลดข้อมูลวิเคราะห์" />
+  return <div className="h-48 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดข้อมูลวิเคราะห์" />
 }
 
 export type ScoreOverride = {
@@ -100,12 +100,12 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
         <div>
           <Link
             href={`/assignments/${assignment.id}`}
-            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors"
           >
             <ChevronLeft className="w-4 h-4" /> กลับหน้าชุดข้อสอบ
           </Link>
-          <h1 className="text-xl font-bold text-gray-900 mt-1">{assignment.title}</h1>
-          <p className="text-sm text-gray-400">
+          <h1 className="text-xl font-bold text-foreground mt-1">{assignment.title}</h1>
+          <p className="text-sm text-muted-foreground">
             {assignment.classrooms?.name ?? 'ไม่ระบุห้อง'} · {submissions.length} คนส่งแล้ว · {questions.length} ข้อ
           </p>
         </div>
@@ -122,19 +122,19 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
           {showExport && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
-              <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl ring-1 ring-black/10 shadow-lg z-20 py-1 overflow-hidden">
+              <div className="absolute right-0 mt-1.5 w-48 bg-card rounded-xl ring-1 ring-border shadow-lg z-20 py-1 overflow-hidden">
                 <button
                   onClick={exportCsv}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                  <FileSpreadsheet className="w-4 h-4 text-success" />
                   Export as Excel (CSV)
                 </button>
                 <button
                   onClick={exportPrint}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
                 >
-                  <FilePdf className="w-4 h-4 text-red-500" />
+                  <FilePdf className="w-4 h-4 text-destructive" />
                   Export as PDF
                 </button>
               </div>
@@ -144,7 +144,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 bg-gray-100 rounded-2xl p-1 print:hidden">
+      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1 print:hidden">
         {TABS.map(tab => {
           const Icon = tab.icon
           return (
@@ -153,8 +153,8 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.key
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-muted-foreground hover:bg-card/50'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />

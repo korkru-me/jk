@@ -106,7 +106,7 @@ export function BillingSettings() {
 
         <div className="mt-4 pt-4 border-t border-white/20 flex items-center justify-between">
           <p className="text-xs text-white/60">ต่ออายุอัตโนมัติวันที่ {NEXT_BILLING}</p>
-          <span className="text-xs bg-emerald-400/20 text-emerald-200 px-2 py-0.5 rounded-full font-medium">
+          <span className="text-xs bg-success/20 text-emerald-200 px-2 py-0.5 rounded-full font-medium">
             ✓ ใช้งานอยู่
           </span>
         </div>
@@ -124,10 +124,10 @@ export function BillingSettings() {
               </div>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                 STORAGE_PCT >= 80
-                  ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                  ? 'bg-destructive/15 text-destructive'
                   : STORAGE_PCT >= 60
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                  : 'bg-green-500/15 text-green-600 dark:text-green-400'
+                  ? 'bg-warning/15 text-warning'
+                  : 'bg-success/15 text-success'
               }`}>
                 {STORAGE_PCT}%
               </span>
@@ -135,9 +135,9 @@ export function BillingSettings() {
             <div className="h-3 bg-muted rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
-                  STORAGE_PCT >= 80 ? 'bg-red-500' :
-                  STORAGE_PCT >= 60 ? 'bg-amber-500' :
-                  'bg-blue-500'
+                  STORAGE_PCT >= 80 ? 'bg-destructive' :
+                  STORAGE_PCT >= 60 ? 'bg-warning' :
+                  'bg-primary'
                 }`}
                 style={{ width: `${STORAGE_PCT}%` }}
               />
@@ -195,11 +195,11 @@ export function BillingSettings() {
               </button>
             </div>
           ) : (
-            <div className="bg-red-500/8 border border-red-400/30 rounded-xl p-4">
+            <div className="bg-destructive/8 border border-destructive/30 rounded-xl p-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                <AlertTriangle size={16} className="text-destructive shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">ยืนยันการยกเลิก?</p>
+                  <p className="text-sm font-semibold text-destructive">ยืนยันการยกเลิก?</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     คุณยังสามารถใช้งานได้จนถึง {NEXT_BILLING} หลังจากนั้นบัญชีจะถูกลดระดับเป็น Free Plan
                     (โจทย์ 50 ข้อ, 1 ครู, 30 นักเรียน)
@@ -208,7 +208,7 @@ export function BillingSettings() {
                     <button
                       type="button"
                       onClick={handleCancelSubscription}
-                      className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+                      className="text-xs px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg transition-colors font-medium"
                     >
                       ยืนยันยกเลิก
                     </button>
@@ -247,7 +247,7 @@ export function BillingSettings() {
                   <td className="px-4 py-3 text-sm">{inv.date}</td>
                   <td className="px-4 py-3 text-right font-semibold font-mono">{inv.amount}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className="inline-flex items-center gap-1 text-xs bg-green-500/15 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full font-medium">
+                    <span className="inline-flex items-center gap-1 text-xs bg-success/15 text-success px-2 py-0.5 rounded-full font-medium">
                       <CheckCircle2 size={10} />
                       ชำระแล้ว
                     </span>

@@ -27,28 +27,28 @@ export function ArchivedActionsClient({ classroom }: { classroom: Classroom }) {
   }
 
   return (
-    <div className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors">
-      <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-        <BookOpen className="w-4 h-4 text-amber-600" />
+    <div className="flex items-center gap-4 p-4 hover:bg-muted transition-colors">
+      <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+        <BookOpen className="w-4 h-4 text-warning" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-900 truncate">{classroom.name}</p>
+        <p className="font-semibold text-foreground truncate">{classroom.name}</p>
         {classroom.description && (
-          <p className="text-xs text-gray-400 truncate">{classroom.description}</p>
+          <p className="text-xs text-muted-foreground truncate">{classroom.description}</p>
         )}
-        <p className="text-xs text-gray-400 mt-0.5">รหัส: {classroom.class_code}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">รหัส: {classroom.class_code}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Link
           href={`/classrooms/${classroom.id}`}
-          className="text-xs text-blue-600 hover:underline px-2 py-1"
+          className="text-xs text-primary hover:underline px-2 py-1"
         >
           ดูข้อมูล
         </Link>
         <button
           onClick={handleRestore}
           disabled={isPending}
-          className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1 text-xs text-success hover:text-success/80 font-medium px-2.5 py-1.5 rounded-lg hover:bg-success/10 transition-colors disabled:opacity-50"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           กู้คืน
@@ -56,7 +56,7 @@ export function ArchivedActionsClient({ classroom }: { classroom: Classroom }) {
         <button
           onClick={handleMoveToTrash}
           disabled={isPending}
-          className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 font-medium px-2.5 py-1.5 rounded-lg hover:bg-destructive/10 transition-colors disabled:opacity-50"
         >
           <Trash2 className="w-3.5 h-3.5" />
           ลบ

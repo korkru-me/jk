@@ -108,7 +108,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">คำสั่งงาน</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">คำสั่งงาน</h2>
         <div className="space-y-1.5">
           <Label>คำสั่งงาน *</Label>
           <RichTextEditor
@@ -121,7 +121,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
         </div>
         <div className="space-y-1.5">
           <Label>ไฟล์อ้างอิงประกอบโจทย์ (ไม่บังคับ)</Label>
-          <p className="text-xs text-gray-500">เช่น ใบงาน สแกนโจทย์ หรือแผนภาพ — รองรับรูปภาพและ PDF</p>
+          <p className="text-xs text-muted-foreground">เช่น ใบงาน สแกนโจทย์ หรือแผนภาพ — รองรับรูปภาพและ PDF</p>
           <QuestionFileUpload value={attachmentUrls} onChange={setAttachmentUrls} />
         </div>
       </section>
@@ -134,7 +134,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
         placeholder="เช่น สิ่งที่ควรปรากฏในไฟล์ที่นักเรียนส่งมา..."
       />
 
-      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
+      <div className="bg-primary/10 border border-blue-100 rounded-xl px-4 py-3 text-xs text-primary">
         นักเรียนจะแนบไฟล์รูปภาพหรือ PDF เป็นคำตอบ ระบบให้คะแนนเต็มอัตโนมัติทันทีที่มีการแนบไฟล์อย่างน้อย 1 ไฟล์ — ไม่มีการตรวจเนื้อหาไฟล์ ครูสามารถเข้าไปดูไฟล์ที่ส่งได้จากหน้าผลการสอบของนักเรียน
       </div>
 

@@ -17,9 +17,9 @@ import { downloadTextFile } from '@/lib/utils'
 import type { QuestionWithCategory } from '../page'
 
 export const DIFF_META: Record<string, { label: string; color: string; bar: string }> = {
-  easy:       { label: 'ง่าย',       color: 'bg-green-100 text-green-700',   bar: 'bg-green-400' },
-  medium:     { label: 'ปานกลาง',   color: 'bg-amber-100 text-amber-700',   bar: 'bg-amber-400' },
-  hard:       { label: 'ยาก',        color: 'bg-red-100 text-red-700',       bar: 'bg-red-400' },
+  easy:       { label: 'ง่าย',       color: 'bg-success/10 text-success',   bar: 'bg-success' },
+  medium:     { label: 'ปานกลาง',   color: 'bg-warning/10 text-warning',   bar: 'bg-warning' },
+  hard:       { label: 'ยาก',        color: 'bg-destructive/10 text-destructive',       bar: 'bg-destructive' },
   analytical: { label: 'วิเคราะห์',  color: 'bg-purple-100 text-purple-700', bar: 'bg-purple-400' },
 }
 
@@ -60,7 +60,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   const pPercent = Math.round(pVal * 100)
   const pDiffLabel = pPercent <= 30 ? 'ยากมาก' : pPercent <= 50 ? 'ยาก' : pPercent <= 70 ? 'ปานกลาง' : 'ง่าย'
   const rLabel = rVal >= 0.4 ? 'ดีมาก' : rVal >= 0.3 ? 'ดี' : rVal >= 0.2 ? 'พอใช้' : 'ต่ำ'
-  const rColor = rVal >= 0.4 ? 'text-green-600' : rVal >= 0.3 ? 'text-blue-600' : rVal >= 0.2 ? 'text-amber-600' : 'text-red-500'
+  const rColor = rVal >= 0.4 ? 'text-success' : rVal >= 0.3 ? 'text-primary' : rVal >= 0.2 ? 'text-warning' : 'text-destructive'
 
   function handleDelete() {
     if (!confirm('ลบโจทย์นี้? ไม่สามารถกู้คืนได้')) return
@@ -102,8 +102,8 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   }
 
   return (
-    <div className={`@container bg-white rounded-2xl ring-1 transition-all hover:shadow-sm group ${
-      isFlagged ? 'ring-orange-300 hover:ring-orange-400' : 'ring-black/5 hover:ring-blue-200'
+    <div className={`@container bg-card rounded-2xl ring-1 transition-all hover:shadow-sm group ${
+      isFlagged ? 'ring-orange-300 hover:ring-orange-400' : 'ring-border hover:ring-blue-200'
     }`}>
       {/* Flagged banner */}
       {isFlagged && (
@@ -122,21 +122,21 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             {/* Badge row */}
             <div className="flex items-center gap-1.5 flex-wrap mb-2">
               {isGroup && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">📚 หลายขั้นตอน</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
               )}
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.color}`}>
                 {diff?.label}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                 {TYPE_LABEL[q.question_type] ?? q.question_type}
               </span>
               {q.question_categories?.name && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                   {q.question_categories.name}
                 </span>
               )}
               {(q.tags ?? []).slice(0, 2).map(tag => (
-                <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100">
+                <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                   #{tag}
                 </span>
               ))}
@@ -146,30 +146,30 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             {q.question_type === 'written' && (
               <div className="flex items-center gap-2 mb-2">
                 <ToggleSwitch checked={requiresWorkImage} onChange={handleToggleWorkImage} disabled={isPending} />
-                <span className="text-xs text-gray-500">บังคับแนบรูปวิธีทำ</span>
+                <span className="text-xs text-muted-foreground">บังคับแนบรูปวิธีทำ</span>
               </div>
             )}
 
             {/* Title */}
             <button
               onClick={onPreview}
-              className="text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors text-left line-clamp-1 w-full"
+              className="text-sm font-semibold text-foreground hover:text-primary transition-colors text-left line-clamp-1 w-full"
             >
               {q.title}
             </button>
 
             {/* Question text preview */}
-            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{q.question_text}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{q.question_text}</p>
 
             {/* Stats row */}
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-gray-50">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-border">
               {/* p-value bar */}
               <div className="flex-1 min-w-0 max-w-[180px]">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-gray-400">ความยาก (p={pVal.toFixed(2)})</span>
-                  <span className="text-[10px] font-semibold text-gray-600">{pPercent}% · {pDiffLabel}</span>
+                  <span className="text-[10px] text-muted-foreground">ความยาก (p={pVal.toFixed(2)})</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground">{pPercent}% · {pDiffLabel}</span>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${diff?.bar}`}
                     style={{ width: `${pPercent}%` }}
@@ -179,17 +179,17 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
 
               {/* r-value */}
               <div className="shrink-0 text-right">
-                <p className="text-[10px] text-gray-400">อำนาจจำแนก</p>
+                <p className="text-[10px] text-muted-foreground">อำนาจจำแนก</p>
                 <p className={`text-xs font-bold ${rColor}`}>
-                  r={rVal.toFixed(2)} <span className="font-normal text-gray-400">({rLabel})</span>
+                  r={rVal.toFixed(2)} <span className="font-normal text-muted-foreground">({rLabel})</span>
                 </p>
               </div>
 
               {/* Usage count */}
               {usedIn > 0 && (
                 <div className="shrink-0 text-right">
-                  <p className="text-[10px] text-gray-400">ใช้ใน</p>
-                  <p className="text-xs font-bold text-gray-600">{usedIn} ชุดสอบ</p>
+                  <p className="text-[10px] text-muted-foreground">ใช้ใน</p>
+                  <p className="text-xs font-bold text-muted-foreground">{usedIn} ชุดสอบ</p>
                 </div>
               )}
             </div>
@@ -200,7 +200,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             {/* Primary action: preview */}
             <button
               onClick={onPreview}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/10 rounded-lg transition-all"
             >
               <Eye className="w-3.5 h-3.5" /> ดูตัวอย่าง
             </button>
@@ -212,27 +212,27 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                 <button
                   onClick={() => setShareOpen(o => !o)}
                   title="แชร์ให้ครูท่านอื่น"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-violet-500 hover:bg-violet-50 transition-all"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-violet-500 hover:bg-violet-50 transition-all"
                 >
                   <Share2 className="w-3.5 h-3.5" />
                 </button>
                 {shareOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShareOpen(false)} />
-                    <div className="absolute right-0 top-8 z-40 bg-white rounded-xl shadow-xl ring-1 ring-black/10 w-52 overflow-hidden">
-                      <div className="px-3 py-2.5 border-b border-gray-50">
-                        <p className="text-xs font-semibold text-gray-500">แชร์ให้ครูท่านอื่น</p>
+                    <div className="absolute right-0 top-8 z-40 bg-card rounded-xl shadow-xl ring-1 ring-border w-52 overflow-hidden">
+                      <div className="px-3 py-2.5 border-b border-border">
+                        <p className="text-xs font-semibold text-muted-foreground">แชร์ให้ครูท่านอื่น</p>
                       </div>
                       {!isGroup && (
                         <button
                           onClick={handleExport}
                           disabled={isPending}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 disabled:opacity-50"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left border-b border-border disabled:opacity-50"
                         >
-                          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
+                          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-muted text-muted-foreground">
                             <Download className="w-3.5 h-3.5" />
                           </span>
-                          <span className="text-sm text-gray-700">ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)</span>
+                          <span className="text-sm text-muted-foreground">ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)</span>
                         </button>
                       )}
                       {teachers.map(t => (
@@ -242,12 +242,12 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                             toast.success(`แชร์ให้ ${t.name} แล้ว`)
                             setShareOpen(false)
                           }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left"
                         >
                           <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${t.color}`}>
                             {t.initials}
                           </span>
-                          <span className="text-sm text-gray-700">{t.name}</span>
+                          <span className="text-sm text-muted-foreground">{t.name}</span>
                         </button>
                       ))}
                     </div>
@@ -262,7 +262,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                 className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
                   isFlagged
                     ? 'text-orange-500 bg-orange-50'
-                    : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'
+                    : 'text-muted-foreground hover:text-orange-500 hover:bg-orange-50'
                 }`}
               >
                 <Flag className="w-3.5 h-3.5" />
@@ -273,7 +273,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                 <button
                   onClick={handleDuplicate}
                   title="ทำสำเนาเพื่อแก้ไข"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
                 >
                   <Copy className="w-3.5 h-3.5" />
                 </button>
@@ -283,7 +283,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
               <Link
                 href={isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`}
                 title="แก้ไข"
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-muted-foreground hover:bg-muted transition-all"
               >
                 <Edit2 className="w-3.5 h-3.5" />
               </Link>
@@ -294,7 +294,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                   onClick={handleDelete}
                   disabled={isPending}
                   title="ลบโจทย์"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all disabled:opacity-50"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

@@ -118,13 +118,13 @@ function SubjectAutocomplete({ value, onChange }: {
         className="text-sm"
       />
       {showDropdown && (
-        <div className="absolute z-50 top-full mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+        <div className="absolute z-50 top-full mt-1 w-full border border-border rounded-lg bg-card shadow-lg overflow-hidden max-h-48 overflow-y-auto">
           {filtered.map(s => (
             <button
               key={s}
               type="button"
               onMouseDown={e => { e.preventDefault(); commit(s) }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors"
+              className="w-full text-left px-3 py-2 text-sm hover:bg-primary/10 hover:text-primary transition-colors"
             >
               {s}
             </button>
@@ -149,7 +149,7 @@ export function TeamShareChips({ label, teams, selectedIds, onToggle, disabled }
 
   return (
     <div className="pt-1">
-      <Label className="text-xs text-gray-500 mb-1 block">{label}</Label>
+      <Label className="text-xs text-muted-foreground mb-1 block">{label}</Label>
       <div className="flex flex-wrap gap-1.5">
         {teams.map(t => {
           const selected = selectedIds.includes(t.id)
@@ -164,8 +164,8 @@ export function TeamShareChips({ label, teams, selectedIds, onToggle, disabled }
                 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors',
                 disabled && 'opacity-50 cursor-not-allowed',
                 selected
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:border-primary/20 hover:bg-primary/10'
               )}
             >
               {selected && <Check className="w-3 h-3" />}
@@ -268,7 +268,7 @@ export function GeneralInfoSection({
 
   return (
     <section className="space-y-4">
-      <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ข้อมูลทั่วไป</h2>
+      <h2 className="text-base font-semibold text-foreground border-b pb-2">ข้อมูลทั่วไป</h2>
 
       <div className="space-y-1.5">
         <Label htmlFor="title">ชื่อโจทย์ *</Label>
@@ -336,9 +336,9 @@ export function GeneralInfoSection({
             </SelectContent>
           </Select>
           {teamChecked && !hasTeams && (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               สร้างทีมก่อนเพื่อใช้งาน —{' '}
-              <a href="/settings/team" className="text-blue-600 hover:underline">
+              <a href="/settings/team" className="text-primary hover:underline">
                 ไปที่หน้าทีมของฉัน
               </a>
             </p>
@@ -361,7 +361,7 @@ export function GeneralInfoSection({
                 onChange={onTeamEditAllowedChange}
                 disabled={!canEditSharing}
               />
-              <span className="text-xs text-gray-600">อนุญาตให้เพื่อนในทีมแก้ไขโจทย์นี้ได้</span>
+              <span className="text-xs text-muted-foreground">อนุญาตให้เพื่อนในทีมแก้ไขโจทย์นี้ได้</span>
             </div>
           )}
         </div>
@@ -369,7 +369,7 @@ export function GeneralInfoSection({
 
       <div className="space-y-1.5">
         <Label>แท็ก *</Label>
-        <p className="text-xs text-gray-500">ใช้ระบุหัวข้อของโจทย์ เช่น แรง, กฎนิวตัน, พลังงาน — ช่วยให้ค้นหาและกรองโจทย์ได้ง่ายขึ้น</p>
+        <p className="text-xs text-muted-foreground">ใช้ระบุหัวข้อของโจทย์ เช่น แรง, กฎนิวตัน, พลังงาน — ช่วยให้ค้นหาและกรองโจทย์ได้ง่ายขึ้น</p>
         <SmartTagInput allTags={allTags} tags={tags} onTagsChange={onTagsChange} />
       </div>
     </section>

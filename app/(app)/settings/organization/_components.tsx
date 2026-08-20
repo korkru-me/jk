@@ -46,10 +46,10 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 const ROLE_COLOR: Record<string, string> = {
-  owner: 'bg-amber-100 text-amber-800',
+  owner: 'bg-warning/10 text-amber-800',
   admin: 'bg-purple-100 text-purple-800',
-  teacher: 'bg-blue-100 text-blue-800',
-  student: 'bg-green-100 text-green-800',
+  teacher: 'bg-primary/10 text-blue-800',
+  student: 'bg-success/10 text-green-800',
 }
 
 function getBaseUrl() {
@@ -111,7 +111,7 @@ function InviteByEmailForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 items-end">
       <div className="flex-1 min-w-48">
-        <label className="text-xs text-gray-500 mb-1 block">อีเมล</label>
+        <label className="text-xs text-muted-foreground mb-1 block">อีเมล</label>
         <Input
           type="email"
           value={email}
@@ -121,7 +121,7 @@ function InviteByEmailForm() {
         />
       </div>
       <div>
-        <label className="text-xs text-gray-500 mb-1 block">บทบาท</label>
+        <label className="text-xs text-muted-foreground mb-1 block">บทบาท</label>
         <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
           <SelectTrigger className="h-9 w-32">
             <SelectValue />
@@ -183,7 +183,7 @@ function InviteLinkSection({ invites }: { invites: OrgData['invites'] }) {
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 items-end">
         <div>
-          <label className="text-xs text-gray-500 mb-1 block">บทบาทสำหรับลิงก์</label>
+          <label className="text-xs text-muted-foreground mb-1 block">บทบาทสำหรับลิงก์</label>
           <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
             <SelectTrigger className="h-9 w-32">
               <SelectValue />
@@ -203,14 +203,14 @@ function InviteLinkSection({ invites }: { invites: OrgData['invites'] }) {
       {invites.length > 0 && (
         <div className="space-y-2">
           {invites.map((inv) => (
-            <div key={inv.id} className="flex items-center gap-2 p-3 rounded-lg border bg-gray-50 text-sm">
+            <div key={inv.id} className="flex items-center gap-2 p-3 rounded-lg border bg-muted text-sm">
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_COLOR[inv.role] ?? ''}`}>
                 {ROLE_LABEL[inv.role] ?? inv.role}
               </span>
-              <span className="flex-1 font-mono text-xs text-gray-500 truncate">
+              <span className="flex-1 font-mono text-xs text-muted-foreground truncate">
                 {`${getBaseUrl()}/join-org?token=${inv.token.slice(0, 12)}…`}
               </span>
-              <span className="text-xs text-gray-400 shrink-0">หมดอายุใน {daysLeft(inv.expiresAt)} วัน</span>
+              <span className="text-xs text-muted-foreground shrink-0">หมดอายุใน {daysLeft(inv.expiresAt)} วัน</span>
               <Button
                 size="sm"
                 variant="ghost"
@@ -222,7 +222,7 @@ function InviteLinkSection({ invites }: { invites: OrgData['invites'] }) {
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 px-2 text-xs text-red-500 hover:text-red-600"
+                className="h-7 px-2 text-xs text-destructive hover:text-destructive/80"
                 onClick={() => handleRevoke(inv.id)}
                 disabled={revoking === inv.id}
               >
@@ -280,23 +280,23 @@ function MembersList({
         const isLoading = loadingId === m.userId
 
         return (
-          <div key={m.userId} className="flex items-center gap-3 px-4 py-3 bg-white">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+          <div key={m.userId} className="flex items-center gap-3 px-4 py-3 bg-card">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
               {m.fullName ? m.fullName.charAt(0) : m.email.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
                 {m.fullName || '(ไม่มีชื่อ)'}
-                {isMe && <span className="ml-2 text-xs text-gray-400">(คุณ)</span>}
+                {isMe && <span className="ml-2 text-xs text-muted-foreground">(คุณ)</span>}
               </p>
-              <p className="text-xs text-gray-500 truncate">{m.email}</p>
+              <p className="text-xs text-muted-foreground truncate">{m.email}</p>
             </div>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${ROLE_COLOR[m.role] ?? 'bg-gray-100 text-gray-700'}`}>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${ROLE_COLOR[m.role] ?? 'bg-muted text-muted-foreground'}`}>
               {ROLE_LABEL[m.role] ?? m.role}
             </span>
             {canManage && !isMe && !isOwner && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="h-7 w-7 inline-flex items-center justify-center rounded-md text-sm hover:bg-gray-100 disabled:opacity-50" disabled={isLoading}>
+                <DropdownMenuTrigger className="h-7 w-7 inline-flex items-center justify-center rounded-md text-sm hover:bg-muted disabled:opacity-50" disabled={isLoading}>
                   {isLoading ? '…' : '⋯'}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
@@ -312,7 +312,7 @@ function MembersList({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onSelect={() => handleRemove(m.userId, m.fullName || m.email)}
-                    className="text-red-600"
+                    className="text-destructive"
                   >
                     ลบออกจากทีม
                   </DropdownMenuItem>
@@ -336,7 +336,7 @@ export function OrgSettingsClient({ data }: { data: OrgData }) {
       {/* Org name */}
       {canManage && (
         <section className="space-y-3">
-          <h2 className="text-base font-semibold text-gray-800">ชื่อสถาบัน / ทีม</h2>
+          <h2 className="text-base font-semibold text-foreground">ชื่อสถาบัน / ทีม</h2>
           <RenameOrgForm currentName={data.org.name} />
         </section>
       )}
@@ -344,8 +344,8 @@ export function OrgSettingsClient({ data }: { data: OrgData }) {
       {/* Members */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">
-            สมาชิก <span className="text-gray-400 font-normal text-sm">({data.members.length} คน)</span>
+          <h2 className="text-base font-semibold text-foreground">
+            สมาชิก <span className="text-muted-foreground font-normal text-sm">({data.members.length} คน)</span>
           </h2>
         </div>
         <MembersList members={data.members} myRole={data.myRole} currentUserId={data.currentUserId} />
@@ -355,14 +355,14 @@ export function OrgSettingsClient({ data }: { data: OrgData }) {
       {canManage && (
         <>
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-gray-800">เชิญสมาชิกผ่านอีเมล</h2>
-            <p className="text-xs text-gray-500">ผู้ใช้ต้องสมัครบัญชีก่อนจึงจะเพิ่มได้</p>
+            <h2 className="text-base font-semibold text-foreground">เชิญสมาชิกผ่านอีเมล</h2>
+            <p className="text-xs text-muted-foreground">ผู้ใช้ต้องสมัครบัญชีก่อนจึงจะเพิ่มได้</p>
             <InviteByEmailForm />
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-gray-800">ลิงก์เชิญ</h2>
-            <p className="text-xs text-gray-500">ลิงก์มีอายุ 7 วัน ใครก็ตามที่มีลิงก์สามารถเข้าร่วมได้</p>
+            <h2 className="text-base font-semibold text-foreground">ลิงก์เชิญ</h2>
+            <p className="text-xs text-muted-foreground">ลิงก์มีอายุ 7 วัน ใครก็ตามที่มีลิงก์สามารถเข้าร่วมได้</p>
             <InviteLinkSection invites={data.invites} />
           </section>
         </>

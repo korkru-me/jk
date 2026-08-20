@@ -94,7 +94,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
             <Link
               href="/admin"
               onClick={onClose}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border border-amber-500/20"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20"
             >
               <span className="text-base">⚙️</span>
               Admin Panel
@@ -105,7 +105,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         {/* User info */}
         <div className="p-4 border-t shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
               {fullName.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">

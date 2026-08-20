@@ -82,14 +82,14 @@ export function CreateClassroomModal() {
                 onClick={() => setClassroomType('subject')}
                 className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
                   classroomType === 'subject'
-                    ? 'border-blue-500 bg-blue-50 text-blue-900'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                    ? 'border-primary bg-primary/10 text-blue-900'
+                    : 'border-border hover:border-ring text-muted-foreground'
                 }`}
               >
                 <BookOpen className="w-4 h-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium leading-tight">ห้องเรียนวิชา</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">มอบหมายการบ้าน สอบ ให้คะแนน</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">มอบหมายการบ้าน สอบ ให้คะแนน</p>
                 </div>
               </button>
               <button
@@ -97,14 +97,14 @@ export function CreateClassroomModal() {
                 onClick={() => setClassroomType('homeroom')}
                 className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
                   classroomType === 'homeroom'
-                    ? 'border-blue-500 bg-blue-50 text-blue-900'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                    ? 'border-primary bg-primary/10 text-blue-900'
+                    : 'border-border hover:border-ring text-muted-foreground'
                 }`}
               >
                 <Users className="w-4 h-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium leading-tight">ห้อง Homeroom</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">ครูที่ปรึกษาติดตามการส่งงานทุกวิชา</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">ครูที่ปรึกษาติดตามการส่งงานทุกวิชา</p>
                 </div>
               </button>
             </div>
@@ -117,7 +117,7 @@ export function CreateClassroomModal() {
 
           {/* Cover color picker */}
           <div>
-            <Label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
               <Palette className="w-3 h-3" /> สีหน้าปก
             </Label>
             <div className="flex gap-2">
@@ -136,7 +136,7 @@ export function CreateClassroomModal() {
 
           {/* Name */}
           <div className="space-y-1.5">
-            <Label htmlFor="new-name">ชื่อห้องเรียน <span className="text-red-500">*</span></Label>
+            <Label htmlFor="new-name">ชื่อห้องเรียน <span className="text-destructive">*</span></Label>
             <Input
               id="new-name"
               value={name}
@@ -158,14 +158,14 @@ export function CreateClassroomModal() {
                     onClick={() => setSubject(s.value === subject ? '' : s.value)}
                     className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
                       subject === s.value
-                        ? 'border-blue-500 bg-blue-50 text-blue-900'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        ? 'border-primary bg-primary/10 text-blue-900'
+                        : 'border-border hover:border-ring text-muted-foreground'
                     }`}
                   >
                     <span className="text-base leading-none mt-0.5">{s.label.split('  ')[0]}</span>
                     <div>
                       <p className="font-medium leading-tight">{s.label.split('  ')[1]}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{s.desc}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{s.desc}</p>
                     </div>
                   </button>
                 ))}

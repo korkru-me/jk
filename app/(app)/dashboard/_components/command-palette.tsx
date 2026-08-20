@@ -10,7 +10,7 @@ const CATEGORIES = [
   {
     label: 'ค้นหานักเรียน',
     icon: Users,
-    color: 'text-blue-500',
+    color: 'text-primary',
     items: [
       { name: 'อนุชา วงษ์ศรี — ม.4/1', sub: 'คะแนนเฉลี่ย 62%' },
       { name: 'พิมพ์ชนก รักดี — ม.5/2', sub: 'คะแนนเฉลี่ย 88%' },
@@ -30,7 +30,7 @@ const CATEGORIES = [
   {
     label: 'คำสั่งด่วน',
     icon: Zap,
-    color: 'text-amber-500',
+    color: 'text-warning',
     items: [
       { name: 'สร้างโจทย์ข้อใหม่', sub: 'เปิด Question Editor', href: '/questions/new', icon: Plus },
       { name: 'จัดชุดข้อสอบ', sub: 'ดึงจากคลัง', href: '/assignments/new', icon: FileText },
@@ -80,20 +80,20 @@ export function CommandPalette() {
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl ring-1 ring-black/10 overflow-hidden"
+        className="relative w-full max-w-xl mx-4 bg-card rounded-2xl shadow-2xl ring-1 ring-border overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-          <Search className="w-4 h-4 text-gray-400 shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="ค้นหานักเรียน, โจทย์, หรือคำสั่ง..."
-            className="flex-1 text-sm outline-none bg-transparent text-gray-800 placeholder:text-gray-400"
+            className="flex-1 text-sm outline-none bg-transparent text-foreground placeholder:text-muted-foreground"
           />
-          <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600">
+          <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-muted-foreground">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -101,13 +101,13 @@ export function CommandPalette() {
         {/* Results */}
         <div className="max-h-[60vh] overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-gray-400">ไม่พบผลลัพธ์</p>
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">ไม่พบผลลัพธ์</p>
           ) : (
             filtered.map(cat => (
               <div key={cat.label} className="mb-1">
                 <div className="flex items-center gap-2 px-4 py-1.5">
                   <cat.icon className={`w-3.5 h-3.5 ${cat.color}`} />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     {cat.label}
                   </span>
                 </div>
@@ -116,27 +116,27 @@ export function CommandPalette() {
                   return (
                     <button
                       key={i}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left group transition-colors"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted text-left group transition-colors"
                       onClick={() => {
                         if ((item as any).href) window.location.href = (item as any).href
                         setOpen(false)
                       }}
                     >
                       {ItemIcon && (
-                        <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                          <ItemIcon className="w-3.5 h-3.5 text-gray-600" />
+                        <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <ItemIcon className="w-3.5 h-3.5 text-muted-foreground" />
                         </div>
                       )}
                       {!ItemIcon && (
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center shrink-0 text-xs font-bold text-blue-600">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
                           {item.name.charAt(0)}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
-                        <p className="text-xs text-gray-400 truncate">{item.sub}</p>
+                        <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{item.sub}</p>
                       </div>
-                      <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 shrink-0" />
+                      <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-muted-foreground shrink-0" />
                     </button>
                   )
                 })}
@@ -146,17 +146,17 @@ export function CommandPalette() {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-100 bg-gray-50/50">
-          <span className="text-xs text-gray-400">
-            <kbd className="px-1.5 py-0.5 text-xs bg-white border border-gray-200 rounded font-mono">↑↓</kbd>
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-muted/50">
+          <span className="text-xs text-muted-foreground">
+            <kbd className="px-1.5 py-0.5 text-xs bg-card border border-border rounded font-mono">↑↓</kbd>
             {' '}เลือก
           </span>
-          <span className="text-xs text-gray-400">
-            <kbd className="px-1.5 py-0.5 text-xs bg-white border border-gray-200 rounded font-mono">↵</kbd>
+          <span className="text-xs text-muted-foreground">
+            <kbd className="px-1.5 py-0.5 text-xs bg-card border border-border rounded font-mono">↵</kbd>
             {' '}เปิด
           </span>
-          <span className="text-xs text-gray-400">
-            <kbd className="px-1.5 py-0.5 text-xs bg-white border border-gray-200 rounded font-mono">Esc</kbd>
+          <span className="text-xs text-muted-foreground">
+            <kbd className="px-1.5 py-0.5 text-xs bg-card border border-border rounded font-mono">Esc</kbd>
             {' '}ปิด
           </span>
         </div>

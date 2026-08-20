@@ -56,10 +56,10 @@ function formatDisplay(s: string): string {
 
 const BTN_BASE = 'flex items-center justify-center rounded-xl text-sm font-semibold h-10 transition-all active:scale-95 select-none cursor-pointer'
 const BTN_NUM = `${BTN_BASE} bg-muted hover:bg-muted/80 text-foreground`
-const BTN_OP  = `${BTN_BASE} bg-blue-600/15 hover:bg-blue-600/25 text-blue-700 dark:text-blue-300`
+const BTN_OP  = `${BTN_BASE} bg-primary/15 hover:bg-primary/25 text-primary`
 const BTN_FN  = `${BTN_BASE} bg-muted/60 hover:bg-muted text-foreground/80 text-xs`
-const BTN_EQ  = `${BTN_BASE} bg-blue-600 hover:bg-blue-700 text-white col-span-2`
-const BTN_CLR = `${BTN_BASE} bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-400`
+const BTN_EQ  = `${BTN_BASE} bg-primary hover:bg-primary/90 text-white col-span-2`
+const BTN_CLR = `${BTN_BASE} bg-destructive/15 hover:bg-destructive/25 text-destructive`
 
 export function Calculator({ onClose }: CalculatorProps) {
   const [expr, setExpr] = useState('')
@@ -176,7 +176,7 @@ export function Calculator({ onClose }: CalculatorProps) {
         </div>
         <div className="text-right mt-1">
           <p className={`text-2xl font-black font-mono truncate ${
-            result === 'Error' ? 'text-destructive' : result ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground/40'
+            result === 'Error' ? 'text-destructive' : result ? 'text-primary' : 'text-muted-foreground/40'
           }`}>
             {result || '—'}
           </p>
@@ -190,7 +190,7 @@ export function Calculator({ onClose }: CalculatorProps) {
           <button
             onClick={() => setMode(m => m === 'DEG' ? 'RAD' : 'DEG')}
             className={`${BTN_FN} text-[10px] font-bold rounded-xl h-8 col-span-1 ${
-              mode === 'DEG' ? 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              mode === 'DEG' ? 'bg-primary/15 text-primary' : 'bg-warning/15 text-warning'
             }`}
           >
             {mode}

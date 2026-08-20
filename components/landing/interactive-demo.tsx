@@ -115,8 +115,8 @@ function PhysicsDemo() {
             className={cn(
               'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
               i === tplIdx
-                ? 'bg-indigo-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                ? 'bg-primary text-white'
+                : 'border border-border bg-card text-muted-foreground hover:border-primary/20 hover:text-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
             )}
           >
             {f.formula} — {f.name}
@@ -125,22 +125,22 @@ function PhysicsDemo() {
       </div>
 
       {/* Question card */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-xl border border-border bg-card p-4 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-start justify-between mb-3">
-          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary dark:bg-indigo-950/60">
             <Calculator className="h-3 w-3" />
             {tpl.name}
           </span>
           <button
             onClick={randomize}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
           >
             <Shuffle className="h-3 w-3" />
             สุ่มตัวเลขใหม่
           </button>
         </div>
 
-        <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed mb-3">
+        <p className="text-sm text-muted-foreground leading-relaxed mb-3">
           {tpl.description(vals, res)}
         </p>
 
@@ -149,7 +149,7 @@ function PhysicsDemo() {
           {tpl.vars.map((v) => (
             <span
               key={v.key}
-              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-mono font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400"
+              className="inline-flex items-center gap-1 rounded-lg border border-success/20 bg-success/10 px-2.5 py-1 text-xs font-mono font-semibold text-success dark:border-emerald-800/50 dark:bg-emerald-950/40"
             >
               {v.key} = {vals[v.key]} {v.unit}
             </span>
@@ -160,22 +160,22 @@ function PhysicsDemo() {
         {!revealed ? (
           <button
             onClick={() => setRevealed(true)}
-            className="w-full rounded-lg border-2 border-dashed border-slate-200 py-3 text-sm text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors dark:border-slate-700 dark:hover:border-indigo-600"
+            className="w-full rounded-lg border-2 border-dashed border-border py-3 text-sm text-muted-foreground hover:border-primary/20 hover:text-primary transition-colors dark:border-slate-700 dark:hover:border-primary"
           >
             กดเพื่อดูเฉลย
           </button>
         ) : (
-          <div className="flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 dark:bg-emerald-950/30">
-            <Zap className="h-4 w-4 text-emerald-500" />
-            <span className="text-sm text-slate-600 dark:text-slate-300">คำตอบ:</span>
-            <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center gap-3 rounded-lg bg-success/10 px-4 py-3 dark:bg-emerald-950/30">
+            <Zap className="h-4 w-4 text-success" />
+            <span className="text-sm text-muted-foreground">คำตอบ:</span>
+            <span className="text-lg font-bold text-success">
               {res.label} = {res.value.toFixed(2)} {res.unit}
             </span>
           </div>
         )}
       </div>
 
-      <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+      <p className="text-xs text-muted-foreground text-center">
         นักเรียนแต่ละคนจะได้รับตัวเลขต่างกัน — ระบบตรวจคะแนนอัตโนมัติโดยไม่ต้องตรวจด้วยมือ
       </p>
     </div>
@@ -192,9 +192,9 @@ const INITIAL_CARDS = [
 ]
 
 const LEVEL_CLS: Record<string, string> = {
-  ง่าย: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
-  ปานกลาง: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
-  ยาก: 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+  ง่าย: 'bg-success/10 text-success dark:bg-emerald-950/60',
+  ปานกลาง: 'bg-warning/10 text-warning dark:bg-amber-950/60',
+  ยาก: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
 }
 
 function DragDemo() {
@@ -227,7 +227,7 @@ function DragDemo() {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="text-xs text-muted-foreground">
         ลากวางเพื่อจัดลำดับข้อสอบในชุด — ตัวอย่างการจัดการชุดข้อสอบ
       </p>
       {cards.map((card, idx) => (
@@ -239,33 +239,33 @@ function DragDemo() {
           onDrop={() => onDrop(card.id)}
           onDragEnd={() => { setDragging(null); setOver(null) }}
           className={cn(
-            'flex items-center gap-3 rounded-xl border bg-white p-3.5 cursor-grab active:cursor-grabbing transition-all select-none',
+            'flex items-center gap-3 rounded-xl border bg-card p-3.5 cursor-grab active:cursor-grabbing transition-all select-none',
             'dark:bg-slate-900',
             dragging === card.id
-              ? 'opacity-50 scale-95 border-indigo-300 dark:border-indigo-700'
+              ? 'opacity-50 scale-95 border-primary/20'
               : over === card.id
-                ? 'border-indigo-400 ring-2 ring-indigo-100 dark:border-indigo-600 dark:ring-indigo-900/50'
-                : 'border-slate-200 dark:border-slate-700',
+                ? 'border-primary ring-2 ring-indigo-100 dark:border-primary dark:ring-indigo-900/50'
+                : 'border-border',
           )}
         >
-          <GripVertical className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+          <GripVertical className="h-4 w-4 shrink-0 text-slate-300" />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary dark:bg-indigo-950/60">
             {idx + 1}
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+            <p className="text-sm font-medium text-foreground truncate">
               {card.topic}
             </p>
           </div>
           <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', LEVEL_CLS[card.level])}>
             {card.level}
           </span>
-          <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">
+          <span className="text-xs text-muted-foreground shrink-0">
             {card.points} คะแนน
           </span>
         </div>
       ))}
-      <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+      <p className="text-xs text-muted-foreground text-center">
         รวม {cards.reduce((s, c) => s + c.points, 0)} คะแนน
       </p>
     </div>
@@ -278,27 +278,27 @@ export function InteractiveDemo() {
   const [tab, setTab] = useState<'physics' | 'drag'>('physics')
 
   return (
-    <section className="bg-white py-20 dark:bg-slate-950">
+    <section className="bg-card py-20 dark:bg-slate-950">
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">
+          <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
             ทดลองใช้งานได้เลย ไม่ต้องล็อกอิน
           </h2>
-          <p className="mt-3 text-slate-500 dark:text-slate-400">
+          <p className="mt-3 text-muted-foreground">
             สัมผัสประสบการณ์จริงก่อนตัดสินใจ ฟีเจอร์หลักทั้งสองอยู่ด้านล่างนี้
           </p>
         </div>
 
         <div className="mx-auto max-w-2xl">
           {/* Tabs */}
-          <div className="mb-6 flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-6 flex rounded-xl border border-border bg-muted p-1 dark:border-slate-700 dark:bg-slate-900">
             <button
               onClick={() => setTab('physics')}
               className={cn(
                 'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
                 tab === 'physics'
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
+                  ? 'bg-card text-foreground shadow-sm dark:bg-slate-800 dark:text-white'
+                  : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-slate-200',
               )}
             >
               สุ่มตัวเลขฟิสิกส์
@@ -308,8 +308,8 @@ export function InteractiveDemo() {
               className={cn(
                 'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
                 tab === 'drag'
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
+                  ? 'bg-card text-foreground shadow-sm dark:bg-slate-800 dark:text-white'
+                  : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-slate-200',
               )}
             >
               จัดลำดับข้อสอบ

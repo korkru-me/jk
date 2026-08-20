@@ -15,8 +15,8 @@ const QUESTION_TYPES = [
     icon: ListChecks,
     title: 'ปรนัย (เลือกตอบ)',
     desc: 'ตัวเลือก 2–6 ข้อ นักเรียนเลือกคำตอบที่ถูกต้องจากรายการ',
-    color: 'bg-green-50 border-green-200 text-green-700',
-    iconColor: 'text-green-500',
+    color: 'bg-success/10 border-success/20 text-success',
+    iconColor: 'text-success',
   },
   {
     href: '/questions/new/true-false',
@@ -39,8 +39,8 @@ const QUESTION_TYPES = [
     icon: ArrowUpDown,
     title: 'เรียงลำดับ',
     desc: 'นักเรียนเรียงรายการ ขั้นตอน หรือเหตุการณ์ให้ถูกลำดับ',
-    color: 'bg-amber-50 border-amber-200 text-amber-700',
-    iconColor: 'text-amber-500',
+    color: 'bg-warning/10 border-warning/20 text-warning',
+    iconColor: 'text-warning',
   },
   {
     href: '/questions/new/matching',
@@ -71,8 +71,8 @@ const QUESTION_TYPES = [
     icon: Blocks,
     title: 'โจทย์ผสม (หลายรูปแบบ)',
     desc: 'รวมคำถามถูก-ผิด เติมคำ เรียงลำดับ ปรนัย ฯลฯ ไว้ในโจทย์เดียวกัน ภายใต้โจทย์หลักเดียว',
-    color: 'bg-slate-50 border-slate-200 text-slate-700',
-    iconColor: 'text-slate-500',
+    color: 'bg-muted border-border text-muted-foreground',
+    iconColor: 'text-muted-foreground',
   },
 ]
 
@@ -80,8 +80,8 @@ export default function NewQuestionTypePage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">สร้างโจทย์ใหม่</h1>
-        <p className="text-sm text-gray-500 mt-1">เลือกประเภทโจทย์ที่ต้องการสร้าง</p>
+        <h1 className="text-2xl font-bold text-foreground">สร้างโจทย์ใหม่</h1>
+        <p className="text-sm text-muted-foreground mt-1">เลือกประเภทโจทย์ที่ต้องการสร้าง</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

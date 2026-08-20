@@ -200,7 +200,7 @@ export function ClassroomScoresMatrix({
 
   if (assignments.length === 0) {
     return (
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 py-12 text-center text-sm text-gray-400">
+      <div className="bg-card rounded-2xl ring-1 ring-border py-12 text-center text-sm text-muted-foreground">
         ยังไม่มีงานที่มอบหมายให้ห้องนี้
       </div>
     )
@@ -220,7 +220,7 @@ export function ClassroomScoresMatrix({
               key={f.key}
               onClick={() => setTypeFilter(f.key)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
               }`}
             >
               {f.label}
@@ -230,12 +230,12 @@ export function ClassroomScoresMatrix({
 
         {visibleAssignments.length > 0 && (
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all outline-none">
+            <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:bg-accent transition-all outline-none">
               <Download className="w-3.5 h-3.5" /> ส่งออกข้อมูล <ChevronDown className="w-3 h-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="max-w-64">
               <DropdownMenuItem onClick={exportAll}>
-                <Download className="w-3.5 h-3.5 text-gray-400" /> ส่งออกทั้งหมด (ตามตารางนี้)
+                <Download className="w-3.5 h-3.5 text-muted-foreground" /> ส่งออกทั้งหมด (ตามตารางนี้)
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
@@ -251,25 +251,25 @@ export function ClassroomScoresMatrix({
         )}
       </div>
 
-      <p className="flex items-center gap-1.5 text-xs text-gray-400">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Info className="w-3.5 h-3.5 shrink-0" />
-        รายชื่อเรียงตาม<strong className="font-semibold text-gray-500">{sortLabel}</strong> ({sortDir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'}) ตามที่ตั้งไว้ที่แท็บ
+        รายชื่อเรียงตาม<strong className="font-semibold text-muted-foreground">{sortLabel}</strong> ({sortDir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'}) ตามที่ตั้งไว้ที่แท็บ
         {onViewStudents ? (
-          <button onClick={onViewStudents} className="text-blue-600 hover:underline font-medium">
+          <button onClick={onViewStudents} className="text-primary hover:underline font-medium">
             &ldquo;นักเรียน&rdquo;
           </button>
         ) : (
-          <span className="font-medium text-gray-500">&ldquo;นักเรียน&rdquo;</span>
+          <span className="font-medium text-muted-foreground">&ldquo;นักเรียน&rdquo;</span>
         )}
         — ไปเปลี่ยนได้ที่นั่น
       </p>
 
       {visibleAssignments.length === 0 ? (
-        <div className="bg-white rounded-2xl ring-1 ring-black/5 py-12 text-center text-sm text-gray-400">
+        <div className="bg-card rounded-2xl ring-1 ring-border py-12 text-center text-sm text-muted-foreground">
           ไม่พบงานที่ตรงกับตัวกรอง
         </div>
       ) : (
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-x-auto">
+      <div className="bg-card rounded-2xl ring-1 ring-border overflow-x-auto">
         {/* border-separate (not -collapse): sticky positioning on table
             cells doesn't reliably paint over a collapsed border seam, which
             let scrolled-under content show through the gap between the
@@ -280,10 +280,10 @@ export function ClassroomScoresMatrix({
                 separated-borders table model (needed above) doesn't render
                 borders set directly on rows. */}
             <tr>
-              <th className="sticky left-0 z-20 bg-white text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-16 min-w-16 max-w-16 border-b border-gray-100">
+              <th className="sticky left-0 z-20 bg-card text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16 min-w-16 max-w-16 border-b border-border">
                 ลำดับ
               </th>
-              <th className="sticky left-16 z-20 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[180px] border-b border-gray-100">
+              <th className="sticky left-16 z-20 bg-card text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px] border-b border-border">
                 นักเรียน
               </th>
               {visibleAssignments.map(a => {
@@ -292,7 +292,7 @@ export function ClassroomScoresMatrix({
                   return !sub || (sub.status !== 'submitted' && sub.status !== 'graded')
                 })
                 return (
-                  <th key={a.id} className="px-3 py-3 text-center min-w-[140px] border-b border-gray-100">
+                  <th key={a.id} className="px-3 py-3 text-center min-w-[140px] border-b border-border">
                     <input
                       type="number"
                       min={1}
@@ -303,9 +303,9 @@ export function ClassroomScoresMatrix({
                       disabled={isOrderPending}
                       placeholder="-"
                       title="ลำดับคอลัมน์ (ยิ่งน้อยยิ่งอยู่ซ้าย)"
-                      className="w-10 mx-auto mb-1 block text-xs text-center rounded-lg border border-gray-200 py-0.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                      className="w-10 mx-auto mb-1 block text-xs text-center rounded-lg border border-border py-0.5 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
                     />
-                    <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-gray-700 hover:text-blue-600 line-clamp-2">
+                    <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
                       {a.title}
                     </Link>
                     <button
@@ -313,8 +313,8 @@ export function ClassroomScoresMatrix({
                       disabled={!hasNonSubmitter || reminding === a.id}
                       className={`mt-1.5 mx-auto flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
                         hasNonSubmitter
-                          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                          : 'bg-gray-50 text-gray-300 cursor-default'
+                          ? 'bg-warning/10 text-warning hover:bg-warning/10'
+                          : 'bg-muted text-gray-300 cursor-default'
                       }`}
                     >
                       <Bell className="w-2.5 h-2.5" />
@@ -327,13 +327,13 @@ export function ClassroomScoresMatrix({
           </thead>
           <tbody>
             {orderedStudents.map((student, index) => (
-              <tr key={student.id} className="hover:bg-gray-50/50">
-                <td className="sticky left-0 z-10 bg-white px-2 py-2.5 text-center text-sm text-gray-500 w-16 min-w-16 max-w-16 border-b border-gray-50">
+              <tr key={student.id} className="hover:bg-muted/50">
+                <td className="sticky left-0 z-10 bg-card px-2 py-2.5 text-center text-sm text-muted-foreground w-16 min-w-16 max-w-16 border-b border-border">
                   {index + 1}
                 </td>
-                <td className="sticky left-16 z-10 bg-white px-4 py-2.5 border-b border-gray-50">
-                  <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">{student.full_name}</p>
-                  <p className="text-xs text-gray-400 truncate max-w-[160px]">{student.email}</p>
+                <td className="sticky left-16 z-10 bg-card px-4 py-2.5 border-b border-border">
+                  <p className="text-sm font-medium text-foreground truncate max-w-[160px]">{student.full_name}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-[160px]">{student.email}</p>
                 </td>
                 {visibleAssignments.map(a => {
                   const sub = bestSubmission.get(subKey(a.id, student.id))
@@ -345,12 +345,12 @@ export function ClassroomScoresMatrix({
                     : null
 
                   return (
-                    <td key={a.id} className="px-3 py-2.5 text-center group relative border-b border-gray-50">
+                    <td key={a.id} className="px-3 py-2.5 text-center group relative border-b border-border">
                       {submitted ? (
                         <Link
                           href={`/submissions/${sub!.id}`}
                           className={`flex items-center justify-center gap-1 hover:underline ${
-                            passed === false ? 'text-red-500' : 'text-emerald-600'
+                            passed === false ? 'text-destructive' : 'text-success'
                           }`}
                         >
                           {passed === false ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -359,7 +359,7 @@ export function ClassroomScoresMatrix({
                           </span>
                         </Link>
                       ) : inProgress ? (
-                        <div className="flex items-center justify-center gap-1 text-blue-500">
+                        <div className="flex items-center justify-center gap-1 text-primary">
                           <CircleDashed className="w-3.5 h-3.5" />
                           <span className="text-xs">กำลังทำ</span>
                         </div>

@@ -55,8 +55,8 @@ export default async function MultiStepEditPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">แก้ไขโจทย์หลายขั้นตอน</h1>
-        <p className="text-sm text-gray-500 mt-1">{subQs.length} ข้อย่อย</p>
+        <h1 className="text-2xl font-bold text-foreground">แก้ไขโจทย์หลายขั้นตอน</h1>
+        <p className="text-sm text-muted-foreground mt-1">{subQs.length} ข้อย่อย</p>
       </div>
       <MultiStepEditor
         mode="edit"

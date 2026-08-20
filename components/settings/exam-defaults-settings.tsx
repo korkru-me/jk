@@ -26,7 +26,7 @@ function Toggle({ checked, onChange, label, description }: {
           checked ? 'bg-primary' : 'bg-muted-foreground/30'
         }`}
       >
-        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-card shadow-sm transition-transform ${
           checked ? 'translate-x-6' : 'translate-x-1'
         }`} />
       </button>
@@ -194,9 +194,9 @@ export function ExamDefaultsSettings() {
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    defaults.passingPercent >= 80 ? 'bg-red-500' :
-                    defaults.passingPercent >= 60 ? 'bg-amber-500' :
-                    'bg-green-500'
+                    defaults.passingPercent >= 80 ? 'bg-destructive' :
+                    defaults.passingPercent >= 60 ? 'bg-warning' :
+                    'bg-success'
                   }`}
                   style={{ width: `${defaults.passingPercent}%` }}
                 />
@@ -204,9 +204,9 @@ export function ExamDefaultsSettings() {
               <div className="flex justify-between text-[10px] text-muted-foreground">
                 <span>0%</span>
                 <span className={`font-semibold ${
-                  defaults.passingPercent >= 80 ? 'text-red-500' :
-                  defaults.passingPercent >= 60 ? 'text-amber-500' :
-                  'text-green-500'
+                  defaults.passingPercent >= 80 ? 'text-destructive' :
+                  defaults.passingPercent >= 60 ? 'text-warning' :
+                  'text-success'
                 }`}>{defaults.passingPercent}%</span>
                 <span>100%</span>
               </div>

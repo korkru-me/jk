@@ -151,7 +151,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                     href={`/classrooms/${c.id}`}
                     className="flex items-center gap-5 bg-gradient-to-r from-slate-800 via-slate-800 to-indigo-900 rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
                       <Home className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -183,7 +183,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                   <Link
                     key={c.id}
                     href={`/classrooms/${c.id}`}
-                    className="block p-5 bg-card border rounded-2xl hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                    className="block p-5 bg-card border rounded-2xl hover:border-primary/20 dark:hover:border-blue-800 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold truncate">{c.name}</p>
@@ -193,7 +193,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description}</p>
                     )}
                     {pending > 0 && (
-                      <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+                      <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                         {pending} รอทำ
                       </span>
                     )}

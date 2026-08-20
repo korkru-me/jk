@@ -209,17 +209,17 @@ const TICKET_STATUS_CONFIG: Record<
 > = {
   open: {
     label: 'รอการตอบกลับ',
-    cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+    cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
     icon: Clock,
   },
   in_progress: {
     label: 'กำลังดำเนินการ',
-    cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300',
+    cls: 'bg-primary/10 text-primary dark:bg-blue-950/60',
     icon: MessageSquare,
   },
   resolved: {
     label: 'แก้ไขแล้ว',
-    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
+    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
     icon: CheckCircle2,
   },
 }
@@ -227,7 +227,7 @@ const TICKET_STATUS_CONFIG: Record<
 const PRIORITY_CONFIG: Record<TicketPriority, { label: string; cls: string }> = {
   critical: {
     label: 'Critical',
-    cls: 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+    cls: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
   },
   high: {
     label: 'High',
@@ -235,11 +235,11 @@ const PRIORITY_CONFIG: Record<TicketPriority, { label: string; cls: string }> = 
   },
   medium: {
     label: 'Medium',
-    cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
+    cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
   },
   low: {
     label: 'Low',
-    cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
   },
 }
 
@@ -253,17 +253,17 @@ function UserRow({ user }: { user: AppUser }) {
   const [suspended, setSuspended] = useState(user.status === 'suspended')
 
   return (
-    <tr className="border-t border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+    <tr className="border-t border-border/60 hover:bg-muted dark:hover:bg-slate-800/40 transition-colors">
       <td className="px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-slate-900 dark:text-white">{user.name}</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">{user.email}</p>
+          <p className="text-sm font-medium text-foreground">{user.name}</p>
+          <p className="text-xs text-muted-foreground">{user.email}</p>
         </div>
       </td>
-      <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+      <td className="px-4 py-3 text-xs text-muted-foreground">
         {ROLE_LABEL[user.role]}
       </td>
-      <td className="px-4 py-3 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+      <td className="px-4 py-3 text-xs font-medium text-primary">
         {user.tenant}
       </td>
       <td className="px-4 py-3">
@@ -271,24 +271,24 @@ function UserRow({ user }: { user: AppUser }) {
           className={cn(
             'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
             suspended
-              ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400'
-              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+              ? 'bg-destructive/10 text-destructive dark:bg-red-950/60'
+              : 'bg-success/10 text-success dark:bg-emerald-950/60',
           )}
         >
           {suspended ? 'Suspended' : 'Active'}
         </span>
       </td>
-      <td className="px-4 py-3 text-xs text-slate-400 dark:text-slate-500">
+      <td className="px-4 py-3 text-xs text-muted-foreground">
         {user.lastSeen}
       </td>
-      <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300 tabular-nums">
+      <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
         {user.submissions.toLocaleString()}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <button
             title="Log in as user (Impersonate)"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-500 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-primary dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300"
             onClick={() =>
               alert(
                 `[Impersonate] กำลังเข้าสู่ระบบในนามของ ${user.email}\n\nในระบบจริงจะสร้าง signed impersonation token และ redirect`,
@@ -303,8 +303,8 @@ function UserRow({ user }: { user: AppUser }) {
             className={cn(
               'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
               suspended
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400',
+                ? 'border-success/20 bg-success/10 text-success hover:bg-success/10 dark:bg-emerald-950/40'
+                : 'border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/10 dark:bg-red-950/40',
             )}
           >
             {suspended ? (
@@ -330,15 +330,15 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
   const StatusIcon = sc.icon
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700/60 dark:bg-slate-900 overflow-hidden">
+    <div className="rounded-xl border border-border bg-card dark:border-slate-700/60 dark:bg-slate-900 overflow-hidden">
       <div
         className="flex items-start gap-3 p-4 cursor-pointer"
         onClick={() => setExpanded((v) => !v)}
       >
-        <StatusIcon className="h-4 w-4 mt-0.5 shrink-0 text-slate-400" />
+        <StatusIcon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white leading-snug">
+            <p className="text-sm font-semibold text-foreground leading-snug">
               {ticket.subject}
             </p>
             <div className="flex shrink-0 items-center gap-2">
@@ -360,19 +360,19 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
               </span>
             </div>
           </div>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {ticket.id} · {ticket.userName} · {ticket.tenant} · {ticket.createdAt}
           </p>
           {expanded && (
-            <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800 p-3">
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <div className="mt-3 rounded-lg bg-muted p-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 {ticket.message}
               </p>
               <div className="mt-3 flex gap-2">
-                <button className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors">
+                <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 transition-colors">
                   ตอบกลับ
                 </button>
-                <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <button className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
                   เปลี่ยนสถานะ
                 </button>
               </div>
@@ -381,7 +381,7 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
         </div>
         <ChevronDown
           className={cn(
-            'h-4 w-4 shrink-0 text-slate-400 transition-transform',
+            'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
             expanded && 'rotate-180',
           )}
         />
@@ -415,34 +415,34 @@ export function UserSupport() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-foreground">
               ผู้ใช้งานทั้งหมด
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               จัดการบัญชี · Suspend · Impersonate
             </p>
           </div>
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={userSearch}
             onChange={(e) => setUserSearch(e.target.value)}
             placeholder="ค้นหาชื่อ อีเมล หรือ Tenant"
-            className="w-full max-w-sm rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+            className="w-full max-w-sm rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/60">
-          <table className="w-full text-sm bg-white dark:bg-slate-900">
+        <div className="overflow-x-auto rounded-xl border border-border/60">
+          <table className="w-full text-sm bg-card">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60">
+              <tr className="bg-muted/60">
                 {['ผู้ใช้', 'บทบาท', 'Tenant', 'สถานะ', 'เข้าล่าสุด', 'Submissions', 'การจัดการ'].map(
                   (h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400"
+                      className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
                     >
                       {h}
                     </th>
@@ -458,7 +458,7 @@ export function UserSupport() {
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-4 py-10 text-center text-sm text-slate-400"
+                    className="px-4 py-10 text-center text-sm text-muted-foreground"
                   >
                     ไม่พบผู้ใช้งานที่ตรงกับเงื่อนไข
                   </td>
@@ -472,10 +472,10 @@ export function UserSupport() {
       {/* Support Tickets Section */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-foreground">
             Support Tickets
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             คำร้องเรียนและปัญหาจากลูกค้า
           </p>
         </div>
@@ -483,9 +483,9 @@ export function UserSupport() {
         {/* Ticket Status Summary */}
         <div className="grid grid-cols-3 gap-3 sm:max-w-lg">
           {[
-            { label: 'รอการตอบกลับ', count: openCount, status: 'open' as TicketStatus, cls: 'text-amber-600 dark:text-amber-400' },
-            { label: 'กำลังดำเนินการ', count: inProgressCount, status: 'in_progress' as TicketStatus, cls: 'text-blue-600 dark:text-blue-400' },
-            { label: 'แก้ไขแล้ว', count: resolvedCount, status: 'resolved' as TicketStatus, cls: 'text-emerald-600 dark:text-emerald-400' },
+            { label: 'รอการตอบกลับ', count: openCount, status: 'open' as TicketStatus, cls: 'text-warning' },
+            { label: 'กำลังดำเนินการ', count: inProgressCount, status: 'in_progress' as TicketStatus, cls: 'text-primary' },
+            { label: 'แก้ไขแล้ว', count: resolvedCount, status: 'resolved' as TicketStatus, cls: 'text-success' },
           ].map((item) => (
             <button
               key={item.status}
@@ -495,13 +495,13 @@ export function UserSupport() {
               className={cn(
                 'rounded-xl border p-3 text-left transition-all',
                 ticketStatus === item.status
-                  ? 'border-indigo-400 ring-2 ring-indigo-100 dark:ring-indigo-900/50'
-                  : 'border-slate-200 dark:border-slate-700/60',
-                'bg-white dark:bg-slate-900',
+                  ? 'border-primary ring-2 ring-indigo-100 dark:ring-indigo-900/50'
+                  : 'border-border/60',
+                'bg-card',
               )}
             >
               <p className={cn('text-2xl font-bold', item.cls)}>{item.count}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {item.label}
               </p>
             </button>
@@ -513,8 +513,8 @@ export function UserSupport() {
             <TicketCard key={t.id} ticket={t} />
           ))}
           {filteredTickets.length === 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-10 text-center dark:border-slate-700/60 dark:bg-slate-900">
-              <p className="text-sm text-slate-400">ไม่มี Ticket ในสถานะนี้</p>
+            <div className="rounded-xl border border-border bg-card p-10 text-center dark:border-slate-700/60 dark:bg-slate-900">
+              <p className="text-sm text-muted-foreground">ไม่มี Ticket ในสถานะนี้</p>
             </div>
           )}
         </div>

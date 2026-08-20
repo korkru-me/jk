@@ -9,17 +9,17 @@ interface Student { id: string; name: string; initials: string }
 interface Group { id: string; name: string; students: Student[] }
 
 const GROUP_COLORS = [
-  'border-blue-200 bg-blue-50/50',
+  'border-primary/20 bg-primary/10',
   'border-violet-200 bg-violet-50/50',
-  'border-emerald-200 bg-emerald-50/50',
-  'border-amber-200 bg-amber-50/50',
+  'border-success/20 bg-success/10',
+  'border-warning/20 bg-warning/10',
   'border-rose-200 bg-rose-50/50',
 ]
 const GROUP_HEADER_COLORS = [
-  'bg-blue-100 text-blue-700',
+  'bg-primary/10 text-primary',
   'bg-violet-100 text-violet-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-amber-100 text-amber-700',
+  'bg-success/10 text-success',
+  'bg-warning/10 text-warning',
   'bg-rose-100 text-rose-700',
 ]
 
@@ -109,14 +109,14 @@ export function BreakoutGroups({ students }: Props) {
     <div
       draggable
       onDragStart={() => startDrag(s.id, fromGroupId)}
-      className={`flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2 py-1 cursor-grab active:cursor-grabbing select-none hover:border-blue-300 hover:bg-blue-50/50 transition-colors ${
+      className={`flex items-center gap-1.5 bg-card border border-border rounded-lg px-2 py-1 cursor-grab active:cursor-grabbing select-none hover:border-primary/20 hover:bg-primary/10 transition-colors ${
         dragging?.studentId === s.id ? 'opacity-40' : ''
       }`}
     >
-      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-100 to-violet-100 flex items-center justify-center text-[9px] font-bold text-blue-600 shrink-0">
+      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-100 to-violet-100 flex items-center justify-center text-[9px] font-bold text-primary shrink-0">
         {s.initials}
       </span>
-      <span className="text-xs text-gray-700 whitespace-nowrap">{s.name}</span>
+      <span className="text-xs text-muted-foreground whitespace-nowrap">{s.name}</span>
     </div>
   )
 
@@ -130,7 +130,7 @@ export function BreakoutGroups({ students }: Props) {
         <Button size="sm" variant="outline" onClick={addGroup} className="gap-1.5">
           <Plus className="w-3.5 h-3.5" /> เพิ่มกลุ่ม
         </Button>
-        <span className="ml-auto text-xs text-gray-400">
+        <span className="ml-auto text-xs text-muted-foreground">
           ลากรายชื่อนักเรียนเข้ากลุ่มได้เลย
         </span>
       </div>
@@ -141,13 +141,13 @@ export function BreakoutGroups({ students }: Props) {
           onDragOver={e => e.preventDefault()}
           onDrop={dropOnUnassigned}
           className={`border-2 border-dashed rounded-2xl p-4 min-h-[200px] transition-colors ${
-            dragging?.fromGroupId !== null ? 'border-blue-300 bg-blue-50/30' : 'border-gray-200 bg-gray-50'
+            dragging?.fromGroupId !== null ? 'border-primary/20 bg-primary/10' : 'border-border bg-muted'
           }`}
         >
           <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-gray-400" />
-            <p className="text-sm font-semibold text-gray-700">ยังไม่ได้จัดกลุ่ม</p>
-            <span className="ml-auto text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{unassigned.length}</span>
+            <Users className="w-4 h-4 text-muted-foreground" />
+            <p className="text-sm font-semibold text-muted-foreground">ยังไม่ได้จัดกลุ่ม</p>
+            <span className="ml-auto text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">{unassigned.length}</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {unassigned.map(s => <StudentChip key={s.id} s={s} fromGroupId={null} />)}
@@ -165,17 +165,17 @@ export function BreakoutGroups({ students }: Props) {
               onDragOver={e => e.preventDefault()}
               onDrop={() => dropOnGroup(group.id)}
               className={`border-2 rounded-2xl p-3 min-h-[140px] transition-colors ${
-                dragging ? 'border-blue-300' : GROUP_COLORS[idx % GROUP_COLORS.length]
+                dragging ? 'border-primary/20' : GROUP_COLORS[idx % GROUP_COLORS.length]
               }`}
             >
               <div className="flex items-center gap-2 mb-2.5">
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${GROUP_HEADER_COLORS[idx % GROUP_HEADER_COLORS.length]}`}>
                   {group.name}
                 </span>
-                <span className="text-[10px] text-gray-400 ml-1">{group.students.length} คน</span>
+                <span className="text-[10px] text-muted-foreground ml-1">{group.students.length} คน</span>
                 <button
                   onClick={() => removeGroup(group.id)}
-                  className="ml-auto w-5 h-5 rounded flex items-center justify-center text-gray-300 hover:text-red-400 transition-colors"
+                  className="ml-auto w-5 h-5 rounded flex items-center justify-center text-gray-300 hover:text-destructive transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>

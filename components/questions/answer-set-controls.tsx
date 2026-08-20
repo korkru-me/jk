@@ -24,8 +24,8 @@ export function LabelStyleToggle({ value, onChange }: { value: PartLabelStyle; o
           onClick={() => onChange(opt.value)}
           className={`px-2.5 py-1 rounded-lg border text-xs font-medium font-mono transition-colors ${
             value === opt.value
-              ? 'border-blue-600 bg-blue-50 text-blue-700'
-              : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:border-ring'
           }`}
         >
           {opt.sample}
@@ -44,14 +44,14 @@ export function AnswerPartCard({
   children: React.ReactNode
 }) {
   return (
-    <div className={`border rounded-xl overflow-hidden bg-white ${locked ? 'border-blue-200' : 'border-gray-200'}`}>
-      <div className={`flex items-center justify-between px-4 py-2.5 border-b ${locked ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-        <span className={`text-sm font-bold ${locked ? 'text-blue-700' : 'text-gray-700'}`}>
+    <div className={`border rounded-xl overflow-hidden bg-card ${locked ? 'border-primary/20' : 'border-border'}`}>
+      <div className={`flex items-center justify-between px-4 py-2.5 border-b ${locked ? 'bg-primary/10 border-primary/20' : 'bg-muted border-border'}`}>
+        <span className={`text-sm font-bold ${locked ? 'text-primary' : 'text-muted-foreground'}`}>
           ข้อย่อย {label})
-          {locked && <span className="ml-1.5 font-normal text-blue-400 text-xs">(คำตอบหลัก)</span>}
+          {locked && <span className="ml-1.5 font-normal text-primary text-xs">(คำตอบหลัก)</span>}
         </span>
         {onRemove && (
-          <button type="button" onClick={onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">
+          <button type="button" onClick={onRemove} className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 px-2 py-1 rounded transition-colors">
             <Trash2 className="w-3.5 h-3.5" /> ลบข้อนี้
           </button>
         )}
@@ -66,7 +66,7 @@ export function AddSubItemButton({ onClick, label = 'เพิ่มโจทย
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 border-2 border-dashed border-blue-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors w-full justify-center"
+      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary border-2 border-dashed border-primary/20 rounded-xl hover:border-primary hover:bg-primary/10 transition-colors w-full justify-center"
     >
       <Plus className="w-4 h-4" />
       {label}

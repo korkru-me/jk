@@ -41,8 +41,8 @@ export function JoinOrgClient({ token, orgName, role }: Props) {
     return (
       <div className="text-center space-y-3">
         <div className="text-4xl">🎉</div>
-        <h1 className="text-lg font-semibold text-gray-900">เข้าร่วมสำเร็จ!</h1>
-        <p className="text-sm text-gray-500">กำลังพาคุณไปหน้าหลัก…</p>
+        <h1 className="text-lg font-semibold text-foreground">เข้าร่วมสำเร็จ!</h1>
+        <p className="text-sm text-muted-foreground">กำลังพาคุณไปหน้าหลัก…</p>
       </div>
     )
   }
@@ -51,16 +51,16 @@ export function JoinOrgClient({ token, orgName, role }: Props) {
     <div className="text-center space-y-5">
       <div className="text-4xl">🏫</div>
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-gray-900">คุณได้รับการเชิญ</h1>
-        <p className="text-sm text-gray-500">
-          เข้าร่วม <span className="font-medium text-gray-800">{orgName}</span> ในฐานะ{' '}
-          <span className="font-medium text-blue-700">{ROLE_LABEL[role] ?? role}</span>
+        <h1 className="text-lg font-semibold text-foreground">คุณได้รับการเชิญ</h1>
+        <p className="text-sm text-muted-foreground">
+          เข้าร่วม <span className="font-medium text-foreground">{orgName}</span> ในฐานะ{' '}
+          <span className="font-medium text-primary">{ROLE_LABEL[role] ?? role}</span>
         </p>
       </div>
       <Button onClick={handleJoin} disabled={pending} className="w-full">
         {pending ? 'กำลังเข้าร่วม…' : 'ยืนยันเข้าร่วม'}
       </Button>
-      <a href="/dashboard" className="block text-xs text-gray-400 hover:underline">
+      <a href="/dashboard" className="block text-xs text-muted-foreground hover:underline">
         ยกเลิก
       </a>
     </div>

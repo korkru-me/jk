@@ -33,16 +33,16 @@ type Severity = 'overdue' | 'soon' | 'later' | 'done'
 
 const SEVERITY_ORDER: Record<Severity, number> = { overdue: 0, soon: 1, later: 2, done: 3 }
 const SEVERITY_DOT: Record<Severity, string> = {
-  overdue: 'bg-red-500',
-  soon: 'bg-amber-500',
-  later: 'bg-blue-500',
-  done: 'bg-green-500',
+  overdue: 'bg-destructive',
+  soon: 'bg-warning',
+  later: 'bg-primary',
+  done: 'bg-success',
 }
 const SEVERITY_BADGE: Record<Severity, string> = {
-  overdue: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400',
-  soon: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
-  later: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400',
-  done: 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400',
+  overdue: 'bg-destructive/10 text-destructive dark:bg-red-950/40',
+  soon: 'bg-warning/10 text-warning dark:bg-amber-950/40',
+  later: 'bg-primary/10 text-primary dark:bg-blue-950/40',
+  done: 'bg-success/10 text-success dark:bg-green-950/40',
 }
 const SEVERITY_LABEL: Record<Severity, string> = {
   overdue: 'เลยกำหนดส่งแล้ว',
@@ -95,7 +95,7 @@ export function AssignmentCalendar({ events }: { events: CalendarEvent[] }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="font-semibold flex items-center gap-2">
-          <CalendarDays size={16} className="text-blue-600 dark:text-blue-400" />
+          <CalendarDays size={16} className="text-primary" />
           ปฏิทินกำหนดส่งงาน
         </h2>
         <div className="flex items-center gap-1">
@@ -143,7 +143,7 @@ export function AssignmentCalendar({ events }: { events: CalendarEvent[] }) {
               onClick={() => setSelected(d)}
               className={cn(
                 'aspect-square rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-all relative',
-                isSelected ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-300 dark:ring-blue-800' : 'hover:bg-muted text-foreground'
+                isSelected ? 'bg-primary text-white' : isToday ? 'bg-primary/10 text-primary ring-1 ring-blue-300 dark:ring-blue-800' : 'hover:bg-muted text-foreground'
               )}
             >
               <span>{d.getDate()}</span>
@@ -152,7 +152,7 @@ export function AssignmentCalendar({ events }: { events: CalendarEvent[] }) {
                   {dots.map((entry, di) => (
                     <span
                       key={di}
-                      className={cn('w-1.5 h-1.5 rounded-full', isSelected ? 'bg-white/80' : SEVERITY_DOT[entry.severity])}
+                      className={cn('w-1.5 h-1.5 rounded-full', isSelected ? 'bg-card/80' : SEVERITY_DOT[entry.severity])}
                     />
                   ))}
                   {dayEvents.length > 3 && (

@@ -22,7 +22,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         checked ? 'bg-primary' : 'bg-muted-foreground/30'
       }`}
     >
-      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-card shadow-sm transition-transform ${
         checked ? 'translate-x-6' : 'translate-x-1'
       }`} />
     </button>
@@ -263,19 +263,19 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
         </div>
 
         {twoFAEnabled && (
-          <div className="mt-4 p-4 bg-green-500/8 border border-green-500/20 rounded-xl flex items-center gap-3">
-            <CheckCircle2 size={16} className="text-green-600 shrink-0" />
+          <div className="mt-4 p-4 bg-success/8 border border-success/20 rounded-xl flex items-center gap-3">
+            <CheckCircle2 size={16} className="text-success shrink-0" />
             <div>
-              <p className="text-sm font-medium text-green-700 dark:text-green-400">2FA เปิดใช้งานแล้ว</p>
+              <p className="text-sm font-medium text-success">2FA เปิดใช้งานแล้ว</p>
               <p className="text-xs text-muted-foreground">บัญชีของคุณมีการป้องกันเพิ่มเติม</p>
             </div>
           </div>
         )}
 
         {!twoFAEnabled && (
-          <div className="mt-4 p-4 bg-amber-500/8 border border-amber-500/20 rounded-xl flex items-center gap-3">
-            <AlertTriangle size={16} className="text-amber-600 shrink-0" />
-            <p className="text-xs text-amber-700 dark:text-amber-400">
+          <div className="mt-4 p-4 bg-warning/8 border border-warning/20 rounded-xl flex items-center gap-3">
+            <AlertTriangle size={16} className="text-warning shrink-0" />
+            <p className="text-xs text-warning">
               แนะนำให้เปิดใช้งาน 2FA เพื่อป้องกันการเข้าถึงบัญชีโดยไม่ได้รับอนุญาต
             </p>
           </div>

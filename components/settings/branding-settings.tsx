@@ -70,14 +70,14 @@ function DropZone({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="flex items-center gap-1.5 text-xs bg-white text-black px-3 py-1.5 rounded-lg font-medium hover:bg-white/90 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-card text-black px-3 py-1.5 rounded-lg font-medium hover:bg-card/90 transition-colors"
           >
             <RefreshCw size={12} /> เปลี่ยนรูป
           </button>
           <button
             type="button"
             onClick={onClear}
-            className="flex items-center gap-1.5 text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-red-600 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-destructive text-white px-3 py-1.5 rounded-lg font-medium hover:bg-destructive/90 transition-colors"
           >
             <X size={12} /> ลบ
           </button>
@@ -173,7 +173,7 @@ function BrandPreview({ logoPreview, primaryColor, orgName }: {
   orgName: string
 }) {
   return (
-    <div className="rounded-2xl border bg-white dark:bg-zinc-900 overflow-hidden shadow-sm">
+    <div className="rounded-2xl border bg-card dark:bg-zinc-900 overflow-hidden shadow-sm">
       {/* Mock topbar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b" style={{ backgroundColor: primaryColor + '18' }}>
         {logoPreview ? (
@@ -269,7 +269,7 @@ export function BrandingSettings() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={bgPreview} alt="bg preview" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <div className="bg-white/90 dark:bg-zinc-900/90 rounded-xl px-6 py-3 text-center">
+              <div className="bg-card/90 dark:bg-zinc-900/90 rounded-xl px-6 py-3 text-center">
                 <p className="text-xs font-bold">ล็อกอินเข้าสู่ระบบ</p>
                 <div className="mt-1 h-2 w-24 rounded-full bg-muted mx-auto" />
               </div>

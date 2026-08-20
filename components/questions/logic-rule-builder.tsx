@@ -81,14 +81,14 @@ export function LogicRuleBuilder({ rules, variables, onChange }: Props) {
           </Select>
 
           {/* RHS type toggle */}
-          <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
+          <div className="flex rounded-md border border-border overflow-hidden text-xs">
             <button
               type="button"
               onClick={() => updateRule(rule.id, { rhs_type: 'variable' })}
               className={`px-2 py-1.5 font-medium transition-colors ${
                 rule.rhs_type === 'variable'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-primary text-white'
+                  : 'bg-card text-muted-foreground hover:bg-muted'
               }`}
             >
               ตัวแปร
@@ -98,8 +98,8 @@ export function LogicRuleBuilder({ rules, variables, onChange }: Props) {
               onClick={() => updateRule(rule.id, { rhs_type: 'constant' })}
               className={`px-2 py-1.5 font-medium transition-colors ${
                 rule.rhs_type === 'constant'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-primary text-white'
+                  : 'bg-card text-muted-foreground hover:bg-muted'
               }`}
             >
               ค่าคงที่
@@ -134,7 +134,7 @@ export function LogicRuleBuilder({ rules, variables, onChange }: Props) {
           <button
             type="button"
             onClick={() => removeRule(rule.id)}
-            className="text-gray-400 hover:text-red-500 transition-colors"
+            className="text-muted-foreground hover:text-destructive transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -147,7 +147,7 @@ export function LogicRuleBuilder({ rules, variables, onChange }: Props) {
       </Button>
 
       {rules.length > 0 && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted-foreground">
           ระบบจะสุ่มค่าใหม่ถ้าไม่ตรงเงื่อนไข (สูงสุด 100 ครั้ง)
         </p>
       )}

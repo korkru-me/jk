@@ -48,56 +48,56 @@ export function PendingTable({ questions }: { questions: Row[] }) {
     <>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-muted border-b">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">ชื่อโจทย์</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">หมวด</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">ผู้สร้าง</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">วันที่ส่ง</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อโจทย์</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">หมวด</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">ผู้สร้าง</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">วันที่ส่ง</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y">
             {questions.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center py-16 text-gray-400">
+                <td colSpan={5} className="text-center py-16 text-muted-foreground">
                   <p className="text-2xl mb-2">✅</p>
                   ไม่มีโจทย์รออนุมัติ
                 </td>
               </tr>
             )}
             {questions.map((q) => (
-              <tr key={q.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={q.id} className="hover:bg-muted transition-colors">
                 <td className="px-4 py-3 max-w-xs">
-                  <p className="font-medium text-gray-900 truncate">{q.title}</p>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">{q.question_text}</p>
+                  <p className="font-medium text-foreground truncate">{q.title}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{q.question_text}</p>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{q.question_categories?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-muted-foreground">{q.question_categories?.name ?? '—'}</td>
                 <td className="px-4 py-3">
-                  <p className="text-gray-800">{q.users?.full_name ?? '—'}</p>
-                  <p className="text-xs text-gray-400">{q.users?.email}</p>
+                  <p className="text-foreground">{q.users?.full_name ?? '—'}</p>
+                  <p className="text-xs text-muted-foreground">{q.users?.email}</p>
                 </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">
+                <td className="px-4 py-3 text-muted-foreground text-xs">
                   {new Date(q.created_at).toLocaleDateString('th-TH')}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setPreview(q)}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-primary hover:underline"
                     >
                       ดูโจทย์
                     </button>
                     <button
                       onClick={() => handleApprove(q.id, q.title)}
                       disabled={isPending}
-                      className="text-xs text-green-600 hover:underline disabled:opacity-50"
+                      className="text-xs text-success hover:underline disabled:opacity-50"
                     >
                       อนุมัติ
                     </button>
                     <button
                       onClick={() => { setRejectTarget(q); setReason('') }}
-                      className="text-xs text-red-600 hover:underline"
+                      className="text-xs text-destructive hover:underline"
                     >
                       ปฏิเสธ
                     </button>
@@ -117,25 +117,25 @@ export function PendingTable({ questions }: { questions: Row[] }) {
           </DialogHeader>
           {preview && (
             <div className="space-y-3 text-sm">
-              <p className="text-gray-700 whitespace-pre-line border rounded-lg p-3 bg-gray-50">{preview.question_text}</p>
+              <p className="text-muted-foreground whitespace-pre-line border rounded-lg p-3 bg-muted">{preview.question_text}</p>
               {preview.question_type === 'written' && preview.answer_formula && (
-                <div className="border rounded-lg p-3 bg-blue-50">
-                  <p className="text-xs text-blue-500 mb-1">สูตรคำตอบ</p>
+                <div className="border rounded-lg p-3 bg-primary/10">
+                  <p className="text-xs text-primary mb-1">สูตรคำตอบ</p>
                   <p className="font-mono text-blue-800">{preview.answer_formula} {preview.answer_unit}</p>
                 </div>
               )}
               {preview.mcq_options && (
                 <div className="space-y-1">
                   {(preview.mcq_options as any[]).map((opt: any, i: number) => (
-                    <div key={i} className={`flex items-center gap-2 p-2 rounded-lg border ${opt.is_correct ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
-                      <span className="text-xs text-gray-500">{['ก','ข','ค','ง'][i]}.</span>
+                    <div key={i} className={`flex items-center gap-2 p-2 rounded-lg border ${opt.is_correct ? 'border-success/20 bg-success/10' : 'border-border'}`}>
+                      <span className="text-xs text-muted-foreground">{['ก','ข','ค','ง'][i]}.</span>
                       <span className="text-sm">{opt.text}</span>
-                      {opt.is_correct && <span className="text-xs text-green-600 ml-auto">✓ ถูก</span>}
+                      {opt.is_correct && <span className="text-xs text-success ml-auto">✓ ถูก</span>}
                     </div>
                   ))}
                 </div>
               )}
-              <p className="text-xs text-gray-400">สร้างโดย: {preview.users?.full_name} ({preview.users?.email})</p>
+              <p className="text-xs text-muted-foreground">สร้างโดย: {preview.users?.full_name} ({preview.users?.email})</p>
             </div>
           )}
           <DialogFooter>
@@ -164,7 +164,7 @@ export function PendingTable({ questions }: { questions: Row[] }) {
             <DialogTitle>ปฏิเสธโจทย์</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-gray-600">โจทย์: <strong>{rejectTarget?.title}</strong></p>
+            <p className="text-sm text-muted-foreground">โจทย์: <strong>{rejectTarget?.title}</strong></p>
             <div className="space-y-1.5">
               <Label>เหตุผลที่ปฏิเสธ (แจ้งครูผู้สร้าง)</Label>
               <Textarea

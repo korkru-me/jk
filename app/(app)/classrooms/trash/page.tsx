@@ -45,34 +45,34 @@ export default async function TrashPage() {
   return (
     <div className="space-y-6 max-w-[1200px]">
       <div className="flex items-center gap-3">
-        <Link href="/classrooms" className="text-gray-400 hover:text-gray-600 transition-colors">
+        <Link href="/classrooms" className="text-muted-foreground hover:text-muted-foreground transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Trash2 className="w-5 h-5 text-red-400" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Trash2 className="w-5 h-5 text-destructive" />
             ถังขยะ
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{classrooms.length} ห้องเรียน</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{classrooms.length} ห้องเรียน</p>
         </div>
       </div>
 
       {classrooms.length === 0 ? (
-        <div className="text-center py-24 border-2 border-dashed border-gray-200 rounded-2xl">
+        <div className="text-center py-24 border-2 border-dashed border-border rounded-2xl">
           <Trash2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">ถังขยะว่างเปล่า</p>
-          <Link href="/classrooms" className="text-sm text-blue-600 hover:underline mt-1 block">
+          <p className="text-muted-foreground font-medium">ถังขยะว่างเปล่า</p>
+          <Link href="/classrooms" className="text-sm text-primary hover:underline mt-1 block">
             กลับหน้าหลัก
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-red-50/50">
-            <p className="text-sm text-red-700">
+        <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+          <div className="p-4 border-b border-border bg-destructive/10">
+            <p className="text-sm text-destructive">
               ห้องเรียนในถังขยะจะถูกลบถาวรอัตโนมัติหลังจาก 3 เดือน
             </p>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {classrooms.map((c) => {
               const deletedAt = c.deleted_at ? new Date(c.deleted_at) : new Date()
               const expiresAt = new Date(deletedAt.getTime() + THREE_MONTHS_MS)

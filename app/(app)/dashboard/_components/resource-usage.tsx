@@ -28,22 +28,22 @@ const RESOURCES = [
 
 function getBarColor(pct: number) {
   if (pct >= 85) return 'bg-orange-500'
-  if (pct >= 60) return 'bg-amber-400'
-  return 'bg-emerald-500'
+  if (pct >= 60) return 'bg-warning'
+  return 'bg-success'
 }
 
 function getTextColor(pct: number) {
   if (pct >= 85) return 'text-orange-600'
-  if (pct >= 60) return 'text-amber-600'
-  return 'text-emerald-600'
+  if (pct >= 60) return 'text-warning'
+  return 'text-success'
 }
 
 export function ResourceUsage() {
   return (
-    <div className="bg-white rounded-xl ring-1 ring-black/5 p-4">
+    <div className="bg-card rounded-xl ring-1 ring-border p-4">
       <div className="flex items-center gap-2 mb-4">
-        <HardDrive className="w-4 h-4 text-gray-400" />
-        <p className="text-sm font-semibold text-gray-900">การใช้ทรัพยากร</p>
+        <HardDrive className="w-4 h-4 text-muted-foreground" />
+        <p className="text-sm font-semibold text-foreground">การใช้ทรัพยากร</p>
       </div>
       <div className="space-y-4">
         {RESOURCES.map(res => {
@@ -53,17 +53,17 @@ export function ResourceUsage() {
             <div key={res.label}>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5">
-                  <Icon className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-xs text-gray-600">{res.label}</span>
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">{res.label}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className={`text-xs font-bold ${getTextColor(pct)}`}>{pct}%</span>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-muted-foreground">
                     ({res.used}/{res.max} {res.unit})
                   </span>
                 </div>
               </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-700 ${getBarColor(pct)}`}
                   style={{ width: `${pct}%` }}

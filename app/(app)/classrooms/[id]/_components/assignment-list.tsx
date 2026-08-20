@@ -16,9 +16,9 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
 
-  if (diff < 0) return { label: 'เลยกำหนดส่งแล้ว', urgent: true, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/30' }
+  if (diff < 0) return { label: 'เลยกำหนดส่งแล้ว', urgent: true, color: 'text-destructive', bg: 'bg-destructive/10' }
   if (hours < 24) return { label: `เหลือเวลาอีก ${hours} ชม. จะหมดเขตส่งงาน`, urgent: true, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' }
-  if (days <= 2) return { label: `เหลือเวลาอีก ${days} วัน จะหมดเขตส่งงาน`, urgent: true, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30' }
+  if (days <= 2) return { label: `เหลือเวลาอีก ${days} วัน จะหมดเขตส่งงาน`, urgent: true, color: 'text-warning', bg: 'bg-warning/10' }
   return {
     label: `กำหนดส่งภายใน ${new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' })}`,
     urgent: false,
@@ -28,7 +28,7 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
 }
 
 const TYPE_CFG: Record<string, { label: string; bg: string; text: string; icon: typeof FileText }> = {
-  exam:     { label: 'ข้อสอบ',     bg: 'bg-blue-50 dark:bg-blue-950/30',   text: 'text-blue-700 dark:text-blue-400',   icon: FileText },
+  exam:     { label: 'ข้อสอบ',     bg: 'bg-primary/10',   text: 'text-primary',   icon: FileText },
   exercise: { label: 'แบบฝึกหัด', bg: 'bg-violet-50 dark:bg-violet-950/30', text: 'text-violet-700 dark:text-violet-400', icon: Repeat },
 }
 
@@ -86,7 +86,7 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
               className={cn(
                 'flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border transition-all',
                 typeFilter === f.key
-                  ? 'bg-blue-600 text-white border-blue-600'
+                  ? 'bg-primary text-white border-primary'
                   : 'bg-transparent text-muted-foreground border-border hover:bg-muted/50'
               )}
             >
@@ -170,7 +170,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           </span>
         )}
         {passingThreshold && !isDone && (
-          <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+          <span className="flex items-center gap-1 text-warning font-medium">
             <Target size={11} />
             เกณฑ์ผ่าน {passingThreshold}
           </span>
@@ -202,7 +202,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           )}
           <Link
             href={`/assignments/${a.id}/take`}
-            className={cn(buttonVariants({ size: 'sm' }), 'w-full justify-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white border-0')}
+            className={cn(buttonVariants({ size: 'sm' }), 'w-full justify-center gap-1 text-xs bg-warning hover:bg-warning/90 text-white border-0')}
           >
             ▶ ทำต่อ
           </Link>
@@ -212,7 +212,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           <div className="flex items-center justify-between">
             <span className={cn(
               'text-xs font-medium flex items-center gap-1',
-              canShowResults && passed === false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+              canShowResults && passed === false ? 'text-destructive' : 'text-success'
             )}>
               {canShowResults && passed === false ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
               {!canShowResults ? 'ส่งแล้ว ✓' : passed === false ? 'ยังไม่ผ่านเกณฑ์' : passed === true ? 'ผ่านเกณฑ์' : 'ส่งแล้ว ✓'}
@@ -226,7 +226,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           )}
           <Link
             href={`/assignments/${a.id}/take`}
-            className={cn(buttonVariants({ size: 'sm' }), 'w-full justify-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white border-0')}
+            className={cn(buttonVariants({ size: 'sm' }), 'w-full justify-center gap-1 text-xs bg-warning hover:bg-warning/90 text-white border-0')}
           >
             <RotateCcw size={12} />
             ลองใหม่{a.max_attempts != null && ` (เหลือ ${a.max_attempts - a.attempts_used} ครั้ง)`}
@@ -237,7 +237,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
           <div className="flex items-center justify-between">
             <span className={cn(
               'text-xs font-medium flex items-center gap-1',
-              canShowResults && passed === false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+              canShowResults && passed === false ? 'text-destructive' : 'text-success'
             )}>
               {canShowResults && passed === false ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
               {!canShowResults ? 'ส่งแล้ว ✓' : passed === null ? 'ส่งแล้ว ✓' : passed ? 'ผ่านเกณฑ์' : 'ไม่ผ่านเกณฑ์'}

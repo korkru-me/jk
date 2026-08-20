@@ -142,7 +142,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาโจทย์</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">เนื้อหาโจทย์</h2>
         <div className="space-y-1.5">
           <Label>โจทย์ *</Label>
           <RichTextEditor
@@ -169,15 +169,15 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
 
       <section className="space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
-          <h2 className="text-base font-semibold text-gray-900">เกณฑ์การให้คะแนน (ไม่บังคับ)</h2>
+          <h2 className="text-base font-semibold text-foreground">เกณฑ์การให้คะแนน (ไม่บังคับ)</h2>
           {rubric.length > 0 && (
-            <span className="text-sm text-gray-500">รวม {totalPoints} คะแนน</span>
+            <span className="text-sm text-muted-foreground">รวม {totalPoints} คะแนน</span>
           )}
         </div>
 
         {rubric.length > 0 && (
           <div className="space-y-2">
-            <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-xs font-medium text-gray-500 px-1">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-xs font-medium text-muted-foreground px-1">
               <span>เกณฑ์</span>
               <span className="w-20 text-center">คะแนน</span>
               <span className="w-6" />
@@ -197,7 +197,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
                   onChange={(e) => updateRubric(item.id, 'points', parseFloat(e.target.value) || 0)}
                   className="w-20 text-center"
                 />
-                <button type="button" onClick={() => removeRubric(item.id)} className="text-gray-400 hover:text-red-500">
+                <button type="button" onClick={() => removeRubric(item.id)} className="text-muted-foreground hover:text-destructive">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -209,7 +209,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
           <Plus className="w-4 h-4 mr-1" />
           เพิ่มเกณฑ์
         </Button>
-        <p className="text-xs text-gray-400">ครูใช้เกณฑ์นี้เป็นแนวทางตอนตรวจงานด้วยมือ ระบบไม่ตรวจอัตโนมัติ</p>
+        <p className="text-xs text-muted-foreground">ครูใช้เกณฑ์นี้เป็นแนวทางตอนตรวจงานด้วยมือ ระบบไม่ตรวจอัตโนมัติ</p>
       </section>
 
       <div className="flex items-center gap-3 pt-2 border-t">

@@ -122,16 +122,16 @@ const PART_TYPES: Array<{ value: CompositePartType; label: string; icon: typeof 
 ]
 
 const PART_ACCENT: Record<CompositePartType, string> = {
-  true_false: 'bg-emerald-50 border-emerald-300 text-emerald-700',
-  fill_blank: 'bg-blue-50 border-blue-300 text-blue-700',
-  ordering: 'bg-amber-50 border-amber-300 text-amber-700',
+  true_false: 'bg-success/10 border-success/20 text-success',
+  fill_blank: 'bg-primary/10 border-primary/20 text-primary',
+  ordering: 'bg-warning/10 border-warning/20 text-warning',
   mcq: 'bg-purple-50 border-purple-300 text-purple-700',
 }
 
 const PART_BADGE: Record<CompositePartType, string> = {
-  true_false: 'bg-emerald-100 text-emerald-700',
-  fill_blank: 'bg-blue-100 text-blue-700',
-  ordering: 'bg-amber-100 text-amber-700',
+  true_false: 'bg-success/10 text-success',
+  fill_blank: 'bg-primary/10 text-primary',
+  ordering: 'bg-warning/10 text-warning',
   mcq: 'bg-purple-100 text-purple-700',
 }
 
@@ -140,18 +140,18 @@ const PART_BADGE: Record<CompositePartType, string> = {
 function TrueFalsePartFields({ part, update }: { part: CompositePartDraft; update: (patch: Partial<CompositePartDraft>) => void }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-sm text-gray-600">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
+      <p className="text-sm text-muted-foreground">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
       <div className="flex gap-3">
         {[
-          { val: true, label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' },
-          { val: false, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' },
+          { val: true, label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
+          { val: false, label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
         ].map(({ val, label, cls }) => (
           <button
             key={String(val)}
             type="button"
             onClick={() => update({ correctAnswer: val })}
             className={`flex-1 py-2.5 rounded-xl border-2 font-semibold transition-colors ${
-              part.correctAnswer === val ? cls : 'border-gray-200 text-gray-400 hover:border-gray-300'
+              part.correctAnswer === val ? cls : 'border-border text-muted-foreground hover:border-ring'
             }`}
           >
             {label}
@@ -209,7 +209,7 @@ function FillBlankPartFields({ part, update, editorRef }: {
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs text-gray-500">โจทย์ของข้อนี้ *</Label>
+        <Label className="text-xs text-muted-foreground">โจทย์ของข้อนี้ *</Label>
         <Button type="button" variant="outline" size="sm" className="text-xs h-7"
           onClick={() => editorRef.current?.insertText(ANSWER_BLANK)}>
           + [คำตอบ]
@@ -222,7 +222,7 @@ function FillBlankPartFields({ part, update, editorRef }: {
         placeholder="เช่น แสงเดินทางด้วยความเร็ว [คำตอบ] m/s"
         rows={2}
       />
-      {!hasMarker && <p className="text-[11px] text-amber-600">ต้องกดปุ่ม "+ [คำตอบ]" แทรกช่องคำตอบในข้อความก่อน</p>}
+      {!hasMarker && <p className="text-[11px] text-warning">ต้องกดปุ่ม "+ [คำตอบ]" แทรกช่องคำตอบในข้อความก่อน</p>}
 
       <div className="flex gap-1.5 flex-wrap pt-1">
         {BLANK_TYPE_OPTIONS.map(t => (
@@ -231,7 +231,7 @@ function FillBlankPartFields({ part, update, editorRef }: {
             type="button"
             onClick={() => update({ blankType: t.value })}
             className={`px-2.5 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${
-              part.blankType === t.value ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+              part.blankType === t.value ? 'bg-primary/10 border-primary text-primary' : 'bg-card border-border text-muted-foreground hover:border-ring'
             }`}
           >
             {t.label}
@@ -258,7 +258,7 @@ function FillBlankPartFields({ part, update, editorRef }: {
                 className="flex-1 h-8 text-sm"
               />
               {part.blankAnswers.length > 1 && (
-                <button type="button" onClick={() => removeFixedAnswer(ai)} className="text-gray-400 hover:text-red-500">
+                <button type="button" onClick={() => removeFixedAnswer(ai)} className="text-muted-foreground hover:text-destructive">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -271,7 +271,7 @@ function FillBlankPartFields({ part, update, editorRef }: {
             <input type="checkbox" checked={part.blankCaseSensitive}
               onChange={e => update({ blankCaseSensitive: e.target.checked })}
               className="w-3.5 h-3.5 rounded" />
-            <span className="text-xs text-gray-600">ตรวจสอบตัวพิมพ์เล็ก-ใหญ่ (Case-sensitive)</span>
+            <span className="text-xs text-muted-foreground">ตรวจสอบตัวพิมพ์เล็ก-ใหญ่ (Case-sensitive)</span>
           </label>
         </div>
       )}
@@ -285,14 +285,14 @@ function FillBlankPartFields({ part, update, editorRef }: {
                 onClick={() => toggleCorrectOption(oi)}
                 title="ติ๊กเพื่อกำหนดเป็นคำตอบที่ถูกต้อง (เลือกได้มากกว่า 1)"
                 className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                  part.blankCorrectIndexes.includes(oi) ? 'border-green-500 bg-green-500' : 'border-gray-300 hover:border-green-400'
+                  part.blankCorrectIndexes.includes(oi) ? 'border-success bg-success' : 'border-border hover:border-success/50'
                 }`}
               >
                 {part.blankCorrectIndexes.includes(oi) && <Check className="w-3 h-3 text-white" />}
               </button>
               <Input value={opt} onChange={e => updateOption(oi, e.target.value)} placeholder={`ตัวเลือก ${oi + 1}`} className="flex-1 h-8 text-sm" />
               {part.blankOptions.length > 2 && (
-                <button type="button" onClick={() => removeOption(oi)} className="text-gray-400 hover:text-red-500">
+                <button type="button" onClick={() => removeOption(oi)} className="text-muted-foreground hover:text-destructive">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -331,27 +331,27 @@ function OrderingPartFields({ part, update }: { part: CompositePartDraft; update
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-xs text-gray-500">คำสั่ง / บริบท *</Label>
+        <Label className="text-xs text-muted-foreground">คำสั่ง / บริบท *</Label>
       </div>
       <RichTextEditor value={part.text} onChange={v => update({ text: v })} placeholder="เช่น จงเรียงขั้นตอนต่อไปนี้จากก่อนไปหลัง" rows={2} />
-      <p className="text-[11px] text-gray-400">ลำดับด้านล่างคือลำดับที่ถูกต้อง นักเรียนจะเห็นรายการสลับแล้ว</p>
+      <p className="text-[11px] text-muted-foreground">ลำดับด้านล่างคือลำดับที่ถูกต้อง นักเรียนจะเห็นรายการสลับแล้ว</p>
       <div className="space-y-1.5">
         {part.items.map((item, idx) => (
           <div key={item.id} className="flex items-start gap-2">
             <div className="flex flex-col gap-0.5 flex-shrink-0 pt-1.5">
-              <button type="button" onClick={() => moveUp(idx)} disabled={idx === 0} className="p-0.5 rounded text-gray-400 hover:text-gray-700 disabled:opacity-30">
+              <button type="button" onClick={() => moveUp(idx)} disabled={idx === 0} className="p-0.5 rounded text-muted-foreground hover:text-muted-foreground disabled:opacity-30">
                 <ChevronUp className="w-3.5 h-3.5" />
               </button>
-              <button type="button" onClick={() => moveDown(idx)} disabled={idx === part.items.length - 1} className="p-0.5 rounded text-gray-400 hover:text-gray-700 disabled:opacity-30">
+              <button type="button" onClick={() => moveDown(idx)} disabled={idx === part.items.length - 1} className="p-0.5 rounded text-muted-foreground hover:text-muted-foreground disabled:opacity-30">
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
             </div>
-            <span className="flex-shrink-0 w-6 h-6 mt-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center">{idx + 1}</span>
+            <span className="flex-shrink-0 w-6 h-6 mt-1 rounded-full bg-warning/10 text-warning text-xs font-bold flex items-center justify-center">{idx + 1}</span>
             <div className="flex-1">
               <RichTextEditor value={item.text} onChange={v => updateItem(item.id, v)} placeholder={`รายการที่ ${idx + 1}`} rows={1} />
             </div>
             {part.items.length > 2 && (
-              <button type="button" onClick={() => removeItem(item.id)} className="flex-shrink-0 mt-1.5 text-gray-400 hover:text-red-500">
+              <button type="button" onClick={() => removeItem(item.id)} className="flex-shrink-0 mt-1.5 text-muted-foreground hover:text-destructive">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -388,7 +388,7 @@ function McqPartFields({ part, update }: { part: CompositePartDraft; update: (pa
 
   return (
     <div className="space-y-2.5">
-      <Label className="text-xs text-gray-500">โจทย์ของข้อนี้ *</Label>
+      <Label className="text-xs text-muted-foreground">โจทย์ของข้อนี้ *</Label>
       <RichTextEditor value={part.text} onChange={v => update({ text: v })} placeholder="พิมพ์คำถามปรนัยของข้อนี้..." rows={2} />
       <div className="space-y-1.5">
         {part.mcqOptions.map((opt, oi) => (
@@ -398,14 +398,14 @@ function McqPartFields({ part, update }: { part: CompositePartDraft; update: (pa
               onClick={() => setCorrect(oi)}
               title="ตั้งเป็นคำตอบที่ถูกต้อง"
               className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                opt.is_correct ? 'border-purple-500 bg-purple-500' : 'border-gray-300 hover:border-purple-400'
+                opt.is_correct ? 'border-purple-500 bg-purple-500' : 'border-border hover:border-purple-400'
               }`}
             >
               {opt.is_correct && <Check className="w-3 h-3 text-white" />}
             </button>
             <Input value={opt.text} onChange={e => updateOption(oi, e.target.value)} placeholder={`ตัวเลือก ${oi + 1}`} className="flex-1 h-8 text-sm" />
             {part.mcqOptions.length > 2 && (
-              <button type="button" onClick={() => removeOption(oi)} className="text-gray-400 hover:text-red-500">
+              <button type="button" onClick={() => removeOption(oi)} className="text-muted-foreground hover:text-destructive">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -416,7 +416,7 @@ function McqPartFields({ part, update }: { part: CompositePartDraft; update: (pa
             <Plus className="w-3.5 h-3.5 mr-1" /> เพิ่มตัวเลือก
           </Button>
         )}
-        <p className="text-[11px] text-gray-400">กดวงกลมหน้าตัวเลือกเพื่อกำหนดคำตอบที่ถูกต้อง</p>
+        <p className="text-[11px] text-muted-foreground">กดวงกลมหน้าตัวเลือกเพื่อกำหนดคำตอบที่ถูกต้อง</p>
       </div>
     </div>
   )
@@ -433,13 +433,13 @@ function CompositePartCard({ part, label, update, onRemove, onMoveUp, onMoveDown
   const fillBlankEditorRef = useRef<RichTextEditorHandle>(null)
 
   return (
-    <div className="border rounded-xl overflow-hidden bg-gray-50">
-      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b bg-white">
+    <div className="border rounded-xl overflow-hidden bg-muted">
+      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b bg-card">
         <div className="flex flex-col gap-0.5 flex-shrink-0">
-          <button type="button" onClick={onMoveUp} className="p-0.5 rounded text-gray-300 hover:text-gray-600">
+          <button type="button" onClick={onMoveUp} className="p-0.5 rounded text-gray-300 hover:text-muted-foreground">
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
-          <button type="button" onClick={onMoveDown} className="p-0.5 rounded text-gray-300 hover:text-gray-600">
+          <button type="button" onClick={onMoveDown} className="p-0.5 rounded text-gray-300 hover:text-muted-foreground">
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -456,7 +456,7 @@ function CompositePartCard({ part, label, update, onRemove, onMoveUp, onMoveDown
                 type="button"
                 onClick={() => update({ type: t.value })}
                 className={`flex items-center gap-1 px-2 py-1 rounded-lg border-2 text-xs font-medium transition-all ${
-                  active ? PART_ACCENT[t.value] : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                  active ? PART_ACCENT[t.value] : 'bg-card border-border text-muted-foreground hover:border-ring'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" /> {t.label}
@@ -465,7 +465,7 @@ function CompositePartCard({ part, label, update, onRemove, onMoveUp, onMoveDown
           })}
         </div>
         {canRemove && (
-          <button type="button" onClick={onRemove} className="flex-shrink-0 flex items-center gap-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">
+          <button type="button" onClick={onRemove} className="flex-shrink-0 flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 px-2 py-1 rounded transition-colors">
             <Trash2 className="w-3.5 h-3.5" /> ลบ
           </button>
         )}
@@ -474,7 +474,7 @@ function CompositePartCard({ part, label, update, onRemove, onMoveUp, onMoveDown
       <div className="p-3.5">
         {part.type === 'true_false' && (
           <div className="space-y-2.5">
-            <Label className="text-xs text-gray-500">ข้อความ *</Label>
+            <Label className="text-xs text-muted-foreground">ข้อความ *</Label>
             <RichTextEditor value={part.text} onChange={v => update({ text: v })} placeholder="พิมพ์ข้อความที่ต้องตัดสินถูก-ผิด..." rows={2} />
             <TrueFalsePartFields part={part} update={update} />
           </div>
@@ -484,7 +484,7 @@ function CompositePartCard({ part, label, update, onRemove, onMoveUp, onMoveDown
         {part.type === 'mcq' && <McqPartFields part={part} update={update} />}
 
         <div className="pt-3 mt-3 border-t">
-          <Label className="text-xs text-gray-500 mb-1.5 block">รูปภาพประกอบข้อนี้ (ไม่บังคับ)</Label>
+          <Label className="text-xs text-muted-foreground mb-1.5 block">รูปภาพประกอบข้อนี้ (ไม่บังคับ)</Label>
           <QuestionImageUpload value={part.imageUrls} onChange={v => update({ imageUrls: v })} />
         </div>
       </div>
@@ -676,7 +676,7 @@ export function CompositeForm({ allTags, mode = 'create', question, isOwner = tr
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">โจทย์หลัก / บทนำ</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">โจทย์หลัก / บทนำ</h2>
         <div className="space-y-1.5">
           <Label>ข้อความโจทย์หลัก *</Label>
           <RichTextEditor
@@ -686,7 +686,7 @@ export function CompositeForm({ allTags, mode = 'create', question, isOwner = tr
             placeholder="เช่น วัตถุมวล 2 kg ถูกลากด้วยแรง 10 N บนพื้นราบไม่มีความเสียดทาน จงพิจารณาข้อความต่อไปนี้ แล้วตอบคำถามแต่ละข้อ"
             rows={4}
           />
-          <p className="text-[11px] text-gray-400">บริบทร่วมที่นักเรียนเห็นก่อนคำถามย่อยทุกข้อด้านล่าง</p>
+          <p className="text-[11px] text-muted-foreground">บริบทร่วมที่นักเรียนเห็นก่อนคำถามย่อยทุกข้อด้านล่าง</p>
         </div>
         <div className="space-y-1.5">
           <Label>รูปภาพประกอบ (ไม่บังคับ)</Label>
@@ -696,10 +696,10 @@ export function CompositeForm({ allTags, mode = 'create', question, isOwner = tr
 
       <section className="space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
-          <h2 className="text-base font-semibold text-gray-900">รายการคำถามย่อย</h2>
+          <h2 className="text-base font-semibold text-foreground">รายการคำถามย่อย</h2>
           {parts.length > 1 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
         </div>
-        <p className="text-xs text-gray-500">แต่ละข้อเลือกได้เองว่าเป็นคำถามประเภทไหน — ถูก-ผิด เติมคำ เรียงลำดับ หรือปรนัย</p>
+        <p className="text-xs text-muted-foreground">แต่ละข้อเลือกได้เองว่าเป็นคำถามประเภทไหน — ถูก-ผิด เติมคำ เรียงลำดับ หรือปรนัย</p>
 
         <div className="space-y-3">
           {parts.map((part, i) => (
@@ -719,12 +719,12 @@ export function CompositeForm({ allTags, mode = 'create', question, isOwner = tr
         <button
           type="button"
           onClick={addPart}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-600 border-2 border-dashed border-blue-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors w-full justify-center"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary border-2 border-dashed border-primary/20 rounded-xl hover:border-primary hover:bg-primary/10 transition-colors w-full justify-center"
         >
           <Plus className="w-4 h-4" /> เพิ่มคำถามย่อย
         </button>
 
-        <p className="text-xs text-gray-400">คะแนนรวม: {parts.length} คะแนน (ข้อละ 1 คะแนน — ข้อที่ตั้งเป็นช่องว่างให้ครูตรวจเองจะรอผลจนกว่าครูจะให้คะแนน)</p>
+        <p className="text-xs text-muted-foreground">คะแนนรวม: {parts.length} คะแนน (ข้อละ 1 คะแนน — ข้อที่ตั้งเป็นช่องว่างให้ครูตรวจเองจะรอผลจนกว่าครูจะให้คะแนน)</p>
       </section>
 
       <SolutionSection

@@ -33,34 +33,34 @@ export default async function ArchivedClassroomsPage() {
   return (
     <div className="space-y-6 max-w-[1200px]">
       <div className="flex items-center gap-3">
-        <Link href="/classrooms" className="text-gray-400 hover:text-gray-600 transition-colors">
+        <Link href="/classrooms" className="text-muted-foreground hover:text-muted-foreground transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Archive className="w-5 h-5 text-amber-500" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Archive className="w-5 h-5 text-warning" />
             ห้องเรียนที่เก็บถาวร
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{classrooms.length} ห้องเรียน</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{classrooms.length} ห้องเรียน</p>
         </div>
       </div>
 
       {classrooms.length === 0 ? (
-        <div className="text-center py-24 border-2 border-dashed border-gray-200 rounded-2xl">
+        <div className="text-center py-24 border-2 border-dashed border-border rounded-2xl">
           <Archive className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">ไม่มีห้องเรียนที่เก็บถาวร</p>
-          <Link href="/classrooms" className="text-sm text-blue-600 hover:underline mt-1 block">
+          <p className="text-muted-foreground font-medium">ไม่มีห้องเรียนที่เก็บถาวร</p>
+          <Link href="/classrooms" className="text-sm text-primary hover:underline mt-1 block">
             กลับหน้าหลัก
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-amber-50/50">
-            <p className="text-sm text-amber-700">
+        <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+          <div className="p-4 border-b border-border bg-warning/10">
+            <p className="text-sm text-warning">
               ห้องเรียนที่เก็บถาวรยังคงดูข้อมูลย้อนหลังได้ แต่ไม่รับงานใหม่
             </p>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {classrooms.map((c) => (
               <ArchivedActionsClient key={c.id} classroom={c} />
             ))}

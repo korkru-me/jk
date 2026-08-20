@@ -1,6 +1,7 @@
 'use client'
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { chartColors, chartSeries } from '@/lib/chart-colors'
 import type { Question } from '@/lib/types'
 
 function seedRand(seed: string, index: number): number {
@@ -9,7 +10,8 @@ function seedRand(seed: string, index: number): number {
 }
 
 const CHOICE_LABELS = ['ก.', 'ข.', 'ค.', 'ง.']
-const COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
+// Distractors only — the correct choice is always drawn in chartColors.success.
+const COLORS = [chartColors.primary, chartColors.warning, chartColors.danger, chartSeries[3]]
 const DISTRACTOR_NOTES_WRONG = [
   'ตัวลวงที่สร้างความสับสนเรื่องทิศทางของเวกเตอร์',
   'ตัวลวงหลักที่ดักความเข้าใจผิดเรื่องการหาพื้นที่ใต้กราฟ v-t',
@@ -29,9 +31,9 @@ const CustomTooltip = ({ active, payload }: any) => {
     ? 'คำตอบที่ถูกต้อง'
     : DISTRACTOR_NOTES_WRONG[item.payload.distractorIdx % DISTRACTOR_NOTES_WRONG.length]
   return (
-    <div className="bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-lg text-xs max-w-[200px]">
-      <p className="font-bold text-gray-900 mb-1">{item.name}: {item.value}%</p>
-      <p className="text-gray-500 leading-relaxed">{note}</p>
+    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-xs max-w-[200px]">
+      <p className="font-bold text-foreground mb-1">{item.name}: {item.value}%</p>
+      <p className="text-muted-foreground leading-relaxed">{note}</p>
     </div>
   )
 }
@@ -41,7 +43,7 @@ const CustomLegend = ({ payload }: any) => (
     {payload?.map((entry: any, i: number) => (
       <div key={i} className="flex items-center gap-2 text-xs">
         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: entry.color }} />
-        <span className="text-gray-600">{entry.value}: <strong>{entry.payload.value}%</strong></span>
+        <span className="text-muted-foreground">{entry.value}: <strong>{entry.payload.value}%</strong></span>
       </div>
     ))}
   </div>
@@ -82,14 +84,14 @@ export function DistractorChart({ question, qLabel, assignmentId }: Props) {
   const topDistractor = data.filter(d => !d.isCorrect).sort((a, b) => b.value - a.value)[0]
 
   return (
-    <div className="bg-white rounded-2xl ring-1 ring-black/5 p-5 h-full">
-      <p className="text-sm font-semibold text-gray-900 mb-0.5">Distractor Analysis</p>
-      <p className="text-xs text-gray-400 mb-1">{qLabel} — สัดส่วนการเลือกตอบ</p>
+    <div className="bg-card rounded-2xl ring-1 ring-border p-5 h-full">
+      <p className="text-sm font-semibold text-foreground mb-0.5">Distractor Analysis</p>
+      <p className="text-xs text-muted-foreground mb-1">{qLabel} — สัดส่วนการเลือกตอบ</p>
 
       {/* Correct answer badge */}
       <div className="flex items-center gap-1.5 mb-3">
-        <span className="text-xs text-gray-500">เฉลย:</span>
-        <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+        <span className="text-xs text-muted-foreground">เฉลย:</span>
+        <span className="text-xs font-bold bg-success/10 text-success px-2 py-0.5 rounded-full">
           {CHOICE_LABELS[correctIdx]}
         </span>
       </div>
@@ -108,8 +110,8 @@ export function DistractorChart({ question, qLabel, assignmentId }: Props) {
             {data.map((entry, i) => (
               <Cell
                 key={i}
-                fill={entry.isCorrect ? '#22c55e' : COLORS[i % COLORS.length]}
-                stroke={entry.isCorrect ? '#16a34a' : 'transparent'}
+                fill={entry.isCorrect ? chartColors.success : COLORS[i % COLORS.length]}
+                stroke={entry.isCorrect ? chartColors.success : 'transparent'}
                 strokeWidth={entry.isCorrect ? 2 : 0}
               />
             ))}
@@ -121,8 +123,8 @@ export function DistractorChart({ question, qLabel, assignmentId }: Props) {
 
       {/* Insight note */}
       {topDistractor && (
-        <div className="mt-3 p-3 bg-amber-50 rounded-xl">
-          <p className="text-xs text-amber-700 leading-relaxed">
+        <div className="mt-3 p-3 bg-warning/10 rounded-xl">
+          <p className="text-xs text-warning leading-relaxed">
             <span className="font-bold">{topDistractor.name}</span> ถูกเลือก{' '}
             <span className="font-bold">{topDistractor.value}%</span>{' '}
             — {DISTRACTOR_NOTES_WRONG[topDistractor.distractorIdx % DISTRACTOR_NOTES_WRONG.length]}

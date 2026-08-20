@@ -73,12 +73,12 @@ function isClose(a: number, b: number): boolean {
 }
 
 function RenderText({ text }: { text: string }) {
-  if (!text) return <p className="text-gray-400 italic text-[15px]">ยังไม่มีเนื้อหาโจทย์</p>
+  if (!text) return <p className="text-muted-foreground italic text-[15px]">ยังไม่มีเนื้อหาโจทย์</p>
   if (isHtml(text)) return (
-    <div className="text-gray-900 leading-relaxed text-[15px] rich-text-content"
+    <div className="text-foreground leading-relaxed text-[15px] rich-text-content"
       dangerouslySetInnerHTML={{ __html: text }} />
   )
-  return <p className="text-gray-900 leading-relaxed whitespace-pre-line text-[15px]">{text}</p>
+  return <p className="text-foreground leading-relaxed whitespace-pre-line text-[15px]">{text}</p>
 }
 
 // ── QuestionPreviewContent ──────────────────────────────────────────────────────
@@ -247,9 +247,9 @@ export function QuestionPreviewContent({
       {/* Regenerate + variable badges (random only) */}
       <div className="flex items-center justify-between gap-3">
         {isRandom && Object.keys(values).length > 0 ? (
-          <div className="flex flex-wrap gap-1.5 bg-indigo-50 px-3 py-2 rounded-lg flex-1">
+          <div className="flex flex-wrap gap-1.5 bg-primary/10 px-3 py-2 rounded-lg flex-1">
             {Object.entries(values).map(([k, v]) => (
-              <span key={k} className="bg-white text-indigo-700 px-2.5 py-1 rounded-lg text-sm font-mono border border-indigo-100">
+              <span key={k} className="bg-card text-primary px-2.5 py-1 rounded-lg text-sm font-mono border border-indigo-100">
                 {k} = {v}
               </span>
             ))}
@@ -258,7 +258,7 @@ export function QuestionPreviewContent({
         <button
           type="button"
           onClick={generate}
-          className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors font-medium shrink-0"
+          className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-lg hover:bg-indigo-200 transition-colors font-medium shrink-0"
         >
           🔄 โจทย์ใหม่
         </button>
@@ -273,7 +273,7 @@ export function QuestionPreviewContent({
           {imageUrls.map((url) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img key={url} src={url} alt="รูปประกอบโจทย์"
-              className="max-h-48 rounded-lg border border-gray-200 object-contain" />
+              className="max-h-48 rounded-lg border border-border object-contain" />
           ))}
         </div>
       )}
@@ -284,14 +284,14 @@ export function QuestionPreviewContent({
           {attachmentUrls.map((url) => (
             isPdfUrl(url) ? (
               <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-                className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
+                className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted hover:bg-accent transition-colors">
                 <span className="text-lg">📄</span>
-                <span className="text-[9px] text-gray-500">PDF</span>
+                <span className="text-[9px] text-muted-foreground">PDF</span>
               </a>
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์"
-                className="max-h-32 rounded-lg border border-gray-200 object-contain" />
+                className="max-h-32 rounded-lg border border-border object-contain" />
             )
           ))}
         </div>
@@ -300,48 +300,48 @@ export function QuestionPreviewContent({
       {/* ── MCQ ── */}
       {questionType === 'mcq' && mcqOptions.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-500 font-medium">เลือกคำตอบที่ถูกต้อง:</p>
+          <p className="text-xs text-muted-foreground font-medium">เลือกคำตอบที่ถูกต้อง:</p>
           {mcqOptions.map((opt, i) => {
             const isSelected = selectedMcq === i
             const isCorrect = opt.is_correct
-            let cls = 'border-gray-200 bg-white'
+            let cls = 'border-border bg-card'
             if (mcqChecked) {
-              if (isCorrect) cls = 'border-green-400 bg-green-50'
-              else if (isSelected) cls = 'border-red-400 bg-red-50'
+              if (isCorrect) cls = 'border-success bg-success/10'
+              else if (isSelected) cls = 'border-destructive bg-destructive/10'
             } else if (isSelected) {
-              cls = 'border-indigo-400 bg-indigo-50'
+              cls = 'border-primary bg-primary/10'
             }
             return (
               <button
                 key={i}
                 type="button"
                 onClick={() => { if (!mcqChecked) setSelectedMcq(i) }}
-                className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 ${cls} text-left transition-colors ${!mcqChecked ? 'hover:border-indigo-300 cursor-pointer' : 'cursor-default'}`}
+                className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 ${cls} text-left transition-colors ${!mcqChecked ? 'hover:border-primary/20 cursor-pointer' : 'cursor-default'}`}
               >
                 <div className={`w-5 h-5 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center
-                  ${isSelected && !mcqChecked ? 'border-indigo-500 bg-indigo-500' :
-                    mcqChecked && isCorrect ? 'border-green-500 bg-green-500' :
-                    mcqChecked && isSelected ? 'border-red-500 bg-red-500' :
-                    'border-gray-300'}`}
+                  ${isSelected && !mcqChecked ? 'border-primary bg-primary' :
+                    mcqChecked && isCorrect ? 'border-success bg-success' :
+                    mcqChecked && isSelected ? 'border-destructive bg-destructive' :
+                    'border-border'}`}
                 >
                   {(isSelected || (mcqChecked && isCorrect)) && (
                     <span className="text-white text-[10px]">●</span>
                   )}
                 </div>
                 <div className="flex-1 space-y-1">
-                  <span className="text-sm text-gray-800">
-                    {PART_LABELS[i]}. {opt.text || <span className="text-gray-400 italic">ยังไม่มีข้อความ</span>}
+                  <span className="text-sm text-foreground">
+                    {PART_LABELS[i]}. {opt.text || <span className="text-muted-foreground italic">ยังไม่มีข้อความ</span>}
                   </span>
                   {opt.image_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={opt.image_url} alt={`ตัวเลือก ${PART_LABELS[i]}`}
-                      className="max-h-32 rounded border border-gray-200 object-contain" />
+                      className="max-h-32 rounded border border-border object-contain" />
                   )}
                   {mcqChecked && isCorrect && (
-                    <span className="text-xs text-green-600 font-medium block">✓ ถูกต้อง</span>
+                    <span className="text-xs text-success font-medium block">✓ ถูกต้อง</span>
                   )}
                   {mcqChecked && isSelected && !isCorrect && (
-                    <span className="text-xs text-red-500 font-medium block">✗ คำตอบของคุณ</span>
+                    <span className="text-xs text-destructive font-medium block">✗ คำตอบของคุณ</span>
                   )}
                 </div>
               </button>
@@ -352,15 +352,15 @@ export function QuestionPreviewContent({
               type="button"
               onClick={() => setMcqChecked(true)}
               disabled={selectedMcq === null}
-              className="mt-1 px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+              className="mt-1 px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
             >
               ตรวจคำตอบ
             </button>
           ) : (
             <div className={`p-3 rounded-lg text-sm font-medium border ${
               selectedMcq !== null && mcqOptions[selectedMcq]?.is_correct
-                ? 'bg-green-50 text-green-700 border-green-200'
-                : 'bg-red-50 text-red-700 border-red-200'
+                ? 'bg-success/10 text-success border-success/20'
+                : 'bg-destructive/10 text-destructive border-destructive/20'
             }`}>
               {selectedMcq !== null && mcqOptions[selectedMcq]?.is_correct
                 ? '🎉 ถูกต้อง!'
@@ -374,15 +374,15 @@ export function QuestionPreviewContent({
       {/* ── Matching ── */}
       {questionType === 'matching' && matchingPairs.length > 0 && (
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm border-collapse">
-              <thead className="bg-gray-50">
-                <tr className="text-xs text-gray-500">
-                  <th className="text-left py-2 px-3 font-medium border-b border-gray-200 w-1/2">รายการ</th>
-                  <th className="text-left py-2 px-3 font-medium border-b border-gray-200 w-1/2">คำตรงกัน (สุ่มลำดับแล้ว)</th>
+              <thead className="bg-muted">
+                <tr className="text-xs text-muted-foreground">
+                  <th className="text-left py-2 px-3 font-medium border-b border-border w-1/2">รายการ</th>
+                  <th className="text-left py-2 px-3 font-medium border-b border-border w-1/2">คำตรงกัน (สุ่มลำดับแล้ว)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-border">
                 {matchingPairs.map((pair, i) => {
                   const rightIdx = shuffledRight[i] ?? i
                   const rightPair = matchingPairs[rightIdx]
@@ -390,24 +390,24 @@ export function QuestionPreviewContent({
                     <tr key={i}>
                       <td className="py-2 px-3 align-top">
                         <div className="flex items-start gap-2">
-                          <span className="text-xs text-gray-500 shrink-0 mt-0.5 font-medium">{i + 1}.</span>
+                          <span className="text-xs text-muted-foreground shrink-0 mt-0.5 font-medium">{i + 1}.</span>
                           <div>
-                            <span className="text-gray-800">{pair.left_text || `รายการ ${i + 1}`}</span>
+                            <span className="text-foreground">{pair.left_text || `รายการ ${i + 1}`}</span>
                             {pair.left_image && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={pair.left_image} alt="" className="mt-1 max-h-16 rounded border border-gray-200 object-contain" />
+                              <img src={pair.left_image} alt="" className="mt-1 max-h-16 rounded border border-border object-contain" />
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="py-2 px-3 align-top">
                         <div className="flex items-start gap-2">
-                          <span className="text-xs text-indigo-500 shrink-0 mt-0.5 font-medium">{RIGHT_LABELS[i]}.</span>
+                          <span className="text-xs text-primary shrink-0 mt-0.5 font-medium">{RIGHT_LABELS[i]}.</span>
                           <div>
-                            <span className="text-gray-800">{rightPair?.right_text || `คำตรงกัน ${i + 1}`}</span>
+                            <span className="text-foreground">{rightPair?.right_text || `คำตรงกัน ${i + 1}`}</span>
                             {rightPair?.right_image && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={rightPair.right_image} alt="" className="mt-1 max-h-16 rounded border border-gray-200 object-contain" />
+                              <img src={rightPair.right_image} alt="" className="mt-1 max-h-16 rounded border border-border object-contain" />
                             )}
                           </div>
                         </div>
@@ -420,7 +420,7 @@ export function QuestionPreviewContent({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs text-gray-500 font-medium">เลือกตัวอักษรที่ตรงกัน:</p>
+            <p className="text-xs text-muted-foreground font-medium">เลือกตัวอักษรที่ตรงกัน:</p>
             {matchingPairs.map((pair, i) => {
               const correctLabel = shuffledRight.length > 0
                 ? RIGHT_LABELS[shuffledRight.indexOf(i)]
@@ -430,7 +430,7 @@ export function QuestionPreviewContent({
               const isWrong = matchingChecked && studentSelected !== correctLabel
               return (
                 <div key={i} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-700 shrink-0 w-28 truncate">
+                  <span className="text-sm text-muted-foreground shrink-0 w-28 truncate">
                     {i + 1}. {pair.left_text || `รายการ ${i + 1}`}
                   </span>
                   <select
@@ -443,9 +443,9 @@ export function QuestionPreviewContent({
                     }}
                     disabled={matchingChecked}
                     className={`h-8 w-20 border rounded-lg px-2 text-sm text-center ${
-                      isCorrect ? 'border-green-400 bg-green-50 text-green-700' :
-                      isWrong ? 'border-red-400 bg-red-50 text-red-700' :
-                      'border-gray-300 bg-white'
+                      isCorrect ? 'border-success bg-success/10 text-success' :
+                      isWrong ? 'border-destructive bg-destructive/10 text-destructive' :
+                      'border-border bg-card'
                     }`}
                   >
                     <option value="">—</option>
@@ -453,8 +453,8 @@ export function QuestionPreviewContent({
                       <option key={label} value={label}>{label}</option>
                     ))}
                   </select>
-                  {isCorrect && <span className="text-xs text-green-600 font-medium">✓</span>}
-                  {isWrong && <span className="text-xs text-red-500">✗ เฉลย: <strong>{correctLabel}</strong></span>}
+                  {isCorrect && <span className="text-xs text-success font-medium">✓</span>}
+                  {isWrong && <span className="text-xs text-destructive">✗ เฉลย: <strong>{correctLabel}</strong></span>}
                 </div>
               )
             })}
@@ -465,17 +465,17 @@ export function QuestionPreviewContent({
               type="button"
               onClick={() => setMatchingChecked(true)}
               disabled={!allMatchingFilled}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+              className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
             >
               ตรวจคำตอบ
             </button>
           ) : (
             <div className={`p-3 rounded-lg text-sm font-medium border ${
               matchingScore === matchingPairs.length
-                ? 'bg-green-50 text-green-700 border-green-200'
+                ? 'bg-success/10 text-success border-success/20'
                 : matchingScore > 0
                   ? 'bg-orange-50 text-orange-700 border-orange-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-destructive/10 text-destructive border-destructive/20'
             }`}>
               {matchingScore === matchingPairs.length
                 ? '🎉 ถูกต้องทุกข้อ!'
@@ -503,25 +503,25 @@ export function QuestionPreviewContent({
               }}
               readOnly={writtenChecked}
               placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)"
-              className={`h-9 w-36 border rounded-lg px-3 text-sm bg-white font-mono ${
-                result === true ? 'border-green-400' :
-                result === false ? 'border-red-400' :
-                'border-gray-300'
+              className={`h-9 w-36 border rounded-lg px-3 text-sm bg-card font-mono ${
+                result === true ? 'border-success' :
+                result === false ? 'border-destructive' :
+                'border-border'
               }`}
             />
           )
           const feedback = (
             <>
               {result === true && (
-                <span className="text-green-600 text-sm font-medium">✓ ถูก!</span>
+                <span className="text-success text-sm font-medium">✓ ถูก!</span>
               )}
               {result === false && correctAnswer !== null && typeof correctAnswer === 'number' && (
-                <span className="text-red-500 text-sm">
+                <span className="text-destructive text-sm">
                   ✗ เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
                 </span>
               )}
               {result === false && (correctAnswer === null || typeof correctAnswer !== 'number') && (
-                <span className="text-red-500 text-sm">✗ ผิด</span>
+                <span className="text-destructive text-sm">✗ ผิด</span>
               )}
             </>
           )
@@ -532,10 +532,10 @@ export function QuestionPreviewContent({
 
         return (
         <div className="space-y-3">
-          <p className="text-xs text-gray-500 font-medium">กรอกคำตอบ:</p>
+          <p className="text-xs text-muted-foreground font-medium">กรอกคำตอบ:</p>
 
           {mainBlankCount > 0 && mainBlanks && (
-            <div className="leading-loose text-gray-900 text-[15px]">
+            <div className="leading-loose text-foreground text-[15px]">
               {mainBlanks.parts.map((frag, i) => {
                 const num = mainBlanks.numbers[i]
                 const part = answerParts[i]
@@ -545,9 +545,9 @@ export function QuestionPreviewContent({
                   <span key={i}>
                     {frag && <RichText text={frag} className="[&_p]:inline" />}
                     <span className="inline-flex items-center gap-1.5 mx-1 align-middle">
-                      <span className="text-xs font-semibold text-gray-400 shrink-0">{num})</span>
+                      <span className="text-xs font-semibold text-muted-foreground shrink-0">{num})</span>
                       {inputEl}
-                      {part.unit && <span className="text-gray-600">{renderUnit(part.unit)}</span>}
+                      {part.unit && <span className="text-muted-foreground">{renderUnit(part.unit)}</span>}
                       {feedback}
                     </span>
                   </span>
@@ -564,33 +564,33 @@ export function QuestionPreviewContent({
             return (
               <div key={part.id} className="space-y-1.5">
                 {blankSplit ? (
-                  <div className={`flex flex-wrap items-center gap-2 p-3 rounded-lg border text-sm text-gray-800 ${
-                    writtenResults[i] === true ? 'bg-green-50 border-green-300' :
-                    writtenResults[i] === false ? 'bg-red-50 border-red-300' :
-                    'bg-gray-50 border-gray-200'
+                  <div className={`flex flex-wrap items-center gap-2 p-3 rounded-lg border text-sm text-foreground ${
+                    writtenResults[i] === true ? 'bg-success/10 border-success/20' :
+                    writtenResults[i] === false ? 'bg-destructive/10 border-destructive/20' :
+                    'bg-muted border-border'
                   }`}>
                     {answerParts.length > 1 && <span className="font-medium shrink-0">{labels[i] ?? i + 1})</span>}
                     {blankSplit[0] && <RichText text={blankSplit[0]} className="[&_p]:inline" />}
                     {inputEl}
-                    {part.unit && <span className="text-gray-600">{renderUnit(part.unit)}</span>}
+                    {part.unit && <span className="text-muted-foreground">{renderUnit(part.unit)}</span>}
                     {blankSplit[1] && <RichText text={blankSplit[1]} className="[&_p]:inline" />}
                     {feedback}
                   </div>
                 ) : (
                   <>
                     {part.sub_text && (
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-sm font-medium text-muted-foreground">
                         {answerParts.length > 1 && <>{labels[i] ?? i + 1}) </>}
-                        <RichText text={part.sub_text} className="font-normal text-gray-600" />
+                        <RichText text={part.sub_text} className="font-normal text-muted-foreground" />
                       </p>
                     )}
                     <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                      writtenResults[i] === true ? 'bg-green-50 border-green-300' :
-                      writtenResults[i] === false ? 'bg-red-50 border-red-300' :
-                      'bg-gray-50 border-gray-200'
+                      writtenResults[i] === true ? 'bg-success/10 border-success/20' :
+                      writtenResults[i] === false ? 'bg-destructive/10 border-destructive/20' :
+                      'bg-muted border-border'
                     }`}>
                       {inputEl}
-                      {part.unit && <span className="text-sm text-gray-600">{renderUnit(part.unit)}</span>}
+                      {part.unit && <span className="text-sm text-muted-foreground">{renderUnit(part.unit)}</span>}
                       {feedback}
                     </div>
                   </>
@@ -603,17 +603,17 @@ export function QuestionPreviewContent({
               type="button"
               onClick={checkWritten}
               disabled={!allWrittenFilled}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+              className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
             >
               ตรวจคำตอบ
             </button>
           ) : (
             <div className={`p-3 rounded-lg text-sm font-medium border ${
               writtenResults.every(r => r === true)
-                ? 'bg-green-50 text-green-700 border-green-200'
+                ? 'bg-success/10 text-success border-success/20'
                 : writtenResults.some(r => r === true)
                   ? 'bg-orange-50 text-orange-700 border-orange-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-destructive/10 text-destructive border-destructive/20'
             }`}>
               {writtenResults.every(r => r === true)
                 ? '🎉 ถูกต้องทุกข้อ!'
@@ -630,13 +630,13 @@ export function QuestionPreviewContent({
       {/* ── Essay ── */}
       {questionType === 'essay' && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-500 font-medium">กรอกคำตอบ (บรรยาย):</p>
+          <p className="text-xs text-muted-foreground font-medium">กรอกคำตอบ (บรรยาย):</p>
           <textarea
             rows={5}
             placeholder="พิมพ์คำตอบที่นี่..."
-            className="w-full border border-gray-300 rounded-lg p-3 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="w-full border border-border rounded-lg p-3 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-indigo-300"
           />
-          <p className="text-xs text-indigo-500 bg-indigo-50 px-3 py-2 rounded-lg">
+          <p className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
             * ครูจะเป็นผู้ตรวจและให้คะแนน — ระบบไม่ตรวจอัตโนมัติ
           </p>
         </div>
@@ -645,11 +645,11 @@ export function QuestionPreviewContent({
       {/* ── File upload ── */}
       {questionType === 'file_upload' && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-500 font-medium">แนบไฟล์คำตอบ (จำลอง):</p>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-gray-400">
+          <p className="text-xs text-muted-foreground font-medium">แนบไฟล์คำตอบ (จำลอง):</p>
+          <div className="border-2 border-dashed border-border rounded-lg p-6 text-center text-sm text-muted-foreground">
             📎 นักเรียนจะแนบไฟล์รูปภาพหรือ PDF ที่นี่
           </div>
-          <p className="text-xs text-indigo-500 bg-indigo-50 px-3 py-2 rounded-lg">
+          <p className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
             * ระบบให้คะแนนเต็มอัตโนมัติเมื่อมีการแนบไฟล์อย่างน้อย 1 ไฟล์ — ไม่มีการตรวจเนื้อหาไฟล์
           </p>
         </div>
@@ -665,17 +665,17 @@ export function QuestionPreviewContent({
         const total = items.length
         return (
           <div className="space-y-4">
-            <p className="text-xs text-gray-500 font-medium">
+            <p className="text-xs text-muted-foreground font-medium">
               ข้อใดต่อไปนี้{trueFalseConfig.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)
             </p>
             <div className="space-y-2">
               {items.map((st, i) => {
                 const ticked = tfAnswers[i] === 'true'
-                let cls = 'border-gray-200 bg-white'
+                let cls = 'border-border bg-card'
                 if (tfChecked) {
-                  cls = isTarget(st.correct_answer) ? 'border-green-400 bg-green-50' : ticked ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'
+                  cls = isTarget(st.correct_answer) ? 'border-success bg-success/10' : ticked ? 'border-destructive bg-destructive/10' : 'border-border bg-card'
                 } else if (ticked) {
-                  cls = 'border-indigo-400 bg-indigo-50'
+                  cls = 'border-primary bg-primary/10'
                 }
                 return (
                   <label key={i} className={`flex items-start gap-2.5 p-2.5 rounded-lg border-2 ${cls} ${tfChecked ? 'cursor-default' : 'cursor-pointer'}`}>
@@ -686,8 +686,8 @@ export function QuestionPreviewContent({
                       onChange={() => { if (!tfChecked) setTfAnswers(a => a.map((v, ai) => ai === i ? (v === 'true' ? 'false' : 'true') : v)) }}
                       className="mt-0.5"
                     />
-                    <span className="flex items-center gap-1.5 flex-wrap text-sm text-gray-800">
-                      <span className="text-xs font-bold text-gray-500">{labels[i] ?? i + 1})</span>
+                    <span className="flex items-center gap-1.5 flex-wrap text-sm text-foreground">
+                      <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
                       {i > 0 && <RenderText text={st.text} />}
                     </span>
                   </label>
@@ -697,7 +697,7 @@ export function QuestionPreviewContent({
 
             {trueFalseConfig.explanation_mode !== 'none' && (
               <div className="space-y-1">
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {trueFalseConfig.explanation_mode === 'wrong_only'
                     ? 'ให้เหตุผล (กรณีตอบผิด):'
                     : 'ให้เหตุผล:'}
@@ -708,9 +708,9 @@ export function QuestionPreviewContent({
                   readOnly={tfChecked}
                   rows={3}
                   placeholder="พิมพ์เหตุผลที่นี่..."
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
-                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-lg">
+                <p className="text-xs text-warning bg-warning/10 px-2 py-1.5 rounded-lg">
                   ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
                 </p>
               </div>
@@ -720,15 +720,15 @@ export function QuestionPreviewContent({
               <button
                 type="button"
                 onClick={() => setTfChecked(true)}
-                className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium transition-colors"
+                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 font-medium transition-colors"
               >
                 ตรวจคำตอบ
               </button>
             ) : (
               <div className={`p-3 rounded-lg text-sm font-medium border ${
                 correctCount === total
-                  ? 'bg-green-50 text-green-700 border-green-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
+                  ? 'bg-success/10 text-success border-success/20'
+                  : 'bg-destructive/10 text-destructive border-destructive/20'
               }`}>
                 {correctCount === total ? '🎉 ถูกต้องทุกข้อ!' : `ถูก ${correctCount}/${total} ข้อ`}
               </div>
@@ -747,19 +747,19 @@ export function QuestionPreviewContent({
         const total = 1 + subStatements.length
         return (
           <div className="space-y-4">
-            <p className="text-xs text-gray-500 font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
+            <p className="text-xs text-muted-foreground font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
             {[{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...subStatements].map((st, i) => (
               <div key={i} className="space-y-1.5">
                 {hasSubs && (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-gray-500">{labels[i] ?? i + 1})</span>
+                    <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
                     {i > 0 && <RenderText text={st.text} />}
                   </div>
                 )}
                 <div className="flex gap-3">
                   {([
-                    { val: 'true' as const,  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' },
-                    { val: 'false' as const, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' },
+                    { val: 'true' as const,  label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
+                    { val: 'false' as const, label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
                   ]).map(({ val, label, cls }) => (
                     <button
                       key={val}
@@ -768,9 +768,9 @@ export function QuestionPreviewContent({
                       onClick={() => { if (!tfChecked) setTfAnswers(a => a.map((v, ai) => ai === i ? val : v)) }}
                       className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
                         tfAnswers[i] === val && !tfChecked ? cls :
-                        tfChecked && val === (st.correct_answer ? 'true' : 'false') ? 'border-green-500 bg-green-50 text-green-700' :
-                        tfChecked && tfAnswers[i] === val ? 'border-red-400 bg-red-50 text-red-600' :
-                        'border-gray-200 text-gray-500'
+                        tfChecked && val === (st.correct_answer ? 'true' : 'false') ? 'border-success bg-success/10 text-success' :
+                        tfChecked && tfAnswers[i] === val ? 'border-destructive bg-destructive/10 text-destructive' :
+                        'border-border text-muted-foreground'
                       }`}
                     >
                       {label}
@@ -782,7 +782,7 @@ export function QuestionPreviewContent({
 
             {trueFalseConfig.explanation_mode !== 'none' && (
               <div className="space-y-1">
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {trueFalseConfig.explanation_mode === 'wrong_only'
                     ? 'ให้เหตุผล (กรณีตอบผิด):'
                     : 'ให้เหตุผล:'}
@@ -793,9 +793,9 @@ export function QuestionPreviewContent({
                   readOnly={tfChecked}
                   rows={3}
                   placeholder="พิมพ์เหตุผลที่นี่..."
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
-                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-lg">
+                <p className="text-xs text-warning bg-warning/10 px-2 py-1.5 rounded-lg">
                   ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
                 </p>
               </div>
@@ -806,15 +806,15 @@ export function QuestionPreviewContent({
                 type="button"
                 onClick={() => setTfChecked(true)}
                 disabled={tfAnswers.some(a => a === null)}
-                className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
               >
                 ตรวจคำตอบ
               </button>
             ) : (
               <div className={`p-3 rounded-lg text-sm font-medium border ${
                 correctCount === total
-                  ? 'bg-green-50 text-green-700 border-green-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
+                  ? 'bg-success/10 text-success border-success/20'
+                  : 'bg-destructive/10 text-destructive border-destructive/20'
               }`}>
                 {total > 1
                   ? `ถูก ${correctCount}/${total} ข้อ`
@@ -839,7 +839,7 @@ export function QuestionPreviewContent({
         const hasAuto = autoIdx.length > 0
         return (
           <div className="space-y-4">
-            <div className="leading-loose text-gray-900 text-[15px]">
+            <div className="leading-loose text-foreground text-[15px]">
               {parts.map((part, i) => {
                 const type = types[i]
                 return (
@@ -855,8 +855,8 @@ export function QuestionPreviewContent({
                           setFillAnswers(next)
                         }}
                         disabled={fillChecked}
-                        className={`inline-block mx-1 px-2 py-0.5 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600 ${
-                          fillChecked ? (fillResults[i] ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50') : ''
+                        className={`inline-block mx-1 px-2 py-0.5 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring ${
+                          fillChecked ? (fillResults[i] ? 'border-success bg-success/10' : 'border-destructive bg-destructive/10') : ''
                         }`}
                       >
                         <option value="">เลือกคำตอบ</option>
@@ -875,9 +875,9 @@ export function QuestionPreviewContent({
                           setFillAnswers(next)
                         }}
                         readOnly={fillChecked}
-                        className={`inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600 ${
+                        className={`inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring ${
                           fillChecked && type !== 'text'
-                            ? fillResults[i] ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50'
+                            ? fillResults[i] ? 'border-success bg-success/10' : 'border-destructive bg-destructive/10'
                             : ''
                         }`}
                       />
@@ -898,7 +898,7 @@ export function QuestionPreviewContent({
                 {fillChecked && (
                   <div className="space-y-1">
                     {blanks.map((b, i) => types[i] === 'text' ? null : (
-                      <p key={i} className={`text-xs px-2 py-1 rounded ${fillResults[i] ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                      <p key={i} className={`text-xs px-2 py-1 rounded ${fillResults[i] ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'}`}>
                         {fillResults[i]
                           ? `✓ ช่อง ${blankNumbers[i] ?? i + 1}: ถูกต้อง`
                           : `✗ ช่อง ${blankNumbers[i] ?? i + 1}: เฉลยคือ "${acceptedAnswers(b).join(' หรือ ')}"`}
@@ -918,17 +918,17 @@ export function QuestionPreviewContent({
                       setFillChecked(true)
                     }}
                     disabled={autoIdx.some(i => !fillAnswers[i]?.trim())}
-                    className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                    className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
                   >
                     ตรวจคำตอบ
                   </button>
                 ) : (
                   <div className={`p-3 rounded-lg text-sm font-medium border ${
                     autoIdx.every(i => fillResults[i])
-                      ? 'bg-green-50 text-green-700 border-green-200'
+                      ? 'bg-success/10 text-success border-success/20'
                       : autoIdx.some(i => fillResults[i])
                         ? 'bg-orange-50 text-orange-700 border-orange-200'
-                        : 'bg-red-50 text-red-700 border-red-200'
+                        : 'bg-destructive/10 text-destructive border-destructive/20'
                   }`}>
                     {autoIdx.every(i => fillResults[i])
                       ? '🎉 ถูกต้องทุกช่อง (ที่ตรวจอัตโนมัติ)!'
@@ -951,7 +951,7 @@ export function QuestionPreviewContent({
 
         return (
           <div className="space-y-3">
-            <p className="text-xs text-gray-500 font-medium">เลือกลำดับสำหรับแต่ละรายการ:</p>
+            <p className="text-xs text-muted-foreground font-medium">เลือกลำดับสำหรับแต่ละรายการ:</p>
             <div className="space-y-2">
               {shuffledItems.map((item) => {
                 const sel = orderSelections[item.id] ?? ''
@@ -960,15 +960,15 @@ export function QuestionPreviewContent({
                 const isWrong = orderChecked && sel !== String(correctPos)
                 return (
                   <div key={item.id} className={`flex items-center gap-3 p-2.5 rounded-lg border ${
-                    isCorrect ? 'border-green-300 bg-green-50' :
-                    isWrong ? 'border-red-300 bg-red-50' :
-                    'border-gray-200 bg-white'
+                    isCorrect ? 'border-success/20 bg-success/10' :
+                    isWrong ? 'border-destructive/20 bg-destructive/10' :
+                    'border-border bg-card'
                   }`}>
                     {item.image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border border-gray-200" />
+                      <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border border-border" />
                     )}
-                    <span className="flex-1 text-sm text-gray-800">{item.text}</span>
+                    <span className="flex-1 text-sm text-foreground">{item.text}</span>
                     <select
                       value={sel}
                       onChange={(e) => {
@@ -977,9 +977,9 @@ export function QuestionPreviewContent({
                       }}
                       disabled={orderChecked}
                       className={`h-8 w-16 border rounded-lg px-1 text-sm text-center ${
-                        isCorrect ? 'border-green-400 text-green-700' :
-                        isWrong ? 'border-red-400 text-red-600' :
-                        'border-gray-300'
+                        isCorrect ? 'border-success text-success' :
+                        isWrong ? 'border-destructive text-destructive' :
+                        'border-border'
                       }`}
                     >
                       <option value="">—</option>
@@ -987,8 +987,8 @@ export function QuestionPreviewContent({
                         <option key={i + 1} value={String(i + 1)}>ที่ {i + 1}</option>
                       ))}
                     </select>
-                    {isCorrect && <span className="text-xs text-green-600 font-medium w-16">✓ ถูก</span>}
-                    {isWrong && <span className="text-xs text-red-500 w-16">✗ ควรที่ {correctPos}</span>}
+                    {isCorrect && <span className="text-xs text-success font-medium w-16">✓ ถูก</span>}
+                    {isWrong && <span className="text-xs text-destructive w-16">✗ ควรที่ {correctPos}</span>}
                   </div>
                 )
               })}
@@ -1003,7 +1003,7 @@ export function QuestionPreviewContent({
                 type="button"
                 onClick={() => setOrderChecked(true)}
                 disabled={!allSelected || hasDuplicate}
-                className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
               >
                 ตรวจคำตอบ
               </button>
@@ -1011,9 +1011,9 @@ export function QuestionPreviewContent({
               const correct = shuffledItems.filter(it => orderSelections[it.id] === String(correctOrder.indexOf(it.id) + 1)).length
               return (
                 <div className={`p-3 rounded-lg text-sm font-medium border ${
-                  correct === n ? 'bg-green-50 text-green-700 border-green-200' :
+                  correct === n ? 'bg-success/10 text-success border-success/20' :
                   correct > 0 ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                  'bg-red-50 text-red-700 border-red-200'
+                  'bg-destructive/10 text-destructive border-destructive/20'
                 }`}>
                   {correct === n ? '🎉 ถูกต้องทุกรายการ!' : `✅ ถูก ${correct}/${n} รายการ`}
                 </div>
@@ -1031,17 +1031,17 @@ export function QuestionPreviewContent({
           <div className="space-y-4">
             {compositeParts.map((part, i) => {
               const result = compositeChecked ? compositeResults[i] : null
-              const boxClass = result === true ? 'border-green-300 bg-green-50' : result === false ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'
+              const boxClass = result === true ? 'border-success/20 bg-success/10' : result === false ? 'border-destructive/20 bg-destructive/10' : 'border-border bg-card'
               function setAnswer(v: string) {
                 setCompositeAnswers(prev => { const next = [...prev]; next[i] = v; return next })
               }
               return (
                 <div key={part.id} className={`rounded-xl border p-3.5 space-y-2.5 ${boxClass}`}>
                   <div className="flex items-center gap-2">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center justify-center">{labels[i] ?? i + 1}</span>
-                    {result === true && <span className="text-xs text-green-600 font-medium">✓ ถูก</span>}
-                    {result === false && <span className="text-xs text-red-500 font-medium">✗ ผิด</span>}
-                    {result === null && compositeChecked && <span className="text-xs text-amber-600 font-medium">รอครูตรวจ</span>}
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs font-bold flex items-center justify-center">{labels[i] ?? i + 1}</span>
+                    {result === true && <span className="text-xs text-success font-medium">✓ ถูก</span>}
+                    {result === false && <span className="text-xs text-destructive font-medium">✗ ผิด</span>}
+                    {result === null && compositeChecked && <span className="text-xs text-warning font-medium">รอครูตรวจ</span>}
                   </div>
 
                   {part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0 && (() => {
@@ -1056,15 +1056,15 @@ export function QuestionPreviewContent({
                     }
                     return (
                       <>
-                        <RichText text={part.text} className="text-[15px] text-gray-900" />
-                        <p className="text-xs text-gray-500">ข้อใดต่อไปนี้{part.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
+                        <RichText text={part.text} className="text-[15px] text-foreground" />
+                        <p className="text-xs text-muted-foreground">ข้อใดต่อไปนี้{part.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
                         <div className="space-y-1.5">
                           {part.choices!.map((c, ci) => {
                             const ticked = ticks[ci] === 'true'
                             const isTargetChoice = flip ? !c.correct_answer : c.correct_answer
-                            let cls = 'border-gray-200'
-                            if (compositeChecked) cls = isTargetChoice ? 'border-green-400 bg-green-50' : ticked ? 'border-red-400 bg-red-50' : 'border-gray-200'
-                            else if (ticked) cls = 'border-indigo-400 bg-indigo-50'
+                            let cls = 'border-border'
+                            if (compositeChecked) cls = isTargetChoice ? 'border-success bg-success/10' : ticked ? 'border-destructive bg-destructive/10' : 'border-border'
+                            else if (ticked) cls = 'border-primary bg-primary/10'
                             return (
                               <label key={c.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${cls} ${compositeChecked ? 'cursor-not-allowed opacity-90' : ''}`}>
                                 <input type="checkbox" checked={ticked} disabled={compositeChecked} onChange={() => toggleChoice(ci)} />
@@ -1079,12 +1079,12 @@ export function QuestionPreviewContent({
 
                   {part.type === 'true_false' && !(Array.isArray(part.choices) && part.choices.length > 0) && (
                     <>
-                      <RichText text={part.text} className="text-[15px] text-gray-900" />
+                      <RichText text={part.text} className="text-[15px] text-foreground" />
                       <div className="flex gap-3">
-                        {[{ val: true, label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' }, { val: false, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' }].map(({ val, label, cls }) => (
+                        {[{ val: true, label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' }, { val: false, label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' }].map(({ val, label, cls }) => (
                           <button key={String(val)} type="button" disabled={compositeChecked}
                             onClick={() => setAnswer(String(val))}
-                            className={`flex-1 py-2 rounded-lg border-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${compositeAnswers[i] === String(val) ? cls : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}>
+                            className={`flex-1 py-2 rounded-lg border-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${compositeAnswers[i] === String(val) ? cls : 'border-border text-muted-foreground hover:border-ring'}`}>
                             {label}
                           </button>
                         ))}
@@ -1096,21 +1096,21 @@ export function QuestionPreviewContent({
                     const blank = part.blanks![0]
                     const split = splitAnswerBlankHtml(part.text)
                     const type = getBlankType(undefined, blank)
-                    if (!split) return <RichText text={part.text} className="text-[15px] text-gray-900" />
+                    if (!split) return <RichText text={part.text} className="text-[15px] text-foreground" />
                     return (
-                      <p className="leading-loose text-[15px] text-gray-900">
+                      <p className="leading-loose text-[15px] text-foreground">
                         <RichText text={split[0]} />
                         {type === 'dropdown' ? (
                           <select value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
                             onChange={e => setAnswer(e.target.value)}
-                            className="inline-block mx-1 px-2 py-0.5 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600">
+                            className="inline-block mx-1 px-2 py-0.5 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring">
                             <option value="">เลือกคำตอบ</option>
                             {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
                           </select>
                         ) : (
                           <input type="text" value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
                             onChange={e => setAnswer(e.target.value)}
-                            className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-indigo-400 bg-indigo-50 rounded text-sm text-center focus:outline-none focus:border-indigo-600" />
+                            className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring" />
                         )}
                         <RichText text={split[1]} />
                       </p>
@@ -1119,10 +1119,10 @@ export function QuestionPreviewContent({
 
                   {part.type === 'mcq' && (
                     <>
-                      <RichText text={part.text} className="text-[15px] text-gray-900" />
+                      <RichText text={part.text} className="text-[15px] text-foreground" />
                       <div className="space-y-1.5">
                         {(part.options ?? []).map((opt, oi) => (
-                          <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${compositeAnswers[i] === opt.text ? 'border-purple-400 bg-purple-50' : 'border-gray-200'} ${compositeChecked ? 'cursor-not-allowed opacity-80' : ''}`}>
+                          <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${compositeAnswers[i] === opt.text ? 'border-purple-400 bg-purple-50' : 'border-border'} ${compositeChecked ? 'cursor-not-allowed opacity-80' : ''}`}>
                             <input type="radio" name={`composite-mcq-${part.id}`} disabled={compositeChecked}
                               checked={compositeAnswers[i] === opt.text}
                               onChange={() => setAnswer(opt.text)} />
@@ -1144,14 +1144,14 @@ export function QuestionPreviewContent({
                     }
                     return (
                       <>
-                        <RichText text={part.text} className="text-[15px] text-gray-900" />
+                        <RichText text={part.text} className="text-[15px] text-foreground" />
                         <div className="space-y-2">
                           {items.map(item => (
-                            <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg border border-gray-200 bg-white">
-                              <RichText text={item.text} className="flex-1 text-sm text-gray-800" />
+                            <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg border border-border bg-card">
+                              <RichText text={item.text} className="flex-1 text-sm text-foreground" />
                               <select value={sel[item.id] ?? ''} disabled={compositeChecked}
                                 onChange={e => setSel(item.id, e.target.value)}
-                                className="h-8 w-16 border border-gray-300 rounded-lg px-1 text-sm text-center">
+                                className="h-8 w-16 border border-border rounded-lg px-1 text-sm text-center">
                                 <option value="">—</option>
                                 {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
                               </select>
@@ -1167,7 +1167,7 @@ export function QuestionPreviewContent({
 
             {!compositeChecked ? (
               <button type="button" onClick={checkComposite}
-                className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium transition-colors">
+                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 font-medium transition-colors">
                 ตรวจคำตอบ
               </button>
             ) : (() => {
@@ -1175,9 +1175,9 @@ export function QuestionPreviewContent({
               const correctCount = gradable.filter(Boolean).length
               return (
                 <div className={`p-3 rounded-lg text-sm font-medium border ${
-                  correctCount === autoCount ? 'bg-green-50 text-green-700 border-green-200' :
+                  correctCount === autoCount ? 'bg-success/10 text-success border-success/20' :
                   correctCount > 0 ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                  'bg-red-50 text-red-700 border-red-200'
+                  'bg-destructive/10 text-destructive border-destructive/20'
                 }`}>
                   {correctCount === autoCount ? '🎉 ถูกต้องทุกข้อ (ที่ตรวจอัตโนมัติ)!' : `✅ ถูก ${correctCount}/${autoCount} ข้อ (ที่ตรวจอัตโนมัติ)`}
                 </div>
@@ -1202,7 +1202,7 @@ export function QuestionPreview(props: QuestionPreviewProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+        className="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
       >
         👁 ดูตัวอย่าง
       </button>
@@ -1213,7 +1213,7 @@ export function QuestionPreview(props: QuestionPreviewProps) {
             <DialogTitle className="flex items-center gap-2">
               <span>👁</span>
               <span>มุมมองนักเรียน</span>
-              {props.isRandom && <span className="text-xs font-normal text-indigo-400">· ค่าถูกสุ่มแล้ว</span>}
+              {props.isRandom && <span className="text-xs font-normal text-primary">· ค่าถูกสุ่มแล้ว</span>}
             </DialogTitle>
           </DialogHeader>
 

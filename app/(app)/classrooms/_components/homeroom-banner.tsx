@@ -24,14 +24,14 @@ export function HomeroomBanner({ classroom, studentCount, isSelecting = false, i
         <div
           className={cn(
             'w-6 h-6 rounded-md border-2 border-white flex items-center justify-center shrink-0 transition-colors',
-            isSelected ? 'bg-white' : 'bg-white/20'
+            isSelected ? 'bg-card' : 'bg-card/20'
           )}
         >
-          {isSelected && <Check className="w-3.5 h-3.5 text-slate-800 stroke-[3]" />}
+          {isSelected && <Check className="w-3.5 h-3.5 text-foreground stroke-[3]" />}
         </div>
       )}
 
-      <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
+      <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
         <Home className="w-6 h-6 text-white" />
       </div>
 

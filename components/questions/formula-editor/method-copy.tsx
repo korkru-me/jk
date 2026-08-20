@@ -47,20 +47,20 @@ export function MethodCopy({ variables, value, unit, onSelect }: MethodCopyProps
       </div>
 
       {isPending && (
-        <p className="text-sm text-gray-400 text-center py-2">กำลังค้นหา...</p>
+        <p className="text-sm text-muted-foreground text-center py-2">กำลังค้นหา...</p>
       )}
 
       {results.length > 0 && (
         <div className="space-y-1.5">
-          <Label className="text-xs text-gray-500">ผลการค้นหา (จากคลังส่วนตัว):</Label>
+          <Label className="text-xs text-muted-foreground">ผลการค้นหา (จากคลังส่วนตัว):</Label>
           <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {results.map((q) => (
-              <div key={q.id} className="border rounded-lg p-3 hover:border-blue-200 transition-colors">
+              <div key={q.id} className="border rounded-lg p-3 hover:border-primary/20 transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{q.title}</p>
-                    <p className="font-mono text-xs text-blue-700 mt-0.5">{q.answer_formula}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="font-mono text-xs text-primary mt-0.5">{q.answer_formula}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       ตัวแปร: {(q.variables as Variable[]).map((v) => v.name).join(', ')} {q.answer_unit ? `| หน่วย: ${q.answer_unit}` : ''}
                     </p>
                   </div>
@@ -73,7 +73,7 @@ export function MethodCopy({ variables, value, unit, onSelect }: MethodCopyProps
                         q.answer_unit ?? ''
                       )
                     }
-                    className="shrink-0 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="shrink-0 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                   >
                     ใช้สูตรนี้
                   </button>
@@ -85,13 +85,13 @@ export function MethodCopy({ variables, value, unit, onSelect }: MethodCopyProps
       )}
 
       {query.length >= 2 && !isPending && results.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-4">ไม่พบโจทย์ที่ตรงกัน</p>
+        <p className="text-sm text-muted-foreground text-center py-4">ไม่พบโจทย์ที่ตรงกัน</p>
       )}
 
       {value && (
         <div className="space-y-1.5">
           <Label>สูตรที่เลือก:</Label>
-          <div className="p-3 bg-green-50 border border-green-200 rounded-lg font-mono text-sm">
+          <div className="p-3 bg-success/10 border border-success/20 rounded-lg font-mono text-sm">
             {value}
           </div>
         </div>

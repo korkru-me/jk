@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function LandingPage() {
   return (
-    <main className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
+    <main className="flex min-h-screen flex-col bg-card">
       <LandingNavbar />
 
       <HeroSection />

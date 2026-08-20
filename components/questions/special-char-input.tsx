@@ -115,7 +115,7 @@ export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void })
           'flex items-center gap-1 px-2 h-9 rounded-md border text-sm font-medium transition-colors',
           open
             ? 'bg-gray-900 text-white border-gray-900'
-            : 'text-gray-600 border-gray-200 bg-white hover:bg-gray-100 hover:border-gray-300',
+            : 'text-muted-foreground border-border bg-card hover:bg-muted hover:border-ring',
         )}
       >
         <span className="font-serif text-base leading-none">Ω</span>
@@ -123,11 +123,11 @@ export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void })
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-80">
+        <div className="absolute top-full left-0 mt-1 z-50 bg-card border border-border rounded-xl shadow-xl p-3 w-80">
           <div className="space-y-3 overflow-y-auto" style={{ maxHeight: '60vh' }}>
             {SYMBOL_GROUPS.map((group) => (
               <div key={group.label}>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                   {group.label}
                 </p>
                 <div className="flex flex-wrap gap-1">
@@ -141,7 +141,7 @@ export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void })
                         onInsert(char)
                         setOpen(false)
                       }}
-                      className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-800 text-sm font-serif hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded border border-border text-foreground text-sm font-serif hover:bg-primary/10 hover:border-primary/20 hover:text-primary transition-colors"
                     >
                       {char}
                     </button>
@@ -150,7 +150,7 @@ export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void })
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-2 pt-2 border-t">
+          <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
             วางเมาส์บนสัญลักษณ์เพื่อดูคำอธิบาย
           </p>
         </div>

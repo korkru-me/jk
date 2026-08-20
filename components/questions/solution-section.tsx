@@ -38,35 +38,35 @@ export function SolutionSection({
         className={cn(
           'group flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
           open
-            ? 'bg-amber-50/60 border-amber-200'
-            : 'bg-white border-gray-200 hover:border-amber-200 hover:bg-amber-50/40',
+            ? 'bg-warning/10 border-warning/20'
+            : 'bg-card border-border hover:border-warning/20 hover:bg-warning/10',
         )}
       >
         <span className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
-          open ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400 group-hover:bg-amber-100 group-hover:text-amber-500',
+          open ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground group-hover:bg-warning/10 group-hover:text-warning/80',
         )}>
           <Lightbulb className="w-4 h-4" />
         </span>
 
         <span className="flex-1 min-w-0">
-          <span className="block text-sm font-semibold text-gray-900">{label}</span>
+          <span className="block text-sm font-semibold text-foreground">{label}</span>
           {!open && (
-            <span className="block text-xs text-gray-400 truncate">
+            <span className="block text-xs text-muted-foreground truncate">
               {hasContent ? 'มีเนื้อหาแล้ว — กดเพื่อดู/แก้ไข' : 'กดเพื่อเพิ่มเฉลยหรือรูปประกอบ'}
             </span>
           )}
         </span>
 
         <ChevronDown className={cn(
-          'w-4 h-4 shrink-0 text-gray-400 transition-transform duration-200',
-          open && 'rotate-180 text-amber-500',
+          'w-4 h-4 shrink-0 text-muted-foreground transition-transform duration-200',
+          open && 'rotate-180 text-warning',
         )} />
       </button>
 
       {open && (
         <div className="mt-3 space-y-3 pl-1">
-          {description && <p className="text-xs text-gray-500">{description}</p>}
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
           <RichTextEditor value={text} onChange={onTextChange} placeholder={placeholder} rows={rows} />
           <QuestionImageUpload value={imageUrls} onChange={onImageUrlsChange} />
         </div>

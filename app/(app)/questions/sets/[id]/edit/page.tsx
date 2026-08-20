@@ -38,8 +38,8 @@ export default async function EditQuestionSetPage({ params }: Props) {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">แก้ไขชุดโจทย์</h1>
-        <p className="text-sm text-gray-500 mt-1">การแก้ไขจะไม่ย้อนกลับไปเปลี่ยนชุดข้อสอบที่มอบหมายไปแล้วจากชุดนี้</p>
+        <h1 className="text-2xl font-bold text-foreground">แก้ไขชุดโจทย์</h1>
+        <p className="text-sm text-muted-foreground mt-1">การแก้ไขจะไม่ย้อนกลับไปเปลี่ยนชุดข้อสอบที่มอบหมายไปแล้วจากชุดนี้</p>
       </div>
 
       <CreateQuestionSetForm

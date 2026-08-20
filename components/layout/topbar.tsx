@@ -53,31 +53,31 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
 
         {/* Dark / Light toggle switch */}
         <div className="flex items-center gap-1.5">
-          <Sun size={13} className={isDark ? 'text-muted-foreground' : 'text-amber-500'} />
+          <Sun size={13} className={isDark ? 'text-muted-foreground' : 'text-warning'} />
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             aria-label="สลับโหมดสี"
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-              isDark ? 'bg-indigo-500' : 'bg-slate-200'
+              isDark ? 'bg-primary' : 'bg-muted'
             }`}
           >
             <span
-              className={`pointer-events-none inline-flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ${
+              className={`pointer-events-none inline-flex h-5 w-5 items-center justify-center rounded-full bg-card shadow-md ring-0 transition-transform duration-200 ${
                 isDark ? 'translate-x-5' : 'translate-x-0'
               }`}
             >
               {isDark
-                ? <Moon size={10} className="text-indigo-600" />
-                : <Sun size={10} className="text-amber-500" />}
+                ? <Moon size={10} className="text-primary" />
+                : <Sun size={10} className="text-warning" />}
             </span>
           </button>
-          <Moon size={13} className={isDark ? 'text-indigo-400' : 'text-muted-foreground'} />
+          <Moon size={13} className={isDark ? 'text-primary' : 'text-muted-foreground'} />
         </div>
 
         {/* User dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted transition-colors outline-none">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
               {user.full_name.charAt(0)}
             </div>
             <span className="text-sm hidden sm:block">{user.full_name}</span>

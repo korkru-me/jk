@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { saveAnswer, saveWorkImage, saveFileSubmission, submitSubmission } from '@/lib/actions/submissions'
+import { gradeAnswer, type GradedAnswer } from '@/lib/assignment-attempt'
 import { WorkImageUpload } from './work-image-upload'
 import { FileSubmissionUpload } from './file-submission-upload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
-  Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, AlertTriangle,
+  Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Calculator as CalcIcon, BookOpen, PenLine, Wifi, WifiOff, ShieldAlert, Maximize,
 } from 'lucide-react'
 import { Calculator } from './calculator'
@@ -33,6 +34,10 @@ interface AnswerRow {
   correct_answer: string
   student_answer: string | null
   work_images: (string | null)[] | null
+  // Only populated for a teacher's preview (see previewMode) — real
+  // submission_answers rows carry this column too, but the real exam-taking
+  // route never needs it client-side since grading happens server-side.
+  max_score?: number
   questions: {
     title: string
     question_text: string
@@ -46,6 +51,8 @@ interface AnswerRow {
     extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | null
     image_urls: string[] | null
     requires_work_image: boolean
+    // Preview-only, see AnswerRow.max_score above.
+    answer_tolerance?: number
   }
 }
 
@@ -64,6 +71,12 @@ interface Props {
   durationMinutes: number | null
   startedAt: string
   config: ExamConfig
+  // Teacher-facing "see it as a student would" mode: renders the exact same
+  // UI/interactions but never calls the save/submit server actions (there is
+  // no real submission row behind `submissionId` to write to), and exits via
+  // `previewReturnHref` instead of the real post-submit redirect.
+  previewMode?: boolean
+  previewReturnHref?: string
 }
 
 // ─── ExamClient ───────────────────────────────────────────────────────────────
@@ -83,7 +96,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config }: Props) {
+export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, previewMode = false, previewReturnHref }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const [localAnswers, setLocalAnswers] = useState<Record<string, string>>(
     () => initLocalAnswers(answers)
@@ -96,6 +109,10 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [submitting, setSubmitting] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
+  // Preview-only: the client-side (never persisted) grading result shown
+  // after a teacher clicks submit in previewMode, in place of the real
+  // /submissions/[id] results page.
+  const [previewResult, setPreviewResult] = useState<{ graded: GradedAnswer[]; totalScore: number; totalMax: number } | null>(null)
 
   // ── UX state ────────────────────────────────────────────────────────────────
   const [flagged, setFlagged] = useState<Set<string>>(new Set())
@@ -147,8 +164,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     const task = (existing ?? Promise.resolve(true))
       .catch(() => false)
       .then(async () => {
-        const result = await saveAnswer(answerId, value)
-        if (result?.error) throw new Error(result.error)
+        const result: { error?: string } = previewMode ? {} : await saveAnswer(answerId, value)
+        if (result.error) throw new Error(result.error)
         if (pendingAnswerValuesRef.current.get(answerId) === value) {
           pendingAnswerValuesRef.current.delete(answerId)
         }
@@ -177,7 +194,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     inFlightSavesRef.current.set(answerId, task)
     setSaving(true)
     return task
-  }, [refreshSavingState])
+  }, [refreshSavingState, previewMode])
 
   const flushQueuedAnswers = useCallback(async () => {
     const queuedIds = [...pendingAnswerValuesRef.current.keys()]
@@ -347,21 +364,23 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       arr[partIndex] = url
       return { ...prev, [answerId]: arr }
     })
+    if (previewMode) return
     try {
       await saveWorkImage(answerId, partIndex, url)
     } catch {
       toast.error('บันทึกรูปวิธีทำไม่สำเร็จ ลองใหม่อีกครั้ง')
     }
-  }, [])
+  }, [previewMode])
 
   const handleFileSubmissionChange = useCallback(async (answerId: string, files: SubmittedFile[]) => {
     setLocalAnswers(prev => ({ ...prev, [answerId]: JSON.stringify(files) }))
+    if (previewMode) return
     try {
       await saveFileSubmission(answerId, files)
     } catch {
       toast.error('บันทึกไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง')
     }
-  }, [])
+  }, [previewMode])
 
   function toggleFlag(answerId: string) {
     setFlagged(prev => {
@@ -385,6 +404,30 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     // Do not grade against stale DB values when the student confirms within
     // the debounce window or while an earlier save is still in flight.
     await flushQueuedAnswers()
+    if (previewMode) {
+      // Grade locally with the exact same rules a real submission would get
+      // (see gradeAnswer) — nothing is written anywhere, so this costs
+      // nothing and leaves no trace.
+      const graded = answers.map(a => gradeAnswer({
+        id: a.id,
+        correct_answer: a.correct_answer,
+        student_answer: localAnswersRef.current[a.id] ?? null,
+        max_score: a.max_score ?? 0,
+        questions: {
+          question_type: a.questions.question_type,
+          answer_tolerance: a.questions.answer_tolerance ?? 0.1,
+          answer_parts: a.questions.answer_parts,
+          extra_data: a.questions.extra_data,
+        },
+      }))
+      const totalScore = graded.reduce((sum, g) => sum + g.score, 0)
+      const totalMax = answers.reduce((sum, a) => sum + (a.max_score ?? 0), 0)
+      localStorage.removeItem(LS_KEY(submissionId))
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
+      setPreviewResult({ graded, totalScore, totalMax })
+      setSubmitting(false)
+      return
+    }
     const result = await submitSubmission(submissionId)
     if (result?.error) {
       toast.error(result.error)
@@ -477,7 +520,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const toolBtn = (active: boolean) =>
     `flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
       active
-        ? 'bg-blue-600/15 border-blue-500/40 text-blue-600 dark:text-blue-400'
+        ? 'bg-primary/15 border-primary/40 text-primary'
         : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
     }`
 
@@ -639,7 +682,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             </Button>
           ) : (
             <Button
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white border-0"
+              className="flex-1 bg-success hover:bg-success/90 text-white border-0"
               onClick={openSubmitDialog}
             >
               ส่งคำตอบ ✓
@@ -655,14 +698,14 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         {secondsLeft !== null && (
           <div className={`rounded-2xl border p-4 text-center transition-colors ${
             timerDanger
-              ? 'border-red-500 bg-red-500/10 animate-pulse'
+              ? 'border-destructive bg-destructive/10 animate-pulse'
               : timerUrgent
               ? 'border-orange-400 bg-orange-500/8'
               : 'bg-card'
           }`}>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">เวลาที่เหลือ</p>
             <p className={`text-3xl font-black font-mono ${
-              timerDanger ? 'text-red-600 dark:text-red-400' :
+              timerDanger ? 'text-destructive' :
               timerUrgent ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
             }`}>
               {formatTime(secondsLeft)}
@@ -695,7 +738,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             )}
             {saving && <span className="ml-auto animate-pulse">กำลังบันทึก...</span>}
             {!isOnline && (
-              <span className="flex items-center gap-0.5 text-amber-500 ml-auto">
+              <span className="flex items-center gap-0.5 text-warning ml-auto">
                 <WifiOff size={9} /> ออฟไลน์
               </span>
             )}
@@ -711,9 +754,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               const isAns = hasAnswered(a.id)
               const isFlg = flagged.has(a.id)
               let cls = 'bg-muted text-muted-foreground'
-              if (isCur)      cls = 'bg-blue-600 text-white shadow-md shadow-blue-600/40 scale-110 z-10'
+              if (isCur)      cls = 'bg-primary text-white shadow-md shadow-blue-600/40 scale-110 z-10'
               else if (isFlg) cls = 'bg-orange-500 text-white'
-              else if (isAns) cls = 'bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
+              else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-green-900/30'
               return (
                 <button
                   key={i}
@@ -727,8 +770,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           </div>
           <div className="mt-3 border-t pt-3 space-y-1.5">
             {[
-              { cls: 'bg-blue-600', label: 'ข้อปัจจุบัน' },
-              { cls: 'bg-green-100 border border-green-300 dark:bg-green-900/30', label: 'ตอบแล้ว' },
+              { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
+              { cls: 'bg-success/10 border border-success/20 dark:bg-green-900/30', label: 'ตอบแล้ว' },
               { cls: 'bg-orange-500', label: 'ปักธง' },
               { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
             ].map(l => (
@@ -742,10 +785,10 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
         {/* Anti-cheat counter */}
         {tabSwitchCount > 0 && (
-          <div className="bg-red-500/10 border border-red-400/30 rounded-xl px-3 py-2 flex items-center gap-2">
-            <ShieldAlert size={14} className="text-red-500 shrink-0" />
+          <div className="bg-destructive/10 border border-destructive/30 rounded-xl px-3 py-2 flex items-center gap-2">
+            <ShieldAlert size={14} className="text-destructive shrink-0" />
             <div>
-              <p className="text-[10px] font-bold text-red-600 dark:text-red-400">สลับแท็บ {tabSwitchCount} ครั้ง</p>
+              <p className="text-[10px] font-bold text-destructive">สลับแท็บ {tabSwitchCount} ครั้ง</p>
               <p className="text-[9px] text-muted-foreground">ระบบบันทึกไว้แล้ว</p>
             </div>
           </div>
@@ -754,7 +797,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         <Button
           onClick={openSubmitDialog}
           disabled={submitting}
-          className="w-full bg-green-600 hover:bg-green-700 text-white border-0"
+          className="w-full bg-success hover:bg-success/90 text-white border-0"
         >
           {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
         </Button>
@@ -766,12 +809,22 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
   return (
     <>
+      {/* ── Preview mode banner ────────────────────────────────────────────── */}
+      {previewMode && (
+        <div className="fixed top-0 inset-x-0 z-[110] bg-warning text-amber-950 text-xs font-semibold px-4 py-1.5 flex items-center justify-center gap-3">
+          <span>🔍 โหมดตัวอย่าง — มุมมองนักเรียน (คำตอบจะไม่ถูกบันทึกจริง)</span>
+          <a href={previewReturnHref ?? '/assignments'} className="underline hover:no-underline">
+            ออกจากตัวอย่าง
+          </a>
+        </div>
+      )}
+
       {/* ── Fullscreen warning overlay ─────────────────────────────────────── */}
       {config.isFullscreenEnforced && showFullscreenWarning && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-red-950/95 backdrop-blur-sm">
           <div className="text-center max-w-md px-8">
-            <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-5">
-              <ShieldAlert size={40} className="text-red-400" />
+            <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-5">
+              <ShieldAlert size={40} className="text-destructive" />
             </div>
             <h2 className="text-2xl font-black text-white mb-2">⚠️ ออกจากโหมดเต็มจอ</h2>
             <p className="text-red-300 text-sm mb-6">
@@ -780,19 +833,19 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             </p>
             <button
               onClick={enterFullscreen}
-              className="bg-red-500 hover:bg-red-400 text-white font-bold px-8 py-3 rounded-xl transition-colors flex items-center gap-2 mx-auto"
+              className="bg-destructive hover:bg-destructive/90 text-white font-bold px-8 py-3 rounded-xl transition-colors flex items-center gap-2 mx-auto"
             >
               <Maximize size={18} />
               กลับสู่โหมดเต็มจอ
             </button>
-            <p className="text-red-500/60 text-xs mt-4">เหตุการณ์นี้ถูกบันทึกไว้ในระบบ</p>
+            <p className="text-destructive/60 text-xs mt-4">เหตุการณ์นี้ถูกบันทึกไว้ในระบบ</p>
           </div>
         </div>
       )}
 
       {/* ── Tab switch warning toast ───────────────────────────────────────── */}
       {showTabWarning && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] bg-red-600 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] bg-destructive text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
           <ShieldAlert size={16} />
           ตรวจพบการสลับแท็บ — ครั้งที่ {tabSwitchCount}
         </div>
@@ -807,8 +860,19 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       {showFormulaSheet && <FormulaSheet onClose={() => setShowFormulaSheet(false)} />}
       {showScratchpad   && <Scratchpad  onClose={() => setShowScratchpad(false)}  />}
 
+      {/* ── Preview results (previewMode only, after submit) ─────────────────── */}
+      {previewResult && (
+        <PreviewResultSummary
+          answers={answers}
+          graded={previewResult.graded}
+          totalScore={previewResult.totalScore}
+          totalMax={previewResult.totalMax}
+          returnHref={previewReturnHref ?? '/assignments'}
+        />
+      )}
+
       {/* ── Normal mode ────────────────────────────────────────────────────── */}
-      {!focusMode && (
+      {!focusMode && !previewResult && (
         <div className="flex flex-col gap-3">
           {/* Toolbar */}
           <ExamToolbar
@@ -838,7 +902,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       )}
 
       {/* ── Focus mode: full-screen overlay ────────────────────────────────── */}
-      {focusMode && (
+      {focusMode && !previewResult && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden">
           {/* Focus header */}
           <div className="shrink-0 border-b bg-card">
@@ -892,20 +956,20 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="bg-card border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="text-center mb-5">
-              <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 size={28} className="text-green-600" />
+              <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 size={28} className="text-success" />
               </div>
               <h3 className="font-bold text-lg">ยืนยันการส่งข้อสอบ</h3>
 
               <div className="mt-4 space-y-2 text-sm text-left bg-muted/40 rounded-xl p-4">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ตอบแล้ว</span>
-                  <span className="font-semibold text-green-600 dark:text-green-400">{answeredCount} / {answers.length} ข้อ</span>
+                  <span className="font-semibold text-success">{answeredCount} / {answers.length} ข้อ</span>
                 </div>
                 {unanswered > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">ยังไม่ตอบ</span>
-                    <span className="font-semibold text-amber-600 dark:text-amber-400">{unanswered} ข้อ</span>
+                    <span className="font-semibold text-warning">{unanswered} ข้อ</span>
                   </div>
                 )}
                 {flaggedCount > 0 && (
@@ -919,13 +983,13 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                     <span className="text-muted-foreground flex items-center gap-1">
                       <ShieldAlert size={12} /> สลับแท็บ
                     </span>
-                    <span className="font-semibold text-red-500">{tabSwitchCount} ครั้ง</span>
+                    <span className="font-semibold text-destructive">{tabSwitchCount} ครั้ง</span>
                   </div>
                 )}
               </div>
 
               {(unanswered > 0 || flaggedCount > 0) && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 flex items-center justify-center gap-1">
+                <p className="text-xs text-warning mt-3 flex items-center justify-center gap-1">
                   <AlertTriangle size={12} />
                   มีข้อที่ยังไม่ตอบหรือปักธงไว้ — ตรวจสอบอีกครั้งก่อนส่ง
                 </p>
@@ -940,7 +1004,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                 กลับไปตรวจ
               </Button>
               <Button
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white border-0 transition-all"
+                className="flex-1 bg-success hover:bg-success/90 text-white border-0 transition-all"
                 onClick={() => { setShowSubmitConfirm(false); handleSubmit() }}
                 disabled={submitting || submitCountdown > 0}
               >
@@ -955,6 +1019,91 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         </div>
       )}
     </>
+  )
+}
+
+// ─── Preview results (teacher preview only) ────────────────────────────────────
+
+function PreviewResultSummary({
+  answers, graded, totalScore, totalMax, returnHref,
+}: {
+  answers: AnswerRow[]
+  graded: GradedAnswer[]
+  totalScore: number
+  totalMax: number
+  returnHref: string
+}) {
+  const gradedById = new Map(graded.map(g => [g.id, g]))
+  const correctCount = graded.filter(g => g.is_correct === true).length
+  const wrongCount = graded.filter(g => g.is_correct === false).length
+  const pendingCount = graded.filter(g => g.is_correct === null).length
+  const pct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-4 py-4">
+      <div className="bg-card border rounded-2xl p-8 text-center">
+        <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-3xl font-black mb-4 ${
+          pct >= 75 ? 'bg-success/10 text-success'
+          : pct >= 50 ? 'bg-warning/10 text-warning'
+          : 'bg-destructive/10 text-destructive'
+        }`}>
+          {pct}%
+        </div>
+        <p className="text-4xl font-black">{totalScore}/{totalMax}</p>
+        <p className="text-muted-foreground mt-1 text-sm">คะแนนที่จะได้ (ตัวอย่าง — ไม่บันทึกจริง)</p>
+        <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1 text-success">
+            <CheckCircle2 size={13} /> ถูก {correctCount} ข้อ
+          </span>
+          <span className="flex items-center gap-1 text-destructive">
+            <XCircle size={13} /> ผิด {wrongCount} ข้อ
+          </span>
+          {pendingCount > 0 && (
+            <span className="flex items-center gap-1 text-warning">
+              <Clock size={13} /> ต้องตรวจเอง {pendingCount} ข้อ
+            </span>
+          )}
+        </div>
+        <a
+          href={returnHref}
+          className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-semibold px-4 py-2 transition-colors"
+        >
+          กลับไปหน้าชุดข้อสอบ
+        </a>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="font-semibold text-sm px-1">ตรวจเฉลยทีละข้อ</h2>
+        {answers.map((a, i) => {
+          const g = gradedById.get(a.id)
+          const isCorrect = g?.is_correct ?? null
+          return (
+            <div
+              key={a.id}
+              className={`bg-card border-l-4 rounded-xl p-4 flex items-start gap-3 ${
+                isCorrect === null ? 'border-l-amber-400'
+                : isCorrect ? 'border-l-green-500'
+                : 'border-l-red-400'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                isCorrect === null ? 'bg-warning/10 text-warning'
+                : isCorrect ? 'bg-success/10 text-success'
+                : 'bg-destructive/10 text-destructive'
+              }`}>
+                {isCorrect === null ? '⏳' : isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">ข้อ {i + 1}{a.questions.title ? ` — ${a.questions.title}` : ''}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {isCorrect === null ? 'ต้องให้ครูตรวจเอง' : `${g?.score ?? 0}/${a.max_score ?? 0} คะแนน`}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -1007,20 +1156,20 @@ function ExamToolbar({
         {saving ? (
           <span className="text-muted-foreground animate-pulse">บันทึก...</span>
         ) : pendingSync > 0 ? (
-          <span className="text-amber-500 flex items-center gap-1">
+          <span className="text-warning flex items-center gap-1">
             <WifiOff size={11} /> รอซิงก์ {pendingSync}
           </span>
         ) : isOnline ? (
-          <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+          <span className="text-success flex items-center gap-1">
             <Wifi size={11} /> บันทึกอัตโนมัติ
           </span>
         ) : (
-          <span className="text-amber-500 flex items-center gap-1">
+          <span className="text-warning flex items-center gap-1">
             <WifiOff size={11} /> ออฟไลน์
           </span>
         )}
         {tabSwitchCount > 0 && (
-          <span className="text-red-500 flex items-center gap-1">
+          <span className="text-destructive flex items-center gap-1">
             <ShieldAlert size={11} /> สลับแท็บ {tabSwitchCount}×
           </span>
         )}
@@ -1063,15 +1212,15 @@ function MCQInput({
               isEliminated
                 ? 'opacity-35 border-dashed border-border'
                 : isSelected
-                ? 'border-blue-500 bg-blue-500/8 dark:bg-blue-500/10'
-                : 'border-border hover:border-blue-300 dark:hover:border-blue-700'
+                ? 'border-primary bg-primary/8 dark:bg-primary/10'
+                : 'border-border hover:border-primary/20 dark:hover:border-blue-700'
             }`}
           >
             <label className="flex items-center gap-3 p-3 cursor-pointer flex-1 min-w-0">
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                isSelected ? 'border-blue-500 bg-blue-500' : 'border-muted-foreground/40'
+                isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/40'
               }`}>
-                {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                {isSelected && <div className="w-2 h-2 rounded-full bg-card" />}
               </div>
               <span className="font-bold text-sm text-muted-foreground shrink-0 w-5">{CHOICE_LABELS[i]}</span>
               <span className={`text-sm flex-1 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
@@ -1089,7 +1238,7 @@ function MCQInput({
             <button
               onClick={() => onToggleEliminate(i)}
               className={`p-2 mr-2 rounded-lg transition-all shrink-0 ${
-                isEliminated ? 'text-red-500 bg-red-500/10' : 'text-muted-foreground hover:text-red-400 hover:bg-muted'
+                isEliminated ? 'text-destructive bg-destructive/10' : 'text-muted-foreground hover:text-destructive/80 hover:bg-muted'
               }`}
               title={isEliminated ? 'เรียกคืนตัวเลือก' : 'ตัดทิ้ง'}
             >
@@ -1274,7 +1423,7 @@ function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChan
       <div className="space-y-2">
         {items.map((st, i) => (
           <label key={i} className={`flex items-start gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-colors ${
-            answers[i] === 'true' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' : 'border-border hover:border-muted-foreground'
+            answers[i] === 'true' ? 'border-primary bg-primary/10' : 'border-border hover:border-muted-foreground'
           }`}>
             <input type="checkbox" className="mt-0.5" checked={answers[i] === 'true'} onChange={() => toggle(i)} />
             <span className="flex items-center gap-1.5 flex-wrap text-sm">
@@ -1291,7 +1440,7 @@ function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChan
           </label>
           <textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
             placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
-          <p className="text-xs text-amber-600">ครูจะตรวจและให้คะแนนด้วยมือ</p>
+          <p className="text-xs text-warning">ครูจะตรวจและให้คะแนนด้วยมือ</p>
         </div>
       )}
     </div>
@@ -1321,8 +1470,8 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
         <p className="text-sm font-medium">ข้อความนี้ถูกหรือผิด?</p>
         <div className="flex gap-3">
           {([
-            { val: 'true',  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400' },
-            { val: 'false', label: '✗ ผิด', cls: 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' },
+            { val: 'true',  label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
+            { val: 'false', label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
           ] as const).map(({ val, label, cls }) => (
             <button key={val} type="button" onClick={() => update(val, explanation)}
               className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
@@ -1339,7 +1488,7 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
             </label>
             <textarea value={explanation} onChange={e => update(tfAnswer, e.target.value)} rows={3}
               placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
-            <p className="text-xs text-amber-600">ครูจะตรวจและให้คะแนนด้วยมือ</p>
+            <p className="text-xs text-warning">ครูจะตรวจและให้คะแนนด้วยมือ</p>
           </div>
         )}
       </div>
@@ -1370,8 +1519,8 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
           </div>
           <div className="flex gap-3">
             {([
-              { val: 'true',  label: '✓ ถูก', cls: 'border-green-500 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400' },
-              { val: 'false', label: '✗ ผิด', cls: 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' },
+              { val: 'true',  label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
+              { val: 'false', label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
             ] as const).map(({ val, label, cls }) => (
               <button key={val} type="button" onClick={() => updateAnswer(i, val)}
                 className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
@@ -1390,7 +1539,7 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
           </label>
           <textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
             placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
-          <p className="text-xs text-amber-600">ครูจะตรวจและให้คะแนนด้วยมือ</p>
+          <p className="text-xs text-warning">ครูจะตรวจและให้คะแนนด้วยมือ</p>
         </div>
       )}
     </div>
@@ -1421,7 +1570,7 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
             <RichText text={part} />
             {type === 'dropdown' ? (
               <select value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
-                className="inline-block mx-1 px-2 py-0.5 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600">
+                className="inline-block mx-1 px-2 py-0.5 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring">
                 <option value="">เลือกคำตอบ</option>
                 {(blank?.options ?? []).map((opt, oi) => (
                   <option key={oi} value={opt}>{opt}</option>
@@ -1429,7 +1578,7 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
               </select>
             ) : type !== null ? (
               <input type="text" value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
-                className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600"
+                className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring"
                 placeholder={`ช่อง ${blankNumbers[i] ?? i + 1}`} />
             ) : null}
           </span>
@@ -1485,7 +1634,7 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
         ))}
       </div>
       {hasdup     && <p className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 rounded-lg">⚠️ มีลำดับซ้ำ</p>}
-      {allFilled && !hasdup && <p className="text-xs text-green-600 dark:text-green-400">✓ เลือกครบแล้ว</p>}
+      {allFilled && !hasdup && <p className="text-xs text-success">✓ เลือกครบแล้ว</p>}
     </div>
   )
 }
@@ -1548,7 +1697,7 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
                 <div className="space-y-1.5">
                   {part.choices!.map((c, ci) => (
                     <label key={c.id} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
-                      choiceAnswers[ci] === 'true' ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30' : 'border-border'
+                      choiceAnswers[ci] === 'true' ? 'border-primary bg-primary/10' : 'border-border'
                     }`}>
                       <input type="checkbox" className="mt-0.5" checked={choiceAnswers[ci] === 'true'} onChange={() => toggleChoice(ci)} />
                       <RichText text={c.text} />
@@ -1564,8 +1713,8 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
               <RichText text={part.text} className="text-sm block" />
               <div className="flex gap-3">
                 {([
-                  { val: 'true', label: '✓ ถูก', cls: 'border-green-500 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400' },
-                  { val: 'false', label: '✗ ผิด', cls: 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' },
+                  { val: 'true', label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
+                  { val: 'false', label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
                 ] as const).map(({ val, label, cls }) => (
                   <button key={val} type="button" onClick={() => updatePart(i, val)}
                     className={`flex-1 py-2.5 rounded-xl border-2 font-semibold text-sm transition-colors ${
@@ -1588,13 +1737,13 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
                 <RichText text={split[0]} />
                 {type === 'dropdown' ? (
                   <select value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
-                    className="inline-block mx-1 px-2 py-0.5 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600">
+                    className="inline-block mx-1 px-2 py-0.5 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring">
                     <option value="">เลือกคำตอบ</option>
                     {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
                   </select>
                 ) : (
                   <input type="text" value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
-                    className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded text-sm text-center focus:outline-none focus:border-blue-600" />
+                    className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring" />
                 )}
                 <RichText text={split[1]} />
               </p>
@@ -1669,9 +1818,9 @@ function FileUploadAnswerInput({ rawValue, onChange }: {
       <p className="text-sm font-medium">แนบไฟล์คำตอบ (รูปภาพหรือ PDF)</p>
       <FileSubmissionUpload value={files} onChange={onChange} />
       {files.length === 0 ? (
-        <p className="text-xs text-amber-600 dark:text-amber-400">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
+        <p className="text-xs text-warning">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
       ) : (
-        <p className="text-xs text-green-600 dark:text-green-400">✓ แนบไฟล์แล้ว {files.length} ไฟล์</p>
+        <p className="text-xs text-success">✓ แนบไฟล์แล้ว {files.length} ไฟล์</p>
       )}
     </div>
   )

@@ -22,8 +22,8 @@ export default async function AdminCategoriesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">หมวดหมู่</h1>
-        <p className="text-sm text-gray-500 mt-1">{categories?.length ?? 0} หมวด</p>
+        <h1 className="text-2xl font-bold text-foreground">หมวดหมู่</h1>
+        <p className="text-sm text-muted-foreground mt-1">{categories?.length ?? 0} หมวด</p>
       </div>
       <CategoriesTree categories={catsWithCount as any} allCategories={categories ?? []} />
     </div>

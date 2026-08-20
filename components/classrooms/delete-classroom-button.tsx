@@ -22,7 +22,7 @@ export function DeleteClassroomButton({ id }: { id: string }) {
     <button
       onClick={handleDelete}
       disabled={isPending}
-      className="text-sm text-red-500 hover:text-red-700 px-3 py-1.5 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+      className="text-sm text-destructive hover:text-destructive/80 px-3 py-1.5 border border-destructive/20 rounded-lg hover:bg-destructive/10 disabled:opacity-50 transition-colors"
     >
       {isPending ? 'กำลังลบ...' : 'ลบห้องเรียน'}
     </button>

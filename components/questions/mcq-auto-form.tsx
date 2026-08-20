@@ -171,18 +171,18 @@ function SelectField({ label, value, onChange, placeholder, options, disabled }:
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
       <div className="relative">
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
           disabled={disabled}
-          className="w-full h-9 text-sm border border-gray-300 rounded-lg pl-3 pr-8 bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full h-9 text-sm border border-border rounded-lg pl-3 pr-8 bg-card appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <option value="">{placeholder}</option>
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
       </div>
     </div>
   )
@@ -244,11 +244,11 @@ function TemplateField({ value, onChange, imageUrl, onImageChange }: {
           + {'{answer}'}
         </button>
         <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => wrapSel(TO_SUPER)}
-          className="text-xs border rounded-md px-2 py-1.5 font-medium text-gray-600 border-gray-300 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 transition-colors shrink-0">
+          className="text-xs border rounded-md px-2 py-1.5 font-medium text-muted-foreground border-border hover:text-primary hover:border-primary hover:bg-primary/10 transition-colors shrink-0">
           X²
         </button>
         <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => wrapSel(TO_SUB)}
-          className="text-xs border rounded-md px-2 py-1.5 font-medium text-gray-600 border-gray-300 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 transition-colors shrink-0">
+          className="text-xs border rounded-md px-2 py-1.5 font-medium text-muted-foreground border-border hover:text-primary hover:border-primary hover:bg-primary/10 transition-colors shrink-0">
           X₂
         </button>
         <SymbolPicker onInsert={insertAt} />
@@ -256,14 +256,14 @@ function TemplateField({ value, onChange, imageUrl, onImageChange }: {
           type="button"
           onClick={() => setShowImagePicker(s => !s)}
           className={`flex-shrink-0 p-1.5 rounded-md border transition-colors ${
-            showImagePicker || imageUrl ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-400 hover:text-gray-600'
+            showImagePicker || imageUrl ? 'border-primary/20 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-muted-foreground'
           }`}
           title="แทรกรูปภาพในตัวเลือก"
         >
           <ImageIcon className="w-3.5 h-3.5" />
         </button>
       </div>
-      <p className="text-[10px] text-gray-400">คลุมข้อความแล้วกด X² หรือ X₂ เพื่อแปลงอักษร</p>
+      <p className="text-[10px] text-muted-foreground">คลุมข้อความแล้วกด X² หรือ X₂ เพื่อแปลงอักษร</p>
       {(showImagePicker || imageUrl) && (
         <SingleImageUpload value={imageUrl} onChange={onImageChange} />
       )}
@@ -280,12 +280,12 @@ function ConstantVarCard({ v, isAnswer, onValueChange, onSetAnswer }: {
   onSetAnswer: (name: string) => void
 }) {
   return (
-    <div className={`group border rounded-xl p-3 bg-white hover:shadow-sm transition-all ${
-      isAnswer ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200 hover:border-blue-200'
+    <div className={`group border rounded-xl p-3 bg-card hover:shadow-sm transition-all ${
+      isAnswer ? 'border-success/20 bg-success/10' : 'border-border hover:border-primary/20'
     }`}>
       <div className="flex items-center gap-2.5">
         <span className={`font-mono font-bold px-2.5 py-1 rounded-lg text-sm border shrink-0 ${
-          isAnswer ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-blue-700 bg-blue-50 border-blue-200'
+          isAnswer ? 'text-success bg-success/10 border-success/20' : 'text-primary bg-primary/10 border-primary/20'
         }`}>
           {'{' + v.name + '}'}
         </span>
@@ -293,15 +293,15 @@ function ConstantVarCard({ v, isAnswer, onValueChange, onSetAnswer }: {
         <div className="flex-1 min-w-0">
           {isAnswer ? (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              <span className="text-xs font-semibold text-success bg-success/10 px-2.5 py-0.5 rounded-full border border-success/20">
                 = คำตอบ
               </span>
-              <span className="text-xs text-gray-400">ค่าคำนวณจากสมการอัตโนมัติ</span>
+              <span className="text-xs text-muted-foreground">ค่าคำนวณจากสมการอัตโนมัติ</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <Label className="text-xs text-gray-500 font-medium shrink-0">ค่า</Label>
+                <Label className="text-xs text-muted-foreground font-medium shrink-0">ค่า</Label>
                 <Input
                   type="number"
                   value={v.constant_value ?? 1}
@@ -313,7 +313,7 @@ function ConstantVarCard({ v, isAnswer, onValueChange, onSetAnswer }: {
               <button
                 type="button"
                 onClick={() => onSetAnswer(v.name)}
-                className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-200 transition-all"
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-muted-foreground hover:text-success hover:bg-success/10 rounded border border-transparent hover:border-success/20 transition-all"
               >
                 ตั้งเป็นคำตอบ
               </button>
@@ -419,7 +419,7 @@ function EquationSection({
   }
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+    <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
       <div className="p-4 space-y-3">
         <SelectField
           label="สมการสำเร็จรูป"
@@ -430,20 +430,20 @@ function EquationSection({
         />
 
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">สมการ</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">สมการ</p>
           <Input
             value={equationText}
             onChange={e => handleEquationInput(e.target.value)}
             placeholder="เช่น F = m * a   หรือ   v = u + a * t"
             className="h-9 text-sm font-mono"
           />
-          <p className="text-[11px] text-blue-500">สามารถพิมพ์หรือปรับแก้สมการในช่องนี้ได้โดยตรง</p>
+          <p className="text-[11px] text-primary">สามารถพิมพ์หรือปรับแก้สมการในช่องนี้ได้โดยตรง</p>
         </div>
 
         {equationText.trim() && allVarNames.length > 0 && (
           <div className="space-y-2.5">
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
                 เลือกตัวแปรที่ต้องการหา (คำตอบ)
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -455,8 +455,8 @@ function EquationSection({
                     disabled={solving}
                     className={`font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-150 disabled:opacity-60 ${
                       name === answerVarName
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50'
+                        ? 'bg-success text-white border-success shadow-md'
+                        : 'bg-card text-muted-foreground border-border hover:border-success hover:text-success hover:bg-success/10'
                     }`}
                   >
                     {'{' + name + '}'}
@@ -464,16 +464,16 @@ function EquationSection({
                   </button>
                 ))}
               </div>
-              {solving && <p className="text-xs text-blue-500 mt-1.5">⏳ กำลังแก้สมการ...</p>}
-              {solveError && <p className="text-xs text-red-500 mt-1.5">{solveError}</p>}
+              {solving && <p className="text-xs text-primary mt-1.5">⏳ กำลังแก้สมการ...</p>}
+              {solveError && <p className="text-xs text-destructive mt-1.5">{solveError}</p>}
             </div>
 
             {answerVarName && derivedFormula && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <span className="font-mono font-bold text-emerald-700 text-sm">{'{' + answerVarName + '}'}</span>
-                <span className="text-emerald-500">=</span>
+              <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl">
+                <span className="font-mono font-bold text-success text-sm">{'{' + answerVarName + '}'}</span>
+                <span className="text-success">=</span>
                 <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{derivedFormula}</span>
-                <span className="text-[10px] text-emerald-500 shrink-0">คำนวณอัตโนมัติ</span>
+                <span className="text-[10px] text-success shrink-0">คำนวณอัตโนมัติ</span>
               </div>
             )}
           </div>
@@ -482,7 +482,7 @@ function EquationSection({
 
       {variables.length > 0 && (
         <div className="border-t p-4 space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">ค่าตัวแปร (คงที่)</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">ค่าตัวแปร (คงที่)</p>
           {variables.map(v => (
             <ConstantVarCard
               key={v.name}
@@ -696,7 +696,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
 
       {/* สมการและตัวแปร */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">สมการและตัวแปร</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">สมการและตัวแปร</h2>
         <EquationSection
           presets={presets}
           variables={variables}
@@ -711,8 +711,8 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
         {derivedFormula.trim() && (
           <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${
             correctAnswer !== null
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-amber-50 border-amber-200 text-amber-700'
+              ? 'bg-success/10 border-success/20 text-emerald-800'
+              : 'bg-warning/10 border-warning/20 text-warning'
           }`}>
             <span className="font-medium shrink-0">คำตอบที่ถูกต้อง:</span>
             {correctAnswer !== null ? (
@@ -726,7 +726,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
 
       {/* เนื้อหาโจทย์ */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาโจทย์</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">เนื้อหาโจทย์</h2>
         <div className="space-y-1.5">
           <Label>โจทย์ *</Label>
           <RichTextEditor ref={editorRef} value={questionText} onChange={setQuestionText} placeholder="พิมพ์เนื้อหาโจทย์ที่นี่..." rows={5} />
@@ -739,58 +739,58 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
 
       {/* ตัวเลือก */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ตัวเลือก</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">ตัวเลือก</h2>
 
         {/* Controls row */}
         <div className="flex flex-wrap gap-4 items-end">
           {/* จำนวนตัวเลือก */}
           <div className="space-y-1">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">จำนวนตัวเลือก</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">จำนวนตัวเลือก</p>
             <div className="relative">
               <select
                 value={numOptions}
                 onChange={e => setNumOptions(Number(e.target.value))}
-                className="h-9 text-sm border border-gray-300 rounded-lg pl-3 pr-8 bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-9 text-sm border border-border rounded-lg pl-3 pr-8 bg-card appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 {[2, 3, 4, 5, 6].map(n => (
                   <option key={n} value={n}>{n} ตัวเลือก</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             </div>
           </div>
 
           {/* ตัวเลือกที่ถูกต้อง */}
           <div className="space-y-1">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ตัวเลือกที่ถูกต้อง</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ตัวเลือกที่ถูกต้อง</p>
             <div className="relative">
               <select
                 value={correctPosition}
                 onChange={e => setCorrectPosition(Number(e.target.value))}
-                className="h-9 text-sm border border-gray-300 rounded-lg pl-3 pr-8 bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="h-9 text-sm border border-border rounded-lg pl-3 pr-8 bg-card appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-success"
               >
                 {Array.from({ length: numOptions }, (_, i) => (
                   <option key={i} value={i}>ตัวเลือก {LABELS[i]}</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             </div>
           </div>
 
           {/* รูปแบบตัวเลือก */}
           <div className="space-y-1">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">รูปแบบตัวเลือก</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">รูปแบบตัวเลือก</p>
             <div className="relative">
               <select
                 value={optionStyle}
                 onChange={e => setOptionStyle(e.target.value as OptionStyle)}
-                className="h-9 text-sm border border-gray-300 rounded-lg pl-3 pr-8 bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-9 text-sm border border-border rounded-lg pl-3 pr-8 bg-card appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 {(Object.keys(STYLE_LABELS) as OptionStyle[]).map(s => (
                   <option key={s} value={s}>{STYLE_LABELS[s]}</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             </div>
           </div>
 
@@ -803,7 +803,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
 
         {/* Option template */}
         <div className="space-y-1.5">
-          <Label className="text-sm">แม่แบบตัวเลือก <span className="font-normal text-gray-400">(ไม่บังคับ)</span></Label>
+          <Label className="text-sm">แม่แบบตัวเลือก <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span></Label>
           <TemplateField
             value={optionTemplate} onChange={setOptionTemplate}
             imageUrl={optionImageUrl} onImageChange={setOptionImageUrl}
@@ -825,14 +825,14 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
             return (
               <div key={i} className={`border rounded-xl px-3 py-2.5 flex items-center gap-3 ${
                 opt.isCorrect
-                  ? 'bg-emerald-50 border-emerald-200'
+                  ? 'bg-success/10 border-success/20'
                   : showWarning
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-white border-gray-200'
+                    ? 'bg-destructive/10 border-destructive/20'
+                    : 'bg-card border-border'
               }`}>
                 {/* Label badge */}
                 <span className={`text-sm font-bold w-6 text-center shrink-0 ${
-                  opt.isCorrect ? 'text-emerald-700' : showWarning ? 'text-red-600' : 'text-gray-500'
+                  opt.isCorrect ? 'text-success' : showWarning ? 'text-destructive' : 'text-muted-foreground'
                 }`}>
                   {opt.label}
                 </span>
@@ -841,27 +841,27 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
                   /* Correct option — value + subtitle formula */
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">✓ ถูกต้อง</span>
+                      <span className="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full border border-success/20 shrink-0">✓ ถูกต้อง</span>
                       <span className="font-semibold text-emerald-900 text-sm">
                         {correctAnswer !== null ? applyTemplate(correctAnswer) : '—'}
                       </span>
                     </div>
                     {derivedFormula && (
-                      <p className="text-[11px] text-emerald-500 font-mono mt-0.5 truncate">{derivedFormula}</p>
+                      <p className="text-[11px] text-success font-mono mt-0.5 truncate">{derivedFormula}</p>
                     )}
                   </div>
                 ) : (
                   /* Wrong option — value on top, compact formula input below */
                   <div className="flex-1 min-w-0 space-y-1">
                     <span className={`text-sm font-semibold block ${
-                      opt.value !== null ? 'text-gray-800' : showWarning ? 'text-red-500' : 'text-gray-300'
+                      opt.value !== null ? 'text-foreground' : showWarning ? 'text-destructive' : 'text-gray-300'
                     }`}>
                       {opt.value !== null
                         ? applyTemplate(opt.value)
                         : formula.trim() ? '⚠ คำนวณไม่ได้' : '—'}
                     </span>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-gray-400 font-medium shrink-0">สูตร</span>
+                      <span className="text-[10px] text-muted-foreground font-medium shrink-0">สูตร</span>
                       <Input
                         value={distractorFormulas[dIdx] ?? ''}
                         onChange={e => updateDistractorFormula(dIdx, e.target.value)}
@@ -882,7 +882,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
           const uniqueSet = new Set(vals.filter(v => v !== null))
           if (vals.filter(v => v !== null).length > 0 && uniqueSet.size < vals.filter(v => v !== null).length) {
             return (
-              <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
+              <p className="text-xs text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
                 ⚠ ตัวเลือกบางข้อได้คำตอบซ้ำกัน — กด &ldquo;สร้างตัวเลือกใหม่&rdquo; หรือแก้สูตรด้วยตนเอง
               </p>
             )

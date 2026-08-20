@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import { Check, X, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -210,13 +210,13 @@ const FEATURE_GROUPS: { group: string; rows: FeatureRow[] }[] = [
 
 function FeatureCell({ value }: { value: FeatureValue }) {
   if (value === true)
-    return <Check className="mx-auto h-4 w-4 text-emerald-500" />
+    return <Check className="mx-auto h-4 w-4 text-success" />
   if (value === false)
-    return <X className="mx-auto h-4 w-4 text-slate-300 dark:text-slate-600" />
+    return <X className="mx-auto h-4 w-4 text-slate-300" />
   if (value === null)
-    return <Minus className="mx-auto h-4 w-4 text-slate-300 dark:text-slate-600" />
+    return <Minus className="mx-auto h-4 w-4 text-slate-300" />
   return (
-    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{value}</span>
+    <span className="text-xs font-medium text-muted-foreground">{value}</span>
   )
 }
 
@@ -227,30 +227,30 @@ export function PricingTable() {
     <div className="space-y-12">
       {/* Toggle */}
       <div className="flex items-center justify-center gap-4">
-        <span className={cn('text-sm font-medium', !yearly ? 'text-slate-900 dark:text-white' : 'text-slate-400')}>
+        <span className={cn('text-sm font-medium', !yearly ? 'text-foreground' : 'text-muted-foreground')}>
           รายเดือน
         </span>
         <button
           onClick={() => setYearly((v) => !v)}
           className={cn(
             'relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none',
-            yearly ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600',
+            yearly ? 'bg-primary' : 'bg-muted dark:bg-slate-600',
           )}
           role="switch"
           aria-checked={yearly}
         >
           <span
             className={cn(
-              'inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
+              'inline-block h-5 w-5 rounded-full bg-card shadow-sm transition-transform',
               yearly ? 'translate-x-8' : 'translate-x-1',
             )}
           />
         </button>
-        <span className={cn('text-sm font-medium', yearly ? 'text-slate-900 dark:text-white' : 'text-slate-400')}>
+        <span className={cn('text-sm font-medium', yearly ? 'text-foreground' : 'text-muted-foreground')}>
           รายปี
         </span>
         {yearly && (
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+          <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success dark:bg-emerald-950/60">
             ประหยัด 20%
           </span>
         )}
@@ -266,34 +266,34 @@ export function PricingTable() {
               className={cn(
                 'relative flex flex-col rounded-2xl border p-7 transition-shadow',
                 plan.highlighted
-                  ? 'border-indigo-400 shadow-xl shadow-indigo-500/20 ring-1 ring-indigo-400/50 dark:border-indigo-600 dark:shadow-indigo-900/40'
-                  : 'border-slate-200 hover:shadow-md dark:border-slate-700/60',
-                'bg-white dark:bg-slate-900',
+                  ? 'border-primary shadow-xl shadow-indigo-500/20 ring-1 ring-primary/50 dark:border-primary dark:shadow-indigo-900/40'
+                  : 'border-border hover:shadow-md dark:border-slate-700/60',
+                'bg-card',
               )}
             >
               {plan.badge && (
-                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-1 text-xs font-bold text-white">
+                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-white">
                   {plan.badge}
                 </span>
               )}
 
               <div className="mb-4 space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
                   {plan.label}
                 </p>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{plan.name}</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{plan.description}</p>
+                <h2 className="text-2xl font-bold text-foreground">{plan.name}</h2>
+                <p className="text-sm text-muted-foreground">{plan.description}</p>
               </div>
 
               <div className="mb-6 flex items-end gap-1">
                 {price === 0 ? (
-                  <span className="text-4xl font-extrabold text-slate-900 dark:text-white">ฟรี</span>
+                  <span className="text-4xl font-extrabold text-foreground">ฟรี</span>
                 ) : (
                   <>
-                    <span className="text-4xl font-extrabold text-slate-900 dark:text-white">
+                    <span className="text-4xl font-extrabold text-foreground">
                       ฿{price?.toLocaleString()}
                     </span>
-                    <span className="mb-1 text-slate-400 dark:text-slate-500">
+                    <span className="mb-1 text-muted-foreground">
                       / {yearly ? 'เดือน (ชำระรายปี)' : 'เดือน'}
                     </span>
                   </>
@@ -305,8 +305,8 @@ export function PricingTable() {
                 className={cn(
                   'mb-6 block w-full rounded-xl py-3 text-center text-sm font-semibold transition-colors',
                   plan.highlighted
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-500/20'
-                    : 'border border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800',
+                    ? 'bg-primary text-white hover:bg-primary/90 shadow-md shadow-indigo-500/20'
+                    : 'border border-border text-muted-foreground hover:bg-muted dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800',
                 )}
               >
                 {plan.cta}
@@ -319,17 +319,17 @@ export function PricingTable() {
                   .map((row) => (
                     <li
                       key={row.feature}
-                      className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
+                      className="flex items-start gap-2 text-sm text-muted-foreground"
                     >
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                       {row.feature}
                       {typeof row[plan.key] === 'string' && row[plan.key] !== 'ไม่จำกัด' && (
-                        <span className="ml-auto shrink-0 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                        <span className="ml-auto shrink-0 text-xs font-semibold text-primary">
                           {row[plan.key] as string}
                         </span>
                       )}
                       {row[plan.key] === 'ไม่จำกัด' && (
-                        <span className="ml-auto shrink-0 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                        <span className="ml-auto shrink-0 text-xs font-semibold text-success">
                           ไม่จำกัด
                         </span>
                       )}
@@ -342,11 +342,11 @@ export function PricingTable() {
       </div>
 
       {/* Comparison Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700/60">
-        <table className="w-full bg-white text-sm dark:bg-slate-900">
+      <div className="overflow-x-auto rounded-2xl border border-border/60">
+        <table className="w-full bg-card text-sm dark:bg-slate-900">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700/60">
-              <th className="px-5 py-4 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-2/5">
+            <tr className="border-b border-border/60">
+              <th className="px-5 py-4 text-left text-sm font-semibold text-muted-foreground w-2/5">
                 ฟีเจอร์
               </th>
               {PLANS.map((plan) => (
@@ -355,8 +355,8 @@ export function PricingTable() {
                   className={cn(
                     'px-4 py-4 text-center text-sm font-semibold',
                     plan.highlighted
-                      ? 'text-indigo-600 dark:text-indigo-400'
-                      : 'text-slate-700 dark:text-slate-200',
+                      ? 'text-primary'
+                      : 'text-muted-foreground',
                   )}
                 >
                   {plan.name}
@@ -366,14 +366,13 @@ export function PricingTable() {
           </thead>
           <tbody>
             {FEATURE_GROUPS.map((group) => (
-              <>
+              <Fragment key={group.group}>
                 <tr
-                  key={group.group}
-                  className="border-t border-slate-200 bg-slate-50 dark:border-slate-700/60 dark:bg-slate-800/40"
+                  className="border-t border-border bg-muted dark:border-slate-700/60 dark:bg-slate-800/40"
                 >
                   <td
                     colSpan={4}
-                    className="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                    className="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground"
                   >
                     {group.group}
                   </td>
@@ -381,9 +380,9 @@ export function PricingTable() {
                 {group.rows.map((row) => (
                   <tr
                     key={row.feature}
-                    className="border-t border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/30 transition-colors"
+                    className="border-t border-border hover:bg-muted dark:border-slate-800 dark:hover:bg-slate-800/30 transition-colors"
                   >
-                    <td className="px-5 py-3 text-sm text-slate-700 dark:text-slate-300">
+                    <td className="px-5 py-3 text-sm text-muted-foreground">
                       {row.feature}
                     </td>
                     {PLANS.map((plan) => (
@@ -393,7 +392,7 @@ export function PricingTable() {
                     ))}
                   </tr>
                 ))}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -128,17 +128,17 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
   return (
     <div className={cn(
       'bg-card border rounded-2xl p-4',
-      post.pinned ? 'border-blue-300 dark:border-blue-800' : ''
+      post.pinned ? 'border-primary/20' : ''
     )}>
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-semibold">{authorName}</p>
             {post.pinned && (
-              <Badge variant="outline" className="gap-1 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800">
+              <Badge variant="outline" className="gap-1 text-primary border-primary/20">
                 <Pin className="w-3 h-3" /> ปักหมุด
               </Badge>
             )}
@@ -188,7 +188,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
                   </button>
                   <div className="border-t my-1" />
                   <button
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 dark:hover:bg-red-950/30 transition-colors"
                     onClick={remove}
                     disabled={isPending}
                   >

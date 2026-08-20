@@ -39,13 +39,13 @@ export function TeacherDashboard({ user, questionsCount, studentsCount, heatmapA
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">สวัสดี, {user.full_name} 👋</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold text-foreground">สวัสดี, {user.full_name} 👋</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             วันนี้มีงานค้างอยู่ 2 รายการ · นักเรียน 3 คนต้องดูแลพิเศษ
           </p>
         </div>
         <button
-          className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white ring-1 ring-black/10 rounded-xl text-sm text-gray-500 hover:ring-gray-300 transition-all shadow-sm cursor-pointer"
+          className="hidden sm:flex items-center gap-2 px-3 py-2 bg-card ring-1 ring-border rounded-xl text-sm text-muted-foreground hover:ring-gray-300 transition-all shadow-sm cursor-pointer"
           onClick={() => {
             const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })
             window.dispatchEvent(event)
@@ -53,7 +53,7 @@ export function TeacherDashboard({ user, questionsCount, studentsCount, heatmapA
         >
           <Search className="w-3.5 h-3.5" />
           <span>ค้นหา...</span>
-          <kbd className="ml-2 text-xs bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
+          <kbd className="ml-2 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
         </button>
       </div>
 
@@ -120,7 +120,7 @@ function DeferredCompetencyRadar() {
       ) : (
         <div
           aria-hidden="true"
-          className="h-[309px] animate-pulse rounded-xl bg-white ring-1 ring-black/5"
+          className="h-[309px] animate-pulse rounded-xl bg-card ring-1 ring-border"
         />
       )}
     </div>

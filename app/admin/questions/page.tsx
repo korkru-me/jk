@@ -31,8 +31,8 @@ export default async function AdminQuestionsPage({ searchParams }: Props) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">โจทย์ทั้งหมด</h1>
-          <p className="text-sm text-gray-500 mt-1">{questions?.length ?? 0} รายการ</p>
+          <h1 className="text-2xl font-bold text-foreground">โจทย์ทั้งหมด</h1>
+          <p className="text-sm text-muted-foreground mt-1">{questions?.length ?? 0} รายการ</p>
         </div>
         <Link href="/questions/new" className={cn(buttonVariants())}>
           + สร้างโจทย์ใหม่

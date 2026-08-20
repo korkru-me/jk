@@ -144,10 +144,10 @@ export function VariableEditor({
     <div className="space-y-5">
 
       {/* ══════════════ PICKER PANEL ══════════════ */}
-      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+      <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
 
         {/* Mode tabs */}
-        <div className="flex border-b border-gray-100">
+        <div className="flex border-b border-border">
           <ModeTab
             active={mode === 'preset'}
             icon={<Sparkles className="w-3.5 h-3.5" />}
@@ -190,17 +190,17 @@ export function VariableEditor({
                   {/* Equation display */}
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mb-1">สมการ</p>
+                      <p className="text-[10px] uppercase tracking-wider text-primary font-semibold mb-1">สมการ</p>
                       <p className="font-mono text-base font-bold text-blue-900">{selectedPreset.equation}</p>
                       {selectedPreset.description && (
-                        <p className="text-xs text-blue-500 mt-1">{selectedPreset.description}</p>
+                        <p className="text-xs text-primary mt-1">{selectedPreset.description}</p>
                       )}
                     </div>
                   </div>
 
                   {/* Variable buttons */}
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mb-2">
+                    <p className="text-[10px] uppercase tracking-wider text-primary font-semibold mb-2">
                       กดตัวแปรเพื่อแทรกลงในโจทย์ + เพิ่มในรายการ
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -225,7 +225,7 @@ export function VariableEditor({
           {mode === 'custom' && (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   พิมพ์สมการ
                 </label>
                 <div className="relative">
@@ -239,23 +239,23 @@ export function VariableEditor({
                     <button
                       type="button"
                       onClick={() => setCustomExpr('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground text-lg leading-none"
                     >
                       ×
                     </button>
                   )}
                 </div>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   ระบบจะ parse สมการด้วย mathjs และดึงเฉพาะตัวแปรออกมาให้อัตโนมัติ
                 </p>
               </div>
 
               {customExpr.trim() && (
                 detectedSymbols.length > 0 ? (
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 space-y-2">
+                  <div className="bg-success/10 border border-emerald-100 rounded-xl p-3.5 space-y-2">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <p className="text-xs font-semibold text-emerald-700">
+                      <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                      <p className="text-xs font-semibold text-success">
                         พบ {detectedSymbols.length} ตัวแปร — กดเพื่อแทรกลงในโจทย์
                       </p>
                     </div>
@@ -271,9 +271,9 @@ export function VariableEditor({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3.5 py-2.5">
-                    <span className="text-amber-500 text-base">⚠️</span>
-                    <p className="text-xs text-amber-700">
+                  <div className="flex items-center gap-2 bg-warning/10 border border-amber-100 rounded-lg px-3.5 py-2.5">
+                    <span className="text-warning text-base">⚠️</span>
+                    <p className="text-xs text-warning">
                       ไม่พบตัวแปรในสมการ — ตรวจสอบ syntax อีกครั้ง (ใช้ * สำหรับคูณ ^ สำหรับยกกำลัง)
                     </p>
                   </div>
@@ -287,8 +287,8 @@ export function VariableEditor({
           )}
 
           {/* ── Manual add — always visible ── */}
-          <div className="pt-3 border-t border-gray-100">
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">
+          <div className="pt-3 border-t border-border">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
               เพิ่มตัวแปรชื่ออื่น (พิมพ์ชื่อ)
             </p>
             <div className="flex gap-2">
@@ -300,7 +300,7 @@ export function VariableEditor({
                   placeholder="เช่น T, k, r, theta, omega"
                   className="h-9 text-sm font-mono"
                 />
-                {manualError && <p className="text-xs text-red-500 mt-1">{manualError}</p>}
+                {manualError && <p className="text-xs text-destructive mt-1">{manualError}</p>}
               </div>
               <Button type="button" size="sm" variant="outline" onClick={handleManualAdd} className="h-9 shrink-0 px-4">
                 + เพิ่ม
@@ -310,11 +310,11 @@ export function VariableEditor({
 
           {/* Reference vars (multi-step only) */}
           {hasRefs && (
-            <div className="pt-2 border-t border-gray-100">
+            <div className="pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => onChange([...variables, { ...EMPTY_REF }])}
-                className="text-xs text-indigo-600 font-semibold hover:text-indigo-800 hover:underline"
+                className="text-xs text-primary font-semibold hover:text-indigo-800 hover:underline"
               >
                 + เพิ่มตัวแปรอ้างอิงคำตอบ (multi-step)
               </button>
@@ -326,9 +326,9 @@ export function VariableEditor({
       {/* ══════════════ VARIABLE LIST ══════════════ */}
       {variables.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
-            <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-blue-600 leading-relaxed">
+          <div className="flex items-start gap-2 bg-primary/10 border border-blue-100 rounded-xl px-3.5 py-2.5">
+            <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+            <p className="text-xs text-primary leading-relaxed">
               <span className="font-semibold">ขนาดก้าว</span>{' '}
               คือระยะห่างระหว่างค่าที่จะสุ่ม เช่น ต่ำสุด=9, สูงสุด=10, ขนาดก้าว=0.2 → 9, 9.2, 9.4, 9.6, 9.8, 10
             </p>
@@ -343,7 +343,7 @@ export function VariableEditor({
       )}
 
       {variables.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-6">
+        <p className="text-sm text-muted-foreground text-center py-6">
           ยังไม่มีตัวแปร — กดปุ่มตัวแปรด้านบนเพื่อเพิ่ม
         </p>
       )}
@@ -363,8 +363,8 @@ function ModeTab({ active, icon, label, onClick }: {
       className={`
         flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-all
         ${active
-          ? 'bg-white text-blue-700 border-b-2 border-blue-600 shadow-sm'
-          : 'bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100'}
+          ? 'bg-card text-primary border-b-2 border-primary shadow-sm'
+          : 'bg-muted text-muted-foreground hover:text-muted-foreground hover:bg-accent'}
       `}
     >
       {icon}
@@ -383,16 +383,16 @@ function SelectField({ label, value, onChange, placeholder, options, disabled }:
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
       <div className="relative">
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
           disabled={disabled}
           className="
-            w-full h-9 text-sm border border-gray-300 rounded-lg pl-3 pr-8 bg-white
+            w-full h-9 text-sm border border-border rounded-lg pl-3 pr-8 bg-card
             appearance-none cursor-pointer transition-colors
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+            focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
             disabled:opacity-40 disabled:cursor-not-allowed
           "
         >
@@ -401,7 +401,7 @@ function SelectField({ label, value, onChange, placeholder, options, disabled }:
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
       </div>
     </div>
   )
@@ -416,13 +416,13 @@ function VarChip({ name, active, onClick }: { name: string; active: boolean; onC
       className={`
         relative font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-150
         ${active
-          ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
-          : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:text-blue-700 hover:bg-blue-50 hover:shadow-sm'}
+          ? 'bg-primary text-white border-primary shadow-md shadow-blue-100'
+          : 'bg-card text-muted-foreground border-border hover:border-primary hover:text-primary hover:bg-primary/10 hover:shadow-sm'}
       `}
     >
       {'{' + name + '}'}
       {active && (
-        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-success border-2 border-white" />
       )}
     </button>
   )
@@ -430,8 +430,8 @@ function VarChip({ name, active, onClick }: { name: string; active: boolean; onC
 
 function EmptyHint({ text }: { text: string }) {
   return (
-    <div className="rounded-xl border-2 border-dashed border-gray-200 py-6 text-center">
-      <p className="text-sm text-gray-400">{text}</p>
+    <div className="rounded-xl border-2 border-dashed border-border py-6 text-center">
+      <p className="text-sm text-muted-foreground">{text}</p>
     </div>
   )
 }
@@ -442,11 +442,11 @@ function ValueCard({ v, index, onUpdate, onRemove }: {
   onRemove: (i: number) => void
 }) {
   return (
-    <div className="group border border-gray-200 rounded-xl p-3.5 bg-white hover:border-blue-200 hover:shadow-sm transition-all">
+    <div className="group border border-border rounded-xl p-3.5 bg-card hover:border-primary/20 hover:shadow-sm transition-all">
       <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2.5 items-end">
         {/* Variable badge */}
         <div className="flex items-end pb-0.5">
-          <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg text-sm border border-blue-200">
+          <span className="font-mono font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg text-sm border border-primary/20">
             {'{' + v.name + '}'}
           </span>
         </div>
@@ -454,7 +454,7 @@ function ValueCard({ v, index, onUpdate, onRemove }: {
         {/* Min / Max / Step */}
         {(['min', 'max', 'step'] as const).map(field => (
           <div key={field}>
-            <Label className="text-xs text-gray-500 font-medium">
+            <Label className="text-xs text-muted-foreground font-medium">
               {field === 'min' ? 'ต่ำสุด' : field === 'max' ? 'สูงสุด' : 'ขนาดก้าว'}
             </Label>
             <Input
@@ -474,7 +474,7 @@ function ValueCard({ v, index, onUpdate, onRemove }: {
             type="button"
             onClick={() => onRemove(index)}
             title="ลบตัวแปรนี้"
-            className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-300 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
           >
             ✕
           </button>
@@ -490,11 +490,11 @@ function ReferenceCard({ v, index, onUpdate, onRemove }: {
   onRemove: (i: number) => void
 }) {
   return (
-    <div className="border border-indigo-200 rounded-xl p-3.5 bg-indigo-50/40">
+    <div className="border border-primary/20 rounded-xl p-3.5 bg-primary/10">
       <div className="flex items-center gap-3">
         <div className="flex-1 grid grid-cols-2 gap-2.5">
           <div>
-            <Label className="text-xs text-indigo-500 font-medium">ชื่อตัวแปร</Label>
+            <Label className="text-xs text-primary font-medium">ชื่อตัวแปร</Label>
             <Input
               value={v.name}
               onChange={e => onUpdate(index, 'name', e.target.value)}
@@ -503,7 +503,7 @@ function ReferenceCard({ v, index, onUpdate, onRemove }: {
             />
           </div>
           <div>
-            <Label className="text-xs text-indigo-500 font-medium">อ้างถึงคำตอบข้อที่</Label>
+            <Label className="text-xs text-primary font-medium">อ้างถึงคำตอบข้อที่</Label>
             <Input
               type="number"
               min={1}
@@ -514,11 +514,11 @@ function ReferenceCard({ v, index, onUpdate, onRemove }: {
           </div>
         </div>
         <div className="flex flex-col items-center gap-1.5 shrink-0">
-          <span className="text-xs text-indigo-600 font-bold bg-indigo-100 px-2.5 py-0.5 rounded-full">อ้างอิง</span>
+          <span className="text-xs text-primary font-bold bg-primary/10 px-2.5 py-0.5 rounded-full">อ้างอิง</span>
           <button
             type="button"
             onClick={() => onRemove(index)}
-            className="text-indigo-200 hover:text-red-500 hover:bg-red-50 rounded-lg px-2 py-1 transition-colors text-xs"
+            className="text-indigo-200 hover:text-destructive hover:bg-destructive/10 rounded-lg px-2 py-1 transition-colors text-xs"
           >
             ✕
           </button>

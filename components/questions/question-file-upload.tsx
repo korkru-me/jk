@@ -95,7 +95,7 @@ export function QuestionFileUpload({ value, onChange }: QuestionFileUploadProps)
           )}
           {uploading ? 'กำลังอัปโหลด...' : 'แนบไฟล์'}
         </Button>
-        <span className="text-xs text-gray-500">รูปภาพหรือ PDF — สูงสุด 10 MB</span>
+        <span className="text-xs text-muted-foreground">รูปภาพหรือ PDF — สูงสุด 10 MB</span>
       </div>
 
       {value.length > 0 && (
@@ -107,13 +107,13 @@ export function QuestionFileUpload({ value, onChange }: QuestionFileUploadProps)
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-28 h-28 flex flex-col items-center justify-center gap-1 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors px-2"
+                  className="w-28 h-28 flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted hover:bg-accent transition-colors px-2"
                 >
-                  <FileText className="w-7 h-7 text-gray-400" />
-                  <span className="text-[10px] text-gray-500 text-center truncate w-full">{fileNameFromUrl(url)}</span>
+                  <FileText className="w-7 h-7 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground text-center truncate w-full">{fileNameFromUrl(url)}</span>
                 </a>
               ) : (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                <div className="w-28 h-28 rounded-lg overflow-hidden border border-border bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="ไฟล์แนบโจทย์" className="w-full h-full object-cover" />
                 </div>
@@ -121,7 +121,7 @@ export function QuestionFileUpload({ value, onChange }: QuestionFileUploadProps)
               <button
                 type="button"
                 onClick={() => removeFile(url)}
-                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
               </button>

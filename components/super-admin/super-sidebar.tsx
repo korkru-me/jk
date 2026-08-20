@@ -75,7 +75,7 @@ export function SuperSidebar() {
           collapsed && 'justify-center px-2',
         )}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
           <Zap className="h-4 w-4 text-white" />
         </div>
         {!collapsed && (
@@ -101,8 +101,8 @@ export function SuperSidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all',
                 active
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
+                  ? 'bg-primary text-white shadow-md shadow-indigo-900/50'
+                  : 'text-muted-foreground hover:bg-slate-800 hover:text-slate-100',
                 collapsed && 'justify-center px-2',
               )}
             >
@@ -113,7 +113,7 @@ export function SuperSidebar() {
                   <p
                     className={cn(
                       'text-xs mt-0.5 truncate',
-                      active ? 'text-indigo-200' : 'text-slate-500',
+                      active ? 'text-indigo-200' : 'text-muted-foreground',
                     )}
                   >
                     {item.sub}
@@ -130,7 +130,7 @@ export function SuperSidebar() {
         {!collapsed && (
           <Link
             href="/admin/dashboard"
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-slate-300 hover:bg-slate-800 transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             กลับ Admin Panel
@@ -138,7 +138,7 @@ export function SuperSidebar() {
         )}
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+          className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-slate-300 hover:bg-slate-800 transition-colors"
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />

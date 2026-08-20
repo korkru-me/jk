@@ -51,32 +51,32 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col z-10 overflow-hidden">
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col z-10 overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-start gap-4 px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+        <div className="flex items-start gap-4 px-6 pt-5 pb-4 border-b border-border shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.color}`}>{diff?.label}</span>
               {q.question_categories?.name && (
-                <span className="text-xs text-gray-400">{q.question_categories.name}</span>
+                <span className="text-xs text-muted-foreground">{q.question_categories.name}</span>
               )}
               <span className="text-xs text-gray-300">·</span>
-              <span className="text-xs text-gray-400">{q.question_type}</span>
+              <span className="text-xs text-muted-foreground">{q.question_type}</span>
             </div>
-            <h2 className="font-bold text-gray-900 text-base leading-snug line-clamp-2">{q.title}</h2>
+            <h2 className="font-bold text-foreground text-base leading-snug line-clamp-2">{q.title}</h2>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={onToggleFlag}
               title={isFlagged ? 'ยกเลิกการรายงาน' : 'รายงานปัญหา'}
               className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-                isFlagged ? 'bg-orange-50 text-orange-500' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'
+                isFlagged ? 'bg-orange-50 text-orange-500' : 'text-muted-foreground hover:text-orange-500 hover:bg-orange-50'
               }`}
             >
               <Flag className="w-4 h-4" />
             </button>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-muted-foreground hover:bg-muted transition-all">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -93,7 +93,7 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
         )}
 
         {/* Tabs */}
-        <div className="flex gap-0 px-6 border-b border-gray-100 shrink-0">
+        <div className="flex gap-0 px-6 border-b border-border shrink-0">
           {([
             { key: 'content' as Tab, label: 'ลองทำโจทย์',        icon: BookOpen },
             { key: 'history' as Tab, label: 'ประวัติการแก้ไข',   icon: GitBranch },
@@ -106,8 +106,8 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: 
                 onClick={() => setTab(t.key)}
                 className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-all -mb-px ${
                   tab === t.key
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-muted-foreground'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" /> {t.label}
@@ -156,15 +156,15 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
 
       {/* Solution text */}
       {(q.solution_text || (q.solution_image_urls ?? []).length > 0) && (
-        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 space-y-3">
-          <p className="text-[11px] font-semibold text-amber-500 uppercase tracking-wide mb-2">วิธีทำ / คำอธิบาย</p>
+        <div className="bg-warning/10 rounded-xl p-4 border border-amber-100 space-y-3">
+          <p className="text-[11px] font-semibold text-warning uppercase tracking-wide mb-2">วิธีทำ / คำอธิบาย</p>
           {q.solution_text && <RichText text={q.solution_text} className="text-sm text-amber-900 leading-relaxed block" />}
           {(q.solution_image_urls ?? []).length > 0 && (
             <div className="flex flex-wrap gap-3">
               {(q.solution_image_urls ?? []).map(url => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={url} src={url} alt="รูปประกอบเฉลย"
-                  className="max-h-40 rounded-lg border border-amber-200 object-contain" />
+                  className="max-h-40 rounded-lg border border-warning/20 object-contain" />
               ))}
             </div>
           )}
@@ -174,10 +174,10 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
       {/* Tags */}
       {q.tags && q.tags.length > 0 && (
         <div>
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">แท็ก</p>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">แท็ก</p>
           <div className="flex flex-wrap gap-1.5">
             {q.tags.map(t => (
-              <span key={t} className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">#{t}</span>
+              <span key={t} className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">#{t}</span>
             ))}
           </div>
         </div>
@@ -192,42 +192,42 @@ function HistoryTab({ versions }: { versions: ReturnType<typeof mockVersions> })
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900 text-sm">ประวัติการแก้ไข</h3>
-        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">{versions.length} เวอร์ชัน</span>
+        <h3 className="font-semibold text-foreground text-sm">ประวัติการแก้ไข</h3>
+        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{versions.length} เวอร์ชัน</span>
       </div>
 
       <div className="relative">
-        <div className="absolute left-3.5 top-4 bottom-4 w-0.5 bg-gray-100" />
+        <div className="absolute left-3.5 top-4 bottom-4 w-0.5 bg-muted" />
         <div className="space-y-4">
           {versions.map((v, i) => (
             <div key={i} className="flex gap-4">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 ${
-                i === 0 ? 'bg-blue-500 text-white shadow-sm shadow-blue-200' : 'bg-white ring-2 ring-gray-200 text-gray-400'
+                i === 0 ? 'bg-primary text-white shadow-sm shadow-blue-200' : 'bg-card ring-2 ring-gray-200 text-muted-foreground'
               }`}>
                 <GitBranch className="w-3.5 h-3.5" />
               </div>
               <div className={`flex-1 p-3.5 rounded-xl border ${
-                i === 0 ? 'border-blue-100 bg-blue-50' : 'border-gray-100 bg-gray-50'
+                i === 0 ? 'border-blue-100 bg-primary/10' : 'border-border bg-muted'
               }`}>
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${
-                    i === 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-500'
+                    i === 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>v{v.ver}</span>
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="w-3 h-3" /> {v.date}
                   </span>
                 </div>
-                <p className="text-sm text-gray-800 font-medium">{v.change}</p>
-                <p className="text-xs text-gray-400 mt-0.5">โดย {v.author}</p>
+                <p className="text-sm text-foreground font-medium">{v.change}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">โดย {v.author}</p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-start gap-3">
-        <Activity className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-        <p className="text-xs text-gray-500 leading-relaxed">
+      <div className="p-4 bg-muted rounded-xl border border-border flex items-start gap-3">
+        <Activity className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-xs text-muted-foreground leading-relaxed">
           ระบบล็อกทุกการเปลี่ยนแปลงโดยอัตโนมัติ เพื่อป้องกันการแก้ไขโจทย์หลังการสอบผ่านไปแล้ว และใช้ตรวจสอบความสมบูรณ์ของข้อสอบ
         </p>
       </div>
@@ -243,16 +243,16 @@ function StatsTab({ stats }: { stats: ReturnType<typeof mockStats> }) {
   const correct = Math.round(stats.pVal * stats.attempts)
 
   const pLabel = pPct <= 30 ? 'ยากมาก' : pPct <= 50 ? 'ยาก' : pPct <= 70 ? 'ปานกลาง' : 'ง่าย'
-  const pColor = pPct <= 30 ? 'text-red-600' : pPct <= 50 ? 'text-orange-600' : pPct <= 70 ? 'text-amber-600' : 'text-green-600'
+  const pColor = pPct <= 30 ? 'text-destructive' : pPct <= 50 ? 'text-orange-600' : pPct <= 70 ? 'text-warning' : 'text-success'
   const rLabel = stats.rVal >= 0.4 ? 'ดีมาก' : stats.rVal >= 0.3 ? 'ดี' : stats.rVal >= 0.2 ? 'พอใช้' : 'ต่ำ'
-  const rBarColor = stats.rVal >= 0.4 ? 'bg-green-400' : stats.rVal >= 0.3 ? 'bg-blue-400' : stats.rVal >= 0.2 ? 'bg-amber-400' : 'bg-red-400'
+  const rBarColor = stats.rVal >= 0.4 ? 'bg-success' : stats.rVal >= 0.3 ? 'bg-primary' : stats.rVal >= 0.2 ? 'bg-warning' : 'bg-destructive'
 
   return (
     <div className="space-y-4">
       {/* p-value & r-value */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gray-50 rounded-2xl p-4">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">ค่าความยาก (p-value)</p>
+        <div className="bg-muted rounded-2xl p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">ค่าความยาก (p-value)</p>
           <p className={`text-4xl font-black leading-none ${pColor}`}>{stats.pVal.toFixed(2)}</p>
           <p className={`text-sm font-semibold mt-1 ${pColor}`}>ระดับ{pLabel}</p>
           {/* Gradient bar */}
@@ -263,43 +263,43 @@ function StatsTab({ stats }: { stats: ReturnType<typeof mockStats> }) {
               style={{ left: `${100 - pPct}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
             <span>ง่าย</span><span>ยาก</span>
           </div>
-          <p className="text-xs text-gray-400 mt-2">สัดส่วนนักเรียนที่ตอบถูก</p>
+          <p className="text-xs text-muted-foreground mt-2">สัดส่วนนักเรียนที่ตอบถูก</p>
         </div>
 
-        <div className="bg-gray-50 rounded-2xl p-4">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">อำนาจจำแนก (r-value)</p>
-          <p className={`text-4xl font-black leading-none ${stats.rVal >= 0.4 ? 'text-green-600' : stats.rVal >= 0.3 ? 'text-blue-600' : stats.rVal >= 0.2 ? 'text-amber-600' : 'text-red-600'}`}>{stats.rVal.toFixed(2)}</p>
-          <p className={`text-sm font-semibold mt-1 ${stats.rVal >= 0.4 ? 'text-green-600' : stats.rVal >= 0.3 ? 'text-blue-600' : stats.rVal >= 0.2 ? 'text-amber-600' : 'text-red-600'}`}>{rLabel}</p>
+        <div className="bg-muted rounded-2xl p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">อำนาจจำแนก (r-value)</p>
+          <p className={`text-4xl font-black leading-none ${stats.rVal >= 0.4 ? 'text-success' : stats.rVal >= 0.3 ? 'text-primary' : stats.rVal >= 0.2 ? 'text-warning' : 'text-destructive'}`}>{stats.rVal.toFixed(2)}</p>
+          <p className={`text-sm font-semibold mt-1 ${stats.rVal >= 0.4 ? 'text-success' : stats.rVal >= 0.3 ? 'text-primary' : stats.rVal >= 0.2 ? 'text-warning' : 'text-destructive'}`}>{rLabel}</p>
           <div className="mt-3">
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div className={`h-full ${rBarColor} rounded-full transition-all`} style={{ width: `${rPct}%` }} />
             </div>
           </div>
-          <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
             <span>0.00</span><span>0.50</span><span>1.00</span>
           </div>
-          <p className="text-xs text-gray-400 mt-2">ค่าสหสัมพันธ์พอยต์ไบซีเรียล</p>
+          <p className="text-xs text-muted-foreground mt-2">ค่าสหสัมพันธ์พอยต์ไบซีเรียล</p>
         </div>
       </div>
 
       {/* Usage stats */}
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 p-4">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">สถิติการใช้งาน</p>
+      <div className="bg-card rounded-2xl ring-1 ring-border p-4">
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">สถิติการใช้งาน</p>
         <div className="grid grid-cols-3 gap-4 text-center">
           {[
-            { label: 'ใช้ในชุดสอบ', value: stats.usedIn, icon: BookOpen, color: 'text-blue-500' },
+            { label: 'ใช้ในชุดสอบ', value: stats.usedIn, icon: BookOpen, color: 'text-primary' },
             { label: 'ครั้งที่ตอบ', value: stats.attempts, icon: TrendingUp, color: 'text-purple-500' },
-            { label: 'ตอบถูก', value: correct, icon: CheckCircle2, color: 'text-green-500' },
+            { label: 'ตอบถูก', value: correct, icon: CheckCircle2, color: 'text-success' },
           ].map(s => {
             const Icon = s.icon
             return (
               <div key={s.label}>
                 <Icon className={`w-4 h-4 ${s.color} mx-auto mb-1`} />
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+                <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
               </div>
             )
           })}
@@ -307,7 +307,7 @@ function StatsTab({ stats }: { stats: ReturnType<typeof mockStats> }) {
       </div>
 
       {/* Guide */}
-      <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-700 space-y-1 leading-relaxed">
+      <div className="p-4 bg-primary/10 rounded-xl border border-blue-100 text-xs text-primary space-y-1 leading-relaxed">
         <p><strong>p-value</strong> ควรอยู่ระหว่าง 0.30–0.70 เพื่อให้โจทย์มีความยากเหมาะสม</p>
         <p><strong>r-value</strong> ควร ≥ 0.30 ถือว่าโจทย์มีอำนาจจำแนกที่ดีตามมาตรฐาน PISA</p>
       </div>

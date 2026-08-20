@@ -69,8 +69,8 @@ export function RegisterForm() {
               onClick={() => setSelectedType(r.value as 'teacher' | 'tutor' | 'student')}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${
                 selectedType === r.value
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:border-ring'
               }`}
             >
               <span className="text-2xl">{r.icon}</span>
@@ -124,9 +124,9 @@ export function RegisterForm() {
         {loading ? 'กำลังสมัคร...' : 'สมัครใช้งาน'}
       </Button>
 
-      <p className="text-center text-sm text-gray-600">
+      <p className="text-center text-sm text-muted-foreground">
         มีบัญชีอยู่แล้ว?{' '}
-        <Link href="/login" className="text-blue-600 hover:underline font-medium">
+        <Link href="/login" className="text-primary hover:underline font-medium">
           เข้าสู่ระบบ
         </Link>
       </p>

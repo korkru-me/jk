@@ -157,7 +157,7 @@ export default async function SubmissionResultPage({
       <div className="flex items-center gap-2 flex-wrap">
         <Link
           href={isTeacherViewer ? `/assignments/${submission.assignment_id}/results` : '/my-submissions'}
-          className="text-sm text-muted-foreground hover:text-blue-600 flex items-center gap-1"
+          className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
         >
           <ChevronLeft size={15} />
           {isTeacherViewer ? 'ผลคะแนนทั้งหมด' : 'ผลงานทั้งหมด'}
@@ -167,7 +167,7 @@ export default async function SubmissionResultPage({
         {isTeacherViewer && studentName && (
           <>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">{studentName}</span>
+            <span className="text-sm font-semibold text-primary truncate">{studentName}</span>
           </>
         )}
       </div>
@@ -176,12 +176,12 @@ export default async function SubmissionResultPage({
       {isTeacherViewer && (prevNav || nextNav) && (
         <div className="flex items-center justify-between text-sm bg-card border rounded-xl px-4 py-2.5">
           {prevNav ? (
-            <Link href={`/submissions/${prevNav.submissionId}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-blue-600 min-w-0">
+            <Link href={`/submissions/${prevNav.submissionId}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary min-w-0">
               <ChevronLeft size={15} className="shrink-0" /> <span className="truncate">{prevNav.label}</span>
             </Link>
           ) : <span />}
           {nextNav ? (
-            <Link href={`/submissions/${nextNav.submissionId}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-blue-600 ml-auto min-w-0">
+            <Link href={`/submissions/${nextNav.submissionId}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary ml-auto min-w-0">
               <span className="truncate">{nextNav.label}</span> <ChevronRight size={15} className="shrink-0" />
             </Link>
           ) : <span />}
@@ -192,7 +192,7 @@ export default async function SubmissionResultPage({
       <div className="bg-card border rounded-2xl p-8 text-center relative overflow-hidden">
         {/* Background decoration */}
         <div className={`absolute inset-0 opacity-5 ${
-          !canShowScore ? 'bg-blue-500' : pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'
+          !canShowScore ? 'bg-primary' : pct >= 75 ? 'bg-success' : pct >= 50 ? 'bg-warning' : 'bg-destructive'
         }`} />
 
         <div className="relative">
@@ -202,8 +202,8 @@ export default async function SubmissionResultPage({
                 <div className="flex flex-col items-center gap-1 mb-3">
                   <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border ${
                     passed
-                      ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
-                      : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+                      ? 'bg-success/10 text-success border-success/20'
+                      : 'bg-destructive/10 text-destructive border-destructive/20'
                   }`}>
                     {passed ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
                     {passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}
@@ -215,7 +215,7 @@ export default async function SubmissionResultPage({
               )}
               {pct >= 90 && (
                 <div className="flex justify-center mb-3">
-                  <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full px-3 py-1 text-xs font-semibold">
+                  <div className="flex items-center gap-1.5 bg-warning/10 text-warning border border-warning/20 rounded-full px-3 py-1 text-xs font-semibold">
                     <Trophy size={13} />
                     ยอดเยี่ยม!
                   </div>
@@ -224,10 +224,10 @@ export default async function SubmissionResultPage({
 
               <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-3xl font-black mb-4 ${
                 pct >= 75
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                  ? 'bg-success/10 text-success'
                   : pct >= 50
-                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                  : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-destructive/10 text-destructive'
               }`}>
                 {pct}%
               </div>
@@ -236,16 +236,16 @@ export default async function SubmissionResultPage({
               <p className="text-muted-foreground mt-1 text-sm">คะแนนที่ได้</p>
 
               <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                <span className="flex items-center gap-1 text-success">
                   <CheckCircle2 size={13} />
                   ถูก {answers.filter(a => a.is_correct === true).length} ข้อ
                 </span>
-                <span className="flex items-center gap-1 text-red-500">
+                <span className="flex items-center gap-1 text-destructive">
                   <XCircle size={13} />
                   ผิด {answers.filter(a => a.is_correct === false).length} ข้อ
                 </span>
                 {pendingManualCount > 0 && (
-                  <span className="flex items-center gap-1 text-amber-600">
+                  <span className="flex items-center gap-1 text-warning">
                     <Clock size={13} />
                     รอตรวจ {pendingManualCount} ข้อ
                   </span>
@@ -253,7 +253,7 @@ export default async function SubmissionResultPage({
               </div>
 
               {pendingManualCount > 0 && (
-                <div className="mt-3 inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-medium px-3 py-1.5 rounded-full">
+                <div className="mt-3 inline-flex items-center gap-1.5 bg-warning/10 border border-warning/20 text-warning text-xs font-medium px-3 py-1.5 rounded-full">
                   ⏳ มี {pendingManualCount} ข้อรอครูตรวจ — คะแนนจะอัปเดตภายหลัง
                 </div>
               )}
@@ -266,7 +266,7 @@ export default async function SubmissionResultPage({
             </>
           ) : (
             <div className="flex flex-col items-center">
-              <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+              <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
                 <EyeOff size={32} />
               </div>
               <h2 className="text-xl font-bold">ส่งคำตอบเรียบร้อยแล้ว</h2>
@@ -287,7 +287,7 @@ export default async function SubmissionResultPage({
               {canRetry && (
                 <Link
                   href={`/assignments/${submission.assignment_id}/take`}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-semibold px-4 py-2 transition-colors"
                 >
                   <RotateCcw size={15} />
                   {assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}
@@ -391,11 +391,11 @@ async function SubmissionAnswerDetails({
                 <div className="flex items-start gap-3 mb-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
                     isPendingManual
-                      ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                      ? 'bg-warning/10 text-warning'
                       : isCorrect === true
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                      ? 'bg-success/10 text-success'
                       : isCorrect === false
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                      ? 'bg-destructive/10 text-destructive'
                       : 'bg-muted text-muted-foreground'
                   }`}>
                     {isPendingManual ? '⏳' : isCorrect === true
@@ -413,7 +413,7 @@ async function SubmissionAnswerDetails({
                           <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
                         ) : (
                           <Badge variant="outline" className={`text-xs ${
-                            isPendingManual ? 'border-amber-300 text-amber-600 dark:text-amber-400' : ''
+                            isPendingManual ? 'border-warning/20 text-warning' : ''
                           }`}>
                             {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
                           </Badge>
@@ -505,18 +505,18 @@ function AnswerReview({
           let indicator = null
 
           if (isCorrectOpt) {
-            wrapClass = 'border-green-400 bg-green-50 dark:bg-green-950/30'
-            labelClass = 'text-green-700 dark:text-green-400'
+            wrapClass = 'border-success bg-success/10'
+            labelClass = 'text-success'
             indicator = (
-              <span className="text-xs font-semibold text-green-600 dark:text-green-400 shrink-0 flex items-center gap-1">
+              <span className="text-xs font-semibold text-success shrink-0 flex items-center gap-1">
                 <CheckCircle2 size={13} /> เฉลย
               </span>
             )
           } else if (isStudentChoice && !isCorrectOpt) {
-            wrapClass = 'border-red-400 bg-red-50 dark:bg-red-950/30'
-            labelClass = 'text-red-700 dark:text-red-400'
+            wrapClass = 'border-destructive bg-destructive/10'
+            labelClass = 'text-destructive'
             indicator = (
-              <span className="text-xs font-semibold text-red-500 shrink-0 flex items-center gap-1">
+              <span className="text-xs font-semibold text-destructive shrink-0 flex items-center gap-1">
                 <XCircle size={13} /> คำตอบคุณ
               </span>
             )
@@ -545,8 +545,8 @@ function AnswerReview({
       <div className="mt-2 space-y-2 text-sm">
         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
           submitted
-            ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400'
-            : 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400'
+            ? 'bg-success/10 text-success dark:bg-green-950/30'
+            : 'bg-destructive/10 text-destructive dark:bg-red-950/30'
         }`}>
           {submitted ? '✓ ส่งแล้ว' : '✗ ไม่ได้ส่งไฟล์'}
         </span>
@@ -578,7 +578,7 @@ function AnswerReview({
     try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { /* */ }
     return (
       <div className="mt-2 space-y-2 text-sm">
-        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">รอครูผู้สอนตรวจสอบและให้คะแนน</p>
+        <p className="text-xs text-warning font-medium">รอครูผู้สอนตรวจสอบและให้คะแนน</p>
         <div className="space-y-1">
           {studentAnswers.map((ans, i) => (
             <div key={i} className="flex gap-2">
@@ -607,8 +607,8 @@ function AnswerReview({
 
           if (type === 'text') {
             return (
-              <div key={i} className="pl-3 border-l-2 border-amber-300 space-y-0.5">
-                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">ช่อง {i + 1} — รอครูตรวจ</p>
+              <div key={i} className="pl-3 border-l-2 border-warning/20 space-y-0.5">
+                <p className="text-xs font-semibold text-warning">ช่อง {i + 1} — รอครูตรวจ</p>
                 <div className="flex gap-2">
                   <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
                   <span className="font-medium">{student || '—'}</span>
@@ -624,7 +624,7 @@ function AnswerReview({
               <p className="text-xs font-semibold text-muted-foreground">ช่อง {i + 1}</p>
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                <span className={`font-medium ${partCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{student || '—'}</span>
+                <span className={`font-medium ${partCorrect ? 'text-success' : 'text-destructive'}`}>{student || '—'}</span>
               </div>
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
@@ -653,8 +653,8 @@ function AnswerReview({
 
           if (cp.type === 'fill_blank' && Array.isArray(cp.correct) && cp.correct.length === 0) {
             return (
-              <div key={i} className="pl-3 border-l-2 border-amber-300 space-y-0.5">
-                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">ข้อ {label} — รอครูตรวจ</p>
+              <div key={i} className="pl-3 border-l-2 border-warning/20 space-y-0.5">
+                <p className="text-xs font-semibold text-warning">ข้อ {label} — รอครูตรวจ</p>
                 <div className="flex gap-2">
                   <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
                   <span className="font-medium">{student || '—'}</span>
@@ -694,7 +694,7 @@ function AnswerReview({
               <p className="text-xs font-semibold text-muted-foreground">ข้อ {label}</p>
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                <span className={`font-medium ${partCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{studentDisplay}</span>
+                <span className={`font-medium ${partCorrect ? 'text-success' : 'text-destructive'}`}>{studentDisplay}</span>
               </div>
               {showCorrectRow && (
                 <div className="flex gap-2">
@@ -734,7 +734,7 @@ function AnswerReview({
               <p className="text-xs font-semibold text-muted-foreground">{PART_LABELS[i] ?? i + 1})</p>
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                <span className={`font-medium ${partCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                <span className={`font-medium ${partCorrect ? 'text-success' : 'text-destructive'}`}>
                   {student} {unit && <UnitText html={unit} />}
                 </span>
               </div>
@@ -757,7 +757,7 @@ function AnswerReview({
     <div className="mt-2 space-y-1 text-sm">
       <div className="flex gap-2">
         <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-        <span className={`font-medium ${isCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+        <span className={`font-medium ${isCorrect ? 'text-success' : 'text-destructive'}`}>
           {studentAnswer ?? '—'} {answerUnit}
         </span>
       </div>

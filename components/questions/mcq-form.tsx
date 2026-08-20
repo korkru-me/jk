@@ -76,16 +76,16 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
         onClick={() => onChange('manual')}
         className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
           mode === 'manual'
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-200 hover:border-blue-300 bg-white'
+            ? 'border-primary bg-primary/10'
+            : 'border-border hover:border-primary/20 bg-card'
         }`}
       >
-        <ListChecks className={`w-5 h-5 mt-0.5 shrink-0 ${mode === 'manual' ? 'text-blue-600' : 'text-gray-400'}`} />
+        <ListChecks className={`w-5 h-5 mt-0.5 shrink-0 ${mode === 'manual' ? 'text-primary' : 'text-muted-foreground'}`} />
         <div>
-          <p className={`text-sm font-semibold ${mode === 'manual' ? 'text-blue-900' : 'text-gray-700'}`}>
+          <p className={`text-sm font-semibold ${mode === 'manual' ? 'text-blue-900' : 'text-muted-foreground'}`}>
             สร้างตัวเลือกเอง
           </p>
-          <p className={`text-xs mt-0.5 ${mode === 'manual' ? 'text-blue-700' : 'text-gray-400'}`}>
+          <p className={`text-xs mt-0.5 ${mode === 'manual' ? 'text-primary' : 'text-muted-foreground'}`}>
             พิมพ์ตัวเลือกทั้งหมดด้วยตัวเอง
           </p>
         </div>
@@ -96,15 +96,15 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
         className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
           mode === 'auto'
             ? 'border-purple-500 bg-purple-50'
-            : 'border-gray-200 hover:border-purple-300 bg-white'
+            : 'border-border hover:border-purple-300 bg-card'
         }`}
       >
-        <Calculator className={`w-5 h-5 mt-0.5 shrink-0 ${mode === 'auto' ? 'text-purple-600' : 'text-gray-400'}`} />
+        <Calculator className={`w-5 h-5 mt-0.5 shrink-0 ${mode === 'auto' ? 'text-purple-600' : 'text-muted-foreground'}`} />
         <div>
-          <p className={`text-sm font-semibold ${mode === 'auto' ? 'text-purple-900' : 'text-gray-700'}`}>
+          <p className={`text-sm font-semibold ${mode === 'auto' ? 'text-purple-900' : 'text-muted-foreground'}`}>
             สร้างตัวเลือกจากสมการ
           </p>
-          <p className={`text-xs mt-0.5 ${mode === 'auto' ? 'text-purple-700' : 'text-gray-400'}`}>
+          <p className={`text-xs mt-0.5 ${mode === 'auto' ? 'text-purple-700' : 'text-muted-foreground'}`}>
             คำนวณจากสูตร สร้างตัวเลือกผิดอัตโนมัติ
           </p>
         </div>
@@ -238,7 +238,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาโจทย์</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">เนื้อหาโจทย์</h2>
         <div className="space-y-1.5">
           <Label>โจทย์ *</Label>
           <RichTextEditor
@@ -257,22 +257,22 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
-          <h2 className="text-base font-semibold text-gray-900">ตัวเลือก</h2>
-          <p className="text-xs text-gray-500">กาถูกที่ตัวเลือกที่ถูกต้อง (เลือกได้มากกว่า 1)</p>
+          <h2 className="text-base font-semibold text-foreground">ตัวเลือก</h2>
+          <p className="text-xs text-muted-foreground">กาถูกที่ตัวเลือกที่ถูกต้อง (เลือกได้มากกว่า 1)</p>
         </div>
 
         <div className="space-y-3">
           {options.map((opt, i) => (
-            <div key={i} className="border rounded-xl p-3 space-y-2 bg-gray-50">
+            <div key={i} className="border rounded-xl p-3 space-y-2 bg-muted">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
                   checked={opt.is_correct}
                   onChange={() => toggleCorrect(i)}
-                  className="w-4 h-4 rounded text-blue-600 flex-shrink-0"
+                  className="w-4 h-4 rounded text-primary flex-shrink-0"
                   title="คำตอบที่ถูกต้อง"
                 />
-                <span className="text-sm font-semibold text-gray-600 w-5 flex-shrink-0">
+                <span className="text-sm font-semibold text-muted-foreground w-5 flex-shrink-0">
                   {OPTION_LABELS[i]}
                 </span>
                 <div className="flex-1">
@@ -280,24 +280,24 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
                     value={opt.text}
                     onChange={(v) => updateOption(i, 'text', v)}
                     placeholder={`ตัวเลือก ${OPTION_LABELS[i]}`}
-                    className={opt.is_correct ? 'border-green-400 bg-green-50' : ''}
+                    className={opt.is_correct ? 'border-success bg-success/10' : ''}
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => toggleShowImage(i)}
-                  className={`flex-shrink-0 p-1.5 rounded-lg border transition-colors ${showImageForOption[i] || opt.image_url ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-400 hover:text-gray-600'}`}
+                  className={`flex-shrink-0 p-1.5 rounded-lg border transition-colors ${showImageForOption[i] || opt.image_url ? 'border-primary/20 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-muted-foreground'}`}
                   title="เพิ่มรูปภาพในตัวเลือก"
                 >
                   <ImageIcon className="w-4 h-4" />
                 </button>
                 {options.length > 2 && (
-                  <button type="button" onClick={() => removeOption(i)} className="flex-shrink-0 text-gray-400 hover:text-red-500">
+                  <button type="button" onClick={() => removeOption(i)} className="flex-shrink-0 text-muted-foreground hover:text-destructive">
                     <X className="w-4 h-4" />
                   </button>
                 )}
                 {opt.is_correct && (
-                  <span className="flex-shrink-0 text-xs text-green-600 font-medium">✓ ถูก</span>
+                  <span className="flex-shrink-0 text-xs text-success font-medium">✓ ถูก</span>
                 )}
               </div>
               {(showImageForOption[i] || opt.image_url) && (

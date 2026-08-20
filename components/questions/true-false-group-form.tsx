@@ -77,14 +77,14 @@ function SubQuestionCard({
   onRemoveChoice: (ci: number) => void
 }) {
   return (
-    <div className="border rounded-xl overflow-hidden bg-gray-50">
-      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b bg-white">
-        <span className="flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center bg-emerald-100 text-emerald-700">
+    <div className="border rounded-xl overflow-hidden bg-muted">
+      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b bg-card">
+        <span className="flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center bg-success/10 text-success">
           {label}
         </span>
-        <span className="text-sm font-medium text-gray-600 flex-1">คำถามย่อย</span>
+        <span className="text-sm font-medium text-muted-foreground flex-1">คำถามย่อย</span>
         {canRemove && (
-          <button type="button" onClick={onRemove} className="flex-shrink-0 flex items-center gap-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">
+          <button type="button" onClick={onRemove} className="flex-shrink-0 flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 px-2 py-1 rounded transition-colors">
             <Trash2 className="w-3.5 h-3.5" /> ลบ
           </button>
         )}
@@ -92,7 +92,7 @@ function SubQuestionCard({
 
       <div className="p-3.5 space-y-3">
         <div className="space-y-1.5">
-          <Label className="text-xs text-gray-500">คำถามย่อย *</Label>
+          <Label className="text-xs text-muted-foreground">คำถามย่อย *</Label>
           <RichTextEditor
             value={subQuestion.text}
             onChange={v => onUpdate({ text: v })}
@@ -102,12 +102,12 @@ function SubQuestionCard({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-gray-500">รูปภาพประกอบคำถามย่อยนี้ (ไม่บังคับ)</Label>
+          <Label className="text-xs text-muted-foreground">รูปภาพประกอบคำถามย่อยนี้ (ไม่บังคับ)</Label>
           <QuestionImageUpload value={subQuestion.imageUrls} onChange={v => onUpdate({ imageUrls: v })} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500">ถามหา:</span>
+          <span className="text-xs text-muted-foreground">ถามหา:</span>
           {([
             { value: 'correct' as const, label: '✓ ข้อที่ถูก' },
             { value: 'wrong' as const, label: '✗ ข้อที่ผิด' },
@@ -117,20 +117,20 @@ function SubQuestionCard({
               type="button"
               onClick={() => onUpdate({ selectTarget: opt.value })}
               className={`px-2.5 py-1.5 rounded-lg border-2 text-xs font-medium transition-colors ${
-                subQuestion.selectTarget === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                subQuestion.selectTarget === opt.value ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-ring'
               }`}
             >
               {opt.label}
             </button>
           ))}
-          <span className="text-[11px] text-gray-400">นักเรียนติ๊กได้ตั้งแต่ 1 ข้อขึ้นไป</span>
+          <span className="text-[11px] text-muted-foreground">นักเรียนติ๊กได้ตั้งแต่ 1 ข้อขึ้นไป</span>
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs text-gray-500">ตัวเลือก</Label>
+          <Label className="text-xs text-muted-foreground">ตัวเลือก</Label>
           {subQuestion.choices.map((choice, ci) => (
-            <div key={choice.id} className="flex items-start gap-2 bg-white border border-gray-200 rounded-lg p-2.5">
-              <span className="text-xs font-bold text-gray-400 mt-2.5 w-4 flex-shrink-0">{ci + 1}.</span>
+            <div key={choice.id} className="flex items-start gap-2 bg-card border border-border rounded-lg p-2.5">
+              <span className="text-xs font-bold text-muted-foreground mt-2.5 w-4 flex-shrink-0">{ci + 1}.</span>
               <div className="flex-1 space-y-1.5 min-w-0">
                 <RichTextEditor
                   value={choice.text}
@@ -140,15 +140,15 @@ function SubQuestionCard({
                 />
                 <div className="flex gap-2">
                   {[
-                    { val: true, label: '✓ ถูก', cls: 'border-green-500 bg-green-50 text-green-700' },
-                    { val: false, label: '✗ ผิด', cls: 'border-red-500 bg-red-50 text-red-700' },
+                    { val: true, label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
+                    { val: false, label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
                   ].map(({ val, label, cls }) => (
                     <button
                       key={String(val)}
                       type="button"
                       onClick={() => onUpdateChoice(ci, { correct_answer: val })}
                       className={`px-3 py-1 rounded-lg border-2 text-xs font-semibold transition-colors ${
-                        choice.correct_answer === val ? cls : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                        choice.correct_answer === val ? cls : 'border-border text-muted-foreground hover:border-ring'
                       }`}
                     >
                       {label}
@@ -157,7 +157,7 @@ function SubQuestionCard({
                 </div>
               </div>
               {subQuestion.choices.length > 2 && (
-                <button type="button" onClick={() => onRemoveChoice(ci)} className="flex-shrink-0 mt-2.5 text-gray-400 hover:text-red-500">
+                <button type="button" onClick={() => onRemoveChoice(ci)} className="flex-shrink-0 mt-2.5 text-muted-foreground hover:text-destructive">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -169,7 +169,7 @@ function SubQuestionCard({
         </div>
 
         <div className="space-y-1.5 pt-2 border-t">
-          <Label className="text-xs text-gray-500">คะแนนของคำถามย่อยนี้</Label>
+          <Label className="text-xs text-muted-foreground">คะแนนของคำถามย่อยนี้</Label>
           <div className="flex items-center gap-2">
             <Input
               type="number"
@@ -179,7 +179,7 @@ function SubQuestionCard({
               onChange={e => onUpdate({ score: parseFloat(e.target.value) || 1 })}
               className="w-24 h-8 text-sm"
             />
-            <span className="text-xs text-gray-500">คะแนน</span>
+            <span className="text-xs text-muted-foreground">คะแนน</span>
           </div>
         </div>
       </div>
@@ -333,7 +333,7 @@ export function TrueFalseGroupForm({ allTags, mode = 'create', question, isOwner
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">โจทย์หลัก / สถานการณ์</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">โจทย์หลัก / สถานการณ์</h2>
         <div className="space-y-1.5">
           <Label>ข้อความโจทย์หลัก *</Label>
           <RichTextEditor
@@ -343,7 +343,7 @@ export function TrueFalseGroupForm({ allTags, mode = 'create', question, isOwner
             placeholder="เช่น พิจารณาข้อความต่อไปนี้เกี่ยวกับระบบสุริยะ แล้วตอบคำถามแต่ละข้อด้านล่าง"
             rows={4}
           />
-          <p className="text-[11px] text-gray-400">บริบทร่วมที่นักเรียนเห็นก่อนคำถามย่อยทุกข้อด้านล่าง — ไม่ใช่ข้อความที่ต้องตัดสินถูก-ผิด</p>
+          <p className="text-[11px] text-muted-foreground">บริบทร่วมที่นักเรียนเห็นก่อนคำถามย่อยทุกข้อด้านล่าง — ไม่ใช่ข้อความที่ต้องตัดสินถูก-ผิด</p>
         </div>
         <div className="space-y-1.5">
           <Label>รูปภาพประกอบ (ไม่บังคับ)</Label>
@@ -353,10 +353,10 @@ export function TrueFalseGroupForm({ allTags, mode = 'create', question, isOwner
 
       <section className="space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
-          <h2 className="text-base font-semibold text-gray-900">คำถามย่อย</h2>
+          <h2 className="text-base font-semibold text-foreground">คำถามย่อย</h2>
           {subQuestions.length > 1 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
         </div>
-        <p className="text-xs text-gray-500">แต่ละคำถามย่อยมีตัวเลือกของตัวเอง ครูตั้งได้ว่าจะถามหาข้อที่ถูกหรือข้อที่ผิด นักเรียนติ๊กได้ตั้งแต่ 1 ข้อขึ้นไป</p>
+        <p className="text-xs text-muted-foreground">แต่ละคำถามย่อยมีตัวเลือกของตัวเอง ครูตั้งได้ว่าจะถามหาข้อที่ถูกหรือข้อที่ผิด นักเรียนติ๊กได้ตั้งแต่ 1 ข้อขึ้นไป</p>
 
         <div className="space-y-3">
           {subQuestions.map((sq, si) => (
@@ -377,12 +377,12 @@ export function TrueFalseGroupForm({ allTags, mode = 'create', question, isOwner
         <button
           type="button"
           onClick={addSubQuestion}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-600 border-2 border-dashed border-blue-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors w-full justify-center"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary border-2 border-dashed border-primary/20 rounded-xl hover:border-primary hover:bg-primary/10 transition-colors w-full justify-center"
         >
           <Plus className="w-4 h-4" /> เพิ่มคำถามย่อย
         </button>
 
-        <p className="text-xs text-gray-400">คะแนนรวม: {subQuestions.reduce((sum, sq) => sum + sq.score, 0)} คะแนน</p>
+        <p className="text-xs text-muted-foreground">คะแนนรวม: {subQuestions.reduce((sum, sq) => sum + sq.score, 0)} คะแนน</p>
       </section>
 
       <SolutionSection

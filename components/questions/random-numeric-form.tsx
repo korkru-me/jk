@@ -93,18 +93,18 @@ function SelectField({ label, value, onChange, placeholder, options, disabled }:
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
       <div className="relative">
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
           disabled={disabled}
-          className="w-full h-9 text-sm border border-gray-300 rounded-lg pl-3 pr-8 bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full h-9 text-sm border border-border rounded-lg pl-3 pr-8 bg-card appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <option value="">{placeholder}</option>
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
       </div>
     </div>
   )
@@ -119,12 +119,12 @@ function VarChip({ name, active, onClick }: { name: string; active: boolean; onC
       onClick={onClick}
       className={`relative font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-150 ${
         active
-          ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
-          : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:text-blue-700 hover:bg-blue-50'
+          ? 'bg-primary text-white border-primary shadow-md shadow-blue-100'
+          : 'bg-card text-muted-foreground border-border hover:border-primary hover:text-primary hover:bg-primary/10'
       }`}
     >
       {'{' + name + '}'}
-      {active && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />}
+      {active && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-success border-2 border-white" />}
     </button>
   )
 }
@@ -162,33 +162,33 @@ function InlineConditionPanel({ varName, allVars, rules, onRulesChange }: {
   }
 
   return (
-    <div className="mt-1.5 pt-2 border-t border-gray-100 space-y-1.5">
+    <div className="mt-1.5 pt-2 border-t border-border space-y-1.5">
       {myRules.map(rule => (
         <div key={rule.id} className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-mono text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 shrink-0">
+          <span className="font-mono text-xs bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 shrink-0">
             {varName}
           </span>
 
           <select
             value={rule.operator}
             onChange={e => updateRule(rule.id, { operator: e.target.value as LogicOperator })}
-            className="h-6 text-xs border border-gray-200 rounded px-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="h-6 text-xs border border-border rounded px-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
           >
             {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
           </select>
 
-          <div className="flex rounded border border-gray-200 overflow-hidden text-[10px] shrink-0">
+          <div className="flex rounded border border-border overflow-hidden text-[10px] shrink-0">
             <button
               type="button"
               onClick={() => updateRule(rule.id, { rhs_type: 'variable' })}
-              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'variable' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'variable' ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
             >
               ตัวแปร
             </button>
             <button
               type="button"
               onClick={() => updateRule(rule.id, { rhs_type: 'constant' })}
-              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'constant' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'constant' ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
             >
               ค่า
             </button>
@@ -198,7 +198,7 @@ function InlineConditionPanel({ varName, allVars, rules, onRulesChange }: {
             <select
               value={rule.rhs_variable}
               onChange={e => updateRule(rule.id, { rhs_variable: e.target.value })}
-              className="h-6 text-xs border border-gray-200 rounded px-1 bg-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="h-6 text-xs border border-border rounded px-1 bg-card font-mono focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="">-- ตัวแปร --</option>
               {otherVarNames.map(n => <option key={n} value={n}>{n}</option>)}
@@ -215,7 +215,7 @@ function InlineConditionPanel({ varName, allVars, rules, onRulesChange }: {
           <button
             type="button"
             onClick={() => removeRule(rule.id)}
-            className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+            className="text-gray-300 hover:text-destructive transition-colors shrink-0"
           >
             <X className="w-3 h-3" />
           </button>
@@ -225,13 +225,13 @@ function InlineConditionPanel({ varName, allVars, rules, onRulesChange }: {
       <button
         type="button"
         onClick={addRule}
-        className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+        className="flex items-center gap-1 text-[11px] text-primary hover:text-blue-800 font-medium transition-colors"
       >
         <Plus className="w-3 h-3" /> เพิ่มเงื่อนไข
       </button>
 
       {myRules.length > 0 && (
-        <p className="text-[10px] text-gray-400">ระบบจะสุ่มค่าใหม่ถ้าไม่ตรงเงื่อนไข (สูงสุด 100 ครั้ง)</p>
+        <p className="text-[10px] text-muted-foreground">ระบบจะสุ่มค่าใหม่ถ้าไม่ตรงเงื่อนไข (สูงสุด 100 ครั้ง)</p>
       )}
     </div>
   )
@@ -254,14 +254,14 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
   const myRuleCount = logicRules.filter(r => r.lhs === v.name).length
 
   return (
-    <div className={`group border rounded-xl p-3 bg-white hover:shadow-sm transition-all ${
-      isAnswer ? 'border-emerald-200 bg-emerald-50/20' : 'border-gray-200 hover:border-blue-200'
+    <div className={`group border rounded-xl p-3 bg-card hover:shadow-sm transition-all ${
+      isAnswer ? 'border-success/20 bg-success/10' : 'border-border hover:border-primary/20'
     }`}>
       <div className="flex items-start gap-2.5">
         <span className={`font-mono font-bold px-2.5 py-1 rounded-lg text-sm border shrink-0 mt-0.5 ${
           isAnswer
-            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-            : 'text-blue-700 bg-blue-50 border-blue-200'
+            ? 'text-success bg-success/10 border-success/20'
+            : 'text-primary bg-primary/10 border-primary/20'
         }`}>
           {'{' + v.name + '}'}
         </span>
@@ -269,15 +269,15 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
         <div className="flex-1 min-w-0 space-y-2">
           {isAnswer ? (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              <span className="text-xs font-semibold text-success bg-success/10 px-2.5 py-0.5 rounded-full border border-success/20">
                 = คำตอบ
               </span>
-              <span className="text-xs text-gray-400">ค่าคำนวณจากสมการอัตโนมัติ</span>
+              <span className="text-xs text-muted-foreground">ค่าคำนวณจากสมการอัตโนมัติ</span>
               {onSetAnswer && (
                 <button
                   type="button"
                   onClick={() => onSetAnswer(null)}
-                  className="text-[10px] text-gray-300 hover:text-red-500 transition-colors ml-auto"
+                  className="text-[10px] text-gray-300 hover:text-destructive transition-colors ml-auto"
                 >
                   ยกเลิก
                 </button>
@@ -286,18 +286,18 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
           ) : (
             <>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs w-fit">
+                <div className="flex rounded-lg border border-border overflow-hidden text-xs w-fit">
                   <button
                     type="button"
                     onClick={() => onUpdate(index, 'is_constant', false)}
-                    className={`px-3 py-1 font-medium transition-colors ${!isConstant ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                    className={`px-3 py-1 font-medium transition-colors ${!isConstant ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
                   >
                     สุ่ม
                   </button>
                   <button
                     type="button"
                     onClick={() => onUpdate(index, 'is_constant', true)}
-                    className={`px-3 py-1 font-medium transition-colors ${isConstant ? 'bg-orange-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                    className={`px-3 py-1 font-medium transition-colors ${isConstant ? 'bg-orange-500 text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
                   >
                     ค่าคงที่
                   </button>
@@ -306,7 +306,7 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
                   <button
                     type="button"
                     onClick={() => onSetAnswer(v.name)}
-                    className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-200 transition-all"
+                    className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-muted-foreground hover:text-success hover:bg-success/10 rounded border border-transparent hover:border-success/20 transition-all"
                   >
                     <Target className="w-3 h-3" /> ตั้งเป็นคำตอบ
                   </button>
@@ -315,7 +315,7 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
 
               {isConstant ? (
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs text-gray-500 font-medium shrink-0">ค่า</Label>
+                  <Label className="text-xs text-muted-foreground font-medium shrink-0">ค่า</Label>
                   <Input
                     type="number"
                     value={v.constant_value ?? 0}
@@ -328,7 +328,7 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
                 <div className="grid grid-cols-3 gap-2">
                   {(['min', 'max', 'step'] as const).map(field => (
                     <div key={field}>
-                      <Label className="text-xs text-gray-500 font-medium">
+                      <Label className="text-xs text-muted-foreground font-medium">
                         {field === 'min' ? 'ต่ำสุด' : field === 'max' ? 'สูงสุด' : 'ขนาดก้าว'}
                       </Label>
                       <Input
@@ -352,8 +352,8 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
               onClick={() => setShowConditions(s => !s)}
               className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border transition-all ${
                 myRuleCount > 0
-                  ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100'
-                  : 'text-gray-400 border-transparent hover:text-gray-600 hover:border-gray-200 hover:bg-gray-50'
+                  ? 'text-warning bg-warning/10 border-warning/20 hover:bg-warning/10'
+                  : 'text-muted-foreground border-transparent hover:text-muted-foreground hover:border-border hover:bg-muted'
               }`}
             >
               {showConditions ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
@@ -374,7 +374,7 @@ function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRulesChang
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors mt-0.5 shrink-0 opacity-0 group-hover:opacity-100"
+          className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-destructive hover:bg-destructive/10 transition-colors mt-0.5 shrink-0 opacity-0 group-hover:opacity-100"
         >
           ✕
         </button>
@@ -415,9 +415,9 @@ function VarList({ variables, onChange, logicRules, onLogicRulesChange, onSetAns
   return (
     <div className="space-y-2 pt-1">
       {hasRandom && (
-        <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-          <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
-          <p className="text-xs text-blue-600 leading-relaxed">
+        <div className="flex items-start gap-2 bg-primary/10 border border-blue-100 rounded-xl px-3 py-2">
+          <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+          <p className="text-xs text-primary leading-relaxed">
             <span className="font-semibold">ขนาดก้าว</span>{' '}
             คือระยะห่างระหว่างค่าที่จะสุ่ม เช่น ต่ำสุด=9, สูงสุด=10, ขนาดก้าว=0.2 → 9, 9.2, 9.4, 9.6, 9.8, 10
           </p>
@@ -462,24 +462,24 @@ function TolerancePicker({ value, onChange }: { value: number; onChange: (v: num
 
   return (
     <div className="space-y-1.5">
-      <Label>ค่าคลาดเคลื่อนที่ยอมรับ <span className="font-normal text-gray-400 text-xs">(ใช้กับทุกข้อ)</span></Label>
+      <Label>ค่าคลาดเคลื่อนที่ยอมรับ <span className="font-normal text-muted-foreground text-xs">(ใช้กับทุกข้อ)</span></Label>
       <div className="flex items-center gap-2">
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+        <div className="flex rounded-lg border border-border overflow-hidden text-sm">
           {(['decimal', 'percent'] as const).map(m => (
             <button
               key={m}
               type="button"
               onClick={() => changeMode(m)}
-              className={`px-3 py-1.5 font-medium transition-colors ${mode === m ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-1.5 font-medium transition-colors ${mode === m ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
             >
               {m === 'decimal' ? 'ทศนิยม' : '%'}
             </button>
           ))}
         </div>
         <Input type="number" min={0} step={mode === 'decimal' ? 0.01 : 0.1} value={display} onChange={e => changeValue(Number(e.target.value))} className="w-28" />
-        {mode === 'percent' && <span className="text-sm text-gray-500">%</span>}
+        {mode === 'percent' && <span className="text-sm text-muted-foreground">%</span>}
       </div>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-muted-foreground">
         {mode === 'decimal'
           ? `ยอมรับผิดพลาดได้ไม่เกิน ±${display} จากคำตอบที่ถูกต้อง`
           : `ยอมรับผิดพลาดได้ไม่เกิน ±${display}% ของคำตอบที่ถูกต้อง`}
@@ -544,7 +544,7 @@ function UnitField({ value, onChange }: { value: string; onChange: (v: string) =
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2 flex-wrap">
-        <Label className="text-sm shrink-0 text-gray-700">หน่วยของคำตอบ</Label>
+        <Label className="text-sm shrink-0 text-muted-foreground">หน่วยของคำตอบ</Label>
         <Input
           ref={inputRef}
           value={value}
@@ -557,7 +557,7 @@ function UnitField({ value, onChange }: { value: string; onChange: (v: string) =
           onMouseDown={e => e.preventDefault()}
           onClick={() => wrapSelection(TO_SUPER)}
           title="คลุมข้อความในช่องแล้วกดเพื่อยกขึ้น"
-          className="text-xs border rounded-md px-2 py-1 font-medium transition-colors text-gray-600 border-gray-300 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 shrink-0"
+          className="text-xs border rounded-md px-2 py-1 font-medium transition-colors text-muted-foreground border-border hover:text-primary hover:border-primary hover:bg-primary/10 shrink-0"
         >
           A² ห้อยบน
         </button>
@@ -566,7 +566,7 @@ function UnitField({ value, onChange }: { value: string; onChange: (v: string) =
           onMouseDown={e => e.preventDefault()}
           onClick={() => wrapSelection(TO_SUB)}
           title="คลุมข้อความในช่องแล้วกดเพื่อห้อยล่าง"
-          className="text-xs border rounded-md px-2 py-1 font-medium transition-colors text-gray-600 border-gray-300 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 shrink-0"
+          className="text-xs border rounded-md px-2 py-1 font-medium transition-colors text-muted-foreground border-border hover:text-primary hover:border-primary hover:bg-primary/10 shrink-0"
         >
           A₂ ห้อยล่าง
         </button>
@@ -575,26 +575,26 @@ function UnitField({ value, onChange }: { value: string; onChange: (v: string) =
           onClick={() => setShowPicker(s => !s)}
           className={`text-xs border rounded px-2 py-1 transition-colors shrink-0 ${
             showPicker
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'text-blue-600 border-blue-200 hover:bg-blue-50'
+              ? 'bg-primary text-white border-primary'
+              : 'text-primary border-primary/20 hover:bg-primary/10'
           }`}
         >
           Ω· อักขระพิเศษ
         </button>
       </div>
-      <p className="text-[10px] text-gray-400">คลุมข้อความในช่องแล้วกด &ldquo;ห้อยบน&rdquo; หรือ &ldquo;ห้อยล่าง&rdquo; เพื่อแปลงอักษร</p>
+      <p className="text-[10px] text-muted-foreground">คลุมข้อความในช่องแล้วกด &ldquo;ห้อยบน&rdquo; หรือ &ldquo;ห้อยล่าง&rdquo; เพื่อแปลงอักษร</p>
       {showPicker && (
-        <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-2">
+        <div className="border border-border rounded-xl p-3 bg-muted space-y-2">
           {UNIT_CHARS_OTHER.map(({ group, chars }) => (
             <div key={group} className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] text-gray-400 font-semibold w-14 shrink-0">{group}</span>
+              <span className="text-[10px] text-muted-foreground font-semibold w-14 shrink-0">{group}</span>
               <div className="flex flex-wrap gap-1">
                 {chars.map(ch => (
                   <button
                     key={ch}
                     type="button"
                     onClick={() => insertChar(ch)}
-                    className="font-mono text-sm px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
+                    className="font-mono text-sm px-2 py-0.5 border border-border rounded bg-card hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
                   >
                     {ch}
                   </button>
@@ -736,10 +736,10 @@ function PresetEquationSelector({
   const exactMatch = presets.some(p => normalizeEq(p.equation) === normalizeEq(equationText))
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+    <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
       <div className="p-4 space-y-3">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">สมการ</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">สมการ</p>
           <div className="relative">
             <Input
               value={equationText}
@@ -750,34 +750,34 @@ function PresetEquationSelector({
               className="h-9 text-sm font-mono"
             />
             {showSuggestions && matches.length > 0 && (
-              <div className="absolute z-10 top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+              <div className="absolute z-10 top-full left-0 mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                 {matches.map(p => (
                   <button
                     key={p.id}
                     type="button"
                     onMouseDown={e => e.preventDefault()}
                     onClick={() => handlePresetChange(p.id)}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                    className="w-full text-left px-3 py-2 hover:bg-primary/10 border-b border-border last:border-b-0 transition-colors"
                   >
-                    <p className="text-sm font-semibold text-gray-800">{p.formula_name}</p>
-                    <p className="text-xs font-mono text-gray-500">{p.equation}</p>
+                    <p className="text-sm font-semibold text-foreground">{p.formula_name}</p>
+                    <p className="text-xs font-mono text-muted-foreground">{p.equation}</p>
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <p className="text-[11px] text-blue-500">
+          <p className="text-[11px] text-primary">
             พิมพ์สมการเองได้เลย — ถ้าตรงกับสมการในคลัง ระบบจะแสดงให้เลือกอัตโนมัติ
           </p>
           {selectedPreset?.description && (
-            <p className="text-xs text-gray-400">{selectedPreset.description}</p>
+            <p className="text-xs text-muted-foreground">{selectedPreset.description}</p>
           )}
         </div>
 
         {equationText.trim() && allVarNames.length > 0 && (
           <div className="space-y-2.5">
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
                 เลือกตัวแปรที่ต้องการหา (คำตอบ)
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -791,8 +791,8 @@ function PresetEquationSelector({
                       disabled={solving}
                       className={`font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-150 disabled:opacity-60 ${
                         isAns
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50'
+                          ? 'bg-success text-white border-success shadow-md'
+                          : 'bg-card text-muted-foreground border-border hover:border-success hover:text-success hover:bg-success/10'
                       }`}
                     >
                       {'{' + name + '}'}
@@ -801,16 +801,16 @@ function PresetEquationSelector({
                   )
                 })}
               </div>
-              {solving && <p className="text-xs text-blue-500 mt-1.5">⏳ กำลังแก้สมการ...</p>}
-              {solveError && <p className="text-xs text-red-500 mt-1.5">{solveError}</p>}
+              {solving && <p className="text-xs text-primary mt-1.5">⏳ กำลังแก้สมการ...</p>}
+              {solveError && <p className="text-xs text-destructive mt-1.5">{solveError}</p>}
             </div>
 
             {answerVarName && derivedFormula && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <span className="font-mono font-bold text-emerald-700 text-sm">{'{' + answerVarName + '}'}</span>
-                <span className="text-emerald-500">=</span>
+              <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl">
+                <span className="font-mono font-bold text-success text-sm">{'{' + answerVarName + '}'}</span>
+                <span className="text-success">=</span>
                 <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{derivedFormula}</span>
-                <span className="text-[10px] text-emerald-500 shrink-0">คำนวณอัตโนมัติ</span>
+                <span className="text-[10px] text-success shrink-0">คำนวณอัตโนมัติ</span>
               </div>
             )}
 
@@ -878,7 +878,7 @@ function SavePresetControl({ equation, targetVariable, variables, onSaved }: {
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+        className="flex items-center gap-1.5 text-xs text-primary hover:text-blue-800 font-medium transition-colors"
       >
         <Plus className="w-3.5 h-3.5" /> บันทึกสมการนี้ลงคลังสมการ
       </button>
@@ -886,8 +886,8 @@ function SavePresetControl({ equation, targetVariable, variables, onSaved }: {
   }
 
   return (
-    <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-3 space-y-2">
-      <p className="text-xs font-semibold text-blue-700">บันทึกสมการนี้ลงคลังสมการ</p>
+    <div className="border border-primary/20 bg-primary/10 rounded-xl p-3 space-y-2">
+      <p className="text-xs font-semibold text-primary">บันทึกสมการนี้ลงคลังสมการ</p>
       <Input value={name} onChange={e => setName(e.target.value)} placeholder="ตั้งชื่อสมการ เช่น กฎข้อที่สองของนิวตัน" className="h-8 text-sm" />
       <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="คำอธิบาย (ไม่บังคับ)" className="h-8 text-sm" />
       <div className="flex gap-2">
@@ -999,7 +999,7 @@ function SubEquationPicker({
   }
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+    <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
       <div className="p-4 space-y-3">
         <SelectField
           label="สมการสำเร็จรูป"
@@ -1012,7 +1012,7 @@ function SubEquationPicker({
         {/* Previous answer chips — insert ans0, ans1, ... into equation */}
         {prevAnswerNames.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-amber-600 font-semibold">
+            <p className="text-[10px] uppercase tracking-wider text-warning font-semibold">
               คำตอบจากข้อก่อนหน้า (กดเพื่อแทรกในสมการ)
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -1021,10 +1021,10 @@ function SubEquationPicker({
                   key={name}
                   type="button"
                   onClick={() => insertIntoEquation(name)}
-                  className="font-mono text-xs px-2.5 py-1 rounded-lg border-2 border-amber-200 bg-amber-50 text-amber-800 font-bold hover:bg-amber-100 transition-colors"
+                  className="font-mono text-xs px-2.5 py-1 rounded-lg border-2 border-warning/20 bg-warning/10 text-amber-800 font-bold hover:bg-warning/10 transition-colors"
                 >
                   {name}
-                  <span className="ml-1.5 font-normal text-amber-500 text-[10px]">คำตอบ {labels[i]})</span>
+                  <span className="ml-1.5 font-normal text-warning text-[10px]">คำตอบ {labels[i]})</span>
                 </button>
               ))}
             </div>
@@ -1032,7 +1032,7 @@ function SubEquationPicker({
         )}
 
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">สมการ</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">สมการ</p>
           <Input
             ref={equationInputRef}
             value={equationText}
@@ -1040,9 +1040,9 @@ function SubEquationPicker({
             placeholder="เช่น F = m * a"
             className="h-9 text-sm font-mono"
           />
-          <p className="text-[11px] text-blue-500">สามารถพิมพ์หรือปรับแก้สมการในช่องนี้ได้โดยตรง</p>
+          <p className="text-[11px] text-primary">สามารถพิมพ์หรือปรับแก้สมการในช่องนี้ได้โดยตรง</p>
           {mainVarNames.length > 0 && (
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-muted-foreground">
               ตัวแปรที่มีจากโจทย์หลัก: <span className="font-mono">{mainVarNames.join(', ')}</span>
             </p>
           )}
@@ -1051,7 +1051,7 @@ function SubEquationPicker({
         {equationText.trim() && allVarNames.length > 0 && (
           <div className="space-y-2.5">
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
                 เลือกตัวแปรที่ต้องการหา (คำตอบ)
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -1063,8 +1063,8 @@ function SubEquationPicker({
                     disabled={solving}
                     className={`font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all disabled:opacity-60 ${
                       name === answerVarName
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50'
+                        ? 'bg-success text-white border-success shadow-md'
+                        : 'bg-card text-muted-foreground border-border hover:border-success hover:text-success hover:bg-success/10'
                     }`}
                   >
                     {'{' + name + '}'}
@@ -1072,16 +1072,16 @@ function SubEquationPicker({
                   </button>
                 ))}
               </div>
-              {solving && <p className="text-xs text-blue-500 mt-1.5">⏳ กำลังแก้สมการ...</p>}
-              {solveError && <p className="text-xs text-red-500 mt-1.5">{solveError}</p>}
+              {solving && <p className="text-xs text-primary mt-1.5">⏳ กำลังแก้สมการ...</p>}
+              {solveError && <p className="text-xs text-destructive mt-1.5">{solveError}</p>}
             </div>
 
             {answerVarName && derivedFormula && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <span className="font-mono font-bold text-emerald-700 text-sm">{'{' + answerVarName + '}'}</span>
-                <span className="text-emerald-500">=</span>
+              <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl">
+                <span className="font-mono font-bold text-success text-sm">{'{' + answerVarName + '}'}</span>
+                <span className="text-success">=</span>
                 <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{derivedFormula}</span>
-                <span className="text-[10px] text-emerald-500 shrink-0">คำนวณอัตโนมัติ</span>
+                <span className="text-[10px] text-success shrink-0">คำนวณอัตโนมัติ</span>
               </div>
             )}
           </div>
@@ -1109,7 +1109,7 @@ function SubQuestionFromEquation({
   return (
     <AnswerPartCard label={label} onRemove={onRemove}>
       <div>
-        <p className="text-sm font-semibold text-gray-700 mb-2">เลือกสมการ *</p>
+        <p className="text-sm font-semibold text-muted-foreground mb-2">เลือกสมการ *</p>
         <SubEquationPicker
           presets={presets}
           mainVarNames={mainVarNames}
@@ -1156,8 +1156,8 @@ function AnswerStepField({ value, onChange }: { value: number; onChange: (v: num
   return (
     <div className="space-y-2">
       <div>
-        <Label className="text-sm font-semibold text-gray-700">ขนาดก้าวคำตอบ</Label>
-        <p className="text-xs text-gray-400 mt-0.5">
+        <Label className="text-sm font-semibold text-muted-foreground">ขนาดก้าวคำตอบ</Label>
+        <p className="text-xs text-muted-foreground mt-0.5">
           คำตอบต้องเป็นทวีคูณของค่านี้ ระบบจะสุ่มใหม่จนกว่าจะได้คำตอบที่ลงตัว (สูงสุด 500 รอบ)
         </p>
       </div>
@@ -1169,8 +1169,8 @@ function AnswerStepField({ value, onChange }: { value: number; onChange: (v: num
             onClick={() => onChange(p.value)}
             className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
               (p.value === 0 && isOff) || (!isOff && Math.abs(value - p.value) < 1e-9)
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+                ? 'bg-primary text-white border-primary'
+                : 'bg-card text-muted-foreground border-border hover:border-primary/20 hover:text-primary'
             }`}
           >
             {p.label}
@@ -1186,7 +1186,7 @@ function AnswerStepField({ value, onChange }: { value: number; onChange: (v: num
           className="h-8 w-28 text-sm"
         />
       </div>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-muted-foreground">
         {isOff
           ? 'ปิดอยู่ — คำตอบอาจเป็นเลขทศนิยมใดก็ได้'
           : `คำตอบต้องเป็นทวีคูณของ ${value}  ตัวอย่าง: ${[1,2,3,5].map(n => +(n * value).toPrecision(6)).join(', ')}...`}
@@ -1203,32 +1203,32 @@ function SampleTable({ title, samples, varNames, type }: {
   varNames: string[]
   type: 'good' | 'warn' | 'bad'
 }) {
-  const dotColor = { good: 'bg-emerald-400', warn: 'bg-amber-400', bad: 'bg-red-400' }[type]
+  const dotColor = { good: 'bg-success', warn: 'bg-warning', bad: 'bg-destructive' }[type]
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${dotColor} shrink-0`} />
-        <p className="text-xs font-semibold text-gray-600">{title}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{title}</p>
       </div>
-      <div className="overflow-x-auto rounded-lg border border-gray-100">
+      <div className="overflow-x-auto rounded-lg border border-border">
         <table className="text-xs w-full">
           <thead>
-            <tr className="bg-gray-50">
+            <tr className="bg-muted">
               {varNames.map(n => (
-                <th key={n} className="px-3 py-1.5 text-left font-mono font-semibold text-gray-500 border-b border-gray-100">
+                <th key={n} className="px-3 py-1.5 text-left font-mono font-semibold text-muted-foreground border-b border-border">
                   {'{' + n + '}'}
                 </th>
               ))}
-              <th className="px-3 py-1.5 text-left font-semibold text-gray-700 border-b border-gray-100">คำตอบ</th>
+              <th className="px-3 py-1.5 text-left font-semibold text-muted-foreground border-b border-border">คำตอบ</th>
             </tr>
           </thead>
           <tbody>
             {samples.map((s, i) => (
-              <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+              <tr key={i} className={i % 2 === 0 ? 'bg-card' : 'bg-muted/50'}>
                 {varNames.map(n => (
-                  <td key={n} className="px-3 py-1.5 font-mono text-gray-700">{s.values[n] ?? '—'}</td>
+                  <td key={n} className="px-3 py-1.5 font-mono text-muted-foreground">{s.values[n] ?? '—'}</td>
                 ))}
-                <td className="px-3 py-1.5 font-mono font-bold text-gray-900">{s.answer}</td>
+                <td className="px-3 py-1.5 font-mono font-bold text-foreground">{s.answer}</td>
               </tr>
             ))}
           </tbody>
@@ -1277,24 +1277,24 @@ function TestRunPanel({ variables, logicRules, formula, answerStep, pythagoreanG
         type="button"
         onClick={run}
         disabled={running}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium border-2 border-dashed rounded-xl transition-colors border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-400 disabled:opacity-60"
+        className="flex items-center gap-2 px-4 py-2 text-sm font-medium border-2 border-dashed rounded-xl transition-colors border-primary/20 text-primary hover:bg-primary/10 hover:border-primary disabled:opacity-60"
       >
         {running ? '⏳ กำลังทดสอบ 200 รอบ...' : '🎲 ทดสอบการสุ่ม (200 รอบ)'}
       </button>
 
       {summary && (
-        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-          <div className="p-4 space-y-3 bg-gray-50 border-b border-gray-100">
+        <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+          <div className="p-4 space-y-3 bg-muted border-b border-border">
             <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">คำตอบลงตัว</span>
-                <span className={`font-bold tabular-nums ${nicePercent >= 50 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <span className="font-medium text-muted-foreground">คำตอบลงตัว</span>
+                <span className={`font-bold tabular-nums ${nicePercent >= 50 ? 'text-success' : 'text-destructive'}`}>
                   {summary.niceCount} / {summary.total} ({nicePercent}%)
                 </span>
               </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${nicePercent >= 50 ? 'bg-emerald-500' : 'bg-red-400'}`}
+                  className={`h-full rounded-full transition-all ${nicePercent >= 50 ? 'bg-success' : 'bg-destructive'}`}
                   style={{ width: `${nicePercent}%` }}
                 />
               </div>
@@ -1303,14 +1303,14 @@ function TestRunPanel({ variables, logicRules, formula, answerStep, pythagoreanG
             {summary.messyCount > 0 && (
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-amber-700">⚠ มีเลขยากระหว่างคำนวณ</span>
-                  <span className="font-bold text-amber-600 tabular-nums">
+                  <span className="font-medium text-warning">⚠ มีเลขยากระหว่างคำนวณ</span>
+                  <span className="font-bold text-warning tabular-nums">
                     {summary.messyCount} ชุด จาก {summary.niceCount} ชุดที่ดี
                   </span>
                 </div>
-                <div className="h-2 bg-amber-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-warning/10 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-amber-400 rounded-full"
+                    className="h-full bg-warning rounded-full"
                     style={{ width: `${summary.niceCount > 0 ? summary.messyCount / summary.niceCount * 100 : 0}%` }}
                   />
                 </div>
@@ -1318,9 +1318,9 @@ function TestRunPanel({ variables, logicRules, formula, answerStep, pythagoreanG
             )}
 
             {summary.niceCount === 0 && (
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mt-2">
-                <Info className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-red-600 font-medium">
+              <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2 mt-2">
+                <Info className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+                <p className="text-xs text-destructive font-medium">
                   ไม่พบชุดคำตอบที่ตรงเงื่อนไข — ลองขยายช่วงค่าตัวแปร หรือปรับขนาดก้าวคำตอบ
                 </p>
               </div>
@@ -1375,7 +1375,7 @@ function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroupsChange
   }
 
   return (
-    <div className="border border-purple-200 rounded-xl overflow-hidden bg-white shadow-sm">
+    <div className="border border-purple-200 rounded-xl overflow-hidden bg-card shadow-sm">
       <div className="flex items-center justify-between px-4 py-3 bg-purple-50 border-b border-purple-100">
         <div>
           <p className="text-sm font-bold text-purple-800">โหมดชุดตัวเลขพิเศษ (Pythagorean)</p>
@@ -1389,9 +1389,9 @@ function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroupsChange
             if (enabled) onGroupsChange([])
             onEnabledChange(!enabled)
           }}
-          className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? 'bg-purple-600' : 'bg-gray-300'}`}
+          className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? 'bg-purple-600' : 'bg-muted'}`}
         >
-          <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+          <span className={`absolute top-1 w-4 h-4 bg-card rounded-full shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
       </div>
 
@@ -1404,7 +1404,7 @@ function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroupsChange
               {PYTHAGOREAN_FAMILIES.map(f => (
                 <div key={f.name} className="space-y-0.5">
                   <p className="text-[10px] font-bold text-purple-600">{f.name}</p>
-                  <p className="text-[10px] font-mono text-gray-500 leading-relaxed">
+                  <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
                     {f.triples.map(t => `(${t[0]}, ${t[1]}, ${t[2]})`).join('  ')}
                   </p>
                 </div>
@@ -1414,7 +1414,7 @@ function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroupsChange
 
           {/* Group editor */}
           {groups.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-2">
+            <p className="text-sm text-muted-foreground text-center py-2">
               ยังไม่มีกลุ่ม — กด &ldquo;เพิ่มกลุ่ม&rdquo; ด้านล่างเพื่อ map ตัวแปรกับตำแหน่ง a, b, c
             </p>
           )}
@@ -1423,20 +1423,20 @@ function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroupsChange
             <div key={g.id} className="border border-purple-200 rounded-xl p-3 space-y-2 bg-purple-50/30">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-purple-700">กลุ่มที่ {gi + 1}</p>
-                <button type="button" onClick={() => removeGroup(g.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                <button type="button" onClick={() => removeGroup(g.id)} className="text-gray-300 hover:text-destructive transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {(['a_var', 'b_var', 'c_var'] as const).map((slot, si) => (
                   <div key={slot}>
-                    <p className="text-[10px] font-semibold text-gray-500 mb-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground mb-1">
                       {si === 0 ? 'ด้านสั้น a' : si === 1 ? 'ด้านยาว b' : 'ด้านเฉียง c'}
                     </p>
                     <select
                       value={g[slot]}
                       onChange={e => updateGroup(g.id, { [slot]: e.target.value })}
-                      className="w-full h-8 text-xs font-mono border border-purple-200 rounded-lg px-2 bg-white focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      className="w-full h-8 text-xs font-mono border border-purple-200 rounded-lg px-2 bg-card focus:outline-none focus:ring-1 focus:ring-purple-400"
                     >
                       <option value="">-- เลือก --</option>
                       {availableVarNames.map(n => (
@@ -1459,7 +1459,7 @@ function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroupsChange
             <Plus className="w-3.5 h-3.5" /> เพิ่มกลุ่มตัวแปร Pythagorean
           </button>
           {availableVarNames.length < 3 && (
-            <p className="text-xs text-red-400">ต้องมีตัวแปรอย่างน้อย 3 ตัวก่อนใช้โหมดนี้</p>
+            <p className="text-xs text-destructive">ต้องมีตัวแปรอย่างน้อย 3 ตัวก่อนใช้โหมดนี้</p>
           )}
         </div>
       )}
@@ -1657,11 +1657,11 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const fromEquationMainContent = (
     <>
       {answerVarName && answerParts[0].formula && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
-          <span className="font-mono font-bold text-emerald-700 text-sm">{'{'}{answerVarName}{'}'}</span>
-          <span className="text-emerald-500">=</span>
+        <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl">
+          <span className="font-mono font-bold text-success text-sm">{'{'}{answerVarName}{'}'}</span>
+          <span className="text-success">=</span>
           <span className="font-mono text-emerald-800 text-sm font-medium flex-1 truncate">{answerParts[0].formula}</span>
-          <span className="text-[10px] text-emerald-500 shrink-0">จากสมการที่เลือกด้านบน</span>
+          <span className="text-[10px] text-success shrink-0">จากสมการที่เลือกด้านบน</span>
         </div>
       )}
       <div className="space-y-1.5">
@@ -1680,7 +1680,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         >
           + แทรก [คำตอบ]
         </Button>
-        <p className="text-[11px] text-gray-400">ใช้ <code className="bg-gray-100 px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
+        <p className="text-[11px] text-muted-foreground">ใช้ <code className="bg-muted px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
       </div>
     </>
   )
@@ -1702,14 +1702,14 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
             onClick={() => setCreationMode(opt.value)}
             className={`flex-1 rounded-xl border-2 px-4 py-3 text-left transition-all ${
               creationMode === opt.value
-                ? 'border-blue-600 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300 bg-white'
+                ? 'border-primary bg-primary/10'
+                : 'border-border hover:border-ring bg-card'
             }`}
           >
-            <p className={`text-sm font-semibold ${creationMode === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>
+            <p className={`text-sm font-semibold ${creationMode === opt.value ? 'text-primary' : 'text-muted-foreground'}`}>
               {opt.label}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
           </button>
         ))}
       </div>
@@ -1732,7 +1732,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         <>
           {/* 2. เลือกสมการ */}
           <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เลือกสมการ *</h2>
+            <h2 className="text-base font-semibold text-foreground border-b pb-2">เลือกสมการ *</h2>
             <PresetEquationSelector
               presets={presetList}
               variables={variables}
@@ -1748,7 +1748,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
 
           {/* 3. สร้างโจทย์ */}
           <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">สร้างโจทย์</h2>
+            <h2 className="text-base font-semibold text-foreground border-b pb-2">สร้างโจทย์</h2>
             <div className="space-y-1.5">
               <Label>โจทย์ *</Label>
               <RichTextEditor
@@ -1761,7 +1761,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
               {/* Variable insert chips — directly below the editor */}
               {inputVars.length > 0 && (
                 <div className="space-y-1.5 pt-1">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                     กดเพื่อแทรกตัวแปรในโจทย์
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -1786,7 +1786,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
           {/* 4. ชุดคำตอบ */}
           <section className="space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
-              <h2 className="text-base font-semibold text-gray-900">ชุดคำตอบ</h2>
+              <h2 className="text-base font-semibold text-foreground">ชุดคำตอบ</h2>
               {subParts.length > 0 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
             </div>
             {subParts.length > 0
@@ -1811,7 +1811,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         <>
           {/* 2. สร้างโจทย์ */}
           <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b pb-2">สร้างโจทย์</h2>
+            <h2 className="text-base font-semibold text-foreground border-b pb-2">สร้างโจทย์</h2>
             <div className="space-y-1.5">
               <Label>คำถามหลัก *</Label>
               <RichTextEditor
@@ -1828,7 +1828,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
               >
                 + แทรกคำตอบ
               </Button>
-              <p className="text-[11px] text-gray-400">แทรกได้หลายช่อง แต่ละช่องจะมีเลขกำกับ พร้อมช่อง &quot;คำตอบที่ถูกต้อง&quot; เลขเดียวกันโผล่ขึ้นด้านล่างให้กรอก</p>
+              <p className="text-[11px] text-muted-foreground">แทรกได้หลายช่อง แต่ละช่องจะมีเลขกำกับ พร้อมช่อง &quot;คำตอบที่ถูกต้อง&quot; เลขเดียวกันโผล่ขึ้นด้านล่างให้กรอก</p>
             </div>
             <div className="space-y-1.5">
               <Label>รูปภาพประกอบโจทย์</Label>
@@ -1839,10 +1839,10 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
           {/* 3. คำตอบที่ถูกต้อง — จำนวนช่องและเลขกำกับอิงตาม [คำตอบ N] ที่แทรกไว้ในคำถามหลัก */}
           {mainBlankNumbers.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-base font-semibold text-gray-900 border-b pb-2">คำตอบที่ถูกต้อง</h2>
+              <h2 className="text-base font-semibold text-foreground border-b pb-2">คำตอบที่ถูกต้อง</h2>
               {mainBlankNumbers.map((num, i) => (
                 <div key={i} className="space-y-1.5">
-                  <Label className="text-xs text-gray-500">คำตอบที่ถูกต้อง {num} *</Label>
+                  <Label className="text-xs text-muted-foreground">คำตอบที่ถูกต้อง {num} *</Label>
                   <Input
                     value={answerParts[i]?.formula ?? ''}
                     onChange={e => updatePart(i, { formula: e.target.value })}
@@ -1858,7 +1858,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       {/* ตั้งค่าการสุ่ม */}
       {creationMode !== 'fixed' && (
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ตั้งค่าการสุ่ม</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">ตั้งค่าการสุ่ม</h2>
 
         <AnswerStepField value={answerStep} onChange={setAnswerStep} />
 
@@ -1882,18 +1882,18 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
 
       {/* ค่าคลาดเคลื่อน */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">ค่าคลาดเคลื่อนที่ยอมรับ</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">ค่าคลาดเคลื่อนที่ยอมรับ</h2>
         <TolerancePicker value={globalTolerance} onChange={setGlobalTolerance} />
       </section>
 
       {/* บังคับแนบรูปวิธีทำ */}
       <section className="space-y-2">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">บังคับแนบรูปวิธีทำ</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">บังคับแนบรูปวิธีทำ</h2>
         <div className="flex items-start gap-3">
           <ToggleSwitch checked={requireWorkImage} onChange={setRequireWorkImage} />
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-muted-foreground">
             <p>เปิดเพื่อให้นักเรียนต้องถ่ายรูป/แนบรูปวิธีทำก่อนส่งคำตอบข้อนี้</p>
-            <p className="text-xs text-gray-400">ถ้ามีข้อย่อยหลายข้อ นักเรียนต้องแนบรูปทีละข้อย่อย (1 รูปต่อคำตอบ)</p>
+            <p className="text-xs text-muted-foreground">ถ้ามีข้อย่อยหลายข้อ นักเรียนต้องแนบรูปทีละข้อย่อย (1 รูปต่อคำตอบ)</p>
           </div>
         </div>
       </section>

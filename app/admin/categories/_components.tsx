@@ -43,22 +43,22 @@ function CategoryRow({
   }
 
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-lg border bg-white ${isChild ? 'ml-8' : ''}`}>
+    <div className={`flex items-center gap-3 p-3 rounded-lg border bg-card ${isChild ? 'ml-8' : ''}`}>
       <div className="flex flex-col gap-0.5">
-        <button onClick={() => handleReorder('up')} disabled={isPending} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs leading-none">▲</button>
-        <button onClick={() => handleReorder('down')} disabled={isPending} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs leading-none">▼</button>
+        <button onClick={() => handleReorder('up')} disabled={isPending} className="text-muted-foreground hover:text-muted-foreground disabled:opacity-30 text-xs leading-none">▲</button>
+        <button onClick={() => handleReorder('down')} disabled={isPending} className="text-muted-foreground hover:text-muted-foreground disabled:opacity-30 text-xs leading-none">▼</button>
       </div>
       <span className="text-lg">{isChild ? '↳' : '📂'}</span>
       <div className="flex-1">
-        <p className="font-medium text-gray-900">{cat.name}</p>
-        <p className="text-xs text-gray-400">{cat.question_count} โจทย์</p>
+        <p className="font-medium text-foreground">{cat.name}</p>
+        <p className="text-xs text-muted-foreground">{cat.question_count} โจทย์</p>
       </div>
       <div className="flex items-center gap-2">
         {!isChild && (
-          <button onClick={() => onAddChild(cat.id)} className="text-xs text-blue-600 hover:underline">+ หมวดย่อย</button>
+          <button onClick={() => onAddChild(cat.id)} className="text-xs text-primary hover:underline">+ หมวดย่อย</button>
         )}
-        <button onClick={() => onEdit(cat)} className="text-xs text-gray-600 hover:underline">แก้ไข</button>
-        <button onClick={handleDelete} disabled={isPending} className="text-xs text-red-600 hover:underline disabled:opacity-50">ลบ</button>
+        <button onClick={() => onEdit(cat)} className="text-xs text-muted-foreground hover:underline">แก้ไข</button>
+        <button onClick={handleDelete} disabled={isPending} className="text-xs text-destructive hover:underline disabled:opacity-50">ลบ</button>
       </div>
     </div>
   )
@@ -143,7 +143,7 @@ export function CategoriesTree({
 
       <div className="space-y-2">
         {parents.length === 0 && (
-          <p className="text-center py-12 text-gray-400">ยังไม่มีหมวดหมู่</p>
+          <p className="text-center py-12 text-muted-foreground">ยังไม่มีหมวดหมู่</p>
         )}
         {parents.map((parent) => (
           <div key={parent.id} className="space-y-1">

@@ -19,7 +19,7 @@ import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy,
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
-  { loading: () => <div className="h-96 animate-pulse rounded-2xl bg-gray-100" aria-label="กำลังโหลดคลังโจทย์" /> }
+  { loading: () => <div className="h-96 animate-pulse rounded-2xl bg-muted" aria-label="กำลังโหลดคลังโจทย์" /> }
 )
 
 const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
@@ -242,18 +242,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           <div key={i} className="flex items-start flex-1 last:flex-none">
             <div className="flex flex-col items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                i < step  ? 'bg-blue-500 text-white' :
-                i === step ? 'bg-blue-600 text-white ring-4 ring-blue-100' :
-                'bg-gray-100 text-gray-400'
+                i < step  ? 'bg-primary text-white' :
+                i === step ? 'bg-primary text-white ring-4 ring-blue-100' :
+                'bg-muted text-muted-foreground'
               }`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
               </div>
-              <p className={`text-xs mt-1 whitespace-nowrap ${i === step ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
+              <p className={`text-xs mt-1 whitespace-nowrap ${i === step ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                 {label}
               </p>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`h-0.5 flex-1 mx-2 mt-4 transition-all ${i < step ? 'bg-blue-400' : 'bg-gray-200'}`} />
+              <div className={`h-0.5 flex-1 mx-2 mt-4 transition-all ${i < step ? 'bg-primary' : 'bg-muted'}`} />
             )}
           </div>
         ))}
@@ -262,18 +262,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* ── Step 1: ข้อมูลพื้นฐาน ─────────────────────────────────────── */}
       {step === 0 && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-            <h2 className="font-semibold text-gray-900">ข้อมูลพื้นฐาน</h2>
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+            <h2 className="font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
 
             {preselectedSet && (
-              <div className="flex items-center gap-2 text-sm bg-blue-50 text-blue-700 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-xl px-3 py-2.5">
                 <Layers className="w-4 h-4 shrink-0" />
                 ใช้ชุดโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({selectedIds.length} ข้อ) — ปรับโจทย์ที่เลือกได้ในขั้นตอนถัดไป
               </div>
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="title">ชื่อชุดข้อสอบ <span className="text-red-500">*</span></Label>
+              <Label htmlFor="title">ชื่อชุดข้อสอบ <span className="text-destructive">*</span></Label>
               <Input
                 id="title"
                 value={title}
@@ -295,9 +295,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </div>
 
             <div className="space-y-1.5">
-              <Label>ห้องเรียน <span className="text-red-500">*</span> {classroomIds.length > 1 && <span className="text-gray-400 font-normal">({classroomIds.length} ห้อง)</span>}</Label>
+              <Label>ห้องเรียน <span className="text-destructive">*</span> {classroomIds.length > 1 && <span className="text-muted-foreground font-normal">({classroomIds.length} ห้อง)</span>}</Label>
               {classrooms.length === 0 ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-amber-800">
                   ยังไม่มีห้องเรียน กรุณา{' '}
                   <a href="/classrooms" className="underline font-medium">สร้างห้องเรียน</a> ก่อน
                 </div>
@@ -311,19 +311,19 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                         type="button"
                         onClick={() => toggleClassroom(c.id)}
                         className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                          isSelected ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-400'
+                          isSelected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
                         }`}>
                           <BookOpen className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                          {c.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{c.description}</p>}
+                          <p className="text-sm font-medium text-foreground">{c.name}</p>
+                          {c.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.description}</p>}
                         </div>
-                        {isSelected && <Check className="w-4 h-4 text-blue-500 shrink-0" />}
+                        {isSelected && <Check className="w-4 h-4 text-primary shrink-0" />}
                       </button>
                     )
                   })}
@@ -332,14 +332,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </div>
 
             {!preselectedSet && (
-              <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
+              <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                    <Layers className="w-4 h-4 text-gray-400" />
+                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                    <Layers className="w-4 h-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">บันทึกชุดโจทย์นี้ไว้ในคลังเพื่อใช้ซ้ำ</p>
-                    <p className="text-xs text-gray-400">โจทย์ที่เลือกจะถูกบันทึกเป็นชุดในคลังชุดโจทย์ ติดแท็กชื่อห้องเรียนให้อัตโนมัติ</p>
+                    <p className="text-sm font-medium text-foreground">บันทึกชุดโจทย์นี้ไว้ในคลังเพื่อใช้ซ้ำ</p>
+                    <p className="text-xs text-muted-foreground">โจทย์ที่เลือกจะถูกบันทึกเป็นชุดในคลังชุดโจทย์ ติดแท็กชื่อห้องเรียนให้อัตโนมัติ</p>
                   </div>
                 </div>
                 <input
@@ -352,8 +352,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             )}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
-            <h2 className="font-semibold text-gray-900">ประเภทงาน</h2>
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+            <h2 className="font-semibold text-foreground">ประเภทงาน</h2>
             <div className="grid grid-cols-2 gap-3">
               {(['exercise', 'exam'] as const).map(t => (
                 <button
@@ -364,12 +364,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     if (attemptsAuto) setMaxAttempts(t === 'exam' ? '1' : '')
                   }}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    assignmentType === t ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    assignmentType === t ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
                 >
                   <div className="text-2xl mb-2">{t === 'exam' ? '📝' : '🔁'}</div>
-                  <p className="font-medium text-sm text-gray-900">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="font-medium text-sm text-foreground">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {t === 'exam' ? 'ทำได้ครั้งเดียว' : 'ทำได้หลายครั้ง'}
                   </p>
                 </button>
@@ -377,8 +377,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
-            <h2 className="font-semibold text-gray-900">โหมดการสอบ</h2>
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+            <h2 className="font-semibold text-foreground">โหมดการสอบ</h2>
             <div className="grid grid-cols-2 gap-3">
               {(['online', 'print'] as const).map(m => (
                 <button
@@ -386,12 +386,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   type="button"
                   onClick={() => setMode(m)}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    mode === m ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    mode === m ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
                 >
                   <div className="text-2xl mb-2">{m === 'online' ? '💻' : '🖨️'}</div>
-                  <p className="font-medium text-sm text-gray-900">{m === 'online' ? 'ออนไลน์' : 'พิมพ์ใบงาน'}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="font-medium text-sm text-foreground">{m === 'online' ? 'ออนไลน์' : 'พิมพ์ใบงาน'}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {m === 'online' ? 'นักเรียนทำบนเว็บ + จับเวลา' : 'สร้าง PDF พร้อม QR Code'}
                   </p>
                 </button>
@@ -405,12 +405,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {step === 1 && (
         <div className="space-y-4">
           {questionSets.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-2.5">
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-2.5">
               <div className="flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-gray-400" />
-                <h3 className="text-sm font-semibold text-gray-900">เพิ่มจากชุดโจทย์ที่มีอยู่</h3>
+                <Layers className="w-4 h-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-foreground">เพิ่มจากชุดโจทย์ที่มีอยู่</h3>
               </div>
-              <p className="text-xs text-gray-400">เลือกชุดเพื่อเพิ่มโจทย์ทั้งหมดเข้ามา — ปรับเพิ่ม/ลดทีละข้อได้ด้านล่าง</p>
+              <p className="text-xs text-muted-foreground">เลือกชุดเพื่อเพิ่มโจทย์ทั้งหมดเข้ามา — ปรับเพิ่ม/ลดทีละข้อได้ด้านล่าง</p>
               <div className="flex flex-wrap gap-2">
                 {questionSets.map(s => {
                   const validCount = s.question_ids.filter(id => questions.some(q => q.id === id)).length
@@ -419,11 +419,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                       key={s.id}
                       type="button"
                       onClick={() => importSet(s)}
-                      className="flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 px-3 py-1.5 rounded-lg transition-all"
+                      className="flex items-center gap-1.5 text-xs font-medium border border-border hover:border-primary/20 hover:bg-primary/10 text-muted-foreground px-3 py-1.5 rounded-lg transition-all"
                     >
-                      <Layers className="w-3 h-3 text-gray-400" />
+                      <Layers className="w-3 h-3 text-muted-foreground" />
                       {s.title}
-                      <span className="text-gray-400">({validCount})</span>
+                      <span className="text-muted-foreground">({validCount})</span>
                     </button>
                   )
                 })}
@@ -446,22 +446,22 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* ── Step 3: คะแนน ────────────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">คะแนนแต่ละข้อ</h2>
-              <span className="text-sm font-semibold text-blue-600">รวม {pointsSum} คะแนน</span>
+              <h2 className="font-semibold text-foreground">คะแนนแต่ละข้อ</h2>
+              <span className="text-sm font-semibold text-primary">รวม {pointsSum} คะแนน</span>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               ค่าเริ่มต้นข้อละ 1 คะแนน — แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
             </p>
 
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
               {previewQuestions.map((q, i) => (
-                <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-200">
-                  <span className="text-xs font-semibold text-gray-400 w-10 shrink-0">ข้อ {i + 1}</span>
+                <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-border">
+                  <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{q.title}</p>
-                    <p className="text-xs text-gray-400 truncate">{q.question_text}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{q.question_text}</p>
                   </div>
                   <Input
                     type="number"
@@ -471,20 +471,20 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
                     className="w-20 text-center shrink-0"
                   />
-                  <span className="text-xs text-gray-400 shrink-0">คะแนน</span>
+                  <span className="text-xs text-muted-foreground shrink-0">คะแนน</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                <Scale className="w-4 h-4 text-gray-400" />
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <Scale className="w-4 h-4 text-muted-foreground" />
               </div>
               <div>
-                <h2 className="font-semibold text-gray-900">คะแนนเต็มที่แสดงผล</h2>
-                <p className="text-xs text-gray-400">
+                <h2 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h2>
+                <p className="text-xs text-muted-foreground">
                   ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
                   เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ปรับได้ภายหลังจากหน้าแก้ไขได้ตลอด แม้นักเรียนทำไปแล้ว
                 </p>
@@ -500,19 +500,19 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
                 className="max-w-[160px]"
               />
-              <span className="text-sm text-gray-500">คะแนน</span>
+              <span className="text-sm text-muted-foreground">คะแนน</span>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-1.5">
-            <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-1.5">
+            <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                  <Target className="w-4 h-4 text-gray-400" />
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  <Target className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">ตั้งเกณฑ์คะแนนผ่าน</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-sm font-medium text-foreground">ตั้งเกณฑ์คะแนนผ่าน</p>
+                  <p className="text-xs text-muted-foreground">
                     {assignmentType === 'exercise'
                       ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
                       : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
@@ -528,15 +528,15 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </label>
 
             {passingEnabled && (
-              <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200">
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+              <div className="flex items-center gap-2 p-3 rounded-xl border border-border">
+                <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
                   {(['percent', 'score'] as const).map(t => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => setPassingType(t)}
                       className={`px-3 py-2 text-xs font-medium transition-all ${
-                        passingType === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                        passingType === t ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
@@ -552,7 +552,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
                   className="max-w-[120px]"
                 />
-                <span className="text-sm text-gray-500 shrink-0">
+                <span className="text-sm text-muted-foreground shrink-0">
                   {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
                 </span>
               </div>
@@ -563,12 +563,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
       {/* ── Step 4: ตั้งค่า ──────────────────────────────────────────── */}
       {step === 3 && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
-          <h2 className="font-semibold text-gray-900">ตั้งค่าการสอบ</h2>
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
+          <h2 className="font-semibold text-foreground">ตั้งค่าการสอบ</h2>
 
           <div className="space-y-1.5">
             <Label htmlFor="dur" className="flex items-center gap-1.5">
-              <Timer className="w-4 h-4 text-gray-400" /> เวลาทำ (นาที)
+              <Timer className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
             </Label>
             <Input
               id="dur"
@@ -602,15 +602,15 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               return (
                 <label
                   key={opt.label}
-                  className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all"
+                  className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-gray-400" />
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{opt.label}</p>
-                      <p className="text-xs text-gray-400">{opt.desc}</p>
+                      <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
                     </div>
                   </div>
                   <input
@@ -626,7 +626,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5">
-              <Eye className="w-4 h-4 text-gray-400" /> แสดงผลลัพธ์
+              <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
             </Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {([
@@ -640,11 +640,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   type="button"
                   onClick={() => setShowResults(o.key)}
                   className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    showResults === o.key ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    showResults === o.key ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
                 >
-                  <p className="font-medium text-sm text-gray-900">{o.label}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{o.desc}</p>
+                  <p className="font-medium text-sm text-foreground">{o.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{o.desc}</p>
                 </button>
               ))}
             </div>
@@ -652,7 +652,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           <div className="space-y-1.5">
             <Label htmlFor="attempts" className="flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-gray-400" /> จำกัดจำนวนครั้งที่ทำได้
+              <Layers className="w-4 h-4 text-muted-foreground" /> จำกัดจำนวนครั้งที่ทำได้
             </Label>
             <Input
               id="attempts"
@@ -671,16 +671,16 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           {maxAttempts !== '1' && (
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-gray-400" /> เลือกคะแนนของนักเรียนจาก
+                <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
               </Label>
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit">
+              <div className="flex rounded-lg border border-border overflow-hidden w-fit">
                 {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
                   <button
                     key={s}
                     type="button"
                     onClick={() => setScoreStrategy(s)}
                     className={`px-3 py-2 text-xs font-medium transition-all ${
-                      scoreStrategy === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      scoreStrategy === s ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
                     }`}
                   >
                     {SCORE_STRATEGY_LABELS[s]}
@@ -692,7 +692,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           <div className="space-y-1.5">
             <Label htmlFor="code" className="flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-gray-400" /> รหัสผ่านเข้าทำ (ถ้ามี)
+              <FileText className="w-4 h-4 text-muted-foreground" /> รหัสผ่านเข้าทำ (ถ้ามี)
             </Label>
             <Input
               id="code"
@@ -708,9 +708,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* ── Step 5: กำหนดการสอบ ───────────────────────────────────────── */}
       {step === 4 && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-400" /> กำหนดการสอบ (ไม่บังคับ)
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+            <h2 className="font-semibold text-foreground flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการสอบ (ไม่บังคับ)
             </h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -753,12 +753,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 { label: 'แสดงผล',    value: showResults === 'immediate' ? 'ทันทีหลังส่ง' : 'หลังพ้นกำหนดส่ง' },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">
-                  <span className="text-gray-400">{row.label}</span>
+                  <span className="text-muted-foreground">{row.label}</span>
                   <span className="font-medium text-right truncate max-w-[200px]">{row.value}</span>
                 </div>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-4 border-t border-white/10 pt-3">
+            <p className="text-xs text-muted-foreground mt-4 border-t border-white/10 pt-3">
               ชุดข้อสอบจะถูกบันทึกเป็นร่าง — เผยแพร่ได้จากหน้ารายละเอียด
             </p>
           </div>
@@ -802,9 +802,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* Work-image enforcement confirm dialog */}
       {showWorkImageConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="font-bold text-lg text-gray-900">บังคับแนบรูปวิธีทำหรือไม่?</h3>
-            <p className="text-sm text-gray-500 mt-2">
+          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="font-bold text-lg text-foreground">บังคับแนบรูปวิธีทำหรือไม่?</h3>
+            <p className="text-sm text-muted-foreground mt-2">
               ชุดข้อสอบนี้มีโจทย์ที่ตั้งค่าไว้ให้นักเรียนต้องแนบรูปวิธีทำ
               ต้องการให้นักเรียนแนบรูปวิธีทำแบบบังคับก่อนส่งคำตอบสำหรับข้อสอบชุดนี้หรือไม่
             </p>
@@ -820,7 +820,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 variant="ghost"
                 onClick={() => setShowWorkImageConfirm(false)}
                 disabled={isPending}
-                className="w-full text-gray-500"
+                className="w-full text-muted-foreground"
               >
                 ยกเลิก
               </Button>
@@ -832,9 +832,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* Publish timing dialog */}
       {showPublishDialog && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="font-bold text-lg text-gray-900">เผยแพร่{assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?</h3>
-            <p className="text-sm text-gray-500 mt-2">
+          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="font-bold text-lg text-foreground">เผยแพร่{assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?</h3>
+            <p className="text-sm text-muted-foreground mt-2">
               เลือกได้ว่าจะให้นักเรียนเห็นและเริ่มทำได้ทันที ตั้งเวลาให้เปิดล่วงหน้า หรือเก็บไว้เป็นร่างก่อนแล้วค่อยเผยแพร่ทีหลัง
             </p>
 
@@ -854,7 +854,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   variant="ghost"
                   onClick={() => setShowPublishDialog(false)}
                   disabled={isPending}
-                  className="w-full text-gray-500"
+                  className="w-full text-muted-foreground"
                 >
                   ยกเลิก
                 </Button>
@@ -869,13 +869,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     value={scheduleAt}
                     onChange={e => setScheduleAt(e.target.value)}
                   />
-                  <p className="text-xs text-gray-400">นักเรียนจะเริ่มเห็นและเข้าทำได้ตั้งแต่เวลานี้เป็นต้นไป</p>
+                  <p className="text-xs text-muted-foreground">นักเรียนจะเริ่มเห็นและเข้าทำได้ตั้งแต่เวลานี้เป็นต้นไป</p>
                 </div>
                 <div className="flex flex-col gap-2">
                   <Button type="button" onClick={handleScheduleConfirm} disabled={isPending} className="w-full">
                     {isPending ? 'กำลังสร้าง...' : 'ยืนยันตั้งเวลาเผยแพร่'}
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => setScheduleMode(false)} disabled={isPending} className="w-full text-gray-500">
+                  <Button type="button" variant="ghost" onClick={() => setScheduleMode(false)} disabled={isPending} className="w-full text-muted-foreground">
                     ย้อนกลับ
                   </Button>
                 </div>

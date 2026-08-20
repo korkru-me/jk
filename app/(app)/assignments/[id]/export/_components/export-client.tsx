@@ -80,11 +80,11 @@ export function ExportClient({ assignment, questions, students, assignmentId }: 
     <>
       {/* Full-height split view — escape main's p-6 padding */}
       <div
-        className="flex -mx-6 -mt-6 border-t border-gray-200 overflow-hidden"
+        className="flex -mx-6 -mt-6 border-t border-border overflow-hidden"
         style={{ height: 'calc(100vh - 64px)' }}
       >
         {/* ─── Left: Settings ───────────────────────── */}
-        <aside className="w-[360px] shrink-0 border-r border-gray-200 bg-white overflow-y-auto">
+        <aside className="w-[360px] shrink-0 border-r border-border bg-card overflow-y-auto">
           <PrintSettingsSidebar
             settings={settings}
             onPatch={patch}
@@ -97,7 +97,7 @@ export function ExportClient({ assignment, questions, students, assignmentId }: 
         </aside>
 
         {/* ─── Right: Live Preview ───────────────────── */}
-        <div className="flex-1 overflow-y-auto bg-slate-300">
+        <div className="flex-1 overflow-y-auto bg-muted">
           <PDFPreview
             settings={settings}
             onPatch={patch}

@@ -48,13 +48,13 @@ export default async function EditAssignmentPage({
 
   return (
     <div className="max-w-2xl space-y-6">
-      <Link href={`/assignments/${id}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+      <Link href={`/assignments/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
         <ChevronLeft className="w-4 h-4" /> กลับไปหน้าชุดข้อสอบ
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">แก้ไขชุดข้อสอบ</h1>
-        <p className="text-sm text-gray-500 mt-1">{a.title}</p>
+        <h1 className="text-2xl font-bold text-foreground">แก้ไขชุดข้อสอบ</h1>
+        <p className="text-sm text-muted-foreground mt-1">{a.title}</p>
       </div>
 
       <EditAssignmentForm assignment={a} questions={questions} />

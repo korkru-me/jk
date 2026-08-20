@@ -42,7 +42,7 @@ export function AssignmentActions({ assignmentId, currentStatus, mode }: Props) 
   return (
     <div className="flex flex-wrap gap-2">
       {currentStatus === 'draft' && (
-        <Button onClick={() => changeStatus('published')} disabled={loading} className="bg-green-600 hover:bg-green-700">
+        <Button onClick={() => changeStatus('published')} disabled={loading} className="bg-success hover:bg-success/90">
           เผยแพร่
         </Button>
       )}
@@ -70,7 +70,7 @@ export function AssignmentActions({ assignmentId, currentStatus, mode }: Props) 
         variant="outline"
         onClick={handleDelete}
         disabled={loading}
-        className="text-red-600 border-red-200 hover:bg-red-50 ml-auto"
+        className="text-destructive border-destructive/20 hover:bg-destructive/10 ml-auto"
       >
         ลบ
       </Button>

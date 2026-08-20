@@ -119,8 +119,8 @@ export function SignupForm() {
               className={[
                 'flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-sm font-medium transition-all',
                 selectedRole === r.value
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/40 dark:text-indigo-300'
-                  : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600',
+                  ? 'border-primary bg-primary/10 text-primary dark:border-primary dark:bg-indigo-950/40'
+                  : 'border-border text-muted-foreground hover:border-ring dark:hover:border-slate-600',
               ].join(' ')}
             >
               <span className="text-xl">{r.icon}</span>
@@ -132,7 +132,7 @@ export function SignupForm() {
           ))}
         </div>
         {errors.survey_role && (
-          <p className="text-xs text-red-600 dark:text-red-400">{errors.survey_role.message}</p>
+          <p className="text-xs text-destructive">{errors.survey_role.message}</p>
         )}
       </div>
 
@@ -146,7 +146,7 @@ export function SignupForm() {
             {...reg('role_custom')}
           />
           {errors.role_custom && (
-            <p className="text-xs text-red-600 dark:text-red-400">{errors.role_custom.message}</p>
+            <p className="text-xs text-destructive">{errors.role_custom.message}</p>
           )}
         </div>
       )}
@@ -167,7 +167,7 @@ export function SignupForm() {
             ))}
           </select>
           {errors.prefix && (
-            <p className="text-xs text-red-600 dark:text-red-400">{errors.prefix.message}</p>
+            <p className="text-xs text-destructive">{errors.prefix.message}</p>
           )}
         </div>
         <div className="space-y-1.5">
@@ -179,7 +179,7 @@ export function SignupForm() {
             {...reg('first_name')}
           />
           {errors.first_name && (
-            <p className="text-xs text-red-600 dark:text-red-400">{errors.first_name.message}</p>
+            <p className="text-xs text-destructive">{errors.first_name.message}</p>
           )}
         </div>
         <div className="space-y-1.5">
@@ -191,7 +191,7 @@ export function SignupForm() {
             {...reg('last_name')}
           />
           {errors.last_name && (
-            <p className="text-xs text-red-600 dark:text-red-400">{errors.last_name.message}</p>
+            <p className="text-xs text-destructive">{errors.last_name.message}</p>
           )}
         </div>
       </div>
@@ -207,7 +207,7 @@ export function SignupForm() {
           {...reg('email')}
         />
         {errors.email && (
-          <p className="text-xs text-red-600 dark:text-red-400">{errors.email.message}</p>
+          <p className="text-xs text-destructive">{errors.email.message}</p>
         )}
       </div>
 
@@ -226,7 +226,7 @@ export function SignupForm() {
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-300"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors dark:hover:text-slate-300"
             aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
           >
             {showPassword ? (
@@ -237,7 +237,7 @@ export function SignupForm() {
           </button>
         </div>
         {errors.password && (
-          <p className="text-xs text-red-600 dark:text-red-400">{errors.password.message}</p>
+          <p className="text-xs text-destructive">{errors.password.message}</p>
         )}
       </div>
 
@@ -247,13 +247,13 @@ export function SignupForm() {
           <input
             type="checkbox"
             {...reg('agreed')}
-            className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-indigo-600 dark:border-slate-600"
+            className="mt-0.5 h-4 w-4 rounded border-border accent-indigo-600 dark:border-slate-600"
           />
-          <span className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+          <span className="text-sm text-muted-foreground leading-relaxed">
             ฉันยอมรับ{' '}
             <a
               href="#"
-              className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              className="font-medium text-primary hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
               เงื่อนไขการให้บริการ (Terms of Service)
@@ -261,7 +261,7 @@ export function SignupForm() {
             และ{' '}
             <a
               href="#"
-              className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              className="font-medium text-primary hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
               นโยบายความเป็นส่วนตัว (Privacy Policy)
@@ -269,7 +269,7 @@ export function SignupForm() {
           </span>
         </label>
         {errors.agreed && (
-          <p className="text-xs text-red-600 dark:text-red-400">{errors.agreed.message}</p>
+          <p className="text-xs text-destructive">{errors.agreed.message}</p>
         )}
       </div>
 
@@ -284,9 +284,9 @@ export function SignupForm() {
         )}
       </Button>
 
-      <p className="text-center text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-center text-sm text-muted-foreground">
         มีบัญชีอยู่แล้ว?{' '}
-        <Link href="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/login" className="font-medium text-primary hover:underline">
           เข้าสู่ระบบ
         </Link>
       </p>

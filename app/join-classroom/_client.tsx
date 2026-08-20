@@ -43,8 +43,8 @@ export function JoinClassroomClient({ token, classroomName, permission }: Props)
     return (
       <div className="text-center space-y-3">
         <div className="text-4xl">🎉</div>
-        <h1 className="text-lg font-semibold text-gray-900">เข้าร่วมสำเร็จ!</h1>
-        <p className="text-sm text-gray-500">กำลังพาคุณไปหน้าห้องเรียน…</p>
+        <h1 className="text-lg font-semibold text-foreground">เข้าร่วมสำเร็จ!</h1>
+        <p className="text-sm text-muted-foreground">กำลังพาคุณไปหน้าห้องเรียน…</p>
       </div>
     )
   }
@@ -53,16 +53,16 @@ export function JoinClassroomClient({ token, classroomName, permission }: Props)
     <div className="text-center space-y-5">
       <div className="text-4xl">👩‍🏫</div>
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-gray-900">คุณได้รับเชิญเป็นผู้ช่วยสอน</h1>
-        <p className="text-sm text-gray-500">
-          เข้าร่วมห้องเรียน <span className="font-medium text-gray-800">{classroomName}</span> ในฐานะ{' '}
-          <span className="font-medium text-blue-700">{PERM_LABEL[permission] ?? permission}</span>
+        <h1 className="text-lg font-semibold text-foreground">คุณได้รับเชิญเป็นผู้ช่วยสอน</h1>
+        <p className="text-sm text-muted-foreground">
+          เข้าร่วมห้องเรียน <span className="font-medium text-foreground">{classroomName}</span> ในฐานะ{' '}
+          <span className="font-medium text-primary">{PERM_LABEL[permission] ?? permission}</span>
         </p>
       </div>
       <Button onClick={handleJoin} disabled={pending} className="w-full">
         {pending ? 'กำลังเข้าร่วม…' : 'ยืนยันเข้าร่วม'}
       </Button>
-      <a href="/dashboard" className="block text-xs text-gray-400 hover:underline">
+      <a href="/dashboard" className="block text-xs text-muted-foreground hover:underline">
         ยกเลิก
       </a>
     </div>

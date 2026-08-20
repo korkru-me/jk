@@ -110,31 +110,31 @@ export function PresetsTable({
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-muted border-b">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">ชื่อสูตร</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">สมการ</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">หมวด</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">ตัวแปร</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">หาตัวแปร</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อสูตร</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">สมการ</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">หมวด</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">ตัวแปร</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">หาตัวแปร</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y">
             {presets.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-12 text-gray-400">ไม่พบสูตรสำเร็จ</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">ไม่พบสูตรสำเร็จ</td></tr>
             )}
             {presets.map((p) => (
-              <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 font-medium text-gray-900">{p.formula_name}</td>
-                <td className="px-4 py-3 font-mono text-blue-700 text-xs">{p.equation}</td>
-                <td className="px-4 py-3 text-gray-600">{p.question_categories?.name ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-600">{(p.variables as Variable[]).length} ตัวแปร</td>
+              <tr key={p.id} className="hover:bg-muted transition-colors">
+                <td className="px-4 py-3 font-medium text-foreground">{p.formula_name}</td>
+                <td className="px-4 py-3 font-mono text-primary text-xs">{p.equation}</td>
+                <td className="px-4 py-3 text-muted-foreground">{p.question_categories?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-muted-foreground">{(p.variables as Variable[]).length} ตัวแปร</td>
                 <td className="px-4 py-3 font-mono text-sm">{p.target_variable}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <button onClick={() => openEdit(p)} className="text-xs text-blue-600 hover:underline">แก้ไข</button>
-                    <button onClick={() => handleDelete(p.id, p.formula_name)} className="text-xs text-red-600 hover:underline">ลบ</button>
+                    <button onClick={() => openEdit(p)} className="text-xs text-primary hover:underline">แก้ไข</button>
+                    <button onClick={() => handleDelete(p.id, p.formula_name)} className="text-xs text-destructive hover:underline">ลบ</button>
                   </div>
                 </td>
               </tr>
@@ -186,8 +186,8 @@ export function PresetsTable({
                 className="font-mono text-xs"
                 placeholder={'[{"name":"F","min":1,"max":100,"unit":"N","decimals":0},{"name":"m","min":1,"max":50,"unit":"kg","decimals":0}]'}
               />
-              {jsonError && <p className="text-xs text-red-500">{jsonError}</p>}
-              <p className="text-xs text-gray-400">แต่ละตัวแปร: name, min, max, unit, decimals</p>
+              {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+              <p className="text-xs text-muted-foreground">แต่ละตัวแปร: name, min, max, unit, decimals</p>
             </div>
           </div>
           <DialogFooter>

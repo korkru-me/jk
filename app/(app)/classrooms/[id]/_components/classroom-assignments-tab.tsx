@@ -7,6 +7,9 @@ import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS, selectOfficialAttempt } from '@/lib/scoring'
 import { formatPassingThreshold, computePassed } from '@/lib/grading'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export interface ClassroomAssignmentRow {
   id: string
@@ -68,13 +71,13 @@ function computeAssignmentStats(
 }
 
 const STATUS_CFG: Record<string, { label: string; bg: string; text: string }> = {
-  draft:     { label: 'ฉบับร่าง',    bg: 'bg-gray-100',    text: 'text-gray-600' },
-  published: { label: 'เผยแพร่แล้ว', bg: 'bg-emerald-50',  text: 'text-emerald-700' },
-  closed:    { label: 'ปิดแล้ว',     bg: 'bg-red-50',       text: 'text-red-600' },
+  draft:     { label: 'ฉบับร่าง',    bg: 'bg-muted',    text: 'text-muted-foreground' },
+  published: { label: 'เผยแพร่แล้ว', bg: 'bg-success/10',  text: 'text-success' },
+  closed:    { label: 'ปิดแล้ว',     bg: 'bg-destructive/10',       text: 'text-destructive' },
 }
 
 const TYPE_CFG: Record<string, { label: string; bg: string; text: string; icon: typeof FileText }> = {
-  exam:     { label: 'ข้อสอบ',     bg: 'bg-blue-50',   text: 'text-blue-700',   icon: FileText },
+  exam:     { label: 'ข้อสอบ',     bg: 'bg-primary/10',   text: 'text-primary',   icon: FileText },
   exercise: { label: 'แบบฝึกหัด', bg: 'bg-violet-50', text: 'text-violet-700', icon: Repeat },
 }
 
@@ -88,13 +91,11 @@ interface Props {
 
 export function ClassroomAssignmentsTab({ classroomId, assignments, submissions, studentCount, onViewScores }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const filtered = assignments.filter(a => typeFilter === 'all' ? true : a.type === typeFilter)
 
   function handleDuplicate(id: string) {
-    setOpenMenu(null)
     startTransition(async () => {
       const res = await duplicateAssignment(id, { targetClassroomIds: [classroomId] })
       if (res?.error) toast.error(res.error)
@@ -114,7 +115,7 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
             key={f.key}
             onClick={() => setTypeFilter(f.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
             }`}
           >
             {f.label}
@@ -122,20 +123,20 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
         ))}
         <Link
           href={`/assignments/new?classroom=${classroomId}`}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-semibold transition-colors"
         >
           <Plus className="w-3.5 h-3.5" /> มอบหมายงานใหม่
         </Link>
       </div>
 
       {/* List */}
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-hidden">
+      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400">
+          <div className="py-12 text-center text-sm text-muted-foreground">
             {assignments.length === 0 ? 'ยังไม่มีงานที่มอบหมายให้ห้องนี้' : 'ไม่พบงานที่ตรงกับตัวกรอง'}
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-border">
             {filtered.map(a => {
               const statusCfg = STATUS_CFG[a.status] ?? STATUS_CFG.draft
               const typeCfg = TYPE_CFG[a.type] ?? TYPE_CFG.exam
@@ -143,27 +144,27 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
               const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
               const stats = computeAssignmentStats(a, submissions)
               return (
-                <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors">
+                <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
                   <Link href={`/assignments/${a.id}`} className="flex-1 min-w-0 flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${typeCfg.bg}`}>
                       <TypeIcon className={`w-4 h-4 ${typeCfg.text}`} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{a.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                        <span className="text-xs text-gray-400">{a.question_ids.length} ข้อ</span>
+                        <span className="text-xs text-muted-foreground">{a.question_ids.length} ข้อ</span>
                         {a.max_attempts != null && (
-                          <span className="flex items-center gap-0.5 text-xs text-gray-400">
+                          <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                             <RefreshCw className="w-3 h-3" /> ทำได้ {a.max_attempts} ครั้ง
                           </span>
                         )}
                         {passingThreshold && (
-                          <span className="flex items-center gap-0.5 text-xs text-amber-600">
+                          <span className="flex items-center gap-0.5 text-xs text-warning">
                             <Target className="w-3 h-3" /> เกณฑ์ผ่าน {passingThreshold}
                           </span>
                         )}
                         {a.max_attempts !== 1 && (
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-muted-foreground">
                             · เก็บ{SCORE_STRATEGY_LABELS[a.score_strategy]}
                           </span>
                         )}
@@ -173,22 +174,22 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                           <Printer className="w-3 h-3 text-gray-300" />
                         )}
                         {a.end_at && (
-                          <span className="flex items-center gap-0.5 text-xs text-gray-400">
+                          <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                             <Clock className="w-3 h-3" /> {new Date(a.end_at).toLocaleDateString('th-TH')}
                           </span>
                         )}
                         {a.status !== 'draft' && (
                           a.type === 'exercise' ? (
-                            <span className="flex items-center gap-0.5 text-xs text-emerald-600">
+                            <span className="flex items-center gap-0.5 text-xs text-success">
                               <CheckCircle2 className="w-3 h-3" /> ทำเสร็จ {stats.completed}/{studentCount} คน
                             </span>
                           ) : (
                             <>
-                              <span className="flex items-center gap-0.5 text-xs text-blue-600">
+                              <span className="flex items-center gap-0.5 text-xs text-primary">
                                 <Users className="w-3 h-3" /> เข้าทำ {stats.attempted}/{studentCount} คน
                               </span>
                               {passingThreshold && (
-                                <span className="flex items-center gap-0.5 text-xs text-emerald-600">
+                                <span className="flex items-center gap-0.5 text-xs text-success">
                                   <CheckCircle2 className="w-3 h-3" /> ผ่าน {stats.passed}/{studentCount} คน
                                 </span>
                               )}
@@ -204,41 +205,22 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusCfg.bg} ${statusCfg.text}`}>
                     {statusCfg.label}
                   </span>
-                  <div className="relative shrink-0">
-                    <button
-                      onClick={() => setOpenMenu(openMenu === a.id ? null : a.id)}
-                      className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
-                    >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-muted-foreground transition-colors outline-none shrink-0">
                       <MoreVertical className="w-3.5 h-3.5" />
-                    </button>
-                    {openMenu === a.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(null)} />
-                        <div className="absolute right-0 top-8 z-20 bg-white rounded-xl shadow-lg ring-1 ring-black/10 py-1 min-w-[170px]">
-                          <Link
-                            href={`/assignments/${a.id}/edit`}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            onClick={() => setOpenMenu(null)}
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-gray-400" /> แก้ไขรายละเอียด
-                          </Link>
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                            onClick={() => handleDuplicate(a.id)}
-                            disabled={isPending}
-                          >
-                            <Copy className="w-3.5 h-3.5 text-gray-400" /> ทำสำเนามาห้องนี้
-                          </button>
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            onClick={() => { setOpenMenu(null); onViewScores?.() }}
-                          >
-                            <BarChart3 className="w-3.5 h-3.5 text-gray-400" /> ดูคะแนน
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem render={<Link href={`/assignments/${a.id}/edit`} />}>
+                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" /> แก้ไขรายละเอียด
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDuplicate(a.id)} disabled={isPending}>
+                        <Copy className="w-3.5 h-3.5 text-muted-foreground" /> ทำสำเนามาห้องนี้
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onViewScores?.()}>
+                        <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" /> ดูคะแนน
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )
             })}

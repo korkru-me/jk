@@ -69,9 +69,9 @@ export function HomeroomStudentView({
           </div>
           {complianceRate !== null && (
             <p className={`text-2xl font-bold shrink-0 ${
-              complianceRate >= 80 ? 'text-emerald-600 dark:text-emerald-400'
-                : complianceRate >= 50 ? 'text-amber-600 dark:text-amber-400'
-                : 'text-red-600 dark:text-red-400'
+              complianceRate >= 80 ? 'text-success'
+                : complianceRate >= 50 ? 'text-warning'
+                : 'text-destructive'
             }`}>
               {complianceRate}%
             </p>
@@ -96,7 +96,7 @@ export function HomeroomStudentView({
           <div className="bg-card border rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
             {classmates.map(s => (
               <div key={s.id} className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">
+                <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
                   {s.full_name.charAt(0)}
                 </div>
                 <span className="text-sm truncate">{s.full_name}</span>

@@ -41,9 +41,9 @@ export function FormulaEditor({
   }
 
   return (
-    <div className="border rounded-xl overflow-hidden bg-white">
+    <div className="border rounded-xl overflow-hidden bg-card">
       <Tabs defaultValue="auto">
-        <div className="border-b bg-gray-50 px-3 pt-2">
+        <div className="border-b bg-muted px-3 pt-2">
           <TabsList variant="line" className="w-full justify-start gap-0">
             {TABS.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value} className="px-4 py-2 text-sm">

@@ -126,11 +126,11 @@ export function ResultsClient({
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <Link href={`/assignments/${assignmentId}`} className="text-sm text-gray-500 hover:text-blue-600">
+          <Link href={`/assignments/${assignmentId}`} className="text-sm text-muted-foreground hover:text-primary">
             ← กลับ
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">{assignmentTitle}</h1>
-          <p className="text-sm text-gray-500">{classroomName}</p>
+          <h1 className="text-2xl font-bold text-foreground mt-1">{assignmentTitle}</h1>
+          <p className="text-sm text-muted-foreground">{classroomName}</p>
         </div>
         {viewMode === 'individual' && (
           <ExportButton submissions={sortedRows as any} title={assignmentTitle} />
@@ -139,29 +139,29 @@ export function ResultsClient({
 
       {/* Summary cards */}
       <div className={`grid gap-3 ${hasPassingThreshold ? 'grid-cols-4' : 'grid-cols-3'}`}>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-          <p className="text-xs text-gray-500">ส่งแล้ว</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{submitted.length}</p>
+        <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <p className="text-xs text-muted-foreground">ส่งแล้ว</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{submitted.length}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-          <p className="text-xs text-gray-500">คะแนนเฉลี่ย</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <p className="text-xs text-muted-foreground">คะแนนเฉลี่ย</p>
+          <p className="text-2xl font-bold text-foreground mt-1">
             {avgScore !== null ? avgScore.toFixed(1) : '—'}/{maxScore}
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-          <p className="text-xs text-gray-500">กำลังทำ</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{inProgressCount}</p>
+        <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <p className="text-xs text-muted-foreground">กำลังทำ</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{inProgressCount}</p>
         </div>
         {hasPassingThreshold && (
-          <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-            <p className="text-xs text-gray-500">
+          <div className="bg-card border border-border rounded-xl p-4 text-center">
+            <p className="text-xs text-muted-foreground">
               ผ่านเกณฑ์ ({passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน`})
             </p>
             <p className="text-2xl font-bold mt-1">
-              <span className="text-green-600">{passCount}</span>
+              <span className="text-success">{passCount}</span>
               <span className="text-gray-300"> / </span>
-              <span className="text-red-500">{submitted.length - passCount}</span>
+              <span className="text-destructive">{submitted.length - passCount}</span>
             </p>
           </div>
         )}
@@ -169,7 +169,7 @@ export function ResultsClient({
 
       {/* Mode toggle + sort */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
           {([
             { key: 'individual', label: 'รายคน' },
             { key: 'question', label: 'รายข้อ' },
@@ -178,7 +178,7 @@ export function ResultsClient({
               key={m.key}
               onClick={() => setViewMode(m.key)}
               className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                viewMode === m.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                viewMode === m.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-muted-foreground'
               }`}
             >
               {m.label}
@@ -187,11 +187,11 @@ export function ResultsClient({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+          <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
           <select
             value={sortKey}
             onChange={e => toggleSort(e.target.value as StudentSortKey)}
-            className="text-xs rounded-lg border border-gray-200 px-2 py-1.5 outline-none focus:border-blue-400"
+            className="text-xs rounded-lg border border-border px-2 py-1.5 outline-none focus:border-primary"
           >
             {(Object.keys(STUDENT_SORT_LABEL) as StudentSortKey[]).map(k => (
               <option key={k} value={k}>{STUDENT_SORT_LABEL[k]}</option>
@@ -199,7 +199,7 @@ export function ResultsClient({
           </select>
           <button
             onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
-            className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+            className="text-xs px-2 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted"
           >
             {sortDir === 'asc' ? 'น้อย→มาก' : 'มาก→น้อย'}
           </button>
@@ -231,24 +231,24 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
   passingValue: number | null
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+    <div className="bg-card border border-border rounded-xl overflow-hidden overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
+        <thead className="bg-muted border-b border-border">
           <tr>
-            <th className="text-left px-4 py-3 font-medium text-gray-600">#</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-600">ชื่อ</th>
-            <th className="text-center px-4 py-3 font-medium text-gray-600">คะแนน</th>
-            <th className="text-center px-4 py-3 font-medium text-gray-600">%</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อ</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">คะแนน</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">%</th>
             {hasPassingThreshold && (
-              <th className="text-center px-4 py-3 font-medium text-gray-600">ผลเกณฑ์</th>
+              <th className="text-center px-4 py-3 font-medium text-muted-foreground">ผลเกณฑ์</th>
             )}
-            <th className="text-left px-4 py-3 font-medium text-gray-600">เวลาส่ง</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">เวลาส่ง</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-50">
+        <tbody className="divide-y divide-border">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={hasPassingThreshold ? 6 : 5} className="text-center py-10 text-gray-400">
+              <td colSpan={hasPassingThreshold ? 6 : 5} className="text-center py-10 text-muted-foreground">
                 ยังไม่มีการส่งงาน
               </td>
             </tr>
@@ -257,22 +257,22 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
               const pct = s.max_score > 0 ? Math.round(((s.total_score ?? 0) / s.max_score) * 100) : 0
               const passed = computePassed(s.total_score, s.max_score, passingType, passingValue)
               return (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-400">{i + 1}</td>
+                <tr key={s.id} className="hover:bg-muted">
+                  <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                   <td className="px-4 py-3">
-                    <Link href={`/submissions/${s.id}`} className="font-medium text-gray-900 hover:text-blue-600 hover:underline">
+                    <Link href={`/submissions/${s.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
                       {s.users?.full_name}
                     </Link>
-                    <p className="text-xs text-gray-400">{s.users?.email}</p>
+                    <p className="text-xs text-muted-foreground">{s.users?.email}</p>
                   </td>
-                  <td className="px-4 py-3 text-center font-bold text-gray-900">
+                  <td className="px-4 py-3 text-center font-bold text-foreground">
                     {s.total_score}/{s.max_score}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      pct >= 75 ? 'bg-green-100 text-green-700'
+                      pct >= 75 ? 'bg-success/10 text-success'
                       : pct >= 50 ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-red-100 text-red-600'
+                      : 'bg-destructive/10 text-destructive'
                     }`}>
                       {pct}%
                     </span>
@@ -280,14 +280,14 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
                   {hasPassingThreshold && (
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                        passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                        passed ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
                       }`}>
                         {passed ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                         {passed ? 'ผ่าน' : 'ไม่ผ่าน'}
                       </span>
                     </td>
                   )}
-                  <td className="px-4 py-3 text-gray-500 text-xs">
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
                     {s.submitted_at
                       ? new Date(s.submitted_at).toLocaleTimeString('th-TH', { timeStyle: 'short' })
                       : '—'}
@@ -314,7 +314,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
 }) {
   if (questions.length === 0 || !activeQuestion) {
     return (
-      <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400">
+      <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
         ไม่พบโจทย์ในชุดข้อสอบนี้
       </div>
     )
@@ -327,71 +327,71 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
   return (
     <div className="space-y-3">
       {/* Question stepper */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+      <div className="bg-card border border-border rounded-xl p-4 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => onChangeIndex(Math.max(0, activeQuestionIndex - 1))}
             disabled={activeQuestionIndex === 0}
-            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <p className="text-sm font-semibold text-gray-700">
+          <p className="text-sm font-semibold text-muted-foreground">
             ข้อที่ {activeQuestionIndex + 1} / {questions.length} · เต็ม {questionMaxScore} คะแนน
           </p>
           <button
             onClick={() => onChangeIndex(Math.min(questions.length - 1, activeQuestionIndex + 1))}
             disabled={activeQuestionIndex === questions.length - 1}
-            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
-        {activeQuestion.title && <p className="text-sm font-medium text-gray-900">{activeQuestion.title}</p>}
+        {activeQuestion.title && <p className="text-sm font-medium text-foreground">{activeQuestion.title}</p>}
         <QuestionText text={activeQuestion.question_text} />
       </div>
 
       {/* Per-student answer grid */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+      <div className="bg-card border border-border rounded-xl overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-muted border-b border-border">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">#</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">ชื่อ</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">คำตอบนักเรียน</th>
-              <th className="text-center px-4 py-3 font-medium text-gray-600">ผล</th>
-              <th className="text-center px-4 py-3 font-medium text-gray-600">คะแนน</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อ</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">คำตอบนักเรียน</th>
+              <th className="text-center px-4 py-3 font-medium text-muted-foreground">ผล</th>
+              <th className="text-center px-4 py-3 font-medium text-muted-foreground">คะแนน</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-border">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-10 text-gray-400">ยังไม่มีการส่งงาน</td>
+                <td colSpan={5} className="text-center py-10 text-muted-foreground">ยังไม่มีการส่งงาน</td>
               </tr>
             ) : (
               rows.map((s, i) => {
                 const answer = answerMap.get(`${s.id}::${activeQuestion.id}`)
                 const isPending = answer != null && answer.is_correct === null
                 return (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-400">{i + 1}</td>
+                  <tr key={s.id} className="hover:bg-muted">
+                    <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                     <td className="px-4 py-3">
-                      <Link href={`/submissions/${s.id}`} className="font-medium text-gray-900 hover:text-blue-600 hover:underline">
+                      <Link href={`/submissions/${s.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
                         {s.users?.full_name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
+                    <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
                       {formatAnswerShort(activeQuestion, answer)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {!answer ? (
                         <span className="text-gray-300 text-xs">—</span>
                       ) : isPending ? (
-                        <Clock className="w-4 h-4 text-amber-500 inline" />
+                        <Clock className="w-4 h-4 text-warning inline" />
                       ) : answer.is_correct ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-500 inline" />
+                        <CheckCircle2 className="w-4 h-4 text-success inline" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-red-400 inline" />
+                        <XCircle className="w-4 h-4 text-destructive inline" />
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -415,7 +415,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
 function QuestionText({ text }: { text: string }) {
   const isHtml = /<[a-z][\s\S]*>/i.test(text)
   if (isHtml) {
-    return <div className="rich-text-content text-sm text-gray-500" dangerouslySetInnerHTML={{ __html: text }} />
+    return <div className="rich-text-content text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: text }} />
   }
-  return <p className="whitespace-pre-line text-sm text-gray-500">{text}</p>
+  return <p className="whitespace-pre-line text-sm text-muted-foreground">{text}</p>
 }

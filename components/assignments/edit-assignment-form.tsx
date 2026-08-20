@@ -121,7 +121,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="edit-title">ชื่อชุดข้อสอบ</Label>
           <Input id="edit-title" value={title} onChange={e => setTitle(e.target.value)} />
@@ -132,22 +132,22 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">คะแนนแต่ละข้อ</h2>
-          <span className="text-sm font-semibold text-blue-600">รวม {pointsSum} คะแนน</span>
+          <h2 className="font-semibold text-foreground">คะแนนแต่ละข้อ</h2>
+          <span className="text-sm font-semibold text-primary">รวม {pointsSum} คะแนน</span>
         </div>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted-foreground">
           ค่าเริ่มต้นข้อละ 1 คะแนน — แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
         </p>
 
         <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
           {questions.map((q, i) => (
-            <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-200">
-              <span className="text-xs font-semibold text-gray-400 w-10 shrink-0">ข้อ {i + 1}</span>
+            <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-border">
+              <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{q.title}</p>
-                <p className="text-xs text-gray-400 truncate">{q.question_text}</p>
+                <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{q.question_text}</p>
               </div>
               <Input
                 type="number"
@@ -157,20 +157,20 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
                 onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
                 className="w-20 text-center shrink-0"
               />
-              <span className="text-xs text-gray-400 shrink-0">คะแนน</span>
+              <span className="text-xs text-muted-foreground shrink-0">คะแนน</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-            <Scale className="w-4 h-4 text-gray-400" />
+          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Scale className="w-4 h-4 text-muted-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-900">คะแนนเต็มที่แสดงผล</h2>
-            <p className="text-xs text-gray-400">
+            <h2 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h2>
+            <p className="text-xs text-muted-foreground">
               ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
               เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ระบบจะคูณสัดส่วนคะแนนของนักเรียนแต่ละคนให้อัตโนมัติ
               ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
@@ -187,19 +187,19 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
             placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
             className="max-w-[160px]"
           />
-          <span className="text-sm text-gray-500">คะแนน</span>
+          <span className="text-sm text-muted-foreground">คะแนน</span>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-1.5">
-        <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-all">
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-1.5">
+        <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-              <Target className="w-4 h-4 text-gray-400" />
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Target className="w-4 h-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">ตั้งเกณฑ์คะแนนผ่าน</p>
-              <p className="text-xs text-gray-400">
+              <p className="text-sm font-medium text-foreground">ตั้งเกณฑ์คะแนนผ่าน</p>
+              <p className="text-xs text-muted-foreground">
                 {a.type === 'exercise'
                   ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
                   : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
@@ -215,15 +215,15 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         </label>
 
         {passingEnabled && (
-          <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200">
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+          <div className="flex items-center gap-2 p-3 rounded-xl border border-border">
+            <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
               {(['percent', 'score'] as const).map(t => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setPassingType(t)}
                   className={`px-3 py-2 text-xs font-medium transition-all ${
-                    passingType === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                    passingType === t ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
@@ -239,16 +239,16 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
               placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
               className="max-w-[120px]"
             />
-            <span className="text-sm text-gray-500 shrink-0">
+            <span className="text-sm text-muted-foreground shrink-0">
               {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
             </span>
           </div>
         )}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-400" /> กำหนดการ
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+        <h2 className="font-semibold text-foreground flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการ
         </h2>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -262,7 +262,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="edit-duration" className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-gray-400" /> เวลาทำ (นาที)
+            <Clock className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
           </Label>
           <Input
             id="edit-duration"
@@ -276,10 +276,10 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5">
-            <Eye className="w-4 h-4 text-gray-400" /> แสดงผลลัพธ์
+            <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
           </Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([
@@ -294,12 +294,12 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
                 onClick={() => setShowResults(option.key)}
                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                   showResults === option.key
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-ring'
                 }`}
               >
-                <p className="font-medium text-sm text-gray-900">{option.label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                <p className="font-medium text-sm text-foreground">{option.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{option.desc}</p>
               </button>
             ))}
           </div>
@@ -307,7 +307,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
 
         <div className="space-y-1.5">
           <Label htmlFor="edit-attempts" className="flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-gray-400" /> จำกัดจำนวนครั้งที่ทำได้
+            <Layers className="w-4 h-4 text-muted-foreground" /> จำกัดจำนวนครั้งที่ทำได้
           </Label>
           <Input
             id="edit-attempts"
@@ -323,16 +323,16 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         {maxAttempts !== '1' && (
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-gray-400" /> เลือกคะแนนของนักเรียนจาก
+              <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
             </Label>
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit">
+            <div className="flex rounded-lg border border-border overflow-hidden w-fit">
               {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setScoreStrategy(s)}
                   className={`px-3 py-2 text-xs font-medium transition-all ${
-                    scoreStrategy === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                    scoreStrategy === s ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {SCORE_STRATEGY_LABELS[s]}
@@ -343,7 +343,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         )}
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2 text-sm text-amber-800">
+      <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-start gap-2 text-sm text-amber-800">
         <FileText className="w-4 h-4 shrink-0 mt-0.5" />
         <p>
           แก้ไขได้เฉพาะกำหนดการ รายละเอียด คะแนน และการแสดงผลลัพธ์ — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน

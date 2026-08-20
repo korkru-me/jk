@@ -80,7 +80,7 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <X className="w-3 h-3" />
           </button>
@@ -92,7 +92,7 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
           disabled={uploading}
           className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
             required
-              ? 'border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-500/8'
+              ? 'border-warning text-warning bg-warning/8'
               : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
           }`}
         >
@@ -101,7 +101,7 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
         </button>
       )}
       {required && !value && (
-        <p className="text-[10px] text-amber-600 dark:text-amber-400">ต้องแนบรูปวิธีทำก่อนส่งคำตอบ</p>
+        <p className="text-[10px] text-warning">ต้องแนบรูปวิธีทำก่อนส่งคำตอบ</p>
       )}
     </div>
   )

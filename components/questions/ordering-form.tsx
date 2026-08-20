@@ -156,7 +156,7 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">คำสั่ง / บริบท</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">คำสั่ง / บริบท</h2>
         <div className="space-y-1.5">
           <Label>คำสั่ง *</Label>
           <RichTextEditor
@@ -176,27 +176,27 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
       <section className="space-y-4">
         <div className="flex items-start justify-between border-b pb-2">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">รายการที่ต้องเรียง</h2>
-            <p className="text-xs text-gray-500 mt-0.5">ลำดับด้านล่างคือลำดับที่ถูกต้อง นักเรียนจะเห็นรายการสลับแล้ว</p>
+            <h2 className="text-base font-semibold text-foreground">รายการที่ต้องเรียง</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">ลำดับด้านล่างคือลำดับที่ถูกต้อง นักเรียนจะเห็นรายการสลับแล้ว</p>
           </div>
-          <span className="text-xs text-gray-400">{items.length}/8 รายการ</span>
+          <span className="text-xs text-muted-foreground">{items.length}/8 รายการ</span>
         </div>
 
         <div className="space-y-2">
           {items.map((item, idx) => (
-            <div key={item.id} className="border rounded-xl bg-gray-50 p-3 space-y-2">
+            <div key={item.id} className="border rounded-xl bg-muted p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col gap-0.5 flex-shrink-0">
                   <button type="button" onClick={() => moveUp(idx)} disabled={idx === 0}
-                    className="p-0.5 rounded text-gray-400 hover:text-gray-700 disabled:opacity-30">
+                    className="p-0.5 rounded text-muted-foreground hover:text-muted-foreground disabled:opacity-30">
                     <ChevronUp className="w-4 h-4" />
                   </button>
                   <button type="button" onClick={() => moveDown(idx)} disabled={idx === items.length - 1}
-                    className="p-0.5 rounded text-gray-400 hover:text-gray-700 disabled:opacity-30">
+                    className="p-0.5 rounded text-muted-foreground hover:text-muted-foreground disabled:opacity-30">
                     <ChevronDown className="w-4 h-4" />
                   </button>
                 </div>
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
                   {idx + 1}
                 </span>
                 <Input
@@ -208,14 +208,14 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
                 <button type="button" onClick={() => setShowImageFor(p => ({ ...p, [item.id]: !p[item.id] }))}
                   className={`flex-shrink-0 p-1.5 rounded-lg border transition-colors ${
                     showImageFor[item.id] || item.image_url
-                      ? 'border-blue-300 bg-blue-50 text-blue-600'
-                      : 'border-gray-200 text-gray-400 hover:text-gray-600'
+                      ? 'border-primary/20 bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:text-muted-foreground'
                   }`} title="เพิ่มรูปภาพ">
                   <ImageIcon className="w-4 h-4" />
                 </button>
                 {items.length > 2 && (
                   <button type="button" onClick={() => removeItem(item.id)}
-                    className="flex-shrink-0 text-gray-400 hover:text-red-500">
+                    className="flex-shrink-0 text-muted-foreground hover:text-destructive">
                     <X className="w-4 h-4" />
                   </button>
                 )}
@@ -238,7 +238,7 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
             เพิ่มรายการ ({items.length}/8)
           </Button>
         )}
-        <p className="text-xs text-gray-400">คะแนนรวม: {items.length} คะแนน (รายการละ 1 คะแนน ตรวจอัตโนมัติ)</p>
+        <p className="text-xs text-muted-foreground">คะแนนรวม: {items.length} คะแนน (รายการละ 1 คะแนน ตรวจอัตโนมัติ)</p>
       </section>
 
       <SolutionSection

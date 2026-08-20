@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
+import { chartColors, chartTooltipStyle } from '@/lib/chart-colors'
 import {
   TrendingUp,
   Users,
@@ -98,18 +99,18 @@ const STAT_CARDS = [
 ]
 
 const COLOR_MAP: Record<string, string> = {
-  indigo: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
-  emerald: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
-  amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+  indigo: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
+  emerald: 'bg-success/10 text-success dark:bg-emerald-950/60',
+  amber: 'bg-warning/10 text-warning dark:bg-amber-950/60',
   violet: 'bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
   cyan: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300',
   rose: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
 }
 
 const ICON_COLOR: Record<string, string> = {
-  indigo: 'text-indigo-500',
-  emerald: 'text-emerald-500',
-  amber: 'text-amber-500',
+  indigo: 'text-primary',
+  emerald: 'text-success',
+  amber: 'text-warning',
   violet: 'text-violet-500',
   cyan: 'text-cyan-500',
   rose: 'text-rose-500',
@@ -133,10 +134,10 @@ export function AdminDashboard() {
           return (
             <div
               key={card.label}
-              className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900"
+              className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900"
             >
               <div className="flex items-start justify-between">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <p className="text-xs font-medium text-muted-foreground">
                   {card.label}
                 </p>
                 <span
@@ -145,14 +146,14 @@ export function AdminDashboard() {
                   <Icon className={`h-3.5 w-3.5 ${ICON_COLOR[card.color]}`} />
                 </span>
               </div>
-              <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+              <p className="mt-2 text-2xl font-bold text-foreground">
                 {card.value}
               </p>
               <p
                 className={`mt-0.5 text-xs font-medium ${
                   card.positive
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-red-500'
+                    ? 'text-success'
+                    : 'text-destructive'
                 }`}
               >
                 {card.delta}
@@ -165,21 +166,21 @@ export function AdminDashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {/* MRR Chart */}
-        <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+        <div className="xl:col-span-2 rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
+              <h3 className="font-semibold text-foreground">
                 Monthly Recurring Revenue
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 ย้อนหลัง 12 เดือน
               </p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+              <p className="text-2xl font-bold text-foreground">
                 ฿{(currentMRR / 1000).toFixed(0)}K
               </p>
-              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <p className="text-xs font-medium text-success">
                 +{mrrGrowth}% MoM
               </p>
             </div>
@@ -188,35 +189,31 @@ export function AdminDashboard() {
             <AreaChart data={MRR_DATA}>
               <defs>
                 <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="5%" stopColor={chartColors.primary} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={chartColors.primary} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} strokeOpacity={0.5} />
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: 11, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={formatMRR}
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: 11, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
                 formatter={(v) => [`฿${Number(v).toLocaleString()}`, 'MRR']}
-                contentStyle={{
-                  borderRadius: 8,
-                  border: '1px solid #e2e8f0',
-                  fontSize: 12,
-                }}
+                contentStyle={chartTooltipStyle}
               />
               <Area
                 type="monotone"
                 dataKey="mrr"
-                stroke="#6366f1"
+                stroke={chartColors.primary}
                 strokeWidth={2.5}
                 fill="url(#mrrGrad)"
               />
@@ -225,73 +222,73 @@ export function AdminDashboard() {
         </div>
 
         {/* Tenant Growth */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
           <div className="mb-4">
-            <h3 className="font-semibold text-slate-900 dark:text-white">
+            <h3 className="font-semibold text-foreground">
               Tenant Growth
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-muted-foreground">
               จำนวนสถาบันที่ใช้งาน
             </p>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={MRR_DATA}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} strokeOpacity={0.5} />
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tick={{ fontSize: 10, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tick={{ fontSize: 10, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
                 formatter={(v) => [Number(v), 'Tenants']}
-                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                contentStyle={chartTooltipStyle}
               />
-              <Bar dataKey="tenants" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="tenants" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Weekly Exam Activity */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+      <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
         <div className="mb-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">
+          <h3 className="font-semibold text-foreground">
             กิจกรรมการสอบรายสัปดาห์
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-muted-foreground">
             Submissions และ Active Exams แยกตามวัน
           </p>
         </div>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={EXAM_ACTIVITY} barGap={4}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} strokeOpacity={0.5} />
             <XAxis
               dataKey="day"
-              tick={{ fontSize: 12, fill: '#94a3b8' }}
+              tick={{ fontSize: 12, fill: chartColors.axis }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: chartColors.axis }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: chartColors.axis }}
               axisLine={false}
               tickLine={false}
             />
             <Tooltip
-              contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              contentStyle={chartTooltipStyle}
             />
             <Legend
               wrapperStyle={{ fontSize: 12 }}
@@ -302,13 +299,13 @@ export function AdminDashboard() {
             <Bar
               yAxisId="left"
               dataKey="submissions"
-              fill="#6366f1"
+              fill={chartColors.primary}
               radius={[4, 4, 0, 0]}
             />
             <Bar
               yAxisId="right"
               dataKey="activeExams"
-              fill="#10b981"
+              fill={chartColors.success}
               radius={[4, 4, 0, 0]}
             />
           </BarChart>

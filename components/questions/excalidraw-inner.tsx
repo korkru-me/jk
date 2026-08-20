@@ -32,11 +32,11 @@ export default function ExcalidrawInner({ onSave }: Props) {
           excalidrawAPI={(api) => { apiRef.current = api }}
         />
       </div>
-      <div className="p-3 border-t bg-white flex justify-end gap-3">
+      <div className="p-3 border-t bg-card flex justify-end gap-3">
         <button
           type="button"
           onClick={handleSave}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
           บันทึกและแทรกในโจทย์
         </button>

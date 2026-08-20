@@ -55,10 +55,10 @@ function StatCard({
   color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple'
 }) {
   const colors = {
-    blue:   'bg-blue-50 border-blue-200 text-blue-700',
-    green:  'bg-green-50 border-green-200 text-green-700',
+    blue:   'bg-primary/10 border-primary/20 text-primary',
+    green:  'bg-success/10 border-success/20 text-success',
     yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
-    red:    'bg-red-50 border-red-200 text-red-700',
+    red:    'bg-destructive/10 border-destructive/20 text-destructive',
     purple: 'bg-purple-50 border-purple-200 text-purple-700',
   }
   return (
@@ -76,12 +76,12 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">ภาพรวมระบบ KorKru</p>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">ภาพรวมระบบ KorKru</p>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">ผู้ใช้</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">ผู้ใช้</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <StatCard label="ผู้ใช้ทั้งหมด" value={s.totalUsers} color="blue" />
           <StatCard label="ครู" value={s.teachers} color="green" />
@@ -90,7 +90,7 @@ export default async function AdminDashboard() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">คลังโจทย์</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">คลังโจทย์</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatCard label="โจทย์ทั้งหมด" value={s.totalQuestions} color="blue" />
           <StatCard label="Public" value={s.publicQuestions} color="green" />
@@ -102,7 +102,7 @@ export default async function AdminDashboard() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">การเรียน</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">การเรียน</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <StatCard label="ห้องเรียน" value={s.classrooms} color="purple" />
           <StatCard label="Submissions วันนี้" value={s.todaySubmissions} color="green" />

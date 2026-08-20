@@ -38,8 +38,8 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
             onClick={() => setSelectedCategory('all')}
             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
               selectedCategory === 'all'
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'border-gray-300 hover:border-blue-400'
+                ? 'bg-primary text-white border-primary'
+                : 'border-border hover:border-primary'
             }`}
           >
             ทั้งหมด
@@ -51,8 +51,8 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
               onClick={() => setSelectedCategory(id)}
               className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                 selectedCategory === id
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-300 hover:border-blue-400'
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-border hover:border-primary'
               }`}
             >
               {name}
@@ -65,19 +65,19 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
         <Label>สูตรในหมวดนี้</Label>
         <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
           {filtered.length === 0 && (
-            <p className="text-sm text-gray-400 py-4 text-center">ไม่พบสูตรในหมวดนี้</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">ไม่พบสูตรในหมวดนี้</p>
           )}
           {filtered.map((preset) => (
             <div
               key={preset.id}
-              className="border rounded-lg p-3 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+              className="border rounded-lg p-3 hover:border-primary/20 hover:bg-primary/10 transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-sm">{preset.formula_name}</p>
-                  <p className="font-mono text-sm text-blue-700 mt-0.5">{preset.equation}</p>
+                  <p className="font-mono text-sm text-primary mt-0.5">{preset.equation}</p>
                   {preset.description && (
-                    <p className="text-xs text-gray-500 mt-0.5">{preset.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{preset.description}</p>
                   )}
                 </div>
                 <button
@@ -93,7 +93,7 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
                       ''
                     )
                   }
-                  className="shrink-0 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="shrink-0 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   เลือก
                 </button>
@@ -106,7 +106,7 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
       {value && (
         <div className="space-y-1.5">
           <Label>สูตรที่เลือก:</Label>
-          <div className="p-3 bg-green-50 border border-green-200 rounded-lg font-mono text-sm">
+          <div className="p-3 bg-success/10 border border-success/20 rounded-lg font-mono text-sm">
             {value}
           </div>
         </div>

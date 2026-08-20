@@ -28,8 +28,8 @@ export default async function TakeExamPage({
     return (
       <div className="max-w-md mx-auto mt-16 text-center">
         <p className="text-4xl mb-4">⚠️</p>
-        <p className="text-lg font-semibold text-gray-900">{result.error}</p>
-        <a href="/assignments" className="text-blue-600 hover:underline text-sm mt-4 inline-block">
+        <p className="text-lg font-semibold text-foreground">{result.error}</p>
+        <a href="/assignments" className="text-primary hover:underline text-sm mt-4 inline-block">
           ← กลับ
         </a>
       </div>

@@ -14,22 +14,22 @@ const TOPIC_MAP: Record<string, { label: string; topics: string[]; color: string
   กลศาสตร์: {
     label: 'กลศาสตร์',
     topics: ['กฎข้อที่ 1-3 ของนิวตัน', 'การเคลื่อนที่แบบต่างๆ', 'พลังงานและงาน', 'โมเมนตัมและการชน'],
-    color: 'bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-300',
+    color: 'bg-primary/10 border-primary/20 text-primary',
   },
   แรงเสียดทาน: {
     label: 'แรงเสียดทาน',
     topics: ['แรงเสียดทานสถิต', 'แรงเสียดทานจลน์', 'การหาค่าสัมประสิทธิ์'],
-    color: 'bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-300',
+    color: 'bg-primary/10 border-primary/20 text-primary',
   },
   คลื่น: {
     label: 'คลื่นและแสง',
     topics: ['สมบัติของคลื่น', 'การหักเหและการสะท้อน', 'คลื่นแม่เหล็กไฟฟ้า'],
-    color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-700 dark:text-indigo-300',
+    color: 'bg-primary/10 border-primary/20 text-primary',
   },
   แสง: {
     label: 'แสงและทัศนศาสตร์',
     topics: ['การสะท้อนของแสง', 'การหักเหของแสง', 'เลนส์และกระจก'],
-    color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-700 dark:text-indigo-300',
+    color: 'bg-primary/10 border-primary/20 text-primary',
   },
   ไฟฟ้า: {
     label: 'ไฟฟ้าและแม่เหล็ก',
@@ -49,7 +49,7 @@ const TOPIC_MAP: Record<string, { label: string; topics: string[]; color: string
   พลังงาน: {
     label: 'พลังงานและงาน',
     topics: ['งานและกำลัง', 'พลังงานกล', 'กฎการอนุรักษ์พลังงาน', 'หาพื้นที่ใต้กราฟ (v-t)'],
-    color: 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-300',
+    color: 'bg-success/10 border-success/20 text-success',
   },
   ความร้อน: {
     label: 'ความร้อนและอุณหพลศาสตร์',
@@ -78,8 +78,8 @@ export function StudyPathPanel({ wrongQuestions, totalQuestions }: StudyPathPane
   if (wrongQuestions.length === 0) {
     return (
       <div className="bg-card border rounded-2xl p-6 text-center">
-        <CheckCircle2 size={40} className="text-green-500 mx-auto mb-3" />
-        <p className="font-semibold text-green-700 dark:text-green-400">ยอดเยี่ยม! ตอบถูกทั้งหมด</p>
+        <CheckCircle2 size={40} className="text-success mx-auto mb-3" />
+        <p className="font-semibold text-success">ยอดเยี่ยม! ตอบถูกทั้งหมด</p>
         <p className="text-sm text-muted-foreground mt-1">ไม่มีหัวข้อที่ต้องทบทวนในชุดนี้</p>
       </div>
     )
@@ -90,9 +90,9 @@ export function StudyPathPanel({ wrongQuestions, totalQuestions }: StudyPathPane
   return (
     <div className="bg-card border rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b bg-amber-500/5">
+      <div className="px-5 py-4 border-b bg-warning/5">
         <div className="flex items-center gap-2">
-          <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+          <AlertTriangle size={16} className="text-warning shrink-0" />
           <p className="font-semibold text-sm">เส้นทางการซ่อมเสริม</p>
           <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
             ตอบผิด {wrongQuestions.length}/{totalQuestions} ข้อ
@@ -110,7 +110,7 @@ export function StudyPathPanel({ wrongQuestions, totalQuestions }: StudyPathPane
             />
           </div>
           <span className="text-xs text-muted-foreground shrink-0">
-            <span className="font-medium text-green-600 dark:text-green-400">{correctCount}</span>/{totalQuestions} ถูก
+            <span className="font-medium text-success">{correctCount}</span>/{totalQuestions} ถูก
           </span>
         </div>
       </div>

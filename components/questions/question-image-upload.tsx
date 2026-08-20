@@ -78,14 +78,14 @@ export function QuestionImageUpload({ value, onChange }: QuestionImageUploadProp
           )}
           {uploading ? 'กำลังอัปโหลด...' : 'แทรกรูปภาพ'}
         </Button>
-        <span className="text-xs text-gray-500">JPG, PNG, GIF — สูงสุด 5 MB</span>
+        <span className="text-xs text-muted-foreground">JPG, PNG, GIF — สูงสุด 5 MB</span>
       </div>
 
       {value.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {value.map((url) => (
             <div key={url} className="relative group">
-              <div className="w-28 h-28 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+              <div className="w-28 h-28 rounded-lg overflow-hidden border border-border bg-muted">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={url}
@@ -96,7 +96,7 @@ export function QuestionImageUpload({ value, onChange }: QuestionImageUploadProp
               <button
                 type="button"
                 onClick={() => removeImage(url)}
-                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
               </button>

@@ -40,60 +40,60 @@ const SUBMISSIONS = [
 const STATUS_CONFIG = {
   pending: {
     label: 'รอตรวจ',
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
+    bg: 'bg-warning/10',
+    text: 'text-warning',
     icon: Clock,
-    dot: 'bg-amber-400',
+    dot: 'bg-warning',
   },
   graded: {
     label: 'ตรวจแล้ว',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
+    bg: 'bg-success/10',
+    text: 'text-success',
     icon: CheckCircle2,
-    dot: 'bg-emerald-400',
+    dot: 'bg-success',
   },
   late: {
     label: 'ส่งช้า',
-    bg: 'bg-red-50',
-    text: 'text-red-600',
+    bg: 'bg-destructive/10',
+    text: 'text-destructive',
     icon: AlertCircle,
-    dot: 'bg-red-400',
+    dot: 'bg-destructive',
   },
 }
 
 export function RecentSubmissions() {
   return (
-    <div className="bg-white rounded-xl ring-1 ring-black/5 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <p className="text-sm font-semibold text-gray-900">การส่งงานล่าสุด</p>
-        <button className="text-xs text-blue-600 hover:underline">ดูทั้งหมด</button>
+    <div className="bg-card rounded-xl ring-1 ring-border overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <p className="text-sm font-semibold text-foreground">การส่งงานล่าสุด</p>
+        <button className="text-xs text-primary hover:underline">ดูทั้งหมด</button>
       </div>
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-border">
         {SUBMISSIONS.map(sub => {
           const cfg = STATUS_CONFIG[sub.status as keyof typeof STATUS_CONFIG]
           const StatusIcon = cfg.icon
           return (
-            <div key={sub.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors group">
+            <div key={sub.id} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors group">
               {/* Timeline dot */}
               <div className="relative mt-1 shrink-0">
                 <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                 {sub.id !== SUBMISSIONS[SUBMISSIONS.length - 1].id && (
-                  <div className="absolute top-2.5 left-0.5 w-px h-6 -translate-x-1/2 bg-gray-100" style={{ left: '3px' }} />
+                  <div className="absolute top-2.5 left-0.5 w-px h-6 -translate-x-1/2 bg-muted" style={{ left: '3px' }} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 font-medium leading-snug group-hover:text-blue-600 truncate transition-colors">
+                    <p className="text-sm text-foreground font-medium leading-snug group-hover:text-primary truncate transition-colors">
                       {sub.title}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <FileText className="w-3 h-3" />
                         {sub.type} · {sub.count} คน
                       </span>
                       <span className="text-xs text-gray-300">·</span>
-                      <span className="text-xs text-gray-400">{sub.time}</span>
+                      <span className="text-xs text-muted-foreground">{sub.time}</span>
                     </div>
                   </div>
                   <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${cfg.bg} ${cfg.text}`}>

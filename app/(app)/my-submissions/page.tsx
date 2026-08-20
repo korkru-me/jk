@@ -136,7 +136,7 @@ export default async function MySubmissionsPage() {
     <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ListChecks size={22} className="text-blue-600 dark:text-blue-400" />
+          <ListChecks size={22} className="text-primary" />
           สรุปงานของฉัน
         </h1>
         <p className="text-muted-foreground text-sm mt-1">งานที่ต้องทำ งานที่ใกล้กำหนดส่ง และประวัติคะแนน</p>
@@ -155,9 +155,9 @@ export default async function MySubmissionsPage() {
           {/* Summary stats */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'ต้องทำส่ง', value: String(pendingCount), icon: <ListTodo size={18} className="text-amber-500" /> },
-              { label: 'ใกล้/เลยกำหนด', value: String(urgentCount), icon: <AlertTriangle size={18} className="text-red-500" /> },
-              { label: 'ส่งงานแล้ว', value: String(doneCount), icon: <CheckCircle2 size={18} className="text-green-500" /> },
+              { label: 'ต้องทำส่ง', value: String(pendingCount), icon: <ListTodo size={18} className="text-warning" /> },
+              { label: 'ใกล้/เลยกำหนด', value: String(urgentCount), icon: <AlertTriangle size={18} className="text-destructive" /> },
+              { label: 'ส่งงานแล้ว', value: String(doneCount), icon: <CheckCircle2 size={18} className="text-success" /> },
             ].map(s => (
               <div key={s.label} className="bg-card border rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-1">
@@ -173,7 +173,7 @@ export default async function MySubmissionsPage() {
           <div className="bg-card border rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b flex items-center justify-between">
               <h2 className="font-semibold flex items-center gap-2">
-                <ListTodo size={16} className="text-amber-500" />
+                <ListTodo size={16} className="text-warning" />
                 งานที่ต้องทำ
               </h2>
               <span className="text-xs text-muted-foreground">{pendingCount} รายการ</span>
@@ -193,14 +193,14 @@ export default async function MySubmissionsPage() {
                       key={a.id}
                       className={cn(
                         'px-5 py-4 flex items-center gap-4',
-                        due.overdue ? 'bg-red-500/5' : due.urgent ? 'bg-amber-500/5' : ''
+                        due.overdue ? 'bg-destructive/5' : due.urgent ? 'bg-warning/5' : ''
                       )}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium truncate">{a.title}</p>
                           {a.isInProgress && (
-                            <span className="shrink-0 text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
+                            <span className="shrink-0 text-[10px] font-semibold text-warning bg-warning/10 px-1.5 py-0.5 rounded-full">
                               กำลังทำอยู่
                             </span>
                           )}
@@ -208,7 +208,7 @@ export default async function MySubmissionsPage() {
                         <p className="text-xs text-muted-foreground mt-0.5">{a.classrooms?.name}</p>
                         <p className={cn(
                           'text-xs mt-1 flex items-center gap-1 font-medium',
-                          due.overdue ? 'text-red-500' : due.urgent ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+                          due.overdue ? 'text-destructive' : due.urgent ? 'text-warning' : 'text-muted-foreground'
                         )}>
                           <Clock size={11} /> {due.label}
                         </p>
@@ -225,7 +225,7 @@ export default async function MySubmissionsPage() {
                           className={cn(
                             buttonVariants({ size: 'sm' }),
                             'text-xs',
-                            (a.isInProgress || a.previousScore) ? 'bg-amber-500 hover:bg-amber-600 text-white border-0' : ''
+                            (a.isInProgress || a.previousScore) ? 'bg-warning hover:bg-warning/90 text-white border-0' : ''
                           )}
                         >
                           {a.isInProgress ? 'ทำต่อ →' : a.previousScore ? 'ลองใหม่' : 'เริ่มทำ'}
@@ -254,24 +254,24 @@ export default async function MySubmissionsPage() {
                     : 0
 
                   const pctColor = pct >= 75
-                    ? 'text-green-600 dark:text-green-400'
+                    ? 'text-success'
                     : pct >= 50
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-red-500'
+                    ? 'text-warning'
+                    : 'text-destructive'
 
-                  const bgBar = pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-400'
+                  const bgBar = pct >= 75 ? 'bg-success' : pct >= 50 ? 'bg-warning' : 'bg-destructive'
 
                   return (
                     <div key={s.id} className="px-5 py-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
                       {/* Score ring */}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
                         !canShowResults
-                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                          ? 'bg-primary/10 text-primary'
                           : pct >= 75
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                          ? 'bg-success/10 text-success'
                           : pct >= 50
-                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                          ? 'bg-warning/10 text-warning'
+                          : 'bg-destructive/10 text-destructive'
                       }`}>
                         {!canShowResults || pct >= 75 ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                       </div>
@@ -299,7 +299,7 @@ export default async function MySubmissionsPage() {
                         {canShowResults && <p className={`text-lg font-black ${pctColor}`}>{pct}%</p>}
                         <Link
                           href={`/submissions/${s.id}`}
-                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 justify-end mt-0.5"
+                          className="text-xs text-primary hover:underline flex items-center gap-0.5 justify-end mt-0.5"
                         >
                           {s.assignments?.show_results === 'never'
                             ? 'ดูสถานะ'

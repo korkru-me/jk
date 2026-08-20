@@ -111,11 +111,11 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-        <h2 className="font-semibold text-gray-900">ข้อมูลชุดโจทย์</h2>
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+        <h2 className="font-semibold text-foreground">ข้อมูลชุดโจทย์</h2>
 
         <div className="space-y-1.5">
-          <Label htmlFor="set-title">ชื่อชุดโจทย์ <span className="text-red-500">*</span></Label>
+          <Label htmlFor="set-title">ชื่อชุดโจทย์ <span className="text-destructive">*</span></Label>
           <Input
             id="set-title"
             value={title}
@@ -138,7 +138,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
 
         <div className="space-y-1.5">
           <Label>แท็ก</Label>
-          <p className="text-xs text-gray-500">ใช้ค้นหา/กรองชุดโจทย์ในคลัง เช่น ฟิสิกส์ ม.4, กลศาสตร์</p>
+          <p className="text-xs text-muted-foreground">ใช้ค้นหา/กรองชุดโจทย์ในคลัง เช่น ฟิสิกส์ ม.4, กลศาสตร์</p>
           <SmartTagInput allTags={allTags} tags={tags} onTagsChange={setTags} />
         </div>
 
@@ -174,9 +174,9 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
             </SelectContent>
           </Select>
           {teamChecked && !hasTeams && (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               สร้างทีมก่อนเพื่อใช้งาน —{' '}
-              <a href="/settings/team" className="text-blue-600 hover:underline">
+              <a href="/settings/team" className="text-primary hover:underline">
                 ไปที่หน้าทีมของฉัน
               </a>
             </p>
@@ -204,7 +204,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
 
       <div className="flex items-center justify-between pt-2">
         {initialSet ? (
-          <Button type="button" variant="outline" onClick={handleDelete} disabled={isPending} className="gap-2 text-red-600 border-red-200 hover:bg-red-50">
+          <Button type="button" variant="outline" onClick={handleDelete} disabled={isPending} className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
             <Trash2 className="w-4 h-4" /> ลบชุดโจทย์
           </Button>
         ) : (

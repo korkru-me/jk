@@ -10,10 +10,10 @@ const SCHOOLS = [
 ]
 
 const COLOR_MAP: Record<string, string> = {
-  indigo: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
+  indigo: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
   violet: 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
-  emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
-  amber: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+  emerald: 'bg-success/10 text-success dark:bg-emerald-950/60',
+  amber: 'bg-warning/10 text-warning dark:bg-amber-950/60',
   cyan: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300',
   rose: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
 }
@@ -45,7 +45,7 @@ const TRUST_ITEMS = [
 
 export function TrustBadges() {
   return (
-    <section className="bg-slate-50 py-20 dark:bg-slate-900/40">
+    <section className="bg-muted py-20 dark:bg-slate-900/40">
       <div className="mx-auto max-w-6xl px-4">
         {/* Stats */}
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
@@ -54,23 +54,23 @@ export function TrustBadges() {
             return (
               <div key={stat.label} className="text-center">
                 <div className="mb-2 flex justify-center">
-                  <Icon className="h-5 w-5 text-indigo-500" />
+                  <Icon className="h-5 w-5 text-primary" />
                 </div>
-                <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                <p className="text-3xl font-extrabold text-foreground">
                   {stat.value}
                 </p>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{stat.label}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{stat.label}</p>
               </div>
             )
           })}
         </div>
 
         {/* Divider */}
-        <div className="my-14 border-t border-slate-200 dark:border-slate-700/60" />
+        <div className="my-14 border-t border-border/60" />
 
         {/* School logos */}
         <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-6">
             เชื่อใจโดยสถาบันชั้นนำทั่วประเทศ
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
@@ -84,13 +84,13 @@ export function TrustBadges() {
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-3 text-xs text-muted-foreground">
             และสถาบันกวดวิชาอีก 20+ แห่งทั่วประเทศ
           </p>
         </div>
 
         {/* Divider */}
-        <div className="my-14 border-t border-slate-200 dark:border-slate-700/60" />
+        <div className="my-14 border-t border-border/60" />
 
         {/* Trust items */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
@@ -99,13 +99,13 @@ export function TrustBadges() {
             return (
               <div
                 key={item.title}
-                className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700/60 dark:bg-slate-900"
+                className="rounded-2xl border border-border bg-card p-6 dark:border-slate-700/60 dark:bg-slate-900"
               >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-950/60">
-                  <Icon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                  <Icon className="h-5 w-5 text-primary" />
                 </div>
-                <h3 className="font-semibold text-slate-900 dark:text-white">{item.title}</h3>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                <h3 className="font-semibold text-foreground">{item.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                   {item.desc}
                 </p>
               </div>

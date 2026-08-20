@@ -181,7 +181,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
       />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 border-b pb-2">เนื้อหาโจทย์</h2>
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">เนื้อหาโจทย์</h2>
         <div className="space-y-1.5">
           <Label>โจทย์ *</Label>
           <RichTextEditor
@@ -200,11 +200,11 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
 
       <section className="space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
-          <h2 className="text-base font-semibold text-gray-900">คู่จับคู่</h2>
-          <p className="text-xs text-gray-500">อย่างน้อย 3 คู่ / สูงสุด 8 คู่</p>
+          <h2 className="text-base font-semibold text-foreground">คู่จับคู่</h2>
+          <p className="text-xs text-muted-foreground">อย่างน้อย 3 คู่ / สูงสุด 8 คู่</p>
         </div>
 
-        <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 gap-y-1 items-center text-sm font-medium text-gray-500 mb-1">
+        <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 gap-y-1 items-center text-sm font-medium text-muted-foreground mb-1">
           <span />
           <span>รายการ (ซ้าย)</span>
           <span>คำตรงกัน (ขวา)</span>
@@ -215,7 +215,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
           {pairs.map((pair, i) => (
             <div key={pair.id} className="space-y-2">
               <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 items-start">
-                <span className="text-sm font-semibold text-gray-500 mt-2.5 w-6 text-center">{i + 1}</span>
+                <span className="text-sm font-semibold text-muted-foreground mt-2.5 w-6 text-center">{i + 1}</span>
 
                 <div className="space-y-1.5">
                   <Input
@@ -226,7 +226,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
                   <button
                     type="button"
                     onClick={() => updatePair(i, 'showLeftImage', !pair.showLeftImage)}
-                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors ${pair.showLeftImage || pair.left_image ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-400 hover:text-gray-600'}`}
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors ${pair.showLeftImage || pair.left_image ? 'border-primary/20 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-muted-foreground'}`}
                   >
                     <ImageIcon className="w-3 h-3" />
                     {pair.left_image ? 'มีรูปภาพ' : 'เพิ่มรูปภาพ'}
@@ -248,7 +248,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
                   <button
                     type="button"
                     onClick={() => updatePair(i, 'showRightImage', !pair.showRightImage)}
-                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors ${pair.showRightImage || pair.right_image ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-400 hover:text-gray-600'}`}
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors ${pair.showRightImage || pair.right_image ? 'border-primary/20 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-muted-foreground'}`}
                   >
                     <ImageIcon className="w-3 h-3" />
                     {pair.right_image ? 'มีรูปภาพ' : 'เพิ่มรูปภาพ'}
@@ -265,7 +265,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
                   type="button"
                   onClick={() => removePair(i)}
                   disabled={pairs.length <= 3}
-                  className="mt-2 text-gray-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="mt-2 text-gray-300 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -280,7 +280,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
             เพิ่มคู่ ({pairs.length}/8)
           </Button>
         )}
-        <p className="text-xs text-gray-400">นักเรียนจะเห็นคอลัมน์ขวาถูกสลับลำดับแบบสุ่ม และต้องจับคู่ให้ถูกต้อง</p>
+        <p className="text-xs text-muted-foreground">นักเรียนจะเห็นคอลัมน์ขวาถูกสลับลำดับแบบสุ่ม และต้องจับคู่ให้ถูกต้อง</p>
       </section>
 
       <SolutionSection

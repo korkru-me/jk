@@ -206,17 +206,17 @@ const LOGS: AuditLog[] = [
 const SEVERITY_CONFIG: Record<Severity, { cls: string; icon: React.ElementType; label: string }> =
   {
     critical: {
-      cls: 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+      cls: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
       icon: ShieldAlert,
       label: 'Critical',
     },
     warning: {
-      cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
+      cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
       icon: AlertTriangle,
       label: 'Warning',
     },
     info: {
-      cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+      cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
       icon: Info,
       label: 'Info',
     },
@@ -257,9 +257,9 @@ export function AuditTrail() {
     <div className="space-y-5">
       {/* Alert Banner */}
       {criticalCount > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30">
-          <ShieldAlert className="h-5 w-5 text-red-500 shrink-0" />
-          <p className="text-sm font-medium text-red-700 dark:text-red-400">
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30">
+          <ShieldAlert className="h-5 w-5 text-destructive shrink-0" />
+          <p className="text-sm font-medium text-destructive">
             พบ {criticalCount} รายการที่มีระดับความรุนแรง Critical ในช่วง 48 ชั่วโมงที่ผ่านมา
             — กรุณาตรวจสอบด่วน
           </p>
@@ -269,16 +269,16 @@ export function AuditTrail() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 sm:max-w-md">
         {[
-          { label: 'Critical', count: LOGS.filter((l) => l.severity === 'critical').length, cls: 'text-red-600 dark:text-red-400' },
-          { label: 'Warning', count: LOGS.filter((l) => l.severity === 'warning').length, cls: 'text-amber-600 dark:text-amber-400' },
-          { label: 'Info', count: LOGS.filter((l) => l.severity === 'info').length, cls: 'text-slate-600 dark:text-slate-400' },
+          { label: 'Critical', count: LOGS.filter((l) => l.severity === 'critical').length, cls: 'text-destructive' },
+          { label: 'Warning', count: LOGS.filter((l) => l.severity === 'warning').length, cls: 'text-warning' },
+          { label: 'Info', count: LOGS.filter((l) => l.severity === 'info').length, cls: 'text-muted-foreground' },
         ].map((item) => (
           <div
             key={item.label}
-            className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700/60 dark:bg-slate-900"
+            className="rounded-xl border border-border bg-card p-3 dark:border-slate-700/60 dark:bg-slate-900"
           >
             <p className={cn('text-2xl font-bold', item.cls)}>{item.count}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
+            <p className="text-xs text-muted-foreground">{item.label}</p>
           </div>
         ))}
       </div>
@@ -286,12 +286,12 @@ export function AuditTrail() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหา Email, Action, IP, Resource"
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
         {[
@@ -331,7 +331,7 @@ export function AuditTrail() {
             key={i}
             value={sel.value}
             onChange={(e) => sel.onChange(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             {sel.options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -340,21 +340,21 @@ export function AuditTrail() {
             ))}
           </select>
         ))}
-        <p className="text-xs text-slate-400 dark:text-slate-500 ml-auto">
+        <p className="text-xs text-muted-foreground ml-auto">
           แสดง {filtered.length} / {LOGS.length} รายการ
         </p>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/60">
-        <table className="w-full text-sm bg-white dark:bg-slate-900">
+      <div className="overflow-x-auto rounded-xl border border-border/60">
+        <table className="w-full text-sm bg-card">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-800/60">
+            <tr className="bg-muted/60">
               {['เวลา', 'Email / Tenant', 'การกระทำ', 'Resource', 'Category', 'Severity', 'IP Address', 'Result'].map(
                 (h) => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400 whitespace-nowrap"
+                    className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap"
                   >
                     {h}
                   </th>
@@ -370,29 +370,29 @@ export function AuditTrail() {
                 <tr
                   key={log.id}
                   className={cn(
-                    'border-t border-slate-200 dark:border-slate-700/60 transition-colors',
+                    'border-t border-border/60 transition-colors',
                     log.severity === 'critical'
-                      ? 'bg-red-50/40 dark:bg-red-950/10'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
+                      ? 'bg-destructive/10 dark:bg-red-950/10'
+                      : 'hover:bg-muted dark:hover:bg-slate-800/40',
                   )}
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                     {log.timestamp}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-xs font-medium text-slate-900 dark:text-white">
+                    <p className="text-xs font-medium text-foreground">
                       {log.email}
                     </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">{log.tenant}</p>
+                    <p className="text-xs text-muted-foreground">{log.tenant}</p>
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200 max-w-[220px]">
+                  <td className="px-4 py-3 text-sm text-muted-foreground max-w-[220px]">
                     {log.action}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 max-w-[160px] truncate">
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground max-w-[160px] truncate">
                     {log.resource}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground dark:bg-slate-800 dark:text-slate-300">
                       {CATEGORY_LABEL[log.category]}
                     </span>
                   </td>
@@ -407,7 +407,7 @@ export function AuditTrail() {
                       {sc.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                     {log.ip}
                   </td>
                   <td className="px-4 py-3">
@@ -415,8 +415,8 @@ export function AuditTrail() {
                       className={cn(
                         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                         log.result === 'success'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+                          ? 'bg-success/10 text-success dark:bg-emerald-950/60'
+                          : 'bg-destructive/10 text-destructive dark:bg-red-950/60',
                       )}
                     >
                       {log.result === 'success' ? 'Success' : 'Failed'}
@@ -429,7 +429,7 @@ export function AuditTrail() {
               <tr>
                 <td
                   colSpan={8}
-                  className="px-4 py-12 text-center text-sm text-slate-400 dark:text-slate-500"
+                  className="px-4 py-12 text-center text-sm text-muted-foreground"
                 >
                   ไม่พบรายการที่ตรงกับเงื่อนไขการค้นหา
                 </td>

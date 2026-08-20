@@ -8,12 +8,12 @@ export default async function NewFileUploadQuestionPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/questions/new" className="text-gray-400 hover:text-gray-600 transition-colors">
+        <Link href="/questions/new" className="text-muted-foreground hover:text-muted-foreground transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">สร้างโจทย์ส่งไฟล์งาน</h1>
-          <p className="text-sm text-gray-500 mt-1">นักเรียนแนบไฟล์รูปภาพหรือ PDF เป็นคำตอบ ระบบให้คะแนนอัตโนมัติเมื่อมีการส่งไฟล์</p>
+          <h1 className="text-2xl font-bold text-foreground">สร้างโจทย์ส่งไฟล์งาน</h1>
+          <p className="text-sm text-muted-foreground mt-1">นักเรียนแนบไฟล์รูปภาพหรือ PDF เป็นคำตอบ ระบบให้คะแนนอัตโนมัติเมื่อมีการส่งไฟล์</p>
         </div>
       </div>
       <FileUploadForm allTags={allTags} />

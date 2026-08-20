@@ -37,27 +37,27 @@ export function UpcomingTasks() {
     setDone(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
   return (
-    <div className="bg-white rounded-xl ring-1 ring-black/5 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+    <div className="bg-card rounded-xl ring-1 ring-border overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <CalendarClock className="w-4 h-4 text-gray-400" />
-          <p className="text-sm font-semibold text-gray-900">เตรียมสอนพรุ่งนี้</p>
+          <CalendarClock className="w-4 h-4 text-muted-foreground" />
+          <p className="text-sm font-semibold text-foreground">เตรียมสอนพรุ่งนี้</p>
         </div>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-muted-foreground">
           {done.length}/{INITIAL_TASKS.length} เสร็จ
         </span>
       </div>
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-border">
         {INITIAL_TASKS.map(task => {
           const isDone = done.includes(task.id)
           return (
-            <div key={task.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors group">
+            <div key={task.id} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors group">
               <button
                 onClick={() => toggle(task.id)}
                 className={`mt-0.5 w-4.5 h-4.5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
                   isDone
-                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : 'border-gray-300 hover:border-emerald-400'
+                    ? 'bg-success border-success text-white'
+                    : 'border-border hover:border-success'
                 }`}
               >
                 {isDone && (
@@ -68,20 +68,20 @@ export function UpcomingTasks() {
               </button>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm leading-snug transition-all ${
-                  isDone ? 'line-through text-gray-400' : 'text-gray-700'
+                  isDone ? 'line-through text-muted-foreground' : 'text-muted-foreground'
                 }`}>
                   {task.text}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
                   {task.urgent && (
-                    <span className="text-[10px] bg-red-50 text-red-500 font-semibold px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] bg-destructive/10 text-destructive font-semibold px-1.5 py-0.5 rounded">
                       เร่งด่วน
                     </span>
                   )}
-                  <span className="text-[10px] text-gray-400">{task.time}</span>
+                  <span className="text-[10px] text-muted-foreground">{task.time}</span>
                 </div>
               </div>
-              <button className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center transition-colors text-gray-400 shrink-0">
+              <button className="w-7 h-7 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-colors text-muted-foreground shrink-0">
                 <Printer className="w-3.5 h-3.5" />
               </button>
             </div>

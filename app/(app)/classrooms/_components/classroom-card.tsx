@@ -59,10 +59,10 @@ export function ClassroomCard({
           <div
             className={cn(
               'absolute top-2.5 left-2.5 w-6 h-6 rounded-md border-2 border-white flex items-center justify-center transition-colors z-10',
-              isSelected ? 'bg-white' : 'bg-white/20'
+              isSelected ? 'bg-card' : 'bg-card/20'
             )}
           >
-            {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 stroke-[3]" />}
+            {isSelected && <Check className="w-3.5 h-3.5 text-primary stroke-[3]" />}
           </div>
         )}
         <div className={isSelecting ? 'ml-8' : ''}>
@@ -79,7 +79,7 @@ export function ClassroomCard({
             title={isPinned ? 'เลิกปักหมุด' : 'ปักหมุดไว้บนสุด'}
             className={cn(
               'absolute top-2.5 right-2.5 w-7 h-7 rounded-lg flex items-center justify-center transition-colors z-10',
-              isPinned ? 'bg-white text-amber-500' : 'bg-white/15 text-white/70 hover:bg-white/25 hover:text-white'
+              isPinned ? 'bg-card text-warning' : 'bg-card/15 text-white/70 hover:bg-card/25 hover:text-white'
             )}
           >
             {isPinned ? <Pin className="w-3.5 h-3.5 fill-current" /> : <PinOff className="w-3.5 h-3.5" />}
@@ -87,36 +87,36 @@ export function ClassroomCard({
         )}
         <div className={cn(
           'absolute inset-0 transition-colors',
-          isSelecting && isSelected ? 'bg-blue-600/15' : 'bg-black/0 group-hover:bg-black/5'
+          isSelecting && isSelected ? 'bg-primary/15' : 'bg-black/0 group-hover:bg-black/5'
         )} />
       </div>
 
       {/* Body */}
       <div className="p-4">
         <div className="flex items-center gap-4 mb-4">
-          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-            <Users className="w-3.5 h-3.5 text-gray-400" />
-            <span className="font-semibold text-gray-900">{studentCount}</span>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Users className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="font-semibold text-foreground">{studentCount}</span>
             <span className="text-xs">คน</span>
           </div>
-          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-            <BookOpen className="w-3.5 h-3.5 text-gray-400" />
-            <span className="font-semibold text-gray-900">{assignmentCount}</span>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="font-semibold text-foreground">{assignmentCount}</span>
             <span className="text-xs">ชุดข้อสอบ</span>
           </div>
           <div className="flex items-center gap-1.5 ml-auto">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-sm font-bold text-emerald-600">{avgScore}%</span>
+            <TrendingUp className="w-3.5 h-3.5 text-success" />
+            <span className="text-sm font-bold text-success">{avgScore}%</span>
           </div>
           {isPinned && (
-            <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+            <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-warning bg-warning/10 px-2 py-0.5 rounded-full">
               <Pin className="w-2.5 h-2.5 fill-current" /> ปักหมุด
             </span>
           )}
         </div>
 
         <div className="mb-3">
-          <p className="text-[10px] text-gray-400 mb-1.5 font-medium uppercase tracking-wide">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">
             ทักษะ PISA · ข้อมูลตัวอย่าง
           </p>
           <div
@@ -127,7 +127,7 @@ export function ClassroomCard({
             {pisaData.map(item => (
               <div
                 key={item.name}
-                className="w-[18px] rounded-t-[3px] bg-blue-500"
+                className="w-[18px] rounded-t-[3px] bg-primary"
                 style={{ height: `${item.score}%` }}
                 title={`${item.name}: ${item.score}% (ข้อมูลตัวอย่าง)`}
               />
@@ -135,20 +135,20 @@ export function ClassroomCard({
           </div>
           <div className="flex justify-between mt-1">
             {pisaData.map((d) => (
-              <p key={d.name} className="text-[9px] text-gray-400 text-center" style={{ width: '33%' }}>
+              <p key={d.name} className="text-[9px] text-muted-foreground text-center" style={{ width: '33%' }}>
                 {d.score}%
               </p>
             ))}
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between pt-3 border-t border-border">
           <div>
-            <p className="text-[10px] text-gray-400">รหัสห้องเรียน</p>
-            <p className="font-mono font-bold text-gray-800 tracking-widest text-sm">{classroom.class_code}</p>
+            <p className="text-[10px] text-muted-foreground">รหัสห้องเรียน</p>
+            <p className="font-mono font-bold text-foreground tracking-widest text-sm">{classroom.class_code}</p>
           </div>
           {!isSelecting && (
-            <span className="text-xs text-blue-600 font-medium group-hover:underline">จัดการ →</span>
+            <span className="text-xs text-primary font-medium group-hover:underline">จัดการ →</span>
           )}
         </div>
       </div>
@@ -160,8 +160,8 @@ export function ClassroomCard({
       <div
         onClick={onToggle}
         className={cn(
-          'group cursor-pointer bg-white rounded-2xl ring-1 overflow-hidden transition-all duration-150',
-          isSelected ? 'ring-2 ring-blue-500 shadow-md' : 'ring-black/5 hover:ring-blue-200'
+          'group cursor-pointer bg-card rounded-2xl ring-1 overflow-hidden transition-all duration-150',
+          isSelected ? 'ring-2 ring-primary shadow-md' : 'ring-border hover:ring-blue-200'
         )}
       >
         {cardBody}
@@ -173,8 +173,8 @@ export function ClassroomCard({
     <Link
       href={`/classrooms/${classroom.id}`}
       className={cn(
-        'group block bg-white rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden',
-        isPinned ? 'ring-2 ring-amber-300' : 'ring-1 ring-black/5'
+        'group block bg-card rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden',
+        isPinned ? 'ring-2 ring-amber-300' : 'ring-1 ring-border'
       )}
     >
       {cardBody}

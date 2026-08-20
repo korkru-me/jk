@@ -79,12 +79,12 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">สร้างงานที่มอบหมาย</h1>
-        <p className="text-sm text-gray-500 mt-1">รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน</p>
+        <h1 className="text-2xl font-bold text-foreground">สร้างงานที่มอบหมาย</h1>
+        <p className="text-sm text-muted-foreground mt-1">รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน</p>
       </div>
 
       {classrooms.length === 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+        <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-amber-800">
           คุณยังไม่มีห้องเรียน กรุณา{' '}
           <a href="/classrooms/new" className="underline font-medium">สร้างห้องเรียน</a>
           {' '}ก่อน

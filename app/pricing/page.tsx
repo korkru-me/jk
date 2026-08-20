@@ -31,16 +31,16 @@ const FAQS = [
 
 export default function PricingPage() {
   return (
-    <main className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
+    <main className="flex min-h-screen flex-col bg-card">
       <LandingNavbar />
 
       {/* Header */}
       <section className="bg-gradient-to-b from-indigo-50/60 to-white py-16 text-center dark:from-indigo-950/30 dark:to-slate-950">
         <div className="mx-auto max-w-3xl px-4">
-          <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white sm:text-5xl">
+          <h1 className="text-4xl font-extrabold text-foreground sm:text-5xl">
             ราคาที่ยุติธรรม เพื่อครูทุกคน
           </h1>
-          <p className="mt-4 text-xl text-slate-500 dark:text-slate-400">
+          <p className="mt-4 text-xl text-muted-foreground">
             เริ่มต้นฟรี อัปเกรดเมื่อพร้อม ไม่มีค่าใช้จ่ายซ่อนเร้น
           </p>
         </div>
@@ -52,19 +52,19 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-slate-50 py-16 dark:bg-slate-900/40">
+      <section className="bg-muted py-16 dark:bg-slate-900/40">
         <div className="mx-auto max-w-3xl px-4">
-          <h2 className="text-center text-2xl font-bold text-slate-900 dark:text-white mb-8">
+          <h2 className="text-center text-2xl font-bold text-foreground mb-8">
             คำถามที่พบบ่อย
           </h2>
           <div className="space-y-4">
             {FAQS.map((faq) => (
               <div
                 key={faq.q}
-                className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900"
+                className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900"
               >
-                <p className="font-semibold text-slate-900 dark:text-white mb-1.5">{faq.q}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{faq.a}</p>
+                <p className="font-semibold text-foreground mb-1.5">{faq.q}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
               </div>
             ))}
           </div>
@@ -72,20 +72,20 @@ export default function PricingPage() {
       </section>
 
       {/* Contact CTA */}
-      <section className="bg-white py-12 text-center dark:bg-slate-950">
+      <section className="bg-card py-12 text-center dark:bg-slate-950">
         <div className="mx-auto max-w-xl px-4">
           <div className="flex justify-center mb-4">
-            <MessageCircle className="h-8 w-8 text-indigo-500" />
+            <MessageCircle className="h-8 w-8 text-primary" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-xl font-bold text-foreground">
             ยังมีคำถามอีกไหม?
           </h2>
-          <p className="mt-2 text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-muted-foreground">
             ทีมงานของเรายินดีให้คำปรึกษาและเสนอราคาสำหรับโรงเรียนและองค์กร
           </p>
           <a
             href="mailto:hello@korkru.app"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
           >
             ติดต่อเรา
           </a>

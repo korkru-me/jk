@@ -91,32 +91,32 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
 
         {/* Header */}
-        <div className={`px-6 py-5 ${stage === 'done' ? 'bg-green-50' : stage === 'cancelled' ? 'bg-gray-50' : 'bg-gray-900'}`}>
+        <div className={`px-6 py-5 ${stage === 'done' ? 'bg-success/10' : stage === 'cancelled' ? 'bg-muted' : 'bg-gray-900'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {stage === 'running' && (
                 <Loader2 className="w-5 h-5 text-white animate-spin" />
               )}
               {stage === 'done' && (
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <CheckCircle2 className="w-5 h-5 text-success" />
               )}
               {stage === 'cancelled' && (
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-muted-foreground" />
               )}
               <div>
-                <p className={`text-sm font-bold ${stage === 'running' ? 'text-white' : 'text-gray-900'}`}>
+                <p className={`text-sm font-bold ${stage === 'running' ? 'text-white' : 'text-foreground'}`}>
                   {stage === 'running' ? 'กำลังสร้างไฟล์...' : stage === 'done' ? 'สร้างไฟล์เสร็จสิ้น!' : 'ยกเลิกแล้ว'}
                 </p>
-                <p className={`text-xs mt-0.5 ${stage === 'running' ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p className={`text-xs mt-0.5 ${stage === 'running' ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                   {assignmentTitle}
                 </p>
               </div>
             </div>
             {stage !== 'running' && (
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-black/5 text-gray-400 transition-colors">
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-black/5 text-muted-foreground transition-colors">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -128,21 +128,21 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
           {/* Progress bar */}
           {stage !== 'cancelled' && (
             <div>
-              <div className="flex justify-between text-xs text-gray-500 mb-2">
+              <div className="flex justify-between text-xs text-muted-foreground mb-2">
                 <span>{currentFile}/{totalCopies} ไฟล์</span>
                 <span className="font-mono tabular-nums">
                   {stage === 'done' ? `ใช้เวลา ${formatTime(elapsed)}` : remaining > 0 ? `เหลือ ~${formatTime(remaining)}` : ''}
                 </span>
               </div>
-              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${stage === 'done' ? 'bg-green-500' : 'bg-gray-900'}`}
+                  className={`h-full rounded-full transition-all duration-300 ${stage === 'done' ? 'bg-success' : 'bg-gray-900'}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
               <div className="flex justify-between mt-1">
                 <span className="text-[10px] text-gray-300">0%</span>
-                <span className="text-xs font-bold text-gray-700">{pct}%</span>
+                <span className="text-xs font-bold text-muted-foreground">{pct}%</span>
                 <span className="text-[10px] text-gray-300">100%</span>
               </div>
             </div>
@@ -150,28 +150,28 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
 
           {/* File log (running) */}
           {stage === 'running' && (
-            <div className="bg-gray-50 rounded-xl overflow-hidden">
-              <div className="px-3 py-1.5 border-b border-gray-100">
-                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
+            <div className="bg-muted rounded-xl overflow-hidden">
+              <div className="px-3 py-1.5 border-b border-border">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                   กำลังประมวลผล
                 </p>
               </div>
-              <div className="divide-y divide-gray-50 max-h-36 overflow-hidden">
+              <div className="divide-y divide-border max-h-36 overflow-hidden">
                 {visibleFiles.map((num, i) => {
                   const isLast = i === visibleFiles.length - 1
                   return (
-                    <div key={num} className={`flex items-center gap-2.5 px-3 py-2 transition-colors ${isLast ? 'bg-blue-50/50' : ''}`}>
+                    <div key={num} className={`flex items-center gap-2.5 px-3 py-2 transition-colors ${isLast ? 'bg-primary/10' : ''}`}>
                       {isLast ? (
-                        <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin shrink-0" />
+                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />
                       ) : (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-700 truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           {assignmentTitle}_ชุดที่_{String(num).padStart(3, '0')}.pdf
                         </p>
                         {isLast && (
-                          <p className="text-[10px] text-blue-400 mt-0.5">
+                          <p className="text-[10px] text-primary mt-0.5">
                             {fileLabels[num % fileLabels.length]}
                           </p>
                         )}
@@ -184,8 +184,8 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
                 })}
                 {currentFile === 0 && (
                   <div className="flex items-center gap-2.5 px-3 py-2">
-                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin shrink-0" />
-                    <p className="text-xs text-gray-500">เริ่มต้นกระบวนการ...</p>
+                    <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />
+                    <p className="text-xs text-muted-foreground">เริ่มต้นกระบวนการ...</p>
                   </div>
                 )}
               </div>
@@ -195,16 +195,16 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
           {/* Done state */}
           {stage === 'done' && (
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-                <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+              <div className="flex items-center gap-3 p-3 bg-success/10 rounded-xl">
+                <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-green-800">สร้าง {totalCopies} ไฟล์ PDF เสร็จสิ้น</p>
-                  <p className="text-xs text-green-600 mt-0.5">กดปุ่มด้านล่างเพื่อพิมพ์หรือบันทึกเป็น PDF</p>
+                  <p className="text-xs text-success mt-0.5">กดปุ่มด้านล่างเพื่อพิมพ์หรือบันทึกเป็น PDF</p>
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-xl">
-                <p className="text-xs text-amber-700 leading-relaxed">
+              <div className="p-3 bg-warning/10 rounded-xl">
+                <p className="text-xs text-warning leading-relaxed">
                   <span className="font-bold">วิธีบันทึก ZIP:</span> เปิดหน้าพิมพ์ → กด Ctrl+P → เลือก "บันทึกเป็น PDF" ทำซ้ำสำหรับแต่ละชุด หรือใช้ฟีเจอร์ Print to File ของ browser
                 </p>
               </div>
@@ -214,8 +214,8 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
           {/* Cancelled state */}
           {stage === 'cancelled' && (
             <div className="text-center py-4">
-              <p className="text-gray-500 text-sm">ยกเลิกการสร้างไฟล์แล้ว</p>
-              <p className="text-xs text-gray-400 mt-1">สร้างไปแล้ว {currentFile} จาก {totalCopies} ชุด</p>
+              <p className="text-muted-foreground text-sm">ยกเลิกการสร้างไฟล์แล้ว</p>
+              <p className="text-xs text-muted-foreground mt-1">สร้างไปแล้ว {currentFile} จาก {totalCopies} ชุด</p>
             </div>
           )}
 
@@ -224,7 +224,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
             {stage === 'running' && (
               <button
                 onClick={handleCancel}
-                className="flex-1 py-2.5 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                className="flex-1 py-2.5 text-sm font-medium text-muted-foreground bg-muted rounded-xl hover:bg-accent transition-colors"
               >
                 ยกเลิก
               </button>
@@ -234,7 +234,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
               <>
                 <button
                   onClick={onClose}
-                  className="py-2.5 px-4 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                  className="py-2.5 px-4 text-sm font-medium text-muted-foreground bg-muted rounded-xl hover:bg-accent transition-colors"
                 >
                   ปิด
                 </button>
@@ -251,7 +251,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
             {stage === 'cancelled' && (
               <button
                 onClick={onClose}
-                className="flex-1 py-2.5 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                className="flex-1 py-2.5 text-sm font-medium text-muted-foreground bg-muted rounded-xl hover:bg-accent transition-colors"
               >
                 ปิด
               </button>

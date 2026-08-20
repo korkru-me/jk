@@ -16,7 +16,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         checked ? 'bg-primary' : 'bg-muted-foreground/30'
       }`}
     >
-      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-card shadow-sm transition-transform ${
         checked ? 'translate-x-6' : 'translate-x-1'
       }`} />
     </button>
@@ -173,10 +173,10 @@ export function NotificationSettings() {
       </div>
 
       {/* Info box */}
-      <div className="bg-blue-500/8 border border-blue-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
-        <Bell size={15} className="text-blue-500 mt-0.5 shrink-0" />
+      <div className="bg-primary/8 border border-primary/20 rounded-xl px-5 py-4 flex items-start gap-3">
+        <Bell size={15} className="text-primary mt-0.5 shrink-0" />
         <div>
-          <p className="text-sm font-medium text-blue-700 dark:text-blue-300">การแจ้งเตือนในระบบ</p>
+          <p className="text-sm font-medium text-primary">การแจ้งเตือนในระบบ</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             การแจ้งเตือนในระบบจะปรากฏที่ไอคอนกระดิ่งมุมบนขวา และในหน้าจอล็อกอิน
             การแจ้งเตือนทางอีเมลจะใช้อีเมลที่ลงทะเบียนไว้กับบัญชีของคุณ

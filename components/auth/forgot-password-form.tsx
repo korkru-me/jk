@@ -47,27 +47,27 @@ export function ForgotPasswordForm() {
     return (
       <div className="space-y-4 py-4 text-center">
         <div className="flex justify-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60">
-            <CheckCircle className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
+            <CheckCircle className="h-7 w-7 text-success" />
           </div>
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-900 dark:text-white">
+          <p className="font-semibold text-foreground">
             ระบบได้ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลของคุณเรียบร้อยแล้ว
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-muted-foreground">
             ตรวจสอบกล่องจดหมายที่{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">
+            <span className="font-semibold text-foreground">
               {getValues('email')}
             </span>
           </p>
-          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-2 text-xs text-muted-foreground">
             ไม่เห็นอีเมล? ลองตรวจสอบโฟลเดอร์ Spam หรือรอสักครู่แล้วลองใหม่
           </p>
         </div>
         <Link
           href="/login"
-          className="block text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          className="block text-sm font-medium text-primary hover:underline"
         >
           กลับไปหน้าเข้าสู่ระบบ
         </Link>
@@ -87,7 +87,7 @@ export function ForgotPasswordForm() {
           {...register('email')}
         />
         {errors.email && (
-          <p className="text-xs text-red-600 dark:text-red-400">{errors.email.message}</p>
+          <p className="text-xs text-destructive">{errors.email.message}</p>
         )}
       </div>
 
@@ -102,10 +102,10 @@ export function ForgotPasswordForm() {
         )}
       </Button>
 
-      <p className="text-center text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-center text-sm text-muted-foreground">
         <Link
           href="/login"
-          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          className="font-medium text-primary hover:underline"
         >
           กลับไปเข้าสู่ระบบ
         </Link>

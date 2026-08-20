@@ -40,7 +40,7 @@ export function ScoreEditor({ submissionAnswerId, score, maxScore }: Props) {
     return (
       <button
         onClick={() => { setDraft(String(currentScore)); setEditing(true) }}
-        className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed border-blue-300 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+        className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed border-primary/20 text-primary hover:bg-primary/10 dark:hover:bg-blue-950/30 transition-colors"
         title="แก้ไขคะแนนข้อนี้"
       >
         <Pencil className="w-3 h-3" />
@@ -61,13 +61,13 @@ export function ScoreEditor({ submissionAnswerId, score, maxScore }: Props) {
         onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
         disabled={isPending}
         autoFocus
-        className="w-14 text-xs text-center rounded-lg border border-blue-300 py-0.5 outline-none focus:ring-2 focus:ring-blue-100"
+        className="w-14 text-xs text-center rounded-lg border border-primary/20 py-0.5 outline-none focus:ring-2 focus:ring-blue-100"
       />
       <span className="text-xs text-muted-foreground">/{maxScore}</span>
-      <button onClick={save} disabled={isPending} className="text-green-600 hover:text-green-700 disabled:opacity-50">
+      <button onClick={save} disabled={isPending} className="text-success hover:text-success/80 disabled:opacity-50">
         <Check className="w-3.5 h-3.5" />
       </button>
-      <button onClick={() => setEditing(false)} disabled={isPending} className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+      <button onClick={() => setEditing(false)} disabled={isPending} className="text-muted-foreground hover:text-muted-foreground disabled:opacity-50">
         <X className="w-3.5 h-3.5" />
       </button>
     </div>

@@ -32,16 +32,16 @@ type Severity = 'overdue' | 'soon' | 'later' | 'done'
 
 const SEVERITY_ORDER: Record<Severity, number> = { overdue: 0, soon: 1, later: 2, done: 3 }
 const SEVERITY_DOT: Record<Severity, string> = {
-  overdue: 'bg-red-500',
-  soon: 'bg-amber-500',
-  later: 'bg-blue-500',
-  done: 'bg-emerald-500',
+  overdue: 'bg-destructive',
+  soon: 'bg-warning',
+  later: 'bg-primary',
+  done: 'bg-success',
 }
 const SEVERITY_BADGE: Record<Severity, string> = {
-  overdue: 'bg-red-50 text-red-700',
-  soon: 'bg-amber-50 text-amber-700',
-  later: 'bg-blue-50 text-blue-700',
-  done: 'bg-emerald-50 text-emerald-700',
+  overdue: 'bg-destructive/10 text-destructive',
+  soon: 'bg-warning/10 text-warning',
+  later: 'bg-primary/10 text-primary',
+  done: 'bg-success/10 text-success',
 }
 const SEVERITY_LABEL: Record<Severity, string> = {
   overdue: 'มีคนยังไม่ส่ง (เลยกำหนด)',
@@ -89,31 +89,31 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
   const selectedEvents = eventsByDay.get(dateKey(selected)) ?? []
 
   return (
-    <div className="bg-white rounded-2xl ring-1 ring-black/5 p-4 space-y-4">
+    <div className="bg-card rounded-2xl ring-1 ring-border p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
           <CalendarDays className="w-3.5 h-3.5" /> ปฏิทินกำหนดส่งงาน
         </h2>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setViewDate(new Date(year, month - 1, 1))}
-            className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors"
+            className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
             aria-label="เดือนก่อนหน้า"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm font-medium w-32 text-center text-gray-900">{MONTH_LABELS[month]} {year + 543}</span>
+          <span className="text-sm font-medium w-32 text-center text-foreground">{MONTH_LABELS[month]} {year + 543}</span>
           <button
             onClick={() => setViewDate(new Date(year, month + 1, 1))}
-            className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors"
+            className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
             aria-label="เดือนถัดไป"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
             onClick={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today) }}
-            className="ml-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+            className="ml-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-muted hover:bg-accent text-muted-foreground transition-colors"
           >
             วันนี้
           </button>
@@ -121,7 +121,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
       </div>
 
       {/* Weekday labels */}
-      <div className="grid grid-cols-7 text-center text-[11px] font-medium text-gray-400">
+      <div className="grid grid-cols-7 text-center text-[11px] font-medium text-muted-foreground">
         {WEEKDAY_LABELS.map(w => <span key={w}>{w}</span>)}
       </div>
 
@@ -141,11 +141,11 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
               onClick={() => setSelected(d)}
               className={cn(
                 'aspect-square rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-all relative',
-                isSelected ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-300' : 'hover:bg-gray-100 text-gray-900'
+                isSelected ? 'bg-primary text-white' : isToday ? 'bg-primary/10 text-primary ring-1 ring-blue-300' : 'hover:bg-muted text-foreground'
               )}
             >
               {hasClash && (
-                <span className={cn('absolute top-1 right-1 w-1.5 h-1.5 rounded-full', isSelected ? 'bg-white' : 'bg-amber-500')} />
+                <span className={cn('absolute top-1 right-1 w-1.5 h-1.5 rounded-full', isSelected ? 'bg-card' : 'bg-warning')} />
               )}
               <span>{d.getDate()}</span>
               {dayEvents.length > 0 && (
@@ -153,11 +153,11 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
                   {dots.map((entry, di) => (
                     <span
                       key={di}
-                      className={cn('w-1.5 h-1.5 rounded-full', isSelected ? 'bg-white/80' : SEVERITY_DOT[entry.severity])}
+                      className={cn('w-1.5 h-1.5 rounded-full', isSelected ? 'bg-card/80' : SEVERITY_DOT[entry.severity])}
                     />
                   ))}
                   {dayEvents.length > 3 && (
-                    <span className={cn('text-[9px] leading-none', isSelected ? 'text-white/80' : 'text-gray-400')}>+{dayEvents.length - 3}</span>
+                    <span className={cn('text-[9px] leading-none', isSelected ? 'text-white/80' : 'text-muted-foreground')}>+{dayEvents.length - 3}</span>
                   )}
                 </span>
               )}
@@ -167,7 +167,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-3 flex-wrap text-[11px] text-gray-500 border-t border-gray-100 pt-3">
+      <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
         {(['overdue', 'soon', 'later', 'done'] as Severity[]).map(s => (
           <span key={s} className="flex items-center gap-1">
             <span className={cn('w-1.5 h-1.5 rounded-full', SEVERITY_DOT[s])} />
@@ -175,33 +175,33 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
           </span>
         ))}
         <span className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-warning" />
           งานชนกันในวันนั้น
         </span>
       </div>
 
       {/* Selected day detail */}
-      <div className="border-t border-gray-100 pt-3 space-y-2">
-        <p className="text-xs font-semibold text-gray-500">
+      <div className="border-t border-border pt-3 space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground">
           {selected.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
         {selectedEvents.length === 0 ? (
-          <p className="text-sm text-gray-400 py-2">ไม่มีงานกำหนดส่งวันนี้</p>
+          <p className="text-sm text-muted-foreground py-2">ไม่มีงานกำหนดส่งวันนี้</p>
         ) : (
           <div className="space-y-2">
             {selectedEvents.length >= 2 && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-1.5 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 วันนี้มีงานชนกัน {selectedEvents.length} รายการ — นักเรียนอาจทำงานไม่ทัน
               </div>
             )}
             {selectedEvents.map(({ event, severity }) => (
-              <div key={event.id} className="flex items-center gap-3 p-2.5 rounded-xl ring-1 ring-black/5">
+              <div key={event.id} className="flex items-center gap-3 p-2.5 rounded-xl ring-1 ring-border">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/assignments/${event.id}`} className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate block">
+                  <Link href={`/assignments/${event.id}`} className="text-sm font-medium text-foreground hover:text-primary truncate block">
                     {event.title}
                   </Link>
-                  <p className="text-xs text-gray-400 truncate">{event.classroomName} · {event.doneCount}/{event.totalStudents} ส่งแล้ว</p>
+                  <p className="text-xs text-muted-foreground truncate">{event.classroomName} · {event.doneCount}/{event.totalStudents} ส่งแล้ว</p>
                 </div>
                 <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0', SEVERITY_BADGE[severity])}>
                   {SEVERITY_LABEL[severity]}

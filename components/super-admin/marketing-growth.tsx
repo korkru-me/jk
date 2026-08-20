@@ -23,6 +23,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { chartColors, chartTooltipStyle } from '@/lib/chart-colors'
 
 type AnnouncementType = 'maintenance' | 'feature' | 'promo' | 'urgent'
 type AnnouncementStatus = 'active' | 'scheduled' | 'expired'
@@ -164,22 +165,22 @@ const ANN_TYPE_CONFIG: Record<
 > = {
   maintenance: {
     label: 'ปิดปรับปรุง',
-    cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
+    cls: 'bg-warning/10 text-warning dark:bg-amber-950/60',
     icon: Clock,
   },
   feature: {
     label: 'ฟีเจอร์ใหม่',
-    cls: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
+    cls: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
     icon: Star,
   },
   promo: {
     label: 'โปรโมชั่น',
-    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
     icon: Gift,
   },
   urgent: {
     label: 'ด่วน',
-    cls: 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+    cls: 'bg-destructive/10 text-destructive dark:bg-red-950/60',
     icon: AlertCircle,
   },
 }
@@ -190,15 +191,15 @@ const ANN_STATUS_CONFIG: Record<
 > = {
   active: {
     label: 'กำลังแสดง',
-    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
   },
   scheduled: {
     label: 'กำหนดการ',
-    cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300',
+    cls: 'bg-primary/10 text-primary dark:bg-blue-950/60',
   },
   expired: {
     label: 'หมดอายุ',
-    cls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500',
+    cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
   },
 }
 
@@ -242,30 +243,30 @@ export function MarketingGrowth() {
       {/* === Announcements Section === */}
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-foreground">
             Global Announcements
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             ส่งข้อความประกาศขึ้นแบนเนอร์ด้านบนสุดสำหรับผู้ใช้ทุกคน
           </p>
         </div>
 
         {/* Compose Form */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-white flex items-center gap-2">
-            <Megaphone className="h-4 w-4 text-indigo-500" />
+        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900 space-y-4">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Megaphone className="h-4 w-4 text-primary" />
             สร้างประกาศใหม่
           </h3>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              <label className="text-xs font-medium text-muted-foreground">
                 ประเภท
               </label>
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as AnnouncementType)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="feature">ฟีเจอร์ใหม่</option>
                 <option value="maintenance">ปิดปรับปรุง</option>
@@ -274,20 +275,20 @@ export function MarketingGrowth() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              <label className="text-xs font-medium text-muted-foreground">
                 หมดอายุ
               </label>
               <input
                 type="date"
                 value={newExpires}
                 onChange={(e) => setNewExpires(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-xs font-medium text-muted-foreground">
               ข้อความประกาศ
             </label>
             <textarea
@@ -295,7 +296,7 @@ export function MarketingGrowth() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="พิมพ์ข้อความที่จะแสดงเป็นแบนเนอร์บนหน้าจอของผู้ใช้ทุกคน"
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
             />
           </div>
 
@@ -303,13 +304,13 @@ export function MarketingGrowth() {
             <button
               onClick={handleSendAnnouncement}
               disabled={!newMessage.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="h-4 w-4" />
               ส่งประกาศทันที
             </button>
             {sent && (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
                 <CheckCircle2 className="h-4 w-4" />
                 ส่งประกาศสำเร็จแล้ว
               </span>
@@ -329,8 +330,8 @@ export function MarketingGrowth() {
                 className={cn(
                   'rounded-xl border p-4',
                   ann.status === 'expired'
-                    ? 'border-slate-200 bg-slate-50/80 opacity-60 dark:border-slate-700/40 dark:bg-slate-900/40'
-                    : 'border-slate-200 bg-white dark:border-slate-700/60 dark:bg-slate-900',
+                    ? 'border-border bg-muted/80 opacity-60 dark:border-slate-700/40 dark:bg-slate-900/40'
+                    : 'border-border bg-card dark:border-slate-700/60 dark:bg-slate-900',
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -344,7 +345,7 @@ export function MarketingGrowth() {
                       <TypeIcon className="h-3 w-3" />
                       {tc.label}
                     </span>
-                    <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       {ann.message}
                     </p>
                   </div>
@@ -357,7 +358,7 @@ export function MarketingGrowth() {
                     {sc.label}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
+                <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
                   <span>ส่งเมื่อ {ann.sentAt}</span>
                   <span>หมดอายุ {ann.expiresAt}</span>
                   {ann.viewCount > 0 && (
@@ -376,10 +377,10 @@ export function MarketingGrowth() {
       {/* === Referral Engine Section === */}
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-foreground">
             Automated Referral Engine
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             ระบบการตลาดแบบบอกต่อ — ติดตามรหัสเชิญชวนและวันที่ต่ออายุแพ็กเกจฟรี
           </p>
         </div>
@@ -400,13 +401,13 @@ export function MarketingGrowth() {
             return (
               <div
                 key={item.label}
-                className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900"
+                className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Icon className="h-4 w-4 text-indigo-500" />
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
+                  <Icon className="h-4 w-4 text-primary" />
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
                 </div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {item.value}
                 </p>
               </div>
@@ -415,38 +416,38 @@ export function MarketingGrowth() {
         </div>
 
         {/* Referral Chart */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-white mb-4">
+        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-foreground mb-4">
             Referrals รายเดือน (ปี 2569)
           </h3>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={REFERRAL_CHART_DATA}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} strokeOpacity={0.5} />
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                tick={{ fontSize: 12, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: 11, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
                 formatter={(v) => [Number(v), 'Referrals']}
-                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                contentStyle={chartTooltipStyle}
               />
-              <Bar dataKey="referrals" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="referrals" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {/* Referral Table */}
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/60">
-          <table className="w-full text-sm bg-white dark:bg-slate-900">
+        <div className="overflow-x-auto rounded-xl border border-border/60">
+          <table className="w-full text-sm bg-card">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60">
+              <tr className="bg-muted/60">
                 {[
                   'ผู้แนะนำ',
                   'Tenant',
@@ -458,7 +459,7 @@ export function MarketingGrowth() {
                 ].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400 whitespace-nowrap"
+                    className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap"
                   >
                     {h}
                   </th>
@@ -469,37 +470,37 @@ export function MarketingGrowth() {
               {REFERRALS.map((r) => (
                 <tr
                   key={r.id}
-                  className="border-t border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                  className="border-t border-border/60 hover:bg-muted dark:hover:bg-slate-800/40 transition-colors"
                 >
                   <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    <p className="text-sm font-medium text-foreground">
                       {r.referrer}
                     </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">{r.email}</p>
+                    <p className="text-xs text-muted-foreground">{r.email}</p>
                   </td>
-                  <td className="px-4 py-3 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                  <td className="px-4 py-3 text-xs font-medium text-primary">
                     {r.tenant}
                   </td>
                   <td className="px-4 py-3">
-                    <code className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <code className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground dark:bg-slate-800 dark:text-slate-200">
                       {r.code}
                     </code>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                      <span className="text-sm font-bold text-primary">
                         {r.referrals}
                       </span>
-                      <span className="text-xs text-slate-400">คน</span>
+                      <span className="text-xs text-muted-foreground">คน</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      <Gift className="h-3.5 w-3.5 text-emerald-500" />
-                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                      <Gift className="h-3.5 w-3.5 text-success" />
+                      <span className="text-sm font-semibold text-success">
                         +{r.earnedDays}
                       </span>
-                      <span className="text-xs text-slate-400">วัน</span>
+                      <span className="text-xs text-muted-foreground">วัน</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -507,14 +508,14 @@ export function MarketingGrowth() {
                       className={cn(
                         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                         r.status === 'active'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                          : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500',
+                          ? 'bg-success/10 text-success dark:bg-emerald-950/60'
+                          : 'bg-muted text-muted-foreground dark:bg-slate-800',
                       )}
                     >
                       {r.status === 'active' ? 'Active' : 'Expired'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-400 dark:text-slate-500">
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
                     {r.lastReferral}
                   </td>
                 </tr>

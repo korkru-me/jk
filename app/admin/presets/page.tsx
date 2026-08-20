@@ -11,8 +11,8 @@ export default async function AdminPresetsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">สูตรสำเร็จ</h1>
-        <p className="text-sm text-gray-500 mt-1">{presets?.length ?? 0} สูตร (ใช้ใน Method 2)</p>
+        <h1 className="text-2xl font-bold text-foreground">สูตรสำเร็จ</h1>
+        <p className="text-sm text-muted-foreground mt-1">{presets?.length ?? 0} สูตร (ใช้ใน Method 2)</p>
       </div>
       <PresetsTable presets={(presets ?? []) as any} categories={categories ?? []} />
     </div>

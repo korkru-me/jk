@@ -26,17 +26,17 @@ function MetricPill({
       className={cn(
         'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
         ok
-          ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
-          : 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400',
+          ? 'bg-success/10 text-success dark:bg-success/20'
+          : 'bg-destructive/10 text-destructive dark:bg-destructive/20',
       )}
     >
       <span
         className={cn(
           'h-1.5 w-1.5 rounded-full',
-          ok ? 'bg-emerald-500 animate-pulse' : 'bg-red-500',
+          ok ? 'bg-success animate-pulse' : 'bg-destructive',
         )}
       />
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-muted-foreground">{label}</span>
       <span>{value}</span>
     </div>
   )
@@ -75,10 +75,10 @@ export function SuperTopbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-6 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-950/90">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/90 px-6 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-950/90">
       <div className="flex items-center gap-2">
-        <Server className="h-4 w-4 text-slate-400" />
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">
+        <Server className="h-4 w-4 text-muted-foreground" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Server Status
         </span>
         <div className="flex items-center gap-2 ml-3">
@@ -89,28 +89,28 @@ export function SuperTopbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-          <Activity className="h-3.5 w-3.5 text-emerald-500" />
-          <span className="font-semibold text-slate-700 dark:text-slate-200">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Activity className="h-3.5 w-3.5 text-success" />
+          <span className="font-semibold text-muted-foreground">
             {activeUsers.toLocaleString()}
           </span>
           <span>ผู้ใช้ออนไลน์</span>
         </div>
 
-        <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+        <div className="h-4 w-px bg-muted" />
 
-        <div className="flex items-center gap-1.5 text-xs font-mono text-slate-500 dark:text-slate-400">
-          <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+        <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground">
+          <Wifi className="h-3.5 w-3.5 text-success" />
           <span>{time}</span>
-          <span className="text-slate-400">ICT+7</span>
+          <span className="text-muted-foreground">ICT+7</span>
         </div>
 
-        <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+        <div className="h-4 w-px bg-muted" />
 
         {mounted && (
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-muted-foreground transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             {theme === 'dark' ? (
               <Sun className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function SuperTopbar() {
         )}
         {!mounted && <div className="h-8 w-8" />}
 
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
           SA
         </div>
       </div>

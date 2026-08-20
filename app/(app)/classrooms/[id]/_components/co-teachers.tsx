@@ -13,9 +13,9 @@ import {
 import type { CoTeacherPermission } from '@/lib/types'
 
 const PERM_CFG: Record<CoTeacherPermission, { label: string; desc: string; icon: typeof Crown; color: string }> = {
-  admin: { label: 'แอดมินเต็มตัว', desc: 'จัดการทุกอย่างได้', icon: Crown, color: 'text-amber-600' },
-  manage: { label: 'จัดการข้อสอบ', desc: 'สร้าง ตรวจ แก้ไขข้อสอบได้', icon: Shield, color: 'text-blue-600' },
-  view: { label: 'ดูได้อย่างเดียว', desc: 'ดูคะแนนและรายงาน', icon: Eye, color: 'text-gray-500' },
+  admin: { label: 'แอดมินเต็มตัว', desc: 'จัดการทุกอย่างได้', icon: Crown, color: 'text-warning' },
+  manage: { label: 'จัดการข้อสอบ', desc: 'สร้าง ตรวจ แก้ไขข้อสอบได้', icon: Shield, color: 'text-primary' },
+  view: { label: 'ดูได้อย่างเดียว', desc: 'ดูคะแนนและรายงาน', icon: Eye, color: 'text-muted-foreground' },
 }
 
 export interface CoTeacherRow {
@@ -91,22 +91,22 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
   return (
     <div className="space-y-4">
       {/* Owner */}
-      <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center font-bold text-amber-700 text-sm shrink-0">
+      <div className="bg-warning/10 border border-amber-100 rounded-2xl p-4 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center font-bold text-warning text-sm shrink-0">
           {ownerName.slice(0, 2)}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 text-sm">{ownerName}</p>
-          <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
+          <p className="font-semibold text-foreground text-sm">{ownerName}</p>
+          <p className="text-xs text-warning flex items-center gap-1 mt-0.5">
             <Crown className="w-3 h-3" /> เจ้าของห้องเรียน
           </p>
         </div>
       </div>
 
       {/* Co-teacher list */}
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-semibold text-gray-900">ผู้ช่วยสอน ({coTeachers.length} คน)</p>
+      <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <p className="text-sm font-semibold text-foreground">ผู้ช่วยสอน ({coTeachers.length} คน)</p>
           {canManage && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setShowInvite(!showInvite); setPendingLink(null) }}>
               <UserPlus className="w-3.5 h-3.5" /> เชิญผู้ช่วยสอน
@@ -116,14 +116,14 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
 
         {/* Invite form */}
         {showInvite && canManage && (
-          <div className="px-4 py-3 bg-blue-50/50 border-b border-gray-100 space-y-3">
+          <div className="px-4 py-3 bg-primary/10 border-b border-border space-y-3">
             {!pendingLink ? (
               <>
                 <div className="flex gap-2">
                   <select
                     value={invitePerm}
                     onChange={e => setInvitePerm(e.target.value as CoTeacherPermission)}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl outline-none bg-white"
+                    className="flex-1 px-3 py-2 text-sm border border-border rounded-xl outline-none bg-card"
                   >
                     {(Object.keys(PERM_CFG) as CoTeacherPermission[]).map(p => (
                       <option key={p} value={p}>{PERM_CFG[p].label}</option>
@@ -139,10 +139,10 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
               </>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs text-gray-500">ส่งลิงก์นี้ให้ครูที่ต้องการเชิญ (ผ่าน Line, Email ฯลฯ)</p>
-                <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-2.5">
-                  <Link2 className="w-4 h-4 text-gray-400 shrink-0" />
-                  <p className="text-xs text-gray-600 truncate flex-1 font-mono">{pendingLink}</p>
+                <p className="text-xs text-muted-foreground">ส่งลิงก์นี้ให้ครูที่ต้องการเชิญ (ผ่าน Line, Email ฯลฯ)</p>
+                <div className="flex items-center gap-2 bg-card border border-border rounded-xl p-2.5">
+                  <Link2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <p className="text-xs text-muted-foreground truncate flex-1 font-mono">{pendingLink}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" className="gap-1.5" onClick={() => copyLink(pendingLink, 'new')}>
@@ -157,20 +157,20 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
         )}
 
         {coTeachers.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400">ยังไม่มีผู้ช่วยสอน</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">ยังไม่มีผู้ช่วยสอน</p>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-border">
             {coTeachers.map(t => {
               const perm = PERM_CFG[t.permission]
               const PermIcon = perm.icon
               return (
-                <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors">
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center text-xs font-bold text-violet-700 shrink-0">
                     {t.fullName.slice(0, 2)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{t.fullName}</p>
-                    <p className="text-xs text-gray-400 truncate">{t.email}</p>
+                    <p className="text-sm font-medium text-foreground">{t.fullName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{t.email}</p>
                   </div>
                   {/* Permission dropdown */}
                   <div className="relative">
@@ -186,20 +186,20 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
                     {openPerm === t.id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setOpenPerm(null)} />
-                        <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-lg ring-1 ring-black/10 py-1 min-w-[180px]">
+                        <div className="absolute right-0 top-9 z-20 bg-card rounded-xl shadow-lg ring-1 ring-border py-1 min-w-[180px]">
                           {(Object.keys(PERM_CFG) as CoTeacherPermission[]).map(p => {
                             const cfg = PERM_CFG[p]
                             const Icon = cfg.icon
                             return (
                               <button
                                 key={p}
-                                className={`w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors ${t.permission === p ? 'bg-gray-50' : ''}`}
+                                className={`w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-accent transition-colors ${t.permission === p ? 'bg-muted' : ''}`}
                                 onClick={() => updatePerm(t.id, p)}
                               >
                                 <Icon className={`w-3.5 h-3.5 mt-0.5 ${cfg.color}`} />
                                 <div>
-                                  <p className="text-sm font-medium text-gray-800">{cfg.label}</p>
-                                  <p className="text-xs text-gray-400">{cfg.desc}</p>
+                                  <p className="text-sm font-medium text-foreground">{cfg.label}</p>
+                                  <p className="text-xs text-muted-foreground">{cfg.desc}</p>
                                 </div>
                               </button>
                             )
@@ -211,7 +211,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
                   {canManage && (
                     <button
                       onClick={() => removeTeacher(t.id)}
-                      className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-300 transition-colors"
+                      className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-gray-300 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -225,28 +225,28 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
 
       {/* Active invite links */}
       {canManage && invites.length > 0 && (
-        <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <p className="text-sm font-semibold text-gray-900">คำเชิญที่ยังไม่ถูกใช้ ({invites.length})</p>
+        <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-sm font-semibold text-foreground">คำเชิญที่ยังไม่ถูกใช้ ({invites.length})</p>
           </div>
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-border">
             {invites.map(inv => {
               const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/join-classroom?token=${inv.token}`
               return (
                 <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-mono text-gray-500 truncate">{link}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">สิทธิ์: {PERM_CFG[inv.permission].label}</p>
+                    <p className="text-xs font-mono text-muted-foreground truncate">{link}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">สิทธิ์: {PERM_CFG[inv.permission].label}</p>
                   </div>
                   <button
                     onClick={() => copyLink(link, inv.id)}
-                    className="w-7 h-7 rounded-lg hover:bg-blue-50 hover:text-blue-500 flex items-center justify-center text-gray-300 transition-colors"
+                    className="w-7 h-7 rounded-lg hover:bg-primary/10 hover:text-primary flex items-center justify-center text-gray-300 transition-colors"
                   >
                     {copied === inv.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                   <button
                     onClick={() => handleRevoke(inv.id)}
-                    className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-300 transition-colors"
+                    className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-gray-300 transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>

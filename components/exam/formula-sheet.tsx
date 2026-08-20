@@ -13,8 +13,8 @@ const SECTIONS = [
     id: 'mechanics',
     title: 'กลศาสตร์คลาสสิก',
     icon: '🔵',
-    color: 'border-blue-500/20 bg-blue-500/5',
-    badge: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+    color: 'border-primary/20 bg-primary/5',
+    badge: 'bg-primary/15 text-primary',
     entries: [
       {
         name: 'กฎข้อสองของนิวตัน',
@@ -196,7 +196,7 @@ export function FormulaSheet({ onClose }: FormulaSheetProps) {
               onClick={() => setTab(t)}
               className={`pb-2.5 px-3 text-sm font-medium border-b-2 transition-colors ${
                 tab === t
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -251,7 +251,7 @@ export function FormulaSheet({ onClose }: FormulaSheetProps) {
                   key={i}
                   className="flex items-center gap-3 px-3 py-2.5 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors"
                 >
-                  <span className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400 w-8 shrink-0 text-center">
+                  <span className="font-mono font-bold text-sm text-primary w-8 shrink-0 text-center">
                     {c.symbol}
                   </span>
                   <div className="flex-1 min-w-0">

@@ -58,7 +58,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-card border rounded-2xl p-4 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <BookOpen size={18} className="text-blue-600 dark:text-blue-400" />
+            <BookOpen size={18} className="text-primary" />
             <span className="text-xl font-black">{assignments.length}</span>
           </div>
           <p className="text-xs text-muted-foreground">งานที่มอบหมายทั้งหมด</p>
@@ -66,7 +66,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         <div className="bg-card border rounded-2xl p-4 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-2xl">✅</span>
-            <span className="text-xl font-black text-green-600 dark:text-green-400">{doneCount}</span>
+            <span className="text-xl font-black text-success">{doneCount}</span>
           </div>
           <p className="text-xs text-muted-foreground">ส่งงานแล้ว</p>
         </div>

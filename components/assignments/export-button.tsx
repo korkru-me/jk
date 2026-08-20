@@ -29,7 +29,7 @@ export function ExportButton({ submissions, title }: { submissions: Submission[]
         a.click()
         URL.revokeObjectURL(url)
       }}
-      className="text-sm px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+      className="text-sm px-3 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
     >
       ⬇️ Export CSV
     </button>

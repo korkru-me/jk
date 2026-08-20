@@ -6,12 +6,12 @@ type EventType = 'join' | 'submit' | 'edit' | 'login' | 'notify' | 'remove' | 'u
 interface LogEvent { id: string; type: EventType; message: string; time: string; actor: string }
 
 const ICON_MAP: Record<EventType, { icon: typeof UserPlus; color: string; bg: string }> = {
-  join:   { icon: UserPlus,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  submit: { icon: CheckSquare, color: 'text-blue-600',    bg: 'bg-blue-50' },
+  join:   { icon: UserPlus,    color: 'text-success', bg: 'bg-success/10' },
+  submit: { icon: CheckSquare, color: 'text-primary',    bg: 'bg-primary/10' },
   edit:   { icon: FileEdit,    color: 'text-violet-600',  bg: 'bg-violet-50' },
-  login:  { icon: LogIn,       color: 'text-gray-500',    bg: 'bg-gray-100' },
-  notify: { icon: Bell,        color: 'text-amber-600',   bg: 'bg-amber-50' },
-  remove: { icon: Trash2,      color: 'text-red-500',     bg: 'bg-red-50' },
+  login:  { icon: LogIn,       color: 'text-muted-foreground',    bg: 'bg-muted' },
+  notify: { icon: Bell,        color: 'text-warning',   bg: 'bg-warning/10' },
+  remove: { icon: Trash2,      color: 'text-destructive',     bg: 'bg-destructive/10' },
   upload: { icon: Upload,      color: 'text-teal-600',    bg: 'bg-teal-50' },
 }
 
@@ -28,17 +28,17 @@ const MOCK_EVENTS: LogEvent[] = [
 
 export function AuditLog() {
   return (
-    <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <p className="text-sm font-semibold text-gray-900">ประวัติกิจกรรม</p>
-        <span className="text-xs text-gray-400">{MOCK_EVENTS.length} รายการ</span>
+    <div className="bg-card rounded-2xl ring-1 ring-border overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <p className="text-sm font-semibold text-foreground">ประวัติกิจกรรม</p>
+        <span className="text-xs text-muted-foreground">{MOCK_EVENTS.length} รายการ</span>
       </div>
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-border">
         {MOCK_EVENTS.map((event, i) => {
           const cfg = ICON_MAP[event.type]
           const Icon = cfg.icon
           return (
-            <div key={event.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors">
+            <div key={event.id} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
               {/* Icon */}
               <div className={`w-7 h-7 rounded-lg ${cfg.bg} flex items-center justify-center shrink-0 mt-0.5`}>
                 <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
@@ -46,13 +46,13 @@ export function AuditLog() {
               {/* Timeline line */}
               <div className="relative flex-1 min-w-0">
                 {i < MOCK_EVENTS.length - 1 && (
-                  <div className="absolute -left-[22px] top-7 w-px h-full bg-gray-100" />
+                  <div className="absolute -left-[22px] top-7 w-px h-full bg-muted" />
                 )}
-                <p className="text-sm text-gray-800 leading-snug">
+                <p className="text-sm text-foreground leading-snug">
                   <span className="font-semibold">{event.actor}</span>{' '}
                   {event.message}
                 </p>
-                <p className="text-[11px] text-gray-400 mt-0.5">{event.time}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{event.time}</p>
               </div>
             </div>
           )

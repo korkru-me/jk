@@ -39,8 +39,8 @@ export default async function AdminUsersPage({ searchParams }: Props) {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">ผู้ใช้</h1>
-        <p className="text-sm text-gray-500 mt-1">{users?.length ?? 0} คน</p>
+        <h1 className="text-2xl font-bold text-foreground">ผู้ใช้</h1>
+        <p className="text-sm text-muted-foreground mt-1">{users?.length ?? 0} คน</p>
       </div>
       <UsersFilter />
       <UsersTable users={usersWithCount as any} />

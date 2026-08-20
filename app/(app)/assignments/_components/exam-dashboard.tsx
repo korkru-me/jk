@@ -41,8 +41,8 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
       {assignments.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-card border rounded-2xl p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-amber-500" />
+            <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-warning" />
             </div>
             <div>
               <p className="text-2xl font-bold leading-none">{pendingCount}</p>
@@ -50,8 +50,8 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
             </div>
           </div>
           <div className="bg-card border rounded-2xl p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-950 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <div className="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-success" />
             </div>
             <div>
               <p className="text-2xl font-bold leading-none">{doneCount}</p>
@@ -88,7 +88,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
             const isInProgress = hasInProgress[a.id] ?? false
             const canRetry = !isInProgress && isDone && (a.max_attempts == null || used < a.max_attempts)
             return (
-              <div key={a.id} className="bg-card border rounded-2xl p-4 hover:border-blue-300 dark:hover:border-blue-800 transition-colors">
+              <div key={a.id} className="bg-card border rounded-2xl p-4 hover:border-primary/20 dark:hover:border-blue-800 transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold">{a.title}</p>
@@ -106,20 +106,20 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                       )}
                       <Link
                         href={`/assignments/${a.id}/take`}
-                        className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 bg-amber-500 hover:bg-amber-600 text-white border-0')}
+                        className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 bg-warning hover:bg-warning/90 text-white border-0')}
                       >
                         ▶ ทำต่อ
                       </Link>
                     </div>
                   ) : canRetry ? (
                     <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">ส่งแล้ว ✓</p>
+                      <p className="text-xs text-success font-medium">ส่งแล้ว ✓</p>
                       {canShowResults && sub.total_score != null && (
                         <p className="text-lg font-bold">{sub.total_score}/{sub.max_score}</p>
                       )}
                       <Link
                         href={`/assignments/${a.id}/take`}
-                        className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 bg-amber-500 hover:bg-amber-600 text-white border-0')}
+                        className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 bg-warning hover:bg-warning/90 text-white border-0')}
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         ลองใหม่{a.max_attempts != null && ` (เหลือ ${a.max_attempts - used} ครั้ง)`}
@@ -127,7 +127,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                     </div>
                   ) : isDone ? (
                     <div className="text-right shrink-0">
-                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">ส่งแล้ว ✓</p>
+                      <p className="text-xs text-success font-medium">ส่งแล้ว ✓</p>
                       {canShowResults && sub.total_score != null && (
                         <p className="text-lg font-bold">{sub.total_score}/{sub.max_score}</p>
                       )}

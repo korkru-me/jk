@@ -16,7 +16,7 @@ export function ClassroomMembers({ classroomId, students, isTeacher }: Classroom
   return (
     <div className="space-y-2">
       {students.length === 0 && (
-        <p className="text-sm text-gray-400 py-4 text-center">ยังไม่มีนักเรียนในห้องเรียนนี้</p>
+        <p className="text-sm text-muted-foreground py-4 text-center">ยังไม่มีนักเรียนในห้องเรียนนี้</p>
       )}
       {students.map((s) => (
         <StudentRow
@@ -61,19 +61,19 @@ function StudentRow({
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl">
-      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm font-bold shrink-0">
+    <div className="flex items-center gap-3 px-4 py-3 bg-card border border-border rounded-xl">
+      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold shrink-0">
         {student.full_name.charAt(0)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">{student.full_name}</p>
-        <p className="text-xs text-gray-400 truncate">{student.email}</p>
+        <p className="text-sm font-medium text-foreground">{student.full_name}</p>
+        <p className="text-xs text-muted-foreground truncate">{student.email}</p>
       </div>
       {isTeacher ? (
         <button
           onClick={handleRemove}
           disabled={isPending}
-          className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+          className="text-xs text-destructive hover:text-destructive/80 disabled:opacity-40"
         >
           นำออก
         </button>
@@ -81,7 +81,7 @@ function StudentRow({
         <button
           onClick={handleLeave}
           disabled={isPending}
-          className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+          className="text-xs text-destructive hover:text-destructive/80 disabled:opacity-40"
         >
           ออก
         </button>

@@ -84,7 +84,7 @@ export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: 
       >
         <Bell size={17} />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -95,7 +95,7 @@ export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: 
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
             >
               <CheckCheck size={12} /> อ่านทั้งหมด
             </button>
@@ -112,7 +112,7 @@ export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: 
           {!loading && notifications.map(n => {
             const row = (
               <div
-                className={`px-3 py-2.5 border-b last:border-b-0 hover:bg-muted transition-colors ${!n.is_read ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}
+                className={`px-3 py-2.5 border-b last:border-b-0 hover:bg-muted transition-colors ${!n.is_read ? 'bg-primary/10' : ''}`}
               >
                 <p className="text-sm font-medium leading-snug">{n.title}</p>
                 {n.body && <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.body}</p>}

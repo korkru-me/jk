@@ -263,13 +263,13 @@ function StudentDashboard({
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold flex items-center gap-2">
-              <BookOpen size={16} className="text-blue-600 dark:text-blue-400" />
+              <BookOpen size={16} className="text-primary" />
               ชุดข้อสอบที่รอทำ
-              <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 {pendingAssignments.length}
               </span>
             </h2>
-            <Link href="/assignments" className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+            <Link href="/assignments" className="text-sm text-primary hover:underline flex items-center gap-1">
               ดูทั้งหมด <ChevronRight size={14} />
             </Link>
           </div>
@@ -286,7 +286,7 @@ function StudentDashboard({
           <p className="text-sm text-muted-foreground mt-1">ไม่มีชุดข้อสอบที่ค้างอยู่ในตอนนี้</p>
         </div>
       ) : (
-        <div className="bg-card border-2 border-dashed border-blue-200 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-950/20 rounded-2xl p-10 text-center">
+        <div className="bg-card border-2 border-dashed border-primary/20 bg-primary/10 dark:bg-blue-950/20 rounded-2xl p-10 text-center">
           <p className="text-4xl mb-3">🏫</p>
           <h3 className="font-semibold mb-1">เข้าร่วมห้องเรียนแรกของคุณ</h3>
           <p className="text-sm text-muted-foreground mb-4">ขอรหัส Class Code จากครู แล้วกรอกในหน้าห้องเรียน</p>
@@ -354,10 +354,10 @@ function StatCard({
   accent?: 'blue' | 'green' | 'amber' | 'red'
 }) {
   const accentClass = {
-    blue: 'text-blue-600 dark:text-blue-400',
-    green: 'text-green-600 dark:text-green-400',
-    amber: 'text-amber-600 dark:text-amber-400',
-    red: 'text-red-600 dark:text-red-400',
+    blue: 'text-primary',
+    green: 'text-success',
+    amber: 'text-warning',
+    red: 'text-destructive',
   }[accent]
 
   const inner = (
@@ -380,9 +380,9 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
 
-  if (diff < 0) return { label: 'เลยกำหนด', urgent: true, color: 'text-red-600 dark:text-red-400' }
+  if (diff < 0) return { label: 'เลยกำหนด', urgent: true, color: 'text-destructive' }
   if (hours < 24) return { label: `อีก ${hours} ชม.`, urgent: true, color: 'text-orange-600 dark:text-orange-400' }
-  if (days <= 2) return { label: `อีก ${days} วัน`, urgent: true, color: 'text-amber-600 dark:text-amber-400' }
+  if (days <= 2) return { label: `อีก ${days} วัน`, urgent: true, color: 'text-warning' }
   return {
     label: new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' }),
     urgent: false,
@@ -433,7 +433,7 @@ function AssignmentCard({ assignment: a }: { assignment: any }) {
           buttonVariants({ size: 'sm' }),
           'w-full justify-center gap-1 text-xs',
           a.inProgress
-            ? 'bg-amber-500 hover:bg-amber-600 text-white border-0'
+            ? 'bg-warning hover:bg-warning/90 text-white border-0'
             : ''
         )}
       >

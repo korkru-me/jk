@@ -26,8 +26,8 @@ const PreviewModal = dynamic(
 
 export const MOCK_TEACHERS: Teacher[] = [
   { id: 't1', name: 'ครูพัชรีญา ส่งแสง', initials: 'พ', color: 'bg-pink-100 text-pink-700' },
-  { id: 't2', name: 'ครูวิชัย สมบูรณ์',  initials: 'ว', color: 'bg-blue-100 text-blue-700' },
-  { id: 't3', name: 'ครูสุภาพร ใจดี',    initials: 'ส', color: 'bg-green-100 text-green-700' },
+  { id: 't2', name: 'ครูวิชัย สมบูรณ์',  initials: 'ว', color: 'bg-primary/10 text-primary' },
+  { id: 't3', name: 'ครูสุภาพร ใจดี',    initials: 'ส', color: 'bg-success/10 text-success' },
 ]
 
 const TAGS = ['อนุภาคมูลฐาน', 'กลศาสตร์', 'เวกเตอร์', 'คลื่น', 'ไฟฟ้า', 'แม่เหล็ก', 'ควอนตัม', 'สัมพัทธภาพ']
@@ -104,8 +104,8 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
         {/* Header */}
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">คลังโจทย์ของฉัน</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-xl font-bold text-foreground">คลังโจทย์ของฉัน</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
               {scope === 'team'
                 ? `${filteredTeam.length} โจทย์`
                 : scope === 'all'
@@ -146,7 +146,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
               onClick={() => setScope(opt.value)}
               className={cn(
                 'flex items-center gap-1.5 rounded-md px-2.5 h-[26px] text-sm font-medium transition-all',
-                scope === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-foreground/60 hover:text-foreground'
+                scope === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-foreground/60 hover:text-foreground/80'
               )}
             >
               {opt.value === 'team' && <Users className="w-3.5 h-3.5" />}
@@ -154,7 +154,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
               {opt.count > 0 && (
                 <span className={cn(
                   'text-[10px] font-bold rounded-full px-1.5 leading-[18px]',
-                  scope === opt.value ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
+                  scope === opt.value ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
                 )}>
                   {opt.count}
                 </span>
@@ -165,22 +165,22 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
 
         {(scope === 'all' || scope === 'mine') && (
           <div className="space-y-4">
-            {scope === 'all' && <h2 className="text-sm font-semibold text-gray-700">โจทย์ของฉัน</h2>}
+            {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">โจทย์ของฉัน</h2>}
 
         {/* Search + controls */}
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 bg-white"
+              className="pl-9 bg-card"
             />
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -191,27 +191,27 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
             variant="outline"
             size="sm"
             onClick={() => setShowFilters(f => !f)}
-            className={`gap-1.5 shrink-0 ${showFilters || activeFilterCount > 0 ? 'border-blue-400 bg-blue-50 text-blue-600' : ''}`}
+            className={`gap-1.5 shrink-0 ${showFilters || activeFilterCount > 0 ? 'border-primary bg-primary/10 text-primary' : ''}`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             กรอง
             {activeFilterCount > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] font-bold rounded-full px-1.5 leading-[18px]">
+              <span className="bg-primary text-white text-[10px] font-bold rounded-full px-1.5 leading-[18px]">
                 {activeFilterCount}
               </span>
             )}
           </Button>
 
-          <div className="flex gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          <div className="flex gap-0.5 bg-muted rounded-lg p-0.5">
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-muted-foreground'}`}
             >
               <LayoutList className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-muted-foreground'}`}
             >
               <Grid3x3 className="w-4 h-4" />
             </button>
@@ -220,10 +220,10 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
 
         {/* Expanded filter panel */}
         {showFilters && (
-          <div className="bg-white rounded-2xl ring-1 ring-black/5 p-4 space-y-4">
+          <div className="bg-card rounded-2xl ring-1 ring-border p-4 space-y-4">
             <div className="flex gap-8 flex-wrap">
               <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">ระดับความยาก</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">ระดับความยาก</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {['all', 'easy', 'medium', 'hard', 'analytical'].map(d => (
                     <button
@@ -232,7 +232,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         diffFilter === d
                           ? 'bg-gray-900 text-white border-gray-900'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          : 'border-border text-muted-foreground hover:border-ring'
                       }`}
                     >
                       {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.label ?? d}
@@ -242,7 +242,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">รูปแบบโจทย์</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">รูปแบบโจทย์</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {['all', ...Object.keys(TYPE_LABEL)].map(t => (
                     <button
@@ -251,7 +251,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         typeFilter === t
                           ? 'bg-gray-900 text-white border-gray-900'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          : 'border-border text-muted-foreground hover:border-ring'
                       }`}
                     >
                       {t === 'all' ? 'ทั้งหมด' : TYPE_LABEL[t]}
@@ -262,7 +262,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
+              <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
                 <Tag className="w-3 h-3" /> แท็ก
               </p>
               <div className="flex gap-1.5 flex-wrap">
@@ -272,8 +272,8 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                     onClick={() => setActiveTag(activeTag === tag ? null : tag)}
                     className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
                       activeTag === tag
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600'
+                        ? 'bg-primary text-white border-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/20 hover:text-primary'
                     }`}
                   >
                     #{tag}
@@ -285,7 +285,7 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
             {activeFilterCount > 0 && (
               <button
                 onClick={() => { setDiffFilter('all'); setTypeFilter('all'); setActiveTag(null) }}
-                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 transition-colors"
+                className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
               >
                 <X className="w-3 h-3" /> ล้างตัวกรองทั้งหมด
               </button>
@@ -296,23 +296,23 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
         {/* Active filter chips */}
         {activeFilterCount > 0 && !showFilters && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-gray-400">กรองโดย:</span>
+            <span className="text-xs text-muted-foreground">กรองโดย:</span>
             {diffFilter !== 'all' && (
-              <span className="flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
                 {DIFF_META[diffFilter]?.label}
-                <button onClick={() => setDiffFilter('all')} className="hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setDiffFilter('all')} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
             {typeFilter !== 'all' && (
-              <span className="flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
                 {TYPE_LABEL[typeFilter]}
-                <button onClick={() => setTypeFilter('all')} className="hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setTypeFilter('all')} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
             {activeTag && (
-              <span className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">
                 #{activeTag}
-                <button onClick={() => setActiveTag(null)} className="hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setActiveTag(null)} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
           </div>
@@ -322,10 +322,10 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
         {questions.length === 0 ? (
           <EmptyState />
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl ring-1 ring-black/5">
+          <div className="text-center py-16 bg-card rounded-2xl ring-1 ring-border">
             <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
-            <p className="text-sm text-gray-400 mt-1">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
+            <p className="text-muted-foreground font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
+            <p className="text-sm text-muted-foreground mt-1">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
           </div>
         ) : (
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'space-y-2.5'}>
@@ -346,14 +346,14 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
 
         {(scope === 'all' || scope === 'team') && (
           <div className="space-y-4">
-            {scope === 'all' && <h2 className="text-sm font-semibold text-gray-700">โจทย์ที่แชร์ในทีม</h2>}
+            {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">โจทย์ที่แชร์ในทีม</h2>}
             {!hasTeamOrg ? (
-              <div className="text-center py-24 bg-white rounded-2xl ring-1 ring-black/5">
-                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-blue-400" />
+              <div className="text-center py-24 bg-card rounded-2xl ring-1 ring-border">
+                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">ยังไม่มีทีม</h3>
-                <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">สร้างหรือเข้าร่วมทีมก่อน เพื่อดูโจทย์ที่เพื่อนครูแชร์ไว้</p>
+                <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีทีม</h3>
+                <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">สร้างหรือเข้าร่วมทีมก่อน เพื่อดูโจทย์ที่เพื่อนครูแชร์ไว้</p>
                 <Link href="/settings/team">
                   <Button className="gap-2 shadow-sm">ไปที่หน้าทีมของฉัน</Button>
                 </Link>
@@ -362,17 +362,17 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
               <>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
                       value={teamSearch}
                       onChange={e => setTeamSearch(e.target.value)}
-                      className="pl-9 bg-white"
+                      className="pl-9 bg-card"
                     />
                   </div>
                   {hasMultipleTeams && (
                     <Select value={teamFilter} onValueChange={(v) => v !== null && setTeamFilter(v)}>
-                      <SelectTrigger className="bg-white">
+                      <SelectTrigger className="bg-card">
                         <SelectValue placeholder="ทุกทีม">
                           {teamFilter === 'all' ? 'ทุกทีม' : myTeams.find(t => t.id === teamFilter)?.name ?? 'ทุกทีม'}
                         </SelectValue>
@@ -388,17 +388,17 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
                 </div>
 
                 {teamQuestions.length === 0 ? (
-                  <div className="text-center py-24 bg-white rounded-2xl ring-1 ring-black/5">
-                    <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-8 h-8 text-blue-400" />
+                  <div className="text-center py-24 bg-card rounded-2xl ring-1 ring-border">
+                    <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-primary" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">ยังไม่มีโจทย์ที่แชร์ในทีม</h3>
-                    <p className="text-sm text-gray-500 max-w-xs mx-auto">เมื่อสมาชิกในทีมสร้างโจทย์และเลือก &ldquo;ทีมของฉัน&rdquo; โจทย์จะปรากฏที่นี่</p>
+                    <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีโจทย์ที่แชร์ในทีม</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">เมื่อสมาชิกในทีมสร้างโจทย์และเลือก &ldquo;ทีมของฉัน&rdquo; โจทย์จะปรากฏที่นี่</p>
                   </div>
                 ) : filteredTeam.length === 0 ? (
-                  <div className="text-center py-16 bg-white rounded-2xl ring-1 ring-black/5">
+                  <div className="text-center py-16 bg-card rounded-2xl ring-1 ring-border">
                     <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
+                    <p className="text-muted-foreground font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -429,19 +429,19 @@ export function QuestionBankClient({ questions, teamQuestions, hasTeamOrg, hasMu
 function PreviewLoadingOverlay() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-label="กำลังโหลดตัวอย่างโจทย์">
-      <div className="h-80 w-full max-w-2xl animate-pulse rounded-2xl bg-white" />
+      <div className="h-80 w-full max-w-2xl animate-pulse rounded-2xl bg-card" />
     </div>
   )
 }
 
 function EmptyState() {
   return (
-    <div className="text-center py-24 bg-white rounded-2xl ring-1 ring-black/5">
-      <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-        <BookOpen className="w-8 h-8 text-blue-400" />
+    <div className="text-center py-24 bg-card rounded-2xl ring-1 ring-border">
+      <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <BookOpen className="w-8 h-8 text-primary" />
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-1">ยังไม่มีโจทย์ในคลัง</h3>
-      <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">เริ่มสร้างโจทย์แรกเพื่อสร้างคลังข้อสอบฟิสิกส์</p>
+      <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีโจทย์ในคลัง</h3>
+      <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">เริ่มสร้างโจทย์แรกเพื่อสร้างคลังข้อสอบฟิสิกส์</p>
       <Link href="/questions/new">
         <Button className="gap-2 shadow-sm">
           <Plus className="w-4 h-4" /> สร้างโจทย์แรก
@@ -467,19 +467,19 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
   const canEdit = isOwner || q.team_edit_allowed
 
   return (
-    <div className="bg-white rounded-2xl ring-1 ring-black/5 hover:ring-blue-200 transition-all p-4">
+    <div className="bg-card rounded-2xl ring-1 ring-border hover:ring-blue-200 transition-all p-4">
       <div className="flex items-center gap-1.5 flex-wrap mb-2">
         {isGroup && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">📚 หลายขั้นตอน</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
         )}
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.color}`}>
           {diff?.label}
         </span>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
           {TYPE_LABEL[q.question_type] ?? q.question_type}
         </span>
         {q.question_categories?.name && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
             {q.question_categories.name}
           </span>
         )}
@@ -497,28 +497,28 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
 
       <button
         onClick={onPreview}
-        className="text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors text-left line-clamp-1 w-full"
+        className="text-sm font-semibold text-foreground hover:text-primary transition-colors text-left line-clamp-1 w-full"
       >
         {q.title}
       </button>
-      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{q.question_text}</p>
+      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{q.question_text}</p>
 
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
-        <span className="text-xs text-gray-400">
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+        <span className="text-xs text-muted-foreground">
           โดย {q.users?.full_name || 'ไม่ทราบชื่อ'}
         </span>
         <div className="flex items-center gap-1.5">
           {canEdit && (
             <Link
               href={isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit?tab=team`}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground bg-muted hover:bg-accent rounded-lg transition-all"
             >
               <Edit2 className="w-3.5 h-3.5" /> แก้ไข
             </Link>
           )}
           <button
             onClick={onPreview}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/10 rounded-lg transition-all"
           >
             <Eye className="w-3.5 h-3.5" /> ดูตัวอย่าง
           </button>

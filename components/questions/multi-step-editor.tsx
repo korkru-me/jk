@@ -230,8 +230,8 @@ export function MultiStepEditor({
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Group header */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
-        <h2 className="font-semibold text-gray-800">ข้อมูลชุดโจทย์</h2>
+      <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+        <h2 className="font-semibold text-foreground">ข้อมูลชุดโจทย์</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2 space-y-1.5">
@@ -280,9 +280,9 @@ export function MultiStepEditor({
               </SelectContent>
             </Select>
             {teamChecked && teams.length === 0 && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 สร้างทีมก่อนเพื่อใช้งาน —{' '}
-                <a href="/settings/team" className="text-blue-600 hover:underline">ไปที่หน้าทีมของฉัน</a>
+                <a href="/settings/team" className="text-primary hover:underline">ไปที่หน้าทีมของฉัน</a>
               </p>
             )}
             {visibility === 'organization' && teams.length > 1 && (
@@ -297,7 +297,7 @@ export function MultiStepEditor({
             {visibility === 'organization' && (
               <div className="flex items-center gap-2 pt-2">
                 <ToggleSwitch checked={teamEditAllowed} onChange={setTeamEditAllowed} disabled={!isOwner} />
-                <span className="text-xs text-gray-600">อนุญาตให้เพื่อนในทีมแก้ไขชุดโจทย์นี้ได้</span>
+                <span className="text-xs text-muted-foreground">อนุญาตให้เพื่อนในทีมแก้ไขชุดโจทย์นี้ได้</span>
               </div>
             )}
           </div>
@@ -335,7 +335,7 @@ export function MultiStepEditor({
       {/* Sub-questions */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">ข้อย่อย ({subQuestions.length} ข้อ)</h2>
+          <h2 className="font-semibold text-foreground">ข้อย่อย ({subQuestions.length} ข้อ)</h2>
           <Button type="button" variant="outline" size="sm" onClick={addSubQuestion}>
             + เพิ่มข้อย่อย
           </Button>
@@ -359,9 +359,9 @@ export function MultiStepEditor({
       </div>
 
       {/* Preview section */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-800">ดูตัวอย่างเฉลย</h2>
+          <h2 className="font-semibold text-foreground">ดูตัวอย่างเฉลย</h2>
           <Button type="button" variant="outline" size="sm" onClick={handlePreview}>
             {previewResults ? '🔁 สุ่มชุดใหม่' : '👁 ดูเฉลย'}
           </Button>
@@ -370,18 +370,18 @@ export function MultiStepEditor({
         {previewResults && (
           <div className="space-y-3">
             {previewResults.map((result, i) => (
-              <div key={i} className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs font-semibold text-gray-500 mb-2">ข้อย่อยที่ {i + 1}</p>
+              <div key={i} className="bg-muted rounded-lg p-3">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">ข้อย่อยที่ {i + 1}</p>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {Object.entries(result.values).map(([name, val]) => (
-                    <span key={name} className="text-xs bg-white border border-gray-200 px-2 py-1 rounded font-mono">
+                    <span key={name} className="text-xs bg-card border border-border px-2 py-1 rounded font-mono">
                       {name} = {val}
                     </span>
                   ))}
                 </div>
                 <p className="text-sm">
-                  <span className="text-gray-500">คำตอบ: </span>
-                  <span className="font-semibold text-blue-700">
+                  <span className="text-muted-foreground">คำตอบ: </span>
+                  <span className="font-semibold text-primary">
                     {typeof result.answer === 'number'
                       ? result.answer.toLocaleString('th-TH', { maximumSignificantDigits: 6 })
                       : result.answer}
@@ -403,7 +403,7 @@ export function MultiStepEditor({
           ยกเลิก
         </Button>
         {mode === 'edit' && groupId && (
-          <Button type="button" variant="ghost" onClick={handleDelete} disabled={isPending} className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50">
+          <Button type="button" variant="ghost" onClick={handleDelete} disabled={isPending} className="ml-auto text-destructive hover:text-destructive/80 hover:bg-destructive/10">
             ลบชุดโจทย์นี้
           </Button>
         )}
@@ -442,10 +442,10 @@ function SubQuestionCard({
   const availableReferences = Array.from({ length: index }, (_, i) => i + 1)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       {/* Card header */}
       <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted transition-colors"
         onClick={onToggle}
       >
         <div className="flex flex-col gap-0.5">
@@ -453,7 +453,7 @@ function SubQuestionCard({
             type="button"
             onClick={(e) => { e.stopPropagation(); onMove('up') }}
             disabled={index === 0}
-            className="text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs leading-none"
+            className="text-muted-foreground hover:text-muted-foreground disabled:opacity-20 text-xs leading-none"
           >
             ▲
           </button>
@@ -461,22 +461,22 @@ function SubQuestionCard({
             type="button"
             onClick={(e) => { e.stopPropagation(); onMove('down') }}
             disabled={index === total - 1}
-            className="text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs leading-none"
+            className="text-muted-foreground hover:text-muted-foreground disabled:opacity-20 text-xs leading-none"
           >
             ▼
           </button>
         </div>
 
-        <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">
+        <div className="w-7 h-7 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center shrink-0">
           {index + 1}
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800 truncate">
-            {sq.question_text || <span className="text-gray-400 italic">ยังไม่ได้กรอกคำถาม</span>}
+          <p className="text-sm font-medium text-foreground truncate">
+            {sq.question_text || <span className="text-muted-foreground italic">ยังไม่ได้กรอกคำถาม</span>}
           </p>
           {sq.answer_formula && (
-            <p className="text-xs text-gray-400 font-mono truncate">= {sq.answer_formula}</p>
+            <p className="text-xs text-muted-foreground font-mono truncate">= {sq.answer_formula}</p>
           )}
         </div>
 
@@ -484,17 +484,17 @@ function SubQuestionCard({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="text-xs text-red-400 hover:text-red-600 px-2 py-1 hover:bg-red-50 rounded"
+            className="text-xs text-destructive hover:text-destructive/80 px-2 py-1 hover:bg-destructive/10 rounded"
           >
             ลบ
           </button>
-          <span className="text-gray-400 text-sm">{isExpanded ? '▲' : '▼'}</span>
+          <span className="text-muted-foreground text-sm">{isExpanded ? '▲' : '▼'}</span>
         </div>
       </div>
 
       {/* Card body */}
       {isExpanded && (
-        <div className="border-t border-gray-100 p-5 space-y-5">
+        <div className="border-t border-border p-5 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2 space-y-1.5">
               <Label>คำถาม *</Label>

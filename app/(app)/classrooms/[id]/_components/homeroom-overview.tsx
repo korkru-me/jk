@@ -79,21 +79,21 @@ export function StudentProfilePanel({ profile }: { profile?: StudentProfileRow }
   const hasAny = rows.some(([, v]) => !!v)
 
   return (
-    <div className="bg-blue-50/60 rounded-xl p-3">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-blue-700 uppercase tracking-wide mb-2">
+    <div className="bg-primary/10 rounded-xl p-3">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">
         <IdCard className="w-3 h-3" /> ข้อมูลส่วนตัว (จากหน้าตั้งค่าของนักเรียน)
       </div>
       {hasAny ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
           {rows.filter(([, v]) => !!v).map(([label, value]) => (
             <div key={label}>
-              <p className="text-[10px] text-gray-400">{label}</p>
-              <p className="text-sm text-gray-800 truncate">{value}</p>
+              <p className="text-[10px] text-muted-foreground">{label}</p>
+              <p className="text-sm text-foreground truncate">{value}</p>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-400">นักเรียนยังไม่ได้กรอกข้อมูลส่วนตัว</p>
+        <p className="text-xs text-muted-foreground">นักเรียนยังไม่ได้กรอกข้อมูลส่วนตัว</p>
       )}
     </div>
   )
@@ -130,21 +130,21 @@ function StudentNotesPanel({
   }
 
   return (
-    <div className="bg-gray-50 rounded-xl p-3 space-y-2.5">
+    <div className="bg-muted rounded-xl p-3 space-y-2.5">
       {notes.length === 0 ? (
-        <p className="text-xs text-gray-400">ยังไม่มีบันทึกสำหรับนักเรียนคนนี้</p>
+        <p className="text-xs text-muted-foreground">ยังไม่มีบันทึกสำหรับนักเรียนคนนี้</p>
       ) : (
         <div className="space-y-2">
           {notes.map(n => (
-            <div key={n.id} className="flex items-start justify-between gap-2 bg-white rounded-lg px-3 py-2 ring-1 ring-black/5">
+            <div key={n.id} className="flex items-start justify-between gap-2 bg-card rounded-lg px-3 py-2 ring-1 ring-border">
               <div className="min-w-0">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{n.body}</p>
-                <p className="text-[10px] text-gray-400 mt-1">{n.author_name} · {formatDateTime(n.created_at)}</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap break-words">{n.body}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{n.author_name} · {formatDateTime(n.created_at)}</p>
               </div>
               <button
                 onClick={() => handleDelete(n.id)}
                 disabled={isPending}
-                className="shrink-0 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-50"
+                className="shrink-0 text-gray-300 hover:text-destructive transition-colors disabled:opacity-50"
                 title="ลบบันทึก"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -159,7 +159,7 @@ function StudentNotesPanel({
           onChange={e => setDraft(e.target.value)}
           placeholder="บันทึกส่วนตัว เช่น สุขภาพ ครอบครัว พฤติกรรม — เห็นเฉพาะครูที่ปรึกษาและผู้ช่วยสอน"
           rows={2}
-          className="flex-1 text-sm rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"
+          className="flex-1 text-sm rounded-lg border border-border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"
         />
         <button
           onClick={handleAdd}
@@ -230,14 +230,14 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
         <Link
           href={`/classrooms/${classroomId}/report`}
           target="_blank"
-          className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 border border-gray-200 transition-colors"
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted border border-border transition-colors"
         >
           <Printer className="w-3.5 h-3.5" /> พิมพ์รายงานผู้ปกครอง
         </Link>
       </div>
 
       {assignments.length === 0 ? (
-        <div className="bg-white rounded-2xl ring-1 ring-black/5 py-10 text-center text-sm text-gray-400">
+        <div className="bg-card rounded-2xl ring-1 ring-border py-10 text-center text-sm text-muted-foreground">
           ยังไม่มีการบ้านจากห้องเรียนวิชาของนักเรียนกลุ่มนี้
         </div>
       ) : (
@@ -245,29 +245,29 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
           <HomeroomCalendar events={calendarEvents} />
 
           {/* Matrix */}
-          <div className="bg-white rounded-2xl ring-1 ring-black/5 overflow-x-auto">
+          <div className="bg-card rounded-2xl ring-1 ring-border overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="sticky left-0 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[180px]">
+                <tr className="border-b border-border">
+                  <th className="sticky left-0 bg-card text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px]">
                     นักเรียน
                   </th>
                   {assignments.map(a => (
                     <th key={a.id} className="px-3 py-3 text-center min-w-[140px]">
-                      <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-gray-700 hover:text-blue-600 line-clamp-2">
+                      <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
                         {a.title}
                       </Link>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{a.classroomName}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{a.classroomName}</p>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {students.map(student => (
-                  <tr key={student.id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50/50">
-                    <td className="sticky left-0 bg-white px-4 py-2.5">
-                      <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">{student.full_name}</p>
-                      <p className="text-xs text-gray-400 truncate max-w-[160px]">{student.email}</p>
+                  <tr key={student.id} className="border-b border-border last:border-b-0 hover:bg-muted/50">
+                    <td className="sticky left-0 bg-card px-4 py-2.5">
+                      <p className="text-sm font-medium text-foreground truncate max-w-[160px]">{student.full_name}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[160px]">{student.email}</p>
                     </td>
                     {assignments.map(a => {
                       const sub = bestSubmission.get(subKey(a.id, student.id))
@@ -282,18 +282,18 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
                         <td key={a.id} className="px-3 py-2.5 text-center">
                           {submitted ? (
                             <div className={`flex items-center justify-center gap-1 ${
-                              passed === false ? 'text-red-500' : 'text-emerald-600'
+                              passed === false ? 'text-destructive' : 'text-success'
                             }`}>
                               {passed === false ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                               <span className="text-xs font-semibold">{sub!.total_score ?? 0}/{sub!.max_score}</span>
                             </div>
                           ) : inProgress ? (
-                            <div className="flex items-center justify-center gap-1 text-blue-500">
+                            <div className="flex items-center justify-center gap-1 text-primary">
                               <CircleDashed className="w-3.5 h-3.5" />
                               <span className="text-xs">กำลังทำ</span>
                             </div>
                           ) : overdue ? (
-                            <div className="flex items-center justify-center gap-1 text-red-400">
+                            <div className="flex items-center justify-center gap-1 text-destructive">
                               <MinusCircle className="w-3.5 h-3.5" />
                               <span className="text-xs">เลยกำหนด</span>
                             </div>
@@ -315,11 +315,11 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
       )}
 
       {/* Compliance + private notes */}
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 p-4">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+      <div className="bg-card rounded-2xl ring-1 ring-border p-4">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
           <AlertTriangle className="w-3.5 h-3.5" /> ความรับผิดชอบในการส่งงาน, ข้อมูลส่วนตัว และบันทึกครูที่ปรึกษา
         </div>
-        <div className="flex items-start gap-1.5 text-[11px] text-gray-400 mb-3">
+        <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground mb-3">
           <Info className="w-3 h-3 mt-0.5 shrink-0" />
           <span>ข้อมูลส่วนตัวที่นักเรียนกรอกไว้ และบันทึกด้านล่าง เห็นเฉพาะครูที่ปรึกษาและผู้ช่วยสอนของห้องนี้เท่านั้น</span>
         </div>
@@ -330,18 +330,18 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
             return (
               <div key={student.id}>
                 <div className="flex items-center gap-3 text-sm py-1">
-                  <p className="w-40 truncate text-gray-900">{student.full_name}</p>
-                  <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <p className="w-40 truncate text-foreground">{student.full_name}</p>
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${rate >= 80 ? 'bg-emerald-500' : rate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                      className={`h-full rounded-full ${rate >= 80 ? 'bg-success' : rate >= 50 ? 'bg-warning' : 'bg-destructive'}`}
                       style={{ width: `${rate}%` }}
                     />
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs text-gray-500">{submitted}/{total} ({rate}%)</span>
+                  <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">{submitted}/{total} ({rate}%)</span>
                   <button
                     onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
                     className={`shrink-0 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors ${
-                      studentNotes.length > 0 ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-400 hover:bg-gray-100'
+                      studentNotes.length > 0 ? 'text-primary bg-primary/10 hover:bg-primary/10' : 'text-muted-foreground hover:bg-muted'
                     }`}
                   >
                     <MessageSquare className="w-3 h-3" />

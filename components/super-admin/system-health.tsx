@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { chartColors, chartTooltipStyle } from '@/lib/chart-colors'
 import { AlertTriangle, CheckCircle2, Database, HardDrive, Cpu, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -64,17 +65,17 @@ const QUOTA_ITEMS = [
 ]
 
 const COLOR_BAR: Record<string, string> = {
-  indigo: 'bg-indigo-500',
+  indigo: 'bg-primary',
   violet: 'bg-violet-500',
-  amber: 'bg-amber-500',
-  emerald: 'bg-emerald-500',
+  amber: 'bg-warning',
+  emerald: 'bg-success',
 }
 
 const COLOR_TRACK: Record<string, string> = {
-  indigo: 'bg-indigo-100 dark:bg-indigo-950/60',
+  indigo: 'bg-primary/10',
   violet: 'bg-violet-100 dark:bg-violet-950/60',
-  amber: 'bg-amber-100 dark:bg-amber-950/60',
-  emerald: 'bg-emerald-100 dark:bg-emerald-950/60',
+  amber: 'bg-warning/10',
+  emerald: 'bg-success/10',
 }
 
 function formatUnit(value: number, unit: string) {
@@ -99,16 +100,16 @@ function QuotaBar({
   const warning = !critical && (warn || pct >= 75)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900">
+    <div className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <div
             className={cn(
               'flex h-7 w-7 items-center justify-center rounded-lg',
               critical
-                ? 'bg-red-100 dark:bg-red-950/60'
+                ? 'bg-destructive/10'
                 : warning
-                  ? 'bg-amber-100 dark:bg-amber-950/60'
+                  ? 'bg-warning/10'
                   : COLOR_TRACK[color],
             )}
           >
@@ -116,40 +117,40 @@ function QuotaBar({
               className={cn(
                 'h-3.5 w-3.5',
                 critical
-                  ? 'text-red-500'
+                  ? 'text-destructive'
                   : warning
-                    ? 'text-amber-500'
+                    ? 'text-warning'
                     : `text-${color}-500`,
               )}
             />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <p className="text-xs font-semibold text-muted-foreground">
               {label}
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-muted-foreground">
               {formatUnit(used, unit)} / {formatUnit(limit, unit)}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
           {critical && (
-            <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
           )}
           {warning && !critical && (
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
           )}
           {!warning && !critical && (
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
           )}
           <span
             className={cn(
               'text-sm font-bold',
               critical
-                ? 'text-red-600 dark:text-red-400'
+                ? 'text-destructive'
                 : warning
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-slate-700 dark:text-slate-200',
+                  ? 'text-warning'
+                  : 'text-muted-foreground',
             )}
           >
             {pct}%
@@ -161,7 +162,7 @@ function QuotaBar({
         <div
           className={cn(
             'h-2 rounded-full transition-all duration-500',
-            critical ? 'bg-red-500' : warning ? 'bg-amber-500' : COLOR_BAR[color],
+            critical ? 'bg-destructive' : warning ? 'bg-warning' : COLOR_BAR[color],
           )}
           style={{ width: `${pct}%` }}
         />
@@ -171,7 +172,7 @@ function QuotaBar({
         <p
           className={cn(
             'mt-2 text-xs font-medium',
-            critical ? 'text-red-500' : 'text-amber-500',
+            critical ? 'text-destructive' : 'text-warning',
           )}
         >
           {critical
@@ -187,10 +188,10 @@ export function SystemHealth() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <h2 className="text-lg font-semibold text-foreground">
           System Health Monitor
         </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+        <p className="text-xs text-muted-foreground mt-0.5">
           Supabase Quota และ API Performance แบบเรียลไทม์
         </p>
       </div>
@@ -203,39 +204,39 @@ export function SystemHealth() {
       </div>
 
       {/* API Usage Chart */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+      <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white">
+            <h3 className="font-semibold text-foreground">
               API Request Rate (วันนี้)
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-muted-foreground">
               Requests/sec และ Latency เฉลี่ย (ms)
             </p>
           </div>
           <div className="flex gap-4 text-xs">
-            <span className="flex items-center gap-1.5 text-slate-500">
-              <span className="inline-block h-2 w-4 rounded-sm bg-indigo-500" />
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="inline-block h-2 w-4 rounded-sm bg-primary" />
               RPS
             </span>
-            <span className="flex items-center gap-1.5 text-slate-500">
-              <span className="inline-block h-2 w-4 rounded-sm bg-amber-400" />
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="inline-block h-2 w-4 rounded-sm bg-warning" />
               Latency (ms)
             </span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={API_USAGE_DATA}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} strokeOpacity={0.5} />
             <XAxis
               dataKey="time"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: chartColors.axis }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               yAxisId="rps"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: chartColors.axis }}
               axisLine={false}
               tickLine={false}
             />
@@ -243,12 +244,12 @@ export function SystemHealth() {
               yAxisId="lat"
               orientation="right"
               domain={[0, 40]}
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: chartColors.axis }}
               axisLine={false}
               tickLine={false}
             />
             <Tooltip
-              contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              contentStyle={chartTooltipStyle}
               formatter={(v, name) =>
                 name === 'rps' ? [`${Number(v)} req/s`, 'RPS'] : [`${Number(v)} ms`, 'Latency']
               }
@@ -257,7 +258,7 @@ export function SystemHealth() {
               yAxisId="rps"
               type="monotone"
               dataKey="rps"
-              stroke="#6366f1"
+              stroke={chartColors.primary}
               strokeWidth={2}
               dot={false}
             />
@@ -265,7 +266,7 @@ export function SystemHealth() {
               yAxisId="lat"
               type="monotone"
               dataKey="latency"
-              stroke="#f59e0b"
+              stroke={chartColors.warning}
               strokeWidth={2}
               dot={false}
             />

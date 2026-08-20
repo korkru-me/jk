@@ -47,37 +47,37 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
-            <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+            <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
               <Clock className="w-4 h-4 text-violet-500" /> ขยายเวลา
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">{studentName} — {assignmentTitle}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{studentName} — {assignmentTitle}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500">ปิดรับเมื่อ (สำหรับนักเรียนคนนี้)</label>
+            <label className="text-xs font-semibold text-muted-foreground">ปิดรับเมื่อ (สำหรับนักเรียนคนนี้)</label>
             <input
               type="datetime-local"
               value={extendedEndAt}
               onChange={e => setExtendedEndAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500">หมายเหตุ (ไม่บังคับ)</label>
+            <label className="text-xs font-semibold text-muted-foreground">หมายเหตุ (ไม่บังคับ)</label>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={2}
               placeholder="เช่น ลาป่วย"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none"
+              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none"
             />
           </div>
 
@@ -93,7 +93,7 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
               <button
                 onClick={handleRevoke}
                 disabled={isPending}
-                className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
+                className="px-3 py-2 border border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl transition-colors disabled:opacity-50"
                 title="ยกเลิกการขยายเวลา"
               >
                 <Trash2 className="w-4 h-4" />

@@ -62,7 +62,7 @@ export function LearningPaths() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">กำหนดเงื่อนไขการปลดล็อกชุดข้อสอบ เพื่อสร้างเส้นทางการเรียนรู้ที่ต่อเนื่อง</p>
+          <p className="text-sm text-muted-foreground">กำหนดเงื่อนไขการปลดล็อกชุดข้อสอบ เพื่อสร้างเส้นทางการเรียนรู้ที่ต่อเนื่อง</p>
         </div>
         <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={addRule}>
           <Plus className="w-3.5 h-3.5" /> เพิ่มเงื่อนไข
@@ -70,29 +70,29 @@ export function LearningPaths() {
       </div>
 
       {rules.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-2xl">
+        <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl">
           <Lock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-sm text-gray-400 font-medium">ยังไม่มีเงื่อนไข</p>
+          <p className="text-sm text-muted-foreground font-medium">ยังไม่มีเงื่อนไข</p>
           <p className="text-xs text-gray-300 mt-1 mb-4">กดเพิ่มเงื่อนไขเพื่อสร้างเส้นทางการเรียน</p>
           <Button size="sm" onClick={addRule}><Plus className="w-3.5 h-3.5 mr-1" /> เพิ่มเงื่อนไข</Button>
         </div>
       ) : (
         <div className="space-y-3">
           {rules.map((rule, idx) => (
-            <div key={rule.id} className="bg-white rounded-2xl ring-1 ring-black/5 p-4">
+            <div key={rule.id} className="bg-card rounded-2xl ring-1 ring-border p-4">
               <div className="flex items-start gap-3">
                 {/* Step number */}
-                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                   {idx + 1}
                 </div>
                 <div className="flex-1 space-y-3">
                   {/* Condition */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-lg whitespace-nowrap">ถ้าสอบผ่าน</span>
+                    <span className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded-lg whitespace-nowrap">ถ้าสอบผ่าน</span>
                     <select
                       value={rule.conditionAssignment}
                       onChange={e => updateRule(rule.id, 'conditionAssignment', e.target.value)}
-                      className="flex-1 min-w-[160px] px-2.5 py-1.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-blue-400"
+                      className="flex-1 min-w-[160px] px-2.5 py-1.5 text-sm border border-border rounded-xl bg-card outline-none focus:border-primary"
                     >
                       {MOCK_ASSIGNMENTS.map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
@@ -100,8 +100,8 @@ export function LearningPaths() {
 
                   {/* Score condition */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-lg whitespace-nowrap">ด้วยคะแนนเกิน</span>
-                    <div className="flex items-center gap-1 border border-gray-200 rounded-xl overflow-hidden">
+                    <span className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded-lg whitespace-nowrap">ด้วยคะแนนเกิน</span>
+                    <div className="flex items-center gap-1 border border-border rounded-xl overflow-hidden">
                       <input
                         type="number"
                         min={1}
@@ -110,19 +110,19 @@ export function LearningPaths() {
                         onChange={e => updateRule(rule.id, 'conditionScore', parseInt(e.target.value) || 0)}
                         className="w-14 px-2 py-1.5 text-sm text-center outline-none"
                       />
-                      <span className="text-xs text-gray-400 pr-2">%</span>
+                      <span className="text-xs text-muted-foreground pr-2">%</span>
                     </div>
                   </div>
 
                   {/* Arrow */}
                   <div className="flex items-center gap-2">
                     <ChevronRight className="w-4 h-4 text-gray-300" />
-                    <Zap className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg whitespace-nowrap">ปลดล็อก</span>
+                    <Zap className="w-3.5 h-3.5 text-success" />
+                    <span className="text-xs font-semibold text-success bg-success/10 px-2 py-1 rounded-lg whitespace-nowrap">ปลดล็อก</span>
                     <select
                       value={rule.unlockAssignment}
                       onChange={e => updateRule(rule.id, 'unlockAssignment', e.target.value)}
-                      className="flex-1 min-w-[160px] px-2.5 py-1.5 text-sm border border-emerald-200 rounded-xl bg-emerald-50/30 outline-none focus:border-emerald-400"
+                      className="flex-1 min-w-[160px] px-2.5 py-1.5 text-sm border border-success/20 rounded-xl bg-success/10 outline-none focus:border-success"
                     >
                       {MOCK_ASSIGNMENTS.map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
@@ -131,7 +131,7 @@ export function LearningPaths() {
 
                 <button
                   onClick={() => deleteRule(rule.id)}
-                  className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-300 transition-colors shrink-0"
+                  className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-gray-300 transition-colors shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

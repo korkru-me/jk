@@ -12,7 +12,7 @@ export function DeleteQuestionButton({ id }: { id: string }) {
     <button
       type="button"
       onClick={handleDelete}
-      className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-lg transition-colors"
+      className="px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 rounded-lg transition-colors"
     >
       ลบ
     </button>

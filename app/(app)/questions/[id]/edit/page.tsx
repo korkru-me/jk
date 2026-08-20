@@ -46,8 +46,8 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">แก้ไขโจทย์</h1>
-        <p className="text-sm text-gray-500 mt-1 truncate">{q.title}</p>
+        <h1 className="text-2xl font-bold text-foreground">แก้ไขโจทย์</h1>
+        <p className="text-sm text-muted-foreground mt-1 truncate">{q.title}</p>
       </div>
       {q.question_type === 'mcq' && <McqForm mode="edit" question={q} allTags={allTags} presets={presets} isOwner={isOwner} />}
       {q.question_type === 'true_false' && <TrueFalseForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}

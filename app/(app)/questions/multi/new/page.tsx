@@ -13,8 +13,8 @@ export default async function MultiStepNewPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">สร้างโจทย์หลายขั้นตอน</h1>
-        <p className="text-sm text-gray-500 mt-1">กำหนดบริบทร่วม แล้วเพิ่มข้อย่อยที่เชื่อมคำตอบกันได้</p>
+        <h1 className="text-2xl font-bold text-foreground">สร้างโจทย์หลายขั้นตอน</h1>
+        <p className="text-sm text-muted-foreground mt-1">กำหนดบริบทร่วม แล้วเพิ่มข้อย่อยที่เชื่อมคำตอบกันได้</p>
       </div>
       <MultiStepEditor
         mode="create"

@@ -61,18 +61,18 @@ const ACCESS_TYPES = [
     label: 'เปิดรับอิสระ',
     desc: 'นักเรียนเข้าร่วมได้ทันทีด้วยรหัสห้องเรียน',
     Icon: Globe,
-    chip: 'bg-emerald-600',
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
-    cardActive: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
+    chip: 'bg-success',
+    iconColor: 'text-success',
+    cardActive: 'border-success bg-success/10',
   },
   {
     value: 'request' as const,
     label: 'ต้องอนุมัติ',
     desc: 'นักเรียนส่งคำขอ ครูอนุมัติก่อนจึงเข้าร่วมได้',
     Icon: UserCheck,
-    chip: 'bg-blue-600',
-    iconColor: 'text-blue-600 dark:text-blue-400',
-    cardActive: 'border-blue-500 bg-blue-50 dark:bg-blue-950/30',
+    chip: 'bg-primary',
+    iconColor: 'text-primary',
+    cardActive: 'border-primary bg-primary/10',
   },
   {
     value: 'closed' as const,
@@ -80,8 +80,8 @@ const ACCESS_TYPES = [
     desc: 'ปิดรับนักเรียนใหม่ชั่วคราว',
     Icon: Lock,
     chip: 'bg-gray-600',
-    iconColor: 'text-gray-600 dark:text-gray-400',
-    cardActive: 'border-gray-500 bg-gray-50 dark:bg-gray-800/40',
+    iconColor: 'text-muted-foreground',
+    cardActive: 'border-gray-500 bg-muted/40',
   },
 ]
 
@@ -90,9 +90,9 @@ const ACCESS_LABEL: Record<string, string> = {
 }
 
 const ACCESS_BADGE: Record<string, string> = {
-  open: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  request: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  closed: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  open: 'bg-success/10 text-success dark:bg-emerald-900/40',
+  request: 'bg-primary/10 text-primary dark:bg-blue-900/40',
+  closed: 'bg-muted text-muted-foreground dark:bg-gray-800',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -207,9 +207,9 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
       onClick={() => inputRef.current?.focus()}
     >
       {tags.map((tag) => (
-        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-sm font-medium">
+        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-blue-800 text-sm font-medium">
           {tag}
-          <button type="button" onClick={(e) => { e.stopPropagation(); onChange(tags.filter((t) => t !== tag)) }} className="hover:text-red-500 transition-colors">
+          <button type="button" onClick={(e) => { e.stopPropagation(); onChange(tags.filter((t) => t !== tag)) }} className="hover:text-destructive transition-colors">
             <X className="w-3 h-3" />
           </button>
         </span>
@@ -303,7 +303,7 @@ function CreatableCombobox({
             <button
               type="button"
               onMouseDown={(e) => { e.preventDefault(); selectOption(inputVal.trim()) }}
-              className="w-full px-3 py-2 text-sm text-left text-blue-600 dark:text-blue-400 hover:bg-accent transition-colors flex items-center gap-2 border-t border-border"
+              className="w-full px-3 py-2 text-sm text-left text-primary hover:bg-accent transition-colors flex items-center gap-2 border-t border-border"
             >
               <Plus className="w-3.5 h-3.5 shrink-0" />
               สร้าง &quot;{inputVal.trim()}&quot;
@@ -398,7 +398,7 @@ function GradientAdvancedControls({
               className={cn(
                 'w-8 h-8 rounded-lg border text-sm flex items-center justify-center transition-all',
                 angle === it.d
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 shadow-sm'
+                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
                   : 'border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground',
               )}
             >
@@ -462,7 +462,7 @@ function CoverDesignSection({
         'overflow-hidden transition-all duration-300 ease-in-out',
         advancedOpen ? 'max-h-[380px] opacity-100' : 'max-h-0 opacity-0',
       )}>
-        <div className="rounded-xl border border-border bg-muted/30 dark:bg-muted/10 p-4">
+        <div className="rounded-xl border border-border bg-muted/30 p-4">
           <GradientAdvancedControls
             fromColor={coverFrom} toColor={coverTo} angle={coverAngle}
             onFromChange={onFromChange} onToChange={onToChange} onAngleChange={onAngleChange}
@@ -525,14 +525,14 @@ function ImageUploadZone({ value, onChange }: { value: string; onChange: (u: str
       className={cn(
         'border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all',
         isDragging
-          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20 scale-[1.01]'
+          ? 'border-primary bg-primary/10 scale-[1.01]'
           : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30',
       )}
     >
       <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
       <p className="text-sm text-muted-foreground">
         ลากวางรูปภาพ หรือ{' '}
-        <span className="text-blue-600 dark:text-blue-400 font-medium">คลิกเพื่อเลือก</span>
+        <span className="text-primary font-medium">คลิกเพื่อเลือก</span>
       </p>
       <p className="text-xs text-muted-foreground/60 mt-1">PNG, JPG, WebP — สูงสุด 5MB</p>
       <input
@@ -571,9 +571,9 @@ function StepIndicator({
                 className={cn(
                   'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-all duration-300',
                   done
-                    ? 'bg-blue-600 border-blue-600 text-white dark:bg-blue-500 dark:border-blue-500 cursor-pointer hover:bg-blue-700 hover:border-blue-700 hover:scale-105'
+                    ? 'bg-primary border-primary text-white dark:bg-primary dark:border-primary cursor-pointer hover:bg-primary/90 hover:border-blue-700 hover:scale-105'
                     : active
-                    ? 'border-blue-600 text-blue-600 bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:bg-blue-950/40'
+                    ? 'border-primary text-primary bg-primary/10 dark:border-primary dark:bg-blue-950/40'
                     : 'border-border text-muted-foreground bg-background cursor-default',
                 )}
                 title={done ? `กลับไปขั้นตอน: ${step.label}` : undefined}
@@ -582,7 +582,7 @@ function StepIndicator({
               </button>
               <span className={cn(
                 'text-[11px] font-medium whitespace-nowrap hidden sm:block',
-                active ? 'text-blue-600 dark:text-blue-400' : done ? 'text-blue-500/70 dark:text-blue-400/60' : 'text-muted-foreground',
+                active ? 'text-primary' : done ? 'text-primary/70 dark:text-primary/60' : 'text-muted-foreground',
               )}>
                 {step.label}
               </span>
@@ -590,7 +590,7 @@ function StepIndicator({
             {idx < STEPS.length - 1 && (
               <div className={cn(
                 'h-0.5 w-12 sm:w-20 mx-1.5 mb-5 transition-colors duration-300',
-                current > step.id ? 'bg-blue-600 dark:bg-blue-500' : 'bg-border',
+                current > step.id ? 'bg-primary dark:bg-primary' : 'bg-border',
               )} />
             )}
           </div>
@@ -706,15 +706,15 @@ function ClassroomTypeSection({ value, onChange }: { value: ClassroomType; onCha
           className={cn(
             'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
             value === 'subject'
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-sm'
+              ? 'border-primary bg-primary/10 shadow-sm'
               : 'border-border bg-card hover:border-muted-foreground/30',
           )}
         >
-          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'subject' ? 'bg-white/60 dark:bg-white/10' : 'bg-muted')}>
-            <BookOpen className={cn('w-4 h-4', value === 'subject' ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground')} />
+          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'subject' ? 'bg-card/60' : 'bg-muted')}>
+            <BookOpen className={cn('w-4 h-4', value === 'subject' ? 'text-primary' : 'text-muted-foreground')} />
           </div>
           <div>
-            <p className={cn('font-semibold text-sm', value === 'subject' ? 'text-blue-600 dark:text-blue-400' : 'text-foreground')}>ห้องเรียนวิชา</p>
+            <p className={cn('font-semibold text-sm', value === 'subject' ? 'text-primary' : 'text-foreground')}>ห้องเรียนวิชา</p>
             <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">มอบหมายการบ้าน สอบ ให้คะแนน</p>
           </div>
         </button>
@@ -724,15 +724,15 @@ function ClassroomTypeSection({ value, onChange }: { value: ClassroomType; onCha
           className={cn(
             'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
             value === 'homeroom'
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-sm'
+              ? 'border-primary bg-primary/10 shadow-sm'
               : 'border-border bg-card hover:border-muted-foreground/30',
           )}
         >
-          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'homeroom' ? 'bg-white/60 dark:bg-white/10' : 'bg-muted')}>
-            <Users className={cn('w-4 h-4', value === 'homeroom' ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground')} />
+          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'homeroom' ? 'bg-card/60' : 'bg-muted')}>
+            <Users className={cn('w-4 h-4', value === 'homeroom' ? 'text-primary' : 'text-muted-foreground')} />
           </div>
           <div>
-            <p className={cn('font-semibold text-sm', value === 'homeroom' ? 'text-blue-600 dark:text-blue-400' : 'text-foreground')}>ห้อง Homeroom</p>
+            <p className={cn('font-semibold text-sm', value === 'homeroom' ? 'text-primary' : 'text-foreground')}>ห้อง Homeroom</p>
             <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">ครูที่ปรึกษาติดตามการส่งงานทุกวิชา</p>
           </div>
         </button>
@@ -934,7 +934,7 @@ function Step1Content({
                     )}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', isSelected ? 'bg-white/60 dark:bg-white/10' : 'bg-muted')}>
+                      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', isSelected ? 'bg-card/60' : 'bg-muted')}>
                         <Icon className={cn('w-4 h-4', isSelected ? type.iconColor : 'text-muted-foreground')} />
                       </div>
                       {isSelected && (
@@ -958,8 +958,8 @@ function Step1Content({
       <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
-              <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 text-primary" />
             </div>
             <div>
               <p className="font-medium text-sm text-foreground">จำกัดจำนวนที่นั่ง</p>
@@ -987,8 +987,8 @@ function Step1Content({
 
       <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
-            <CalendarDays className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+            <CalendarDays className="w-4 h-4 text-warning" />
           </div>
           <div>
             <p className="font-medium text-sm text-foreground">ระยะเวลาของห้องเรียน</p>
@@ -1010,7 +1010,7 @@ function Step1Content({
           </div>
         </div>
         {(values.startDate || values.endDate) && (
-          <div className="flex items-start gap-2.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-xl px-3.5 py-3 border border-amber-200 dark:border-amber-900">
+          <div className="flex items-start gap-2.5 text-xs text-warning bg-warning/10 rounded-xl px-3.5 py-3 border border-warning/20">
             <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <p>เมื่อถึงวันปิดคอร์ส ระบบจะเปลี่ยนเป็น <strong>Read-only</strong> — นักเรียนดูประวัติได้แต่ส่งคำตอบไม่ได้</p>
           </div>
@@ -1157,7 +1157,7 @@ export function CreateCourseWizard() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={!isNextEnabled}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/40 text-white min-w-[160px]"
+                className="bg-success hover:bg-success/90 disabled:bg-success/40 text-white min-w-[160px]"
               >
                 <Check className="w-4 h-4 mr-1.5" />
                 {isPending ? 'กำลังสร้างห้องเรียน...' : 'ยืนยันสร้างห้องเรียน'}

@@ -21,7 +21,7 @@ import { HomeroomOverview, type StudentNoteRow, type StudentProfileRow } from '.
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 
 function TabLoading() {
-  return <div className="h-32 rounded-2xl bg-gray-100 animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
+  return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
 }
 
 // Stream and homeroom are the two possible initial tabs. Everything else is
@@ -130,7 +130,7 @@ export function ClassroomDetailClient({
   return (
     <div className="space-y-6 max-w-[1200px]">
       {/* Back link */}
-      <Link href="/classrooms" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+      <Link href="/classrooms" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
         <ChevronLeft className="w-4 h-4" /> ห้องเรียนทั้งหมด
       </Link>
 
@@ -145,23 +145,23 @@ export function ClassroomDetailClient({
             )}
             <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
             {classroom.description && (
-              <p className="text-gray-400 text-sm mt-1">{classroom.description}</p>
+              <p className="text-muted-foreground text-sm mt-1">{classroom.description}</p>
             )}
 
             {/* Stats row */}
             <div className="flex items-center gap-5 mt-4">
               <div className="flex items-center gap-2 text-sm">
-                <Users className="w-4 h-4 text-gray-400" />
+                <Users className="w-4 h-4 text-muted-foreground" />
                 <span className="font-semibold">{students.length}</span>
-                <span className="text-gray-400">นักเรียน</span>
+                <span className="text-muted-foreground">นักเรียน</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <BookOpen className="w-4 h-4 text-gray-400" />
+                <BookOpen className="w-4 h-4 text-muted-foreground" />
                 <span className="font-semibold">{isHomeroom ? homeroomAssignments.length : assignmentCount}</span>
-                <span className="text-gray-400">{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
+                <span className="text-muted-foreground">{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
               </div>
               {!isHomeroom && (
-                <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-primary hover:text-blue-300 transition-colors">
                   + สร้างชุดข้อสอบ
                 </Link>
               )}
@@ -170,14 +170,14 @@ export function ClassroomDetailClient({
 
           {/* Class code */}
           <div className="shrink-0 text-right">
-            <p className="text-xs text-gray-500 mb-1">รหัสห้องเรียน</p>
+            <p className="text-xs text-muted-foreground mb-1">รหัสห้องเรียน</p>
             <div className="flex items-center gap-2">
               <p className="font-mono font-black text-2xl tracking-[0.3em] text-white">{classroom.class_code}</p>
               <button
                 onClick={copyCode}
-                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-lg bg-card/10 hover:bg-card/20 flex items-center justify-center transition-colors"
               >
-                {codeCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {codeCopied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
@@ -186,7 +186,7 @@ export function ClassroomDetailClient({
         {/* Owner actions */}
         {isOwner && (
           <div className="flex items-center gap-2 mt-5 pt-4 border-t border-white/10">
-            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-white/10 hover:text-white bg-transparent">
+            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
               <Settings className="w-3.5 h-3.5" /> ตั้งค่าห้องเรียน
             </Button>
             <div className="ml-auto">
@@ -197,7 +197,7 @@ export function ClassroomDetailClient({
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 bg-gray-100 rounded-2xl p-1 overflow-x-auto">
+      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1 overflow-x-auto">
         {TABS.filter(tab => !tab.managerOnly || canManage).map(tab => {
           const Icon = tab.icon
           return (
@@ -206,15 +206,15 @@ export function ClassroomDetailClient({
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.key
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-muted-foreground hover:bg-card/50'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
               {tab.label}
               {tab.key === 'students' && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? 'bg-gray-100 text-gray-600' : 'bg-gray-200 text-gray-500'
+                  activeTab === tab.key ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
                 }`}>
                   {students.length}
                 </span>

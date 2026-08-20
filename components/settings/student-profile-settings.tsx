@@ -151,9 +151,9 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
       </SectionCard>
 
       {/* ── Notice: shared with homeroom advisor ────────────────────────── */}
-      <div className="flex items-start gap-3 p-4 bg-blue-500/8 border border-blue-500/20 rounded-xl">
-        <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
-        <p className="text-xs text-blue-700 dark:text-blue-400">
+      <div className="flex items-start gap-3 p-4 bg-primary/8 border border-primary/20 rounded-xl">
+        <Info size={16} className="text-primary shrink-0 mt-0.5" />
+        <p className="text-xs text-primary">
           ข้อมูลตัวตน, ข้อมูลการศึกษา และข้อมูลติดต่อด้านล่างนี้ จะแสดงให้ <b>ครูที่ปรึกษาประจำห้อง Homeroom</b> ของคุณเห็น
           เพื่อใช้ติดต่อและดูแลนักเรียน — ครูวิชาอื่นหรือนักเรียนคนอื่นจะไม่เห็นข้อมูลนี้
         </p>
@@ -301,7 +301,7 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
                     <button
                       type="button"
                       onClick={() => removeGuardian(i)}
-                      className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                      className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                       title="ลบผู้ปกครองคนนี้"
                     >
                       <X size={15} />

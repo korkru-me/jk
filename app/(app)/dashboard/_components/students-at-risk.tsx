@@ -12,7 +12,7 @@ const AT_RISK_STUDENTS = [
     topic: 'อนุภาคมูลฐาน (แบบจำลองมาตรฐาน)',
     drop: 3,
     initials: 'อว',
-    color: 'bg-red-100 text-red-600',
+    color: 'bg-destructive/10 text-destructive',
   },
   {
     id: 2,
@@ -40,38 +40,38 @@ const AT_RISK_STUDENTS = [
 
 export function StudentsAtRisk() {
   return (
-    <div className="bg-white rounded-xl ring-1 ring-black/5 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+    <div className="bg-card rounded-xl ring-1 ring-border overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div>
-          <p className="text-sm font-semibold text-gray-900">นักเรียนที่ต้องดูแลพิเศษ</p>
-          <p className="text-xs text-gray-400 mt-0.5">คะแนนลดลงติดต่อกัน 2+ ครั้ง</p>
+          <p className="text-sm font-semibold text-foreground">นักเรียนที่ต้องดูแลพิเศษ</p>
+          <p className="text-xs text-muted-foreground mt-0.5">คะแนนลดลงติดต่อกัน 2+ ครั้ง</p>
         </div>
-        <span className="text-xs bg-red-50 text-red-600 font-semibold px-2 py-1 rounded-full">
+        <span className="text-xs bg-destructive/10 text-destructive font-semibold px-2 py-1 rounded-full">
           {AT_RISK_STUDENTS.length} คน
         </span>
       </div>
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-border">
         {AT_RISK_STUDENTS.map(student => (
-          <div key={student.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors">
+          <div key={student.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
             <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${student.color}`}>
               {student.initials}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-900">{student.name}</p>
-                <span className="text-xs text-gray-400">{student.class}</span>
+                <p className="text-sm font-medium text-foreground">{student.name}</p>
+                <span className="text-xs text-muted-foreground">{student.class}</span>
               </div>
-              <p className="text-xs text-gray-500 truncate mt-0.5">{student.topic}</p>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{student.topic}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <div className="text-right">
-                <div className="flex items-center gap-1 text-red-500">
+                <div className="flex items-center gap-1 text-destructive">
                   <TrendingDown className="w-3 h-3" />
                   <span className="text-xs font-semibold">{student.score}%</span>
                 </div>
-                <p className="text-[10px] text-gray-400">ตกหนัก {student.drop} ครั้ง</p>
+                <p className="text-[10px] text-muted-foreground">ตกหนัก {student.drop} ครั้ง</p>
               </div>
-              <button className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-blue-100 hover:text-blue-600 flex items-center justify-center transition-colors text-gray-500">
+              <button className="w-7 h-7 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-colors text-muted-foreground">
                 <Mail className="w-3.5 h-3.5" />
               </button>
             </div>

@@ -42,11 +42,11 @@ function generateHeatmapData(anchorDate: string) {
 
 function getColor(count: number, max: number): string {
   const ratio = count / max
-  if (ratio > 0.8) return 'bg-blue-600'
-  if (ratio > 0.6) return 'bg-blue-500'
+  if (ratio > 0.8) return 'bg-primary'
+  if (ratio > 0.6) return 'bg-primary'
   if (ratio > 0.4) return 'bg-blue-300'
-  if (ratio > 0.2) return 'bg-blue-100'
-  return 'bg-gray-100'
+  if (ratio > 0.2) return 'bg-primary/10'
+  return 'bg-muted'
 }
 
 export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
@@ -55,18 +55,18 @@ export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
   const max = useMemo(() => Math.max(...data.map(day => day.count)), [data])
 
   return (
-    <div className="bg-white rounded-xl ring-1 ring-black/5 p-4">
+    <div className="bg-card rounded-xl ring-1 ring-border p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-sm font-semibold text-gray-900">การเข้าใช้งาน 30 วันที่ผ่านมา</p>
-          <p className="text-xs text-gray-400 mt-0.5">จำนวนนักเรียนที่เข้าทำแบบทดสอบต่อวัน</p>
+          <p className="text-sm font-semibold text-foreground">การเข้าใช้งาน 30 วันที่ผ่านมา</p>
+          <p className="text-xs text-muted-foreground mt-0.5">จำนวนนักเรียนที่เข้าทำแบบทดสอบต่อวัน</p>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-gray-400">น้อย</span>
-          {['bg-gray-100', 'bg-blue-100', 'bg-blue-300', 'bg-blue-500', 'bg-blue-600'].map(c => (
+          <span className="text-[10px] text-muted-foreground">น้อย</span>
+          {['bg-muted', 'bg-primary/10', 'bg-blue-300', 'bg-primary', 'bg-primary'].map(c => (
             <div key={c} className={`w-3 h-3 rounded-sm ${c}`} />
           ))}
-          <span className="text-[10px] text-gray-400">มาก</span>
+          <span className="text-[10px] text-muted-foreground">มาก</span>
         </div>
       </div>
 
@@ -75,7 +75,7 @@ export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
           {data.map(day => (
             <div
               key={day.date}
-              className={`w-7 h-7 rounded-md cursor-pointer transition-all hover:scale-110 hover:ring-2 hover:ring-blue-400 ${getColor(day.count, max)}`}
+              className={`w-7 h-7 rounded-md cursor-pointer transition-all hover:scale-110 hover:ring-2 hover:ring-primary ${getColor(day.count, max)}`}
               onMouseEnter={e => {
                 const rect = (e.target as HTMLElement).getBoundingClientRect()
                 setTooltip({ x: rect.left, y: rect.top - 40, label: day.label, count: day.count })
@@ -91,15 +91,15 @@ export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
             style={{ left: tooltip.x, top: tooltip.y }}
           >
             <span className="font-semibold">{tooltip.count} คน</span>
-            <span className="text-gray-400 ml-1">· {tooltip.label}</span>
+            <span className="text-muted-foreground ml-1">· {tooltip.label}</span>
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-        <div className="w-2 h-2 rounded-full bg-blue-600" />
-        <p className="text-xs text-gray-500">
-          ยอดสูงสุดช่วง <span className="font-semibold text-gray-700">ก่อนสอบกลางภาค</span> ({max} คน/วัน)
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+        <div className="w-2 h-2 rounded-full bg-primary" />
+        <p className="text-xs text-muted-foreground">
+          ยอดสูงสุดช่วง <span className="font-semibold text-muted-foreground">ก่อนสอบกลางภาค</span> ({max} คน/วัน)
         </p>
       </div>
     </div>

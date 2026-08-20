@@ -106,17 +106,17 @@ const BUNDLES: MasterBundle[] = [
 const STATUS_CONFIG: Record<ContentStatus, { label: string; cls: string; icon: React.ElementType }> = {
   pushed: {
     label: 'Push แล้ว',
-    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+    cls: 'bg-success/10 text-success dark:bg-emerald-950/60',
     icon: CheckCircle2,
   },
   public: {
     label: 'Public',
-    cls: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
+    cls: 'bg-primary/10 text-primary dark:bg-indigo-950/60',
     icon: Globe,
   },
   draft: {
     label: 'Draft',
-    cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
     icon: Lock,
   },
 }
@@ -126,17 +126,17 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
   const StatusIcon = sc.icon
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900">
+    <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950/60">
-            <BookOpen className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <BookOpen className="h-4 w-4 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-slate-900 dark:text-white leading-snug truncate">
+            <p className="font-semibold text-foreground leading-snug truncate">
               {bundle.title}
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {bundle.subject} · {bundle.level} · {bundle.questionCount} ข้อ · สร้างเมื่อ{' '}
               {bundle.createdAt}
             </p>
@@ -153,7 +153,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
         </span>
       </div>
 
-      <p className="mt-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+      <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
         {bundle.description}
       </p>
 
@@ -161,7 +161,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
         {bundle.tags.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+            className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground dark:bg-slate-800 dark:text-slate-300"
           >
             <Tag className="h-2.5 w-2.5" />
             {tag}
@@ -170,7 +170,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
       </div>
 
       {bundle.pushedAt && (
-        <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
+        <p className="mt-2 text-xs text-success">
           Push ไปยัง Public Bank เมื่อ {bundle.pushedAt}
         </p>
       )}
@@ -179,17 +179,17 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
         {bundle.status !== 'pushed' && (
           <button
             onClick={() => onPush(bundle.id)}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Send className="h-3.5 w-3.5" />
             Push to Public Bank
           </button>
         )}
-        <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+        <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
           แก้ไข
         </button>
         {bundle.status === 'pushed' && (
-          <span className="text-xs text-slate-400 dark:text-slate-500">
+          <span className="text-xs text-muted-foreground">
             ข้อสอบชุดนี้ปรากฏในบัญชีของทุกสถาบันแล้ว
           </span>
         )}
@@ -257,22 +257,22 @@ export function MasterContent() {
         ].map((item) => (
           <div
             key={item.label}
-            className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900"
+            className="rounded-xl border border-border bg-card p-4 dark:border-slate-700/60 dark:bg-slate-900"
           >
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">{item.value}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.label}</p>
+            <p className="text-2xl font-bold text-foreground">{item.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{item.label}</p>
           </div>
         ))}
       </div>
 
       {/* Info Banner */}
-      <div className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-        <Layers className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+        <Layers className="h-5 w-5 text-primary shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+          <p className="text-sm font-semibold text-indigo-800">
             Public Bank คืออะไร?
           </p>
-          <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+          <p className="text-xs text-primary mt-0.5">
             เมื่อ Super Admin กด "Push to Public Bank" ชุดข้อสอบนั้นจะปรากฏในบัญชีของทุกสถาบันทันที
             เป็นจุดขายของแพลตฟอร์มที่ผู้ใช้ทุกคนได้รับประโยชน์ร่วมกัน
           </p>
@@ -282,18 +282,18 @@ export function MasterContent() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหาชื่อชุด, วิชา, หรือ Tag"
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
         <select
           value={levelFilter}
           onChange={(e) => setLevelFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
         >
           <option value="All">ทุกระดับ</option>
           <option value="ม.4">ม.4</option>
@@ -304,7 +304,7 @@ export function MasterContent() {
         </select>
         <button
           onClick={() => setShowCreateForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
         >
           <Plus className="h-4 w-4" />
           สร้างชุดใหม่
@@ -313,25 +313,25 @@ export function MasterContent() {
 
       {/* Create Form */}
       {showCreateForm && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900 space-y-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">
+        <div className="rounded-xl border border-border bg-card p-5 dark:border-slate-700/60 dark:bg-slate-900 space-y-4">
+          <h3 className="font-semibold text-foreground">
             สร้างชุดข้อสอบมาตรฐานใหม่
           </h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              <label className="text-xs font-medium text-muted-foreground">
                 ชื่อชุดข้อสอบ
               </label>
               <input
                 placeholder="เช่น ชุดข้อสอบฟิสิกส์มาตรฐาน ม.6 ภาค 1"
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              <label className="text-xs font-medium text-muted-foreground">
                 ระดับชั้น
               </label>
-              <select className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+              <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 <option>ม.4</option>
                 <option>ม.5</option>
                 <option>ม.6</option>
@@ -340,23 +340,23 @@ export function MasterContent() {
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              <label className="text-xs font-medium text-muted-foreground">
                 คำอธิบาย
               </label>
               <textarea
                 rows={3}
                 placeholder="อธิบายเนื้อหาและขอบเขตของชุดข้อสอบนี้"
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
               />
             </div>
           </div>
           <div className="flex gap-2">
-            <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+            <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
               บันทึก Draft
             </button>
             <button
               onClick={() => setShowCreateForm(false)}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               ยกเลิก
             </button>
@@ -370,8 +370,8 @@ export function MasterContent() {
           <BundleCard key={bundle.id} bundle={bundle} onPush={handlePush} />
         ))}
         {filtered.length === 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center dark:border-slate-700/60 dark:bg-slate-900">
-            <p className="text-sm text-slate-400">ไม่พบชุดข้อสอบที่ตรงกับเงื่อนไข</p>
+          <div className="rounded-xl border border-border bg-card p-12 text-center dark:border-slate-700/60 dark:bg-slate-900">
+            <p className="text-sm text-muted-foreground">ไม่พบชุดข้อสอบที่ตรงกับเงื่อนไข</p>
           </div>
         )}
       </div>
@@ -379,16 +379,16 @@ export function MasterContent() {
       {/* Confirm Push Dialog */}
       {pushConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/60">
-                <Send className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                <Send className="h-5 w-5 text-primary" />
               </div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
+              <h3 className="font-semibold text-foreground">
                 ยืนยัน Push to Public Bank
               </h3>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-muted-foreground">
               ชุดข้อสอบ "
               <strong>
                 {bundles.find((b) => b.id === pushConfirm)?.title}
@@ -399,13 +399,13 @@ export function MasterContent() {
             <div className="mt-5 flex gap-3">
               <button
                 onClick={confirmPush}
-                className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
+                className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
               >
                 ยืนยัน Push
               </button>
               <button
                 onClick={() => setPushConfirm(null)}
-                className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="flex-1 rounded-lg border border-border bg-card py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 ยกเลิก
               </button>

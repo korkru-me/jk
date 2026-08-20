@@ -102,7 +102,7 @@ export function Scratchpad({ onClose }: ScratchpadProps) {
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold">✏️ กระดาษทด</span>
           {mode === 'draw' && (
-            <span className="text-[10px] bg-blue-500/15 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">วาด</span>
+            <span className="text-[10px] bg-primary/15 text-primary px-2 py-0.5 rounded-full">วาด</span>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -110,7 +110,7 @@ export function Scratchpad({ onClose }: ScratchpadProps) {
           <button
             onClick={() => setMode(m => m === 'text' ? 'draw' : 'text')}
             className={`p-1.5 rounded-lg transition-colors ${
-              mode === 'draw' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' : 'hover:bg-muted text-muted-foreground'
+              mode === 'draw' ? 'bg-primary/15 text-primary' : 'hover:bg-muted text-muted-foreground'
             }`}
             title={mode === 'text' ? 'เปลี่ยนเป็นโหมดวาด' : 'เปลี่ยนเป็นโหมดพิมพ์'}
           >
@@ -123,7 +123,7 @@ export function Scratchpad({ onClose }: ScratchpadProps) {
           )}
           <button
             onClick={() => { clearCanvas(); if (mode === 'text') setText('') }}
-            className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500"
+            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
             title="ล้างทั้งหมด"
           >
             <Trash2 size={14} />
@@ -153,7 +153,7 @@ export function Scratchpad({ onClose }: ScratchpadProps) {
               <button
                 key={s}
                 onClick={() => setLineSize(s)}
-                className={`rounded-full bg-foreground transition-all ${lineSize === s ? 'ring-2 ring-offset-1 ring-offset-background ring-blue-500' : ''}`}
+                className={`rounded-full bg-foreground transition-all ${lineSize === s ? 'ring-2 ring-offset-1 ring-offset-background ring-primary' : ''}`}
                 style={{ width: s + 8, height: s + 8, minWidth: 10 }}
               />
             ))}
