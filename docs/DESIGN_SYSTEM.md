@@ -50,7 +50,21 @@
 <html lang="th" data-style="warm">
 ```
 
-preset ที่มีให้: `soft` (มน โปร่ง เงานุ่ม), `sharp` (เหลี่ยม แน่น ไม่มีเงา), `warm` (โทนอุ่น) ถ้าไม่ใส่ = ค่าเริ่มต้น
+preset ที่มีให้:
+
+| preset | ลักษณะ |
+| --- | --- |
+| `soft` | มน โปร่ง เงานุ่มฟุ้ง |
+| `sharp` | เหลี่ยม แน่น ไม่มีเงา ใช้เส้นขอบแทน |
+| `warm` | พื้นครีม primary terracotta |
+| `minimal` | เกือบขาวดำ น้ำหนักตัวอักษรเบา เส้นขอบบาง |
+| `playful` | หนา มนมาก เงาทึบแบบ offset |
+
+ไม่ใส่ = ค่าเริ่มต้น (indigo, มนปานกลาง)
+
+preset ปรับได้ 5 แกน: สี, `--radius`, `--spacing`, `--elevation-*` และ typography (`--font-weight-*`, `--text-*`, `--tracking-*`) — Tailwind v4 คำนวณ utility จากตัวแปรเหล่านี้อยู่แล้ว จึงไม่ต้องแก้ component
+
+ดูผลของแต่ละ preset บนคอมโพเนนต์จริงได้ที่ `/style-preview` (เปิดเฉพาะตอน `next dev` — production จะ 404)
 
 เพิ่ม preset ใหม่โดยคัดลอกบล็อก `[data-style="..."]` ท้าย `globals.css` แล้วแก้ค่า ไม่ต้องแก้ไฟล์อื่น
 
