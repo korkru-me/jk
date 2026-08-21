@@ -12,7 +12,7 @@ import { DIFF_META } from '@/lib/question-display'
 
 /** Must match the [data-style] blocks at the bottom of app/globals.css. */
 const PRESETS = [
-  { id: null, label: 'ค่าเริ่มต้น', desc: 'indigo · มนปานกลาง' },
+  { id: null, label: 'ไม่ใส่ preset', desc: 'ค่าเริ่มต้นของระบบ — indigo · มนปานกลาง' },
   { id: 'soft', label: 'soft', desc: 'มน โปร่ง เงานุ่ม' },
   { id: 'sharp', label: 'sharp', desc: 'เหลี่ยม แน่น ไม่มีเงา' },
   { id: 'warm', label: 'warm', desc: 'โทนอุ่น ครีม' },
@@ -21,15 +21,27 @@ const PRESETS = [
 ] as const
 
 export function StylePreview() {
+  // Start from whatever app/layout.tsx set, so opening this page does not
+  // silently show a different style than the app is actually configured with.
   const [preset, setPreset] = useState<string | null>(null)
   const [dark, setDark] = useState(false)
+  const [appPreset, setAppPreset] = useState<string | null>(null)
+
+  useEffect(() => {
+    const initial = document.documentElement.getAttribute('data-style')
+    setAppPreset(initial)
+    setPreset(initial)
+  }, [])
 
   useEffect(() => {
     const el = document.documentElement
     if (preset) el.setAttribute('data-style', preset)
     else el.removeAttribute('data-style')
-    return () => el.removeAttribute('data-style')
-  }, [preset])
+    return () => {
+      if (appPreset) el.setAttribute('data-style', appPreset)
+      else el.removeAttribute('data-style')
+    }
+  }, [preset, appPreset])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -55,6 +67,7 @@ export function StylePreview() {
               title={p.desc}
             >
               {p.label}
+              {p.id === appPreset && <span className="ml-1 opacity-70">· ใช้อยู่</span>}
             </Button>
           ))}
           <Button variant="secondary" onClick={() => setDark((d) => !d)}>
