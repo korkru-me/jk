@@ -283,8 +283,32 @@ function collapseEmptyParagraphs(html) {
   return plainText(out) ? out.trim() : ''
 }
 
+// Fields KorKru stores as plain text (MCQ options, matching pairs, answer part
+// labels) can't carry <sup>/<sub>, and dropping the tags turns "kg·m/s²" into
+// "kg·m/s 2" — a different unit. Unicode has the digits and signs that physics
+// notation actually uses, so they survive as characters instead.
+const SUPERSCRIPT = { '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','−':'⁻','=':'⁼','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ' }
+const SUBSCRIPT   = { '0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','−':'₋','=':'₌','(':'₍',')':'₎','a':'ₐ','e':'ₑ','i':'ᵢ','m':'ₘ','n':'ₙ','o':'ₒ','p':'ₚ','r':'ᵣ','s':'ₛ','t':'ₜ','x':'ₓ' }
+
+/** Renders one sup/sub body, falling back to ^x / _x when Unicode has no glyph. */
+function toScript(inner, table, marker) {
+  const chars = [...inner]
+  return chars.every(c => table[c]) ? chars.map(c => table[c]).join('') : marker + inner
+}
+
 function plainText(html) {
-  return text(html).replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+  return text(html)
+    .replace(/<sup[^>]*>([\s\S]*?)<\/sup>/gi, (_, inner) => toScript(plainInner(inner), SUPERSCRIPT, '^'))
+    .replace(/<sub[^>]*>([\s\S]*?)<\/sub>/gi, (_, inner) => toScript(plainInner(inner), SUBSCRIPT, '_'))
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Moodle nests <span> inside <sup>, so the body needs its own tag strip. */
+function plainInner(html) {
+  return text(html).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim()
 }
 
 const EXT_BY_MIME = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
