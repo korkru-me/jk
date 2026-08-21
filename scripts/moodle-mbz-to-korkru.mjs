@@ -514,12 +514,17 @@ function convertQuestion(q, ctx) {
         return done({ question_type: 'mcq', mcq_options: options })
       }
 
+      // TrueFalseStatement carries no image of its own, so a picture-based
+      // choice puts its image in the question's gallery and keeps the choice
+      // letter as its label — otherwise the student is handed a column of
+      // blank checkboxes with no way to tell which picture each one means.
       const choices = rows.map((o, i) => {
         const extracted = extractImages(o.text, ctx.resolveImage)
-        // TrueFalseStatement has no image field of its own; a picture-based
-        // choice therefore lands in the question's gallery, in choice order.
         slot(slots, extracted.sources, url => question.image_urls.push(url))
-        return { id: `c${i + 1}`, text: extracted.html, correct_answer: o.isCorrect }
+        const label = plainText(extracted.html)
+          ? extracted.html
+          : (CHOICE_LETTERS[i] ?? `ตัวเลือก ${i + 1}`)
+        return { id: `c${i + 1}`, text: label, correct_answer: o.isCorrect }
       })
 
       return done({
