@@ -127,7 +127,7 @@ export function CreateClassroomModal() {
                   type="button"
                   onClick={() => setCoverColor(g)}
                   className={`w-7 h-7 rounded-full bg-gradient-to-br ${g} transition-all ${
-                    coverColor === g ? 'ring-2 ring-offset-2 ring-gray-900 scale-110' : 'opacity-70 hover:opacity-100'
+                    coverColor === g ? 'ring-2 ring-offset-2 ring-foreground scale-110' : 'opacity-70 hover:opacity-100'
                   }`}
                 />
               ))}

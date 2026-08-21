@@ -17,7 +17,7 @@ import type { SubmissionRow } from '../page'
 import { Card } from '@/components/ui/card'
 
 const STATUS_META = {
-  draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-gray-400' },
+  draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
   published: { label: 'เผยแพร่แล้ว',  color: 'bg-success/10 text-success', dot: 'bg-success' },
   closed:    { label: 'ปิดแล้ว',      color: 'bg-destructive/10 text-destructive',     dot: 'bg-destructive' },
 } as const
@@ -526,7 +526,7 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
         <div className="flex items-end gap-3 h-32">
           {buckets.map((count, i) => {
             const labels = ['0–20%', '21–40%', '41–60%', '61–80%', '81–100%']
-            const colors = ['bg-destructive', 'bg-flag', 'bg-warning', 'bg-lime-400', 'bg-success']
+            const colors = ['bg-destructive', 'bg-flag', 'bg-warning', 'bg-success/60', 'bg-success']
             return (
               <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
                 <span className="text-xs font-bold text-muted-foreground">{count}</span>

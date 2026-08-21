@@ -27,7 +27,7 @@ function Section({ title, icon: Icon, children }: {
   return (
     <div className="border-b border-border py-5 px-5">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-6 h-6 rounded-md bg-gray-900 flex items-center justify-center shrink-0">
+        <div className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center shrink-0">
           <Icon className="w-3.5 h-3.5 text-white" />
         </div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{title}</p>
@@ -53,7 +53,7 @@ function Toggle({ checked, onChange, label, description }: {
         <p className="text-sm font-medium text-foreground">{label}</p>
         {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>
-      <div className={`relative w-10 h-5.5 rounded-full transition-colors shrink-0 ${checked ? 'bg-gray-900' : 'bg-muted'}`}>
+      <div className={`relative w-10 h-5.5 rounded-full transition-colors shrink-0 ${checked ? 'bg-foreground' : 'bg-muted'}`}>
         <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-card rounded-full shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
       </div>
     </button>
@@ -110,7 +110,7 @@ export function PrintSettingsSidebar({
             ) : (
               <button
                 onClick={() => logoInputRef.current?.click()}
-                className="flex items-center gap-2.5 w-full px-3 py-2.5 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-gray-400 hover:text-muted-foreground transition-colors text-xs"
+                className="flex items-center gap-2.5 w-full px-3 py-2.5 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-ring hover:text-muted-foreground transition-colors text-xs"
               >
                 <Upload className="w-4 h-4" />
                 คลิกเพื่ออัปโหลดโลโก้ (PNG, JPG)
@@ -135,7 +135,7 @@ export function PrintSettingsSidebar({
               type="text"
               value={settings.institutionName}
               onChange={e => onPatch({ institutionName: e.target.value })}
-              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-gray-400"
+              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-ring"
             />
           </div>
 
@@ -147,7 +147,7 @@ export function PrintSettingsSidebar({
               value={settings.watermarkText}
               onChange={e => onPatch({ watermarkText: e.target.value })}
               placeholder="เช่น ห้ามถ่ายเอกสาร หรือ DRAFT"
-              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-gray-400 placeholder:text-muted-foreground/40"
+              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-ring placeholder:text-muted-foreground/40"
             />
           </div>
 
@@ -192,8 +192,8 @@ export function PrintSettingsSidebar({
                   onClick={() => onPatch({ columns: col })}
                   className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
                     settings.columns === col
-                      ? 'border-gray-900 bg-foreground text-background'
-                      : 'border-border text-muted-foreground hover:border-gray-400'
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-border text-muted-foreground hover:border-ring'
                   }`}
                 >
                   <Columns2 className="w-4 h-4" />
@@ -216,7 +216,7 @@ export function PrintSettingsSidebar({
                 max={500}
                 value={settings.copies}
                 onChange={e => onPatch({ copies: Math.max(1, Math.min(500, Number(e.target.value))) })}
-                className="w-24 text-2xl font-bold text-foreground text-center border-2 border-border rounded-xl px-3 py-2 focus:outline-none focus:border-gray-900"
+                className="w-24 text-2xl font-bold text-foreground text-center border-2 border-border rounded-xl px-3 py-2 focus:outline-none focus:border-foreground"
               />
               <div className="text-xs text-muted-foreground leading-relaxed">
                 ชุด<br />
@@ -267,8 +267,8 @@ export function PrintSettingsSidebar({
               <label key={opt.value} className="flex items-start gap-3 cursor-pointer group">
                 <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                   settings.answerKeyType === opt.value
-                    ? 'border-gray-900 bg-gray-900'
-                    : 'border-border group-hover:border-gray-500'
+                    ? 'border-foreground bg-foreground'
+                    : 'border-border group-hover:border-ring'
                 }`}>
                   {settings.answerKeyType === opt.value && (
                     <div className="w-1.5 h-1.5 rounded-full bg-card" />
@@ -295,7 +295,7 @@ export function PrintSettingsSidebar({
         {/* Primary: Generate ZIP */}
         <button
           onClick={onGenerateZip}
-          className="w-full flex items-center justify-center gap-2.5 py-3 bg-foreground text-background text-sm font-bold rounded-2xl hover:bg-gray-800 active:scale-[0.98] transition-all shadow-lg shadow-foreground/20"
+          className="w-full flex items-center justify-center gap-2.5 py-3 bg-foreground text-background text-sm font-bold rounded-2xl hover:bg-foreground active:scale-[0.98] transition-all shadow-lg shadow-foreground/20"
         >
           <ArchiveIcon className="w-4 h-4" />
           Generate &amp; Download All (ZIP)

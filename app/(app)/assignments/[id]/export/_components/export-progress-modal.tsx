@@ -95,7 +95,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
       <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
 
         {/* Header */}
-        <div className={`px-6 py-5 ${stage === 'done' ? 'bg-success/10' : stage === 'cancelled' ? 'bg-muted' : 'bg-gray-900'}`}>
+        <div className={`px-6 py-5 ${stage === 'done' ? 'bg-success/10' : stage === 'cancelled' ? 'bg-muted' : 'bg-foreground'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {stage === 'running' && (
@@ -137,7 +137,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
               </div>
               <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${stage === 'done' ? 'bg-success' : 'bg-gray-900'}`}
+                  className={`h-full rounded-full transition-all duration-300 ${stage === 'done' ? 'bg-success' : 'bg-foreground'}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -241,7 +241,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold bg-foreground text-background rounded-xl hover:bg-gray-800 transition-all active:scale-[0.98]"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold bg-foreground text-background rounded-xl hover:bg-foreground transition-all active:scale-[0.98]"
                 >
                   <ExternalLink className="w-4 h-4" />
                   เปิดหน้าพิมพ์ / บันทึก PDF

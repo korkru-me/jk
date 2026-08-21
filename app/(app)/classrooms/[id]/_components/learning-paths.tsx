@@ -73,7 +73,7 @@ export function LearningPaths() {
 
       {rules.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl">
-          <Lock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <Lock className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground font-medium">ยังไม่มีเงื่อนไข</p>
           <p className="text-xs text-muted-foreground/40 mt-1 mb-4">กดเพิ่มเงื่อนไขเพื่อสร้างเส้นทางการเรียน</p>
           <Button size="sm" onClick={addRule}><Plus className="w-3.5 h-3.5 mr-1" /> เพิ่มเงื่อนไข</Button>

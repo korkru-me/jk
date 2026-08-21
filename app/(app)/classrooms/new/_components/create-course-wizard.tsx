@@ -80,9 +80,9 @@ const ACCESS_TYPES = [
     label: 'ปิดรับ',
     desc: 'ปิดรับนักเรียนใหม่ชั่วคราว',
     Icon: Lock,
-    chip: 'bg-gray-600',
+    chip: 'bg-muted-foreground',
     iconColor: 'text-muted-foreground',
-    cardActive: 'border-gray-500 bg-muted/40',
+    cardActive: 'border-ring bg-muted/40',
   },
 ]
 

@@ -40,7 +40,7 @@ export function ScoreEditor({ submissionAnswerId, score, maxScore }: Props) {
     return (
       <button
         onClick={() => { setDraft(String(currentScore)); setEditing(true) }}
-        className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed border-primary/20 text-primary hover:bg-primary/10 dark:hover:bg-blue-950/30 transition-colors"
+        className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed border-primary/20 text-primary hover:bg-primary/10 dark:hover:bg-primary/15 transition-colors"
         title="แก้ไขคะแนนข้อนี้"
       >
         <Pencil className="w-3 h-3" />

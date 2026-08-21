@@ -114,7 +114,7 @@ export function MethodBuilder({ variables, value, unit, onChange }: MethodBuilde
               key={op}
               type="button"
               onClick={() => push(op)}
-              className="w-10 h-10 rounded-lg border border-border bg-card text-foreground font-mono hover:bg-muted hover:border-gray-400 transition-colors"
+              className="w-10 h-10 rounded-lg border border-border bg-card text-foreground font-mono hover:bg-muted hover:border-ring transition-colors"
             >
               {op}
             </button>

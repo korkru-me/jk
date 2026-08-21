@@ -249,7 +249,7 @@ function DragDemo() {
                 : 'border-border',
           )}
         >
-          <GripVertical className="h-4 w-4 shrink-0 text-slate-300" />
+          <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
             {idx + 1}
           </span>

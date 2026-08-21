@@ -30,7 +30,7 @@ export function StatCards({ mean, median, max, min, count }: Props) {
       icon: BarChart2,
       color: 'bg-tint-1/10',
       iconColor: 'text-tint-1',
-      ring: 'ring-violet-100',
+      ring: 'ring-tint-1/20',
       bar: median,
       barColor: 'bg-tint-1',
     },

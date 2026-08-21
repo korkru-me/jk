@@ -311,7 +311,7 @@ function TenantRow({ tenant }: { tenant: Tenant }) {
         </td>
 
         <td className="px-4 py-3.5">
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:hover:border-primary dark:hover:bg-indigo-950/40 dark:hover:text-primary">
+          <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:hover:border-primary dark:hover:bg-primary/15 dark:hover:text-primary">
             <Settings className="h-3 w-3" />
             Manage
           </button>

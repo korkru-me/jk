@@ -45,7 +45,7 @@ function getColor(count: number, max: number): string {
   const ratio = count / max
   if (ratio > 0.8) return 'bg-primary'
   if (ratio > 0.6) return 'bg-primary'
-  if (ratio > 0.4) return 'bg-blue-300'
+  if (ratio > 0.4) return 'bg-primary/50'
   if (ratio > 0.2) return 'bg-primary/10'
   return 'bg-muted'
 }
@@ -64,7 +64,7 @@ export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground">น้อย</span>
-          {['bg-muted', 'bg-primary/10', 'bg-blue-300', 'bg-primary', 'bg-primary'].map(c => (
+          {['bg-muted', 'bg-primary/10', 'bg-primary/50', 'bg-primary', 'bg-primary'].map(c => (
             <div key={c} className={`w-3 h-3 rounded-sm ${c}`} />
           ))}
           <span className="text-[10px] text-muted-foreground">มาก</span>

@@ -165,7 +165,7 @@ function StudentNotesPanel({
         <button
           onClick={handleAdd}
           disabled={isPending || !draft.trim()}
-          className="shrink-0 text-xs font-medium px-3 py-2 rounded-lg bg-foreground text-background hover:bg-gray-800 disabled:opacity-40 transition-colors"
+          className="shrink-0 text-xs font-medium px-3 py-2 rounded-lg bg-foreground text-background hover:bg-foreground disabled:opacity-40 transition-colors"
         >
           บันทึก
         </button>

@@ -99,7 +99,7 @@ export function ScoreOverrideModal({
                 onClick={() => setTab(t.key)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   tab === t.key
-                    ? 'border-gray-900 text-foreground'
+                    ? 'border-foreground text-foreground'
                     : 'border-transparent text-muted-foreground hover:text-muted-foreground'
                 }`}
               >
@@ -145,7 +145,7 @@ export function ScoreOverrideModal({
                 onChange={e => { setReason(e.target.value); setError('') }}
                 placeholder="เช่น นักเรียนแสดงวิธีทำถูกต้องแต่ระบบตรวจคะแนนผิดพลาด..."
                 rows={3}
-                className="w-full text-sm text-muted-foreground bg-muted border border-border rounded-xl px-3 py-2.5 focus:outline-none focus:border-gray-400 resize-none placeholder:text-muted-foreground/40"
+                className="w-full text-sm text-muted-foreground bg-muted border border-border rounded-xl px-3 py-2.5 focus:outline-none focus:border-ring resize-none placeholder:text-muted-foreground/40"
               />
             </div>
 
@@ -171,7 +171,7 @@ export function ScoreOverrideModal({
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-xl transition-all ${
                   saved
                     ? 'bg-success text-white'
-                    : 'bg-foreground text-background hover:bg-gray-800'
+                    : 'bg-foreground text-background hover:bg-foreground'
                 }`}
               >
                 <Save className="w-4 h-4" />
@@ -186,7 +186,7 @@ export function ScoreOverrideModal({
           <div className="p-5">
             {studentOverrides.length === 0 ? (
               <div className="text-center py-8">
-                <History className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <History className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">ยังไม่มีประวัติการแก้ไข</p>
               </div>
             ) : (

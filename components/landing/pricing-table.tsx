@@ -212,9 +212,9 @@ function FeatureCell({ value }: { value: FeatureValue }) {
   if (value === true)
     return <Check className="mx-auto h-4 w-4 text-success" />
   if (value === false)
-    return <X className="mx-auto h-4 w-4 text-slate-300" />
+    return <X className="mx-auto h-4 w-4 text-muted-foreground" />
   if (value === null)
-    return <Minus className="mx-auto h-4 w-4 text-slate-300" />
+    return <Minus className="mx-auto h-4 w-4 text-muted-foreground" />
   return (
     <span className="text-xs font-medium text-muted-foreground">{value}</span>
   )

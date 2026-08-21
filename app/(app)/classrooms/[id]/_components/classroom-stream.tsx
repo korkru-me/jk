@@ -187,7 +187,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
                   </button>
                   <div className="border-t my-1" />
                   <button
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 dark:hover:bg-red-950/30 transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/15 transition-colors"
                     onClick={remove}
                     disabled={isPending}
                   >
@@ -214,7 +214,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
           <div className="mt-2.5 space-y-2.5">
             {post.comments.map(c => (
               <div key={c.id} className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-gray-400 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                <div className="w-7 h-7 rounded-full bg-muted-foreground flex items-center justify-center text-white text-xs font-bold shrink-0">
                   {(c.users?.full_name ?? '?').slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0 bg-muted rounded-xl px-3 py-2">

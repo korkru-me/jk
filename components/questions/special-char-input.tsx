@@ -115,7 +115,7 @@ export function SymbolPicker({ onInsert }: { onInsert: (char: string) => void })
         className={cn(
           'flex items-center gap-1 px-2 h-9 rounded-md border text-sm font-medium transition-colors',
           open
-            ? 'bg-foreground text-background border-gray-900'
+            ? 'bg-foreground text-background border-foreground'
             : 'text-muted-foreground border-border bg-card hover:bg-muted hover:border-ring',
         )}
       >

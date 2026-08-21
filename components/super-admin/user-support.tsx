@@ -289,7 +289,7 @@ function UserRow({ user }: { user: AppUser }) {
         <div className="flex items-center gap-2">
           <button
             title="Log in as user (Impersonate)"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:hover:border-primary dark:hover:bg-indigo-950/40 dark:hover:text-primary"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:hover:border-primary dark:hover:bg-primary/15 dark:hover:text-primary"
             onClick={() =>
               alert(
                 `[Impersonate] กำลังเข้าสู่ระบบในนามของ ${user.email}\n\nในระบบจริงจะสร้าง signed impersonation token และ redirect`,

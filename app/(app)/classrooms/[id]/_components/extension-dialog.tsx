@@ -68,7 +68,7 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
               type="datetime-local"
               value={extendedEndAt}
               onChange={e => setExtendedEndAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-violet-100"
+              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-tint-1/20"
             />
           </div>
           <div className="space-y-1.5">
@@ -78,7 +78,7 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
               onChange={e => setNote(e.target.value)}
               rows={2}
               placeholder="เช่น ลาป่วย"
-              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-violet-100 resize-none"
+              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-tint-1/20 resize-none"
             />
           </div>
 

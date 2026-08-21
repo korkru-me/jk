@@ -45,7 +45,7 @@ export function TeacherDashboard({ user, questionsCount, studentsCount, heatmapA
           </p>
         </div>
         <button
-          className="hidden sm:flex items-center gap-2 px-3 py-2 bg-card ring-1 ring-border rounded-xl text-sm text-muted-foreground hover:ring-gray-300 transition-all shadow-sm cursor-pointer"
+          className="hidden sm:flex items-center gap-2 px-3 py-2 bg-card ring-1 ring-border rounded-xl text-sm text-muted-foreground hover:ring-border transition-all shadow-sm cursor-pointer"
           onClick={() => {
             const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })
             window.dispatchEvent(event)

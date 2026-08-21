@@ -270,7 +270,7 @@ function StatsTab({ stats }: { stats?: QuestionStats }) {
           <div className="mt-3 relative">
             <div className="h-2 bg-gradient-to-r from-green-400 via-amber-400 to-red-400 rounded-full" />
             <div
-              className="absolute top-0 -translate-x-1/2 w-3 h-2 bg-gray-800 rounded-full"
+              className="absolute top-0 -translate-x-1/2 w-3 h-2 bg-foreground rounded-full"
               style={{ left: `${100 - pPct}%` }}
             />
           </div>

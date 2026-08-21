@@ -131,7 +131,7 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
                 <p className="text-sm text-muted-foreground">ยังไม่มีชุดโจทย์ของคุณ</p>
               ) : filteredMine.length === 0 ? (
                 <Card edge="ring" className="text-center py-16">
-                  <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <Search className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground font-medium">ไม่พบชุดโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
@@ -149,7 +149,7 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
                 <p className="text-sm text-muted-foreground">ยังไม่มีชุดโจทย์ที่ทีมแชร์ไว้</p>
               ) : filteredTeam.length === 0 ? (
                 <Card edge="ring" className="text-center py-16">
-                  <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <Search className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground font-medium">ไม่พบชุดโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (

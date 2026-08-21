@@ -11,10 +11,10 @@ interface Group { id: string; name: string; students: Student[] }
 
 const GROUP_COLORS = [
   'border-primary/20 bg-primary/10',
-  'border-tint-1/20 bg-tint-1/10/50',
+  'border-tint-1/20 bg-tint-1/10',
   'border-success/20 bg-success/10',
   'border-warning/20 bg-warning/10',
-  'border-tint-3/20 bg-tint-3/10/50',
+  'border-tint-3/20 bg-tint-3/10',
 ]
 const GROUP_HEADER_COLORS = [
   'bg-primary/10 text-primary',

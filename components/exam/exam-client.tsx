@@ -573,7 +573,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               let cls = 'bg-muted text-muted-foreground'
               if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
               else if (isFlg) cls = 'bg-flag text-white'
-              else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-green-900/30'
+              else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
               return (
                 <button
                   key={i}
@@ -588,7 +588,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           <div className="mt-3 border-t pt-3 space-y-1.5">
             {[
               { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
-              { cls: 'bg-success/10 border border-success/20 dark:bg-green-900/30', label: 'ตอบแล้ว' },
+              { cls: 'bg-success/10 border border-success/20 dark:bg-success/15', label: 'ตอบแล้ว' },
               { cls: 'bg-flag', label: 'ปักธง' },
               { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
             ].map(l => (
@@ -638,7 +638,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
       {/* ── Fullscreen warning overlay ─────────────────────────────────────── */}
       {config.isFullscreenEnforced && showFullscreenWarning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-red-950/95 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-destructive/15 backdrop-blur-sm">
           <div className="text-center max-w-md px-8">
             <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-5">
               <ShieldAlert size={40} className="text-destructive" />

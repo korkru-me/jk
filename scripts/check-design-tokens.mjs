@@ -53,6 +53,17 @@ function countPalette(src) {
   return (src.match(PALETTE) ?? []).length
 }
 
+/**
+ * `bg-primary/10/40` — two opacity modifiers. Tailwind emits nothing for it, so
+ * the element silently loses that style. Produced repeatedly by codemods whose
+ * replacement pattern did not consume a trailing /N.
+ */
+const MALFORMED = /\b(?:bg|text|border|ring|divide|fill|shadow)-[a-z0-9-]+\/\d+\/\d+/g
+
+function countMalformed(src) {
+  return (src.match(MALFORMED) ?? []).length
+}
+
 function countHandRolledCards(src) {
   let n = 0
   for (const [, cls] of src.matchAll(CLASS_ATTR)) {
@@ -86,6 +97,12 @@ for (const rel of files) {
   const src = readFileSync(join(ROOT, rel), 'utf8')
   const palette = countPalette(src)
   const card = countHandRolledCards(src)
+  const malformed = countMalformed(src)
+  if (malformed) {
+    console.error(`malformed class (two opacity modifiers) in ${rel}:`)
+    for (const m of src.match(MALFORMED)) console.error(`  ${m}`)
+    process.exitCode = 1
+  }
   if (palette || card) current[rel] = { palette, card }
 }
 

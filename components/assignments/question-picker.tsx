@@ -100,7 +100,7 @@ export function QuestionPicker({
               type="button"
               onClick={() => onDiffFilterChange(d)}
               className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                diffFilter === d ? 'bg-foreground text-background border-gray-900' : 'border-border text-muted-foreground hover:border-ring'
+                diffFilter === d ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:border-ring'
               }`}
             >
               {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.label ?? d}

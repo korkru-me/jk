@@ -97,7 +97,7 @@ export function StudentScoreTable({
   const editingSubOverride = editingId ? overrides.filter(o => o.submissionId === editingId) : []
 
   function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ChevronUp className="w-3 h-3 text-gray-200" />
+    if (sortKey !== col) return <ChevronUp className="w-3 h-3 text-muted-foreground/30" />
     return sortDir === 'asc'
       ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
       : <ChevronDown className="w-3 h-3 text-muted-foreground" />

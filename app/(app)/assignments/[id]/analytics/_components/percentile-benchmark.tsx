@@ -35,7 +35,7 @@ export function PercentileBenchmark({ mean, assignmentId, passingPercent = null 
   const benchmarks = [
     { label: 'ห้องเรียนนี้',      value: mean,        color: 'bg-primary' },
     { label: 'ค่าเฉลี่ยประเทศ',  value: nationMean,  color: 'bg-muted' },
-    ...(passingPercent != null ? [{ label: 'เกณฑ์ผ่าน', value: Math.round(passingPercent), color: 'bg-red-300' }] : []),
+    ...(passingPercent != null ? [{ label: 'เกณฑ์ผ่าน', value: Math.round(passingPercent), color: 'bg-destructive/50' }] : []),
   ]
 
   return (
@@ -75,7 +75,7 @@ export function PercentileBenchmark({ mean, assignmentId, passingPercent = null 
           />
           {/* needle */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-card ring-2 ring-gray-700 rounded-full shadow-md transition-all duration-700"
+            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-card ring-2 ring-border rounded-full shadow-md transition-all duration-700"
             style={{ left: `calc(${rawPercentile}% - 8px)` }}
           />
         </div>
