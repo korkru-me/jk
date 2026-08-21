@@ -136,6 +136,10 @@ export function VariableEditor({
     ))
   }
 
+  function patchVar(index: number, patch: Partial<Variable>) {
+    onChange(variables.map((v, i) => (i === index ? { ...v, ...patch } : v)))
+  }
+
   function removeVar(index: number) {
     onChange(variables.filter((_, i) => i !== index))
   }
@@ -331,13 +335,15 @@ export function VariableEditor({
             <p className="text-xs text-primary leading-relaxed">
               <span className="font-semibold">ขนาดก้าว</span>{' '}
               คือระยะห่างระหว่างค่าที่จะสุ่ม เช่น ต่ำสุด=9, สูงสุด=10, ขนาดก้าว=0.2 → 9, 9.2, 9.4, 9.6, 9.8, 10
+              {' — '}ถ้าค่าที่ต้องการห่างไม่เท่ากัน (เช่น 0.1, 0.2, 0.5) ให้สลับไปโหมด{' '}
+              <span className="font-semibold">ระบุค่าเอง</span>
             </p>
           </div>
 
           {variables.map((v, i) =>
             v.type === 'reference'
               ? <ReferenceCard key={i} v={v} index={i} onUpdate={updateVar} onRemove={removeVar} />
-              : <ValueCard key={i} v={v} index={i} onUpdate={updateVar} onRemove={removeVar} />
+              : <ValueCard key={i} v={v} index={i} onUpdate={updateVar} onPatch={patchVar} onRemove={removeVar} />
           )}
         </div>
       )}
@@ -430,51 +436,151 @@ function EmptyHint({ text }: { text: string }) {
   )
 }
 
-function ValueCard({ v, index, onUpdate, onRemove }: {
+// Two ways to describe a random variable: an evenly spaced ladder
+// (min/max/step) or an explicit list of the only values that make physical
+// sense (mu = 0.1, 0.2, 0.5). `values` on the variable is what distinguishes
+// them — see Variable.values in lib/types.ts.
+function parseValueList(raw: string): number[] {
+  return raw
+    .split(/[,\s]+/)
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter(n => isFinite(n))
+}
+
+function ValueCard({ v, index, onUpdate, onPatch, onRemove }: {
   v: Variable; index: number
   onUpdate: (i: number, f: keyof Variable, val: string) => void
+  onPatch: (i: number, patch: Partial<Variable>) => void
   onRemove: (i: number) => void
 }) {
+  const isDerived = !!v.formula?.trim()
+  const isList = !isDerived && Array.isArray(v.values) && v.values.length > 0
+  // Kept local so half-typed input ("0.1, 0.2,") survives re-render — the
+  // parsed numbers are pushed up to the variable on every keystroke.
+  const [listText, setListText] = useState((v.values ?? []).join(', '))
+
+  function switchToList() {
+    const seeded = [v.min, v.max].filter(n => isFinite(n))
+    setListText(seeded.join(', '))
+    onPatch(index, { values: seeded, formula: undefined })
+  }
+
+  function switchToRange() {
+    onPatch(index, { values: undefined, formula: undefined })
+  }
+
+  function switchToDerived() {
+    // A space, not '', so the mode sticks while the teacher is still typing —
+    // an empty formula would read as "not derived" and flip the tab back.
+    onPatch(index, { formula: v.formula || ' ', values: undefined })
+  }
+
+  function handleListChange(raw: string) {
+    setListText(raw)
+    const nums = parseValueList(raw)
+    // min/max stay in sync with the list's ends so anything still reading
+    // min/max (old rows, the preview's mock values) lands inside the list.
+    onPatch(index, nums.length > 0
+      ? { values: nums, min: Math.min(...nums), max: Math.max(...nums) }
+      : { values: nums })
+  }
+
   return (
     <Card radius="md" className="group p-3.5 hover:border-primary/20 hover:shadow-sm transition-all">
-      <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2.5 items-end">
+      <div className="flex items-start gap-2.5">
         {/* Variable badge */}
-        <div className="flex items-end pb-0.5">
-          <span className="font-mono font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg text-sm border border-primary/20">
-            {'{' + v.name + '}'}
-          </span>
-        </div>
+        <span className="font-mono font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg text-sm border border-primary/20 mt-5 shrink-0">
+          {'{' + v.name + '}'}
+        </span>
 
-        {/* Min / Max / Step */}
-        {(['min', 'max', 'step'] as const).map(field => (
-          <div key={field}>
-            <Label className="text-xs text-muted-foreground font-medium">
-              {field === 'min' ? 'ต่ำสุด' : field === 'max' ? 'สูงสุด' : 'ขนาดก้าว'}
-            </Label>
-            <Input
-              type="number"
-              value={v[field] as number}
-              onChange={e => onUpdate(index, field, e.target.value)}
-              className="h-8 text-sm"
-              step="any"
-              min={field === 'step' ? '0.0001' : undefined}
-            />
+        <div className="flex-1 min-w-0 space-y-2">
+          {/* How this variable gets its value */}
+          <div className="flex gap-1">
+            <VarModeChip active={!isList && !isDerived} label="ช่วงค่า" onClick={switchToRange} />
+            <VarModeChip active={isList} label="ระบุค่าเอง" onClick={switchToList} />
+            <VarModeChip active={isDerived} label="คำนวณ" onClick={switchToDerived} />
           </div>
-        ))}
+
+          {isDerived ? (
+            <div>
+              <Label className="text-xs text-muted-foreground font-medium">
+                คำนวณจากตัวแปรอื่น
+              </Label>
+              <Input
+                value={v.formula ?? ''}
+                onChange={e => onPatch(index, { formula: e.target.value })}
+                placeholder="เช่น l*0.4"
+                className="h-8 text-sm font-mono"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                ไม่ถูกสุ่ม แต่คำนวณหลังสุ่มตัวแปรอื่นเสร็จ ใช้ใน {'{' + v.name + '}'} และในสูตรเฉลยได้
+              </p>
+            </div>
+          ) : isList ? (
+            <div>
+              <Label className="text-xs text-muted-foreground font-medium">
+                ค่าที่จะสุ่ม (คั่นด้วยจุลภาค)
+              </Label>
+              <Input
+                value={listText}
+                onChange={e => handleListChange(e.target.value)}
+                placeholder="เช่น 0.1, 0.2, 0.5"
+                className="h-8 text-sm font-mono"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {(v.values?.length ?? 0) > 0
+                  ? `สุ่มจาก ${v.values!.length} ค่านี้เท่านั้น`
+                  : 'ยังไม่มีค่า — จะกลับไปใช้ช่วงค่าแทน'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2.5">
+              {(['min', 'max', 'step'] as const).map(field => (
+                <div key={field}>
+                  <Label className="text-xs text-muted-foreground font-medium">
+                    {field === 'min' ? 'ต่ำสุด' : field === 'max' ? 'สูงสุด' : 'ขนาดก้าว'}
+                  </Label>
+                  <Input
+                    type="number"
+                    value={v[field] as number}
+                    onChange={e => onUpdate(index, field, e.target.value)}
+                    className="h-8 text-sm"
+                    step="any"
+                    min={field === 'step' ? '0.0001' : undefined}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Remove */}
-        <div className="flex items-end pb-0.5">
-          <button
-            type="button"
-            onClick={() => onRemove(index)}
-            title="ลบตัวแปรนี้"
-            className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
-          >
-            ✕
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          title="ลบตัวแปรนี้"
+          className="mt-5 h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+        >
+          ✕
+        </button>
       </div>
     </Card>
+  )
+}
+
+function VarModeChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant={active ? 'secondary' : 'ghost'}
+      onClick={onClick}
+      className={active ? 'text-primary' : 'text-muted-foreground'}
+    >
+      {label}
+    </Button>
   )
 }
 

@@ -218,6 +218,19 @@ export interface Variable {
   min: number
   max: number
   step: number
+  /** Draw from this explicit list instead of the min/max/step ladder. Used for
+   *  quantities whose sensible values aren't evenly spaced (mu = 0.1, 0.2, 0.5;
+   *  m = 1, 4, 9, 16). When present and non-empty it takes precedence over
+   *  min/max/step everywhere values are sampled; min/max are still kept in sync
+   *  with the list's ends so older readers degrade to a plausible range. */
+  values?: number[]
+  /** Computed from the other variables instead of drawn at random — the beam
+   *  length `l` is random, the load sits at `lm = l*0.4`. Evaluated right after
+   *  sampling (so logic rules and `{lm}` in the question text both see it) and
+   *  frozen into the attempt's random_values like any other value. Takes
+   *  precedence over `values`/min/max/step; may reference other derived
+   *  variables, but a reference cycle simply leaves the variable unset. */
+  formula?: string
   unit?: string
   type?: 'value' | 'reference'
   reference_question_order?: number

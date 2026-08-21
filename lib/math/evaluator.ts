@@ -64,6 +64,54 @@ function getStep(v: Variable): number {
   return legacy !== undefined ? Math.pow(10, -legacy) : 1
 }
 
+// Some quantities only make sense at a handful of unevenly spaced values
+// (mu = 0.1, 0.2, 0.5), which the min/max/step ladder can't express. When a
+// variable carries an explicit `values` list, every sampler draws from it
+// instead — see Variable.values in lib/types.ts.
+function hasValueList(v: Variable): boolean {
+  return Array.isArray(v.values) && v.values.length > 0
+}
+
+function pickFromList(values: number[]): number {
+  return values[Math.floor(Math.random() * values.length)]
+}
+
+/** One sample of `v`, honouring constant → value-list → min/max/step in that order. */
+function sampleVariable(v: Variable): number {
+  if (v.is_constant) return v.constant_value ?? v.min
+  if (hasValueList(v)) return pickFromList(v.values!)
+  return randomFromStep(v.min, v.max, getStep(v))
+}
+
+function isDerived(v: Variable): boolean {
+  return typeof v.formula === 'string' && v.formula.trim().length > 0
+}
+
+/**
+ * Fills in the variables that are computed rather than drawn — see
+ * Variable.formula. Written into `values` in place, so callers get derived
+ * values in the same record as the sampled ones and nothing downstream has to
+ * know the difference.
+ *
+ * A derived variable may depend on another, so this repeats until nothing new
+ * resolves. Each pass resolves at least one variable or stops, which bounds a
+ * chain of N variables at N passes and leaves a reference cycle simply unset
+ * rather than looping.
+ */
+function resolveDerived(derived: Variable[], values: Record<string, number>): void {
+  let pending = derived
+  for (let pass = 0; pass < derived.length && pending.length > 0; pass++) {
+    const unresolved: Variable[] = []
+    for (const v of pending) {
+      const result = evaluateFormula(v.formula as string, values)
+      if (typeof result === 'number' && isFinite(result)) values[v.name] = result
+      else unresolved.push(v)
+    }
+    if (unresolved.length === pending.length) break
+    pending = unresolved
+  }
+}
+
 // ─── isNiceNumber ─────────────────────────────────────────────────────────────
 // Returns true when |value| is a multiple of step within floating-point tolerance.
 
@@ -119,14 +167,22 @@ function checkConstraints(values: Record<string, number>, rules: LogicRule[]): b
 
 // ─── Sampling ─────────────────────────────────────────────────────────────────
 
-function sampleValues(variables: Variable[], exclude: Set<string> = new Set()): Record<string, number> {
-  const values: Record<string, number> = {}
+// `seed` holds values decided elsewhere (currently the Pythagorean triples),
+// passed in rather than merged afterwards so that derived variables can be
+// computed from them.
+function sampleValues(
+  variables: Variable[],
+  exclude: Set<string> = new Set(),
+  seed: Record<string, number> = {},
+): Record<string, number> {
+  const values: Record<string, number> = { ...seed }
+  const derived: Variable[] = []
   for (const v of variables) {
     if (v.type === 'reference' || v.is_answer || exclude.has(v.name)) continue
-    values[v.name] = v.is_constant
-      ? (v.constant_value ?? v.min)
-      : randomFromStep(v.min, v.max, getStep(v))
+    if (isDerived(v)) { derived.push(v); continue }
+    values[v.name] = sampleVariable(v)
   }
+  resolveDerived(derived, values)
   return values
 }
 
@@ -172,8 +228,7 @@ export function randomizeVariables(
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const pyValues = hasPythagorean ? samplePythagoreanValues(pythagoreanGroups) : {}
-    const normalValues = sampleValues(variables, pythagoreanVarNames)
-    const values = { ...pyValues, ...normalValues }
+    const values = sampleValues(variables, pythagoreanVarNames, pyValues)
 
     if (!checkConstraints(values, logicRules)) continue
 
@@ -189,7 +244,7 @@ export function randomizeVariables(
 
   // Fallback after exhausting attempts
   const pyValues = hasPythagorean ? samplePythagoreanValues(pythagoreanGroups) : {}
-  return { ...pyValues, ...sampleValues(variables, pythagoreanVarNames) }
+  return sampleValues(variables, pythagoreanVarNames, pyValues)
 }
 
 // ─── Trial runner (for preview UI) ───────────────────────────────────────────
@@ -232,8 +287,7 @@ export function runTrials(
 
   for (let i = 0; i < trialCount; i++) {
     const pyValues = pythagoreanGroups.length > 0 ? samplePythagoreanValues(pythagoreanGroups) : {}
-    const normalValues = sampleValues(variables, pythagoreanVarNames)
-    const values = { ...pyValues, ...normalValues }
+    const values = sampleValues(variables, pythagoreanVarNames, pyValues)
 
     if (!checkConstraints(values, logicRules)) continue
 
@@ -377,16 +431,18 @@ export function evaluateMultiStep(
   const prevAnswers: number[] = []
   return subQuestions.map((sq) => {
     const values: Record<string, number> = {}
+    const derived: Variable[] = []
     for (const v of sq.variables) {
       if (v.type === 'reference') {
         const idx = (v.reference_question_order ?? 1) - 1
         values[v.name] = prevAnswers[idx] ?? 0
+      } else if (isDerived(v)) {
+        derived.push(v)
       } else {
-        values[v.name] = v.is_constant
-          ? (v.constant_value ?? v.min)
-          : randomFromStep(v.min, v.max, getStep(v))
+        values[v.name] = sampleVariable(v)
       }
     }
+    resolveDerived(derived, values)
     const answer = evaluateFormula(sq.answer_formula, values)
     prevAnswers.push(typeof answer === 'number' ? answer : 0)
     return { values, answer }
@@ -400,8 +456,15 @@ export function liveCalculate(
   variables: Variable[]
 ): number | string {
   const mockValues: Record<string, number> = {}
+  const derived: Variable[] = []
   for (const v of variables) {
-    mockValues[v.name] = v.type === 'reference' ? 1 : (v.min + v.max) / 2
+    if (isDerived(v)) { derived.push(v); continue }
+    mockValues[v.name] = v.type === 'reference'
+      ? 1
+      : hasValueList(v)
+        ? v.values![Math.floor(v.values!.length / 2)]
+        : (v.min + v.max) / 2
   }
+  resolveDerived(derived, mockValues)
   return evaluateFormula(formula, mockValues)
 }
