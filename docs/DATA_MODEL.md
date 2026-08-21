@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 18 สิงหาคม 2026
+อัปเดตล่าสุด: 21 สิงหาคม 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -21,7 +21,7 @@ Invariant สำคัญ:
 
 ## คลังโจทย์
 
-- `question_categories` — หมวดหมู่แบบ parent/child
+- `question_categories` — หมวดหมู่แบบ parent/child เป็น taxonomy กลางร่วมทุก organization เขียนได้เฉพาะทาง admin action (`lib/actions/admin.ts`) การนำเข้าไฟล์จึงจับคู่ตามชื่อเท่านั้น ไม่สร้างหมวดใหม่
 - `questions` — เนื้อหา ชนิด เฉลย ตัวแปร การมองเห็น และ metadata
 - `formula_presets` — สมการ/ตัวแปรที่นำกลับมาใช้
 - `question_sets` — รายการ `question_ids` ที่บันทึกเป็นชุด
