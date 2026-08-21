@@ -386,22 +386,28 @@ function hashOf(buffer) {
 
 // ─── Question mapping ────────────────────────────────────────────────────────
 
-const BASE_QUESTION = {
-  difficulty: 'medium',
-  is_random: false,
-  variables: [],
-  logic_rules: [],
-  answer_formula: '',
-  answer_unit: null,
-  answer_tolerance: 0.01,
-  answer_parts: null,
-  mcq_options: null,
-  extra_data: {},
-  solution_text: null,
-  solution_image_urls: [],
-  tags: null,
-  image_urls: [],
-  requires_work_image: false,
+// A function, not a shared constant: the arrays and objects here are per
+// question and some of them get mutated (image URLs are pushed in once the
+// upload resolves), so handing every question the same literal would pool
+// every question's images into one list.
+function baseQuestion() {
+  return {
+    difficulty: 'medium',
+    is_random: false,
+    variables: [],
+    logic_rules: [],
+    answer_formula: '',
+    answer_unit: null,
+    answer_tolerance: 0.01,
+    answer_parts: null,
+    mcq_options: null,
+    extra_data: {},
+    solution_text: null,
+    solution_image_urls: [],
+    tags: null,
+    image_urls: [],
+    requires_work_image: false,
+  }
 }
 
 function optionRows(plugin, key) {
@@ -432,7 +438,7 @@ function convertQuestion(q, ctx) {
   const slots = []
 
   const question = {
-    ...BASE_QUESTION,
+    ...baseQuestion(),
     title,
     // A stem that was nothing but a diagram would leave the question looking
     // blank in the editor, so the Moodle question name stands in for it.
