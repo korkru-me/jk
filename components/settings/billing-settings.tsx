@@ -187,13 +187,11 @@ export function BillingSettings() {
                 <p className="text-sm text-muted-foreground">ยกเลิกการต่ออายุอัตโนมัติ</p>
                 <p className="text-xs text-muted-foreground/70">การเข้าถึงจะยังคงอยู่จนถึง {NEXT_BILLING}</p>
               </div>
-              <button
+              <Button variant="link" size="xs"
                 type="button"
-                onClick={() => setShowCancelConfirm(true)}
-                className="text-xs text-muted-foreground hover:text-destructive transition-colors underline-offset-2 hover:underline"
-              >
+                onClick={() => setShowCancelConfirm(true)} className="text-muted-foreground hover:text-destructive">
                 ยกเลิกการต่ออายุ
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="bg-destructive/8 border border-destructive/30 rounded-xl p-4">
@@ -254,14 +252,12 @@ export function BillingSettings() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button
+                    <Button variant="link" size="xs"
                       type="button"
-                      onClick={() => handleDownloadInvoice(inv.id)}
-                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium hover:underline underline-offset-2 transition-colors"
-                    >
+                      onClick={() => handleDownloadInvoice(inv.id)} className="inline-flex items-center gap-1.5 hover:text-primary/80">
                       <Download size={12} />
                       PDF
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

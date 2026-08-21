@@ -160,24 +160,20 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPreview(q)}
-                      className="text-xs text-primary hover:underline"
-                    >
+                    <Button variant="link" size="xs"
+                      onClick={() => setPreview(q)}>
                       ดู
-                    </button>
+                    </Button>
                     <Link
                       href={`/questions/${q.id}/edit`}
                       className="text-xs text-muted-foreground hover:underline"
                     >
                       แก้ไข
                     </Link>
-                    <button
-                      onClick={() => handleDelete(q.id, q.title)}
-                      className="text-xs text-destructive hover:underline"
-                    >
+                    <Button variant="link" size="xs"
+                      onClick={() => handleDelete(q.id, q.title)} className="text-destructive">
                       ลบ
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>

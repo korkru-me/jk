@@ -2,6 +2,7 @@
 
 import { GitFork, Tag } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 const TEMPLATES = [
   {
@@ -44,7 +45,7 @@ export function ForkRemix() {
           <GitFork className="w-4 h-4 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Fork & Remix</p>
         </div>
-        <button className="text-xs text-primary hover:underline">ดูคลัง</button>
+        <Button variant="link" size="xs">ดูคลัง</Button>
       </div>
       <div className="p-3 space-y-2">
         {TEMPLATES.map(tpl => (

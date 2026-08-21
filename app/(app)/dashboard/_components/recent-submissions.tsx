@@ -2,6 +2,7 @@
 
 import { Clock, CheckCircle2, AlertCircle, FileText } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 const SUBMISSIONS = [
   {
@@ -67,7 +68,7 @@ export function RecentSubmissions() {
     <Card radius="md" edge="ring" className="overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <p className="text-sm font-semibold text-foreground">การส่งงานล่าสุด</p>
-        <button className="text-xs text-primary hover:underline">ดูทั้งหมด</button>
+        <Button variant="link" size="xs">ดูทั้งหมด</Button>
       </div>
       <div className="divide-y divide-border">
         {SUBMISSIONS.map(sub => {

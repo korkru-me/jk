@@ -133,8 +133,8 @@ export function PresetsTable({
                 <td className="px-4 py-3 font-mono text-sm">{p.target_variable}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <button onClick={() => openEdit(p)} className="text-xs text-primary hover:underline">แก้ไข</button>
-                    <button onClick={() => handleDelete(p.id, p.formula_name)} className="text-xs text-destructive hover:underline">ลบ</button>
+                    <Button variant="link" size="xs" onClick={() => openEdit(p)}>แก้ไข</Button>
+                    <Button variant="link" size="xs" onClick={() => handleDelete(p.id, p.formula_name)} className="text-destructive">ลบ</Button>
                   </div>
                 </td>
               </tr>

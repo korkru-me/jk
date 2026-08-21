@@ -2,6 +2,7 @@
 
 import { Clock, FileEdit, ChevronRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 const DRAFTS = [
   {
@@ -38,7 +39,7 @@ export function RecentDrafts() {
           <FileEdit className="w-4 h-4 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">แบบร่างที่ค้างไว้</p>
         </div>
-        <button className="text-xs text-primary hover:underline">ดูทั้งหมด</button>
+        <Button variant="link" size="xs">ดูทั้งหมด</Button>
       </div>
       <div className="divide-y divide-border">
         {DRAFTS.map(draft => (

@@ -55,10 +55,10 @@ function CategoryRow({
       </div>
       <div className="flex items-center gap-2">
         {!isChild && (
-          <button onClick={() => onAddChild(cat.id)} className="text-xs text-primary hover:underline">+ หมวดย่อย</button>
+          <Button variant="link" size="xs" onClick={() => onAddChild(cat.id)}>+ หมวดย่อย</Button>
         )}
-        <button onClick={() => onEdit(cat)} className="text-xs text-muted-foreground hover:underline">แก้ไข</button>
-        <button onClick={handleDelete} disabled={isPending} className="text-xs text-destructive hover:underline disabled:opacity-50">ลบ</button>
+        <Button variant="link" size="xs" onClick={() => onEdit(cat)} className="text-muted-foreground">แก้ไข</Button>
+        <Button variant="link" size="xs" onClick={handleDelete} disabled={isPending} className="disabled:opacity-50">ลบ</Button>
       </div>
     </div>
   )

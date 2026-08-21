@@ -150,12 +150,10 @@ export function UsersTable({ users }: { users: Row[] }) {
                 <td className="px-4 py-3">
                   {u.role !== 'admin' && (
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => { setRoleTarget(u); setNewRole(u.role === 'teacher' ? 'student' : 'teacher') }}
-                        className="text-xs text-primary hover:underline"
-                      >
+                      <Button variant="link" size="xs"
+                        onClick={() => { setRoleTarget(u); setNewRole(u.role === 'teacher' ? 'student' : 'teacher') }}>
                         เปลี่ยน Role
-                      </button>
+                      </Button>
                       <button
                         onClick={() => handleSuspend(u)}
                         disabled={isPending}
@@ -165,13 +163,11 @@ export function UsersTable({ users }: { users: Row[] }) {
                       >
                         {u.status === 'suspended' ? 'คืนสิทธิ์' : 'ระงับ'}
                       </button>
-                      <button
+                      <Button variant="link" size="xs"
                         onClick={() => handleDelete(u)}
-                        disabled={isPending}
-                        className="text-xs text-destructive hover:underline disabled:opacity-50"
-                      >
+                        disabled={isPending} className="disabled:opacity-50">
                         ลบ
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </td>

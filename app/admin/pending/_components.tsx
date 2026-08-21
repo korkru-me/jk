@@ -82,25 +82,19 @@ export function PendingTable({ questions }: { questions: Row[] }) {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPreview(q)}
-                      className="text-xs text-primary hover:underline"
-                    >
+                    <Button variant="link" size="xs"
+                      onClick={() => setPreview(q)}>
                       ดูโจทย์
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="link" size="xs"
                       onClick={() => handleApprove(q.id, q.title)}
-                      disabled={isPending}
-                      className="text-xs text-success hover:underline disabled:opacity-50"
-                    >
+                      disabled={isPending} className="text-success disabled:opacity-50">
                       อนุมัติ
-                    </button>
-                    <button
-                      onClick={() => { setRejectTarget(q); setReason('') }}
-                      className="text-xs text-destructive hover:underline"
-                    >
+                    </Button>
+                    <Button variant="link" size="xs"
+                      onClick={() => { setRejectTarget(q); setReason('') }} className="text-destructive">
                       ปฏิเสธ
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>

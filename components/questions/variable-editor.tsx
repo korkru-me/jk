@@ -313,13 +313,11 @@ export function VariableEditor({
           {/* Reference vars (multi-step only) */}
           {hasRefs && (
             <div className="pt-2 border-t border-border">
-              <button
+              <Button variant="link" size="xs"
                 type="button"
-                onClick={() => onChange([...variables, { ...EMPTY_REF }])}
-                className="text-xs text-primary font-semibold hover:text-primary hover:underline"
-              >
+                onClick={() => onChange([...variables, { ...EMPTY_REF }])} className="font-semibold hover:text-primary">
                 + เพิ่มตัวแปรอ้างอิงคำตอบ (multi-step)
-              </button>
+              </Button>
             </div>
           )}
         </div>

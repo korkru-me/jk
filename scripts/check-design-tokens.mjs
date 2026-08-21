@@ -82,21 +82,64 @@ function countHandRolledCards(src) {
   return n
 }
 
+
+/**
+ * Attributes of every `<name ...>` opening tag.
+ *
+ * A regex like /<button\b([^>]*)>/ stops at the first `>`, which lands inside
+ * `onClick={() => f()}` — that undercounted buttons 80 against a true 340.
+ * This walks the tag honouring quotes and JSX braces instead.
+ */
+function openingTags(src, name) {
+  const out = []
+  let i = 0
+  while ((i = src.indexOf(`<${name}`, i)) !== -1) {
+    const after = src[i + 1 + name.length]
+    if (after && !' \n\t/>'.includes(after)) { i += 1; continue }
+    let j = i + 1 + name.length
+    let depth = 0
+    let quote = null
+    while (j < src.length) {
+      const c = src[j]
+      if (quote) { if (c === quote) quote = null }
+      else if (c === '"' || c === "'" || c === '`') quote = c
+      else if (c === '{') depth++
+      else if (c === '}') depth--
+      else if (c === '>' && depth === 0) break
+      j++
+    }
+    out.push(src.slice(i, j + 1))
+    i = j + 1
+  }
+  return out
+}
+
+const STYLED = /className=[{"][^"}]*(?:bg-|border|rounded|px-|py-|p-\d|hover:)/
+
 /**
  * Form controls styled by hand instead of using Input / Textarea /
  * NativeSelect. Checkbox, radio, file, range and colour are exempt — the
  * text-field styling does not apply to them.
  */
-const CONTROL = /<(input|select|textarea)\b([^>]*)>/g
-
 function countHandRolledControls(src) {
   let n = 0
-  for (const [, , attrs] of src.matchAll(CONTROL)) {
-    const type = /type="(\w+)"/.exec(attrs)?.[1]
-    if (type && ['checkbox', 'radio', 'file', 'range', 'color', 'hidden'].includes(type)) continue
-    if (/className="[^"]*\b(border|rounded|bg-card|bg-background)\b/.test(attrs)) n++
+  for (const name of ['input', 'select', 'textarea']) {
+    for (const tag of openingTags(src, name)) {
+      const type = /type="(\w+)"/.exec(tag)?.[1]
+      if (type && ['checkbox', 'radio', 'file', 'range', 'color', 'hidden'].includes(type)) continue
+      if (/className=[{"][^"}]*(?:border|rounded|bg-card|bg-background)/.test(tag)) n++
+    }
   }
   return n
+}
+
+/**
+ * Buttons styled by hand instead of using Button / IconButton. Counted only
+ * when they carry visual styling — a bare <button> wrapping a custom element
+ * is a legitimate hit target, not a styled control.
+ */
+function countHandRolledButtons(src) {
+  return openingTags(src, 'button').filter((t) => STYLED.test(t)).length
 }
 
 async function walk(dir, out = []) {
@@ -121,13 +164,14 @@ for (const rel of files) {
   const palette = countPalette(src)
   const card = countHandRolledCards(src)
   const control = countHandRolledControls(src)
+  const button = countHandRolledButtons(src)
   const malformed = countMalformed(src)
   if (malformed) {
     console.error(`malformed class (two opacity modifiers) in ${rel}:`)
     for (const m of src.match(MALFORMED)) console.error(`  ${m}`)
     process.exitCode = 1
   }
-  if (palette || card || control) current[rel] = { palette, card, control }
+  if (palette || card || control || button) current[rel] = { palette, card, control, button }
 }
 
 const total = (m, k) => Object.values(m).reduce((a, v) => a + v[k], 0)
@@ -144,8 +188,8 @@ if (UPDATE || !existsSync(BASELINE)) {
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))
 const regressions = []
 for (const [rel, counts] of Object.entries(current)) {
-  const was = baseline[rel] ?? { palette: 0, card: 0, control: 0 }
-  for (const kind of ['palette', 'card', 'control']) {
+  const was = baseline[rel] ?? { palette: 0, card: 0, control: 0, button: 0 }
+  for (const kind of ['palette', 'card', 'control', 'button']) {
     if (counts[kind] > was[kind]) {
       regressions.push({ rel, kind, was: was[kind], now: counts[kind] })
     }
@@ -162,6 +206,9 @@ console.log(`hand-rolled cards: ${nowC}  (baseline ${wasC}, ${nowC - wasC >= 0 ?
 const nowF = total(current, 'control')
 const wasF = total(baseline, 'control')
 console.log(`hand-rolled form controls: ${nowF}  (baseline ${wasF}, ${nowF - wasF >= 0 ? '+' : ''}${nowF - wasF})`)
+const nowB = total(current, 'button')
+const wasB = total(baseline, 'button')
+console.log(`hand-rolled buttons: ${nowB}  (baseline ${wasB}, ${nowB - wasB >= 0 ? '+' : ''}${nowB - wasB})`)
 
 if (regressions.length) {
   const files = new Set(regressions.map((r) => r.rel)).size
@@ -171,7 +218,8 @@ if (regressions.length) {
   for (const r of regressions) {
     const what = r.kind === 'palette' ? 'raw palette classes'
       : r.kind === 'card' ? 'hand-rolled card surfaces'
-      : 'hand-rolled form controls'
+      : r.kind === 'control' ? 'hand-rolled form controls'
+      : 'hand-rolled buttons'
     console.error(`  ${r.rel}\n    ${what}: ${r.was} -> ${r.now}`)
   }
   console.error(

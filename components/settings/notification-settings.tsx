@@ -122,26 +122,22 @@ export function NotificationSettings() {
               <Mail size={12} className="text-muted-foreground" />
               <p className="text-xs font-bold text-muted-foreground">อีเมล</p>
             </div>
-            <button
+            <Button variant="link" size="sm"
               type="button"
-              onClick={() => setAll('email', !emailAllOn)}
-              className="text-[10px] text-primary hover:underline"
-            >
+              onClick={() => setAll('email', !emailAllOn)} className="text-[10px]">
               {emailAllOn ? 'ปิดทั้งหมด' : 'เปิดทั้งหมด'}
-            </button>
+            </Button>
           </div>
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-1.5">
               <BellRing size={12} className="text-muted-foreground" />
               <p className="text-xs font-bold text-muted-foreground">ในระบบ</p>
             </div>
-            <button
+            <Button variant="link" size="sm"
               type="button"
-              onClick={() => setAll('inapp', !inappAllOn)}
-              className="text-[10px] text-primary hover:underline"
-            >
+              onClick={() => setAll('inapp', !inappAllOn)} className="text-[10px]">
               {inappAllOn ? 'ปิดทั้งหมด' : 'เปิดทั้งหมด'}
-            </button>
+            </Button>
           </div>
         </div>
 

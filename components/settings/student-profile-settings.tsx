@@ -137,13 +137,11 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
             <p className="text-sm font-medium">{displayName}</p>
             <p className="text-xs text-muted-foreground">{user.email}</p>
             <p className="text-[10px] text-muted-foreground">สมาชิกตั้งแต่ {joinedDate}</p>
-            <button
+            <Button variant="link" size="xs"
               type="button"
-              onClick={() => fileRef.current?.click()}
-              className="text-xs text-primary hover:underline font-medium"
-            >
+              onClick={() => fileRef.current?.click()}>
               เปลี่ยนรูปโปรไฟล์
-            </button>
+            </Button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           </div>
         </div>
@@ -308,13 +306,11 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
                 </div>
               ))}
               {guardians.length < MAX_GUARDIANS && (
-                <button
+                <Button variant="link" size="xs"
                   type="button"
-                  onClick={addGuardian}
-                  className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                >
+                  onClick={addGuardian} className="flex items-center gap-1.5">
                   <Plus size={14} /> เพิ่มผู้ปกครองอีกคน
-                </button>
+                </Button>
               )}
             </div>
           </div>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { Plus, CheckSquare, X, Archive, Trash2, BookOpen, Users, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { buttonVariants } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { bulkDeleteClassrooms, bulkArchiveClassrooms, togglePinClassroom } from '@/lib/actions/classrooms'
 import { ClassroomCard } from './classroom-card'
 import { HomeroomBanner } from './homeroom-banner'
@@ -142,12 +142,10 @@ export function TeacherViewClient({
           <span className="text-sm font-medium text-primary">
             เลือกแล้ว {selected.size} ห้องเรียน
           </span>
-          <button
-            onClick={selected.size === classrooms.length ? () => setSelected(new Set()) : selectAll}
-            className="text-xs text-primary underline hover:text-primary"
-          >
+          <Button variant="link" size="xs"
+            onClick={selected.size === classrooms.length ? () => setSelected(new Set()) : selectAll} className="hover:text-primary">
             {selected.size === classrooms.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
-          </button>
+          </Button>
         </div>
       )}
 

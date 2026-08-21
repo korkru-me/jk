@@ -20,6 +20,7 @@ import type { SortKey as StudentTableSortKey, SortDir as StudentTableSortDir } f
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey } from '@/lib/student-sort'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'ส่งแล้ว', graded: 'ส่งแล้ว', in_progress: 'กำลังทำ',
@@ -257,9 +258,9 @@ export function ClassroomScoresMatrix({
         <Info className="w-3.5 h-3.5 shrink-0" />
         รายชื่อเรียงตาม<strong className="font-semibold text-muted-foreground">{sortLabel}</strong> ({sortDir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'}) ตามที่ตั้งไว้ที่แท็บ
         {onViewStudents ? (
-          <button onClick={onViewStudents} className="text-primary hover:underline font-medium">
+          <Button variant="link" size="sm" onClick={onViewStudents}>
             &ldquo;นักเรียน&rdquo;
-          </button>
+          </Button>
         ) : (
           <span className="font-medium text-muted-foreground">&ldquo;นักเรียน&rdquo;</span>
         )}

@@ -16,6 +16,7 @@ import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview
 import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib/student-sort'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 export type SortKey = StudentSortKey
 export type SortDir = StudentSortDir
@@ -169,12 +170,10 @@ export function StudentTable({
                     <p className="text-sm font-medium text-foreground truncate">{student.full_name}</p>
                     <p className="text-xs text-muted-foreground truncate">{student.email}</p>
                     {showProfiles && (
-                      <button
-                        onClick={() => setViewingProfile(student)}
-                        className="flex items-center gap-1 text-[11px] text-primary hover:underline font-medium mt-0.5"
-                      >
+                      <Button variant="link" size="sm"
+                        onClick={() => setViewingProfile(student)} className="flex items-center gap-1 text-[11px] mt-0.5">
                         <IdCard className="w-3 h-3" /> ดูข้อมูลนักเรียน
-                      </button>
+                      </Button>
                     )}
                   </div>
 
