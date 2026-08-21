@@ -1,6 +1,7 @@
 import type {
   Question, QuestionType, Difficulty, Variable, LogicRule, AnswerPart, MCQOption,
   TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig,
+  CompositeConfig,
 } from '@/lib/types'
 
 export const EXPORT_FORMAT = 'korkru.question_export'
@@ -22,7 +23,9 @@ export interface PortableQuestion {
   answer_tolerance: number
   answer_parts: AnswerPart[] | null
   mcq_options: MCQOption[] | null
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | Record<string, never>
+  // Mirrors Question.extra_data — CompositeConfig included, so composite and
+  // "ถูก-ผิดแบบชุด" questions survive an export/import round trip.
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | Record<string, never>
   solution_text: string | null
   solution_image_urls: string[]
   tags: string[] | null

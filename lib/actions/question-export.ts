@@ -131,15 +131,46 @@ async function resolveUniqueTitle(supabase: Awaited<ReturnType<typeof createClie
   return `${baseTitle} (${n})`
 }
 
-async function resolveCategoryId(supabase: Awaited<ReturnType<typeof createClient>>, name: string | null) {
-  if (!name) return null
-  const { data } = await supabase
-    .from('question_categories')
-    .select('id')
-    .ilike('name', escapeLike(name))
-    .limit(1)
-    .maybeSingle()
-  return data?.id ?? null
+interface CategoryRow { id: string; name: string; parent_id: string | null }
+
+/**
+ * Resolves the `category_name` carried in an export file to an existing
+ * category id, by name.
+ *
+ * Categories are a global, admin-managed taxonomy — an import never creates
+ * one (see bulkCreateCategories in lib/actions/admin.ts for that). A name with
+ * no match resolves to null, which is a valid `questions.category_id`, so an
+ * unrecognised category costs the question its category rather than its import.
+ *
+ * `category_name` may be a single name or a "หมวดหลัก / หมวดย่อย" path; the
+ * path form disambiguates the sub-categories that repeat under several parents
+ * ("นิยาม" exists under more than one topic in a real bank).
+ */
+function makeCategoryResolver(categories: CategoryRow[]) {
+  const norm = (s: string) => s.trim().toLowerCase()
+
+  const byName = new Map<string, CategoryRow[]>()
+  for (const c of categories) {
+    const k = norm(c.name)
+    const bucket = byName.get(k)
+    if (bucket) bucket.push(c)
+    else byName.set(k, [c])
+  }
+
+  return function resolve(rawName: string | null): string | null {
+    if (!rawName) return null
+
+    const parts = rawName.split('/').map(p => p.trim()).filter(Boolean)
+    if (parts.length === 0) return null
+
+    const leaf = byName.get(norm(parts[parts.length - 1]))
+    if (!leaf || leaf.length === 0) return null
+    if (leaf.length === 1 || parts.length === 1) return leaf[0].id
+
+    // Ambiguous leaf and a parent to go on: prefer the one under that parent.
+    const parentIds = new Set((byName.get(norm(parts[parts.length - 2])) ?? []).map(c => c.id))
+    return (leaf.find(c => c.parent_id && parentIds.has(c.parent_id)) ?? leaf[0]).id
+  }
 }
 
 async function insertPortableQuestion(
@@ -147,8 +178,9 @@ async function insertPortableQuestion(
   pq: PortableQuestion,
   userId: string,
   orgId: string,
+  resolveCategory: (name: string | null) => string | null,
 ) {
-  const category_id = await resolveCategoryId(supabase, pq.category_name)
+  const category_id = resolveCategory(pq.category_name)
 
   return supabase.from('questions').insert({
     org_id: orgId,
@@ -194,6 +226,13 @@ export async function importQuestionsFromFile(
   if ('error' in parsed) return { error: parsed.error }
   const file = parsed.data
 
+  // Read the taxonomy once instead of once per question — a set import is
+  // hundreds of rows and every one of them used to cost its own round trip.
+  const { data: categories } = await supabase
+    .from('question_categories')
+    .select('id, name, parent_id')
+  const resolveCategory = makeCategoryResolver((categories ?? []) as CategoryRow[])
+
   const dupSet = new Set(duplicateIndexes)
   const newIds: string[] = []
   for (let i = 0; i < file.questions.length; i++) {
@@ -204,7 +243,7 @@ export async function importQuestionsFromFile(
       ? await resolveUniqueTitle(supabase, pq.title, user.id)
       : pq.title
 
-    const { data, error } = await insertPortableQuestion(supabase, { ...pq, title }, user.id, orgId)
+    const { data, error } = await insertPortableQuestion(supabase, { ...pq, title }, user.id, orgId, resolveCategory)
     if (error) return { error: error.message, imported: newIds.length }
     newIds.push(data.id as string)
   }
