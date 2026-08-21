@@ -772,7 +772,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
       {/* ── Submit confirmation dialog ──────────────────────────────────────── */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay backdrop-blur-sm">
           <Card padding="xl" elevation="xl" className="max-w-sm w-full mx-4">
             <div className="text-center mb-5">
               <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">

@@ -416,7 +416,7 @@ function VarChip({ name, active, onClick }: { name: string; active: boolean; onC
     >
       {'{' + name + '}'}
       {active && (
-        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-success border-2 border-white" />
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-success border-2 border-background" />
       )}
     </button>
   )

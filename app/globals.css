@@ -34,6 +34,7 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-flag: var(--flag);
   --color-flag-foreground: var(--flag-foreground);
+  --color-overlay: var(--overlay);
   --color-surface-inverse: var(--surface-inverse);
   --color-surface-inverse-foreground: var(--surface-inverse-foreground);
   --color-surface-inverse-muted: var(--surface-inverse-muted);
@@ -94,6 +95,10 @@
      about the system's own state. */
   --flag: oklch(0.646 0.222 41.116);
   --flag-foreground: oklch(0.985 0 0);
+  /* Scrim behind a modal or over an image. Black at a fixed alpha ignores the
+     theme; as a token a preset can warm it or lighten it for dark mode. */
+  --overlay: oklch(0 0 0 / 45%);
+
   /* Inverted panel — hero banners, the super-admin chrome, the assignment
      header card. Deliberately dark in both themes, but a preset should still
      be able to restyle it instead of it staying frozen slate. */
@@ -169,6 +174,7 @@
   --warning-foreground: oklch(0.145 0 0);
   --flag: oklch(0.75 0.183 55.934);
   --flag-foreground: oklch(0.145 0 0);
+  --overlay: oklch(0 0 0 / 62%);
   --tint-1: oklch(0.702 0.183 293.541);
   --tint-2: oklch(0.789 0.154 211.53);
   --tint-3: oklch(0.712 0.194 13.428);
@@ -242,6 +248,7 @@
 
 /* Warm and roomy, for a calmer classroom feel. */
 [data-style="warm"] {
+  --overlay: oklch(0.18 0.02 50 / 48%);
   --surface-inverse: oklch(0.26 0.03 50);
   --surface-inverse-muted: oklch(0.74 0.02 50);
   --radius: 0.75rem;

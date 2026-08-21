@@ -67,6 +67,7 @@ preset ที่มีให้:
 สีแบ่งเป็น 2 ชนิด — อย่าสลับกัน:
 
 - **สีที่มีความหมาย** (`--primary`, `--success`, `--warning`, `--flag`, `--destructive`) เปลี่ยนค่าได้ แต่ห้ามเปลี่ยนว่าอะไรหมายถึงอะไร
+- **ฉากหลังทึบ** (`--overlay`) ใช้กับ modal และภาพที่ต้องหรี่ — preset ปรับความเข้ม/โทนได้
 - **พื้นมืดกลับสี** (`--surface-inverse` + `-foreground` / `-muted` / `-border`) ใช้กับแบนเนอร์ การ์ดหัวเรื่อง และ chrome ของ super-admin ที่ตั้งใจให้มืดทั้งสองโหมด — preset ปรับโทนได้
 - **สีตกแต่ง** (`--tint-1` … `--tint-4`) ใช้แยกแยะรายการเฉยๆ เช่น stat card, ไอคอน, ป้ายหมวดหมู่ — สลับได้อิสระ preset ควรปรับให้เข้ากับ primary ของตัวเอง (เช่น `playful` ใช้ primary ม่วงแดง จึงดัน tint-1 ไปทางน้ำเงินไม่ให้ดูเหมือนพลาด)
 
@@ -84,9 +85,10 @@ preset ปรับได้ 5 แกน: สี, `--radius`, `--spacing`, `--el
 
 | ตรวจอะไร | ใช้อะไรแทน |
 | --- | --- |
-| สี palette ดิบ (`bg-gray-100`) | token ใน `globals.css` |
+| สี palette ดิบ (`bg-gray-100`, `text-white`, `bg-black/50`) | token ใน `globals.css` |
 | การ์ดเขียนมือ | `<Card>` |
 | form control เขียนมือ | `<Input>` / `<Textarea>` / `<NativeSelect>` |
+| ปุ่มเขียนมือ | `<Button>` / `<IconButton>` |
 | class ผิดรูป (`bg-primary/10/40`) | — Tailwind ทิ้งเงียบๆ ต้องแก้ |
 
 `<NativeSelect>` คือ `<select>` ธรรมดาที่จัดสไตล์ให้ตรงกับ `<Input>` ส่วน `<Select>` (base-ui) เป็น dropdown แบบเต็มรูปแบบสำหรับกรณีที่ต้องการมากกว่านั้น

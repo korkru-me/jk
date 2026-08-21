@@ -802,7 +802,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
       {/* Work-image enforcement confirm dialog */}
       {showWorkImageConfirm && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
           <Card padding="xl" elevation="xl" className="max-w-sm w-full">
             <h3 className="font-bold text-lg text-foreground">บังคับแนบรูปวิธีทำหรือไม่?</h3>
             <p className="text-sm text-muted-foreground mt-2">
@@ -832,7 +832,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
       {/* Publish timing dialog */}
       {showPublishDialog && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
           <Card padding="xl" elevation="xl" className="max-w-sm w-full">
             <h3 className="font-bold text-lg text-foreground">เผยแพร่{assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?</h3>
             <p className="text-sm text-muted-foreground mt-2">

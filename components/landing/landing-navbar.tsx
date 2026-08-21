@@ -44,7 +44,7 @@ export function LandingNavbar() {
                 'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 pathname === link.href
                   ? 'bg-muted text-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:text-white',
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
               {link.label}
@@ -66,7 +66,7 @@ export function LandingNavbar() {
 
           <Link
             href="/login"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors dark:hover:text-white"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             เข้าสู่ระบบ
           </Link>

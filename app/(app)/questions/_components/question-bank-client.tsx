@@ -429,7 +429,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
 
 function PreviewLoadingOverlay() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-label="กำลังโหลดตัวอย่างโจทย์">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4" aria-label="กำลังโหลดตัวอย่างโจทย์">
       <div className="h-80 w-full max-w-2xl animate-pulse rounded-2xl bg-card" />
     </div>
   )

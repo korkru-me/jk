@@ -23,7 +23,7 @@ export function HomeroomBanner({ classroom, studentCount, isSelecting = false, i
       {isSelecting && (
         <div
           className={cn(
-            'w-6 h-6 rounded-md border-2 border-white flex items-center justify-center shrink-0 transition-colors',
+            'w-6 h-6 rounded-md border-2 border-background flex items-center justify-center shrink-0 transition-colors',
             isSelected ? 'bg-card' : 'bg-card/20'
           )}
         >

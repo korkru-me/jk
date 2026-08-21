@@ -508,7 +508,7 @@ function ImageUploadZone({ value, onChange }: { value: string; onChange: (u: str
         <button
           type="button"
           onClick={() => onChange('')}
-          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-overlay text-white flex items-center justify-center hover:bg-overlay transition-colors"
         >
           <X className="w-3 h-3" />
         </button>

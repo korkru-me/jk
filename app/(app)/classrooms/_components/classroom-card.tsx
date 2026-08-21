@@ -58,7 +58,7 @@ export function ClassroomCard({
         {isSelecting && (
           <div
             className={cn(
-              'absolute top-2.5 left-2.5 w-6 h-6 rounded-md border-2 border-white flex items-center justify-center transition-colors z-10',
+              'absolute top-2.5 left-2.5 w-6 h-6 rounded-md border-2 border-background flex items-center justify-center transition-colors z-10',
               isSelected ? 'bg-card' : 'bg-card/20'
             )}
           >

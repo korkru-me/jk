@@ -37,7 +37,7 @@ export function ShellClient({
     <div className="flex h-screen overflow-hidden bg-background">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/50 md:hidden"
+          className="fixed inset-0 z-20 bg-overlay md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

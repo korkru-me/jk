@@ -73,7 +73,7 @@ export function ScoreOverrideModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-overlay backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">

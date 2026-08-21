@@ -67,7 +67,7 @@ function DropZone({
       <div className="relative rounded-2xl border-2 border-border overflow-hidden bg-muted/30 group">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={preview} alt="preview" className="w-full h-40 object-contain" />
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+        <div className="absolute inset-0 bg-overlay opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -269,7 +269,7 @@ export function BrandingSettings() {
           <div className="mt-3 rounded-xl overflow-hidden border h-32 relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={bgPreview} alt="bg preview" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <div className="absolute inset-0 bg-overlay flex items-center justify-center">
               <div className="bg-card/90 rounded-xl px-6 py-3 text-center">
                 <p className="text-xs font-bold">ล็อกอินเข้าสู่ระบบ</p>
                 <div className="mt-1 h-2 w-24 rounded-full bg-muted mx-auto" />

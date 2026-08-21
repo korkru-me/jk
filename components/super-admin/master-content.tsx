@@ -375,7 +375,7 @@ export function MasterContent() {
 
       {/* Confirm Push Dialog */}
       {pushConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
           <Card padding="xl" elevation="xl" className="w-full max-w-md">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">

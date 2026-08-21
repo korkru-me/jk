@@ -80,7 +80,7 @@ export function CommandPalette() {
       className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
       onClick={() => setOpen(false)}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-overlay backdrop-blur-sm" />
       <Card edge="ring" elevation="xl" className="relative w-full max-w-xl mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
