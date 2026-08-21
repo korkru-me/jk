@@ -22,6 +22,7 @@ import { Calculator } from './calculator'
 import { FormulaSheet } from './formula-sheet'
 import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
+import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { partLabels } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
@@ -52,7 +53,11 @@ interface AnswerRow {
     answer_unit: string | null
     // is_correct is intentionally stripped server-side before this reaches
     // the client — never trust/display it here pre-submission.
-    mcq_options: Array<{ text: string }> | null
+    // MCQ options for 'mcq'; for 'matching' this instead carries the left-hand
+    // prompts, with the shuffled right-hand column in `matching_options`
+    // (split apart server-side so the pairing isn't shipped to the client).
+    mcq_options: Array<{ text?: string; image_url?: string; left_text?: string; left_image?: string }> | null
+    matching_options?: Array<{ right_text: string; right_image?: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
     answer_parts: AnswerPart[] | null
     extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | null
@@ -427,10 +432,17 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
         {/* Answer inputs */}
         <Card padding="lg">
-          {current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
+          {current.questions.question_type === 'matching' && current.questions.mcq_options ? (
+            <MatchingAnswerInput
+              prompts={current.questions.mcq_options}
+              options={current.questions.matching_options ?? []}
+              rawValue={localAnswers[current.id] ?? ''}
+              onChange={val => handleAnswerChange(current.id, val)}
+            />
+          ) : current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
             <MCQInput
               answerId={current.id}
-              options={current.questions.mcq_options}
+              options={current.questions.mcq_options as Array<{ text: string; image_url?: string }>}
               selected={localAnswers[current.id] ?? ''}
               eliminatedSet={eliminated[current.id] ?? new Set()}
               onSelect={val => handleAnswerChange(current.id, val)}
@@ -1012,7 +1024,7 @@ function MCQInput({
   answerId, options, selected, eliminatedSet, onSelect, onToggleEliminate,
 }: {
   answerId: string
-  options: Array<{ text: string }>
+  options: Array<{ text: string; image_url?: string }>
   selected: string
   eliminatedSet: Set<number>
   onSelect: (val: string) => void
@@ -1042,9 +1054,16 @@ function MCQInput({
                 {isSelected && <div className="w-2 h-2 rounded-full bg-card" />}
               </div>
               <span className="font-bold text-sm text-muted-foreground shrink-0 w-5">{CHOICE_LABELS[i]}</span>
-              <span className={`text-sm flex-1 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
-                {opt.text}
-              </span>
+              <div className={`flex-1 min-w-0 flex items-center gap-2 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
+                {opt.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={opt.image_url} alt="" className="max-h-28 w-auto object-contain rounded border shrink-0" />
+                )}
+                {/* A picture-only option carries the choice letter as its text
+                    (the answer's identity is opt.text, so it can't be blank) —
+                    printing it here would just repeat the label beside it. */}
+                {opt.text !== CHOICE_LABELS[i] && <span className="text-sm min-w-0">{opt.text}</span>}
+              </div>
               <input
                 type="radio"
                 className="sr-only"
@@ -1407,6 +1426,58 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
 
 // ─── Ordering ─────────────────────────────────────────────────────────────────
 
+// ─── Matching ────────────────────────────────────────────────────────────────
+// One dropdown per left-hand prompt, listing the whole (already shuffled)
+// right-hand column. The answer is stored as the chosen right_text per prompt,
+// in prompt order — the shape the 'MATCH:' branch in lib/assignment-attempt.ts
+// grades against. Options are deliberately not struck off as they're used: a
+// teacher may legitimately reuse a label across pairs.
+function MatchingAnswerInput({ prompts, options, rawValue, onChange }: {
+  prompts: Array<{ left_text?: string; left_image?: string }>
+  options: Array<{ right_text: string; right_image?: string }>
+  rawValue: string
+  onChange: (v: string) => void
+}) {
+  let picked: string[] = []
+  try { picked = rawValue ? JSON.parse(rawValue) : [] } catch { picked = [] }
+  if (!Array.isArray(picked)) picked = []
+
+  const filled = prompts.every((_, i) => picked[i])
+
+  function update(index: number, value: string) {
+    const next = prompts.map((_, i) => (i === index ? value : picked[i] ?? ''))
+    onChange(JSON.stringify(next))
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">จับคู่แต่ละข้อกับคำตอบที่ถูกต้อง:</p>
+      <div className="space-y-2">
+        {prompts.map((prompt, i) => (
+          <Card radius="md" className="flex items-center gap-3 p-2.5" key={i}>
+            {prompt.left_image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={prompt.left_image} alt="" className="w-12 h-12 object-contain rounded border shrink-0" />
+            )}
+            <span className="flex-1 min-w-0 text-sm"><RichText text={prompt.left_text ?? ''} /></span>
+            <NativeSelect
+              value={picked[i] ?? ''}
+              onChange={e => update(i, e.target.value)}
+              className="w-44 shrink-0"
+            >
+              <option value="">— เลือก —</option>
+              {options.map((o, j) => (
+                <option key={j} value={o.right_text}>{o.right_text}</option>
+              ))}
+            </NativeSelect>
+          </Card>
+        ))}
+      </div>
+      {filled && prompts.length > 0 && <p className="text-xs text-success">✓ จับคู่ครบแล้ว</p>}
+    </div>
+  )
+}
+
 function OrderingAnswerInput({ config, rawValue, onChange }: {
   answerId: string; config: OrderingConfig | null; rawValue: string; onChange: (v: string) => void
 }) {
@@ -1652,18 +1723,18 @@ function interpolateValues(text: string, values: Record<string, number>, variabl
 }
 
 function UnitDisplay({ html }: { html: string }) {
-  return /<[a-z][\s\S]*>/i.test(html)
-    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: html }} />
+  return /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
+    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
     : <span className="text-sm text-muted-foreground">{html}</span>
 }
 
 function QuestionText({ text }: { text: string }) {
-  // Support: HTML, MathML (<math>), plain text
-  if (/<[a-z][\s\S]*>/i.test(text)) {
+  // Support: HTML, MathML (<math>), TeX via KaTeX, plain text
+  if (/<[a-z][\s\S]*>/i.test(text) || containsMath(text)) {
     return (
       <div
         className="leading-relaxed rich-text-content text-base [&_math]:my-1 [&_math]:inline-block"
-        dangerouslySetInnerHTML={{ __html: text }}
+        dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }}
       />
     )
   }

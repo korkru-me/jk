@@ -18,7 +18,12 @@ function shuffleArray<T>(arr: T[]): T[] {
 // answers count as correct). Must stay identical in both places: when no
 // override is set, this being equal to the stored max_score is exactly what
 // keeps grading unchanged from before this feature existed.
-export function naturalMaxScore(questionType: string, extraData: any, answerParts: unknown[] | null): number {
+export function naturalMaxScore(
+  questionType: string,
+  extraData: any,
+  answerParts: unknown[] | null,
+  matchingPairCount = 0,
+): number {
   if (questionType === 'true_false') {
     const statements: unknown[] = extraData?.statements ?? []
     const scoreAnswer: number = extraData?.score_answer ?? 1
@@ -33,6 +38,12 @@ export function naturalMaxScore(questionType: string, extraData: any, answerPart
   if (questionType === 'ordering') {
     const items: unknown[] = extraData?.items ?? []
     return items.length || 1
+  }
+  if (questionType === 'matching') {
+    // Matching pairs live in mcq_options rather than extra_data (see
+    // MatchingPair in lib/types.ts), so the count comes in explicitly — one
+    // point per pair.
+    return matchingPairCount || 1
   }
   if (questionType === 'file_upload') return 1
   if (questionType === 'composite') {
@@ -95,6 +106,21 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
   if (q.question_type === 'ordering') {
     const items: import('@/lib/types').OrderingItem[] = extraData?.items ?? []
     return { question_id: q.id, random_values: {}, correct_answer: 'ORDER:' + JSON.stringify(items.map((i) => i.id)), max_score: naturalMaxScore(q.question_type, extraData, null) }
+  }
+
+  // Matching: the answer is which right-hand label belongs to each left-hand
+  // prompt, in the pairs' authored order. Storing the label rather than the
+  // pair's index is what makes two identically-labelled right-hand options
+  // interchangeable, which is the behaviour a teacher expects when they reuse
+  // a label across pairs.
+  if (q.question_type === 'matching') {
+    const pairs = (q.mcq_options ?? []) as unknown as import('@/lib/types').MatchingPair[]
+    return {
+      question_id: q.id,
+      random_values: {},
+      correct_answer: 'MATCH:' + JSON.stringify(pairs.map((p) => p.right_text)),
+      max_score: naturalMaxScore(q.question_type, extraData, null, pairs.length),
+    }
   }
 
   // Composite: each part is graded independently by re-dispatching into
@@ -180,7 +206,13 @@ export function buildAssignmentAttempt(
     .filter((qid) => questionsById.has(qid))
     .map((qid, orderIndex) => {
       const q = questionsById.get(qid) as Question
-      const optionOrder = assignment.shuffle_options && q.question_type === 'mcq' && q.mcq_options
+      // A matching question is only a question if the right-hand column is
+      // scrambled, so it shuffles regardless of the assignment's
+      // shuffle_options setting (which is about MCQ choices). Frozen into
+      // option_order either way, so the student sees one stable order.
+      const shufflesOptions = q.question_type === 'matching'
+        || (assignment.shuffle_options && q.question_type === 'mcq')
+      const optionOrder = shufflesOptions && q.mcq_options
         ? shuffleArray((q.mcq_options as unknown[]).map((_, i) => i))
         : null
 
@@ -358,6 +390,21 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
     const structuralMax = naturalMaxScore('composite', a.questions?.extra_data, null)
     const isFullyCorrect = Math.round(earned * 1000) === Math.round(structuralMax * 1000)
     return { id: a.id, is_correct: hasManual ? null : isFullyCorrect, score: scaleScore(earned, structuralMax, a.max_score) }
+  }
+
+  // Matching grading — one point per correctly paired prompt. The pair count
+  // comes from the frozen correct answer rather than the question, so a pair
+  // added after this attempt started can't change what it is scored out of.
+  if (correctAns.startsWith('MATCH:')) {
+    const correctRights: string[] = JSON.parse(correctAns.slice(6))
+    let studentRights: string[] = []
+    try { studentRights = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
+    let matched = 0
+    for (let i = 0; i < correctRights.length; i++) {
+      if ((studentRights[i] ?? '').trim() === correctRights[i].trim()) matched++
+    }
+    const structuralMax = naturalMaxScore('matching', a.questions?.extra_data, null, correctRights.length)
+    return { id: a.id, is_correct: matched === correctRights.length, score: scaleScore(matched, structuralMax, a.max_score) }
   }
 
   // Ordering grading

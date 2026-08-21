@@ -10,6 +10,7 @@ import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSort
 import type { Question } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
+import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 
 export interface SubmittedRow {
   id: string
@@ -78,7 +79,7 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
     } catch { return studentAnswer }
   }
 
-  if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:') || correctAnswer.startsWith('COMP:')) {
+  if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:') || correctAnswer.startsWith('COMP:') || correctAnswer.startsWith('MATCH:')) {
     try {
       const arr = JSON.parse(studentAnswer)
       return Array.isArray(arr) ? arr.map(v => (v === '' || v == null ? '—' : String(v))).join(', ') : studentAnswer
@@ -414,9 +415,9 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
 }
 
 function QuestionText({ text }: { text: string }) {
-  const isHtml = /<[a-z][\s\S]*>/i.test(text)
+  const isHtml = /<[a-z][\s\S]*>/i.test(text) || containsMath(text)
   if (isHtml) {
-    return <div className="rich-text-content text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: text }} />
+    return <div className="rich-text-content text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
   }
   return <p className="whitespace-pre-line text-sm text-muted-foreground">{text}</p>
 }

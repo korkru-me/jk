@@ -2,7 +2,7 @@
 
 import { QRCodeSVG } from 'qrcode.react'
 import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
-import type { Question, Variable, MCQOption } from '@/lib/types'
+import type { Question, Variable, MCQOption, MatchingPair } from '@/lib/types'
 
 interface StudentSheet {
   studentName: string
@@ -29,6 +29,28 @@ function formatAnswer(n: number): string {
   return parseFloat(n.toPrecision(4)).toString()
 }
 
+// Letters for the matching answer bank, so a student writes "ข" in the blank
+// beside prompt 1 rather than copying the whole label out.
+const RIGHT_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ']
+
+function shuffleIndices(n: number): number[] {
+  const a = Array.from({ length: n }, (_, i) => i)
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/** "1-ข, 2-ก, ..." — prompt number to the letter of its answer in the bank. */
+function matchingKey(pairs: MatchingPair[] | null, rightOrder: number[] | undefined): string {
+  if (!pairs || pairs.length === 0) return '—'
+  const order = rightOrder ?? pairs.map((_, i) => i)
+  return pairs
+    .map((_, promptIndex) => `${promptIndex + 1}-${RIGHT_LABELS[order.indexOf(promptIndex)] ?? '?'}`)
+    .join(', ')
+}
+
 interface WorksheetPageProps {
   student: StudentSheet
   questions: Question[]
@@ -45,6 +67,14 @@ function WorksheetPage({ student, questions, assignmentId, assignmentTitle, clas
     const answer = evaluateFormula(q.answer_formula, values)
     return { values, answer }
   })
+
+  // One shuffle of the matching answer bank per question, reused by both the
+  // worksheet and the answer key below so the letters agree.
+  const shuffledIndices = questions.map(q =>
+    q.question_type === 'matching' && q.mcq_options
+      ? shuffleIndices((q.mcq_options as unknown as MatchingPair[]).length)
+      : undefined
+  )
 
   const qrUrl = `https://korkru.com/answer/${assignmentId}?student=${student.studentId}`
 
@@ -93,6 +123,30 @@ function WorksheetPage({ student, questions, assignmentId, assignmentTitle, clas
                 </div>
               )}
 
+              {/* Matching: prompts numbered on the left, the choices listed
+                  once underneath with letters to write in the blanks. */}
+              {q.question_type === 'matching' && q.mcq_options && (() => {
+                const pairs = q.mcq_options as unknown as MatchingPair[]
+                const rightOrder = shuffledIndices[i] ?? pairs.map((_, j) => j)
+                return (
+                  <div className="ml-4 mt-2 space-y-2">
+                    {pairs.map((pair, j) => (
+                      <p key={j} className="text-sm">
+                        <span className="inline-block w-10 border-b border-gray-400 mr-2" />
+                        {j + 1}. {pair.left_text}
+                      </p>
+                    ))}
+                    <div className="grid grid-cols-2 gap-1 pt-1">
+                      {rightOrder.filter(idx => pairs[idx]).map((idx, k) => (
+                        <p key={k} className="text-sm">
+                          {RIGHT_LABELS[k] ?? k + 1}. {pairs[idx].right_text}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Answer blank */}
               {q.question_type === 'written' && (
                 <div className="ml-4 mt-2">
@@ -118,6 +172,8 @@ function WorksheetPage({ student, questions, assignmentId, assignmentTitle, clas
                 <span className="font-medium">ข้อ {i + 1}: </span>
                 {q.question_type === 'written'
                   ? <span className="font-mono">{typeof answer === 'number' ? formatAnswer(answer) : answer} {q.answer_unit}</span>
+                  : q.question_type === 'matching'
+                  ? <span>{matchingKey(q.mcq_options as unknown as MatchingPair[], shuffledIndices[i])}</span>
                   : <span>{(q.mcq_options as MCQOption[])?.find(o => o.is_correct)?.text ?? '—'}</span>
                 }
               </div>
