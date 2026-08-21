@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { RotateCcw, Trash2, BookOpen } from 'lucide-react'
 import { restoreClassroom, deleteClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
+import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 export function ArchivedActionsClient({ classroom }: { classroom: Classroom }) {
   const [isPending, startTransition] = useTransition()
@@ -33,8 +34,8 @@ export function ArchivedActionsClient({ classroom }: { classroom: Classroom }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground truncate">{classroom.name}</p>
-        {classroom.description && (
-          <p className="text-xs text-muted-foreground truncate">{classroom.description}</p>
+        {displayDescription(classroom.description) && (
+          <p className="text-xs text-muted-foreground truncate">{displayDescription(classroom.description)}</p>
         )}
         <p className="text-xs text-muted-foreground mt-0.5">รหัส: {classroom.class_code}</p>
       </div>

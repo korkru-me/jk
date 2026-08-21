@@ -4,16 +4,17 @@ import { useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
-  Users, BookOpen, Copy, Check, Settings,
+  Users, BookOpen, Copy, Check,
   GraduationCap, UserPlus, Grid3x3, Mail, GitBranch, Activity, ChevronLeft,
   ClipboardList, Megaphone, CalendarDays, Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomStream } from './classroom-stream'
+import { ClassroomSettingsDialog } from './classroom-settings-dialog'
+import { parseDescription, coverOf, displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import type { SortKey as StudentSortKey, SortDir as StudentSortDir } from './student-table'
 import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
@@ -108,6 +109,12 @@ export function ClassroomDetailClient({
   const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
   const [activeTab, setActiveTab] = useState<Tab>(isHomeroom && canManage ? 'homeroom' : 'stream')
   const [codeCopied, setCodeCopied] = useState(false)
+  const savedCover = coverOf(parseDescription(classroom.description))
+  // A chosen cover paints the banner as a tinted surface whose text is the same
+  // colour at full strength; secondary lines just dim it. Without one the
+  // banner keeps its original dark gradient and white text.
+  const coverMuted = savedCover ? savedCover.textMuted : 'text-muted-foreground'
+  const shownDescription = displayDescription(classroom.description)
 
   // Shared with the "คะแนนและการส่งงาน" tab so both show students in the
   // same order — set here (not inside StudentTable) so it survives
@@ -136,30 +143,34 @@ export function ClassroomDetailClient({
       </Link>
 
       {/* Header card */}
-      <div className={`bg-gradient-to-br rounded-2xl p-6 text-white ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`}>
+      <div
+        className={savedCover
+          ? `rounded-2xl p-6 border-2 ${savedCover.surface} ${savedCover.text}`
+          : `rounded-2xl p-6 text-white bg-gradient-to-br ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`}
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             {isHomeroom && (
-              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">
+              <p className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-1.5 ${savedCover ? savedCover.textMuted : 'text-primary'}`}>
                 <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
               </p>
             )}
             <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
-            {classroom.description && (
-              <p className="text-muted-foreground text-sm mt-1">{classroom.description}</p>
+            {shownDescription && (
+              <p className={`text-sm mt-1 ${coverMuted}`}>{shownDescription}</p>
             )}
 
             {/* Stats row */}
             <div className="flex items-center gap-5 mt-4">
               <div className="flex items-center gap-2 text-sm">
-                <Users className="w-4 h-4 text-muted-foreground" />
+                <Users className={`w-4 h-4 ${coverMuted}`} />
                 <span className="font-semibold">{students.length}</span>
-                <span className="text-muted-foreground">นักเรียน</span>
+                <span className={coverMuted}>นักเรียน</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <BookOpen className="w-4 h-4 text-muted-foreground" />
+                <BookOpen className={`w-4 h-4 ${coverMuted}`} />
                 <span className="font-semibold">{isHomeroom ? homeroomAssignments.length : assignmentCount}</span>
-                <span className="text-muted-foreground">{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
+                <span className={coverMuted}>{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
               </div>
               {!isHomeroom && (
                 <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-primary hover:text-primary transition-colors">
@@ -171,9 +182,9 @@ export function ClassroomDetailClient({
 
           {/* Class code */}
           <div className="shrink-0 text-right">
-            <p className="text-xs text-muted-foreground mb-1">รหัสห้องเรียน</p>
+            <p className={`text-xs mb-1 ${coverMuted}`}>รหัสห้องเรียน</p>
             <div className="flex items-center gap-2">
-              <p className="font-mono font-black text-2xl tracking-[0.3em] text-white">{classroom.class_code}</p>
+              <p className={`font-mono font-black text-2xl tracking-[0.3em] ${savedCover ? "" : "text-white"}`}>{classroom.class_code}</p>
               <IconButton onClick={copyCode} label="คัดลอกรหัสห้องเรียน" className="bg-card/10 hover:bg-card/20">
                 {codeCopied ? <Check className="text-success" /> : <Copy />}
               </IconButton>
@@ -184,9 +195,7 @@ export function ClassroomDetailClient({
         {/* Owner actions */}
         {isOwner && (
           <div className="flex items-center gap-2 mt-5 pt-4 border-t border-white/10">
-            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
-              <Settings className="w-3.5 h-3.5" /> ตั้งค่าห้องเรียน
-            </Button>
+            <ClassroomSettingsDialog classroom={classroom} onCover={!!savedCover} />
             <div className="ml-auto">
               <DeleteClassroomButton id={classroom.id} />
             </div>

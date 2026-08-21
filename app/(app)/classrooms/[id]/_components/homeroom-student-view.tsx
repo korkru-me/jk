@@ -4,6 +4,7 @@ import { ClassroomStream } from './classroom-stream'
 import { AssignmentCalendar, type CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 interface Classmate { id: string; full_name: string }
 
@@ -40,8 +41,8 @@ export function HomeroomStudentView({
           <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
         </p>
         <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
-        {classroom.description && (
-          <p className="text-white/50 text-sm mt-1">{classroom.description}</p>
+        {displayDescription(classroom.description) && (
+          <p className="text-white/50 text-sm mt-1">{displayDescription(classroom.description)}</p>
         )}
         <div className="flex items-center gap-5 mt-4 flex-wrap text-sm">
           <div className="flex items-center gap-2">

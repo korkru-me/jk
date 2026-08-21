@@ -8,6 +8,7 @@ import { Home, GraduationCap, ArrowRight } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
 import { Card } from '@/components/ui/card'
+import { displayDescription } from './_components/classroom-meta'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียน — KorKru' }
@@ -158,8 +159,8 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-primary">ครูที่ปรึกษาประจำชั้น</p>
                       <p className="text-white font-bold text-xl leading-tight truncate mt-0.5">{c.name}</p>
-                      {c.description && (
-                        <p className="text-white/50 text-xs mt-1 truncate">{c.description}</p>
+                      {displayDescription(c.description) && (
+                        <p className="text-white/50 text-xs mt-1 truncate">{displayDescription(c.description)}</p>
                       )}
                     </div>
                     <span className="flex items-center gap-1 text-sm font-medium text-primary shrink-0">
@@ -190,8 +191,8 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                       <p className="font-semibold truncate">{c.name}</p>
                       <span className="shrink-0 text-2xl">🏫</span>
                     </div>
-                    {c.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description}</p>
+                    {displayDescription(c.description) && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{displayDescription(c.description)}</p>
                     )}
                     {pending > 0 && (
                       <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">

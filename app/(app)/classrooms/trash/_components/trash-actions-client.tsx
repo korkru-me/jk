@@ -6,6 +6,7 @@ import { RotateCcw, Trash2, BookOpen, Clock } from 'lucide-react'
 import { restoreClassroom, permanentDeleteClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 interface Props {
   classroom: Classroom
@@ -41,8 +42,8 @@ export function TrashActionsClient({ classroom, daysLeft }: Props) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground truncate">{classroom.name}</p>
-        {classroom.description && (
-          <p className="text-xs text-muted-foreground truncate">{classroom.description}</p>
+        {displayDescription(classroom.description) && (
+          <p className="text-xs text-muted-foreground truncate">{displayDescription(classroom.description)}</p>
         )}
         <div className={cn(
           'flex items-center gap-1 mt-1 text-xs font-medium',

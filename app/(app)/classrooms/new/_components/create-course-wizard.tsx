@@ -16,111 +16,22 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { createClassroom } from '@/lib/actions/classrooms'
+import {
+  ACCESS_LABEL, ACCESS_BADGE, GRADE_SUGGESTIONS, getTermSuggestions, getSmartTermDefault,
+  composeDescription, COVER_PRESETS,
+} from '@/app/(app)/classrooms/_components/classroom-meta'
+import { AccessTypePicker, TagInput, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { ClassroomType } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
-const GRADIENT_PRESETS = [
-  { id: 'quantum',  label: 'ควอนตัม',       from: '#4776E6', to: '#8E54E9' },
-  { id: 'cosmos',   label: 'จักรวาล',        from: '#0f0c29', to: '#302b63' },
-  { id: 'midnight', label: 'มิดไนต์',        from: '#2c3e50', to: '#4ca1af' },
-  { id: 'aurora',   label: 'ออโรร่า',         from: '#00d2ff', to: '#3a7bd5' },
-  { id: 'nebula',   label: 'เนบิวลา',         from: '#834d9b', to: '#d04ed6' },
-  { id: 'ocean',    label: 'มหาสมุทร',       from: '#1CB5E0', to: '#000851' },
-  { id: 'sunset',   label: 'พระอาทิตย์ตก',   from: '#f7971e', to: '#ffd200' },
-  { id: 'fire',     label: 'เพลิง',           from: '#f12711', to: '#f5af19' },
-  { id: 'rose',     label: 'โรสโกลด์',        from: '#b24592', to: '#f15f79' },
-  { id: 'forest',   label: 'ป่าไม้',          from: '#134e5e', to: '#71b280' },
-  { id: 'emerald',  label: 'มรกต',            from: '#11998e', to: '#38ef7d' },
-  { id: 'steel',    label: 'สตีล',            from: '#1f1c2c', to: '#928DAB' },
-]
-
-const GRADE_SUGGESTIONS = [
-  'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6',
-  'ม.4/1', 'ม.4/2', 'ม.5/1', 'ม.5/2', 'ม.6/1', 'ม.6/2',
-  'ป.5', 'ป.6', 'ม.ต้น (1–3)', 'ติวสอบ', 'ติวเข้า ม.1',
-]
-
-function getTermSuggestions(): string[] {
-  const now = new Date()
-  const be = now.getFullYear() + 543
-  return [`1/${be}`, `2/${be}`, `1/${be - 1}`, `2/${be - 1}`, `ภาคฤดูร้อน ${be}`]
-}
-
-function getSmartTermDefault(): string {
-  const now = new Date()
-  const be = now.getFullYear() + 543
-  const month = now.getMonth() + 1
-  return (month >= 5 && month <= 10) ? `1/${be}` : `2/${be}`
-}
-
-const ACCESS_TYPES = [
-  {
-    value: 'open' as const,
-    label: 'เปิดรับอิสระ',
-    desc: 'นักเรียนเข้าร่วมได้ทันทีด้วยรหัสห้องเรียน',
-    Icon: Globe,
-    chip: 'bg-success',
-    iconColor: 'text-success',
-    cardActive: 'border-success bg-success/10',
-  },
-  {
-    value: 'request' as const,
-    label: 'ต้องอนุมัติ',
-    desc: 'นักเรียนส่งคำขอ ครูอนุมัติก่อนจึงเข้าร่วมได้',
-    Icon: UserCheck,
-    chip: 'bg-primary',
-    iconColor: 'text-primary',
-    cardActive: 'border-primary bg-primary/10',
-  },
-  {
-    value: 'closed' as const,
-    label: 'ปิดรับ',
-    desc: 'ปิดรับนักเรียนใหม่ชั่วคราว',
-    Icon: Lock,
-    chip: 'bg-muted-foreground',
-    iconColor: 'text-muted-foreground',
-    cardActive: 'border-ring bg-muted/40',
-  },
-]
-
-const ACCESS_LABEL: Record<string, string> = {
-  open: 'เปิดรับอิสระ', request: 'ต้องอนุมัติ', closed: 'ปิดรับ',
-}
-
-const ACCESS_BADGE: Record<string, string> = {
-  open: 'bg-success/10 text-success',
-  request: 'bg-primary/10 text-primary',
-  closed: 'bg-muted text-muted-foreground',
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function hexLuminance(hex: string): number {
-  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return 0
-  const r = parseInt(hex.slice(1, 3), 16) / 255
-  const g = parseInt(hex.slice(3, 5), 16) / 255
-  const b = parseInt(hex.slice(5, 7), 16) / 255
-  return 0.299 * r + 0.587 * g + 0.114 * b
-}
-
-function gradientTextColor(from: string, to: string): string {
-  return (hexLuminance(from) + hexLuminance(to)) / 2 > 0.55 ? '#1a1a2a' : '#ffffff'
-}
-
-function gradientStyle(from: string, to: string, angle: number): React.CSSProperties {
-  return { background: `linear-gradient(${angle}deg, ${from}, ${to})` }
-}
-
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const wizardSchema = z.object({
   classroomType:   z.enum(['subject', 'homeroom']),
-  coverFrom:       z.string().min(1),
-  coverTo:         z.string().min(1),
-  coverAngle:      z.number().min(0).max(360),
+  cover:           z.string(),
   coverImageUrl:   z.string(),
   name:            z.string().min(1, 'กรุณากรอกชื่อห้องเรียน').max(100, 'ชื่อห้องเรียนไม่เกิน 100 ตัวอักษร'),
   description:     z.string().max(500, 'คำอธิบายไม่เกิน 500 ตัวอักษร'),
@@ -138,9 +49,7 @@ type WizardData = z.infer<typeof wizardSchema>
 
 const DEFAULT_VALUES: WizardData = {
   classroomType:   'subject',
-  coverFrom:       '#4776E6',
-  coverTo:         '#8E54E9',
-  coverAngle:      135,
+  cover:           COVER_PRESETS[0].id,
   coverImageUrl:   '',
   name:            '',
   description:     '',
@@ -181,299 +90,45 @@ function FieldError({ message }: { message?: string }) {
   )
 }
 
-// ─── Tag Input ────────────────────────────────────────────────────────────────
-
-function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
-  const [input, setInput] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  function addTag(raw: string) {
-    const tag = raw.trim().replace(/,+$/, '').trim()
-    if (!tag || tags.includes(tag)) { setInput(''); return }
-    onChange([...tags, tag])
-    setInput('')
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(input) }
-    else if (e.key === 'Backspace' && !input && tags.length > 0) onChange(tags.slice(0, -1))
-  }
-
-  return (
-    <div
-      className={cn(
-        'flex flex-wrap gap-1.5 min-h-10 w-full rounded-lg border border-input bg-background px-3 py-2 cursor-text',
-        'focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:border-ring transition-colors',
-      )}
-      onClick={() => inputRef.current?.focus()}
-    >
-      {tags.map((tag) => (
-        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-sm font-medium">
-          {tag}
-          <button type="button" onClick={(e) => { e.stopPropagation(); onChange(tags.filter((t) => t !== tag)) }} className="hover:text-destructive transition-colors">
-            <X className="w-3 h-3" />
-          </button>
-        </span>
-      ))}
-      <Input
-        ref={inputRef}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => { if (input.trim()) addTag(input) }}
-        placeholder={tags.length === 0 ? 'กด Enter หรือ , เพื่อเพิ่มแท็ก' : ''} className="flex-1 min-w-[100px]"
-      />
-    </div>
-  )
-}
-
-// ─── Creatable Combobox ───────────────────────────────────────────────────────
-
-function CreatableCombobox({
-  value, onChange, options, placeholder,
-}: {
-  value: string
-  onChange: (v: string) => void
-  options: string[]
-  placeholder?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [inputVal, setInputVal] = useState(value)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => { setInputVal(value) }, [value])
-
-  const filtered = options.filter((o) =>
-    inputVal === '' || o.toLowerCase().includes(inputVal.toLowerCase())
-  )
-  const isNewValue = inputVal.trim() !== '' && !options.some((o) => o.toLowerCase() === inputVal.trim().toLowerCase())
-
-  useEffect(() => {
-    if (!open) return
-    function handler(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        onChange(inputVal)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open, inputVal, onChange])
-
-  function selectOption(v: string) {
-    onChange(v)
-    setInputVal(v)
-    setOpen(false)
-  }
-
-  return (
-    <div ref={containerRef} className="relative">
-      <Input
-        value={inputVal}
-        onChange={(e) => { setInputVal(e.target.value); onChange(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); onChange(inputVal); setOpen(false) }
-          if (e.key === 'Escape') setOpen(false)
-        }}
-        placeholder={placeholder}
-        autoComplete="off"
-        className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm',
-          'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring',
-          'placeholder:text-muted-foreground transition-colors',
-        )}
-      />
-      {open && (filtered.length > 0 || isNewValue) && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
-          {filtered.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onMouseDown={(e) => { e.preventDefault(); selectOption(opt) }}
-              className={cn(
-                'w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground transition-colors',
-                value === opt && 'bg-accent/40 font-medium',
-              )}
-            >
-              {opt}
-            </button>
-          ))}
-          {isNewValue && (
-            <button
-              type="button"
-              onMouseDown={(e) => { e.preventDefault(); selectOption(inputVal.trim()) }}
-              className="w-full px-3 py-2 text-sm text-left text-primary hover:bg-accent transition-colors flex items-center gap-2 border-t border-border"
-            >
-              <Plus className="w-3.5 h-3.5 shrink-0" />
-              สร้าง &quot;{inputVal.trim()}&quot;
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Color Swatch (hex + native picker) ──────────────────────────────────────
-
-function ColorSwatch({ value, onChange, label }: { value: string; onChange: (h: string) => void; label: string }) {
-  const [inputVal, setInputVal] = useState(value)
-  useEffect(() => { setInputVal(value) }, [value])
-
-  function handleText(v: string) {
-    setInputVal(v)
-    if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
-  }
-
-  return (
-    <div className="flex-1 space-y-1.5">
-      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      <div className="flex items-center gap-2">
-        <label className="relative shrink-0 w-10 h-10 rounded-lg border-2 border-border overflow-hidden cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-sm" title="คลิกเพื่อเลือกสี">
-          <div className="absolute inset-0" style={{ background: value }} />
-          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-        </label>
-        <Input
-          value={inputVal}
-          onChange={(e) => handleText(e.target.value)}
-          onBlur={() => setInputVal(value)}
-          maxLength={7}
-          placeholder="#000000"
-          className={cn(
-            'h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm',
-            'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring transition-colors',
-          )}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ─── Gradient Advanced Controls (inside accordion) ───────────────────────────
-
-function GradientAdvancedControls({
-  fromColor, toColor, angle,
-  onFromChange, onToChange, onAngleChange,
-}: {
-  fromColor: string; toColor: string; angle: number
-  onFromChange: (h: string) => void; onToChange: (h: string) => void; onAngleChange: (d: number) => void
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-end gap-3">
-        <ColorSwatch value={fromColor} onChange={onFromChange} label="สีเริ่มต้น" />
-        <button
-          type="button"
-          onClick={() => { onFromChange(toColor); onToChange(fromColor) }}
-          title="สลับสี"
-          className="shrink-0 mb-0.5 w-9 h-10 rounded-lg border border-border bg-background flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <ArrowLeftRight className="w-4 h-4" />
-        </button>
-        <ColorSwatch value={toColor} onChange={onToChange} label="สีสิ้นสุด" />
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground font-medium">มุมไล่สี</p>
-          <span className="text-xs font-mono font-semibold tabular-nums">{angle}°</span>
-        </div>
-        <div className="h-4 w-full rounded-md" style={gradientStyle(fromColor, toColor, angle)} />
-        <input
-          type="range"
-          min={0}
-          max={360}
-          value={angle}
-          onChange={(e) => onAngleChange(Number(e.target.value))}
-          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-muted accent-primary"
-        />
-        <div className="flex gap-1.5">
-          {[{ l: '→', d: 90 }, { l: '↘', d: 135 }, { l: '↓', d: 180 }, { l: '↗', d: 45 }, { l: '↙', d: 225 }, { l: '←', d: 270 }].map((it) => (
-            <button
-              key={it.d}
-              type="button"
-              onClick={() => onAngleChange(it.d)}
-              title={`${it.d}°`}
-              className={cn(
-                'w-8 h-8 rounded-lg border text-sm flex items-center justify-center transition-all',
-                angle === it.d
-                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                  : 'border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground',
-              )}
-            >
-              {it.l}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Cover Design Section (presets + accordion) ───────────────────────────────
+// ─── Cover Design Section ─────────────────────────────────────────────────────
 
 function CoverDesignSection({
-  coverFrom, coverTo, coverAngle, coverImageUrl,
-  onFromChange, onToChange, onAngleChange, onImageChange,
+  cover, coverImageUrl, onCoverChange, onImageChange,
 }: {
-  coverFrom: string; coverTo: string; coverAngle: number; coverImageUrl: string
-  onFromChange: (h: string) => void; onToChange: (h: string) => void
-  onAngleChange: (d: number) => void; onImageChange: (u: string) => void
+  cover: string
+  coverImageUrl: string
+  onCoverChange: (id: string) => void
+  onImageChange: (u: string) => void
 }) {
-  const [advancedOpen, setAdvancedOpen] = useState(false)
-  const matchedPreset = GRADIENT_PRESETS.find(
-    (p) => p.from.toLowerCase() === coverFrom.toLowerCase() && p.to.toLowerCase() === coverTo.toLowerCase()
-  )
-
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label className="text-sm font-medium">ธีมสี</Label>
         <div className="flex flex-wrap gap-2.5">
-          {GRADIENT_PRESETS.map((p) => (
+          {COVER_PRESETS.map((preset) => (
             <button
-              key={p.id}
+              key={preset.id}
               type="button"
-              title={p.label}
-              onClick={() => { onFromChange(p.from); onToChange(p.to) }}
+              title={preset.label}
+              aria-label={preset.label}
+              aria-pressed={cover === preset.id}
+              onClick={() => onCoverChange(preset.id)}
               className={cn(
-                'w-8 h-8 rounded-full border-2 transition-all hover:scale-110',
-                matchedPreset?.id === p.id
-                  ? 'border-foreground scale-110 shadow-md ring-2 ring-offset-1 ring-foreground/30'
-                  : 'border-white/40 dark:border-black/40',
+                'w-8 h-8 rounded-full transition-all hover:scale-110',
+                preset.solid,
+                cover === preset.id
+                  ? 'scale-110 shadow-md ring-2 ring-offset-2 ring-ring'
+                  : 'opacity-70 hover:opacity-100',
               )}
-              style={{ background: `linear-gradient(135deg, ${p.from}, ${p.to})` }}
             />
           ))}
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setAdvancedOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ChevronRight className={cn('w-4 h-4 transition-transform duration-200', advancedOpen && 'rotate-90')} />
-        ตั้งค่าสีขั้นสูง
-      </button>
-
-      <div className={cn(
-        'overflow-hidden transition-all duration-300 ease-in-out',
-        advancedOpen ? 'max-h-[380px] opacity-100' : 'max-h-0 opacity-0',
-      )}>
-        <div className="rounded-xl border border-border bg-muted/30 p-4">
-          <GradientAdvancedControls
-            fromColor={coverFrom} toColor={coverTo} angle={coverAngle}
-            onFromChange={onFromChange} onToChange={onToChange} onAngleChange={onAngleChange}
-          />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label className="text-sm font-medium">
           รูปภาพหน้าปก
-          <span className="text-xs text-muted-foreground font-normal ml-1">(ไม่บังคับ — แทนที่สีไล่เฉด)</span>
+          <span className="text-xs text-muted-foreground font-normal ml-1">(ไม่บังคับ — แทนที่สีหน้าปก)</span>
         </Label>
         <ImageUploadZone value={coverImageUrl} onChange={onImageChange} />
       </div>
@@ -603,7 +258,7 @@ function StepIndicator({
 // ─── Classroom Preview Card (right side, sticky) ─────────────────────────────
 
 function ClassroomPreviewCard({ values }: { values: WizardData }) {
-  const textColor = gradientTextColor(values.coverFrom, values.coverTo)
+  const preset = COVER_PRESETS.find(p => p.id === values.cover) ?? null
   const hasCover = values.coverImageUrl !== ''
 
   return (
@@ -615,25 +270,24 @@ function ClassroomPreviewCard({ values }: { values: WizardData }) {
 
       <div className="rounded-2xl overflow-hidden border border-border shadow-lg">
         <div
-          className="relative h-36 flex flex-col justify-end p-5 overflow-hidden"
+          className={cn(
+            'relative h-36 flex flex-col justify-end p-5 overflow-hidden',
+            !hasCover && (preset ? `${preset.surface} ${preset.text}` : 'bg-muted text-muted-foreground'),
+          )}
           style={hasCover
             ? { backgroundImage: `url(${values.coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-            : gradientStyle(values.coverFrom, values.coverTo, values.coverAngle)
-          }
+            : undefined}
         >
           {hasCover && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />}
           <div className="relative">
-            <p
-              className="font-bold text-lg leading-tight drop-shadow-sm truncate"
-              style={{ color: hasCover ? '#ffffff' : textColor }}
-            >
+            <p className={cn(
+              'font-bold text-lg leading-tight truncate',
+              hasCover && 'text-white drop-shadow-sm',
+            )}>
               {values.name.trim() || 'ชื่อห้องเรียน'}
             </p>
             {(values.gradeLevel || values.academicTerm) && (
-              <p
-                className="text-xs mt-0.5 opacity-80"
-                style={{ color: hasCover ? '#ffffff' : textColor }}
-              >
+              <p className={cn('text-xs mt-0.5', hasCover ? 'text-white opacity-80' : preset?.textMuted)}>
                 {[values.gradeLevel, values.academicTerm].filter(Boolean).join(' · ')}
               </p>
             )}
@@ -746,9 +400,7 @@ function Step0Content({
   errors,
   values,
   onClassroomTypeChange,
-  onCoverFromChange,
-  onCoverToChange,
-  onCoverAngleChange,
+  onCoverChange,
   onCoverImageChange,
   onTagsChange,
 }: {
@@ -756,9 +408,7 @@ function Step0Content({
   errors: ReturnType<typeof useForm<WizardData>>['formState']['errors']
   values: WizardData
   onClassroomTypeChange: (v: ClassroomType) => void
-  onCoverFromChange: (h: string) => void
-  onCoverToChange: (h: string) => void
-  onCoverAngleChange: (d: number) => void
+  onCoverChange: (id: string) => void
   onCoverImageChange: (u: string) => void
   onTagsChange: (t: string[]) => void
 }) {
@@ -772,13 +422,9 @@ function Step0Content({
       <ClassroomTypeSection value={values.classroomType} onChange={onClassroomTypeChange} />
 
       <CoverDesignSection
-        coverFrom={values.coverFrom}
-        coverTo={values.coverTo}
-        coverAngle={values.coverAngle}
+        cover={values.cover}
         coverImageUrl={values.coverImageUrl}
-        onFromChange={onCoverFromChange}
-        onToChange={onCoverToChange}
-        onAngleChange={onCoverAngleChange}
+        onCoverChange={onCoverChange}
         onImageChange={onCoverImageChange}
       />
 
@@ -919,38 +565,7 @@ function Step1Content({
           control={control}
           name="accessType"
           render={({ field }) => (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {ACCESS_TYPES.map((type) => {
-                const isSelected = field.value === type.value
-                const Icon = type.Icon
-                return (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => field.onChange(type.value)}
-                    className={cn(
-                      'relative flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
-                      isSelected ? type.cardActive + ' shadow-sm' : 'border-border bg-card hover:border-muted-foreground/30',
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', isSelected ? 'bg-card/60' : 'bg-muted')}>
-                        <Icon className={cn('w-4 h-4', isSelected ? type.iconColor : 'text-muted-foreground')} />
-                      </div>
-                      {isSelected && (
-                        <div className={cn('w-5 h-5 rounded-full flex items-center justify-center', type.chip)}>
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className={cn('font-semibold text-sm', isSelected ? type.iconColor : 'text-foreground')}>{type.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{type.desc}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+            <AccessTypePicker value={field.value} onChange={field.onChange} />
           )}
         />
       </div>
@@ -1062,22 +677,26 @@ export function CreateCourseWizard() {
   function handleSubmit() {
     const data = values
 
-    const metaParts: string[] = []
-    if (data.gradeLevel)   metaParts.push(`ระดับ: ${data.gradeLevel}`)
-    if (data.academicTerm) metaParts.push(`ภาคเรียน: ${data.academicTerm}`)
-    if (data.tags.length > 0) metaParts.push(`แท็ก: ${data.tags.join(', ')}`)
-    metaParts.push(`การเข้าร่วม: ${ACCESS_LABEL[data.accessType]}`)
-    if (data.capacityEnabled && data.maxCapacity) metaParts.push(`ที่นั่ง: ${data.maxCapacity} คน`)
-    if (data.startDate) metaParts.push(`เปิด: ${data.startDate}`)
-    if (data.endDate)   metaParts.push(`ปิด: ${data.endDate}`)
-
-    const descParts = [data.description.trim(), metaParts.join(' · ')].filter(Boolean)
+    // The description encoding is shared with the settings dialog — see
+    // classroom-meta.ts.
+    const description = composeDescription({
+      description:     data.description,
+      cover:           data.cover,
+      gradeLevel:      data.gradeLevel,
+      academicTerm:    data.academicTerm,
+      tags:            data.tags,
+      accessType:      data.accessType,
+      capacityEnabled: data.capacityEnabled,
+      maxCapacity:     data.maxCapacity,
+      startDate:       data.startDate,
+      endDate:         data.endDate,
+    })
 
     startTransition(async () => {
       try {
         const res = await createClassroom({
           name: data.name.trim(),
-          description: descParts.join('\n'),
+          description,
           classroomType: data.classroomType,
         })
         if (res?.error) {
@@ -1114,9 +733,7 @@ export function CreateCourseWizard() {
               errors={errors}
               values={values}
               onClassroomTypeChange={(v) => setValue('classroomType', v)}
-              onCoverFromChange={(h) => setValue('coverFrom', h)}
-              onCoverToChange={(h) => setValue('coverTo', h)}
-              onCoverAngleChange={(d) => setValue('coverAngle', d)}
+              onCoverChange={(id) => setValue('cover', id)}
               onCoverImageChange={(u) => setValue('coverImageUrl', u)}
               onTagsChange={(t) => setValue('tags', t)}
             />

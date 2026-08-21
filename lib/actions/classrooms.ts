@@ -54,6 +54,34 @@ export async function createClassroom(data: { name: string; description: string;
   return { success: true }
 }
 
+// ── Update (rename / edit the description shown on the classroom header) ───
+
+export async function updateClassroom(id: string, data: { name: string; description: string }) {
+  const user = await getAuthUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const name = data.name.trim()
+  if (!name) return { error: 'กรุณากรอกชื่อห้องเรียน' }
+
+  const admin = createAdminClient()
+  // `.eq('teacher_id')` is the authorization check: a non-owner matches no row,
+  // so `updated` comes back empty rather than the update silently succeeding.
+  const { data: updated, error } = await admin
+    .from('classrooms')
+    .update({ name, description: data.description.trim() || null })
+    .eq('id', id)
+    .eq('teacher_id', user.id)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { error: error.message }
+  if (!updated) return { error: 'ไม่มีสิทธิ์แก้ไขห้องเรียนนี้' }
+
+  revalidatePath('/classrooms')
+  revalidatePath(`/classrooms/${id}`)
+  return { success: true }
+}
+
 // ── Soft delete (moves to trash, kept 3 months) ────────────────────────────
 
 export async function deleteClassroom(id: string) {

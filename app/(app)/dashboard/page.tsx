@@ -6,7 +6,9 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { User } from '@/lib/types'
-import { TeacherDashboard } from './_components/teacher-dashboard'
+import {
+  TeacherDashboard, type DashboardClassroom,
+} from './_components/teacher-dashboard'
 import { AssignmentCalendar, type CalendarEvent } from './_components/assignment-calendar'
 import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
@@ -14,6 +16,9 @@ import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } fro
 import { Card } from '@/components/ui/card'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
+
+/** How many rows each "recent" list on the teacher home shows. */
+const RECENT_LIMIT = 5
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -32,26 +37,73 @@ export default async function DashboardPage() {
   const user = profile as Pick<User, 'id' | 'full_name' | 'role'>
 
   if (user.role === 'teacher' || user.role === 'admin') {
-    const [questionsRes, studentsRes] = await Promise.all([
+    // Everything shown to a teacher is their own real data. Counts come back
+    // with the first page of rows (`count: 'exact'` alongside `limit`), so the
+    // totals and the previews cost one query each rather than two.
+    const [classroomsRes, questionsRes, setsRes] = await Promise.all([
+      // Roster and assignment tallies ride along on the classroom relation,
+      // the same way the classroom list page reads them.
+      admin
+        .from('classrooms')
+        .select('id, name, classroom_type, created_at, classroom_students(count), assignment_classrooms(count)')
+        .eq('teacher_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false }),
       supabase
         .from('questions')
-        .select('id', { count: 'exact', head: true })
-        .eq('created_by', user.id),
-      // Count roster memberships through the classroom relation directly.
-      // This preserves the existing "students across all rooms" semantics
-      // without first waiting for a separate classroom-id query.
-      admin
-        .from('classroom_students')
-        .select('id, classrooms!inner(teacher_id)', { count: 'exact', head: true })
-        .eq('classrooms.teacher_id', user.id),
+        .select('id, title, question_type', { count: 'exact' })
+        .eq('created_by', user.id)
+        // Grouped questions are stored one row per member; only the first row
+        // represents the question in a list.
+        .or('group_id.is.null,order_in_group.eq.0')
+        .order('created_at', { ascending: false })
+        .limit(RECENT_LIMIT),
+      supabase
+        .from('question_sets')
+        .select('id, title, question_ids', { count: 'exact' })
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false })
+        .limit(RECENT_LIMIT),
     ])
+
+    // A set's question_ids keep pointing at deleted questions, so the stored
+    // length overstates the set. Resolve which ids still exist and count only
+    // those — the same rule the set library itself displays.
+    const setRows = (setsRes.data ?? []) as any[]
+    const referencedIds = Array.from(new Set(setRows.flatMap(set => set.question_ids ?? [])))
+    const { data: liveQuestions } = referencedIds.length > 0
+      ? await supabase.from('questions').select('id').in('id', referencedIds)
+      : { data: [] as { id: string }[] }
+    const liveQuestionIds = new Set((liveQuestions ?? []).map(q => q.id))
+
+    const classroomRows = (classroomsRes.data ?? []) as any[]
+    const classrooms: DashboardClassroom[] = classroomRows.map(row => ({
+      id: row.id,
+      name: row.name,
+      classroom_type: row.classroom_type,
+      studentCount: row.classroom_students?.[0]?.count ?? 0,
+      assignmentCount: row.assignment_classrooms?.[0]?.count ?? 0,
+    }))
 
     return (
       <TeacherDashboard
         user={user}
+        classroomsCount={classrooms.length}
         questionsCount={questionsRes.count ?? 0}
-        studentsCount={studentsRes.count ?? 0}
-        heatmapAnchorDate={new Date().toISOString().slice(0, 10)}
+        setsCount={setsRes.count ?? 0}
+        studentsCount={classrooms.reduce((sum, c) => sum + c.studentCount, 0)}
+        classrooms={classrooms.slice(0, RECENT_LIMIT)}
+        questionSets={setRows.map(set => ({
+          id: set.id,
+          title: set.title,
+          questionCount: ((set.question_ids ?? []) as string[])
+            .filter(id => liveQuestionIds.has(id)).length,
+        }))}
+        questions={((questionsRes.data ?? []) as any[]).map(question => ({
+          id: question.id,
+          title: question.title,
+          question_type: question.question_type,
+        }))}
       />
     )
   }

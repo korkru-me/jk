@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Users, BookOpen, TrendingUp, Check, Pin, PinOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Classroom } from '@/lib/types'
+import { parseDescription, coverOf, displayDescription } from './classroom-meta'
 
 const GRADIENTS = [
   'from-blue-500 to-violet-500',
@@ -45,6 +46,10 @@ export function ClassroomCard({
   isSelecting = false, isSelected = false, onToggle, onTogglePin,
 }: Props) {
   const isPinned = !!classroom.pinned_at
+  // A teacher-picked cover wins; classrooms saved before covers were persisted
+  // keep the position-based gradient they have always shown.
+  const savedCover = coverOf(parseDescription(classroom.description))
+  const shownDescription = displayDescription(classroom.description)
   const gradient = GRADIENTS[index % GRADIENTS.length]
   const emoji = COVER_EMOJIS[index % COVER_EMOJIS.length]
   const pisaData = getPisaData(classroom.id)
@@ -53,7 +58,14 @@ export function ClassroomCard({
   const cardBody = (
     <>
       {/* Cover */}
-      <div className={`h-20 bg-gradient-to-br ${gradient} relative flex items-center justify-between px-5`}>
+      <div
+        className={cn(
+          'h-20 relative flex items-center justify-between px-5',
+          savedCover
+            ? `border-b-2 ${savedCover.surface} ${savedCover.text}`
+            : `bg-gradient-to-br ${gradient}`,
+        )}
+      >
         {/* Checkbox overlay in selection mode */}
         {isSelecting && (
           <div
@@ -66,9 +78,14 @@ export function ClassroomCard({
           </div>
         )}
         <div className={isSelecting ? 'ml-8' : ''}>
-          <p className="text-white font-bold text-lg leading-tight">{classroom.name}</p>
-          {classroom.description && (
-            <p className="text-white/70 text-xs mt-0.5 truncate max-w-[180px]">{classroom.description}</p>
+          <p className={cn('font-bold text-lg leading-tight', !savedCover && 'text-white')}>
+            {classroom.name}
+          </p>
+          {shownDescription && (
+            <p className={cn(
+              'text-xs mt-0.5 truncate max-w-[180px]',
+              savedCover ? savedCover.textMuted : 'text-white/70',
+            )}>{shownDescription}</p>
           )}
         </div>
         <span className="text-3xl">{emoji}</span>

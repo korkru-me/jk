@@ -5,6 +5,7 @@ import { AssignmentList } from './assignment-list'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 export type { StudentAssignmentRow }
 
@@ -31,8 +32,8 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
       {/* Header card */}
       <Card padding="xl">
         <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
-        {classroom.description && (
-          <p className="text-muted-foreground text-sm mt-1">{classroom.description}</p>
+        {displayDescription(classroom.description) && (
+          <p className="text-muted-foreground text-sm mt-1">{displayDescription(classroom.description)}</p>
         )}
 
         <div className="flex items-center gap-5 mt-4 flex-wrap text-sm">
