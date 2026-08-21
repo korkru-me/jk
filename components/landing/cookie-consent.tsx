@@ -43,7 +43,7 @@ export function CookieConsent() {
     <div
       role="dialog"
       aria-label="การยินยอมการใช้คุกกี้"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card px-4 py-4 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card px-4 py-4 shadow-2xl"
     >
       <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center">
         <div className="flex items-start gap-3 flex-1">

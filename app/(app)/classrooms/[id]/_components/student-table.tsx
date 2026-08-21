@@ -102,7 +102,7 @@ export function StudentTable({
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="ค้นหานักเรียน..."
-            className="w-full pl-8 pr-4 py-2 text-sm bg-card border border-border rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-blue-100 transition-all"
+            className="w-full pl-8 pr-4 py-2 text-sm bg-card border border-border rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
           />
           {query && (
             <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground">

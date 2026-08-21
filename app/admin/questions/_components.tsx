@@ -89,11 +89,11 @@ const VIS_STYLE: Record<string, string> = {
   public:  'bg-success/10 text-success',
   private: 'bg-muted text-muted-foreground',
   school:  'bg-primary/10 text-primary',
-  pending: 'bg-yellow-100 text-yellow-700',
+  pending: 'bg-warning/10 text-warning',
 }
 const DIFF_STYLE: Record<string, string> = {
   easy:       'bg-success/10 text-success',
-  medium:     'bg-yellow-50 text-yellow-700',
+  medium:     'bg-warning/10 text-warning',
   hard:       'bg-destructive/10 text-destructive',
   analytical: 'bg-tint-1/10 text-tint-1',
 }

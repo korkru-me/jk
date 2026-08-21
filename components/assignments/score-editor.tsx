@@ -61,7 +61,7 @@ export function ScoreEditor({ submissionAnswerId, score, maxScore }: Props) {
         onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
         disabled={isPending}
         autoFocus
-        className="w-14 text-xs text-center rounded-lg border border-primary/20 py-0.5 outline-none focus:ring-2 focus:ring-blue-100"
+        className="w-14 text-xs text-center rounded-lg border border-primary/20 py-0.5 outline-none focus:ring-2 focus:ring-primary/20"
       />
       <span className="text-xs text-muted-foreground">/{maxScore}</span>
       <button onClick={save} disabled={isPending} className="text-success hover:text-success/80 disabled:opacity-50">

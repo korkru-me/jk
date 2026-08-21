@@ -240,7 +240,7 @@ const PRIORITY_CONFIG: Record<TicketPriority, { label: string; cls: string }> = 
   },
   low: {
     label: 'Low',
-    cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
+    cls: 'bg-muted text-muted-foreground',
   },
 }
 
@@ -254,7 +254,7 @@ function UserRow({ user }: { user: AppUser }) {
   const [suspended, setSuspended] = useState(user.status === 'suspended')
 
   return (
-    <tr className="border-t border-border/60 hover:bg-muted dark:hover:bg-slate-800/40 transition-colors">
+    <tr className="border-t border-border/60 hover:bg-muted transition-colors">
       <td className="px-4 py-3">
         <div>
           <p className="text-sm font-medium text-foreground">{user.name}</p>
@@ -289,7 +289,7 @@ function UserRow({ user }: { user: AppUser }) {
         <div className="flex items-center gap-2">
           <button
             title="Log in as user (Impersonate)"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-primary dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:hover:border-primary dark:hover:bg-indigo-950/40 dark:hover:text-primary"
             onClick={() =>
               alert(
                 `[Impersonate] กำลังเข้าสู่ระบบในนามของ ${user.email}\n\nในระบบจริงจะสร้าง signed impersonation token และ redirect`,
@@ -373,7 +373,7 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
                 <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 transition-colors">
                   ตอบกลับ
                 </button>
-                <button className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <button className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">
                   เปลี่ยนสถานะ
                 </button>
               </div>
@@ -431,7 +431,7 @@ export function UserSupport() {
             value={userSearch}
             onChange={(e) => setUserSearch(e.target.value)}
             placeholder="ค้นหาชื่อ อีเมล หรือ Tenant"
-            className="w-full max-w-sm rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
+            className="w-full max-w-sm rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
 
@@ -496,7 +496,7 @@ export function UserSupport() {
               className={cn(
                 'rounded-xl border p-3 text-left transition-all',
                 ticketStatus === item.status
-                  ? 'border-primary ring-2 ring-indigo-100 dark:ring-indigo-900/50'
+                  ? 'border-primary ring-2 ring-primary/20 dark:ring-primary/40'
                   : 'border-border/60',
                 'bg-card',
               )}

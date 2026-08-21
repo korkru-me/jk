@@ -115,7 +115,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
         <div className="relative shrink-0 print:hidden">
           <button
             onClick={() => setShowExport(v => !v)}
-            className="flex items-center gap-2 px-3.5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 bg-foreground text-background text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
           >
             <Download className="w-4 h-4" />
             ส่งออกรายงาน

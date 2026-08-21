@@ -93,7 +93,7 @@ const ACCESS_LABEL: Record<string, string> = {
 const ACCESS_BADGE: Record<string, string> = {
   open: 'bg-success/10 text-success',
   request: 'bg-primary/10 text-primary',
-  closed: 'bg-muted text-muted-foreground dark:bg-gray-800',
+  closed: 'bg-muted text-muted-foreground',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -572,7 +572,7 @@ function StepIndicator({
                 className={cn(
                   'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-all duration-300',
                   done
-                    ? 'bg-primary border-primary text-white dark:bg-primary dark:border-primary cursor-pointer hover:bg-primary/90 hover:border-blue-700 hover:scale-105'
+                    ? 'bg-primary border-primary text-white dark:bg-primary dark:border-primary cursor-pointer hover:bg-primary/90 hover:border-primary hover:scale-105'
                     : active
                     ? 'border-primary text-primary bg-primary/10 dark:border-primary'
                     : 'border-border text-muted-foreground bg-background cursor-default',

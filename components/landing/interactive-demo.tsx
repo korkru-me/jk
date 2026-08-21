@@ -117,7 +117,7 @@ function PhysicsDemo() {
               'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
               i === tplIdx
                 ? 'bg-primary text-white'
-                : 'border border-border bg-card text-muted-foreground hover:border-primary/20 hover:text-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                : 'border border-border bg-card text-muted-foreground hover:border-primary/20 hover:text-primary',
             )}
           >
             {f.formula} — {f.name}
@@ -150,7 +150,7 @@ function PhysicsDemo() {
           {tpl.vars.map((v) => (
             <span
               key={v.key}
-              className="inline-flex items-center gap-1 rounded-lg border border-success/20 bg-success/10 px-2.5 py-1 text-xs font-mono font-semibold text-success dark:border-emerald-800/50"
+              className="inline-flex items-center gap-1 rounded-lg border border-success/20 bg-success/10 px-2.5 py-1 text-xs font-mono font-semibold text-success dark:border-success/50"
             >
               {v.key} = {vals[v.key]} {v.unit}
             </span>
@@ -161,7 +161,7 @@ function PhysicsDemo() {
         {!revealed ? (
           <button
             onClick={() => setRevealed(true)}
-            className="w-full rounded-lg border-2 border-dashed border-border py-3 text-sm text-muted-foreground hover:border-primary/20 hover:text-primary transition-colors dark:border-slate-700 dark:hover:border-primary"
+            className="w-full rounded-lg border-2 border-dashed border-border py-3 text-sm text-muted-foreground hover:border-primary/20 hover:text-primary transition-colors dark:hover:border-primary"
           >
             กดเพื่อดูเฉลย
           </button>
@@ -245,7 +245,7 @@ function DragDemo() {
             dragging === card.id
               ? 'opacity-50 scale-95 border-primary/20'
               : over === card.id
-                ? 'border-primary ring-2 ring-indigo-100 dark:border-primary dark:ring-indigo-900/50'
+                ? 'border-primary ring-2 ring-primary/20 dark:border-primary dark:ring-primary/40'
                 : 'border-border',
           )}
         >
@@ -279,7 +279,7 @@ export function InteractiveDemo() {
   const [tab, setTab] = useState<'physics' | 'drag'>('physics')
 
   return (
-    <section className="bg-card py-20 dark:bg-slate-950">
+    <section className="bg-card py-20">
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
@@ -292,14 +292,14 @@ export function InteractiveDemo() {
 
         <div className="mx-auto max-w-2xl">
           {/* Tabs */}
-          <div className="mb-6 flex rounded-xl border border-border bg-muted p-1 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-6 flex rounded-xl border border-border bg-muted p-1">
             <button
               onClick={() => setTab('physics')}
               className={cn(
                 'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
                 tab === 'physics'
-                  ? 'bg-card text-foreground shadow-sm dark:bg-slate-800 dark:text-white'
-                  : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-slate-200',
+                  ? 'bg-card text-foreground shadow-sm dark:text-white'
+                  : 'text-muted-foreground hover:text-muted-foreground',
               )}
             >
               สุ่มตัวเลขฟิสิกส์
@@ -309,8 +309,8 @@ export function InteractiveDemo() {
               className={cn(
                 'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
                 tab === 'drag'
-                  ? 'bg-card text-foreground shadow-sm dark:bg-slate-800 dark:text-white'
-                  : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-slate-200',
+                  ? 'bg-card text-foreground shadow-sm dark:text-white'
+                  : 'text-muted-foreground hover:text-muted-foreground',
               )}
             >
               จัดลำดับข้อสอบ

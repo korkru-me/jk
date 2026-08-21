@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-border bg-card dark:border-slate-800 dark:bg-slate-950">
+    <footer className="border-t border-border bg-card">
       <div className="mx-auto max-w-6xl px-4 py-12">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           <div className="col-span-2 sm:col-span-1">
@@ -85,7 +85,7 @@ export function LandingFooter() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 dark:border-slate-800 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 sm:flex-row">
           <p className="text-xs text-muted-foreground">
             © 2026 KorKru — ก่อการเรียนรู้ โดยครู
           </p>

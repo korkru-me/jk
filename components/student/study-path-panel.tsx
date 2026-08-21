@@ -35,7 +35,7 @@ const TOPIC_MAP: Record<string, { label: string; topics: string[]; color: string
   ไฟฟ้า: {
     label: 'ไฟฟ้าและแม่เหล็ก',
     topics: ['กฎของโอห์ม', 'วงจรไฟฟ้า', 'สนามแม่เหล็กไฟฟ้า'],
-    color: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-300',
+    color: 'bg-warning/10 border-warning/20 text-warning dark:text-warning',
   },
   อนุภาค: {
     label: 'ฟิสิกส์อนุภาค',

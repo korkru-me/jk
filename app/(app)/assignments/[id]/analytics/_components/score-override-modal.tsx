@@ -171,7 +171,7 @@ export function ScoreOverrideModal({
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-xl transition-all ${
                   saved
                     ? 'bg-success text-white'
-                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                    : 'bg-foreground text-background hover:bg-gray-800'
                 }`}
               >
                 <Save className="w-4 h-4" />

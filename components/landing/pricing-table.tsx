@@ -267,7 +267,7 @@ export function PricingTable() {
                 'relative flex flex-col rounded-2xl border p-7 transition-shadow',
                 plan.highlighted
                   ? 'border-primary shadow-xl shadow-primary/20 ring-1 ring-primary/50 dark:border-primary dark:shadow-primary/40'
-                  : 'border-border hover:shadow-md dark:border-slate-700/60',
+                  : 'border-border hover:shadow-md',
                 'bg-card',
               )}
             >
@@ -306,7 +306,7 @@ export function PricingTable() {
                   'mb-6 block w-full rounded-xl py-3 text-center text-sm font-semibold transition-colors',
                   plan.highlighted
                     ? 'bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/20'
-                    : 'border border-border text-muted-foreground hover:bg-muted dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800',
+                    : 'border border-border text-muted-foreground hover:bg-muted',
                 )}
               >
                 {plan.cta}
@@ -343,7 +343,7 @@ export function PricingTable() {
 
       {/* Comparison Table */}
       <div className="overflow-x-auto rounded-2xl border border-border/60">
-        <table className="w-full bg-card text-sm dark:bg-slate-900">
+        <table className="w-full bg-card text-sm">
           <thead>
             <tr className="border-b border-border/60">
               <th className="px-5 py-4 text-left text-sm font-semibold text-muted-foreground w-2/5">
@@ -368,7 +368,7 @@ export function PricingTable() {
             {FEATURE_GROUPS.map((group) => (
               <Fragment key={group.group}>
                 <tr
-                  className="border-t border-border bg-muted dark:border-slate-700/60 dark:bg-slate-800/40"
+                  className="border-t border-border bg-muted"
                 >
                   <td
                     colSpan={4}
@@ -380,7 +380,7 @@ export function PricingTable() {
                 {group.rows.map((row) => (
                   <tr
                     key={row.feature}
-                    className="border-t border-border hover:bg-muted dark:border-slate-800 dark:hover:bg-slate-800/30 transition-colors"
+                    className="border-t border-border hover:bg-muted transition-colors"
                   >
                     <td className="px-5 py-3 text-sm text-muted-foreground">
                       {row.feature}

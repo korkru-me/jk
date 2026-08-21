@@ -19,7 +19,7 @@ interface Props {
 // for a subject classroom at a glance.
 export function HomeroomBanner({ classroom, studentCount, isSelecting = false, isSelected = false, onToggle }: Props) {
   const body = (
-    <div className="relative flex items-center gap-5 bg-gradient-to-r from-slate-800 via-slate-800 to-indigo-900 rounded-2xl px-6 py-5 overflow-hidden">
+    <div className="relative flex items-center gap-5 bg-surface-inverse rounded-2xl px-6 py-5 overflow-hidden">
       {isSelecting && (
         <div
           className={cn(
@@ -36,7 +36,7 @@ export function HomeroomBanner({ classroom, studentCount, isSelecting = false, i
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">ครูที่ปรึกษาประจำชั้น</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-primary">ครูที่ปรึกษาประจำชั้น</p>
         <p className="text-white font-bold text-xl leading-tight truncate mt-0.5">{classroom.name}</p>
         {classroom.description && (
           <p className="text-white/50 text-xs mt-1 truncate">{classroom.description}</p>
@@ -50,7 +50,7 @@ export function HomeroomBanner({ classroom, studentCount, isSelecting = false, i
       </div>
 
       {!isSelecting && (
-        <span className="flex items-center gap-1 text-sm font-medium text-indigo-300 shrink-0">
+        <span className="flex items-center gap-1 text-sm font-medium text-primary shrink-0">
           ดูภาพรวมการบ้าน <ArrowRight className="w-3.5 h-3.5" />
         </span>
       )}

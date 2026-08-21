@@ -250,7 +250,7 @@ export function QuestionPreviewContent({
         {isRandom && Object.keys(values).length > 0 ? (
           <div className="flex flex-wrap gap-1.5 bg-primary/10 px-3 py-2 rounded-lg flex-1">
             {Object.entries(values).map(([k, v]) => (
-              <span key={k} className="bg-card text-primary px-2.5 py-1 rounded-lg text-sm font-mono border border-indigo-100">
+              <span key={k} className="bg-card text-primary px-2.5 py-1 rounded-lg text-sm font-mono border border-primary/20">
                 {k} = {v}
               </span>
             ))}
@@ -259,7 +259,7 @@ export function QuestionPreviewContent({
         <button
           type="button"
           onClick={generate}
-          className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-lg hover:bg-indigo-200 transition-colors font-medium shrink-0"
+          className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-lg hover:bg-primary/10 transition-colors font-medium shrink-0"
         >
           🔄 โจทย์ใหม่
         </button>
@@ -635,7 +635,7 @@ export function QuestionPreviewContent({
           <textarea
             rows={5}
             placeholder="พิมพ์คำตอบที่นี่..."
-            className="w-full border border-border rounded-lg p-3 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="w-full border border-border rounded-lg p-3 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
           <p className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
             * ครูจะเป็นผู้ตรวจและให้คะแนน — ระบบไม่ตรวจอัตโนมัติ
@@ -709,7 +709,7 @@ export function QuestionPreviewContent({
                   readOnly={tfChecked}
                   rows={3}
                   placeholder="พิมพ์เหตุผลที่นี่..."
-                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="text-xs text-warning bg-warning/10 px-2 py-1.5 rounded-lg">
                   ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
@@ -794,7 +794,7 @@ export function QuestionPreviewContent({
                   readOnly={tfChecked}
                   rows={3}
                   placeholder="พิมพ์เหตุผลที่นี่..."
-                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="text-xs text-warning bg-warning/10 px-2 py-1.5 rounded-lg">
                   ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)

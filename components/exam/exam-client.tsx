@@ -644,7 +644,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               <ShieldAlert size={40} className="text-destructive" />
             </div>
             <h2 className="text-2xl font-black text-white mb-2">⚠️ ออกจากโหมดเต็มจอ</h2>
-            <p className="text-red-300 text-sm mb-6">
+            <p className="text-destructive text-sm mb-6">
               ระบบตรวจจับว่าคุณออกจากโหมดเต็มจอ<br />
               กรุณากลับสู่โหมดเต็มจอเพื่อทำข้อสอบต่อ
             </p>
@@ -1030,7 +1030,7 @@ function MCQInput({
                 ? 'opacity-35 border-dashed border-border'
                 : isSelected
                 ? 'border-primary bg-primary/8 dark:bg-primary/10'
-                : 'border-border hover:border-primary/20 dark:hover:border-blue-700'
+                : 'border-border hover:border-primary/20 dark:hover:border-primary'
             }`}
           >
             <label className="flex items-center gap-3 p-3 cursor-pointer flex-1 min-w-0">

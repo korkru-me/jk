@@ -192,7 +192,7 @@ export function PrintSettingsSidebar({
                   onClick={() => onPatch({ columns: col })}
                   className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
                     settings.columns === col
-                      ? 'border-gray-900 bg-gray-900 text-white'
+                      ? 'border-gray-900 bg-foreground text-background'
                       : 'border-border text-muted-foreground hover:border-gray-400'
                   }`}
                 >
@@ -295,7 +295,7 @@ export function PrintSettingsSidebar({
         {/* Primary: Generate ZIP */}
         <button
           onClick={onGenerateZip}
-          className="w-full flex items-center justify-center gap-2.5 py-3 bg-gray-900 text-white text-sm font-bold rounded-2xl hover:bg-gray-800 active:scale-[0.98] transition-all shadow-lg shadow-foreground/20"
+          className="w-full flex items-center justify-center gap-2.5 py-3 bg-foreground text-background text-sm font-bold rounded-2xl hover:bg-gray-800 active:scale-[0.98] transition-all shadow-lg shadow-foreground/20"
         >
           <ArchiveIcon className="w-4 h-4" />
           Generate &amp; Download All (ZIP)

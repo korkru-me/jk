@@ -75,7 +75,7 @@ export function SuperTopbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/90 px-6 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-950/90">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/90 px-6 backdrop-blur-sm">
       <div className="flex items-center gap-2">
         <Server className="h-4 w-4 text-muted-foreground" />
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -110,7 +110,7 @@ export function SuperTopbar() {
         {mounted && (
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-muted-foreground transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-muted-foreground transition-colors"
           >
             {theme === 'dark' ? (
               <Sun className="h-4 w-4" />

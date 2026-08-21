@@ -49,7 +49,7 @@ const ROLE_COLOR: Record<string, string> = {
   owner: 'bg-warning/10 text-warning',
   admin: 'bg-tint-1/10 text-tint-1',
   teacher: 'bg-primary/10 text-primary',
-  student: 'bg-success/10 text-green-800',
+  student: 'bg-success/10 text-success',
 }
 
 function getBaseUrl() {

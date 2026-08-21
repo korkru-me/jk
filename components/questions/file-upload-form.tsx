@@ -134,7 +134,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
         placeholder="เช่น สิ่งที่ควรปรากฏในไฟล์ที่นักเรียนส่งมา..."
       />
 
-      <div className="bg-primary/10 border border-blue-100 rounded-xl px-4 py-3 text-xs text-primary">
+      <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 text-xs text-primary">
         นักเรียนจะแนบไฟล์รูปภาพหรือ PDF เป็นคำตอบ ระบบให้คะแนนเต็มอัตโนมัติทันทีที่มีการแนบไฟล์อย่างน้อย 1 ไฟล์ — ไม่มีการตรวจเนื้อหาไฟล์ ครูสามารถเข้าไปดูไฟล์ที่ส่งได้จากหน้าผลการสอบของนักเรียน
       </div>
 

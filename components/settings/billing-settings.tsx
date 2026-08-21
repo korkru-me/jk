@@ -84,7 +84,7 @@ export function BillingSettings() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Crown size={16} className="text-amber-300" />
+              <Crown size={16} className="text-warning" />
               <span className="text-xs font-bold text-white/70 uppercase tracking-wider">แพ็กเกจปัจจุบัน</span>
             </div>
             <h2 className="text-2xl font-black">Pro Plan</h2>
@@ -99,7 +99,7 @@ export function BillingSettings() {
         <div className="mt-5 pt-4 border-t border-white/20 grid grid-cols-2 gap-3">
           {PLAN_FEATURES.map(f => (
             <div key={f} className="flex items-center gap-2 text-xs text-white/80">
-              <CheckCircle2 size={12} className="text-emerald-300 shrink-0" />
+              <CheckCircle2 size={12} className="text-success shrink-0" />
               {f}
             </div>
           ))}
@@ -107,7 +107,7 @@ export function BillingSettings() {
 
         <div className="mt-4 pt-4 border-t border-white/20 flex items-center justify-between">
           <p className="text-xs text-white/60">ต่ออายุอัตโนมัติวันที่ {NEXT_BILLING}</p>
-          <span className="text-xs bg-success/20 text-emerald-200 px-2 py-0.5 rounded-full font-medium">
+          <span className="text-xs bg-success/20 text-success px-2 py-0.5 rounded-full font-medium">
             ✓ ใช้งานอยู่
           </span>
         </div>

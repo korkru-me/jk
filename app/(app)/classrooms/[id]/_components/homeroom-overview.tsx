@@ -160,12 +160,12 @@ function StudentNotesPanel({
           onChange={e => setDraft(e.target.value)}
           placeholder="บันทึกส่วนตัว เช่น สุขภาพ ครอบครัว พฤติกรรม — เห็นเฉพาะครูที่ปรึกษาและผู้ช่วยสอน"
           rows={2}
-          className="flex-1 text-sm rounded-lg border border-border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"
+          className="flex-1 text-sm rounded-lg border border-border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
         />
         <button
           onClick={handleAdd}
           disabled={isPending || !draft.trim()}
-          className="shrink-0 text-xs font-medium px-3 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 transition-colors"
+          className="shrink-0 text-xs font-medium px-3 py-2 rounded-lg bg-foreground text-background hover:bg-gray-800 disabled:opacity-40 transition-colors"
         >
           บันทึก
         </button>

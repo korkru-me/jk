@@ -217,7 +217,7 @@ const SEVERITY_CONFIG: Record<Severity, { cls: string; icon: React.ElementType; 
       label: 'Warning',
     },
     info: {
-      cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
+      cls: 'bg-muted text-muted-foreground',
       icon: Info,
       label: 'Info',
     },
@@ -258,7 +258,7 @@ export function AuditTrail() {
     <div className="space-y-5">
       {/* Alert Banner */}
       {criticalCount > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 dark:border-red-900/50">
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 dark:border-destructive/50">
           <ShieldAlert className="h-5 w-5 text-destructive shrink-0" />
           <p className="text-sm font-medium text-destructive">
             พบ {criticalCount} รายการที่มีระดับความรุนแรง Critical ในช่วง 48 ชั่วโมงที่ผ่านมา
@@ -289,7 +289,7 @@ export function AuditTrail() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหา Email, Action, IP, Resource"
-            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
+            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
         {[
@@ -329,7 +329,7 @@ export function AuditTrail() {
             key={i}
             value={sel.value}
             onChange={(e) => sel.onChange(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
           >
             {sel.options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -371,7 +371,7 @@ export function AuditTrail() {
                     'border-t border-border/60 transition-colors',
                     log.severity === 'critical'
                       ? 'bg-destructive/10'
-                      : 'hover:bg-muted dark:hover:bg-slate-800/40',
+                      : 'hover:bg-muted',
                   )}
                 >
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
@@ -390,7 +390,7 @@ export function AuditTrail() {
                     {log.resource}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground dark:bg-slate-800 dark:text-slate-300">
+                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       {CATEGORY_LABEL[log.category]}
                     </span>
                   </td>

@@ -270,7 +270,7 @@ export function BrandingSettings() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={bgPreview} alt="bg preview" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <div className="bg-card/90 dark:bg-zinc-900/90 rounded-xl px-6 py-3 text-center">
+              <div className="bg-card/90 rounded-xl px-6 py-3 text-center">
                 <p className="text-xs font-bold">ล็อกอินเข้าสู่ระบบ</p>
                 <div className="mt-1 h-2 w-24 rounded-full bg-muted mx-auto" />
               </div>

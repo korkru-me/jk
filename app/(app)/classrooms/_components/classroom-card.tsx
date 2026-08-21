@@ -161,7 +161,7 @@ export function ClassroomCard({
         onClick={onToggle}
         className={cn(
           'group cursor-pointer bg-card rounded-2xl ring-1 overflow-hidden transition-all duration-150',
-          isSelected ? 'ring-2 ring-primary shadow-md' : 'ring-border hover:ring-blue-200'
+          isSelected ? 'ring-2 ring-primary shadow-md' : 'ring-border hover:ring-primary/20'
         )}
       >
         {cardBody}
@@ -174,7 +174,7 @@ export function ClassroomCard({
       href={`/classrooms/${classroom.id}`}
       className={cn(
         'group block bg-card rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden',
-        isPinned ? 'ring-2 ring-amber-300' : 'ring-1 ring-border'
+        isPinned ? 'ring-2 ring-warning/40' : 'ring-1 ring-border'
       )}
     >
       {cardBody}

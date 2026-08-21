@@ -170,9 +170,9 @@ const TENANTS: Tenant[] = [
 const PLAN_BADGE: Record<Plan, string> = {
   Enterprise:
     'bg-tint-1/10 text-tint-1 ring-1 ring-tint-1/40 dark:ring-violet-700',
-  Pro: 'bg-primary/10 text-primary ring-1 ring-indigo-300 dark:ring-indigo-700',
+  Pro: 'bg-primary/10 text-primary ring-1 ring-primary/40 dark:ring-indigo-700',
   Basic:
-    'bg-muted text-muted-foreground ring-1 ring-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600',
+    'bg-muted text-muted-foreground ring-1 ring-slate-300 dark:ring-slate-600',
 }
 
 const STATUS_BADGE: Record<TenantStatus, string> = {
@@ -191,7 +191,7 @@ const STATUS_LABEL: Record<TenantStatus, string> = {
 
 function BranchRow({ branch }: { branch: Branch }) {
   return (
-    <tr className="border-t border-border/40 bg-muted/60 dark:bg-slate-900/40">
+    <tr className="border-t border-border/40 bg-muted/60">
       <td className="pl-12 pr-4 py-2.5">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <ChevronRight className="h-3 w-3 text-muted-foreground" />
@@ -226,13 +226,13 @@ function TenantRow({ tenant }: { tenant: Tenant }) {
 
   return (
     <>
-      <tr className="border-t border-border/60 hover:bg-muted dark:hover:bg-slate-800/40 transition-colors">
+      <tr className="border-t border-border/60 hover:bg-muted transition-colors">
         <td className="px-4 py-3.5">
           <div className="flex items-center gap-2.5">
             {hasBranches ? (
               <button
                 onClick={() => setExpanded((v) => !v)}
-                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-muted-foreground dark:hover:text-slate-200"
+                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-muted-foreground"
               >
                 {expanded ? (
                   <ChevronDown className="h-3.5 w-3.5" />
@@ -311,7 +311,7 @@ function TenantRow({ tenant }: { tenant: Tenant }) {
         </td>
 
         <td className="px-4 py-3.5">
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-primary dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300">
+          <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary transition-colors dark:hover:border-primary dark:hover:bg-indigo-950/40 dark:hover:text-primary">
             <Settings className="h-3 w-3" />
             Manage
           </button>
@@ -397,13 +397,13 @@ export function TenantManager() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหาชื่อสถาบัน หรือ Domain"
-            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground dark:focus:border-primary dark:focus:ring-indigo-900/30"
+            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white dark:placeholder:text-muted-foreground dark:focus:border-primary dark:focus:ring-primary/40"
           />
         </div>
         <select
           value={planFilter}
           onChange={(e) => setPlanFilter(e.target.value as Plan | 'All')}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
         >
           <option value="All">ทุก Plan</option>
           <option value="Enterprise">Enterprise</option>
@@ -413,7 +413,7 @@ export function TenantManager() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as TenantStatus | 'All')}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
         >
           <option value="All">ทุก Status</option>
           <option value="active">Active</option>
@@ -445,7 +445,7 @@ export function TenantManager() {
                   onClick={col.key ? () => toggleSort(col.key!) : undefined}
                   className={cn(
                     'px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider',
-                    col.key && 'cursor-pointer select-none hover:text-muted-foreground dark:hover:text-slate-200',
+                    col.key && 'cursor-pointer select-none hover:text-muted-foreground',
                   )}
                 >
                   {col.label}

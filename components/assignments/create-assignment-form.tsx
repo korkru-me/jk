@@ -244,7 +244,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             <div className="flex flex-col items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                 i < step  ? 'bg-primary text-white' :
-                i === step ? 'bg-primary text-white ring-4 ring-blue-100' :
+                i === step ? 'bg-primary text-white ring-4 ring-primary/20' :
                 'bg-muted text-muted-foreground'
               }`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}

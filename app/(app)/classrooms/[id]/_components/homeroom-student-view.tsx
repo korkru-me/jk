@@ -36,7 +36,7 @@ export function HomeroomStudentView({
           header so students recognize this as their advisory class, not a
           subject classroom. */}
       <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-indigo-900 rounded-2xl p-6 text-white">
-        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-300 mb-1.5">
+        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">
           <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
         </p>
         <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>

@@ -200,7 +200,7 @@ const ANN_STATUS_CONFIG: Record<
   },
   expired: {
     label: 'หมดอายุ',
-    cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
+    cls: 'bg-muted text-muted-foreground',
   },
 }
 
@@ -267,7 +267,7 @@ export function MarketingGrowth() {
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as AnnouncementType)}
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
               >
                 <option value="feature">ฟีเจอร์ใหม่</option>
                 <option value="maintenance">ปิดปรับปรุง</option>
@@ -283,7 +283,7 @@ export function MarketingGrowth() {
                 type="date"
                 value={newExpires}
                 onChange={(e) => setNewExpires(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
               />
             </div>
           </div>
@@ -297,7 +297,7 @@ export function MarketingGrowth() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="พิมพ์ข้อความที่จะแสดงเป็นแบนเนอร์บนหน้าจอของผู้ใช้ทุกคน"
-              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
+              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
             />
           </div>
 
@@ -331,8 +331,8 @@ export function MarketingGrowth() {
                 className={cn(
                   'rounded-xl border p-4',
                   ann.status === 'expired'
-                    ? 'border-border bg-muted/80 opacity-60 dark:border-slate-700/40 dark:bg-slate-900/40'
-                    : 'border-border bg-card dark:border-slate-700/60 dark:bg-slate-900',
+                    ? 'border-border bg-muted/80 opacity-60'
+                    : 'border-border bg-card',
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -468,7 +468,7 @@ export function MarketingGrowth() {
               {REFERRALS.map((r) => (
                 <tr
                   key={r.id}
-                  className="border-t border-border/60 hover:bg-muted dark:hover:bg-slate-800/40 transition-colors"
+                  className="border-t border-border/60 hover:bg-muted transition-colors"
                 >
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-foreground">
@@ -480,7 +480,7 @@ export function MarketingGrowth() {
                     {r.tenant}
                   </td>
                   <td className="px-4 py-3">
-                    <code className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground dark:bg-slate-800 dark:text-slate-200">
+                    <code className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
                       {r.code}
                     </code>
                   </td>
@@ -507,7 +507,7 @@ export function MarketingGrowth() {
                         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                         r.status === 'active'
                           ? 'bg-success/10 text-success'
-                          : 'bg-muted text-muted-foreground dark:bg-slate-800',
+                          : 'bg-muted text-muted-foreground',
                       )}
                     >
                       {r.status === 'active' ? 'Active' : 'Expired'}

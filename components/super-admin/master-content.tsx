@@ -117,7 +117,7 @@ const STATUS_CONFIG: Record<ContentStatus, { label: string; cls: string; icon: R
   },
   draft: {
     label: 'Draft',
-    cls: 'bg-muted text-muted-foreground dark:bg-slate-800',
+    cls: 'bg-muted text-muted-foreground',
     icon: Lock,
   },
 }
@@ -162,7 +162,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
         {bundle.tags.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground dark:bg-slate-800 dark:text-slate-300"
+            className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
           >
             <Tag className="h-2.5 w-2.5" />
             {tag}
@@ -186,7 +186,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
             Push to Public Bank
           </button>
         )}
-        <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+        <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
           แก้ไข
         </button>
         {bundle.status === 'pushed' && (
@@ -264,7 +264,7 @@ export function MasterContent() {
       </div>
 
       {/* Info Banner */}
-      <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 dark:border-indigo-900/50">
+      <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 dark:border-primary/50">
         <Layers className="h-5 w-5 text-primary shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-semibold text-primary">
@@ -285,13 +285,13 @@ export function MasterContent() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหาชื่อชุด, วิชา, หรือ Tag"
-            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
+            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
         <select
           value={levelFilter}
           onChange={(e) => setLevelFilter(e.target.value)}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
         >
           <option value="All">ทุกระดับ</option>
           <option value="ม.4">ม.4</option>
@@ -322,14 +322,14 @@ export function MasterContent() {
               </label>
               <input
                 placeholder="เช่น ชุดข้อสอบฟิสิกส์มาตรฐาน ม.6 ภาค 1"
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
               />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">
                 ระดับชั้น
               </label>
-              <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+              <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none">
                 <option>ม.4</option>
                 <option>ม.5</option>
                 <option>ม.6</option>
@@ -344,7 +344,7 @@ export function MasterContent() {
               <textarea
                 rows={3}
                 placeholder="อธิบายเนื้อหาและขอบเขตของชุดข้อสอบนี้"
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-muted-foreground"
+                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
               />
             </div>
           </div>
@@ -354,7 +354,7 @@ export function MasterContent() {
             </button>
             <button
               onClick={() => setShowCreateForm(false)}
-              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
             >
               ยกเลิก
             </button>
@@ -403,7 +403,7 @@ export function MasterContent() {
               </button>
               <button
                 onClick={() => setPushConfirm(null)}
-                className="flex-1 rounded-lg border border-border bg-card py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="flex-1 rounded-lg border border-border bg-card py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
               >
                 ยกเลิก
               </button>

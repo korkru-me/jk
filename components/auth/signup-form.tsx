@@ -226,7 +226,7 @@ export function SignupForm() {
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors dark:hover:text-slate-300"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
             aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
           >
             {showPassword ? (
@@ -247,7 +247,7 @@ export function SignupForm() {
           <input
             type="checkbox"
             {...reg('agreed')}
-            className="mt-0.5 h-4 w-4 rounded border-border accent-primary dark:border-slate-600"
+            className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
           />
           <span className="text-sm text-muted-foreground leading-relaxed">
             ฉันยอมรับ{' '}

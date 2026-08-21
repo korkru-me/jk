@@ -17,7 +17,7 @@ export function ClassInsights() {
             แนะนำให้มอบหมายแบบฝึกหัดเสริม
           </p>
         </div>
-        <button className="flex items-center gap-1 text-xs font-semibold text-warning bg-warning/10 hover:bg-amber-200 px-3 py-1.5 rounded-lg shrink-0 transition-colors whitespace-nowrap">
+        <button className="flex items-center gap-1 text-xs font-semibold text-warning bg-warning/10 hover:bg-warning/10 px-3 py-1.5 rounded-lg shrink-0 transition-colors whitespace-nowrap">
           มอบหมายงาน
           <ChevronRight className="w-3 h-3" />
         </button>

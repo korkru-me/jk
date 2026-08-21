@@ -65,7 +65,7 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
             onClick={() => setStatusFilter(f.key)}
             className={cn(
               'px-3 py-1.5 rounded-full text-xs font-medium transition-all',
-              statusFilter === f.key ? 'bg-gray-900 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/70'
+              statusFilter === f.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-muted/70'
             )}
           >
             {f.label} <span className="opacity-70">({f.count})</span>
@@ -140,7 +140,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
   return (
     <div className={cn(
       'bg-card border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-all',
-      due.urgent && !isDone ? 'border-flag/20 dark:border-orange-800' : ''
+      due.urgent && !isDone ? 'border-flag/20 dark:border-flag' : ''
     )}>
       <div className="flex items-start gap-2">
         {due.urgent && !isDone && (

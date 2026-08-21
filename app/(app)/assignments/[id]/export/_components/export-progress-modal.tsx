@@ -199,7 +199,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
               <div className="flex items-center gap-3 p-3 bg-success/10 rounded-xl">
                 <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-green-800">สร้าง {totalCopies} ไฟล์ PDF เสร็จสิ้น</p>
+                  <p className="text-sm font-medium text-success">สร้าง {totalCopies} ไฟล์ PDF เสร็จสิ้น</p>
                   <p className="text-xs text-success mt-0.5">กดปุ่มด้านล่างเพื่อพิมพ์หรือบันทึกเป็น PDF</p>
                 </div>
               </div>
@@ -241,7 +241,7 @@ export function ExportProgressModal({ assignmentId, assignmentTitle, totalCopies
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all active:scale-[0.98]"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold bg-foreground text-background rounded-xl hover:bg-gray-800 transition-all active:scale-[0.98]"
                 >
                   <ExternalLink className="w-4 h-4" />
                   เปิดหน้าพิมพ์ / บันทึก PDF

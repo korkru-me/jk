@@ -93,7 +93,7 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
       </Link>
 
       {/* Header card */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
+      <div className="bg-surface-inverse text-surface-inverse-foreground rounded-2xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
@@ -213,7 +213,7 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
           <button
             onClick={handleDelete}
             disabled={isPending}
-            className="flex items-center gap-1.5 text-xs text-destructive hover:text-red-300 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive transition-colors disabled:opacity-50"
           >
             <Trash2 className="w-3.5 h-3.5" /> ลบ
           </button>
@@ -428,7 +428,7 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
               key={s}
               onClick={() => setSort(s)}
               className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                sort === s ? 'bg-gray-900 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
+                sort === s ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'
               }`}
             >
               {s === 'time' ? 'ล่าสุด' : s === 'score' ? 'คะแนน' : 'ชื่อ'}
@@ -526,7 +526,7 @@ function AnalyticsTab({ questions, submissions, assignmentId }: {
         <div className="flex items-end gap-3 h-32">
           {buckets.map((count, i) => {
             const labels = ['0–20%', '21–40%', '41–60%', '61–80%', '81–100%']
-            const colors = ['bg-destructive', 'bg-orange-400', 'bg-warning', 'bg-lime-400', 'bg-success']
+            const colors = ['bg-destructive', 'bg-flag', 'bg-warning', 'bg-lime-400', 'bg-success']
             return (
               <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
                 <span className="text-xs font-bold text-muted-foreground">{count}</span>

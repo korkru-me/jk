@@ -82,7 +82,7 @@ export function CreateClassroomModal() {
                 onClick={() => setClassroomType('subject')}
                 className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
                   classroomType === 'subject'
-                    ? 'border-primary bg-primary/10 text-blue-900'
+                    ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border hover:border-ring text-muted-foreground'
                 }`}
               >
@@ -97,7 +97,7 @@ export function CreateClassroomModal() {
                 onClick={() => setClassroomType('homeroom')}
                 className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
                   classroomType === 'homeroom'
-                    ? 'border-primary bg-primary/10 text-blue-900'
+                    ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border hover:border-ring text-muted-foreground'
                 }`}
               >
@@ -158,7 +158,7 @@ export function CreateClassroomModal() {
                     onClick={() => setSubject(s.value === subject ? '' : s.value)}
                     className={`flex items-start gap-2 p-2.5 rounded-xl border text-left transition-all text-xs ${
                       subject === s.value
-                        ? 'border-primary bg-primary/10 text-blue-900'
+                        ? 'border-primary bg-primary/10 text-primary'
                         : 'border-border hover:border-ring text-muted-foreground'
                     }`}
                   >

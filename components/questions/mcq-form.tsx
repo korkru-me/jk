@@ -82,7 +82,7 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
       >
         <ListChecks className={`w-5 h-5 mt-0.5 shrink-0 ${mode === 'manual' ? 'text-primary' : 'text-muted-foreground'}`} />
         <div>
-          <p className={`text-sm font-semibold ${mode === 'manual' ? 'text-blue-900' : 'text-muted-foreground'}`}>
+          <p className={`text-sm font-semibold ${mode === 'manual' ? 'text-primary' : 'text-muted-foreground'}`}>
             สร้างตัวเลือกเอง
           </p>
           <p className={`text-xs mt-0.5 ${mode === 'manual' ? 'text-primary' : 'text-muted-foreground'}`}>

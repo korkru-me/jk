@@ -46,7 +46,7 @@ const TRUST_ITEMS = [
 
 export function TrustBadges() {
   return (
-    <section className="bg-muted py-20 dark:bg-slate-900/40">
+    <section className="bg-muted py-20">
       <div className="mx-auto max-w-6xl px-4">
         {/* Stats */}
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">

@@ -272,7 +272,7 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       pct >= 75 ? 'bg-success/10 text-success'
-                      : pct >= 50 ? 'bg-yellow-100 text-yellow-700'
+                      : pct >= 50 ? 'bg-warning/10 text-warning'
                       : 'bg-destructive/10 text-destructive'
                     }`}>
                       {pct}%

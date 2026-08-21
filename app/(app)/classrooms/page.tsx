@@ -150,19 +150,19 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                   <Link
                     key={c.id}
                     href={`/classrooms/${c.id}`}
-                    className="flex items-center gap-5 bg-gradient-to-r from-slate-800 via-slate-800 to-indigo-900 rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-5 bg-surface-inverse rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
                       <Home className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">ครูที่ปรึกษาประจำชั้น</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">ครูที่ปรึกษาประจำชั้น</p>
                       <p className="text-white font-bold text-xl leading-tight truncate mt-0.5">{c.name}</p>
                       {c.description && (
                         <p className="text-white/50 text-xs mt-1 truncate">{c.description}</p>
                       )}
                     </div>
-                    <span className="flex items-center gap-1 text-sm font-medium text-indigo-300 shrink-0">
+                    <span className="flex items-center gap-1 text-sm font-medium text-primary shrink-0">
                       เข้าห้อง <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </Link>
@@ -184,7 +184,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                   <Link
                     key={c.id}
                     href={`/classrooms/${c.id}`}
-                    className="block p-5 bg-card border rounded-2xl hover:border-primary/20 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                    className="block p-5 bg-card border rounded-2xl hover:border-primary/20 dark:hover:border-primary hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold truncate">{c.name}</p>

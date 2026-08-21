@@ -57,7 +57,7 @@ function StatCard({
   const colors = {
     blue:   'bg-primary/10 border-primary/20 text-primary',
     green:  'bg-success/10 border-success/20 text-success',
-    yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+    yellow: 'bg-warning/10 border-warning/20 text-warning',
     red:    'bg-destructive/10 border-destructive/20 text-destructive',
     purple: 'bg-tint-1/10 border-tint-1/20 text-tint-1',
   }

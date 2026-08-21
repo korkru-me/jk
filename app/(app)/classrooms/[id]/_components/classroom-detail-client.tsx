@@ -140,7 +140,7 @@ export function ClassroomDetailClient({
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             {isHomeroom && (
-              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-300 mb-1.5">
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">
                 <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
               </p>
             )}
@@ -162,7 +162,7 @@ export function ClassroomDetailClient({
                 <span className="text-muted-foreground">{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
               </div>
               {!isHomeroom && (
-                <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-primary hover:text-blue-300 transition-colors">
+                <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-primary hover:text-primary transition-colors">
                   + สร้างชุดข้อสอบ
                 </Link>
               )}

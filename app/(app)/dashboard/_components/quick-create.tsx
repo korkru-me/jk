@@ -23,7 +23,7 @@ export function QuickCreate() {
       </Link>
       <Link
         href="/assignments/new"
-        className="flex items-center gap-3 w-full bg-primary/10 hover:bg-primary/10 text-blue-900 rounded-xl px-4 py-3 transition-all border border-blue-100 hover:border-primary/20 group"
+        className="flex items-center gap-3 w-full bg-primary/10 hover:bg-primary/10 text-primary rounded-xl px-4 py-3 transition-all border border-primary/20 hover:border-primary/20 group"
       >
         <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
           <Library className="w-4 h-4 text-primary" />
@@ -32,7 +32,7 @@ export function QuickCreate() {
           <p className="text-sm font-semibold">จัดชุดข้อสอบ</p>
           <p className="text-xs text-primary">ดึงจากคลังโจทย์</p>
         </div>
-        <ChevronRight className="w-4 h-4 text-blue-300 group-hover:text-primary transition-colors" />
+        <ChevronRight className="w-4 h-4 text-primary group-hover:text-primary transition-colors" />
       </Link>
     </Card>
   )

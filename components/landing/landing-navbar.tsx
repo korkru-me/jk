@@ -19,7 +19,7 @@ export function LandingNavbar() {
   useEffect(() => setMounted(true), [])
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/80 bg-card/90 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/90">
+    <nav className="sticky top-0 z-50 border-b border-border/80 bg-card/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
@@ -28,7 +28,7 @@ export function LandingNavbar() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-base font-bold text-foreground">KorKru</span>
-            <span className="rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning dark:border-amber-800/60">
+            <span className="rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning dark:border-warning/60">
               Demo
             </span>
           </div>
@@ -43,8 +43,8 @@ export function LandingNavbar() {
               className={cn(
                 'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 pathname === link.href
-                  ? 'bg-muted text-foreground dark:bg-slate-800 dark:text-white'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-slate-800 dark:hover:text-white',
+                  ? 'bg-muted text-foreground dark:text-white'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:text-white',
               )}
             >
               {link.label}
@@ -66,7 +66,7 @@ export function LandingNavbar() {
 
           <Link
             href="/login"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors dark:hover:bg-slate-800 dark:hover:text-white"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors dark:hover:text-white"
           >
             เข้าสู่ระบบ
           </Link>
@@ -103,13 +103,13 @@ export function LandingNavbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="border-t border-border bg-card px-4 pb-4 pt-2 dark:border-slate-800 dark:bg-slate-950 sm:hidden">
+        <div className="border-t border-border bg-card px-4 pb-4 pt-2 sm:hidden">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-              className="block rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted dark:text-slate-300 dark:hover:bg-slate-800"
+              className="block rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted"
             >
               {link.label}
             </Link>
@@ -118,7 +118,7 @@ export function LandingNavbar() {
             <Link
               href="/login"
               onClick={() => setMobileOpen(false)}
-              className="flex-1 rounded-lg border border-border py-2.5 text-center text-sm font-medium text-muted-foreground dark:border-slate-700 dark:text-slate-300"
+              className="flex-1 rounded-lg border border-border py-2.5 text-center text-sm font-medium text-muted-foreground"
             >
               เข้าสู่ระบบ
             </Link>

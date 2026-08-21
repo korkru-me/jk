@@ -112,7 +112,7 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
             key={f.key}
             onClick={() => setTypeFilter(f.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
+              typeFilter === f.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'
             }`}
           >
             {f.label}

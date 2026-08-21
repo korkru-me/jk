@@ -81,8 +81,8 @@ const SECTIONS = [
     id: 'em',
     title: 'แม่เหล็กไฟฟ้า',
     icon: '⚡',
-    color: 'border-yellow-500/20 bg-yellow-500/5',
-    badge: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-300',
+    color: 'border-warning/20 bg-warning/5',
+    badge: 'bg-warning/15 text-warning dark:text-warning',
     entries: [
       {
         name: 'กฎของคูลอมบ์',

@@ -93,7 +93,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
   return (
     <div className="space-y-4">
       {/* Owner */}
-      <div className="bg-warning/10 border border-amber-100 rounded-2xl p-4 flex items-center gap-3">
+      <div className="bg-warning/10 border border-warning/20 rounded-2xl p-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center font-bold text-warning text-sm shrink-0">
           {ownerName.slice(0, 2)}
         </div>

@@ -27,7 +27,7 @@ export default async function SuperAdminLayout({
   if (profile?.role !== 'admin') redirect('/')
 
   return (
-    <div className="flex min-h-screen bg-muted dark:bg-slate-950">
+    <div className="flex min-h-screen bg-muted">
       <SuperSidebar />
       <div className="flex flex-1 flex-col min-w-0">
         <SuperTopbar />

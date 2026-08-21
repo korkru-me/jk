@@ -221,7 +221,7 @@ export function ClassroomScoresMatrix({
               key={f.key}
               onClick={() => setTypeFilter(f.key)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                typeFilter === f.key ? 'bg-gray-900 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
+                typeFilter === f.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'
               }`}
             >
               {f.label}
@@ -304,7 +304,7 @@ export function ClassroomScoresMatrix({
                       disabled={isOrderPending}
                       placeholder="-"
                       title="ลำดับคอลัมน์ (ยิ่งน้อยยิ่งอยู่ซ้าย)"
-                      className="w-10 mx-auto mb-1 block text-xs text-center rounded-lg border border-border py-0.5 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                      className="w-10 mx-auto mb-1 block text-xs text-center rounded-lg border border-border py-0.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50"
                     />
                     <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
                       {a.title}

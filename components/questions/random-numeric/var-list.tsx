@@ -36,7 +36,7 @@ export function VarList({ variables, onChange, logicRules, onLogicRulesChange, o
   return (
     <div className="space-y-2 pt-1">
       {hasRandom && (
-        <div className="flex items-start gap-2 bg-primary/10 border border-blue-100 rounded-xl px-3 py-2">
+        <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl px-3 py-2">
           <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
           <p className="text-xs text-primary leading-relaxed">
             <span className="font-semibold">ขนาดก้าว</span>{' '}

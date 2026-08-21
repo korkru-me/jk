@@ -34,6 +34,10 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-flag: var(--flag);
   --color-flag-foreground: var(--flag-foreground);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-surface-inverse-foreground: var(--surface-inverse-foreground);
+  --color-surface-inverse-muted: var(--surface-inverse-muted);
+  --color-surface-inverse-border: var(--surface-inverse-border);
   --color-tint-1: var(--tint-1);
   --color-tint-2: var(--tint-2);
   --color-tint-3: var(--tint-3);
@@ -90,6 +94,14 @@
      about the system's own state. */
   --flag: oklch(0.646 0.222 41.116);
   --flag-foreground: oklch(0.985 0 0);
+  /* Inverted panel — hero banners, the super-admin chrome, the assignment
+     header card. Deliberately dark in both themes, but a preset should still
+     be able to restyle it instead of it staying frozen slate. */
+  --surface-inverse: oklch(0.24 0.012 265);
+  --surface-inverse-foreground: oklch(0.985 0 0);
+  --surface-inverse-muted: oklch(0.72 0.01 265);
+  --surface-inverse-border: oklch(1 0 0 / 14%);
+
   /* Decorative tints — used to tell items apart (stat cards, icon chips,
      category badges). They carry no meaning: swapping them changes nothing a
      teacher reads, unlike --success or --flag. A preset overrides them so its
@@ -211,6 +223,7 @@
 
 /* Square, dense, flat — crisp edges instead of shadow. */
 [data-style="sharp"] {
+  --surface-inverse: oklch(0.2 0 0);
   --radius: 0rem;
   --spacing: 0.22rem;
   --primary: oklch(0.32 0.02 260);
@@ -229,6 +242,8 @@
 
 /* Warm and roomy, for a calmer classroom feel. */
 [data-style="warm"] {
+  --surface-inverse: oklch(0.26 0.03 50);
+  --surface-inverse-muted: oklch(0.74 0.02 50);
   --radius: 0.75rem;
   --spacing: 0.3rem;
   --background: oklch(0.985 0.008 85);
@@ -285,6 +300,7 @@
   --warning: oklch(0.78 0.17 75);
   /* primary is magenta here, so the neighbouring violet reads as a near-miss;
      push the tints to hues that separate from it cleanly */
+  --surface-inverse: oklch(0.26 0.06 320);
   --tint-1: oklch(0.58 0.2 255);
   --tint-2: oklch(0.68 0.15 195);
   --tint-3: oklch(0.68 0.17 35);

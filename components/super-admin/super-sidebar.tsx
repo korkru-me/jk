@@ -64,14 +64,14 @@ export function SuperSidebar() {
     <aside
       className={cn(
         'shrink-0 flex flex-col min-h-screen border-r transition-all duration-300',
-        'bg-slate-900 border-slate-700/60',
+        'bg-surface-inverse border-surface-inverse-border',
         collapsed ? 'w-16' : 'w-64',
       )}
     >
       {/* Brand */}
       <div
         className={cn(
-          'flex items-center gap-3 border-b border-slate-700/60 px-4 py-4 min-h-[64px]',
+          'flex items-center gap-3 border-b border-surface-inverse-border px-4 py-4 min-h-[64px]',
           collapsed && 'justify-center px-2',
         )}
       >
@@ -80,7 +80,7 @@ export function SuperSidebar() {
         </div>
         {!collapsed && (
           <div>
-            <p className="text-xs font-bold text-indigo-300 uppercase tracking-widest">
+            <p className="text-xs font-bold text-primary uppercase tracking-widest">
               Super Admin
             </p>
             <p className="text-sm font-semibold text-white">KorKru HQ</p>
@@ -102,7 +102,7 @@ export function SuperSidebar() {
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all',
                 active
                   ? 'bg-primary text-white shadow-md shadow-primary/50'
-                  : 'text-muted-foreground hover:bg-slate-800 hover:text-slate-100',
+                  : 'text-muted-foreground hover:bg-surface-inverse-border hover:text-surface-inverse-muted',
                 collapsed && 'justify-center px-2',
               )}
             >
@@ -113,7 +113,7 @@ export function SuperSidebar() {
                   <p
                     className={cn(
                       'text-xs mt-0.5 truncate',
-                      active ? 'text-indigo-200' : 'text-muted-foreground',
+                      active ? 'text-primary' : 'text-muted-foreground',
                     )}
                   >
                     {item.sub}
@@ -126,11 +126,11 @@ export function SuperSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-slate-700/60 p-2 space-y-1">
+      <div className="border-t border-surface-inverse-border p-2 space-y-1">
         {!collapsed && (
           <Link
             href="/admin/dashboard"
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-surface-inverse-muted hover:bg-surface-inverse-border transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             กลับ Admin Panel
@@ -138,7 +138,7 @@ export function SuperSidebar() {
         )}
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-slate-300 hover:bg-slate-800 transition-colors"
+          className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-surface-inverse-muted hover:bg-surface-inverse-border transition-colors"
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />

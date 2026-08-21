@@ -88,7 +88,7 @@ export function MethodAuto({ variables, value, onChange, unit }: MethodAutoProps
       {/* Inline live result */}
       {value.trim() && (
         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-          isValid ? 'bg-success/10 border border-success/20 text-green-800' : 'bg-destructive/10 border border-destructive/20 text-destructive'
+          isValid ? 'bg-success/10 border border-success/20 text-success' : 'bg-destructive/10 border border-destructive/20 text-destructive'
         }`}>
           <span className="font-mono flex-1 truncate">{value}</span>
           <span className="opacity-40">=</span>

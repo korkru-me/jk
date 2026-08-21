@@ -88,7 +88,7 @@ export function EngagementHeatmap({ anchorDate }: { anchorDate: string }) {
 
         {tooltip && (
           <div
-            className="fixed z-50 bg-gray-900 text-white text-xs px-2.5 py-1.5 rounded-lg pointer-events-none shadow-lg"
+            className="fixed z-50 bg-foreground text-background text-xs px-2.5 py-1.5 rounded-lg pointer-events-none shadow-lg"
             style={{ left: tooltip.x, top: tooltip.y }}
           >
             <span className="font-semibold">{tooltip.count} คน</span>

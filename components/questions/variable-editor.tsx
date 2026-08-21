@@ -187,12 +187,12 @@ export function VariableEditor({
               </div>
 
               {selectedPreset ? (
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-primary/20 rounded-xl p-4 space-y-3">
                   {/* Equation display */}
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] uppercase tracking-wider text-primary font-semibold mb-1">สมการ</p>
-                      <p className="font-mono text-base font-bold text-blue-900">{selectedPreset.equation}</p>
+                      <p className="font-mono text-base font-bold text-primary">{selectedPreset.equation}</p>
                       {selectedPreset.description && (
                         <p className="text-xs text-primary mt-1">{selectedPreset.description}</p>
                       )}
@@ -253,7 +253,7 @@ export function VariableEditor({
 
               {customExpr.trim() && (
                 detectedSymbols.length > 0 ? (
-                  <div className="bg-success/10 border border-emerald-100 rounded-xl p-3.5 space-y-2">
+                  <div className="bg-success/10 border border-success/20 rounded-xl p-3.5 space-y-2">
                     <div className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
                       <p className="text-xs font-semibold text-success">
@@ -272,7 +272,7 @@ export function VariableEditor({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 bg-warning/10 border border-amber-100 rounded-lg px-3.5 py-2.5">
+                  <div className="flex items-center gap-2 bg-warning/10 border border-warning/20 rounded-lg px-3.5 py-2.5">
                     <span className="text-warning text-base">⚠️</span>
                     <p className="text-xs text-warning">
                       ไม่พบตัวแปรในสมการ — ตรวจสอบ syntax อีกครั้ง (ใช้ * สำหรับคูณ ^ สำหรับยกกำลัง)
@@ -327,7 +327,7 @@ export function VariableEditor({
       {/* ══════════════ VARIABLE LIST ══════════════ */}
       {variables.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-start gap-2 bg-primary/10 border border-blue-100 rounded-xl px-3.5 py-2.5">
+          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl px-3.5 py-2.5">
             <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
             <p className="text-xs text-primary leading-relaxed">
               <span className="font-semibold">ขนาดก้าว</span>{' '}
@@ -519,7 +519,7 @@ function ReferenceCard({ v, index, onUpdate, onRemove }: {
           <button
             type="button"
             onClick={() => onRemove(index)}
-            className="text-indigo-200 hover:text-destructive hover:bg-destructive/10 rounded-lg px-2 py-1 transition-colors text-xs"
+            className="text-primary hover:text-destructive hover:bg-destructive/10 rounded-lg px-2 py-1 transition-colors text-xs"
           >
             ✕
           </button>

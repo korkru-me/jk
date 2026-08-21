@@ -160,7 +160,7 @@ export function UsersTable({ users }: { users: Row[] }) {
                         onClick={() => handleSuspend(u)}
                         disabled={isPending}
                         className={`text-xs hover:underline disabled:opacity-50 ${
-                          u.status === 'suspended' ? 'text-success' : 'text-yellow-600'
+                          u.status === 'suspended' ? 'text-success' : 'text-warning'
                         }`}
                       >
                         {u.status === 'suspended' ? 'คืนสิทธิ์' : 'ระงับ'}

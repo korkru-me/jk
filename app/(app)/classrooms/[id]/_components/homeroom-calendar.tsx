@@ -126,7 +126,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
               onClick={() => setSelected(d)}
               className={cn(
                 'aspect-square rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-all relative',
-                isSelected ? 'bg-primary text-white' : isToday ? 'bg-primary/10 text-primary ring-1 ring-blue-300' : 'hover:bg-muted text-foreground'
+                isSelected ? 'bg-primary text-white' : isToday ? 'bg-primary/10 text-primary ring-1 ring-primary/40' : 'hover:bg-muted text-foreground'
               )}
             >
               {hasClash && (

@@ -149,7 +149,7 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
 
       {/* Solution text */}
       {(q.solution_text || (q.solution_image_urls ?? []).length > 0) && (
-        <div className="bg-warning/10 rounded-xl p-4 border border-amber-100 space-y-3">
+        <div className="bg-warning/10 rounded-xl p-4 border border-warning/20 space-y-3">
           <p className="text-[11px] font-semibold text-warning uppercase tracking-wide mb-2">วิธีทำ / คำอธิบาย</p>
           {q.solution_text && <RichText text={q.solution_text} className="text-sm text-warning leading-relaxed block" />}
           {(q.solution_image_urls ?? []).length > 0 && (
@@ -322,7 +322,7 @@ function StatsTab({ stats }: { stats?: QuestionStats }) {
       </Card>
 
       {/* Guide */}
-      <div className="p-4 bg-primary/10 rounded-xl border border-blue-100 text-xs text-primary space-y-1 leading-relaxed">
+      <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 text-xs text-primary space-y-1 leading-relaxed">
         <p><strong>p-value</strong> ควรอยู่ระหว่าง 0.30–0.70 เพื่อให้โจทย์มีความยากเหมาะสม</p>
         <p><strong>r-value</strong> ควร ≥ 0.30 ถือว่าโจทย์มีอำนาจจำแนกที่ดีตามมาตรฐาน PISA</p>
       </div>

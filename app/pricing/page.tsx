@@ -53,7 +53,7 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-muted py-16 dark:bg-slate-900/40">
+      <section className="bg-muted py-16">
         <div className="mx-auto max-w-3xl px-4">
           <h2 className="text-center text-2xl font-bold text-foreground mb-8">
             คำถามที่พบบ่อย
@@ -70,7 +70,7 @@ export default function PricingPage() {
       </section>
 
       {/* Contact CTA */}
-      <section className="bg-card py-12 text-center dark:bg-slate-950">
+      <section className="bg-card py-12 text-center">
         <div className="mx-auto max-w-xl px-4">
           <div className="flex justify-center mb-4">
             <MessageCircle className="h-8 w-8 text-primary" />
