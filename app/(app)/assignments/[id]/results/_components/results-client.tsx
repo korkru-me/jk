@@ -9,6 +9,7 @@ import { computePassed } from '@/lib/grading'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSortDir, type SortableStudentProfile } from '@/lib/student-sort'
 import type { Question } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
 
 export interface SubmittedRow {
   id: string
@@ -189,15 +190,14 @@ export function ResultsClient({
 
         <div className="flex items-center gap-1.5">
           <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
-          <select
+          <NativeSelect
             value={sortKey}
             onChange={e => toggleSort(e.target.value as StudentSortKey)}
-            className="text-xs rounded-lg border border-border px-2 py-1.5 outline-none focus:border-primary"
           >
             {(Object.keys(STUDENT_SORT_LABEL) as StudentSortKey[]).map(k => (
               <option key={k} value={k}>{STUDENT_SORT_LABEL[k]}</option>
             ))}
-          </select>
+          </NativeSelect>
           <button
             onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
             className="text-xs px-2 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted"

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 type UserRole = 'teacher' | 'student' | 'admin'
 type UserStatus = 'active' | 'suspended'
@@ -427,11 +428,10 @@ export function UserSupport() {
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
+          <Input
             value={userSearch}
             onChange={(e) => setUserSearch(e.target.value)}
-            placeholder="ค้นหาชื่อ อีเมล หรือ Tenant"
-            className="w-full max-w-sm rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white dark:placeholder:text-muted-foreground"
+            placeholder="ค้นหาชื่อ อีเมล หรือ Tenant" className="w-full max-w-sm pl-9 pr-4 text-foreground dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
 

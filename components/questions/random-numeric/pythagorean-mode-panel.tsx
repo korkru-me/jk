@@ -4,6 +4,7 @@ import { PYTHAGOREAN_FAMILIES } from '@/lib/math/evaluator'
 import { Plus, X } from 'lucide-react'
 import type { PythagoreanGroup } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
 
 // ─── PythagoreanModePanel ─────────────────────────────────────────────────────
 
@@ -92,16 +93,15 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
                     <p className="text-[10px] font-semibold text-muted-foreground mb-1">
                       {si === 0 ? 'ด้านสั้น a' : si === 1 ? 'ด้านยาว b' : 'ด้านเฉียง c'}
                     </p>
-                    <select
+                    <NativeSelect
                       value={g[slot]}
-                      onChange={e => updateGroup(g.id, { [slot]: e.target.value })}
-                      className="w-full h-8 text-xs font-mono border border-tint-1/20 rounded-lg px-2 bg-card focus:outline-none focus:ring-1 focus:ring-tint-1/40"
+                      onChange={e => updateGroup(g.id, { [slot]: e.target.value })} className="w-full font-mono border-tint-1/20"
                     >
                       <option value="">-- เลือก --</option>
                       {availableVarNames.map(n => (
                         <option key={n} value={n}>{'{' + n + '}'}</option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </div>
                 ))}
               </div>

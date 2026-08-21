@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import type { StudentProfile, StudentGuardian, NamePrefix } from '@/lib/types'
 import { buildFullName } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   User, Lock, GraduationCap, Phone, Info, Eye, EyeOff, Plus, X,
 } from 'lucide-react'
@@ -166,16 +167,15 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[8.5rem_1fr_1fr] mb-4">
             <div className="space-y-1.5">
               <Label htmlFor="prefix">คำนำหน้าชื่อ</Label>
-              <select
+              <NativeSelect
                 id="prefix"
                 name="prefix"
                 defaultValue={user.prefix ?? ''}
-                required
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                required className="flex w-full"
               >
                 <option value="" disabled>เลือก</option>
                 {NAME_PREFIXES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+              </NativeSelect>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="first_name">ชื่อ</Label>
@@ -197,16 +197,15 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="gender">เพศสภาพ</Label>
-              <select
+              <NativeSelect
                 id="gender"
                 name="gender"
-                defaultValue={profile?.gender ?? ''}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                defaultValue={profile?.gender ?? ''} className="flex w-full"
               >
                 <option value="">ไม่ระบุ</option>
                 <option value="male">ชาย</option>
                 <option value="female">หญิง</option>
-              </select>
+              </NativeSelect>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -226,27 +225,25 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
             <div className="space-y-1.5">
               <Label htmlFor="grade_level">ระดับชั้น</Label>
-              <select
+              <NativeSelect
                 id="grade_level"
                 name="grade_level"
-                defaultValue={profile?.grade_level ?? ''}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                defaultValue={profile?.grade_level ?? ''} className="flex w-full"
               >
                 <option value="">เลือกระดับชั้น</option>
                 {GRADE_LEVELS.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
+              </NativeSelect>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="section_number">ห้อง</Label>
-              <select
+              <NativeSelect
                 id="section_number"
                 name="section_number"
-                defaultValue={profile?.section_number ?? ''}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                defaultValue={profile?.section_number ?? ''} className="flex w-full"
               >
                 <option value="">เลือกห้อง</option>
                 {SECTION_NUMBERS.map(n => <option key={n} value={n}>ห้อง {n}</option>)}
-              </select>
+              </NativeSelect>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="school_name">โรงเรียน</Label>

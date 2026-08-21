@@ -4,6 +4,7 @@ import { OPERATORS } from './shared'
 import { Input } from '@/components/ui/input'
 import { Plus, X } from 'lucide-react'
 import type { LogicOperator, LogicRule, Variable } from '@/lib/types'
+import { NativeSelect } from '@/components/ui/native-select'
 
 // ─── InlineConditionPanel ─────────────────────────────────────────────────────
 
@@ -45,13 +46,12 @@ export function InlineConditionPanel({ varName, allVars, rules, onRulesChange }:
             {varName}
           </span>
 
-          <select
+          <NativeSelect
             value={rule.operator}
             onChange={e => updateRule(rule.id, { operator: e.target.value as LogicOperator })}
-            className="h-6 text-xs border border-border rounded px-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
           >
             {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-          </select>
+          </NativeSelect>
 
           <div className="flex rounded border border-border overflow-hidden text-[10px] shrink-0">
             <button
@@ -71,14 +71,13 @@ export function InlineConditionPanel({ varName, allVars, rules, onRulesChange }:
           </div>
 
           {rule.rhs_type === 'variable' ? (
-            <select
+            <NativeSelect
               value={rule.rhs_variable}
-              onChange={e => updateRule(rule.id, { rhs_variable: e.target.value })}
-              className="h-6 text-xs border border-border rounded px-1 bg-card font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+              onChange={e => updateRule(rule.id, { rhs_variable: e.target.value })} className="font-mono"
             >
               <option value="">-- ตัวแปร --</option>
               {otherVarNames.map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
+            </NativeSelect>
           ) : (
             <Input
               type="number"

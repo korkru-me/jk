@@ -13,6 +13,7 @@ import { addStudentNote, deleteStudentNote } from '@/lib/actions/homeroom-notes'
 import { HomeroomCalendar, type HomeroomCalendarEvent } from './homeroom-calendar'
 import type { HomeroomAssignmentRow, HomeroomSubmissionRow as SubmissionRow } from '@/lib/homeroom-data'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
 
 export interface StudentNoteRow {
   id: string
@@ -155,12 +156,11 @@ function StudentNotesPanel({
         </div>
       )}
       <div className="flex items-start gap-2">
-        <textarea
+        <Textarea
           value={draft}
           onChange={e => setDraft(e.target.value)}
           placeholder="บันทึกส่วนตัว เช่น สุขภาพ ครอบครัว พฤติกรรม — เห็นเฉพาะครูที่ปรึกษาและผู้ช่วยสอน"
-          rows={2}
-          className="flex-1 text-sm rounded-lg border border-border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+          rows={2} className="flex-1 resize-none"
         />
         <button
           onClick={handleAdd}

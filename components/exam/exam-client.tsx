@@ -27,6 +27,8 @@ import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fil
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, CompositePart } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import { NativeSelect } from '@/components/ui/native-select'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1255,8 +1257,8 @@ function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChan
           <label className="text-xs text-muted-foreground">
             {mode === 'wrong_only' ? 'เหตุผล (กรณีตอบผิด):' : 'เหตุผล:'}
           </label>
-          <textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
-            placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
+          <Textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
+            placeholder="พิมพ์เหตุผล..." className="w-full resize-none" />
           <p className="text-xs text-warning">ครูจะตรวจและให้คะแนนด้วยมือ</p>
         </div>
       )}
@@ -1303,8 +1305,8 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
             <label className="text-xs text-muted-foreground">
               {mode === 'wrong_only' ? 'เหตุผล (กรณีตอบผิด):' : 'เหตุผล:'}
             </label>
-            <textarea value={explanation} onChange={e => update(tfAnswer, e.target.value)} rows={3}
-              placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
+            <Textarea value={explanation} onChange={e => update(tfAnswer, e.target.value)} rows={3}
+              placeholder="พิมพ์เหตุผล..." className="w-full resize-none" />
             <p className="text-xs text-warning">ครูจะตรวจและให้คะแนนด้วยมือ</p>
           </div>
         )}
@@ -1354,8 +1356,8 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
           <label className="text-xs text-muted-foreground">
             {mode === 'wrong_only' ? 'เหตุผล (กรณีตอบผิด):' : 'เหตุผล:'}
           </label>
-          <textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
-            placeholder="พิมพ์เหตุผล..." className="w-full border border-input rounded-xl p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
+          <Textarea value={explanation} onChange={e => updateExplanation(e.target.value)} rows={3}
+            placeholder="พิมพ์เหตุผล..." className="w-full resize-none" />
           <p className="text-xs text-warning">ครูจะตรวจและให้คะแนนด้วยมือ</p>
         </div>
       )}
@@ -1386,16 +1388,14 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
           <span key={i}>
             <RichText text={part} />
             {type === 'dropdown' ? (
-              <select value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
-                className="inline-block mx-1 px-2 py-0.5 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring">
+              <NativeSelect value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)} className="inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center">
                 <option value="">เลือกคำตอบ</option>
                 {(blank?.options ?? []).map((opt, oi) => (
                   <option key={oi} value={opt}>{opt}</option>
                 ))}
-              </select>
+              </NativeSelect>
             ) : type !== null ? (
-              <input type="text" value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)}
-                className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring"
+              <Input type="text" value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)} className="inline-block mx-1 w-28 border-b-2 border-primary bg-primary/10 text-center"
                 placeholder={`ช่อง ${blankNumbers[i] ?? i + 1}`} />
             ) : null}
           </span>
@@ -1442,11 +1442,10 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
               <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border flex-shrink-0" />
             )}
             <span className="flex-1 text-sm">{item.text}</span>
-            <select value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)}
-              className="h-8 w-20 border border-input rounded-lg px-1 text-sm text-center bg-background">
+            <NativeSelect value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)} className="w-20 text-center">
               <option value="">ลำดับ</option>
               {Array.from({ length: n }, (_, i) => <option key={i + 1} value={String(i + 1)}>ที่ {i + 1}</option>)}
-            </select>
+            </NativeSelect>
           </Card>
         ))}
       </div>
@@ -1553,14 +1552,12 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
               <p className="text-sm leading-loose">
                 <RichText text={split[0]} />
                 {type === 'dropdown' ? (
-                  <select value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
-                    className="inline-block mx-1 px-2 py-0.5 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring">
+                  <NativeSelect value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)} className="inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center">
                     <option value="">เลือกคำตอบ</option>
                     {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
-                  </select>
+                  </NativeSelect>
                 ) : (
-                  <input type="text" value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
-                    className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring" />
+                  <Input type="text" value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)} className="inline-block mx-1 w-28 border-b-2 border-primary bg-primary/10 text-center" />
                 )}
                 <RichText text={split[1]} />
               </p>
@@ -1605,11 +1602,10 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
                   {items.map(item => (
                     <Card radius="md" className="flex items-center gap-3 p-2" key={item.id}>
                       <RichText text={item.text} className="flex-1 text-sm" />
-                      <select value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)}
-                        className="h-8 w-20 border border-input rounded-lg px-1 text-sm text-center bg-background">
+                      <NativeSelect value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)} className="w-20 text-center">
                         <option value="">ลำดับ</option>
                         {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
-                      </select>
+                      </NativeSelect>
                     </Card>
                   ))}
                 </div>

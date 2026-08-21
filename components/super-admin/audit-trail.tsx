@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react'
 import { Search, ShieldAlert, Info, AlertTriangle, Filter } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
 
 type Severity = 'info' | 'warning' | 'critical'
 type ActionCategory = 'auth' | 'content' | 'billing' | 'data' | 'admin'
@@ -285,11 +287,10 @@ export function AuditTrail() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
+          <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหา Email, Action, IP, Resource"
-            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:text-white dark:placeholder:text-muted-foreground"
+            placeholder="ค้นหา Email, Action, IP, Resource" className="w-full pl-9 pr-4 text-foreground dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
         {[
@@ -325,18 +326,17 @@ export function AuditTrail() {
             ],
           },
         ].map((sel, i) => (
-          <select
+          <NativeSelect
             key={i}
             value={sel.value}
-            onChange={(e) => sel.onChange(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
+            onChange={(e) => sel.onChange(e.target.value)} className="text-muted-foreground"
           >
             {sel.options.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         ))}
         <p className="text-xs text-muted-foreground ml-auto">
           แสดง {filtered.length} / {LOGS.length} รายการ

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 // ─── Same symbol data as RichTextEditor ───────────────────────────────────────
 
@@ -199,7 +200,7 @@ export function SpecialCharInput({
 
   return (
     <div className="flex gap-1.5 items-center">
-      <input
+      <Input
         ref={inputRef}
         id={id}
         type={type}

@@ -5,6 +5,8 @@ import { X, Clock, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { grantExtension, revokeExtension } from '@/lib/actions/extensions'
 import { IconButton } from '@/components/ui/icon-button'
+import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 
 interface Props {
   assignmentId: string
@@ -64,21 +66,19 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
         <div className="p-5 space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground">ปิดรับเมื่อ (สำหรับนักเรียนคนนี้)</label>
-            <input
+            <Input
               type="datetime-local"
               value={extendedEndAt}
-              onChange={e => setExtendedEndAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-tint-1/20"
+              onChange={e => setExtendedEndAt(e.target.value)} className="w-full"
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground">หมายเหตุ (ไม่บังคับ)</label>
-            <textarea
+            <Textarea
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={2}
-              placeholder="เช่น ลาป่วย"
-              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-tint-1/20 resize-none"
+              placeholder="เช่น ลาป่วย" className="w-full resize-none"
             />
           </div>
 

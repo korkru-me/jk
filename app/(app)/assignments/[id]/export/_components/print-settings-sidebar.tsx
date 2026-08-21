@@ -8,6 +8,7 @@ import {
   Image as ImageIcon, X,
 } from 'lucide-react'
 import type { PrintSettings } from './export-client'
+import { Input } from '@/components/ui/input'
 
 interface Props {
   settings: PrintSettings
@@ -131,23 +132,21 @@ export function PrintSettingsSidebar({
           {/* Institution name */}
           <div>
             <Label>ชื่อสถาบัน</Label>
-            <input
+            <Input
               type="text"
               value={settings.institutionName}
-              onChange={e => onPatch({ institutionName: e.target.value })}
-              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-ring"
+              onChange={e => onPatch({ institutionName: e.target.value })} className="w-full text-foreground"
             />
           </div>
 
           {/* Watermark */}
           <div>
             <Label>ข้อความลายน้ำ (Watermark)</Label>
-            <input
+            <Input
               type="text"
               value={settings.watermarkText}
               onChange={e => onPatch({ watermarkText: e.target.value })}
-              placeholder="เช่น ห้ามถ่ายเอกสาร หรือ DRAFT"
-              className="w-full text-sm text-foreground border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-ring placeholder:text-muted-foreground/40"
+              placeholder="เช่น ห้ามถ่ายเอกสาร หรือ DRAFT" className="w-full text-foreground"
             />
           </div>
 
@@ -209,14 +208,13 @@ export function PrintSettingsSidebar({
           <div>
             <Label htmlFor="copies">จำนวนชุด (แต่ละชุดมีตัวเลขตัวแปรต่างกัน)</Label>
             <div className="flex items-center gap-3">
-              <input
+              <Input
                 id="copies"
                 type="number"
                 min={1}
                 max={500}
                 value={settings.copies}
-                onChange={e => onPatch({ copies: Math.max(1, Math.min(500, Number(e.target.value))) })}
-                className="w-24 text-2xl font-bold text-foreground text-center border-2 border-border rounded-xl px-3 py-2 focus:outline-none focus:border-foreground"
+                onChange={e => onPatch({ copies: Math.max(1, Math.min(500, Number(e.target.value))) })} className="w-24 text-2xl font-bold text-foreground text-center border-2"
               />
               <div className="text-xs text-muted-foreground leading-relaxed">
                 ชุด<br />

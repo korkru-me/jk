@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Search, BookOpen, Users, Zap, ArrowRight,
   FileText, Plus, Settings, X
@@ -84,12 +85,11 @@ export function CommandPalette() {
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-          <input
+          <Input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="ค้นหานักเรียน, โจทย์, หรือคำสั่ง..."
-            className="flex-1 text-sm outline-none bg-transparent text-foreground placeholder:text-muted-foreground"
+            placeholder="ค้นหานักเรียน, โจทย์, หรือคำสั่ง..." className="flex-1 text-foreground"
           />
           <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-muted-foreground">
             <X className="w-4 h-4" />

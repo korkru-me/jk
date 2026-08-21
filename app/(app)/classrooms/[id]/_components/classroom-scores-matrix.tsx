@@ -19,6 +19,7 @@ import type { StudentProfileRow } from './homeroom-overview'
 import type { SortKey as StudentTableSortKey, SortDir as StudentTableSortDir } from './student-table'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey } from '@/lib/student-sort'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'ส่งแล้ว', graded: 'ส่งแล้ว', in_progress: 'กำลังทำ',
@@ -294,7 +295,7 @@ export function ClassroomScoresMatrix({
                 })
                 return (
                   <th key={a.id} className="px-3 py-3 text-center min-w-[140px] border-b border-border">
-                    <input
+                    <Input
                       type="number"
                       min={1}
                       value={orderDrafts[a.id] ?? a.display_order ?? ''}
@@ -303,8 +304,7 @@ export function ClassroomScoresMatrix({
                       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
                       disabled={isOrderPending}
                       placeholder="-"
-                      title="ลำดับคอลัมน์ (ยิ่งน้อยยิ่งอยู่ซ้าย)"
-                      className="w-10 mx-auto mb-1 block text-xs text-center rounded-lg border border-border py-0.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50"
+                      title="ลำดับคอลัมน์ (ยิ่งน้อยยิ่งอยู่ซ้าย)" className="w-10 mx-auto mb-1 block text-center transition-all"
                     />
                     <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
                       {a.title}

@@ -13,6 +13,7 @@ import { register } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 
 const NAME_PREFIXES = ['เด็กหญิง', 'เด็กชาย', 'นาย', 'นางสาว'] as const
 
@@ -155,17 +156,16 @@ export function SignupForm() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[8.5rem_1fr_1fr]">
         <div className="space-y-1.5">
           <Label htmlFor="prefix">คำนำหน้าชื่อ</Label>
-          <select
+          <NativeSelect
             id="prefix"
-            defaultValue=""
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+            defaultValue="" className="flex w-full"
             {...reg('prefix')}
           >
             <option value="" disabled>เลือก</option>
             {NAME_PREFIXES.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
-          </select>
+          </NativeSelect>
           {errors.prefix && (
             <p className="text-xs text-destructive">{errors.prefix.message}</p>
           )}

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Trash2, Type, Pen, Download } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
 
 type Mode = 'text' | 'draw'
 
@@ -165,11 +166,10 @@ export function Scratchpad({ onClose }: ScratchpadProps) {
       {/* Content area */}
       <div className="flex-1 overflow-hidden">
         {mode === 'text' ? (
-          <textarea
+          <Textarea
             value={text}
             onChange={e => setText(e.target.value)}
-            placeholder="พิมพ์บันทึกย่อ, ทดเลขคำนวณ, หรือจดสูตรที่ต้องการ...&#10;&#10;ข้อมูลจะถูกบันทึกอัตโนมัติ"
-            className="w-full h-full resize-none p-4 text-sm font-mono bg-transparent focus:outline-none text-foreground placeholder:text-muted-foreground/50 leading-relaxed"
+            placeholder="พิมพ์บันทึกย่อ, ทดเลขคำนวณ, หรือจดสูตรที่ต้องการ...&#10;&#10;ข้อมูลจะถูกบันทึกอัตโนมัติ" className="w-full h-full resize-none font-mono text-foreground leading-relaxed"
             spellCheck={false}
           />
         ) : (

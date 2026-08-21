@@ -9,6 +9,9 @@ import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers,
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -434,7 +437,7 @@ export function QuestionPreviewContent({
                   <span className="text-sm text-muted-foreground shrink-0 w-28 truncate">
                     {i + 1}. {pair.left_text || `รายการ ${i + 1}`}
                   </span>
-                  <select
+                  <NativeSelect
                     value={studentSelected}
                     onChange={(e) => {
                       if (matchingChecked) return
@@ -453,7 +456,7 @@ export function QuestionPreviewContent({
                     {RIGHT_LABELS.slice(0, matchingPairs.length).map(label => (
                       <option key={label} value={label}>{label}</option>
                     ))}
-                  </select>
+                  </NativeSelect>
                   {isCorrect && <span className="text-xs text-success font-medium">✓</span>}
                   {isWrong && <span className="text-xs text-destructive">✗ เฉลย: <strong>{correctLabel}</strong></span>}
                 </div>
@@ -492,7 +495,7 @@ export function QuestionPreviewContent({
           const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
           const result = writtenResults[i]
           const inputEl = (
-            <input
+            <Input
               type="text"
               inputMode="text"
               value={writtenInputs[i] ?? ''}
@@ -632,10 +635,9 @@ export function QuestionPreviewContent({
       {questionType === 'essay' && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground font-medium">กรอกคำตอบ (บรรยาย):</p>
-          <textarea
+          <Textarea
             rows={5}
-            placeholder="พิมพ์คำตอบที่นี่..."
-            className="w-full border border-border rounded-lg p-3 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-primary/40"
+            placeholder="พิมพ์คำตอบที่นี่..." className="w-full resize-none"
           />
           <p className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
             * ครูจะเป็นผู้ตรวจและให้คะแนน — ระบบไม่ตรวจอัตโนมัติ
@@ -703,13 +705,12 @@ export function QuestionPreviewContent({
                     ? 'ให้เหตุผล (กรณีตอบผิด):'
                     : 'ให้เหตุผล:'}
                 </p>
-                <textarea
+                <Textarea
                   value={tfExplanation}
                   onChange={(e) => { if (!tfChecked) setTfExplanation(e.target.value) }}
                   readOnly={tfChecked}
                   rows={3}
-                  placeholder="พิมพ์เหตุผลที่นี่..."
-                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="พิมพ์เหตุผลที่นี่..." className="w-full resize-none"
                 />
                 <p className="text-xs text-warning bg-warning/10 px-2 py-1.5 rounded-lg">
                   ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
@@ -788,13 +789,12 @@ export function QuestionPreviewContent({
                     ? 'ให้เหตุผล (กรณีตอบผิด):'
                     : 'ให้เหตุผล:'}
                 </p>
-                <textarea
+                <Textarea
                   value={tfExplanation}
                   onChange={(e) => { if (!tfChecked) setTfExplanation(e.target.value) }}
                   readOnly={tfChecked}
                   rows={3}
-                  placeholder="พิมพ์เหตุผลที่นี่..."
-                  className="w-full border border-border rounded-lg p-2 text-sm resize-none bg-card focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="พิมพ์เหตุผลที่นี่..." className="w-full resize-none"
                 />
                 <p className="text-xs text-warning bg-warning/10 px-2 py-1.5 rounded-lg">
                   ครูจะตรวจเหตุผลและให้คะแนนด้วยมือ ({trueFalseConfig.score_explanation} คะแนน)
@@ -847,7 +847,7 @@ export function QuestionPreviewContent({
                   <span key={i}>
                     <RichText text={part} />
                     {type === 'dropdown' ? (
-                      <select
+                      <NativeSelect
                         value={fillAnswers[i] ?? ''}
                         onChange={(e) => {
                           if (fillChecked) return
@@ -864,9 +864,9 @@ export function QuestionPreviewContent({
                         {(blanks[i]?.options ?? []).map((opt, oi) => (
                           <option key={oi} value={opt}>{opt}</option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     ) : i < blanks.length ? (
-                      <input
+                      <Input
                         type="text"
                         value={fillAnswers[i] ?? ''}
                         onChange={(e) => {
@@ -970,7 +970,7 @@ export function QuestionPreviewContent({
                       <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border border-border" />
                     )}
                     <span className="flex-1 text-sm text-foreground">{item.text}</span>
-                    <select
+                    <NativeSelect
                       value={sel}
                       onChange={(e) => {
                         if (orderChecked) return
@@ -987,7 +987,7 @@ export function QuestionPreviewContent({
                       {Array.from({ length: n }, (_, i) => (
                         <option key={i + 1} value={String(i + 1)}>ที่ {i + 1}</option>
                       ))}
-                    </select>
+                    </NativeSelect>
                     {isCorrect && <span className="text-xs text-success font-medium w-16">✓ ถูก</span>}
                     {isWrong && <span className="text-xs text-destructive w-16">✗ ควรที่ {correctPos}</span>}
                   </div>
@@ -1102,16 +1102,14 @@ export function QuestionPreviewContent({
                       <p className="leading-loose text-[15px] text-foreground">
                         <RichText text={split[0]} />
                         {type === 'dropdown' ? (
-                          <select value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
-                            onChange={e => setAnswer(e.target.value)}
-                            className="inline-block mx-1 px-2 py-0.5 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring">
+                          <NativeSelect value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
+                            onChange={e => setAnswer(e.target.value)} className="inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center">
                             <option value="">เลือกคำตอบ</option>
                             {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
-                          </select>
+                          </NativeSelect>
                         ) : (
-                          <input type="text" value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
-                            onChange={e => setAnswer(e.target.value)}
-                            className="inline-block mx-1 px-2 py-0.5 w-28 border-b-2 border-primary bg-primary/10 rounded text-sm text-center focus:outline-none focus:border-ring" />
+                          <Input type="text" value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
+                            onChange={e => setAnswer(e.target.value)} className="inline-block mx-1 w-28 border-b-2 border-primary bg-primary/10 text-center" />
                         )}
                         <RichText text={split[1]} />
                       </p>
@@ -1150,12 +1148,11 @@ export function QuestionPreviewContent({
                           {items.map(item => (
                             <Card radius="sm" className="flex items-center gap-3 p-2" key={item.id}>
                               <RichText text={item.text} className="flex-1 text-sm text-foreground" />
-                              <select value={sel[item.id] ?? ''} disabled={compositeChecked}
-                                onChange={e => setSel(item.id, e.target.value)}
-                                className="h-8 w-16 border border-border rounded-lg px-1 text-sm text-center">
+                              <NativeSelect value={sel[item.id] ?? ''} disabled={compositeChecked}
+                                onChange={e => setSel(item.id, e.target.value)} className="w-16 text-center">
                                 <option value="">—</option>
                                 {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
-                              </select>
+                              </NativeSelect>
                             </Card>
                           ))}
                         </div>

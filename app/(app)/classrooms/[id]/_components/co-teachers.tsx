@@ -13,6 +13,7 @@ import {
 import type { CoTeacherPermission } from '@/lib/types'
 import { IconButton } from '@/components/ui/icon-button'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
 
 const PERM_CFG: Record<CoTeacherPermission, { label: string; desc: string; icon: typeof Crown; color: string }> = {
   admin: { label: 'แอดมินเต็มตัว', desc: 'จัดการทุกอย่างได้', icon: Crown, color: 'text-warning' },
@@ -122,15 +123,14 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
             {!pendingLink ? (
               <>
                 <div className="flex gap-2">
-                  <select
+                  <NativeSelect
                     value={invitePerm}
-                    onChange={e => setInvitePerm(e.target.value as CoTeacherPermission)}
-                    className="flex-1 px-3 py-2 text-sm border border-border rounded-xl outline-none bg-card"
+                    onChange={e => setInvitePerm(e.target.value as CoTeacherPermission)} className="flex-1"
                   >
                     {(Object.keys(PERM_CFG) as CoTeacherPermission[]).map(p => (
                       <option key={p} value={p}>{PERM_CFG[p].label}</option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleCreateInvite} disabled={busy}>

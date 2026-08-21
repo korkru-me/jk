@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Pencil, Check, X } from 'lucide-react'
 import { updateSubmissionAnswerScore } from '@/lib/actions/submissions'
+import { Input } from '@/components/ui/input'
 
 interface Props {
   submissionAnswerId: string
@@ -51,7 +52,7 @@ export function ScoreEditor({ submissionAnswerId, score, maxScore }: Props) {
 
   return (
     <div className="inline-flex items-center gap-1">
-      <input
+      <Input
         type="number"
         min={0}
         max={maxScore}
@@ -60,8 +61,7 @@ export function ScoreEditor({ submissionAnswerId, score, maxScore }: Props) {
         onChange={e => setDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
         disabled={isPending}
-        autoFocus
-        className="w-14 text-xs text-center rounded-lg border border-primary/20 py-0.5 outline-none focus:ring-2 focus:ring-primary/20"
+        autoFocus className="w-14 text-center border-primary/20"
       />
       <span className="text-xs text-muted-foreground">/{maxScore}</span>
       <button onClick={save} disabled={isPending} className="text-success hover:text-success/80 disabled:opacity-50">

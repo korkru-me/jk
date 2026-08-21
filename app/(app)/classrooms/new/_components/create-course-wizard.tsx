@@ -215,14 +215,13 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
           </button>
         </span>
       ))}
-      <input
+      <Input
         ref={inputRef}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => { if (input.trim()) addTag(input) }}
-        placeholder={tags.length === 0 ? 'กด Enter หรือ , เพื่อเพิ่มแท็ก' : ''}
-        className="flex-1 min-w-[100px] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        placeholder={tags.length === 0 ? 'กด Enter หรือ , เพื่อเพิ่มแท็ก' : ''} className="flex-1 min-w-[100px]"
       />
     </div>
   )
@@ -269,7 +268,7 @@ function CreatableCombobox({
 
   return (
     <div ref={containerRef} className="relative">
-      <input
+      <Input
         value={inputVal}
         onChange={(e) => { setInputVal(e.target.value); onChange(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
@@ -335,7 +334,7 @@ function ColorSwatch({ value, onChange, label }: { value: string; onChange: (h: 
           <div className="absolute inset-0" style={{ background: value }} />
           <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
         </label>
-        <input
+        <Input
           value={inputVal}
           onChange={(e) => handleText(e.target.value)}
           onBlur={() => setInputVal(value)}

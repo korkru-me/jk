@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, Search } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 
 interface FormulaSheetProps {
   onClose: () => void
@@ -178,12 +179,11 @@ export function FormulaSheet({ onClose }: FormulaSheetProps) {
         <div className="px-4 pt-3 pb-2 shrink-0">
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="ค้นหาสูตร..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              onChange={e => setSearch(e.target.value)} className="w-full pl-8 pr-3"
             />
           </div>
         </div>

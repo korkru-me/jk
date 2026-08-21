@@ -1,162 +1,147 @@
 {
   "app/(app)/assignments/[id]/_components/assignment-detail-client.tsx": {
     "palette": 2,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/percentile-benchmark.tsx": {
     "palette": 3,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/[id]/_components/breakout-groups.tsx": {
     "palette": 2,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/[id]/_components/classroom-detail-client.tsx": {
     "palette": 5,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/[id]/_components/co-teachers.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/[id]/_components/extension-dialog.tsx": {
     "palette": 1,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/[id]/_components/homeroom-student-view.tsx": {
     "palette": 3,
-    "card": 0
-  },
-  "app/(app)/classrooms/[id]/_components/learning-paths.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/[id]/_components/student-table.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/_components/classroom-card.tsx": {
     "palette": 12,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/classrooms/_components/create-classroom-modal.tsx": {
     "palette": 12,
-    "card": 0
-  },
-  "app/(app)/classrooms/page.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0,
+    "control": 0
   },
   "app/(app)/dashboard/_components/command-palette.tsx": {
     "palette": 2,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/dashboard/_components/fork-remix.tsx": {
     "palette": 6,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/dashboard/_components/teacher-dashboard.tsx": {
     "palette": 0,
-    "card": 2
+    "card": 1,
+    "control": 0
   },
   "app/(app)/questions/_components/preview-modal.tsx": {
     "palette": 3,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/questions/_components/question-card.tsx": {
     "palette": 2,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/(app)/submissions/[id]/page.tsx": {
     "palette": 1,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "app/pricing/page.tsx": {
     "palette": 3,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/assignments/create-assignment-form.tsx": {
     "palette": 2,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/auth/signup-form.tsx": {
     "palette": 1,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/exam/exam-client.tsx": {
     "palette": 7,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/landing/interactive-demo.tsx": {
     "palette": 1,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/landing/pricing-table.tsx": {
     "palette": 1,
-    "card": 0
-  },
-  "components/questions/formula-editor/method-builder.tsx": {
-    "palette": 0,
-    "card": 2
-  },
-  "components/questions/mcq-auto-form.tsx": {
-    "palette": 0,
-    "card": 4
+    "card": 0,
+    "control": 0
   },
   "components/questions/mcq-form.tsx": {
     "palette": 1,
-    "card": 0
-  },
-  "components/questions/question-preview.tsx": {
-    "palette": 0,
-    "card": 4
-  },
-  "components/questions/random-numeric/pythagorean-mode-panel.tsx": {
-    "palette": 0,
-    "card": 1
-  },
-  "components/questions/random-numeric/select-field.tsx": {
-    "palette": 0,
-    "card": 1
+    "card": 0,
+    "control": 0
   },
   "components/questions/variable-editor.tsx": {
     "palette": 2,
-    "card": 1
+    "card": 0,
+    "control": 0
   },
   "components/settings/billing-settings.tsx": {
     "palette": 6,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/settings/profile-settings.tsx": {
     "palette": 2,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/settings/student-profile-settings.tsx": {
     "palette": 2,
-    "card": 0
+    "card": 0,
+    "control": 0
   },
   "components/student/study-path-panel.tsx": {
     "palette": 2,
-    "card": 0
-  },
-  "components/super-admin/audit-trail.tsx": {
-    "palette": 0,
-    "card": 2
-  },
-  "components/super-admin/marketing-growth.tsx": {
-    "palette": 0,
-    "card": 3
-  },
-  "components/super-admin/master-content.tsx": {
-    "palette": 0,
-    "card": 8
+    "card": 0,
+    "control": 0
   },
   "components/super-admin/tenant-manager.tsx": {
     "palette": 4,
-    "card": 4
-  },
-  "components/super-admin/user-support.tsx": {
-    "palette": 0,
-    "card": 3
+    "card": 0,
+    "control": 0
   }
 }

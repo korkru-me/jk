@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
 
 interface Rule {
   id: string
@@ -91,26 +93,24 @@ export function LearningPaths() {
                   {/* Condition */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded-lg whitespace-nowrap">ถ้าสอบผ่าน</span>
-                    <select
+                    <NativeSelect
                       value={rule.conditionAssignment}
-                      onChange={e => updateRule(rule.id, 'conditionAssignment', e.target.value)}
-                      className="flex-1 min-w-[160px] px-2.5 py-1.5 text-sm border border-border rounded-xl bg-card outline-none focus:border-primary"
+                      onChange={e => updateRule(rule.id, 'conditionAssignment', e.target.value)} className="flex-1 min-w-[160px]"
                     >
                       {MOCK_ASSIGNMENTS.map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
+                    </NativeSelect>
                   </div>
 
                   {/* Score condition */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded-lg whitespace-nowrap">ด้วยคะแนนเกิน</span>
                     <div className="flex items-center gap-1 border border-border rounded-xl overflow-hidden">
-                      <input
+                      <Input
                         type="number"
                         min={1}
                         max={100}
                         value={rule.conditionScore}
-                        onChange={e => updateRule(rule.id, 'conditionScore', parseInt(e.target.value) || 0)}
-                        className="w-14 px-2 py-1.5 text-sm text-center outline-none"
+                        onChange={e => updateRule(rule.id, 'conditionScore', parseInt(e.target.value) || 0)} className="w-14 text-center"
                       />
                       <span className="text-xs text-muted-foreground pr-2">%</span>
                     </div>
@@ -121,13 +121,12 @@ export function LearningPaths() {
                     <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
                     <Zap className="w-3.5 h-3.5 text-success" />
                     <span className="text-xs font-semibold text-success bg-success/10 px-2 py-1 rounded-lg whitespace-nowrap">ปลดล็อก</span>
-                    <select
+                    <NativeSelect
                       value={rule.unlockAssignment}
-                      onChange={e => updateRule(rule.id, 'unlockAssignment', e.target.value)}
-                      className="flex-1 min-w-[160px] px-2.5 py-1.5 text-sm border border-success/20 rounded-xl bg-success/10 outline-none focus:border-success"
+                      onChange={e => updateRule(rule.id, 'unlockAssignment', e.target.value)} className="flex-1 min-w-[160px] border-success/20 bg-success/10"
                     >
                       {MOCK_ASSIGNMENTS.map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
+                    </NativeSelect>
                   </div>
                 </div>
 

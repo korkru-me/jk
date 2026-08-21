@@ -14,6 +14,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
 
 type ContentStatus = 'public' | 'draft' | 'pushed'
 
@@ -281,17 +284,15 @@ export function MasterContent() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
+          <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อชุด, วิชา, หรือ Tag"
-            className="w-full rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
+            placeholder="ค้นหาชื่อชุด, วิชา, หรือ Tag" className="w-full pl-9 pr-4 text-foreground dark:text-white dark:placeholder:text-muted-foreground"
           />
         </div>
-        <select
+        <NativeSelect
           value={levelFilter}
-          onChange={(e) => setLevelFilter(e.target.value)}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
+          onChange={(e) => setLevelFilter(e.target.value)} className="text-muted-foreground"
         >
           <option value="All">ทุกระดับ</option>
           <option value="ม.4">ม.4</option>
@@ -299,7 +300,7 @@ export function MasterContent() {
           <option value="ม.6">ม.6</option>
           <option value="ม.ปลาย">ม.ปลาย</option>
           <option value="โอลิมปิก">โอลิมปิก</option>
-        </select>
+        </NativeSelect>
         <button
           onClick={() => setShowCreateForm((v) => !v)}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
@@ -320,31 +321,29 @@ export function MasterContent() {
               <label className="text-xs font-medium text-muted-foreground">
                 ชื่อชุดข้อสอบ
               </label>
-              <input
-                placeholder="เช่น ชุดข้อสอบฟิสิกส์มาตรฐาน ม.6 ภาค 1"
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
+              <Input
+                placeholder="เช่น ชุดข้อสอบฟิสิกส์มาตรฐาน ม.6 ภาค 1" className="mt-1 w-full text-foreground dark:text-white dark:placeholder:text-muted-foreground"
               />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">
                 ระดับชั้น
               </label>
-              <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none">
+              <NativeSelect className="mt-1 w-full text-muted-foreground">
                 <option>ม.4</option>
                 <option>ม.5</option>
                 <option>ม.6</option>
                 <option>ม.ปลาย</option>
                 <option>โอลิมปิก</option>
-              </select>
+              </NativeSelect>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-medium text-muted-foreground">
                 คำอธิบาย
               </label>
-              <textarea
+              <Textarea
                 rows={3}
-                placeholder="อธิบายเนื้อหาและขอบเขตของชุดข้อสอบนี้"
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
+                placeholder="อธิบายเนื้อหาและขอบเขตของชุดข้อสอบนี้" className="mt-1 w-full text-foreground dark:text-white dark:placeholder:text-muted-foreground"
               />
             </div>
           </div>

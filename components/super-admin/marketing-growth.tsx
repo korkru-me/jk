@@ -25,6 +25,9 @@ import {
 } from 'recharts'
 import { chartColors, chartTooltipStyle } from '@/lib/chart-colors'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
 
 type AnnouncementType = 'maintenance' | 'feature' | 'promo' | 'urgent'
 type AnnouncementStatus = 'active' | 'scheduled' | 'expired'
@@ -264,26 +267,24 @@ export function MarketingGrowth() {
               <label className="text-xs font-medium text-muted-foreground">
                 ประเภท
               </label>
-              <select
+              <NativeSelect
                 value={newType}
-                onChange={(e) => setNewType(e.target.value as AnnouncementType)}
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
+                onChange={(e) => setNewType(e.target.value as AnnouncementType)} className="mt-1 w-full text-muted-foreground"
               >
                 <option value="feature">ฟีเจอร์ใหม่</option>
                 <option value="maintenance">ปิดปรับปรุง</option>
                 <option value="promo">โปรโมชั่น</option>
                 <option value="urgent">ด่วน</option>
-              </select>
+              </NativeSelect>
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">
                 หมดอายุ
               </label>
-              <input
+              <Input
                 type="date"
                 value={newExpires}
-                onChange={(e) => setNewExpires(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none"
+                onChange={(e) => setNewExpires(e.target.value)} className="mt-1 w-full text-muted-foreground"
               />
             </div>
           </div>
@@ -292,12 +293,11 @@ export function MarketingGrowth() {
             <label className="text-xs font-medium text-muted-foreground">
               ข้อความประกาศ
             </label>
-            <textarea
+            <Textarea
               rows={3}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="พิมพ์ข้อความที่จะแสดงเป็นแบนเนอร์บนหน้าจอของผู้ใช้ทุกคน"
-              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none dark:text-white dark:placeholder:text-muted-foreground"
+              placeholder="พิมพ์ข้อความที่จะแสดงเป็นแบนเนอร์บนหน้าจอของผู้ใช้ทุกคน" className="mt-1 w-full text-foreground dark:text-white dark:placeholder:text-muted-foreground"
             />
           </div>
 

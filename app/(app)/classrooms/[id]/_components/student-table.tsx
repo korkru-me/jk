@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview'
 import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib/student-sort'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 export type SortKey = StudentSortKey
 export type SortDir = StudentSortDir
@@ -98,11 +99,10 @@ export function StudentTable({
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <input
+          <Input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="ค้นหานักเรียน..."
-            className="w-full pl-8 pr-4 py-2 text-sm bg-card border border-border rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+            placeholder="ค้นหานักเรียน..." className="w-full pl-8 pr-4 transition-all"
           />
           {query && (
             <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground">

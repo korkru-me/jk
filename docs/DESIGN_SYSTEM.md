@@ -80,7 +80,16 @@ preset ปรับได้ 5 แกน: สี, `--radius`, `--spacing`, `--el
 
 สิ่งที่ยังเป็นค่าคงที่โดยตั้งใจ: ชุดสีปกห้องเรียนที่ครูเลือกเอง (`GRADIENTS` ใน `classroom-card.tsx`) และแถบสเกลเปอร์เซ็นไทล์ — สองอย่างนี้เป็นเนื้อหาและความหมาย ไม่ใช่การตกแต่ง preset จึงไม่ควรเปลี่ยน
 
-องค์ประกอบใหม่ต้องใช้ token และ primitive ใน `components/ui/` ไม่เขียน class สีหรือทรงเอง — `npm run lint:tokens` ตรวจข้อนี้
+องค์ประกอบใหม่ต้องใช้ token และ primitive ใน `components/ui/` ไม่เขียน class สีหรือทรงเอง — `npm run lint:tokens` ตรวจข้อนี้ 4 อย่าง:
+
+| ตรวจอะไร | ใช้อะไรแทน |
+| --- | --- |
+| สี palette ดิบ (`bg-gray-100`) | token ใน `globals.css` |
+| การ์ดเขียนมือ | `<Card>` |
+| form control เขียนมือ | `<Input>` / `<Textarea>` / `<NativeSelect>` |
+| class ผิดรูป (`bg-primary/10/40`) | — Tailwind ทิ้งเงียบๆ ต้องแก้ |
+
+`<NativeSelect>` คือ `<select>` ธรรมดาที่จัดสไตล์ให้ตรงกับ `<Input>` ส่วน `<Select>` (base-ui) เป็น dropdown แบบเต็มรูปแบบสำหรับกรณีที่ต้องการมากกว่านั้น
 
 ## UI behavior
 

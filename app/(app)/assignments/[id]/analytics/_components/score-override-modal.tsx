@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { X, Pencil, History, Save, AlertCircle } from 'lucide-react'
 import type { ScoreOverride } from './analytics-client'
 import { IconButton } from '@/components/ui/icon-button'
+import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 
 interface Props {
   submissionId: string
@@ -123,13 +125,12 @@ export function ScoreOverrideModal({
               <div className="text-muted-foreground/40 text-xl">→</div>
               <div className="text-center flex-1">
                 <p className="text-xs text-muted-foreground mb-0.5">คะแนนใหม่</p>
-                <input
+                <Input
                   type="number"
                   min={0}
                   max={maxScore}
                   value={newScore}
-                  onChange={e => { setNewScore(e.target.value); setError('') }}
-                  className="w-24 text-2xl font-black text-primary tabular-nums text-center bg-card border-2 border-primary/20 rounded-xl px-2 py-1 focus:outline-none focus:border-primary"
+                  onChange={e => { setNewScore(e.target.value); setError('') }} className="w-24 text-2xl font-black text-primary tabular-nums text-center border-2 border-primary/20"
                 />
                 <p className="text-xs text-muted-foreground">/{maxScore}</p>
               </div>
@@ -140,12 +141,11 @@ export function ScoreOverrideModal({
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
                 เหตุผลในการแก้ไข <span className="text-destructive">*</span>
               </label>
-              <textarea
+              <Textarea
                 value={reason}
                 onChange={e => { setReason(e.target.value); setError('') }}
                 placeholder="เช่น นักเรียนแสดงวิธีทำถูกต้องแต่ระบบตรวจคะแนนผิดพลาด..."
-                rows={3}
-                className="w-full text-sm text-muted-foreground bg-muted border border-border rounded-xl px-3 py-2.5 focus:outline-none focus:border-ring resize-none placeholder:text-muted-foreground/40"
+                rows={3} className="w-full text-muted-foreground bg-muted resize-none"
               />
             </div>
 

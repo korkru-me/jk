@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { BookOpen, Shuffle, Hash, Percent, ListOrdered } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 
@@ -140,15 +142,14 @@ export function ExamDefaultsSettings() {
               <Hash size={14} className="text-muted-foreground" />
               <p className="text-sm font-medium">จำนวนทศนิยมเริ่มต้น</p>
             </div>
-            <select
+            <NativeSelect
               value={defaults.decimalPlaces}
-              onChange={e => update('decimalPlaces', Number(e.target.value))}
-              className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              onChange={e => update('decimalPlaces', Number(e.target.value))} className="w-full"
             >
               {[0, 1, 2, 3, 4, 5, 6].map(n => (
                 <option key={n} value={n}>{n} ตำแหน่งทศนิยม{n === 2 ? ' (ค่าแนะนำ)' : ''}</option>
               ))}
-            </select>
+            </NativeSelect>
             <p className="text-xs text-muted-foreground">
               ใช้ในการตรวจคำตอบแบบเติมเลข — นักเรียนต้องตอบให้ถูกต้องถึง {defaults.decimalPlaces} ตำแหน่ง
             </p>
@@ -173,7 +174,7 @@ export function ExamDefaultsSettings() {
               <p className="text-sm font-medium">เกณฑ์สอบผ่านเริ่มต้น</p>
             </div>
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 type="number"
                 min={0}
                 max={100}
@@ -182,8 +183,7 @@ export function ExamDefaultsSettings() {
                 onChange={e => {
                   const v = Math.max(0, Math.min(100, Number(e.target.value)))
                   update('passingPercent', v)
-                }}
-                className="w-24 h-10 rounded-xl border border-input bg-background px-3 text-sm text-center focus:outline-none focus:ring-2 focus:ring-ring font-mono font-bold"
+                }} className="w-24 text-center font-mono font-bold"
               />
               <span className="text-sm text-muted-foreground">%</span>
             </div>

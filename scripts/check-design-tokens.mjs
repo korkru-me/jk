@@ -64,14 +64,37 @@ function countMalformed(src) {
   return (src.match(MALFORMED) ?? []).length
 }
 
+/**
+ * A card is a <div>. Matching the class signature anywhere counted inputs,
+ * selects and buttons that happen to share it, which inflated this by 38.
+ */
+const DIV_CLASS = /<div\b[^>]*?className="([^"]*)"/g
+
 function countHandRolledCards(src) {
   let n = 0
-  for (const [, cls] of src.matchAll(CLASS_ATTR)) {
+  for (const [, cls] of src.matchAll(DIV_CLASS)) {
     const t = cls.split(/\s+/)
     const rounded = t.some((x) => /^rounded-(sm|md|lg|xl|2xl|3xl)$/.test(x))
     const surface = t.includes('bg-card')
     const edge = t.includes('border') || t.includes('ring-1')
     if (rounded && surface && edge) n++
+  }
+  return n
+}
+
+/**
+ * Form controls styled by hand instead of using Input / Textarea /
+ * NativeSelect. Checkbox, radio, file, range and colour are exempt — the
+ * text-field styling does not apply to them.
+ */
+const CONTROL = /<(input|select|textarea)\b([^>]*)>/g
+
+function countHandRolledControls(src) {
+  let n = 0
+  for (const [, , attrs] of src.matchAll(CONTROL)) {
+    const type = /type="(\w+)"/.exec(attrs)?.[1]
+    if (type && ['checkbox', 'radio', 'file', 'range', 'color', 'hidden'].includes(type)) continue
+    if (/className="[^"]*\b(border|rounded|bg-card|bg-background)\b/.test(attrs)) n++
   }
   return n
 }
@@ -97,13 +120,14 @@ for (const rel of files) {
   const src = readFileSync(join(ROOT, rel), 'utf8')
   const palette = countPalette(src)
   const card = countHandRolledCards(src)
+  const control = countHandRolledControls(src)
   const malformed = countMalformed(src)
   if (malformed) {
     console.error(`malformed class (two opacity modifiers) in ${rel}:`)
     for (const m of src.match(MALFORMED)) console.error(`  ${m}`)
     process.exitCode = 1
   }
-  if (palette || card) current[rel] = { palette, card }
+  if (palette || card || control) current[rel] = { palette, card, control }
 }
 
 const total = (m, k) => Object.values(m).reduce((a, v) => a + v[k], 0)
@@ -120,8 +144,8 @@ if (UPDATE || !existsSync(BASELINE)) {
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))
 const regressions = []
 for (const [rel, counts] of Object.entries(current)) {
-  const was = baseline[rel] ?? { palette: 0, card: 0 }
-  for (const kind of ['palette', 'card']) {
+  const was = baseline[rel] ?? { palette: 0, card: 0, control: 0 }
+  for (const kind of ['palette', 'card', 'control']) {
     if (counts[kind] > was[kind]) {
       regressions.push({ rel, kind, was: was[kind], now: counts[kind] })
     }
@@ -135,6 +159,9 @@ const wasC = total(baseline, 'card')
 
 console.log(`palette classes: ${nowP}  (baseline ${wasP}, ${nowP - wasP >= 0 ? '+' : ''}${nowP - wasP})`)
 console.log(`hand-rolled cards: ${nowC}  (baseline ${wasC}, ${nowC - wasC >= 0 ? '+' : ''}${nowC - wasC})`)
+const nowF = total(current, 'control')
+const wasF = total(baseline, 'control')
+console.log(`hand-rolled form controls: ${nowF}  (baseline ${wasF}, ${nowF - wasF >= 0 ? '+' : ''}${nowF - wasF})`)
 
 if (regressions.length) {
   const files = new Set(regressions.map((r) => r.rel)).size
@@ -142,11 +169,13 @@ if (regressions.length) {
     `\n${regressions.length} regression(s) in ${files} file(s):\n`
   )
   for (const r of regressions) {
-    const what = r.kind === 'palette' ? 'raw palette classes' : 'hand-rolled card surfaces'
+    const what = r.kind === 'palette' ? 'raw palette classes'
+      : r.kind === 'card' ? 'hand-rolled card surfaces'
+      : 'hand-rolled form controls'
     console.error(`  ${r.rel}\n    ${what}: ${r.was} -> ${r.now}`)
   }
   console.error(
-    '\nUse the semantic tokens in app/globals.css and <Card> from components/ui/card.tsx.' +
+    '\nUse the semantic tokens in app/globals.css and the primitives in components/ui/.' +
       '\nIf the increase is deliberate, run: npm run lint:tokens -- --update'
   )
   process.exit(1)
