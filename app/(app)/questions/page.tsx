@@ -42,30 +42,68 @@ export type QuestionWithCreator = QuestionWithCategory & {
  * performed in my classes". Only submitted/graded attempts count — an
  * in-progress one has no meaningful score yet.
  */
+// PostgREST caps a response at 1,000 rows server-side (db-max-rows), and
+// `.range()` cannot lift it — so a bank past a thousand questions silently
+// loses the tail. Pages through instead, stopping as soon as a page comes back
+// short. Loading the whole bank at once is what the client-side search and
+// filters expect today; real pagination is the longer-term answer.
+const PAGE_SIZE = 1000
+
+async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<{ rows: T[]; error: unknown }> {
+  const rows: T[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1)
+    if (error) return { rows, error }
+    const batch = data ?? []
+    rows.push(...batch)
+    if (batch.length < PAGE_SIZE) return { rows, error: null }
+  }
+}
+
+// PostgREST puts an `.in(...)` list in the URL, so asking about every question
+// at once stops working as a bank grows — a thousand ids is a ~45 KB query
+// string, which the server rejects outright (400) and the stats silently
+// vanish from the page. Asking in slices keeps each URL small.
+const STATS_ID_BATCH = 200
+
 async function fetchQuestionStats(
   supabase: Awaited<ReturnType<typeof createClient>>,
   questionIds: string[],
 ): Promise<Record<string, QuestionStats>> {
   if (questionIds.length === 0) return {}
 
-  const { data, error } = await supabase
-    .from('submission_answers')
-    .select('question_id, score, max_score, submissions!inner(assignment_id, total_score, status)')
-    .in('question_id', questionIds)
-    .in('submissions.status', ['submitted', 'graded'])
-
-  if (error) {
-    console.error('[questions/page] stats query failed:', error)
-    return {}
+  const batches: string[][] = []
+  for (let i = 0; i < questionIds.length; i += STATS_ID_BATCH) {
+    batches.push(questionIds.slice(i, i + STATS_ID_BATCH))
   }
 
-  const rows: GradedAnswerRow[] = (data ?? []).map((row: any) => ({
-    question_id: row.question_id,
-    score: Number(row.score ?? 0),
-    max_score: Number(row.max_score ?? 0),
-    submission_total: Number(row.submissions?.total_score ?? 0),
-    assignment_id: row.submissions?.assignment_id ?? '',
-  }))
+  const results = await Promise.all(batches.map(ids =>
+    supabase
+      .from('submission_answers')
+      .select('question_id, score, max_score, submissions!inner(assignment_id, total_score, status)')
+      .in('question_id', ids)
+      .in('submissions.status', ['submitted', 'graded'])
+  ))
+
+  const rows: GradedAnswerRow[] = []
+  for (const { data, error } of results) {
+    if (error) {
+      // One failed slice costs its questions their stats, not the whole page.
+      console.error('[questions/page] stats query failed:', error)
+      continue
+    }
+    for (const row of (data ?? []) as any[]) {
+      rows.push({
+        question_id: row.question_id,
+        score: Number(row.score ?? 0),
+        max_score: Number(row.max_score ?? 0),
+        submission_total: Number(row.submissions?.total_score ?? 0),
+        assignment_id: row.submissions?.assignment_id ?? '',
+      })
+    }
+  }
 
   return Object.fromEntries(computeQuestionStats(rows))
 }
@@ -76,13 +114,16 @@ export default async function QuestionsPage() {
   if (!user) redirect('/login')
 
   const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, created_at'
-  const [{ data: questions, error }, { data: membershipRows }] = await Promise.all([
-    supabase
-      .from('questions')
-      .select(`${summaryFields}, question_categories(name)`)
-      .eq('created_by', user.id)
-      .or('group_id.is.null,order_in_group.eq.0')
-      .order('created_at', { ascending: false }),
+  const [{ rows: questions, error }, { data: membershipRows }] = await Promise.all([
+    fetchAllRows<Record<string, unknown>>((from, to) =>
+      supabase
+        .from('questions')
+        .select(`${summaryFields}, question_categories(name)`)
+        .eq('created_by', user.id)
+        .or('group_id.is.null,order_in_group.eq.0')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+    ),
     supabase
       .from('organization_members')
       .select('org_role, organizations!inner(id, name, is_personal)')
