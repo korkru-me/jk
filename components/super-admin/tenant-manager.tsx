@@ -169,7 +169,7 @@ const TENANTS: Tenant[] = [
 
 const PLAN_BADGE: Record<Plan, string> = {
   Enterprise:
-    'bg-violet-100 text-violet-700 ring-1 ring-violet-300 dark:bg-violet-950/60 dark:text-violet-300 dark:ring-violet-700',
+    'bg-tint-1/10 text-tint-1 ring-1 ring-tint-1/40 dark:ring-violet-700',
   Pro: 'bg-primary/10 text-primary ring-1 ring-indigo-300 dark:ring-indigo-700',
   Basic:
     'bg-muted text-muted-foreground ring-1 ring-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600',

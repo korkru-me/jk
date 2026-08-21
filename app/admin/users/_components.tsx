@@ -18,7 +18,7 @@ const ROLE_LABEL: Record<string, string> = {
 const ROLE_STYLE: Record<string, string> = {
   teacher: 'bg-primary/10 text-primary',
   student: 'bg-muted text-muted-foreground',
-  admin:   'bg-purple-100 text-purple-700',
+  admin:   'bg-tint-1/10 text-tint-1',
 }
 
 // ─── Filter ─────────────────────────────────────────────────

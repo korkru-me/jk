@@ -32,8 +32,8 @@ export function QuickStats({ questionsCount, studentsCount }: QuickStatsProps) {
       value: studentsCount > 0 ? studentsCount.toLocaleString() : '800',
       trend: { value: '3%', up: true },
       icon: Users,
-      iconBg: 'bg-violet-50',
-      iconColor: 'text-violet-500',
+      iconBg: 'bg-tint-1/10',
+      iconColor: 'text-tint-1',
     },
     {
       label: 'ชุดข้อสอบ',

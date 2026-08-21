@@ -1,6 +1,6 @@
 {
   "app/(app)/assignments/[id]/_components/assignment-detail-client.tsx": {
-    "palette": 11,
+    "palette": 9,
     "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/analytics-client.tsx": {
@@ -8,7 +8,7 @@
     "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/percentile-benchmark.tsx": {
-    "palette": 8,
+    "palette": 5,
     "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/score-override-modal.tsx": {
@@ -16,11 +16,11 @@
     "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/stat-cards.tsx": {
-    "palette": 7,
+    "palette": 4,
     "card": 0
   },
   "app/(app)/assignments/[id]/analytics/_components/student-score-table.tsx": {
-    "palette": 7,
+    "palette": 1,
     "card": 0
   },
   "app/(app)/assignments/[id]/export/_components/export-progress-modal.tsx": {
@@ -43,12 +43,8 @@
     "palette": 2,
     "card": 0
   },
-  "app/(app)/classrooms/[id]/_components/audit-log.tsx": {
-    "palette": 4,
-    "card": 0
-  },
   "app/(app)/classrooms/[id]/_components/breakout-groups.tsx": {
-    "palette": 10,
+    "palette": 2,
     "card": 0
   },
   "app/(app)/classrooms/[id]/_components/classroom-assignments-tab.tsx": {
@@ -60,7 +56,7 @@
     "card": 0
   },
   "app/(app)/classrooms/[id]/_components/classroom-scores-matrix.tsx": {
-    "palette": 4,
+    "palette": 2,
     "card": 0
   },
   "app/(app)/classrooms/[id]/_components/classroom-stream.tsx": {
@@ -68,11 +64,11 @@
     "card": 0
   },
   "app/(app)/classrooms/[id]/_components/co-teachers.tsx": {
-    "palette": 4,
+    "palette": 3,
     "card": 1
   },
   "app/(app)/classrooms/[id]/_components/extension-dialog.tsx": {
-    "palette": 7,
+    "palette": 3,
     "card": 0
   },
   "app/(app)/classrooms/[id]/_components/homeroom-calendar.tsx": {
@@ -91,10 +87,6 @@
     "palette": 1,
     "card": 1
   },
-  "app/(app)/classrooms/[id]/_components/parent-portal.tsx": {
-    "palette": 2,
-    "card": 0
-  },
   "app/(app)/classrooms/[id]/_components/student-table.tsx": {
     "palette": 3,
     "card": 1
@@ -112,7 +104,7 @@
     "card": 0
   },
   "app/(app)/classrooms/_components/teacher-view-client.tsx": {
-    "palette": 4,
+    "palette": 2,
     "card": 0
   },
   "app/(app)/classrooms/new/_components/create-course-wizard.tsx": {
@@ -132,7 +124,7 @@
     "card": 0
   },
   "app/(app)/dashboard/_components/command-palette.tsx": {
-    "palette": 3,
+    "palette": 2,
     "card": 0
   },
   "app/(app)/dashboard/_components/engagement-heatmap.tsx": {
@@ -151,40 +143,28 @@
     "palette": 5,
     "card": 0
   },
-  "app/(app)/dashboard/_components/quick-stats.tsx": {
-    "palette": 2,
-    "card": 0
-  },
   "app/(app)/dashboard/_components/teacher-dashboard.tsx": {
     "palette": 1,
     "card": 2
   },
   "app/(app)/dashboard/page.tsx": {
-    "palette": 9,
+    "palette": 1,
     "card": 0
   },
   "app/(app)/questions/_components/preview-modal.tsx": {
-    "palette": 7,
-    "card": 0
-  },
-  "app/(app)/questions/_components/question-bank-client.tsx": {
-    "palette": 8,
-    "card": 0
-  },
-  "app/(app)/questions/_components/question-card.tsx": {
-    "palette": 4,
-    "card": 0
-  },
-  "app/(app)/questions/new/page.tsx": {
-    "palette": 20,
-    "card": 0
-  },
-  "app/(app)/questions/sets/_components/question-sets-client.tsx": {
     "palette": 6,
     "card": 0
   },
+  "app/(app)/questions/_components/question-card.tsx": {
+    "palette": 2,
+    "card": 0
+  },
+  "app/(app)/questions/sets/_components/question-sets-client.tsx": {
+    "palette": 2,
+    "card": 0
+  },
   "app/(app)/settings/organization/_components.tsx": {
-    "palette": 3,
+    "palette": 1,
     "card": 0
   },
   "app/(app)/submissions/[id]/page.tsx": {
@@ -192,15 +172,15 @@
     "card": 0
   },
   "app/admin/dashboard/page.tsx": {
-    "palette": 6,
+    "palette": 3,
     "card": 0
   },
   "app/admin/questions/_components.tsx": {
-    "palette": 6,
+    "palette": 4,
     "card": 0
   },
   "app/admin/users/_components.tsx": {
-    "palette": 3,
+    "palette": 1,
     "card": 0
   },
   "app/forgot-password/page.tsx": {
@@ -244,11 +224,11 @@
     "card": 0
   },
   "components/exam/exam-client.tsx": {
-    "palette": 15,
+    "palette": 12,
     "card": 0
   },
   "components/exam/formula-sheet.tsx": {
-    "palette": 15,
+    "palette": 5,
     "card": 0
   },
   "components/landing/cookie-consent.tsx": {
@@ -272,19 +252,11 @@
     "card": 0
   },
   "components/landing/trust-badges.tsx": {
-    "palette": 11,
-    "card": 0
-  },
-  "components/questions/composite-form.tsx": {
-    "palette": 8,
+    "palette": 1,
     "card": 0
   },
   "components/questions/file-upload-form.tsx": {
     "palette": 1,
-    "card": 0
-  },
-  "components/questions/fill-blank-form.tsx": {
-    "palette": 3,
     "card": 0
   },
   "components/questions/formula-editor/method-auto.tsx": {
@@ -292,23 +264,23 @@
     "card": 0
   },
   "components/questions/formula-editor/method-builder.tsx": {
-    "palette": 5,
+    "palette": 1,
     "card": 2
   },
   "components/questions/mcq-auto-form.tsx": {
-    "palette": 8,
+    "palette": 1,
     "card": 4
   },
   "components/questions/mcq-form.tsx": {
-    "palette": 7,
+    "palette": 2,
     "card": 0
   },
   "components/questions/question-preview.tsx": {
-    "palette": 7,
+    "palette": 5,
     "card": 4
   },
   "components/questions/random-numeric/pythagorean-mode-panel.tsx": {
-    "palette": 18,
+    "palette": 0,
     "card": 1
   },
   "components/questions/random-numeric/select-field.tsx": {
@@ -344,11 +316,7 @@
     "card": 0
   },
   "components/student/study-path-panel.tsx": {
-    "palette": 14,
-    "card": 0
-  },
-  "components/super-admin/admin-dashboard.tsx": {
-    "palette": 13,
+    "palette": 6,
     "card": 0
   },
   "components/super-admin/audit-trail.tsx": {
@@ -367,12 +335,8 @@
     "palette": 12,
     "card": 0
   },
-  "components/super-admin/system-health.tsx": {
-    "palette": 3,
-    "card": 0
-  },
   "components/super-admin/tenant-manager.tsx": {
-    "palette": 31,
+    "palette": 26,
     "card": 4
   },
   "components/super-admin/topbar.tsx": {

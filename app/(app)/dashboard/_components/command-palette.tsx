@@ -21,7 +21,7 @@ const CATEGORIES = [
   {
     label: 'คลังข้อสอบฟิสิกส์',
     icon: BookOpen,
-    color: 'text-purple-500',
+    color: 'text-tint-1',
     items: [
       { name: 'กลศาสตร์ของนิวตัน — 120 ข้อ', sub: 'แก้ไขล่าสุด 3 วันที่แล้ว' },
       { name: 'ฟิสิกส์อนุภาค — 45 ข้อ', sub: 'แก้ไขล่าสุด 1 สัปดาห์ที่แล้ว' },

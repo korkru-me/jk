@@ -64,6 +64,11 @@ preset ที่มีให้:
 
 ทุก preset ผ่าน WCAG AA (ตัวอักษรบนปุ่ม primary ≥ 4.5:1) ทั้งโหมดสว่างและมืด ถ้าเพิ่ม preset ใหม่ต้องวัด contrast ก่อนใช้
 
+สีแบ่งเป็น 2 ชนิด — อย่าสลับกัน:
+
+- **สีที่มีความหมาย** (`--primary`, `--success`, `--warning`, `--flag`, `--destructive`) เปลี่ยนค่าได้ แต่ห้ามเปลี่ยนว่าอะไรหมายถึงอะไร
+- **สีตกแต่ง** (`--tint-1` … `--tint-4`) ใช้แยกแยะรายการเฉยๆ เช่น stat card, ไอคอน, ป้ายหมวดหมู่ — สลับได้อิสระ preset ควรปรับให้เข้ากับ primary ของตัวเอง (เช่น `playful` ใช้ primary ม่วงแดง จึงดัน tint-1 ไปทางน้ำเงินไม่ให้ดูเหมือนพลาด)
+
 preset ปรับได้ 5 แกน: สี, `--radius`, `--spacing`, `--elevation-*` และ typography (`--font-weight-*`, `--text-*`, `--tracking-*`) — Tailwind v4 คำนวณ utility จากตัวแปรเหล่านี้อยู่แล้ว จึงไม่ต้องแก้ component
 
 ดูผลของแต่ละ preset บนคอมโพเนนต์จริงได้ที่ `/style-preview` (เปิดเฉพาะตอน `next dev` — production จะ 404)

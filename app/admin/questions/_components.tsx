@@ -95,7 +95,7 @@ const DIFF_STYLE: Record<string, string> = {
   easy:       'bg-success/10 text-success',
   medium:     'bg-yellow-50 text-yellow-700',
   hard:       'bg-destructive/10 text-destructive',
-  analytical: 'bg-purple-50 text-purple-700',
+  analytical: 'bg-tint-1/10 text-tint-1',
 }
 
 type Row = Question & {

@@ -141,7 +141,7 @@ export function MethodBuilder({ variables, value, unit, onChange }: MethodBuilde
               key={fn}
               type="button"
               onClick={() => push(fn === 'sqrt' ? 'sqrt(' : `${fn}(`)}
-              className="px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-purple-800 text-sm font-mono hover:bg-purple-100 transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-tint-1/20 bg-tint-1/10 text-tint-1 text-sm font-mono hover:bg-tint-1/10 transition-colors"
             >
               {fn}(
             </button>

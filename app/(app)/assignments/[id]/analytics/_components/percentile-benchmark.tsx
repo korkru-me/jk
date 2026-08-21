@@ -19,7 +19,7 @@ const PERCENTILE_LABELS = [
   { p: 50, label: 'ปานกลาง',       color: 'text-warning', bg: 'bg-warning/10', bar: 'bg-warning' },
   { p: 75, label: 'สูงกว่าเฉลี่ย', color: 'text-primary', bg: 'bg-primary/10', bar: 'bg-primary' },
   { p: 90, label: 'ดีเยี่ยม',      color: 'text-success', bg: 'bg-success/10', bar: 'bg-success' },
-  { p: 99, label: 'เป็นเลิศ',      color: 'text-violet-600', bg: 'bg-violet-50', bar: 'bg-violet-500' },
+  { p: 99, label: 'เป็นเลิศ',      color: 'text-tint-1', bg: 'bg-tint-1/10', bar: 'bg-tint-1' },
 ]
 
 export function PercentileBenchmark({ mean, assignmentId, passingPercent = null }: Props) {

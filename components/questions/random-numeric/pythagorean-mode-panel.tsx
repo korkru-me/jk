@@ -34,11 +34,11 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
   }
 
   return (
-    <Card radius="md" elevation="sm" className="border-purple-200 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-purple-50 border-b border-purple-100">
+    <Card radius="md" elevation="sm" className="border-tint-1/20 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-tint-1/10 border-b border-tint-1/20">
         <div>
-          <p className="text-sm font-bold text-purple-800">โหมดชุดตัวเลขพิเศษ (Pythagorean)</p>
-          <p className="text-xs text-purple-500 mt-0.5">
+          <p className="text-sm font-bold text-tint-1">โหมดชุดตัวเลขพิเศษ (Pythagorean)</p>
+          <p className="text-xs text-tint-1 mt-0.5">
             สุ่มหยิบชุด (a, b, c) ที่ a² + b² = c² ลงตัวเสมอ — เหมาะสำหรับโจทย์เวกเตอร์และ ก.พ.ท.
           </p>
         </div>
@@ -48,7 +48,7 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
             if (enabled) onGroupsChange([])
             onEnabledChange(!enabled)
           }}
-          className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? 'bg-purple-600' : 'bg-muted'}`}
+          className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? 'bg-tint-1' : 'bg-muted'}`}
         >
           <span className={`absolute top-1 w-4 h-4 bg-card rounded-full shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
@@ -57,12 +57,12 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
       {enabled && (
         <div className="p-4 space-y-4">
           {/* Triple preview */}
-          <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 space-y-2">
-            <p className="text-xs font-semibold text-purple-700">ชุดตัวเลขที่ระบบจะสุ่มใช้ ({ALL_PYTHAGOREAN_TRIPLES_COUNT} ชุด):</p>
+          <div className="bg-tint-1/10 border border-tint-1/20 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-tint-1">ชุดตัวเลขที่ระบบจะสุ่มใช้ ({ALL_PYTHAGOREAN_TRIPLES_COUNT} ชุด):</p>
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {PYTHAGOREAN_FAMILIES.map(f => (
                 <div key={f.name} className="space-y-0.5">
-                  <p className="text-[10px] font-bold text-purple-600">{f.name}</p>
+                  <p className="text-[10px] font-bold text-tint-1">{f.name}</p>
                   <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
                     {f.triples.map(t => `(${t[0]}, ${t[1]}, ${t[2]})`).join('  ')}
                   </p>
@@ -79,9 +79,9 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
           )}
 
           {groups.map((g, gi) => (
-            <div key={g.id} className="border border-purple-200 rounded-xl p-3 space-y-2 bg-purple-50/30">
+            <div key={g.id} className="border border-tint-1/20 rounded-xl p-3 space-y-2 bg-tint-1/10/30">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-bold text-purple-700">กลุ่มที่ {gi + 1}</p>
+                <p className="text-xs font-bold text-tint-1">กลุ่มที่ {gi + 1}</p>
                 <button type="button" onClick={() => removeGroup(g.id)} className="text-muted-foreground/40 hover:text-destructive transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -95,7 +95,7 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
                     <select
                       value={g[slot]}
                       onChange={e => updateGroup(g.id, { [slot]: e.target.value })}
-                      className="w-full h-8 text-xs font-mono border border-purple-200 rounded-lg px-2 bg-card focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      className="w-full h-8 text-xs font-mono border border-tint-1/20 rounded-lg px-2 bg-card focus:outline-none focus:ring-1 focus:ring-tint-1/40"
                     >
                       <option value="">-- เลือก --</option>
                       {availableVarNames.map(n => (
@@ -105,7 +105,7 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-purple-500">a² + b² = c² — ระบบจะสุ่มหยิบชุดตัวเลขทั้งแพ็กเกจ</p>
+              <p className="text-[10px] text-tint-1">a² + b² = c² — ระบบจะสุ่มหยิบชุดตัวเลขทั้งแพ็กเกจ</p>
             </div>
           ))}
 
@@ -113,7 +113,7 @@ export function PythagoreanModePanel({ enabled, onEnabledChange, groups, onGroup
             type="button"
             onClick={addGroup}
             disabled={availableVarNames.length < 3}
-            className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 text-xs text-tint-1 hover:text-tint-1 font-medium transition-colors disabled:opacity-40"
           >
             <Plus className="w-3.5 h-3.5" /> เพิ่มกลุ่มตัวแปร Pythagorean
           </button>

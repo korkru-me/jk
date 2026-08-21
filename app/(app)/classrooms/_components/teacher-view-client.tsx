@@ -156,7 +156,7 @@ export function TeacherViewClient({
         <div className="grid grid-cols-3 gap-4">
           {[
             { label: 'ห้องเรียน', value: classrooms.length, icon: BookOpen, color: 'bg-primary/10 text-primary' },
-            { label: 'นักเรียนรวม', value: totalStudents, icon: Users, color: 'bg-violet-50 text-violet-500' },
+            { label: 'นักเรียนรวม', value: totalStudents, icon: Users, color: 'bg-tint-1/10 text-tint-1' },
             { label: 'ชุดข้อสอบรวม', value: totalAssignments, icon: BookOpen, color: 'bg-warning/10 text-warning' },
           ].map(s => {
             const Icon = s.icon

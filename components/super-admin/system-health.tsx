@@ -67,14 +67,14 @@ const QUOTA_ITEMS = [
 
 const COLOR_BAR: Record<string, string> = {
   indigo: 'bg-primary',
-  violet: 'bg-violet-500',
+  violet: 'bg-tint-1',
   amber: 'bg-warning',
   emerald: 'bg-success',
 }
 
 const COLOR_TRACK: Record<string, string> = {
   indigo: 'bg-primary/10',
-  violet: 'bg-violet-100 dark:bg-violet-950/60',
+  violet: 'bg-tint-1/10',
   amber: 'bg-warning/10',
   emerald: 'bg-success/10',
 }

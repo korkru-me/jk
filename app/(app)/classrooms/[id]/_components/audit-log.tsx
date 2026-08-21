@@ -9,11 +9,11 @@ interface LogEvent { id: string; type: EventType; message: string; time: string;
 const ICON_MAP: Record<EventType, { icon: typeof UserPlus; color: string; bg: string }> = {
   join:   { icon: UserPlus,    color: 'text-success', bg: 'bg-success/10' },
   submit: { icon: CheckSquare, color: 'text-primary',    bg: 'bg-primary/10' },
-  edit:   { icon: FileEdit,    color: 'text-violet-600',  bg: 'bg-violet-50' },
+  edit:   { icon: FileEdit,    color: 'text-tint-1',  bg: 'bg-tint-1/10' },
   login:  { icon: LogIn,       color: 'text-muted-foreground',    bg: 'bg-muted' },
   notify: { icon: Bell,        color: 'text-warning',   bg: 'bg-warning/10' },
   remove: { icon: Trash2,      color: 'text-destructive',     bg: 'bg-destructive/10' },
-  upload: { icon: Upload,      color: 'text-teal-600',    bg: 'bg-teal-50' },
+  upload: { icon: Upload,      color: 'text-tint-4',    bg: 'bg-tint-4/10' },
 }
 
 const MOCK_EVENTS: LogEvent[] = [

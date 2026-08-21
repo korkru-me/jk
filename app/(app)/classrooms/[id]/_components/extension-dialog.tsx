@@ -52,7 +52,7 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
             <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-violet-500" /> ขยายเวลา
+              <Clock className="w-4 h-4 text-tint-1" /> ขยายเวลา
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">{studentName} — {assignmentTitle}</p>
           </div>
@@ -68,7 +68,7 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
               type="datetime-local"
               value={extendedEndAt}
               onChange={e => setExtendedEndAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-violet-100"
             />
           </div>
           <div className="space-y-1.5">
@@ -78,7 +78,7 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
               onChange={e => setNote(e.target.value)}
               rows={2}
               placeholder="เช่น ลาป่วย"
-              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none"
+              className="w-full px-3 py-2 text-sm border border-border rounded-xl outline-none focus:border-tint-1 focus:ring-2 focus:ring-violet-100 resize-none"
             />
           </div>
 
@@ -86,7 +86,7 @@ export function ExtensionDialog({ assignmentId, assignmentTitle, studentId, stud
             <button
               onClick={handleSave}
               disabled={isPending}
-              className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-tint-1 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
             >
               {currentExtension ? 'อัปเดต' : 'ขยายเวลา'}
             </button>

@@ -75,8 +75,8 @@ export function ParentPortal({ studentCount }: { studentCount: number }) {
       <Card edge="ring" padding="lg">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
-              <Key className="w-4.5 h-4.5 text-violet-500" />
+            <div className="w-9 h-9 bg-tint-1/10 rounded-xl flex items-center justify-center shrink-0">
+              <Key className="w-4.5 h-4.5 text-tint-1" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">รหัสผู้สังเกตการณ์</p>

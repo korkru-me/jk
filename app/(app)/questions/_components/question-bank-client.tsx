@@ -485,12 +485,12 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
           </span>
         )}
         {showTeamName && q.organizations?.name && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-tint-1/10 text-tint-1">
             {q.organizations.name}
           </span>
         )}
         {q.shared_org_names?.map((name) => (
-          <span key={name} className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+          <span key={name} className="text-xs px-2 py-0.5 rounded-full bg-tint-2/10 text-tint-2">
             + {name}
           </span>
         ))}

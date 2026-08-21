@@ -47,8 +47,8 @@ const SECTIONS = [
     id: 'relativity',
     title: 'ฟิสิกส์อนุภาคและสัมพัทธภาพ',
     icon: '⚛️',
-    color: 'border-purple-500/20 bg-purple-500/5',
-    badge: 'bg-purple-500/15 text-purple-700 dark:text-purple-300',
+    color: 'border-tint-1/20 bg-tint-1/5',
+    badge: 'bg-tint-1/15 text-tint-1',
     entries: [
       {
         name: 'E = mc² (ไอน์สไตน์)',
@@ -105,8 +105,8 @@ const SECTIONS = [
     id: 'waves',
     title: 'คลื่นและแสง',
     icon: '🌊',
-    color: 'border-teal-500/20 bg-teal-500/5',
-    badge: 'bg-teal-500/15 text-teal-700 dark:text-teal-300',
+    color: 'border-tint-4/20 bg-tint-4/5',
+    badge: 'bg-tint-4/15 text-tint-4',
     entries: [
       {
         name: 'ความเร็วคลื่น',

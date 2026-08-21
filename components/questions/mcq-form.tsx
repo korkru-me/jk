@@ -95,16 +95,16 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
         onClick={() => onChange('auto')}
         className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
           mode === 'auto'
-            ? 'border-purple-500 bg-purple-50'
-            : 'border-border hover:border-purple-300 bg-card'
+            ? 'border-tint-1 bg-tint-1/10'
+            : 'border-border hover:border-tint-1/20 bg-card'
         }`}
       >
-        <Calculator className={`w-5 h-5 mt-0.5 shrink-0 ${mode === 'auto' ? 'text-purple-600' : 'text-muted-foreground'}`} />
+        <Calculator className={`w-5 h-5 mt-0.5 shrink-0 ${mode === 'auto' ? 'text-tint-1' : 'text-muted-foreground'}`} />
         <div>
           <p className={`text-sm font-semibold ${mode === 'auto' ? 'text-purple-900' : 'text-muted-foreground'}`}>
             สร้างตัวเลือกจากสมการ
           </p>
-          <p className={`text-xs mt-0.5 ${mode === 'auto' ? 'text-purple-700' : 'text-muted-foreground'}`}>
+          <p className={`text-xs mt-0.5 ${mode === 'auto' ? 'text-tint-1' : 'text-muted-foreground'}`}>
             คำนวณจากสูตร สร้างตัวเลือกผิดอัตโนมัติ
           </p>
         </div>

@@ -241,7 +241,7 @@ function TemplateField({ value, onChange, imageUrl, onImageChange }: {
           className="text-sm h-9 flex-1 min-w-[220px]"
         />
         <button type="button" onClick={() => insertAt('{answer}')}
-          className="text-xs border border-purple-300 rounded-md px-2.5 py-1.5 font-mono font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 transition-colors shrink-0">
+          className="text-xs border border-tint-1/20 rounded-md px-2.5 py-1.5 font-mono font-medium text-tint-1 bg-tint-1/10 hover:bg-tint-1/10 transition-colors shrink-0">
           + {'{answer}'}
         </button>
         <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => wrapSel(TO_SUPER)}
@@ -810,7 +810,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
             imageUrl={optionImageUrl} onImageChange={setOptionImageUrl}
           />
           {optionTemplate.trim() && correctAnswer !== null && (
-            <p className="text-xs text-purple-700 font-medium bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5">
+            <p className="text-xs text-tint-1 font-medium bg-tint-1/10 border border-tint-1/20 rounded-lg px-3 py-1.5">
               ตัวอย่าง: {applyTemplate(correctAnswer)}
             </p>
           )}

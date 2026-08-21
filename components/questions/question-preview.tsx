@@ -1123,7 +1123,7 @@ export function QuestionPreviewContent({
                       <RichText text={part.text} className="text-[15px] text-foreground" />
                       <div className="space-y-1.5">
                         {(part.options ?? []).map((opt, oi) => (
-                          <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${compositeAnswers[i] === opt.text ? 'border-purple-400 bg-purple-50' : 'border-border'} ${compositeChecked ? 'cursor-not-allowed opacity-80' : ''}`}>
+                          <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${compositeAnswers[i] === opt.text ? 'border-tint-1 bg-tint-1/10' : 'border-border'} ${compositeChecked ? 'cursor-not-allowed opacity-80' : ''}`}>
                             <input type="radio" name={`composite-mcq-${part.id}`} disabled={compositeChecked}
                               checked={compositeAnswers[i] === opt.text}
                               onChange={() => setAnswer(opt.text)} />

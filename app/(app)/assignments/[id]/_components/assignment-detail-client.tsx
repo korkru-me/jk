@@ -278,7 +278,7 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
     { label: 'ส่งแล้ว',      value: submittedCount,  icon: CheckCircle2, color: 'bg-success/10 text-success' },
     { label: 'กำลังทำ',      value: inProgressCount, icon: Activity,     color: 'bg-warning/10 text-warning' },
     { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'bg-primary/10 text-primary' },
-    { label: 'จำนวนข้อ',    value: a.question_ids.length, icon: FileText, color: 'bg-purple-50 text-purple-500' },
+    { label: 'จำนวนข้อ',    value: a.question_ids.length, icon: FileText, color: 'bg-tint-1/10 text-tint-1' },
   ]
 
   return (

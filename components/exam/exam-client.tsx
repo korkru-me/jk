@@ -1573,7 +1573,7 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
               <div className="space-y-1.5">
                 {(part.options ?? []).map((opt, oi) => (
                   <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
-                    answers[i] === opt.text ? 'border-purple-400 bg-purple-50 dark:bg-purple-950/30' : 'border-border'
+                    answers[i] === opt.text ? 'border-tint-1 bg-tint-1/10' : 'border-border'
                   }`}>
                     <input type="radio" name={`composite-${part.id}`} checked={answers[i] === opt.text} onChange={() => updatePart(i, opt.text)} />
                     <RichText text={opt.text} />

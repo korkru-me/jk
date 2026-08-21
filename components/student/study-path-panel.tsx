@@ -40,12 +40,12 @@ const TOPIC_MAP: Record<string, { label: string; topics: string[]; color: string
   อนุภาค: {
     label: 'ฟิสิกส์อนุภาค',
     topics: ['Standard Model', 'แรงพื้นฐาน 4 แรง', 'อนุภาคมูลฐาน'],
-    color: 'bg-purple-500/10 border-purple-500/20 text-purple-700 dark:text-purple-300',
+    color: 'bg-tint-1/10 border-tint-1/20 text-tint-1',
   },
   โมเมนตัม: {
     label: 'โมเมนตัมและแรงกระตุ้น',
     topics: ['กฎการอนุรักษ์โมเมนตัม', 'การชนแบบยืดหยุ่น', 'การชนแบบไม่ยืดหยุ่น'],
-    color: 'bg-teal-500/10 border-teal-500/20 text-teal-700 dark:text-teal-300',
+    color: 'bg-tint-4/10 border-tint-4/20 text-tint-4',
   },
   พลังงาน: {
     label: 'พลังงานและงาน',

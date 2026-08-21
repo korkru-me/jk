@@ -61,7 +61,7 @@ function draftFromExisting(config: FillBlankConfig | undefined, item: FillBlankI
 const BLANK_TYPES: Array<{ value: FillBlankType; label: string; desc: string; icon: typeof PenLine; activeClass: string }> = [
   { value: 'text', label: 'ช่องว่าง', desc: 'นักเรียนตอบอะไรก็ได้ ครูกลับมาตรวจให้คะแนนเอง', icon: PenLine, activeClass: 'bg-flag/10 border-flag text-flag' },
   { value: 'fixed', label: 'ฟิกคำตอบ', desc: 'นักเรียนพิมพ์คำตอบ ระบบตรวจให้อัตโนมัติตามคำตอบที่ครูกำหนด', icon: CheckCircle2, activeClass: 'bg-primary/10 border-primary text-primary' },
-  { value: 'dropdown', label: 'ดรอปดาวน์', desc: 'นักเรียนเลือกคำตอบจากตัวเลือกที่ครูกำหนด ระบบตรวจให้อัตโนมัติ', icon: ChevronDownSquare, activeClass: 'bg-purple-50 border-purple-400 text-purple-700' },
+  { value: 'dropdown', label: 'ดรอปดาวน์', desc: 'นักเรียนเลือกคำตอบจากตัวเลือกที่ครูกำหนด ระบบตรวจให้อัตโนมัติ', icon: ChevronDownSquare, activeClass: 'bg-tint-1/10 border-tint-1 text-tint-1' },
 ]
 
 export function FillBlankForm({ allTags, mode = 'create', question, isOwner = true }: FillBlankFormProps) {

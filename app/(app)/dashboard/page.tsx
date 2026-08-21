@@ -301,7 +301,7 @@ function StudentDashboard({
       {recentPosts.length > 0 && (
         <div>
           <h2 className="font-semibold flex items-center gap-2 mb-3">
-            <Megaphone size={16} className="text-violet-600 dark:text-violet-400" />
+            <Megaphone size={16} className="text-tint-1 dark:text-tint-1" />
             ประกาศล่าสุด
           </h2>
           <Card className="divide-y">
@@ -311,12 +311,12 @@ function StudentDashboard({
                 href={`/classrooms/${p.classroom_id}`}
                 className="flex items-start gap-3 p-4 hover:bg-muted/30 transition-colors"
               >
-                <div className="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-950/30 flex items-center justify-center shrink-0 text-violet-600 dark:text-violet-400">
+                <div className="w-8 h-8 rounded-lg bg-tint-1/10 flex items-center justify-center shrink-0 text-tint-1 dark:text-tint-1">
                   <Megaphone size={14} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 truncate">{p.classrooms?.name}</span>
+                    <span className="text-xs font-semibold text-tint-1 dark:text-tint-1 truncate">{p.classrooms?.name}</span>
                     <span className="text-xs text-muted-foreground">· {p.users?.full_name}</span>
                     <span className="text-xs text-muted-foreground ml-auto shrink-0">{timeAgo(p.created_at)}</span>
                   </div>

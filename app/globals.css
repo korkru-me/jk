@@ -34,6 +34,10 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-flag: var(--flag);
   --color-flag-foreground: var(--flag-foreground);
+  --color-tint-1: var(--tint-1);
+  --color-tint-2: var(--tint-2);
+  --color-tint-3: var(--tint-3);
+  --color-tint-4: var(--tint-4);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -86,6 +90,14 @@
      about the system's own state. */
   --flag: oklch(0.646 0.222 41.116);
   --flag-foreground: oklch(0.985 0 0);
+  /* Decorative tints — used to tell items apart (stat cards, icon chips,
+     category badges). They carry no meaning: swapping them changes nothing a
+     teacher reads, unlike --success or --flag. A preset overrides them so its
+     accents stay in tune with its primary. */
+  --tint-1: oklch(0.606 0.25 292.717);
+  --tint-2: oklch(0.715 0.143 215.221);
+  --tint-3: oklch(0.645 0.246 16.439);
+  --tint-4: oklch(0.6 0.118 184.704);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.585 0.233 277.117);
@@ -145,6 +157,10 @@
   --warning-foreground: oklch(0.145 0 0);
   --flag: oklch(0.75 0.183 55.934);
   --flag-foreground: oklch(0.145 0 0);
+  --tint-1: oklch(0.702 0.183 293.541);
+  --tint-2: oklch(0.789 0.154 211.53);
+  --tint-3: oklch(0.712 0.194 13.428);
+  --tint-4: oklch(0.704 0.14 182.503);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.673 0.182 276.935);
@@ -267,6 +283,12 @@
   --ring: oklch(0.68 0.19 320);
   --success: oklch(0.66 0.19 145);
   --warning: oklch(0.78 0.17 75);
+  /* primary is magenta here, so the neighbouring violet reads as a near-miss;
+     push the tints to hues that separate from it cleanly */
+  --tint-1: oklch(0.58 0.2 255);
+  --tint-2: oklch(0.68 0.15 195);
+  --tint-3: oklch(0.68 0.17 35);
+  --tint-4: oklch(0.62 0.14 165);
   --elevation-sm: 0 2px 0 0 oklch(0.62 0.21 320 / 0.22);
   --elevation-md: 0 4px 0 0 oklch(0.62 0.21 320 / 0.25);
   --elevation-lg: 0 6px 0 0 oklch(0.62 0.21 320 / 0.28);

@@ -17,11 +17,11 @@ function getInitials(name: string): string {
 function avatarColor(name: string): string {
   const colors = [
     'bg-primary/10 text-primary',
-    'bg-violet-100 text-violet-600',
+    'bg-tint-1/10 text-tint-1',
     'bg-success/10 text-success',
     'bg-warning/10 text-warning',
-    'bg-rose-100 text-rose-600',
-    'bg-cyan-100 text-cyan-600',
+    'bg-tint-3/10 text-tint-3',
+    'bg-tint-2/10 text-tint-2',
   ]
   const idx = name.charCodeAt(0) % colors.length
   return colors[idx]

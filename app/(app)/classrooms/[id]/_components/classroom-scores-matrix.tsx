@@ -375,7 +375,7 @@ export function ClassroomScoresMatrix({
                         <button
                           onClick={() => setDialogTarget({ assignmentId: a.id, studentId: student.id })}
                           className={`mt-0.5 flex items-center gap-0.5 mx-auto text-[10px] transition-colors ${
-                            extension ? 'text-violet-600 font-medium' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-violet-500'
+                            extension ? 'text-tint-1 font-medium' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-tint-1'
                           }`}
                         >
                           <Clock className="w-2.5 h-2.5" />

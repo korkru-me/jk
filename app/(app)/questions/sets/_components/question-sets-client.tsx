@@ -228,12 +228,12 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
           <div className="flex items-center gap-1.5 flex-wrap mt-2">
             {set.organizations?.name && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-violet-50 text-violet-600">
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-tint-1/10 text-tint-1">
                 {set.organizations.name}
               </span>
             )}
             {set.shared_org_names?.map((name) => (
-              <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-600">
+              <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-tint-2/10 text-tint-2">
                 + {name}
               </span>
             ))}

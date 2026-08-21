@@ -125,14 +125,14 @@ const PART_ACCENT: Record<CompositePartType, string> = {
   true_false: 'bg-success/10 border-success/20 text-success',
   fill_blank: 'bg-primary/10 border-primary/20 text-primary',
   ordering: 'bg-warning/10 border-warning/20 text-warning',
-  mcq: 'bg-purple-50 border-purple-300 text-purple-700',
+  mcq: 'bg-tint-1/10 border-tint-1/20 text-tint-1',
 }
 
 const PART_BADGE: Record<CompositePartType, string> = {
   true_false: 'bg-success/10 text-success',
   fill_blank: 'bg-primary/10 text-primary',
   ordering: 'bg-warning/10 text-warning',
-  mcq: 'bg-purple-100 text-purple-700',
+  mcq: 'bg-tint-1/10 text-tint-1',
 }
 
 // ─── Per-type field blocks ──────────────────────────────────────────────────
@@ -398,7 +398,7 @@ function McqPartFields({ part, update }: { part: CompositePartDraft; update: (pa
               onClick={() => setCorrect(oi)}
               title="ตั้งเป็นคำตอบที่ถูกต้อง"
               className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                opt.is_correct ? 'border-purple-500 bg-purple-500' : 'border-border hover:border-purple-400'
+                opt.is_correct ? 'border-tint-1 bg-tint-1' : 'border-border hover:border-tint-1'
               }`}
             >
               {opt.is_correct && <Check className="w-3 h-3 text-white" />}

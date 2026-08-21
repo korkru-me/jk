@@ -167,7 +167,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
               const PermIcon = perm.icon
               return (
                 <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center text-xs font-bold text-violet-700 shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center text-xs font-bold text-tint-1 shrink-0">
                     {t.fullName.slice(0, 2)}
                   </div>
                   <div className="flex-1 min-w-0">

@@ -306,7 +306,7 @@ function StatsTab({ stats }: { stats?: QuestionStats }) {
         <div className="grid grid-cols-3 gap-4 text-center">
           {[
             { label: 'ใช้ในชุดสอบ', value: stats.usedIn, icon: BookOpen, color: 'text-primary' },
-            { label: 'ครั้งที่ตอบ', value: stats.attempts, icon: TrendingUp, color: 'text-purple-500' },
+            { label: 'ครั้งที่ตอบ', value: stats.attempts, icon: TrendingUp, color: 'text-tint-1' },
             { label: 'ตอบถูก', value: correct, icon: CheckCircle2, color: 'text-success' },
           ].map(s => {
             const Icon = s.icon

@@ -11,17 +11,17 @@ interface Group { id: string; name: string; students: Student[] }
 
 const GROUP_COLORS = [
   'border-primary/20 bg-primary/10',
-  'border-violet-200 bg-violet-50/50',
+  'border-tint-1/20 bg-tint-1/10/50',
   'border-success/20 bg-success/10',
   'border-warning/20 bg-warning/10',
-  'border-rose-200 bg-rose-50/50',
+  'border-tint-3/20 bg-tint-3/10/50',
 ]
 const GROUP_HEADER_COLORS = [
   'bg-primary/10 text-primary',
-  'bg-violet-100 text-violet-700',
+  'bg-tint-1/10 text-tint-1',
   'bg-success/10 text-success',
   'bg-warning/10 text-warning',
-  'bg-rose-100 text-rose-700',
+  'bg-tint-3/10 text-tint-3',
 ]
 
 interface Props {

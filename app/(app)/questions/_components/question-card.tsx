@@ -218,7 +218,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                   onClick={() => setShareOpen(o => !o)}
                   label="แชร์ให้ครูท่านอื่น"
                   size="sm"
-                  className="hover:text-violet-600 hover:bg-violet-50 dark:hover:text-violet-300 dark:hover:bg-violet-950/40"
+                  className="hover:text-tint-1 hover:bg-tint-1/10 dark:hover:text-violet-300 dark:hover:bg-violet-950/40"
                 >
                   <Share2 />
                 </IconButton>

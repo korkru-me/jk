@@ -103,18 +103,18 @@ const COLOR_MAP: Record<string, string> = {
   indigo: 'bg-primary/10 text-primary',
   emerald: 'bg-success/10 text-success',
   amber: 'bg-warning/10 text-warning',
-  violet: 'bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
-  cyan: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300',
-  rose: 'bg-rose-50 text-rose-700',
+  violet: 'bg-tint-1/10 text-tint-1',
+  cyan: 'bg-tint-2/10 text-tint-2',
+  rose: 'bg-tint-3/10 text-tint-3',
 }
 
 const ICON_COLOR: Record<string, string> = {
   indigo: 'text-primary',
   emerald: 'text-success',
   amber: 'text-warning',
-  violet: 'text-violet-500',
-  cyan: 'text-cyan-500',
-  rose: 'text-rose-500',
+  violet: 'text-tint-1',
+  cyan: 'text-tint-2',
+  rose: 'text-tint-3',
 }
 
 function formatMRR(value: number) {

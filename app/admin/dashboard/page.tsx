@@ -59,7 +59,7 @@ function StatCard({
     green:  'bg-success/10 border-success/20 text-success',
     yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
     red:    'bg-destructive/10 border-destructive/20 text-destructive',
-    purple: 'bg-purple-50 border-purple-200 text-purple-700',
+    purple: 'bg-tint-1/10 border-tint-1/20 text-tint-1',
   }
   return (
     <div className={`rounded-xl border p-5 ${colors[color]}`}>
