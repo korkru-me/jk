@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getMyOrgId } from '@/lib/actions/org'
 import { toPortableQuestion, buildExportFile, parseExportFile, type PortableQuestion } from '@/lib/question-portable'
-import { escapeLike } from '@/lib/utils'
 import type { Question } from '@/lib/types'
 
 type QuestionRow = Question & { question_categories?: { name: string } | null }
@@ -116,19 +115,23 @@ export async function checkImportDuplicates(raw: string): Promise<
   return { duplicates, total: file.questions.length }
 }
 
-async function resolveUniqueTitle(supabase: Awaited<ReturnType<typeof createClient>>, baseTitle: string, userId: string) {
-  const { data } = await supabase
-    .from('questions')
-    .select('title')
-    .eq('created_by', userId)
-    .ilike('title', `${escapeLike(baseTitle)}%`)
-
-  const existingTitles = new Set((data ?? []).map(r => r.title as string))
-  if (!existingTitles.has(baseTitle)) return baseTitle
-
-  let n = 2
-  while (existingTitles.has(`${baseTitle} (${n})`)) n++
-  return `${baseTitle} (${n})`
+/**
+ * Hands out a title that doesn't collide with one the user already has.
+ *
+ * Loads their titles once and remembers what it hands out, so a batch import
+ * neither costs a query per renamed question nor gives two of them the same
+ * "(2)" suffix.
+ */
+function makeTitleResolver(existingTitles: string[]) {
+  const taken = new Set(existingTitles)
+  return function resolve(baseTitle: string) {
+    if (!taken.has(baseTitle)) { taken.add(baseTitle); return baseTitle }
+    let n = 2
+    while (taken.has(`${baseTitle} (${n})`)) n++
+    const unique = `${baseTitle} (${n})`
+    taken.add(unique)
+    return unique
+  }
 }
 
 interface CategoryRow { id: string; name: string; parent_id: string | null }
@@ -173,8 +176,7 @@ function makeCategoryResolver(categories: CategoryRow[]) {
   }
 }
 
-async function insertPortableQuestion(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+function toQuestionRow(
   pq: PortableQuestion,
   userId: string,
   orgId: string,
@@ -182,7 +184,7 @@ async function insertPortableQuestion(
 ) {
   const category_id = resolveCategory(pq.category_name)
 
-  return supabase.from('questions').insert({
+  return {
     org_id: orgId,
     created_by: userId,
     category_id,
@@ -207,13 +209,25 @@ async function insertPortableQuestion(
     tags: pq.tags,
     image_urls: pq.image_urls ?? [],
     requires_work_image: pq.requires_work_image,
-  }).select('id').single()
+  }
 }
 
+/**
+ * Imports one batch of questions.
+ *
+ * The client splits a file into batches and calls this per batch (see
+ * import-questions-button.tsx): a whole bank runs to a couple of megabytes,
+ * over the Server Action body limit, and inserting it as one request meant one
+ * round trip per question — a thousand of them, in series.
+ *
+ * `previousIds` carries the ids from earlier batches so that a question_set
+ * file, whose set is created on the final batch, still lists every question.
+ */
 export async function importQuestionsFromFile(
   raw: string,
   duplicateDecision?: 'rename' | 'skip',
   duplicateIndexes: number[] = [],
+  previousIds: string[] = [],
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -226,32 +240,43 @@ export async function importQuestionsFromFile(
   if ('error' in parsed) return { error: parsed.error }
   const file = parsed.data
 
-  // Read the taxonomy once instead of once per question — a set import is
-  // hundreds of rows and every one of them used to cost its own round trip.
-  const { data: categories } = await supabase
-    .from('question_categories')
-    .select('id, name, parent_id')
-  const resolveCategory = makeCategoryResolver((categories ?? []) as CategoryRow[])
-
   const dupSet = new Set(duplicateIndexes)
-  const newIds: string[] = []
-  for (let i = 0; i < file.questions.length; i++) {
-    const pq = file.questions[i]
-    if (dupSet.has(i) && duplicateDecision === 'skip') continue
+  const incoming = file.questions.filter((_, i) => !(dupSet.has(i) && duplicateDecision === 'skip'))
 
-    const title = (dupSet.has(i) && duplicateDecision === 'rename')
-      ? await resolveUniqueTitle(supabase, pq.title, user.id)
-      : pq.title
+  // Both lookups are per batch rather than per question: the taxonomy to map
+  // category names onto ids, the titles to rename around collisions.
+  const [{ data: categories }, { data: existing }] = await Promise.all([
+    supabase.from('question_categories').select('id, name, parent_id'),
+    duplicateDecision === 'rename'
+      ? supabase.from('questions').select('title').eq('created_by', user.id)
+      : Promise.resolve({ data: [] as { title: string }[] }),
+  ])
 
-    const { data, error } = await insertPortableQuestion(supabase, { ...pq, title }, user.id, orgId, resolveCategory)
-    if (error) return { error: error.message, imported: newIds.length }
-    newIds.push(data.id as string)
+  const resolveCategory = makeCategoryResolver((categories ?? []) as CategoryRow[])
+  const resolveTitle = makeTitleResolver((existing ?? []).map(r => r.title as string))
+
+  const rows = file.questions.flatMap((pq, i) => {
+    if (dupSet.has(i) && duplicateDecision === 'skip') return []
+    const title = (dupSet.has(i) && duplicateDecision === 'rename') ? resolveTitle(pq.title) : pq.title
+    return [toQuestionRow({ ...pq, title }, user.id, orgId, resolveCategory)]
+  })
+
+  let newIds: string[] = []
+  if (rows.length > 0) {
+    // One insert for the batch. PostgREST returns the rows in the order they
+    // were sent, which is what keeps a set's question order intact.
+    const { data, error } = await supabase.from('questions').insert(rows).select('id')
+    if (error) return { error: error.message, imported: 0 }
+    newIds = (data ?? []).map(r => r.id as string)
   }
 
-  if (newIds.length === 0) {
-    return { error: 'ข้ามโจทย์ที่ซ้ำทั้งหมด ไม่มีโจทย์ใหม่ถูกนำเข้า', imported: 0 }
+  const allIds = [...previousIds, ...newIds]
+  if (allIds.length === 0) {
+    return { error: 'ข้ามโจทย์ที่ซ้ำทั้งหมด ไม่มีโจทย์ใหม่ถูกนำเข้า', imported: 0, ids: [] as string[] }
   }
 
+  // Only the batch that carries the set descriptor creates it — the client
+  // puts that on the last one.
   let setId: string | undefined
   if (file.kind === 'question_set' && file.set) {
     const { data: set, error } = await supabase
@@ -261,16 +286,16 @@ export async function importQuestionsFromFile(
         created_by: user.id,
         title: file.set.title,
         description: file.set.description,
-        question_ids: newIds,
+        question_ids: allIds,
         tags: file.set.tags,
       })
       .select('id')
       .single()
-    if (error) return { error: error.message, imported: newIds.length }
+    if (error) return { error: error.message, imported: newIds.length, ids: newIds }
     setId = set.id as string
     revalidatePath('/questions/sets')
   }
 
   revalidatePath('/questions')
-  return { imported: newIds.length, setId }
+  return { imported: newIds.length, ids: newIds, setId }
 }
