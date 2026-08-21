@@ -133,7 +133,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
       post.pinned ? 'border-primary/20' : ''
     )}>
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
+        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
           {initials}
         </div>
         <div className="flex-1 min-w-0">

@@ -83,7 +83,7 @@ export default function PricingPage() {
           </p>
           <a
             href="mailto:hello@korkru.app"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             ติดต่อเรา
           </a>

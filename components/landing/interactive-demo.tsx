@@ -116,7 +116,7 @@ function PhysicsDemo() {
             className={cn(
               'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
               i === tplIdx
-                ? 'bg-primary text-white'
+                ? 'bg-primary text-primary-foreground'
                 : 'border border-border bg-card text-muted-foreground hover:border-primary/20 hover:text-primary',
             )}
           >
@@ -134,7 +134,7 @@ function PhysicsDemo() {
           </span>
           <button
             onClick={randomize}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Shuffle className="h-3 w-3" />
             สุ่มตัวเลขใหม่
@@ -298,7 +298,7 @@ export function InteractiveDemo() {
               className={cn(
                 'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
                 tab === 'physics'
-                  ? 'bg-card text-foreground shadow-sm dark:text-white'
+                  ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-muted-foreground',
               )}
             >
@@ -309,7 +309,7 @@ export function InteractiveDemo() {
               className={cn(
                 'flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all',
                 tab === 'drag'
-                  ? 'bg-card text-foreground shadow-sm dark:text-white'
+                  ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-muted-foreground',
               )}
             >

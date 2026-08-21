@@ -34,7 +34,7 @@ export function TolerancePicker({ value, onChange }: { value: number; onChange: 
               key={m}
               type="button"
               onClick={() => changeMode(m)}
-              className={`px-3 py-1.5 font-medium transition-colors ${mode === m ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+              className={`px-3 py-1.5 font-medium transition-colors ${mode === m ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'}`}
             >
               {m === 'decimal' ? 'ทศนิยม' : '%'}
             </button>

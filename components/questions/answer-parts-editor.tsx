@@ -200,7 +200,7 @@ function PartCard({
                 onClick={() => handleToleranceModeChange('decimal')}
                 className={`px-3 py-1.5 font-medium transition-colors ${
                   toleranceMode === 'decimal'
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-card text-muted-foreground hover:bg-muted'
                 }`}
               >
@@ -211,7 +211,7 @@ function PartCard({
                 onClick={() => handleToleranceModeChange('percent')}
                 className={`px-3 py-1.5 font-medium transition-colors ${
                   toleranceMode === 'percent'
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-card text-muted-foreground hover:bg-muted'
                 }`}
               >

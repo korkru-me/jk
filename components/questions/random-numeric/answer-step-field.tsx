@@ -34,7 +34,7 @@ export function AnswerStepField({ value, onChange }: { value: number; onChange: 
             onClick={() => onChange(p.value)}
             className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
               (p.value === 0 && isOff) || (!isOff && Math.abs(value - p.value) < 1e-9)
-                ? 'bg-primary text-white border-primary'
+                ? 'bg-primary text-primary-foreground border-primary'
                 : 'bg-card text-muted-foreground border-border hover:border-primary/20 hover:text-primary'
             }`}
           >

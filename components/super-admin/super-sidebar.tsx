@@ -101,7 +101,7 @@ export function SuperSidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all',
                 active
-                  ? 'bg-primary text-white shadow-md shadow-primary/50'
+                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/50'
                   : 'text-muted-foreground hover:bg-surface-inverse-border hover:text-surface-inverse-muted',
                 collapsed && 'justify-center px-2',
               )}

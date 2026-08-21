@@ -23,7 +23,7 @@ export function LandingNavbar() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-white shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-sm">
             K
           </div>
           <div className="flex items-center gap-2">
@@ -43,7 +43,7 @@ export function LandingNavbar() {
               className={cn(
                 'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 pathname === link.href
-                  ? 'bg-muted text-foreground dark:text-white'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:text-white',
               )}
             >
@@ -72,7 +72,7 @@ export function LandingNavbar() {
           </Link>
           <Link
             href="/signup"
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors shadow-sm"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
           >
             สมัครสมาชิก
           </Link>
@@ -125,7 +125,7 @@ export function LandingNavbar() {
             <Link
               href="/signup"
               onClick={() => setMobileOpen(false)}
-              className="flex-1 rounded-lg bg-primary py-2.5 text-center text-sm font-semibold text-white"
+              className="flex-1 rounded-lg bg-primary py-2.5 text-center text-sm font-semibold text-primary-foreground"
             >
               สมัครสมาชิก
             </Link>

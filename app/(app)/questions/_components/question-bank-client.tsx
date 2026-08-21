@@ -153,7 +153,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
               {opt.count > 0 && (
                 <span className={cn(
                   'text-[10px] font-bold rounded-full px-1.5 leading-[18px]',
-                  scope === opt.value ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                  scope === opt.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 )}>
                   {opt.count}
                 </span>
@@ -195,7 +195,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
             <SlidersHorizontal className="w-3.5 h-3.5" />
             กรอง
             {activeFilterCount > 0 && (
-              <span className="bg-primary text-white text-[10px] font-bold rounded-full px-1.5 leading-[18px]">
+              <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full px-1.5 leading-[18px]">
                 {activeFilterCount}
               </span>
             )}
@@ -271,7 +271,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                     onClick={() => setActiveTag(activeTag === tag ? null : tag)}
                     className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
                       activeTag === tag
-                        ? 'bg-primary text-white border-primary'
+                        ? 'bg-primary text-primary-foreground border-primary'
                         : 'border-border text-muted-foreground hover:border-primary/20 hover:text-primary'
                     }`}
                   >

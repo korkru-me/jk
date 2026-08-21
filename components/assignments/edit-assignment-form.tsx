@@ -224,7 +224,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
                   type="button"
                   onClick={() => setPassingType(t)}
                   className={`px-3 py-2 text-xs font-medium transition-all ${
-                    passingType === t ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
+                    passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
@@ -333,7 +333,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
                   type="button"
                   onClick={() => setScoreStrategy(s)}
                   className={`px-3 py-2 text-xs font-medium transition-all ${
-                    scoreStrategy === s ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
+                    scoreStrategy === s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {SCORE_STRATEGY_LABELS[s]}

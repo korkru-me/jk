@@ -297,7 +297,7 @@ export function MarketingGrowth() {
               rows={3}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="พิมพ์ข้อความที่จะแสดงเป็นแบนเนอร์บนหน้าจอของผู้ใช้ทุกคน" className="mt-1 w-full text-foreground dark:text-white dark:placeholder:text-muted-foreground"
+              placeholder="พิมพ์ข้อความที่จะแสดงเป็นแบนเนอร์บนหน้าจอของผู้ใช้ทุกคน" className="mt-1 w-full text-foreground dark:placeholder:text-muted-foreground"
             />
           </div>
 
@@ -305,7 +305,7 @@ export function MarketingGrowth() {
             <button
               onClick={handleSendAnnouncement}
               disabled={!newMessage.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="h-4 w-4" />
               ส่งประกาศทันที

@@ -43,8 +43,15 @@ const SKIP_FILES = [
 
 const HUES =
   'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose'
+
+/**
+ * `white` and `black` are counted alongside the numbered palette. Text set to
+ * literal white does not follow the theme: on a preset with a lighter primary
+ * it fails contrast, which is exactly how the playful preset broke. Use the
+ * matching -foreground token instead.
+ */
 const PALETTE = new RegExp(
-  String.raw`\b(?:bg|text|border|ring|divide|from|to|via|shadow|outline|decoration|accent|caret|fill|stroke)-(?:${HUES})-\d{2,3}\b`,
+  String.raw`\b(?:bg|text|border|ring|divide|from|to|via|shadow|outline|decoration|accent|caret|fill|stroke)-(?:(?:${HUES})-\d{2,3}|white|black)(?:\/\d+)?\b`,
   'g'
 )
 const CLASS_ATTR = /className="([^"]*)"/g

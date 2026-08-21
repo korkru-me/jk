@@ -80,7 +80,7 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <X className="w-3 h-3" />
           </button>

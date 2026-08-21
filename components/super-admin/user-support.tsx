@@ -371,7 +371,7 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
                 {ticket.message}
               </p>
               <div className="mt-3 flex gap-2">
-                <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 transition-colors">
+                <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
                   ตอบกลับ
                 </button>
                 <button className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">
@@ -431,7 +431,7 @@ export function UserSupport() {
           <Input
             value={userSearch}
             onChange={(e) => setUserSearch(e.target.value)}
-            placeholder="ค้นหาชื่อ อีเมล หรือ Tenant" className="w-full max-w-sm pl-9 pr-4 text-foreground dark:text-white dark:placeholder:text-muted-foreground"
+            placeholder="ค้นหาชื่อ อีเมล หรือ Tenant" className="w-full max-w-sm pl-9 pr-4 text-foreground dark:placeholder:text-muted-foreground"
           />
         </div>
 

@@ -170,7 +170,7 @@ export function ScoreOverrideModal({
                 disabled={saved}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-xl transition-all ${
                   saved
-                    ? 'bg-success text-white'
+                    ? 'bg-success text-success-foreground'
                     : 'bg-foreground text-background hover:bg-foreground'
                 }`}
               >

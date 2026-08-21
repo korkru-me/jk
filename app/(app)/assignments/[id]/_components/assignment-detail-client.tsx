@@ -101,38 +101,38 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
                 <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
                 {statusMeta.label}
               </span>
-              <span className="text-xs text-muted-foreground border border-white/20 px-2.5 py-1 rounded-full">
+              <span className="text-xs text-surface-inverse-muted border border-surface-inverse-border px-2.5 py-1 rounded-full">
                 {a.mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์'}
               </span>
             </div>
             <h1 className="text-2xl font-bold leading-tight">{a.title}</h1>
-            {a.classrooms?.name && <p className="text-muted-foreground text-sm mt-1">{a.classrooms.name}</p>}
-            {a.description && <p className="text-muted-foreground text-sm mt-1">{a.description}</p>}
+            {a.classrooms?.name && <p className="text-surface-inverse-muted text-sm mt-1">{a.classrooms.name}</p>}
+            {a.description && <p className="text-surface-inverse-muted text-sm mt-1">{a.description}</p>}
 
             {/* Quick stats */}
             <div className="flex items-center gap-5 mt-4 text-sm">
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-muted-foreground" />
+                <FileText className="w-4 h-4 text-surface-inverse-muted" />
                 <span className="font-semibold">{a.question_ids.length}</span>
-                <span className="text-muted-foreground">ข้อ</span>
+                <span className="text-surface-inverse-muted">ข้อ</span>
               </div>
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-muted-foreground" />
+                <Users className="w-4 h-4 text-surface-inverse-muted" />
                 <span className="font-semibold">{submittedSubs.length}</span>
-                <span className="text-muted-foreground">ส่งแล้ว</span>
+                <span className="text-surface-inverse-muted">ส่งแล้ว</span>
               </div>
               {a.duration_minutes && (
                 <div className="flex items-center gap-2">
-                  <Timer className="w-4 h-4 text-muted-foreground" />
+                  <Timer className="w-4 h-4 text-surface-inverse-muted" />
                   <span className="font-semibold">{a.duration_minutes}</span>
-                  <span className="text-muted-foreground">นาที</span>
+                  <span className="text-surface-inverse-muted">นาที</span>
                 </div>
               )}
               {avgScore !== null && (
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                  <TrendingUp className="w-4 h-4 text-surface-inverse-muted" />
                   <span className="font-semibold">{avgScore}%</span>
-                  <span className="text-muted-foreground">เฉลี่ย</span>
+                  <span className="text-surface-inverse-muted">เฉลี่ย</span>
                 </div>
               )}
             </div>
@@ -143,13 +143,13 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             <div className="shrink-0 text-right">
               {a.start_at && (
                 <div className="mb-1">
-                  <p className="text-xs text-muted-foreground">เปิด</p>
+                  <p className="text-xs text-surface-inverse-muted">เปิด</p>
                   <p className="text-sm font-medium">{new Date(a.start_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}</p>
                 </div>
               )}
               {a.end_at && (
                 <div>
-                  <p className="text-xs text-muted-foreground">ปิด</p>
+                  <p className="text-xs text-surface-inverse-muted">ปิด</p>
                   <p className="text-sm font-medium">{new Date(a.end_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}</p>
                 </div>
               )}
@@ -158,7 +158,7 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
         </div>
 
         {/* Actions row */}
-        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-white/10 flex-wrap">
+        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-surface-inverse-border flex-wrap">
           {a.status === 'draft' && (
             <Button onClick={publish} disabled={isPending} size="sm" className="gap-1.5 bg-success hover:bg-success/90 border-0">
               <Play className="w-3.5 h-3.5" /> เผยแพร่
@@ -171,42 +171,42 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
           )}
           {a.mode === 'print' && (
             <Link href={`/assignments/${a.id}/print`} target="_blank">
-              <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
+              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
                 <Printer className="w-3.5 h-3.5" /> พิมพ์ใบงาน
               </Button>
             </Link>
           )}
           {a.mode === 'online' && a.question_ids.length > 0 && (
             <Link href={`/assignments/${a.id}/preview`} target="_blank">
-              <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
+              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
                 <Eye className="w-3.5 h-3.5" /> ดูตัวอย่างมุมมองนักเรียน
               </Button>
             </Link>
           )}
           <Link href={`/assignments/${a.id}/edit`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
+            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
               <Pencil className="w-3.5 h-3.5" /> แก้ไขรายละเอียด
             </Button>
           </Link>
           <Link href={`/assignments/${a.id}/results`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
+            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
               <BarChart2 className="w-3.5 h-3.5" /> ดูคำตอบ &amp; คะแนน
             </Button>
           </Link>
           <Link href={`/assignments/${a.id}/analytics`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
+            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
               <TrendingUp className="w-3.5 h-3.5" /> วิเคราะห์เชิงลึก
             </Button>
           </Link>
           <Link href={`/assignments/${a.id}/export`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-white/20 text-white hover:bg-card/10 hover:text-white bg-transparent">
+            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
               <Settings className="w-3.5 h-3.5" /> ส่งออก &amp; พิมพ์
             </Button>
           </Link>
           <button
             onClick={handleDuplicate}
             disabled={isPending}
-            className="ml-auto flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors disabled:opacity-50"
+            className="ml-auto flex items-center gap-1.5 text-xs text-surface-inverse-foreground/70 hover:text-surface-inverse-foreground transition-colors disabled:opacity-50"
           >
             <Copy className="w-3.5 h-3.5" /> ทำสำเนา
           </button>

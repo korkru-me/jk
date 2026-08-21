@@ -38,7 +38,7 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
             onClick={() => setSelectedCategory('all')}
             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
               selectedCategory === 'all'
-                ? 'bg-primary text-white border-primary'
+                ? 'bg-primary text-primary-foreground border-primary'
                 : 'border-border hover:border-primary'
             }`}
           >
@@ -51,7 +51,7 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
               onClick={() => setSelectedCategory(id)}
               className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                 selectedCategory === id
-                  ? 'bg-primary text-white border-primary'
+                  ? 'bg-primary text-primary-foreground border-primary'
                   : 'border-border hover:border-primary'
               }`}
             >
@@ -93,7 +93,7 @@ export function MethodPresets({ presets, variables, value, unit, onSelect }: Met
                       ''
                     )
                   }
-                  className="shrink-0 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  className="shrink-0 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   เลือก
                 </button>

@@ -91,7 +91,7 @@ export function UnitField({ value, onChange }: { value: string; onChange: (v: st
           onClick={() => setShowPicker(s => !s)}
           className={`text-xs border rounded px-2 py-1 transition-colors shrink-0 ${
             showPicker
-              ? 'bg-primary text-white border-primary'
+              ? 'bg-primary text-primary-foreground border-primary'
               : 'text-primary border-primary/20 hover:bg-primary/10'
           }`}
         >

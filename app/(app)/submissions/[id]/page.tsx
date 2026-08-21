@@ -288,7 +288,7 @@ export default async function SubmissionResultPage({
               {canRetry && (
                 <Link
                   href={`/assignments/${submission.assignment_id}/take`}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-semibold px-4 py-2 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-4 py-2 transition-colors"
                 >
                   <RotateCcw size={15} />
                   {assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}

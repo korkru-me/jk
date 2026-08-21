@@ -468,7 +468,7 @@ function SubQuestionCard({
           </button>
         </div>
 
-        <div className="w-7 h-7 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center shrink-0">
+        <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center shrink-0">
           {index + 1}
         </div>
 

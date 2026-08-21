@@ -281,7 +281,7 @@ function MembersList({
 
         return (
           <div key={m.userId} className="flex items-center gap-3 px-4 py-3 bg-card">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
               {m.fullName ? m.fullName.charAt(0) : m.email.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">

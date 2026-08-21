@@ -7,7 +7,7 @@ export function LandingFooter() {
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           <div className="col-span-2 sm:col-span-1">
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
                 K
               </div>
               <span className="font-bold text-foreground">KorKru</span>

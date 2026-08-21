@@ -31,7 +31,7 @@ export function HeroSection() {
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link
             href="/signup"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-4 text-base font-semibold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all hover:shadow-primary/40 hover:-translate-y-0.5"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all hover:shadow-primary/40 hover:-translate-y-0.5"
           >
             เริ่มต้นทดสอบการใช้งาน
             <ArrowRight className="h-4 w-4" />

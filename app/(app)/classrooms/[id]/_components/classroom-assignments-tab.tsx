@@ -120,7 +120,7 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
         ))}
         <Link
           href={`/assignments/new?classroom=${classroomId}`}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-semibold transition-colors"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-colors"
         >
           <Plus className="w-3.5 h-3.5" /> มอบหมายงานใหม่
         </Link>

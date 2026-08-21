@@ -398,7 +398,7 @@ export function TenantManager() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อสถาบัน หรือ Domain" className="w-full pl-9 pr-4 text-foreground dark:text-white dark:placeholder:text-muted-foreground dark:focus:border-primary dark:focus:ring-primary/40"
+            placeholder="ค้นหาชื่อสถาบัน หรือ Domain" className="w-full pl-9 pr-4 text-foreground dark:placeholder:text-muted-foreground dark:focus:border-primary dark:focus:ring-primary/40"
           />
         </div>
         <NativeSelect

@@ -58,7 +58,7 @@ export function UpcomingTasks() {
                 onClick={() => toggle(task.id)}
                 className={`mt-0.5 w-4.5 h-4.5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
                   isDone
-                    ? 'bg-success border-success text-white'
+                    ? 'bg-success border-success text-success-foreground'
                     : 'border-border hover:border-success'
                 }`}
               >

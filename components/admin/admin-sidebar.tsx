@@ -30,7 +30,7 @@ export function AdminSidebar() {
             className={cn(
               'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
               pathname.startsWith(item.href)
-                ? 'bg-primary text-white font-medium'
+                ? 'bg-primary text-primary-foreground font-medium'
                 : 'text-muted-foreground hover:bg-muted'
             )}
           >

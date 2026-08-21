@@ -105,7 +105,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         {/* User info */}
         <div className="p-4 border-t shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
               {fullName.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">

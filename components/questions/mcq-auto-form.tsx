@@ -456,7 +456,7 @@ function EquationSection({
                     disabled={solving}
                     className={`font-mono text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-150 disabled:opacity-60 ${
                       name === answerVarName
-                        ? 'bg-success text-white border-success shadow-md'
+                        ? 'bg-success text-success-foreground border-success shadow-md'
                         : 'bg-card text-muted-foreground border-border hover:border-success hover:text-success hover:bg-success/10'
                     }`}
                   >

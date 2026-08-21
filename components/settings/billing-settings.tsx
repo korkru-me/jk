@@ -207,7 +207,7 @@ export function BillingSettings() {
                     <button
                       type="button"
                       onClick={handleCancelSubscription}
-                      className="text-xs px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg transition-colors font-medium"
+                      className="text-xs px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors font-medium"
                     >
                       ยืนยันยกเลิก
                     </button>

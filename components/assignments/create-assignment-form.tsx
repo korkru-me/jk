@@ -243,8 +243,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           <div key={i} className="flex items-start flex-1 last:flex-none">
             <div className="flex flex-col items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                i < step  ? 'bg-primary text-white' :
-                i === step ? 'bg-primary text-white ring-4 ring-primary/20' :
+                i < step  ? 'bg-primary text-primary-foreground' :
+                i === step ? 'bg-primary text-primary-foreground ring-4 ring-primary/20' :
                 'bg-muted text-muted-foreground'
               }`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
@@ -316,7 +316,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                          isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                         }`}>
                           <BookOpen className="w-4 h-4" />
                         </div>
@@ -537,7 +537,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                       type="button"
                       onClick={() => setPassingType(t)}
                       className={`px-3 py-2 text-xs font-medium transition-all ${
-                        passingType === t ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
+                        passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
@@ -681,7 +681,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     type="button"
                     onClick={() => setScoreStrategy(s)}
                     className={`px-3 py-2 text-xs font-medium transition-all ${
-                      scoreStrategy === s ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'
+                      scoreStrategy === s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
                     }`}
                   >
                     {SCORE_STRATEGY_LABELS[s]}

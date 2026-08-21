@@ -272,7 +272,7 @@ export function PricingTable() {
               )}
             >
               {plan.badge && (
-                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-white">
+                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-primary-foreground">
                   {plan.badge}
                 </span>
               )}
@@ -305,7 +305,7 @@ export function PricingTable() {
                 className={cn(
                   'mb-6 block w-full rounded-xl py-3 text-center text-sm font-semibold transition-colors',
                   plan.highlighted
-                    ? 'bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/20'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20'
                     : 'border border-border text-muted-foreground hover:bg-muted',
                 )}
               >

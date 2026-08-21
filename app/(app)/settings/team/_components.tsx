@@ -199,7 +199,7 @@ function MemberList({ members }: { members: TeamOrgMember[] }) {
           {members.map((m) => (
             <tr key={m.userId}>
               <td className="px-4 py-3 flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold shrink-0">
                   {m.fullName ? m.fullName.charAt(0) : m.email.charAt(0)}
                 </div>
                 <span className="truncate">{m.fullName || '(ไม่มีชื่อ)'}</span>

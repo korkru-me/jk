@@ -183,7 +183,7 @@ function BundleCard({ bundle, onPush }: { bundle: MasterBundle; onPush: (id: str
         {bundle.status !== 'pushed' && (
           <button
             onClick={() => onPush(bundle.id)}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Send className="h-3.5 w-3.5" />
             Push to Public Bank
@@ -287,7 +287,7 @@ export function MasterContent() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อชุด, วิชา, หรือ Tag" className="w-full pl-9 pr-4 text-foreground dark:text-white dark:placeholder:text-muted-foreground"
+            placeholder="ค้นหาชื่อชุด, วิชา, หรือ Tag" className="w-full pl-9 pr-4 text-foreground dark:placeholder:text-muted-foreground"
           />
         </div>
         <NativeSelect
@@ -303,7 +303,7 @@ export function MasterContent() {
         </NativeSelect>
         <button
           onClick={() => setShowCreateForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Plus className="h-4 w-4" />
           สร้างชุดใหม่
@@ -322,7 +322,7 @@ export function MasterContent() {
                 ชื่อชุดข้อสอบ
               </label>
               <Input
-                placeholder="เช่น ชุดข้อสอบฟิสิกส์มาตรฐาน ม.6 ภาค 1" className="mt-1 w-full text-foreground dark:text-white dark:placeholder:text-muted-foreground"
+                placeholder="เช่น ชุดข้อสอบฟิสิกส์มาตรฐาน ม.6 ภาค 1" className="mt-1 w-full text-foreground dark:placeholder:text-muted-foreground"
               />
             </div>
             <div>
@@ -343,12 +343,12 @@ export function MasterContent() {
               </label>
               <Textarea
                 rows={3}
-                placeholder="อธิบายเนื้อหาและขอบเขตของชุดข้อสอบนี้" className="mt-1 w-full text-foreground dark:text-white dark:placeholder:text-muted-foreground"
+                placeholder="อธิบายเนื้อหาและขอบเขตของชุดข้อสอบนี้" className="mt-1 w-full text-foreground dark:placeholder:text-muted-foreground"
               />
             </div>
           </div>
           <div className="flex gap-2">
-            <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
+            <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
               บันทึก Draft
             </button>
             <button
@@ -396,7 +396,7 @@ export function MasterContent() {
             <div className="mt-5 flex gap-3">
               <button
                 onClick={confirmPush}
-                className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+                className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 ยืนยัน Push
               </button>

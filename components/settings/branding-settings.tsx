@@ -78,7 +78,7 @@ function DropZone({
           <button
             type="button"
             onClick={onClear}
-            className="flex items-center gap-1.5 text-xs bg-destructive text-white px-3 py-1.5 rounded-lg font-medium hover:bg-destructive/90 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-destructive text-destructive-foreground px-3 py-1.5 rounded-lg font-medium hover:bg-destructive/90 transition-colors"
           >
             <X size={12} /> ลบ
           </button>

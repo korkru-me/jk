@@ -10,7 +10,7 @@ export function QuickCreate() {
       <p className="text-sm font-semibold text-foreground">สร้างด่วน</p>
       <Link
         href="/questions/new"
-        className="flex items-center gap-3 w-full bg-foreground hover:bg-foreground text-white rounded-xl px-4 py-3 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 group"
+        className="flex items-center gap-3 w-full bg-foreground hover:bg-foreground text-background rounded-xl px-4 py-3 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 group"
       >
         <div className="w-8 h-8 bg-card/10 rounded-lg flex items-center justify-center shrink-0">
           <Plus className="w-4 h-4" />

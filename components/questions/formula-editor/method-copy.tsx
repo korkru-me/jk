@@ -73,7 +73,7 @@ export function MethodCopy({ variables, value, unit, onSelect }: MethodCopyProps
                         q.answer_unit ?? ''
                       )
                     }
-                    className="shrink-0 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    className="shrink-0 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                   >
                     ใช้สูตรนี้
                   </button>

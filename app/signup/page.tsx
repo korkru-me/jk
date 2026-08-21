@@ -10,7 +10,7 @@ export default function SignupPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
       {/* Logo mark */}
       <Link href="/" className="mb-8 flex items-center gap-2.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-white shadow-md">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-md">
           K
         </div>
         <div>

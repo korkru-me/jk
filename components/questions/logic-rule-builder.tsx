@@ -87,7 +87,7 @@ export function LogicRuleBuilder({ rules, variables, onChange }: Props) {
               onClick={() => updateRule(rule.id, { rhs_type: 'variable' })}
               className={`px-2 py-1.5 font-medium transition-colors ${
                 rule.rhs_type === 'variable'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-card text-muted-foreground hover:bg-muted'
               }`}
             >
@@ -98,7 +98,7 @@ export function LogicRuleBuilder({ rules, variables, onChange }: Props) {
               onClick={() => updateRule(rule.id, { rhs_type: 'constant' })}
               className={`px-2 py-1.5 font-medium transition-colors ${
                 rule.rhs_type === 'constant'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-card text-muted-foreground hover:bg-muted'
               }`}
             >

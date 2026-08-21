@@ -57,14 +57,14 @@ export function InlineConditionPanel({ varName, allVars, rules, onRulesChange }:
             <button
               type="button"
               onClick={() => updateRule(rule.id, { rhs_type: 'variable' })}
-              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'variable' ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'variable' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'}`}
             >
               ตัวแปร
             </button>
             <button
               type="button"
               onClick={() => updateRule(rule.id, { rhs_type: 'constant' })}
-              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'constant' ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+              className={`px-2 py-1 font-medium transition-colors ${rule.rhs_type === 'constant' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'}`}
             >
               ค่า
             </button>

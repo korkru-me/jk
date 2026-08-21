@@ -266,7 +266,7 @@ function StudentDashboard({
             <h2 className="font-semibold flex items-center gap-2">
               <BookOpen size={16} className="text-primary" />
               ชุดข้อสอบที่รอทำ
-              <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 {pendingAssignments.length}
               </span>
             </h2>

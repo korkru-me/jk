@@ -571,7 +571,7 @@ function StepIndicator({
                 className={cn(
                   'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-all duration-300',
                   done
-                    ? 'bg-primary border-primary text-white dark:bg-primary dark:border-primary cursor-pointer hover:bg-primary/90 hover:border-primary hover:scale-105'
+                    ? 'bg-primary border-primary text-primary-foreground dark:bg-primary dark:border-primary cursor-pointer hover:bg-primary/90 hover:border-primary hover:scale-105'
                     : active
                     ? 'border-primary text-primary bg-primary/10 dark:border-primary'
                     : 'border-border text-muted-foreground bg-background cursor-default',
@@ -1157,7 +1157,7 @@ export function CreateCourseWizard() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={!isNextEnabled}
-                className="bg-success hover:bg-success/90 disabled:bg-success/40 text-white min-w-[160px]"
+                className="bg-success hover:bg-success/90 disabled:bg-success/40 text-success-foreground min-w-[160px]"
               >
                 <Check className="w-4 h-4 mr-1.5" />
                 {isPending ? 'กำลังสร้างห้องเรียน...' : 'ยืนยันสร้างห้องเรียน'}

@@ -501,7 +501,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             </Button>
           ) : (
             <Button
-              className="flex-1 bg-success hover:bg-success/90 text-white border-0"
+              className="flex-1 bg-success hover:bg-success/90 text-success-foreground border-0"
               onClick={openSubmitDialog}
             >
               ส่งคำตอบ ✓
@@ -616,7 +616,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         <Button
           onClick={openSubmitDialog}
           disabled={submitting}
-          className="w-full bg-success hover:bg-success/90 text-white border-0"
+          className="w-full bg-success hover:bg-success/90 text-success-foreground border-0"
         >
           {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
         </Button>
@@ -652,7 +652,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             </p>
             <button
               onClick={enterFullscreen}
-              className="bg-destructive hover:bg-destructive/90 text-white font-bold px-8 py-3 rounded-xl transition-colors flex items-center gap-2 mx-auto"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold px-8 py-3 rounded-xl transition-colors flex items-center gap-2 mx-auto"
             >
               <Maximize size={18} />
               กลับสู่โหมดเต็มจอ
@@ -664,7 +664,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
       {/* ── Tab switch warning toast ───────────────────────────────────────── */}
       {showTabWarning && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] bg-destructive text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] bg-destructive text-destructive-foreground px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
           <ShieldAlert size={16} />
           ตรวจพบการสลับแท็บ — ครั้งที่ {tabSwitchCount}
         </div>
@@ -823,7 +823,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                 กลับไปตรวจ
               </Button>
               <Button
-                className="flex-1 bg-success hover:bg-success/90 text-white border-0 transition-all"
+                className="flex-1 bg-success hover:bg-success/90 text-success-foreground border-0 transition-all"
                 onClick={() => { setShowSubmitConfirm(false); handleSubmit() }}
                 disabled={submitting || submitCountdown > 0}
               >
@@ -885,7 +885,7 @@ function PreviewResultSummary({
         </div>
         <a
           href={returnHref}
-          className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-semibold px-4 py-2 transition-colors"
+          className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-4 py-2 transition-colors"
         >
           กลับไปหน้าชุดข้อสอบ
         </a>

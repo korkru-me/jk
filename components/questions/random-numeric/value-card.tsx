@@ -60,14 +60,14 @@ export function ValueCard({ v, index, onUpdate, onRemove, logicRules, onLogicRul
                   <button
                     type="button"
                     onClick={() => onUpdate(index, 'is_constant', false)}
-                    className={`px-3 py-1 font-medium transition-colors ${!isConstant ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+                    className={`px-3 py-1 font-medium transition-colors ${!isConstant ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'}`}
                   >
                     สุ่ม
                   </button>
                   <button
                     type="button"
                     onClick={() => onUpdate(index, 'is_constant', true)}
-                    className={`px-3 py-1 font-medium transition-colors ${isConstant ? 'bg-flag text-white' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+                    className={`px-3 py-1 font-medium transition-colors ${isConstant ? 'bg-flag text-flag-foreground' : 'bg-card text-muted-foreground hover:bg-muted'}`}
                   >
                     ค่าคงที่
                   </button>

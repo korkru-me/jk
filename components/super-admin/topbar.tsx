@@ -121,7 +121,7 @@ export function SuperTopbar() {
         )}
         {!mounted && <div className="h-8 w-8" />}
 
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
           SA
         </div>
       </div>

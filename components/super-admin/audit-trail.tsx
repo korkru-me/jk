@@ -290,7 +290,7 @@ export function AuditTrail() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหา Email, Action, IP, Resource" className="w-full pl-9 pr-4 text-foreground dark:text-white dark:placeholder:text-muted-foreground"
+            placeholder="ค้นหา Email, Action, IP, Resource" className="w-full pl-9 pr-4 text-foreground dark:placeholder:text-muted-foreground"
           />
         </div>
         {[

@@ -77,7 +77,7 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
         {/* User dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted transition-colors outline-none">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
               {user.full_name.charAt(0)}
             </div>
             <span className="text-sm hidden sm:block">{user.full_name}</span>

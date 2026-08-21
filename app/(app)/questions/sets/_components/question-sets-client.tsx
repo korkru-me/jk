@@ -85,7 +85,7 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
                 {opt.count > 0 && (
                   <span className={cn(
                     'text-[10px] font-bold rounded-full px-1.5 leading-[18px]',
-                    scope === opt.value ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                    scope === opt.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                   )}>
                     {opt.count}
                   </span>
@@ -113,7 +113,7 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
                     onClick={() => setActiveTag(activeTag === tag ? null : tag)}
                     className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
                       activeTag === tag
-                        ? 'bg-primary text-white border-primary'
+                        ? 'bg-primary text-primary-foreground border-primary'
                         : 'border-border text-muted-foreground hover:border-primary/20 hover:text-primary'
                     }`}
                   >

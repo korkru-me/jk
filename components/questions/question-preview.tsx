@@ -356,7 +356,7 @@ export function QuestionPreviewContent({
               type="button"
               onClick={() => setMcqChecked(true)}
               disabled={selectedMcq === null}
-              className="mt-1 px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+              className="mt-1 px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
             >
               ตรวจคำตอบ
             </button>
@@ -469,7 +469,7 @@ export function QuestionPreviewContent({
               type="button"
               onClick={() => setMatchingChecked(true)}
               disabled={!allMatchingFilled}
-              className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+              className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
             >
               ตรวจคำตอบ
             </button>
@@ -607,7 +607,7 @@ export function QuestionPreviewContent({
               type="button"
               onClick={checkWritten}
               disabled={!allWrittenFilled}
-              className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+              className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
             >
               ตรวจคำตอบ
             </button>
@@ -722,7 +722,7 @@ export function QuestionPreviewContent({
               <button
                 type="button"
                 onClick={() => setTfChecked(true)}
-                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 font-medium transition-colors"
+                className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 font-medium transition-colors"
               >
                 ตรวจคำตอบ
               </button>
@@ -807,7 +807,7 @@ export function QuestionPreviewContent({
                 type="button"
                 onClick={() => setTfChecked(true)}
                 disabled={tfAnswers.some(a => a === null)}
-                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
               >
                 ตรวจคำตอบ
               </button>
@@ -919,7 +919,7 @@ export function QuestionPreviewContent({
                       setFillChecked(true)
                     }}
                     disabled={autoIdx.some(i => !fillAnswers[i]?.trim())}
-                    className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                    className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
                   >
                     ตรวจคำตอบ
                   </button>
@@ -1004,7 +1004,7 @@ export function QuestionPreviewContent({
                 type="button"
                 onClick={() => setOrderChecked(true)}
                 disabled={!allSelected || hasDuplicate}
-                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
+                className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
               >
                 ตรวจคำตอบ
               </button>
@@ -1165,7 +1165,7 @@ export function QuestionPreviewContent({
 
             {!compositeChecked ? (
               <button type="button" onClick={checkComposite}
-                className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 font-medium transition-colors">
+                className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 font-medium transition-colors">
                 ตรวจคำตอบ
               </button>
             ) : (() => {
@@ -1200,7 +1200,7 @@ export function QuestionPreview(props: QuestionPreviewProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+        className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
       >
         👁 ดูตัวอย่าง
       </button>
