@@ -113,11 +113,15 @@ function BulkAddButton() {
           </DialogHeader>
           <div className="space-y-2">
             <Label>หนึ่งบรรทัดต่อหนึ่งหมวด — ใช้ <code>/</code> คั่นเพื่อสร้างหมวดย่อย</Label>
+            {/* Textarea grows with its content (field-sizing-content), and a
+                pasted category tree runs to hundreds of lines — so it needs a
+                ceiling of its own, or it pushes the dialog's own scrolling to
+                its limit and buries the submit button. */}
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={12}
-              className="font-mono text-sm"
+              className="max-h-[45vh] overflow-y-auto font-mono text-sm"
               placeholder={'กลศาสตร์\nกลศาสตร์ / เวกเตอร์และการแตกแรง\nคลื่นกล / ส่วนประกอบคลื่น'}
               autoFocus
             />
