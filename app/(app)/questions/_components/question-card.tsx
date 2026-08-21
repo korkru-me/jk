@@ -17,6 +17,7 @@ import { cn, downloadTextFile } from '@/lib/utils'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import type { QuestionWithCategory } from '../page'
+import { questionExcerpt } from '@/lib/question-display'
 
 interface Props {
   question: QuestionWithCategory
@@ -153,7 +154,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             </button>
 
             {/* Question text preview */}
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{q.question_text}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{questionExcerpt(q.question_text)}</p>
 
             {/* Stats row — measured from graded attempts, so absent on a question
                 nobody has answered yet */}

@@ -15,6 +15,7 @@ import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { Assignment, Question } from '@/lib/types'
 import type { SubmissionRow } from '../page'
 import { Card } from '@/components/ui/card'
+import { questionExcerpt } from '@/lib/question-display'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
@@ -377,7 +378,7 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
               <span className="text-sm text-muted-foreground font-medium w-7 shrink-0 text-right">{i + 1}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">{q.question_text}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{questionExcerpt(q.question_text)}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${diff?.badge ?? 'bg-muted text-muted-foreground'}`}>

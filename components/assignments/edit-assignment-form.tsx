@@ -12,6 +12,7 @@ import { updateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import type { Assignment, Question, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { questionExcerpt } from '@/lib/question-display'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -148,7 +149,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
               <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{q.question_text}</p>
+                <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
               </div>
               <Input
                 type="number"

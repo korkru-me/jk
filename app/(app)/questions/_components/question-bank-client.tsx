@@ -19,6 +19,7 @@ import type { QuestionStats } from '@/lib/question-stats'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
 import type { QuestionDetailWithCategory, QuestionWithCategory, QuestionWithCreator } from '../page'
+import { questionExcerpt } from '@/lib/question-display'
 
 const PreviewModal = dynamic(
   () => import('./preview-modal').then(mod => mod.PreviewModal),
@@ -502,7 +503,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
       >
         {q.title}
       </button>
-      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{q.question_text}</p>
+      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{questionExcerpt(q.question_text)}</p>
 
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
         <span className="text-xs text-muted-foreground">
