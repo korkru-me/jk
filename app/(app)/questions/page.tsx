@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
 import { computeQuestionStats, type GradedAnswerRow, type QuestionStats } from '@/lib/question-stats'
 import { QuestionBankClient } from './_components/question-bank-client'
+import { escapeLike } from '@/lib/utils'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
 
@@ -108,27 +109,72 @@ async function fetchQuestionStats(
   return Object.fromEntries(computeQuestionStats(rows))
 }
 
-export default async function QuestionsPage() {
+/** Questions per page in the bank list. */
+export const QUESTIONS_PER_PAGE = 24
+
+export interface QuestionFilters {
+  q: string
+  type: string
+  difficulty: string
+  tag: string
+  page: number
+}
+
+function readFilters(sp: Record<string, string | string[] | undefined>): QuestionFilters {
+  const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '')
+  return {
+    q: one('q').trim(),
+    type: one('type') || 'all',
+    difficulty: one('difficulty') || 'all',
+    tag: one('tag'),
+    page: Math.max(1, Number(one('page')) || 1),
+  }
+}
+
+export default async function QuestionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const supabase = await createClient()
   const user = await getAuthUser()
   if (!user) redirect('/login')
 
+  const filters = readFilters(await searchParams)
+  const from = (filters.page - 1) * QUESTIONS_PER_PAGE
+
   const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, created_at'
-  const [{ rows: questions, error }, { data: membershipRows }] = await Promise.all([
-    fetchAllRows<Record<string, unknown>>((from, to) =>
-      supabase
-        .from('questions')
-        .select(`${summaryFields}, question_categories(name)`)
-        .eq('created_by', user.id)
-        .or('group_id.is.null,order_in_group.eq.0')
-        .order('created_at', { ascending: false })
-        .range(from, to)
-    ),
+
+  // Filtering and paging happen in the database rather than in the browser:
+  // the bank is already past a thousand questions, and shipping all of them on
+  // every visit only gets slower.
+  let ownQuery = supabase
+    .from('questions')
+    .select(`${summaryFields}, question_categories(name)`, { count: 'exact' })
+    .eq('created_by', user.id)
+    .or('group_id.is.null,order_in_group.eq.0')
+
+  if (filters.q) {
+    const term = `%${escapeLike(filters.q)}%`
+    ownQuery = ownQuery.or(`title.ilike.${term},question_text.ilike.${term}`)
+  }
+  if (filters.type !== 'all') ownQuery = ownQuery.eq('question_type', filters.type)
+  if (filters.difficulty !== 'all') ownQuery = ownQuery.eq('difficulty', filters.difficulty)
+  if (filters.tag) ownQuery = ownQuery.contains('tags', [filters.tag])
+
+  const [{ data: questions, error, count: ownTotal }, { data: membershipRows }, { count: unfilteredTotal }] = await Promise.all([
+    ownQuery.order('created_at', { ascending: false }).range(from, from + QUESTIONS_PER_PAGE - 1),
     supabase
       .from('organization_members')
       .select('org_role, organizations!inner(id, name, is_personal)')
       .eq('user_id', user.id)
       .eq('organizations.is_personal', false),
+    // The tab badge counts the whole bank, not the filtered slice.
+    supabase
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('created_by', user.id)
+      .or('group_id.is.null,order_in_group.eq.0'),
   ])
 
   if (error) console.error('[questions/page] query failed:', error)
@@ -141,14 +187,20 @@ export default async function QuestionsPage() {
 
   let teamQuestions: QuestionWithCreator[] = []
   if (teamOrgIds.length > 0) {
-    const [{ data: primaryData, error: primaryError }, { data: shareRows, error: shareError }] = await Promise.all([
-      supabase
-        .from('questions')
-        .select(`${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`)
-        .in('org_id', teamOrgIds)
-        .in('visibility', ['organization', 'school'])
-        .or('group_id.is.null,order_in_group.eq.0')
-        .order('created_at', { ascending: false }),
+    const [{ rows: primaryData, error: primaryError }, { data: shareRows, error: shareError }] = await Promise.all([
+      // The team tab is a union of org-owned and shared-in questions, which a
+      // single paged query can't order across — so it still loads in full,
+      // just without the silent 1,000-row cut-off.
+      fetchAllRows<Record<string, unknown>>((rangeFrom, rangeTo) =>
+        supabase
+          .from('questions')
+          .select(`${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`)
+          .in('org_id', teamOrgIds)
+          .in('visibility', ['organization', 'school'])
+          .or('group_id.is.null,order_in_group.eq.0')
+          .order('created_at', { ascending: false })
+          .range(rangeFrom, rangeTo)
+      ),
       supabase
         .from('question_shares')
         .select('question_id, org_id, organizations(name)')
@@ -197,6 +249,7 @@ export default async function QuestionsPage() {
   }
 
   const ownQuestions = (questions ?? []) as unknown as QuestionWithCategory[]
+  // Only the questions actually on screen need stats now.
   const stats = await fetchQuestionStats(
     supabase,
     [...ownQuestions, ...teamQuestions].map(q => q.id),
@@ -211,6 +264,10 @@ export default async function QuestionsPage() {
       hasMultipleTeams={teamOrgIds.length > 1}
       myTeams={myTeams.map(t => ({ id: t.id, name: t.name }))}
       currentUserId={user.id}
+      filters={filters}
+      matchCount={ownTotal ?? 0}
+      totalCount={unfilteredTotal ?? 0}
+      perPage={QUESTIONS_PER_PAGE}
     />
   )
 }

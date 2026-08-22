@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye,
@@ -41,19 +41,60 @@ interface Props {
   hasMultipleTeams: boolean
   myTeams: { id: string; name: string }[]
   currentUserId: string
+  /** Search and filters, as read from the URL by the page. */
+  filters: { q: string; type: string; difficulty: string; tag: string; page: number }
+  /** Questions matching the current filters — the number being paged through. */
+  matchCount: number
+  /** Every question the user owns, regardless of filters (for the tab badge). */
+  totalCount: number
+  perPage: number
 }
 
-export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId }: Props) {
+export function QuestionBankClient({
+  questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
+  filters, matchCount, totalCount, perPage,
+}: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [isPending, startTransition] = useTransition()
   const initialScopeParam = searchParams.get('tab')
   const [scope,        setScope]        = useState<'all' | 'mine' | 'team'>(
     initialScopeParam === 'mine' || initialScopeParam === 'team' ? initialScopeParam : 'all'
   )
-  const [search,       setSearch]       = useState('')
-  const [diffFilter,   setDiffFilter]   = useState('all')
-  const [typeFilter,   setTypeFilter]   = useState('all')
-  const [activeTag,    setActiveTag]    = useState<string | null>(null)
+
+  // The URL owns the search and filters, because the server does the filtering
+  // now — local state would only describe a list the server never sent.
+  const search = filters.q
+  const diffFilter = filters.difficulty
+  const typeFilter = filters.type
+  const activeTag = filters.tag || null
+  const totalPages = Math.max(1, Math.ceil(matchCount / perPage))
+
+  /** Rewrites the query string; any filter change starts again from page 1. */
+  function setParams(next: Record<string, string | null>, opts: { keepPage?: boolean } = {}) {
+    const params = new URLSearchParams(searchParams.toString())
+    for (const [key, value] of Object.entries(next)) {
+      if (value === null || value === '' || value === 'all') params.delete(key)
+      else params.set(key, value)
+    }
+    if (!opts.keepPage) params.delete('page')
+    startTransition(() => {
+      router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false })
+    })
+  }
+
+  // Typing shouldn't fire a query per keystroke, so the input keeps its own
+  // value and pushes it to the URL once the user pauses.
+  const [searchDraft, setSearchDraft] = useState(filters.q)
+  useEffect(() => { setSearchDraft(filters.q) }, [filters.q])
+  useEffect(() => {
+    if (searchDraft === filters.q) return
+    const timer = setTimeout(() => setParams({ q: searchDraft }), 350)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchDraft])
+
   const [viewMode,     setViewMode]     = useState<'list' | 'grid'>('list')
   const [previewQ,     setPreviewQ]     = useState<QuestionDetailWithCategory | null>(null)
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
@@ -82,13 +123,8 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
     })
   }
 
-  const filtered = useMemo(() => questions.filter(q => {
-    if (search && !q.title.toLowerCase().includes(search.toLowerCase()) && !q.question_text.toLowerCase().includes(search.toLowerCase())) return false
-    if (diffFilter !== 'all' && q.difficulty !== diffFilter) return false
-    if (typeFilter !== 'all' && q.question_type !== typeFilter) return false
-    if (activeTag && !(q.tags ?? []).includes(activeTag)) return false
-    return true
-  }), [questions, search, diffFilter, typeFilter, activeTag])
+  // `questions` is already the filtered page the server sent back.
+  const filtered = questions
 
   const activeFilterCount = [diffFilter !== 'all', typeFilter !== 'all', !!activeTag].filter(Boolean).length
 
@@ -106,13 +142,16 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
           <div>
             <h1 className="text-xl font-bold text-foreground">คลังโจทย์ของฉัน</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
+              {/* With a filter on, the count has to describe the list actually
+                  shown — otherwise it reads as the whole bank while the page
+                  holds a handful of matches. */}
               {scope === 'team'
                 ? `${filteredTeam.length} โจทย์`
-                : scope === 'all'
-                  ? `${questions.length + teamQuestions.length} โจทย์`
-                  : filtered.length !== questions.length
-                    ? `${filtered.length} จาก ${questions.length} โจทย์`
-                    : `${questions.length} โจทย์`}
+                : matchCount !== totalCount
+                  ? `${matchCount} จาก ${totalCount} โจทย์`
+                  : scope === 'all'
+                    ? `${totalCount + teamQuestions.length} โจทย์`
+                    : `${totalCount} โจทย์`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -137,8 +176,8 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
 
         <div className="inline-flex w-fit items-center rounded-lg bg-muted p-[3px] gap-0.5">
           {([
-            { value: 'all' as const, label: 'ทั้งหมด', count: questions.length + teamQuestions.length },
-            { value: 'mine' as const, label: 'ของฉัน', count: questions.length },
+            { value: 'all' as const, label: 'ทั้งหมด', count: totalCount + teamQuestions.length },
+            { value: 'mine' as const, label: 'ของฉัน', count: totalCount },
             { value: 'team' as const, label: 'แชร์ในทีม', count: teamQuestions.length },
           ]).map(opt => (
             <button
@@ -173,13 +212,13 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchDraft}
+              onChange={e => setSearchDraft(e.target.value)}
               className="pl-9 bg-card"
             />
-            {search && (
+            {searchDraft && (
               <button
-                onClick={() => setSearch('')}
+                onClick={() => setSearchDraft('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -228,7 +267,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                   {['all', 'easy', 'medium', 'hard', 'analytical'].map(d => (
                     <button
                       key={d}
-                      onClick={() => setDiffFilter(d)}
+                      onClick={() => setParams({ difficulty: d })}
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         diffFilter === d
                           ? 'bg-foreground text-background border-foreground'
@@ -247,7 +286,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                   {['all', ...Object.keys(TYPE_LABEL)].map(t => (
                     <button
                       key={t}
-                      onClick={() => setTypeFilter(t)}
+                      onClick={() => setParams({ type: t })}
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         typeFilter === t
                           ? 'bg-foreground text-background border-foreground'
@@ -269,7 +308,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
                 {TAGS.map(tag => (
                   <button
                     key={tag}
-                    onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                    onClick={() => setParams({ tag: activeTag === tag ? null : tag })}
                     className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
                       activeTag === tag
                         ? 'bg-primary text-primary-foreground border-primary'
@@ -284,7 +323,7 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
 
             {activeFilterCount > 0 && (
               <button
-                onClick={() => { setDiffFilter('all'); setTypeFilter('all'); setActiveTag(null) }}
+                onClick={() => setParams({ difficulty: null, type: null, tag: null })}
                 className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
               >
                 <X className="w-3 h-3" /> ล้างตัวกรองทั้งหมด
@@ -300,26 +339,26 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
             {diffFilter !== 'all' && (
               <span className="flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
                 {DIFF_META[diffFilter]?.label}
-                <button onClick={() => setDiffFilter('all')} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setParams({ difficulty: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
             {typeFilter !== 'all' && (
               <span className="flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
                 {TYPE_LABEL[typeFilter]}
-                <button onClick={() => setTypeFilter('all')} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setParams({ type: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
             {activeTag && (
               <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">
                 #{activeTag}
-                <button onClick={() => setActiveTag(null)} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setParams({ tag: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
           </div>
         )}
 
         {/* Question list */}
-        {questions.length === 0 ? (
+        {totalCount === 0 ? (
           <EmptyState />
         ) : filtered.length === 0 ? (
           <Card edge="ring" className="text-center py-16">
@@ -341,6 +380,20 @@ export function QuestionBankClient({ questions, stats, teamQuestions, hasTeamOrg
               />
             ))}
           </div>
+        )}
+
+        {totalPages > 1 && (
+          <Pagination
+            page={filters.page}
+            totalPages={totalPages}
+            isPending={isPending}
+            onGo={p => {
+              setParams({ page: String(p) }, { keepPage: true })
+              // The controls sit at the bottom of the list, so without this the
+              // next page opens scrolled to its end.
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+          />
         )}
           </div>
         )}
@@ -527,5 +580,64 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
         </div>
       </div>
     </Card>
+  )
+}
+
+
+/**
+ * Page controls for the bank.
+ *
+ * Shows the first and last page plus a window around the current one, so a
+ * bank of any size keeps the same handful of buttons. `isPending` comes from
+ * the transition that rewrites the URL, since navigation is what fetches the
+ * next page.
+ */
+function Pagination({ page, totalPages, isPending, onGo }: {
+  page: number
+  totalPages: number
+  isPending: boolean
+  onGo: (page: number) => void
+}) {
+  const window = new Set([1, totalPages, page, page - 1, page + 1])
+  const pages = [...window].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b)
+
+  return (
+    <nav className="flex items-center justify-center gap-1 pt-2" aria-label="หน้าของคลังโจทย์">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page <= 1 || isPending}
+        onClick={() => onGo(page - 1)}
+      >
+        ← ก่อนหน้า
+      </Button>
+
+      {pages.map((p, i) => (
+        <span key={p} className="flex items-center gap-1">
+          {i > 0 && pages[i - 1] !== p - 1 && (
+            <span className="px-1 text-sm text-muted-foreground">…</span>
+          )}
+          <Button
+            variant={p === page ? 'default' : 'ghost'}
+            size="sm"
+            disabled={isPending}
+            onClick={() => onGo(p)}
+            aria-current={p === page ? 'page' : undefined}
+            className="min-w-9"
+          >
+            {p}
+          </Button>
+        </span>
+      ))}
+
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page >= totalPages || isPending}
+        onClick={() => onGo(page + 1)}
+      >
+        ถัดไป →
+      </Button>
+    </nav>
   )
 }
