@@ -60,7 +60,17 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
   const studentAnswer = a.student_answer
   const correctAnswer = a.correct_answer ?? ''
 
-  if (q?.question_type === 'mcq') return studentAnswer
+  // An mcq answer is recorded as MCQ:<position>, so it has to be turned back
+  // into the option's words before a teacher reads it. Older answers stored
+  // the text itself and are shown as-is.
+  if (q?.question_type === 'mcq') {
+    const position = studentAnswer.startsWith('MCQ:') ? Number(studentAnswer.slice(4)) : NaN
+    if (Number.isInteger(position)) {
+      const option = (q.mcq_options as { text?: string }[] | null)?.[position]
+      return option?.text?.trim() || `ตัวเลือกที่ ${position + 1}`
+    }
+    return studentAnswer
+  }
 
   if (q?.question_type === 'file_upload') {
     try {

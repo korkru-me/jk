@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { gradeAnswer, naturalMaxScore, scaleScore, type GradableAnswer } from './assignment-attempt'
-import type { AnswerPart } from '@/lib/types'
+import { buildAssignmentAttempt, gradeAnswer, naturalMaxScore, scaleScore, type GradableAnswer } from './assignment-attempt'
+import type { AnswerPart, Assignment, Question } from '@/lib/types'
 
 /** A gradable answer with everything defaulted, so each test states only what it is about. */
 function answer(over: {
@@ -238,5 +238,137 @@ describe('gradeAnswer — file upload', () => {
     expect(upload(JSON.stringify([{ url: 'x', name: 'a.pdf', type: 'application/pdf' }]))).toMatchObject({ is_correct: true, score: 5 })
     expect(upload(JSON.stringify([]))).toMatchObject({ is_correct: false, score: 0 })
     expect(upload(null)).toMatchObject({ is_correct: false, score: 0 })
+  })
+})
+
+// ─── Multiple choice ─────────────────────────────────────────────────────────
+
+const assignment = {
+  question_ids: ['q1'],
+  shuffle_questions: false,
+  shuffle_options: false,
+  question_points: null,
+} as unknown as Assignment
+
+/** An mcq question shaped the way mcq-form.tsx saves one: the options carry
+ *  the answer and answer_formula stays empty. */
+function mcqQuestion(options: { text: string; is_correct: boolean }[]): Question {
+  return {
+    id: 'q1',
+    question_type: 'mcq',
+    answer_formula: '',
+    answer_parts: null,
+    variables: [],
+    logic_rules: [],
+    extra_data: {},
+    mcq_options: options,
+  } as unknown as Question
+}
+
+function gradeMcq(correctAnswer: string, student: string, maxScore = 1) {
+  return gradeAnswer(answer({ correct: correctAnswer, student, questionType: 'mcq', maxScore }))
+}
+
+describe('multiple choice, from attempt to grade', () => {
+  const options = [
+    { text: 'เวกเตอร์', is_correct: false },
+    { text: 'สเกลาร์', is_correct: true },
+    { text: 'มูลฐาน', is_correct: false },
+  ]
+
+  it('records which option is correct by position', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion(options)])
+    expect(skeleton.correct_answer).toBe('MCQ:1')
+  })
+
+  it('does not fall through to the numeric path', () => {
+    // An mcq question has no answer_formula. Without a branch of its own the
+    // attempt was stored as the string "undefined", and every answer counted
+    // as wrong.
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion(options)])
+    expect(skeleton.correct_answer).not.toBe('undefined')
+  })
+
+  it('credits the right option and refuses the others', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion(options)])
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:1')).toMatchObject({ is_correct: true, score: 1 })
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:0')).toMatchObject({ is_correct: false, score: 0 })
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:2')).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('tells apart two options that read the same', () => {
+    // Text comparison credited whichever matched first, so picking the wrong
+    // one of a duplicated pair scored.
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion([
+      { text: '10 m/s', is_correct: false },
+      { text: '10 m/s', is_correct: true },
+    ])])
+    expect(skeleton.correct_answer).toBe('MCQ:1')
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:0').is_correct).toBe(false)
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:1').is_correct).toBe(true)
+  })
+
+  it('distinguishes picture-only options, which carry no text at all', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion([
+      { text: '', is_correct: false },
+      { text: '', is_correct: false },
+      { text: '', is_correct: true },
+    ])])
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:2').is_correct).toBe(true)
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:0').is_correct).toBe(false)
+  })
+
+  it('is not fooled by an option whose text is a number', () => {
+    // "2" as an option must not be mistaken for the index 2.
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion([
+      { text: '2', is_correct: true },
+      { text: '4', is_correct: false },
+    ])])
+    expect(gradeMcq(skeleton.correct_answer, '2').is_correct).toBe(false)
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:0').is_correct).toBe(true)
+  })
+
+  it('scales to a custom point override', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion(options)])
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:1', 5).score).toBe(5)
+  })
+
+  it('leaves an attempt taken before the change grading the way it did', () => {
+    // Older attempts stored the option's text; they fall through to the text
+    // comparison rather than being re-interpreted as an index.
+    expect(gradeAnswer(answer({ correct: 'สเกลาร์', student: 'สเกลาร์', questionType: 'mcq' })).is_correct).toBe(true)
+  })
+
+  it('survives a question with no correct option marked', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [mcqQuestion([
+      { text: 'ก', is_correct: false },
+      { text: 'ข', is_correct: false },
+    ])])
+    expect(skeleton.correct_answer).toBe('')
+    expect(gradeMcq(skeleton.correct_answer, 'MCQ:0').is_correct).toBe(false)
+  })
+})
+
+describe('gradeAnswer — composite with an mcq part', () => {
+  it('scores the part by position, not by the option text', () => {
+    const result = gradeAnswer(answer({
+      correct: 'COMP:' + JSON.stringify([{ type: 'mcq', correct: 'MCQ:1', score: 2 }]),
+      student: JSON.stringify(['MCQ:1']),
+      questionType: 'composite',
+      extraData: { parts: [{ type: 'mcq', score: 2 }] },
+      maxScore: 2,
+    }))
+    expect(result).toMatchObject({ is_correct: true, score: 2 })
+  })
+
+  it('refuses a different position', () => {
+    const result = gradeAnswer(answer({
+      correct: 'COMP:' + JSON.stringify([{ type: 'mcq', correct: 'MCQ:1', score: 2 }]),
+      student: JSON.stringify(['MCQ:0']),
+      questionType: 'composite',
+      extraData: { parts: [{ type: 'mcq', score: 2 }] },
+      maxScore: 2,
+    }))
+    expect(result).toMatchObject({ is_correct: false, score: 0 })
   })
 })

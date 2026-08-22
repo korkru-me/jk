@@ -56,7 +56,7 @@ interface AnswerRow {
     // MCQ options for 'mcq'; for 'matching' this instead carries the left-hand
     // prompts, with the shuffled right-hand column in `matching_options`
     // (split apart server-side so the pairing isn't shipped to the client).
-    mcq_options: Array<{ text?: string; image_url?: string; left_text?: string; left_image?: string }> | null
+    mcq_options: Array<{ text?: string; image_url?: string; index?: number; left_text?: string; left_image?: string }> | null
     matching_options?: Array<{ right_text: string; right_image?: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
     answer_parts: AnswerPart[] | null
@@ -442,7 +442,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           ) : current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
             <MCQInput
               answerId={current.id}
-              options={current.questions.mcq_options as Array<{ text: string; image_url?: string }>}
+              options={current.questions.mcq_options as Array<{ text: string; image_url?: string; index: number }>}
               selected={localAnswers[current.id] ?? ''}
               eliminatedSet={eliminated[current.id] ?? new Set()}
               onSelect={val => handleAnswerChange(current.id, val)}
@@ -1020,11 +1020,18 @@ function ExamToolbar({
 
 // ─── MCQ Input ────────────────────────────────────────────────────────────────
 
+// The answer is stored as MCQ:<position in the question's own option list>,
+// not as the option's text — two options can read the same, or be pictures
+// with no text at all. See the MCQ: branch in lib/assignment-attempt.ts.
+function mcqValue(option: { index?: number }, fallbackIndex: number) {
+  return `MCQ:${option.index ?? fallbackIndex}`
+}
+
 function MCQInput({
   answerId, options, selected, eliminatedSet, onSelect, onToggleEliminate,
 }: {
   answerId: string
-  options: Array<{ text: string; image_url?: string }>
+  options: Array<{ text: string; image_url?: string; index?: number }>
   selected: string
   eliminatedSet: Set<number>
   onSelect: (val: string) => void
@@ -1034,7 +1041,8 @@ function MCQInput({
     <div className="space-y-2">
       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">เลือกคำตอบ</p>
       {options.map((opt, i) => {
-        const isSelected  = selected === opt.text
+        const value = mcqValue(opt, i)
+        const isSelected  = selected === value
         const isEliminated = eliminatedSet.has(i)
         return (
           <div
@@ -1068,9 +1076,9 @@ function MCQInput({
                 type="radio"
                 className="sr-only"
                 name={`answer-${answerId}`}
-                value={opt.text}
+                value={value}
                 checked={isSelected}
-                onChange={() => !isEliminated && onSelect(opt.text)}
+                onChange={() => !isEliminated && onSelect(value)}
               />
             </label>
             <button
@@ -1639,14 +1647,20 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
             <>
               <RichText text={part.text} className="text-sm block" />
               <div className="space-y-1.5">
-                {(part.options ?? []).map((opt, oi) => (
-                  <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
-                    answers[i] === opt.text ? 'border-tint-1 bg-tint-1/10' : 'border-border'
-                  }`}>
-                    <input type="radio" name={`composite-${part.id}`} checked={answers[i] === opt.text} onChange={() => updatePart(i, opt.text)} />
-                    <RichText text={opt.text} />
-                  </label>
-                ))}
+                {(part.options ?? []).map((opt, oi) => {
+                  // Same MCQ:<position> identity a standalone mcq uses; a
+                  // composite part's options aren't shuffled, so the position
+                  // is just where it sits in the list.
+                  const value = `MCQ:${oi}`
+                  return (
+                    <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
+                      answers[i] === value ? 'border-tint-1 bg-tint-1/10' : 'border-border'
+                    }`}>
+                      <input type="radio" name={`composite-${part.id}`} checked={answers[i] === value} onChange={() => updatePart(i, value)} />
+                      <RichText text={opt.text} />
+                    </label>
+                  )
+                })}
               </div>
             </>
           )}

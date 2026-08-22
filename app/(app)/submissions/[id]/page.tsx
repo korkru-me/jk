@@ -22,10 +22,16 @@ const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 
 export const metadata = { title: 'ผลการสอบ — KorKru' }
 
-function reorderOptions<T>(options: T[] | null, order: number[] | null): T[] | null {
+/**
+ * Puts the options back in the order the student saw them, keeping each one's
+ * position in the question's own list alongside — the answer was recorded as
+ * that position (MCQ:<index>), so the review needs it to say which option was
+ * picked.
+ */
+function reorderOptions<T>(options: T[] | null, order: number[] | null): (T & { index: number })[] | null {
   if (!options) return null
-  if (!order) return options
-  return order.map(i => options[i])
+  const positions = order ?? options.map((_, i) => i)
+  return positions.filter(i => options[i]).map(i => ({ ...options[i], index: i }))
 }
 
 function formatAnswer(n: number): string {
@@ -498,7 +504,7 @@ function AnswerReview({
   answerUnit: string | null
   questionType?: string
   extraData?: Record<string, unknown>
-  mcqOptions: Array<{ text: string; is_correct: boolean; image_url?: string; left_text?: string; right_text?: string; left_image?: string }> | null
+  mcqOptions: Array<{ text: string; is_correct: boolean; index?: number; image_url?: string; left_text?: string; right_text?: string; left_image?: string }> | null
   workImages?: (string | null)[] | null
 }) {
   // ─── Matching: the pairs in their authored order, each showing what the
@@ -550,7 +556,11 @@ function AnswerReview({
     return (
       <div className="space-y-2 mt-2">
         {mcqOptions.map((opt, i) => {
-          const isStudentChoice = studentAnswer === opt.text
+          // Answers are recorded as MCQ:<position>; anything older stored the
+          // option's text, so both are accepted here.
+          const optionIndex = opt.index ?? i
+          const isStudentChoice = studentAnswer === `MCQ:${optionIndex}`
+            || (!studentAnswer?.startsWith('MCQ:') && studentAnswer === opt.text)
           const isCorrectOpt = opt.is_correct
 
           let wrapClass = 'border-border bg-background'

@@ -39,7 +39,9 @@ export default async function ResultsPage({
       .eq('assignment_id', id),
     supabase
       .from('questions')
-      .select('id, title, question_text, question_type')
+      // mcq_options comes along so an answer recorded as MCQ:<position> can be
+      // shown as the option's words rather than a number.
+      .select('id, title, question_text, question_type, mcq_options')
       .in('id', assignment.question_ids),
   ])
 

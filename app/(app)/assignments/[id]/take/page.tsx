@@ -68,12 +68,22 @@ export default async function TakeExamPage({
     const order: number[] | null = a.option_order
 
     if (q.question_type === 'mcq') {
-      const ordered = order ? order.map(i => q.mcq_options[i]) : q.mcq_options
+      // `index` is the option's position in the question's own mcq_options,
+      // carried through the shuffle because that position — not the option's
+      // text — is what the answer is recorded as. See the MCQ: branch in
+      // lib/assignment-attempt.ts.
+      const positions: number[] = order ?? q.mcq_options.map((_: unknown, i: number) => i)
       return {
         ...a,
         questions: {
           ...q,
-          mcq_options: ordered.map((o: any) => ({ text: o.text, image_url: o.image_url })),
+          mcq_options: positions
+            .filter((i: number) => q.mcq_options[i])
+            .map((i: number) => ({
+              text: q.mcq_options[i].text,
+              image_url: q.mcq_options[i].image_url,
+              index: i,
+            })),
         },
       }
     }

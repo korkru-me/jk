@@ -155,11 +155,35 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
           score,
         }
       }
-      if (p.type === 'mcq') return { type: 'mcq', correct: (p.options ?? []).find((o) => o.is_correct)?.text ?? '', score }
+      // Index rather than text, for the same reason as a standalone mcq above.
+      if (p.type === 'mcq') return { type: 'mcq', correct: `MCQ:${(p.options ?? []).findIndex((o) => o.is_correct)}`, score }
       if (p.type === 'ordering') return { type: 'ordering', correct: (p.items ?? []).map((it) => it.id), score }
       return { type: p.type, correct: null, score }
     })
     return { question_id: q.id, random_values: {}, correct_answer: 'COMP:' + JSON.stringify(answers), max_score: naturalMaxScore(q.question_type, extraData, null) }
+  }
+
+  // Multiple choice: the answer is which option, recorded as its position in
+  // the question's own mcq_options.
+  //
+  // Position, not the option's text, for two reasons. Two options can carry
+  // the same words — a picture-only option has none at all — and comparing
+  // text then credits the wrong one. And an mcq question keeps `answer_formula`
+  // empty, so without a branch of its own it fell through to the numeric path
+  // below and every attempt was stored with the correct answer "undefined",
+  // which no student answer could ever match.
+  //
+  // The MCQ: prefix follows the same convention as TF:/ORDER:/MATCH: and is
+  // what tells a stored index apart from an option whose text is "2".
+  if (q.question_type === 'mcq') {
+    const options = (q.mcq_options ?? []) as import('@/lib/types').MCQOption[]
+    const correctIndex = options.findIndex((o) => o.is_correct)
+    return {
+      question_id: q.id,
+      random_values: {},
+      correct_answer: correctIndex >= 0 ? `MCQ:${correctIndex}` : '',
+      max_score: naturalMaxScore(q.question_type, extraData, null),
+    }
   }
 
   // File-upload: no meaningful correct answer to precompute — grading
@@ -390,6 +414,18 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
     const structuralMax = naturalMaxScore('composite', a.questions?.extra_data, null)
     const isFullyCorrect = Math.round(earned * 1000) === Math.round(structuralMax * 1000)
     return { id: a.id, is_correct: hasManual ? null : isFullyCorrect, score: scaleScore(earned, structuralMax, a.max_score) }
+  }
+
+  // Multiple-choice grading — compares which option was picked. Attempts
+  // started before the answer became an index stored the option's text; those
+  // fall through to the text comparison at the bottom, so an old submission
+  // still grades the way it did when it was taken.
+  if (correctAns.startsWith('MCQ:')) {
+    return {
+      id: a.id,
+      is_correct: studentAns.trim() === correctAns,
+      score: studentAns.trim() === correctAns ? a.max_score : 0,
+    }
   }
 
   // Matching grading — one point per correctly paired prompt. The pair count
