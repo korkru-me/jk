@@ -48,20 +48,27 @@ interface Props {
   /** Every question the user owns, regardless of filters (for the tab badge). */
   totalCount: number
   perPage: number
+  teamFilters: { q: string; team: string; page: number }
+  teamMatchCount: number
+  /** False when the share list was too large to page in one query — the team
+   *  list then arrives whole and its controls are hidden. */
+  teamPaged: boolean
 }
 
 export function QuestionBankClient({
   questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
   filters, matchCount, totalCount, perPage,
+  teamFilters, teamMatchCount, teamPaged,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
-  const initialScopeParam = searchParams.get('tab')
-  const [scope,        setScope]        = useState<'all' | 'mine' | 'team'>(
-    initialScopeParam === 'mine' || initialScopeParam === 'team' ? initialScopeParam : 'all'
-  )
+  // The tab lives in the URL alongside the filters, so a paged or filtered
+  // view survives a reload and can be linked to.
+  const tabParam = searchParams.get('tab')
+  const scope: 'all' | 'mine' | 'team' =
+    tabParam === 'mine' || tabParam === 'team' ? tabParam : 'all'
 
   // The URL owns the search and filters, because the server does the filtering
   // now — local state would only describe a list the server never sent.
@@ -71,14 +78,17 @@ export function QuestionBankClient({
   const activeTag = filters.tag || null
   const totalPages = Math.max(1, Math.ceil(matchCount / perPage))
 
-  /** Rewrites the query string; any filter change starts again from page 1. */
-  function setParams(next: Record<string, string | null>, opts: { keepPage?: boolean } = {}) {
+  /**
+   * Rewrites the query string. Callers say explicitly which page param to
+   * clear — the two lists page independently, so narrowing the team list must
+   * not throw away where the reader was in their own bank.
+   */
+  function setParams(next: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString())
     for (const [key, value] of Object.entries(next)) {
       if (value === null || value === '' || value === 'all') params.delete(key)
       else params.set(key, value)
     }
-    if (!opts.keepPage) params.delete('page')
     startTransition(() => {
       router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false })
     })
@@ -90,7 +100,7 @@ export function QuestionBankClient({
   useEffect(() => { setSearchDraft(filters.q) }, [filters.q])
   useEffect(() => {
     if (searchDraft === filters.q) return
-    const timer = setTimeout(() => setParams({ q: searchDraft }), 350)
+    const timer = setTimeout(() => setParams({ q: searchDraft, page: null }), 350)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchDraft])
@@ -98,8 +108,18 @@ export function QuestionBankClient({
   const [viewMode,     setViewMode]     = useState<'list' | 'grid'>('list')
   const [previewQ,     setPreviewQ]     = useState<QuestionDetailWithCategory | null>(null)
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
-  const [teamSearch,   setTeamSearch]   = useState('')
-  const [teamFilter,   setTeamFilter]   = useState('all')
+  const teamSearch = teamFilters.q
+  const teamFilter = teamFilters.team || 'all'
+  const teamTotalPages = Math.max(1, Math.ceil(teamMatchCount / perPage))
+
+  const [teamSearchDraft, setTeamSearchDraft] = useState(teamFilters.q)
+  useEffect(() => { setTeamSearchDraft(teamFilters.q) }, [teamFilters.q])
+  useEffect(() => {
+    if (teamSearchDraft === teamFilters.q) return
+    const timer = setTimeout(() => setParams({ teamq: teamSearchDraft, tpage: null }), 350)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamSearchDraft])
   const [flaggedIds,   setFlaggedIds]   = useState<Set<string>>(new Set())
   const [showFilters,  setShowFilters]  = useState(false)
 
@@ -128,11 +148,13 @@ export function QuestionBankClient({
 
   const activeFilterCount = [diffFilter !== 'all', typeFilter !== 'all', !!activeTag].filter(Boolean).length
 
-  const filteredTeam = useMemo(() => teamQuestions.filter(q => {
+  // Already filtered by the server when it could page; otherwise the whole
+  // list arrived and still needs narrowing here.
+  const filteredTeam = useMemo(() => teamPaged ? teamQuestions : teamQuestions.filter(q => {
     if (teamFilter !== 'all' && q.org_id !== teamFilter && !q.shared_org_ids?.includes(teamFilter)) return false
     if (teamSearch && !q.title.toLowerCase().includes(teamSearch.toLowerCase()) && !q.question_text.toLowerCase().includes(teamSearch.toLowerCase())) return false
     return true
-  }), [teamQuestions, teamSearch, teamFilter])
+  }), [teamPaged, teamQuestions, teamSearch, teamFilter])
 
   return (
     <div className="space-y-4">
@@ -146,11 +168,11 @@ export function QuestionBankClient({
                   shown — otherwise it reads as the whole bank while the page
                   holds a handful of matches. */}
               {scope === 'team'
-                ? `${filteredTeam.length} โจทย์`
+                ? `${teamMatchCount} โจทย์`
                 : matchCount !== totalCount
                   ? `${matchCount} จาก ${totalCount} โจทย์`
                   : scope === 'all'
-                    ? `${totalCount + teamQuestions.length} โจทย์`
+                    ? `${totalCount + teamMatchCount} โจทย์`
                     : `${totalCount} โจทย์`}
             </p>
           </div>
@@ -176,13 +198,13 @@ export function QuestionBankClient({
 
         <div className="inline-flex w-fit items-center rounded-lg bg-muted p-[3px] gap-0.5">
           {([
-            { value: 'all' as const, label: 'ทั้งหมด', count: totalCount + teamQuestions.length },
+            { value: 'all' as const, label: 'ทั้งหมด', count: totalCount + teamMatchCount },
             { value: 'mine' as const, label: 'ของฉัน', count: totalCount },
-            { value: 'team' as const, label: 'แชร์ในทีม', count: teamQuestions.length },
+            { value: 'team' as const, label: 'แชร์ในทีม', count: teamMatchCount },
           ]).map(opt => (
             <button
               key={opt.value}
-              onClick={() => setScope(opt.value)}
+              onClick={() => setParams({ tab: opt.value === 'all' ? null : opt.value })}
               className={cn(
                 'flex items-center gap-1.5 rounded-md px-2.5 h-[26px] text-sm font-medium transition-all',
                 scope === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-foreground/60 hover:text-foreground/80'
@@ -267,7 +289,7 @@ export function QuestionBankClient({
                   {['all', 'easy', 'medium', 'hard', 'analytical'].map(d => (
                     <button
                       key={d}
-                      onClick={() => setParams({ difficulty: d })}
+                      onClick={() => setParams({ difficulty: d, page: null })}
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         diffFilter === d
                           ? 'bg-foreground text-background border-foreground'
@@ -286,7 +308,7 @@ export function QuestionBankClient({
                   {['all', ...Object.keys(TYPE_LABEL)].map(t => (
                     <button
                       key={t}
-                      onClick={() => setParams({ type: t })}
+                      onClick={() => setParams({ type: t, page: null })}
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all border ${
                         typeFilter === t
                           ? 'bg-foreground text-background border-foreground'
@@ -308,7 +330,7 @@ export function QuestionBankClient({
                 {TAGS.map(tag => (
                   <button
                     key={tag}
-                    onClick={() => setParams({ tag: activeTag === tag ? null : tag })}
+                    onClick={() => setParams({ tag: activeTag === tag ? null : tag, page: null })}
                     className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
                       activeTag === tag
                         ? 'bg-primary text-primary-foreground border-primary'
@@ -323,7 +345,7 @@ export function QuestionBankClient({
 
             {activeFilterCount > 0 && (
               <button
-                onClick={() => setParams({ difficulty: null, type: null, tag: null })}
+                onClick={() => setParams({ difficulty: null, type: null, tag: null, page: null })}
                 className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
               >
                 <X className="w-3 h-3" /> ล้างตัวกรองทั้งหมด
@@ -339,19 +361,19 @@ export function QuestionBankClient({
             {diffFilter !== 'all' && (
               <span className="flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
                 {DIFF_META[diffFilter]?.label}
-                <button onClick={() => setParams({ difficulty: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setParams({ difficulty: null, page: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
             {typeFilter !== 'all' && (
               <span className="flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
                 {TYPE_LABEL[typeFilter]}
-                <button onClick={() => setParams({ type: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setParams({ type: null, page: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
             {activeTag && (
               <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">
                 #{activeTag}
-                <button onClick={() => setParams({ tag: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={() => setParams({ tag: null, page: null })} className="hover:text-destructive transition-colors"><X className="w-3 h-3" /></button>
               </span>
             )}
           </div>
@@ -388,7 +410,7 @@ export function QuestionBankClient({
             totalPages={totalPages}
             isPending={isPending}
             onGo={p => {
-              setParams({ page: String(p) }, { keepPage: true })
+              setParams({ page: String(p) })
               // The controls sit at the bottom of the list, so without this the
               // next page opens scrolled to its end.
               window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -419,13 +441,13 @@ export function QuestionBankClient({
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
-                      value={teamSearch}
-                      onChange={e => setTeamSearch(e.target.value)}
+                      value={teamSearchDraft}
+                      onChange={e => setTeamSearchDraft(e.target.value)}
                       className="pl-9 bg-card"
                     />
                   </div>
                   {hasMultipleTeams && (
-                    <Select value={teamFilter} onValueChange={(v) => v !== null && setTeamFilter(v)}>
+                    <Select value={teamFilter} onValueChange={(v) => v !== null && setParams({ team: v === 'all' ? null : v, tpage: null })}>
                       <SelectTrigger className="bg-card">
                         <SelectValue placeholder="ทุกทีม">
                           {teamFilter === 'all' ? 'ทุกทีม' : myTeams.find(t => t.id === teamFilter)?.name ?? 'ทุกทีม'}
@@ -441,7 +463,7 @@ export function QuestionBankClient({
                   )}
                 </div>
 
-                {teamQuestions.length === 0 ? (
+                {teamMatchCount === 0 && !teamFilters.q && !teamFilters.team ? (
                   <Card edge="ring" className="text-center py-24">
                     <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                       <Users className="w-8 h-8 text-primary" />
@@ -455,11 +477,24 @@ export function QuestionBankClient({
                     <p className="text-muted-foreground font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
                   </Card>
                 ) : (
-                  <div className="space-y-2.5">
-                    {filteredTeam.map(q => (
-                      <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="space-y-2.5">
+                      {filteredTeam.map(q => (
+                        <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
+                      ))}
+                    </div>
+                    {teamPaged && teamTotalPages > 1 && (
+                      <Pagination
+                        page={teamFilters.page}
+                        totalPages={teamTotalPages}
+                        isPending={isPending}
+                        onGo={p => {
+                          setParams({ tpage: String(p) })
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </>
             )}

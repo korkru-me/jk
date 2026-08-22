@@ -120,14 +120,35 @@ export interface QuestionFilters {
   page: number
 }
 
+/** The team tab has its own search, team narrowing and page. */
+export interface TeamFilters {
+  q: string
+  team: string
+  page: number
+}
+
+const readOne = (sp: Record<string, string | string[] | undefined>, k: string) =>
+  typeof sp[k] === 'string' ? (sp[k] as string) : ''
+
 function readFilters(sp: Record<string, string | string[] | undefined>): QuestionFilters {
-  const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '')
+  const one = (k: string) => readOne(sp, k)
   return {
     q: one('q').trim(),
     type: one('type') || 'all',
     difficulty: one('difficulty') || 'all',
     tag: one('tag'),
     page: Math.max(1, Number(one('page')) || 1),
+  }
+}
+
+// Separate params from the own-questions list, because the "ทั้งหมด" tab shows
+// both lists at once and each has to page on its own.
+function readTeamFilters(sp: Record<string, string | string[] | undefined>): TeamFilters {
+  const one = (k: string) => readOne(sp, k)
+  return {
+    q: one('teamq').trim(),
+    team: one('team'),
+    page: Math.max(1, Number(one('tpage')) || 1),
   }
 }
 
@@ -140,7 +161,9 @@ export default async function QuestionsPage({
   const user = await getAuthUser()
   if (!user) redirect('/login')
 
-  const filters = readFilters(await searchParams)
+  const sp = await searchParams
+  const filters = readFilters(sp)
+  const teamFilters = readTeamFilters(sp)
   const from = (filters.page - 1) * QUESTIONS_PER_PAGE
 
   const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, created_at'
@@ -148,6 +171,11 @@ export default async function QuestionsPage({
   // Filtering and paging happen in the database rather than in the browser:
   // the bank is already past a thousand questions, and shipping all of them on
   // every visit only gets slower.
+  //
+  // Every ordered query here breaks ties on `id`. created_at alone is not
+  // unique — a bulk import stamps a whole batch with the same instant, and 50
+  // rows sharing a timestamp have no defined order between them, so successive
+  // pages would repeat some questions and skip others.
   let ownQuery = supabase
     .from('questions')
     .select(`${summaryFields}, question_categories(name)`, { count: 'exact' })
@@ -163,7 +191,7 @@ export default async function QuestionsPage({
   if (filters.tag) ownQuery = ownQuery.contains('tags', [filters.tag])
 
   const [{ data: questions, error, count: ownTotal }, { data: membershipRows }, { count: unfilteredTotal }] = await Promise.all([
-    ownQuery.order('created_at', { ascending: false }).range(from, from + QUESTIONS_PER_PAGE - 1),
+    ownQuery.order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, from + QUESTIONS_PER_PAGE - 1),
     supabase
       .from('organization_members')
       .select('org_role, organizations!inner(id, name, is_personal)')
@@ -185,29 +213,21 @@ export default async function QuestionsPage({
   }))
   const teamOrgIds = myTeams.map(t => t.id)
 
-  let teamQuestions: QuestionWithCreator[] = []
-  if (teamOrgIds.length > 0) {
-    const [{ rows: primaryData, error: primaryError }, { data: shareRows, error: shareError }] = await Promise.all([
-      // The team tab is a union of org-owned and shared-in questions, which a
-      // single paged query can't order across — so it still loads in full,
-      // just without the silent 1,000-row cut-off.
-      fetchAllRows<Record<string, unknown>>((rangeFrom, rangeTo) =>
-        supabase
-          .from('questions')
-          .select(`${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`)
-          .in('org_id', teamOrgIds)
-          .in('visibility', ['organization', 'school'])
-          .or('group_id.is.null,order_in_group.eq.0')
-          .order('created_at', { ascending: false })
-          .range(rangeFrom, rangeTo)
-      ),
-      supabase
-        .from('question_shares')
-        .select('question_id, org_id, organizations(name)')
-        .in('org_id', teamOrgIds),
-    ])
+  // A share list is small in practice — sharing is a deliberate per-question
+  // action — but it rides in the URL of the query below, and PostgREST rejects
+  // a query string past roughly a thousand ids. Beyond this the team tab falls
+  // back to loading in full: still correct, just not paged.
+  const MAX_SHARED_IDS_IN_QUERY = 700
 
-    if (primaryError) console.error('[questions/page] team query failed:', primaryError)
+  let teamQuestions: QuestionWithCreator[] = []
+  let teamTotal = 0
+  let teamPaged = false
+
+  if (teamOrgIds.length > 0) {
+    const { data: shareRows, error: shareError } = await supabase
+      .from('question_shares')
+      .select('question_id, org_id, organizations(name)')
+      .in('org_id', teamOrgIds)
     if (shareError) console.error('[questions/page] share query failed:', shareError)
 
     // question_id -> extra teams it was shared to (id + name, for filtering + badges)
@@ -219,33 +239,87 @@ export default async function QuestionsPage({
       sharedNamesByQuestion.set(row.question_id, [...(sharedNamesByQuestion.get(row.question_id) ?? []), name])
       sharedIdsByQuestion.set(row.question_id, [...(sharedIdsByQuestion.get(row.question_id) ?? []), row.org_id])
     }
+    const sharedIds = [...sharedNamesByQuestion.keys()]
 
-    // Questions shared into a team the user belongs to, but whose home org
-    // is elsewhere — fetch those rows too so they show up alongside primaryData.
-    const sharedOnlyIds = [...sharedNamesByQuestion.keys()]
-    let sharedOnlyData: QuestionWithCreator[] = []
-    if (sharedOnlyIds.length > 0) {
-      const { data, error: sharedOnlyError } = await supabase
+    const teamSelect = `${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`
+    // The tab is a union: questions a team owns, plus questions shared into
+    // one. Expressed as a single OR so the database can order and slice the
+    // whole thing — two queries could each be paged, but not merged in order.
+    const ownedByTeam = `and(org_id.in.(${teamOrgIds.join(',')}),visibility.in.(organization,school))`
+    const unionFilter = sharedIds.length > 0
+      ? `${ownedByTeam},id.in.(${sharedIds.join(',')})`
+      : ownedByTeam
+
+    if (sharedIds.length <= MAX_SHARED_IDS_IN_QUERY) {
+      teamPaged = true
+      let teamQuery = supabase
         .from('questions')
-        .select(`${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`)
-        .in('id', sharedOnlyIds)
+        .select(teamSelect, { count: 'exact' })
+        .or(unionFilter)
         .or('group_id.is.null,order_in_group.eq.0')
-        .order('created_at', { ascending: false })
-      if (sharedOnlyError) console.error('[questions/page] shared-only query failed:', sharedOnlyError)
-      sharedOnlyData = (data ?? []) as unknown as QuestionWithCreator[]
-    }
 
-    const byId = new Map<string, QuestionWithCreator>()
-    for (const q of [...(primaryData ?? []), ...sharedOnlyData] as unknown as QuestionWithCreator[]) {
-      byId.set(q.id, {
+      if (teamFilters.q) {
+        const term = `%${escapeLike(teamFilters.q)}%`
+        teamQuery = teamQuery.or(`title.ilike.${term},question_text.ilike.${term}`)
+      }
+      // Narrowing to one team means either it owns the question, or the
+      // question was shared to it.
+      if (teamFilters.team) {
+        const sharedToTeam = [...sharedIdsByQuestion.entries()]
+          .filter(([, orgIds]) => orgIds.includes(teamFilters.team))
+          .map(([questionId]) => questionId)
+        teamQuery = teamQuery.or(
+          sharedToTeam.length > 0
+            ? `org_id.eq.${teamFilters.team},id.in.(${sharedToTeam.join(',')})`
+            : `org_id.eq.${teamFilters.team}`
+        )
+      }
+
+      const teamFrom = (teamFilters.page - 1) * QUESTIONS_PER_PAGE
+      const { data, error: teamError, count } = await teamQuery
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(teamFrom, teamFrom + QUESTIONS_PER_PAGE - 1)
+      if (teamError) console.error('[questions/page] team query failed:', teamError)
+      teamTotal = count ?? 0
+      teamQuestions = ((data ?? []) as unknown as QuestionWithCreator[]).map(q => ({
         ...q,
         shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
         shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
-      })
+      }))
+    } else {
+      const { rows, error: teamError } = await fetchAllRows<Record<string, unknown>>((rangeFrom, rangeTo) =>
+        supabase
+          .from('questions')
+          .select(teamSelect)
+          .or(ownedByTeam)
+          .or('group_id.is.null,order_in_group.eq.0')
+          .order('created_at', { ascending: false })
+          .range(rangeFrom, rangeTo)
+      )
+      if (teamError) console.error('[questions/page] team query failed:', teamError)
+
+      const byId = new Map<string, QuestionWithCreator>()
+      for (const q of rows as unknown as QuestionWithCreator[]) byId.set(q.id, q)
+      if (sharedIds.length > 0) {
+        for (let i = 0; i < sharedIds.length; i += 500) {
+          const { data } = await supabase
+            .from('questions')
+            .select(teamSelect)
+            .in('id', sharedIds.slice(i, i + 500))
+            .or('group_id.is.null,order_in_group.eq.0')
+          for (const q of (data ?? []) as unknown as QuestionWithCreator[]) byId.set(q.id, q)
+        }
+      }
+      teamQuestions = [...byId.values()]
+        .map(q => ({
+          ...q,
+          shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
+          shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
+        }))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      teamTotal = teamQuestions.length
     }
-    teamQuestions = [...byId.values()].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
   }
 
   const ownQuestions = (questions ?? []) as unknown as QuestionWithCategory[]
@@ -268,6 +342,9 @@ export default async function QuestionsPage({
       matchCount={ownTotal ?? 0}
       totalCount={unfilteredTotal ?? 0}
       perPage={QUESTIONS_PER_PAGE}
+      teamFilters={teamFilters}
+      teamMatchCount={teamTotal}
+      teamPaged={teamPaged}
     />
   )
 }
