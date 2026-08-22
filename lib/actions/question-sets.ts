@@ -5,13 +5,20 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { resolveOrgId } from '@/lib/actions/questions'
 import { getMyTeamOrgIds } from '@/lib/actions/team-org'
+import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { QuestionSet, Visibility } from '@/lib/types'
 
 interface QuestionSetData {
   title: string
   description: string
   question_ids: string[]
-  tags: string[]
+  /** หัวข้อ inside the set. Normalized server-side against question_ids, so a
+   *  client that sends stale or invented ids can't corrupt the set. */
+  sections?: QuestionSetSection[]
+  /** Optional and no longer edited anywhere: sets are found by title now. Left
+   *  in so a caller that still has tags can write them, and so an update that
+   *  omits them keeps whatever an older set was saved with. */
+  tags?: string[]
   visibility: Visibility
   /** Which team to share to when visibility is 'organization'. Required once
    *  the user belongs to more than one team; auto-resolved if they have exactly one. */
@@ -55,10 +62,10 @@ export async function createQuestionSet(data: QuestionSetData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
-  if (data.question_ids.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
-
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
   if ('error' in orgResult) return orgResult
+
+  const normalized = normalizeSetSections(data.sections ?? [], data.question_ids)
 
   const { data: set, error } = await supabase
     .from('question_sets')
@@ -68,8 +75,9 @@ export async function createQuestionSet(data: QuestionSetData) {
       visibility: data.visibility,
       title: data.title.trim(),
       description: data.description.trim() || null,
-      question_ids: data.question_ids,
-      tags: data.tags,
+      question_ids: normalized.question_ids,
+      sections: normalized.sections,
+      tags: data.tags ?? [],
     })
     .select('id')
     .single()
@@ -90,10 +98,10 @@ export async function updateQuestionSet(id: string, data: QuestionSetData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
-  if (data.question_ids.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
-
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
   if ('error' in orgResult) return orgResult
+
+  const normalized = normalizeSetSections(data.sections ?? [], data.question_ids)
 
   const { error } = await supabase
     .from('question_sets')
@@ -102,8 +110,9 @@ export async function updateQuestionSet(id: string, data: QuestionSetData) {
       visibility: data.visibility,
       title: data.title.trim(),
       description: data.description.trim() || null,
-      question_ids: data.question_ids,
-      tags: data.tags,
+      question_ids: normalized.question_ids,
+      sections: normalized.sections,
+      ...(data.tags ? { tags: data.tags } : {}),
     })
     .eq('id', id)
 

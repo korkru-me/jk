@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { QuestionSetsClient } from './_components/question-sets-client'
 import type { QuestionSet } from '@/lib/types'
 
-export const metadata = { title: 'คลังชุดโจทย์ — KorKru' }
+export const metadata = { title: 'คลังแฟ้มโจทย์ — KorKru' }
 
 // A set's question_ids can go stale once a question is deleted — attaches
 // valid_question_count (how many ids still resolve) to each set so the
@@ -12,7 +12,7 @@ export const metadata = { title: 'คลังชุดโจทย์ — KorKr
 // shows, instead of the raw (possibly inflated) stored length.
 export type QuestionSetSummary = Pick<
   QuestionSet,
-  'id' | 'created_by' | 'title' | 'description' | 'question_ids' | 'tags'
+  'id' | 'created_by' | 'title' | 'description' | 'question_ids' | 'sections' | 'tags'
 > & {
   valid_question_count?: number
 }
@@ -44,7 +44,7 @@ export default async function QuestionSetsPage() {
   const user = await getAuthUser()
   if (!user) redirect('/login')
 
-  const summaryFields = 'id, created_by, title, description, question_ids, tags'
+  const summaryFields = 'id, created_by, title, description, question_ids, sections, tags'
   const [profileResult, mySetsResult, membershipResult] = await Promise.all([
     supabase.from('users').select('role').eq('id', user.id).single(),
     supabase

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { startSubmission } from '@/lib/actions/submissions'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
+import { parseSections } from '@/lib/question-set-sections'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
 
@@ -47,7 +48,7 @@ export default async function TakeExamPage({
   const [submissionRes, answersRes] = await Promise.all([
     supabase
       .from('submissions')
-      .select('*, assignments(title, duration_minutes, end_at, require_work_image)')
+      .select('*, assignments(title, duration_minutes, end_at, require_work_image, sections, show_sections)')
       .eq('id', result.submissionId!)
       .single(),
     supabase
@@ -128,6 +129,7 @@ export default async function TakeExamPage({
         durationMinutes={assignment.duration_minutes}
         startedAt={submission!.started_at}
         config={examConfig}
+        sections={assignment.show_sections === false ? [] : parseSections(assignment.sections)}
       />
     </div>
   )

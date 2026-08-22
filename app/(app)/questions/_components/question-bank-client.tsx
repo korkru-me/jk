@@ -20,15 +20,15 @@ import { ImportQuestionsButton } from '@/components/questions/import-questions-b
 import { getQuestionClientDetail } from '@/lib/actions/questions'
 import type { QuestionDetailWithCategory, QuestionWithCategory, QuestionWithCreator } from '../page'
 import { questionExcerpt } from '@/lib/question-display'
+import { mergeTagPool } from '@/lib/tag-suggest'
 
 const PreviewModal = dynamic(
   () => import('./preview-modal').then(mod => mod.PreviewModal),
   { loading: () => <PreviewLoadingOverlay /> }
 )
 
-// ── Mock constants ─────────────────────────────────────────────────────────────
-
-const TAGS = ['อนุภาคมูลฐาน', 'กลศาสตร์', 'เวกเตอร์', 'คลื่น', 'ไฟฟ้า', 'แม่เหล็ก', 'ควอนตัม', 'สัมพัทธภาพ']
+/** How many tags the filter shows before asking to be expanded. */
+const TAG_FILTER_PREVIEW = 12
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -41,6 +41,8 @@ interface Props {
   hasMultipleTeams: boolean
   myTeams: { id: string; name: string }[]
   currentUserId: string
+  /** Every tag used in this teacher's own bank, most-used first. */
+  allTags: string[]
   /** Search and filters, as read from the URL by the page. */
   filters: { q: string; type: string; difficulty: string; tag: string; page: number }
   /** Questions matching the current filters — the number being paged through. */
@@ -57,7 +59,7 @@ interface Props {
 
 export function QuestionBankClient({
   questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
-  filters, matchCount, totalCount, perPage,
+  allTags, filters, matchCount, totalCount, perPage,
   teamFilters, teamMatchCount, teamPaged,
 }: Props) {
   const router = useRouter()
@@ -148,11 +150,31 @@ export function QuestionBankClient({
 
   const activeFilterCount = [diffFilter !== 'all', typeFilter !== 'all', !!activeTag].filter(Boolean).length
 
+  // Suggestions for the add-a-tag control on each card: the whole of this
+  // teacher's bank, plus whatever the team questions on screen are tagged with.
+  const tagPool = useMemo(
+    () => mergeTagPool(allTags, teamQuestions.flatMap(q => q.tags ?? [])),
+    [allTags, teamQuestions],
+  )
+
+  // The filter lists the bank's tags, and a long tail of them would push the
+  // rest of the panel off screen — so it opens with the most-used ones.
+  const [showAllTags, setShowAllTags] = useState(false)
+  const visibleTags = useMemo(() => {
+    if (showAllTags || allTags.length <= TAG_FILTER_PREVIEW) return allTags
+    const head = allTags.slice(0, TAG_FILTER_PREVIEW)
+    // A tag filtered from a URL or from the card of a rarely-used tag must
+    // still show as selected, even when it sits outside the preview.
+    return activeTag && !head.includes(activeTag) ? [...head, activeTag] : head
+  }, [allTags, showAllTags, activeTag])
+
   // Already filtered by the server when it could page; otherwise the whole
   // list arrived and still needs narrowing here.
   const filteredTeam = useMemo(() => teamPaged ? teamQuestions : teamQuestions.filter(q => {
     if (teamFilter !== 'all' && q.org_id !== teamFilter && !q.shared_org_ids?.includes(teamFilter)) return false
-    if (teamSearch && !q.title.toLowerCase().includes(teamSearch.toLowerCase()) && !q.question_text.toLowerCase().includes(teamSearch.toLowerCase())) return false
+    // Excerpt, not the raw value: imported questions carry HTML, and matching
+    // that makes "class" a hit while a phrase split by a tag is a miss.
+    if (teamSearch && !q.title.toLowerCase().includes(teamSearch.toLowerCase()) && !questionExcerpt(q.question_text).toLowerCase().includes(teamSearch.toLowerCase())) return false
     return true
   }), [teamPaged, teamQuestions, teamSearch, teamFilter])
 
@@ -185,7 +207,7 @@ export function QuestionBankClient({
             />
             <Link href="/questions/sets/new">
               <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
-                <Layers className="w-3.5 h-3.5" /> สร้างชุดโจทย์/ชุดแบบฝึกหัด
+                <Layers className="w-3.5 h-3.5" /> สร้างแฟ้มโจทย์
               </Button>
             </Link>
             <Link href="/questions/new">
@@ -326,21 +348,37 @@ export function QuestionBankClient({
               <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
                 <Tag className="w-3 h-3" /> แท็ก
               </p>
-              <div className="flex gap-1.5 flex-wrap">
-                {TAGS.map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => setParams({ tag: activeTag === tag ? null : tag, page: null })}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
-                      activeTag === tag
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'border-border text-muted-foreground hover:border-primary/20 hover:text-primary'
-                    }`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
-              </div>
+              {allTags.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  ยังไม่มีแท็กในคลัง — เพิ่มแท็กได้จากปุ่ม &ldquo;+ แท็ก&rdquo; บนการ์ดโจทย์
+                </p>
+              ) : (
+                <div className="flex gap-1.5 flex-wrap">
+                  {visibleTags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => setParams({ tag: activeTag === tag ? null : tag, page: null })}
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
+                        activeTag === tag
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/20 hover:text-primary'
+                      }`}
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                  {allTags.length > TAG_FILTER_PREVIEW && (
+                    <Button
+                      onClick={() => setShowAllTags(v => !v)}
+                      variant="link"
+                      size="xs"
+                      className="px-1"
+                    >
+                      {showAllTags ? 'ย่อรายการแท็ก' : `ดูแท็กทั้งหมด (${allTags.length})`}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
 
             {activeFilterCount > 0 && (
@@ -399,6 +437,7 @@ export function QuestionBankClient({
                 onToggleFlag={() => toggleFlag(q.id)}
                 myTeams={myTeams}
                 stats={stats[q.id]}
+                allTags={tagPool}
               />
             ))}
           </div>

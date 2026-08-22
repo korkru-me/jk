@@ -1,11 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
-import { getMyQuestionSets } from '@/lib/actions/question-sets'
 import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
 import type { Question } from '@/lib/types'
 
-export const metadata = { title: 'สร้างชุดโจทย์ — KorKru' }
+export const metadata = { title: 'สร้างแฟ้มโจทย์ — KorKru' }
 
 export default async function NewQuestionSetPage() {
   const supabase = await createClient()
@@ -16,29 +15,21 @@ export default async function NewQuestionSetPage() {
     .from('users').select('role').eq('id', user.id).single()
   if (profile?.role !== 'teacher' && profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: questions }, existingSets] = await Promise.all([
-    supabase
-      .from('questions')
-      .select('id, title, question_text, difficulty, question_type, visibility, requires_work_image')
-      .eq('created_by', user.id)
-      .neq('visibility', 'pending')
-      .order('created_at', { ascending: false }),
-    getMyQuestionSets(),
-  ])
-
-  const allTags = Array.from(new Set(existingSets.flatMap(s => s.tags)))
+  const { data: questions } = await supabase
+    .from('questions')
+    .select('id, title, question_text, difficulty, question_type, visibility, requires_work_image')
+    .eq('created_by', user.id)
+    .neq('visibility', 'pending')
+    .order('created_at', { ascending: false })
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-[1200px] space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">สร้างชุดโจทย์</h1>
-        <p className="text-sm text-muted-foreground mt-1">รวมโจทย์จากคลังเป็นชุด ติดแท็กไว้ใช้ซ้ำ — ไม่ต้องเลือกห้องเรียนตอนนี้</p>
+        <h1 className="text-2xl font-bold text-foreground">สร้างแฟ้มโจทย์</h1>
+        <p className="text-sm text-muted-foreground mt-1">รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
       </div>
 
-      <CreateQuestionSetForm
-        questions={(questions ?? []) as Question[]}
-        allTags={allTags}
-      />
+      <CreateQuestionSetForm questions={(questions ?? []) as Question[]} />
     </div>
   )
 }

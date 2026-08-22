@@ -2,6 +2,7 @@
 
 import { QRCodeSVG } from 'qrcode.react'
 import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
+import { sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { Question, Variable, MCQOption, MatchingPair } from '@/lib/types'
 
 interface StudentSheet {
@@ -15,6 +16,8 @@ interface Props {
   classroomName: string
   questions: Question[]
   students: StudentSheet[]
+  /** หัวข้อ printed as headings between questions. Empty = plain list. */
+  sections?: QuestionSetSection[]
 }
 
 function substituteVars(text: string, values: Record<string, number>) {
@@ -58,9 +61,14 @@ interface WorksheetPageProps {
   assignmentTitle: string
   classroomName: string
   seed: number
+  sections: QuestionSetSection[]
 }
 
-function WorksheetPage({ student, questions, assignmentId, assignmentTitle, classroomName, seed }: WorksheetPageProps) {
+function WorksheetPage({ student, questions, assignmentId, assignmentTitle, classroomName, seed, sections }: WorksheetPageProps) {
+  // Headings come from the questions' own order on the sheet, so question
+  // numbering stays a single run 1..n across หัวข้อ — the number a student
+  // writes on the answer sheet must not restart per หัวข้อ.
+  const sectionOwner = sectionByQuestionId(sections)
   // Generate deterministic-ish random values per student using seed concept
   const questionValues = questions.map(q => {
     const values = randomizeVariables(q.variables as Variable[])
@@ -108,8 +116,14 @@ function WorksheetPage({ student, questions, assignmentId, assignmentTitle, clas
           const { values, answer } = questionValues[i]
           const renderedText = substituteVars(q.question_text, values)
 
+          const section = sectionOwner.get(q.id)
+          const isSectionStart = !!section?.title && sectionOwner.get(questions[i - 1]?.id)?.id !== section.id
+
           return (
             <div key={q.id} className="question print:break-inside-avoid">
+              {isSectionStart && (
+                <p className="font-bold text-sm border-b border-gray-400 pb-1 mb-3">{section!.title}</p>
+              )}
               <p className="font-semibold mb-2">ข้อ {i + 1}. {renderedText}</p>
 
               {/* MCQ options */}
@@ -185,7 +199,7 @@ function WorksheetPage({ student, questions, assignmentId, assignmentTitle, clas
   )
 }
 
-export function PrintWorksheet({ assignmentId, assignmentTitle, classroomName, questions, students }: Props) {
+export function PrintWorksheet({ assignmentId, assignmentTitle, classroomName, questions, students, sections = [] }: Props) {
   return (
     <>
       <style>{`
@@ -214,6 +228,7 @@ export function PrintWorksheet({ assignmentId, assignmentTitle, classroomName, q
             assignmentTitle={assignmentTitle}
             classroomName={classroomName}
             seed={i}
+            sections={sections}
           />
         ))
       )}

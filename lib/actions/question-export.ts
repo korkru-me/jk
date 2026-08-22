@@ -53,7 +53,7 @@ export async function exportQuestionSet(setId: string) {
     .maybeSingle()
 
   if (setError) return { error: setError.message }
-  if (!set) return { error: 'ไม่พบชุดโจทย์นี้' }
+  if (!set) return { error: 'ไม่พบแฟ้มโจทย์นี้' }
 
   const { data, error } = await supabase
     .from('questions')
@@ -65,7 +65,7 @@ export async function exportQuestionSet(setId: string) {
 
   const exportable = rows.filter(q => !q.group_id)
   if (exportable.length === 0) {
-    return { error: 'ชุดโจทย์นี้ไม่มีโจทย์ที่ส่งออกเป็นไฟล์ได้ (โจทย์แบบหลายขั้นตอนยังไม่รองรับ)' }
+    return { error: 'แฟ้มโจทย์นี้ไม่มีโจทย์ที่ส่งออกเป็นไฟล์ได้ (โจทย์แบบหลายขั้นตอนยังไม่รองรับ)' }
   }
 
   const file = buildExportFile(

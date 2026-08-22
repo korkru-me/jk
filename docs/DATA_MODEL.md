@@ -24,13 +24,15 @@ Invariant สำคัญ:
 - `question_categories` — หมวดหมู่แบบ parent/child เป็น taxonomy กลางร่วมทุก organization เขียนได้เฉพาะทาง admin action (`lib/actions/admin.ts`) การนำเข้าไฟล์จึงจับคู่ตามชื่อเท่านั้น ไม่สร้างหมวดใหม่
 - `questions` — เนื้อหา ชนิด เฉลย ตัวแปร การมองเห็น และ metadata
 - `formula_presets` — สมการ/ตัวแปรที่นำกลับมาใช้
-- `question_sets` — รายการ `question_ids` ที่บันทึกเป็นชุด
+- `question_sets` — รายการ `question_ids` ที่บันทึกเป็นแฟ้ม พร้อม `sections` (jsonb) สำหรับหัวข้อย่อยในแฟ้ม
 - `question_shares` และ `question_set_shares` — แชร์เข้าทีม/organization เพิ่มเติม
 
 ความสัมพันธ์สำคัญ:
 
 - Question อาจมี parent/group/order สำหรับโจทย์หลายข้อที่สัมพันธ์กัน
 - QuestionSet เก็บ array ของ IDs ซึ่งอาจเกิด dangling reference เมื่อโจทย์ถูกลบ โค้ดต้องรับมือ
+- `question_sets.sections` เป็นมุมมองบน `question_ids` ไม่ใช่แหล่งความจริงคู่ขนาน: `[{ id, title, question_ids }]` โดย id ทุกตัวต้องอยู่ใน `question_ids`, ห้ามซ้ำข้ามหัวข้อ และทุกครั้งที่บันทึก server จะเขียน `question_ids` ใหม่ตามลำดับหัวข้อผ่าน `normalizeSetSections` ใน `lib/question-set-sections.ts` — ห้ามเขียนคอลัมน์ใดคอลัมน์หนึ่งโดยไม่ผ่านฟังก์ชันนี้
+- `assignments.sections` เป็น snapshot ของหัวข้อตอนสร้างงาน (แช่แข็งเหมือน `question_ids`) และ `assignments.show_sections` คุมว่านักเรียน/ใบงานจะเห็นชื่อหัวข้อหรือไม่ การแก้แฟ้มโจทย์ภายหลังไม่ย้อนไปเปลี่ยนงานที่มอบหมายไปแล้ว
 - visibility ไม่แทน authorization ทั้งหมด ต้องพิจารณา owner, org, share และ assignment access ร่วมกัน
 
 ## ห้องเรียน

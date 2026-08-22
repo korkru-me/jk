@@ -175,7 +175,7 @@ export function MultiStepEditor({
   }
 
   function handleSave() {
-    if (!title.trim()) { toast.error('กรอกชื่อชุดโจทย์'); return }
+    if (!title.trim()) { toast.error('กรอกชื่อโจทย์กลุ่ม'); return }
     if (!context.trim()) { toast.error('กรอกโจทย์ส่วนกลาง'); return }
     for (let i = 0; i < subQuestions.length; i++) {
       if (!subQuestions[i].question_text.trim()) {
@@ -217,7 +217,7 @@ export function MultiStepEditor({
 
   function handleDelete() {
     if (!groupId) return
-    if (!confirm('ลบชุดโจทย์นี้ทั้งหมด?')) return
+    if (!confirm('ลบโจทย์กลุ่มนี้ทั้งหมด?')) return
     startTransition(async () => {
       const res = await deleteQuestionGroup(groupId)
       if (res?.error) toast.error(res.error)
@@ -232,11 +232,11 @@ export function MultiStepEditor({
     <div className="space-y-6 max-w-4xl">
       {/* Group header */}
       <Card radius="md" padding="xl" className="space-y-4">
-        <h2 className="font-semibold text-foreground">ข้อมูลชุดโจทย์</h2>
+        <h2 className="font-semibold text-foreground">ข้อมูลโจทย์กลุ่ม</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2 space-y-1.5">
-            <Label>ชื่อชุดโจทย์ *</Label>
+            <Label>ชื่อโจทย์กลุ่ม *</Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -298,7 +298,7 @@ export function MultiStepEditor({
             {visibility === 'organization' && (
               <div className="flex items-center gap-2 pt-2">
                 <ToggleSwitch checked={teamEditAllowed} onChange={setTeamEditAllowed} disabled={!isOwner} />
-                <span className="text-xs text-muted-foreground">อนุญาตให้เพื่อนในทีมแก้ไขชุดโจทย์นี้ได้</span>
+                <span className="text-xs text-muted-foreground">อนุญาตให้เพื่อนในทีมแก้ไขโจทย์กลุ่มนี้ได้</span>
               </div>
             )}
           </div>
@@ -398,14 +398,14 @@ export function MultiStepEditor({
       {/* Actions */}
       <div className="flex items-center gap-3 pb-8">
         <Button onClick={handleSave} disabled={isPending}>
-          {isPending ? 'กำลังบันทึก...' : mode === 'create' ? 'สร้างชุดโจทย์' : 'บันทึกการแก้ไข'}
+          {isPending ? 'กำลังบันทึก...' : mode === 'create' ? 'สร้างโจทย์กลุ่ม' : 'บันทึกการแก้ไข'}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.push('/questions')}>
           ยกเลิก
         </Button>
         {mode === 'edit' && groupId && (
           <Button type="button" variant="ghost" onClick={handleDelete} disabled={isPending} className="ml-auto text-destructive hover:text-destructive/80 hover:bg-destructive/10">
-            ลบชุดโจทย์นี้
+            ลบโจทย์กลุ่มนี้
           </Button>
         )}
       </div>

@@ -22,6 +22,8 @@
 - Explain the plan before changing auth, Supabase RLS, migrations, grading/scoring, billing, or subscription entitlements.
 - Never weaken RLS, expose `SUPABASE_SERVICE_ROLE_KEY`, or use the admin client without explicit server-side authorization.
 - Never edit an already-applied migration to change production behavior; add a new migration after checking live migration state.
+- Create migrations with `supabase migration new <name>` only. Never hand-name a file in `supabase/migrations`, and never apply SQL through the Supabase dashboard without recording it — if the dashboard is the only route available, follow it with `supabase migration repair --status applied <version>` in the same session and say so in the final report.
+- Commit a migration in the same commit as the code that depends on it. Never push schema to the database and leave the file uncommitted.
 - Keep organization data isolated. Treat student profiles, guardians, health/family notes, answers, and survey data as sensitive.
 - Do not present mock data, pricing, compliance, security, analytics, or unfinished UI as production truth.
 - Preserve existing question and submission compatibility when extending question types or scoring.
@@ -29,12 +31,22 @@
 ## Change workflow
 
 - Inspect the relevant route, server action, types, migrations, and RLS policies before implementation.
+- Before touching the database, run `supabase migration list` and compare local against remote. If they disagree, stop and report — never "fix" the gap with `supabase db push` or `supabase migration repair --status reverted`, which would replay old migrations over a live schema.
 - Prefer small, reversible changes and validate authorization on the server, not only in the UI.
 - Run `npx tsc --noEmit` for TypeScript changes and `npm run build` for material application changes.
 - Run `npm run lint:tokens` after touching UI. It fails when a file gains raw Tailwind palette classes (`bg-gray-100`, `text-blue-600`) instead of the semantic tokens in `app/globals.css`, or a hand-written card surface instead of `<Card>`. Existing debt is baselined per file, so only a file getting worse fails; update the baseline with `-- --update` only for a deliberate increase.
 - Run `npm test` for changes to `lib/` — vitest covers the evaluator, scoring and shared text helpers. Add a case alongside any change to how a question is sampled or graded.
 - Coverage stops at the pure modules: nothing exercises Supabase, server actions or the browser, so state what was and was not verified.
 - Update `docs/FEATURE_STATUS.md` and any affected domain/architecture document when behavior or scope changes.
+
+## Working across two agents and two machines
+
+Claude Code and Codex both work in this repo, on more than one machine. Git is the only channel that carries context between them; anything left outside it is lost to whoever works next.
+
+- Push finished work to `origin` before ending a session. A change that exists only in a local worktree does not exist for the other agent.
+- The worktree is usually dirty with the other agent's work in progress. Touch only the files your task needs, and never revert or "tidy" a change you did not make.
+- State in the final report which migrations must be applied and which commands were not run, so the next session can pick the task up without re-deriving it.
+- Migration history already diverged once this way: 29 versions recorded in the live database were never committed here, and 42 committed files the database never recorded — the two workflows (CLI push versus hand-named files run in the dashboard) drifted apart in July 2026. `supabase/migrations` is therefore not yet a faithful description of the live schema; reconciling it with `supabase db pull` is outstanding work.
 
 ## Next.js version rule
 

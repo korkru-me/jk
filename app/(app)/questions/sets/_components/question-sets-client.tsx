@@ -4,13 +4,18 @@ import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Search, Tag, Layers, Trash2, Edit2, Send, Download, Users } from 'lucide-react'
+import { Plus, Search, Layers, Trash2, Edit2, Send, Download, Users, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { deleteQuestionSet } from '@/lib/actions/question-sets'
 import { exportQuestionSet } from '@/lib/actions/question-export'
 import { downloadTextFile, cn } from '@/lib/utils'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { parseSections } from '@/lib/question-set-sections'
 import type { QuestionSetSummary, QuestionSetSummaryWithCreator } from '../page'
 import { Card } from '@/components/ui/card'
 
@@ -23,30 +28,25 @@ interface Props {
 export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
-  const [activeTag, setActiveTag] = useState<string | null>(null)
   const [scope, setScope] = useState<'all' | 'mine' | 'team'>('all')
 
   const totalCount = mySets.length + teamSets.length
-  const allTags = useMemo(
-    () => Array.from(new Set([...mySets, ...teamSets].flatMap(s => s.tags))),
-    [mySets, teamSets]
-  )
 
+  // Sets are found by their title — the one thing a teacher reliably remembers
+  // about a set they made.
   function matches(s: QuestionSetSummary) {
-    if (search && !s.title.toLowerCase().includes(search.toLowerCase())) return false
-    if (activeTag && !s.tags.includes(activeTag)) return false
-    return true
+    return !search || s.title.toLowerCase().includes(search.toLowerCase())
   }
 
-  const filteredMine = useMemo(() => mySets.filter(matches), [mySets, search, activeTag])
-  const filteredTeam = useMemo(() => teamSets.filter(matches), [teamSets, search, activeTag])
+  const filteredMine = useMemo(() => mySets.filter(matches), [mySets, search])
+  const filteredTeam = useMemo(() => teamSets.filter(matches), [teamSets, search])
 
   return (
     <div className="space-y-4 max-w-[1200px]">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-foreground">คลังชุดโจทย์</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{totalCount} ชุดโจทย์ — รวมโจทย์เป็นชุดไว้ใช้ซ้ำ ไม่ผูกกับห้องเรียน</p>
+          <h1 className="text-xl font-bold text-foreground">คลังแฟ้มโจทย์</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{totalCount} แฟ้มโจทย์ — รวมโจทย์ไว้เป็นแฟ้มเพื่อใช้ซ้ำ</p>
         </div>
         <div className="flex items-center gap-2">
           <ImportQuestionsButton
@@ -56,7 +56,7 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
           />
           <Link href="/questions/sets/new">
             <Button className="gap-2 shadow-sm">
-              <Plus className="w-4 h-4" /> สร้างชุดโจทย์ใหม่
+              <Plus className="w-4 h-4" /> สร้างแฟ้มโจทย์ใหม่
             </Button>
           </Link>
         </div>
@@ -98,41 +98,23 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
             <div className="relative flex-1 min-w-48 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาชื่อชุดโจทย์..."
+                placeholder="ค้นหาชื่อแฟ้มโจทย์..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 bg-card"
               />
             </div>
-            {allTags.length > 0 && (
-              <div className="flex gap-1.5 flex-wrap items-center">
-                <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                {allTags.map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
-                      activeTag === tag
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'border-border text-muted-foreground hover:border-primary/20 hover:text-primary'
-                    }`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           {(scope === 'all' || scope === 'mine') && (
             <div className="space-y-3">
-              {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">ชุดโจทย์ของฉัน</h2>}
+              {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">แฟ้มโจทย์ของฉัน</h2>}
               {mySets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">ยังไม่มีชุดโจทย์ของคุณ</p>
+                <p className="text-sm text-muted-foreground">ยังไม่มีแฟ้มโจทย์ของคุณ</p>
               ) : filteredMine.length === 0 ? (
                 <Card edge="ring" className="text-center py-16">
                   <Search className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground font-medium">ไม่พบชุดโจทย์ที่ตรงกัน</p>
+                  <p className="text-muted-foreground font-medium">ไม่พบแฟ้มโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -144,13 +126,13 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
 
           {(scope === 'all' || scope === 'team') && (
             <div className="space-y-3">
-              {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">ชุดโจทย์ที่แชร์ในทีม</h2>}
+              {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">แฟ้มโจทย์ที่แชร์ในทีม</h2>}
               {teamSets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">ยังไม่มีชุดโจทย์ที่ทีมแชร์ไว้</p>
+                <p className="text-sm text-muted-foreground">ยังไม่มีแฟ้มโจทย์ที่ทีมแชร์ไว้</p>
               ) : filteredTeam.length === 0 ? (
                 <Card edge="ring" className="text-center py-16">
                   <Search className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground font-medium">ไม่พบชุดโจทย์ที่ตรงกัน</p>
+                  <p className="text-muted-foreground font-medium">ไม่พบแฟ้มโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -169,9 +151,10 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
   const [isPending, startTransition] = useTransition()
   const [deleted, setDeleted] = useState(false)
   const isOwner = set.created_by === currentUserId
+  const sections = parseSections(set.sections)
 
   function handleDelete() {
-    if (!confirm(`ลบชุดโจทย์ "${set.title}"? ไม่สามารถกู้คืนได้`)) return
+    if (!confirm(`ลบแฟ้มโจทย์ "${set.title}"? ไม่สามารถกู้คืนได้`)) return
     startTransition(async () => {
       const res = await deleteQuestionSet(set.id)
       if (res?.error) toast.error(res.error)
@@ -184,7 +167,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
       const result = await exportQuestionSet(set.id)
       if ('error' in result) { toast.error(result.error); return }
       downloadTextFile(result.filename, result.content)
-      toast.success('ดาวน์โหลดไฟล์ชุดโจทย์แล้ว')
+      toast.success('ดาวน์โหลดไฟล์แฟ้มโจทย์แล้ว')
     })
   }
 
@@ -210,7 +193,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
               onClick={handleDelete}
               disabled={isPending}
               className="text-muted-foreground/40 hover:text-destructive transition-colors p-1"
-              title="ลบชุดโจทย์"
+              title="ลบแฟ้มโจทย์"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -223,7 +206,23 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         {set.description && (
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{set.description}</p>
         )}
-        <p className="text-xs text-muted-foreground mt-1.5">{set.valid_question_count ?? set.question_ids.length} ข้อ</p>
+        <p className="text-xs text-muted-foreground mt-1.5">
+          {sections.length > 0 && <>{sections.length} หัวข้อ · </>}
+          {set.valid_question_count ?? set.question_ids.length} ข้อ
+        </p>
+
+        {sections.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+            {sections.slice(0, 3).map(section => (
+              <span key={section.id} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                {section.title || 'ไม่ได้ตั้งชื่อ'}
+              </span>
+            ))}
+            {sections.length > 3 && (
+              <span className="text-[11px] text-muted-foreground">+{sections.length - 3}</span>
+            )}
+          </div>
+        )}
 
         {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
           <div className="flex items-center gap-1.5 flex-wrap mt-2">
@@ -243,15 +242,6 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
           </div>
         )}
 
-        {set.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {set.tags.map(tag => (
-              <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="flex items-center gap-2 pt-2 border-t border-border">
@@ -262,11 +252,45 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
             </Button>
           </Link>
         )}
-        <Link href={`/assignments/new?set=${set.id}`} className="flex-1">
-          <Button size="sm" className="w-full gap-1.5">
-            <Send className="w-3.5 h-3.5" /> ใช้มอบหมาย
-          </Button>
-        </Link>
+        {sections.length > 0 ? (
+          <div className="flex-1 flex">
+            <Link href={`/assignments/new?set=${set.id}`} className="flex-1">
+              <Button size="sm" className="w-full gap-1.5 rounded-r-none">
+                <Send className="w-3.5 h-3.5" /> ใช้มอบหมาย
+              </Button>
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button size="sm" className="rounded-l-none border-l border-primary-foreground/20 px-2" aria-label="เลือกหัวข้อที่จะมอบหมาย" />}
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>มอบหมายเฉพาะหัวข้อ</DropdownMenuLabel>
+                  {sections.map(section => (
+                    <DropdownMenuItem
+                      key={section.id}
+                      render={<Link href={`/assignments/new?set=${set.id}&sections=${section.id}`} />}
+                    >
+                      {section.title || 'หัวข้อที่ยังไม่ตั้งชื่อ'} ({section.question_ids.length} ข้อ)
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link href={`/assignments/new?set=${set.id}`} />}>
+                  ทั้งแฟ้ม ({set.valid_question_count ?? set.question_ids.length} ข้อ)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : (
+          <Link href={`/assignments/new?set=${set.id}`} className="flex-1">
+            <Button size="sm" className="w-full gap-1.5">
+              <Send className="w-3.5 h-3.5" /> ใช้มอบหมาย
+            </Button>
+          </Link>
+        )}
       </div>
     </Card>
   )
@@ -278,13 +302,13 @@ function EmptyState() {
       <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
         <Layers className="w-8 h-8 text-primary" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีชุดโจทย์ในคลัง</h3>
+      <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีแฟ้มโจทย์ในคลัง</h3>
       <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
-        รวมโจทย์จากคลังเป็นชุด ติดแท็ก แล้วนำไปมอบหมายให้ห้องเรียนได้ทีหลัง
+        รวมโจทย์จากคลังไว้ในแฟ้ม แล้วนำไปมอบหมายให้ห้องเรียนได้ทีหลัง
       </p>
       <Link href="/questions/sets/new">
         <Button className="gap-2 shadow-sm">
-          <Plus className="w-4 h-4" /> สร้างชุดโจทย์แรก
+          <Plus className="w-4 h-4" /> สร้างแฟ้มโจทย์แรก
         </Button>
       </Link>
     </Card>

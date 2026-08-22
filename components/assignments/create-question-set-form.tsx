@@ -11,26 +11,28 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { SmartTagInput } from '@/components/ui/smart-tag-input'
 import { TeamShareChips } from '@/components/questions/general-info-section'
 import { QuestionPicker } from '@/components/assignments/question-picker'
+import { SetSectionsPanel } from '@/components/questions/set-sections-panel'
+import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { Question, QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 
 interface Props {
   questions: Question[]
-  allTags: string[]
   initialSet?: QuestionSet
 }
 
-export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props) {
+export function CreateQuestionSetForm({ questions, initialSet }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const [title, setTitle] = useState(initialSet?.title ?? '')
   const [description, setDescription] = useState(initialSet?.description ?? '')
-  const [tags, setTags] = useState<string[]>(initialSet?.tags ?? [])
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSet?.question_ids ?? [])
+  const [sections, setSections] = useState<QuestionSetSection[]>(initialSet?.sections ?? [])
+  // The หัวข้อ newly ticked questions drop into. null = leave them ungrouped.
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
@@ -78,15 +80,26 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
   }
 
   function toggleQ(id: string) {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+    const isRemoving = selectedIds.includes(id)
+    const nextIds = isRemoving ? selectedIds.filter(i => i !== id) : [...selectedIds, id]
+    // Ticking a question while a หัวข้อ is focused files it there straight
+    // away — the alternative is picking everything first and then moving each
+    // question into place one by one.
+    const draft = (!isRemoving && activeSectionId)
+      ? sections.map(sec => sec.id === activeSectionId ? { ...sec, question_ids: [...sec.question_ids, id] } : sec)
+      : sections
+    const next = normalizeSetSections(draft, nextIds)
+    setSelectedIds(next.question_ids)
+    setSections(next.sections)
   }
 
-  const canSave = title.trim().length > 0 && selectedIds.length > 0
+  const canSave = title.trim().length > 0
 
   function handleSubmit() {
     startTransition(async () => {
       const payload = {
-        title: title.trim(), description: description.trim(), question_ids: selectedIds, tags,
+        title: title.trim(), description: description.trim(), question_ids: selectedIds,
+        sections,
         visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds,
       }
       const res = initialSet
@@ -94,7 +107,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
         : await createQuestionSet(payload)
       if ('error' in res) { toast.error(res.error); return }
       if (!initialSet && 'id' in res) {
-        toast.success('สร้างชุดโจทย์แล้ว')
+        toast.success('สร้างแฟ้มโจทย์แล้ว')
         router.push('/questions/sets')
       }
     })
@@ -102,7 +115,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
 
   function handleDelete() {
     if (!initialSet) return
-    if (!confirm(`ลบชุดโจทย์ "${initialSet.title}"? ไม่สามารถกู้คืนได้`)) return
+    if (!confirm(`ลบแฟ้มโจทย์ "${initialSet.title}"? ไม่สามารถกู้คืนได้`)) return
     startTransition(async () => {
       const res = await deleteQuestionSet(initialSet.id)
       if ('error' in res) { toast.error(res.error); return }
@@ -113,10 +126,10 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
   return (
     <div className="space-y-4">
       <Card padding="xl" className="space-y-4">
-        <h2 className="font-semibold text-foreground">ข้อมูลชุดโจทย์</h2>
+        <h2 className="font-semibold text-foreground">ข้อมูลแฟ้มโจทย์</h2>
 
         <div className="space-y-1.5">
-          <Label htmlFor="set-title">ชื่อชุดโจทย์ <span className="text-destructive">*</span></Label>
+          <Label htmlFor="set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
           <Input
             id="set-title"
             value={title}
@@ -135,12 +148,6 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
             placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
             rows={2}
           />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>แท็ก</Label>
-          <p className="text-xs text-muted-foreground">ใช้ค้นหา/กรองชุดโจทย์ในคลัง เช่น ฟิสิกส์ ม.4, กลศาสตร์</p>
-          <SmartTagInput allTags={allTags} tags={tags} onTagsChange={setTags} />
         </div>
 
         <div className="space-y-1.5">
@@ -168,7 +175,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นชุดโจทย์นี้</SelectItem>
+              <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้</SelectItem>
               <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
                 ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
               </SelectItem>
@@ -193,20 +200,49 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
         </div>
       </Card>
 
-      <QuestionPicker
-        questions={questions}
-        selectedIds={selectedIds}
-        onToggle={toggleQ}
-        search={search}
-        onSearchChange={setSearch}
-        diffFilter={diffFilter}
-        onDiffFilterChange={setDiffFilter}
-      />
+      <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_380px] items-start">
+        <QuestionPicker
+          questions={questions}
+          selectedIds={selectedIds}
+          onToggle={toggleQ}
+          search={search}
+          onSearchChange={setSearch}
+          diffFilter={diffFilter}
+          onDiffFilterChange={setDiffFilter}
+          showSelectedFooter={false}
+          banner={sections.length > 0 ? (
+            <div className="flex items-center gap-2 text-xs bg-primary/10 text-primary rounded-xl px-3 py-2">
+              <span className="shrink-0">กำลังเพิ่มเข้า:</span>
+              <select
+                value={activeSectionId ?? ''}
+                onChange={e => setActiveSectionId(e.target.value || null)}
+                className="bg-transparent font-medium outline-none max-w-full truncate"
+              >
+                <option value="">ยังไม่ได้จัดหัวข้อ</option>
+                {sections.map(sec => (
+                  <option key={sec.id} value={sec.id}>{sec.title || 'หัวข้อที่ยังไม่ตั้งชื่อ'}</option>
+                ))}
+              </select>
+            </div>
+          ) : undefined}
+        />
+
+        <Card padding="md" className="min-w-0 lg:sticky lg:top-4">
+          <SetSectionsPanel
+            questions={questions}
+            questionIds={selectedIds}
+            sections={sections}
+            activeSectionId={activeSectionId}
+            onActiveSectionChange={setActiveSectionId}
+            onChange={next => { setSelectedIds(next.questionIds); setSections(next.sections) }}
+          />
+        </Card>
+      </div>
 
       <div className="flex items-center justify-between pt-2">
         {initialSet ? (
           <Button type="button" variant="outline" onClick={handleDelete} disabled={isPending} className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
-            <Trash2 className="w-4 h-4" /> ลบชุดโจทย์
+            <Trash2 className="w-4 h-4" /> ลบแฟ้มโจทย์
           </Button>
         ) : (
           <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>
@@ -215,7 +251,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
         )}
         <Button type="button" onClick={handleSubmit} disabled={isPending || !canSave} className="gap-2">
           <Save className="w-4 h-4" />
-          {isPending ? 'กำลังบันทึก...' : initialSet ? 'บันทึกการแก้ไข' : 'สร้างชุดโจทย์'}
+          {isPending ? 'กำลังบันทึก...' : initialSet ? 'บันทึกการแก้ไข' : 'สร้างแฟ้มโจทย์'}
         </Button>
       </div>
     </div>

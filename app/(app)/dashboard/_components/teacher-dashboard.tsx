@@ -77,8 +77,8 @@ export function TeacherDashboard({
               href="/questions/sets"
               icon={Layers}
               value={setsCount}
-              label="ชุดโจทย์"
-              sub="ชุดที่คุณสร้างเอง"
+              label="แฟ้มโจทย์"
+              sub="แฟ้มที่คุณสร้างเอง"
             />
           </div>
 
@@ -87,7 +87,7 @@ export function TeacherDashboard({
               <Plus className="w-3.5 h-3.5" /> สร้างโจทย์
             </Link>
             <Link href="/questions/sets/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5')}>
-              <Plus className="w-3.5 h-3.5" /> สร้างชุดโจทย์
+              <Plus className="w-3.5 h-3.5" /> สร้างแฟ้มโจทย์
             </Link>
             <Link href="/classrooms/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5')}>
               <Plus className="w-3.5 h-3.5" /> สร้างห้องเรียน
@@ -121,12 +121,12 @@ export function TeacherDashboard({
           </Section>
 
           <Section
-            title="ชุดโจทย์ล่าสุด"
+            title="แฟ้มโจทย์ล่าสุด"
             href="/questions/sets"
-            seeAll={setsCount > questionSets.length ? `ดูทั้งหมด ${setsCount} ชุด` : 'ดูทั้งหมด'}
+            seeAll={setsCount > questionSets.length ? `ดูทั้งหมด ${setsCount} แฟ้ม` : 'ดูทั้งหมด'}
             isEmpty={questionSets.length === 0}
-            emptyText="ยังไม่มีชุดโจทย์"
-            emptyAction={{ href: '/questions/sets/new', label: 'สร้างชุดโจทย์แรก' }}
+            emptyText="ยังไม่มีแฟ้มโจทย์"
+            emptyAction={{ href: '/questions/sets/new', label: 'สร้างแฟ้มโจทย์แรก' }}
           >
             {questionSets.map(set => (
               <Row key={set.id} href={`/questions/sets/${set.id}/edit`} title={set.title}>
@@ -231,7 +231,7 @@ function Row({ href, title, children }: { href: string; title: string; children:
 function GettingStarted() {
   const steps = [
     { href: '/questions/new', icon: BookOpen, title: 'สร้างโจทย์', desc: 'เริ่มจากโจทย์ข้อแรกในคลังของคุณ' },
-    { href: '/questions/sets/new', icon: Layers, title: 'จัดชุดโจทย์', desc: 'รวมโจทย์หลายข้อไว้เป็นชุดเดียว' },
+    { href: '/questions/sets/new', icon: Layers, title: 'จัดแฟ้มโจทย์', desc: 'รวมโจทย์หลายข้อไว้ในแฟ้มเดียว' },
     { href: '/classrooms/new', icon: GraduationCap, title: 'สร้างห้องเรียน', desc: 'เชิญนักเรียนเข้าร่วมด้วยรหัสห้องเรียน' },
   ]
 

@@ -94,7 +94,7 @@ export function ImportQuestionsButton({ label = 'นำเข้าไฟล์'
       }
       const skipped = decision === 'skip' ? dupSet.size : 0
       toast.success(
-        (setId ? `นำเข้าชุดโจทย์แล้ว (${imported} ข้อ)` : `นำเข้าโจทย์แล้ว ${imported} ข้อ`)
+        (setId ? `นำเข้าแฟ้มโจทย์แล้ว (${imported} ข้อ)` : `นำเข้าโจทย์แล้ว ${imported} ข้อ`)
         + (skipped > 0 ? ` · ข้ามที่ซ้ำ ${skipped} ข้อ` : '')
       )
       onImported({ imported, setId })

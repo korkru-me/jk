@@ -332,6 +332,9 @@ export type AssignmentType = 'exercise' | 'exam'
 export type ShowResultsMode = 'immediate' | 'score_only' | 'after_due' | 'never'
 export type ScoreStrategy = 'best' | 'average' | 'latest'
 
+export type { QuestionSetSection } from '@/lib/question-set-sections'
+import type { QuestionSetSection } from '@/lib/question-set-sections'
+
 export interface Assignment {
   id: string
   org_id: string
@@ -351,6 +354,13 @@ export interface Assignment {
    *  NULL = show the raw structural total. */
   display_max_score: number | null
   set_id: string | null
+  /** Snapshot of the หัวข้อ the questions came from, taken when the assignment
+   *  is created — like question_ids, frozen, so editing the set afterwards
+   *  never changes an assignment already handed out. NULL = no headings. */
+  sections: QuestionSetSection[] | null
+  /** Whether those หัวข้อ are shown to students / on the printed sheet. The
+   *  teacher can group for their own sake and still hand out a plain list. */
+  show_sections: boolean
   start_at: string | null
   end_at: string | null
   duration_minutes: number | null
@@ -381,6 +391,11 @@ export interface QuestionSet {
   title: string
   description: string | null
   question_ids: string[]
+  /** หัวข้อ — the optional grouping level inside a set. A view over
+   *  question_ids (see lib/question-set-sections.ts), never a second source of
+   *  truth: [] means the set is one flat list, exactly as before sections
+   *  existed. */
+  sections: QuestionSetSection[]
   /** Count of question_ids that still resolve to an existing, visible
    *  question — question_ids can go stale (dangling) once a question is
    *  deleted, so this is never assumed equal to question_ids.length.

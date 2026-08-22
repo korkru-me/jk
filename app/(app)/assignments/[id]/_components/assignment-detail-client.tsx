@@ -16,6 +16,7 @@ import type { Assignment, Question } from '@/lib/types'
 import type { SubmissionRow } from '../page'
 import { Card } from '@/components/ui/card'
 import { questionExcerpt } from '@/lib/question-display'
+import { sectionByQuestionId, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
@@ -258,7 +259,13 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             avgScore={avgScore}
           />
         )}
-        {activeTab === 'questions' && <QuestionsTab questions={questions} />}
+        {activeTab === 'questions' && (
+          <QuestionsTab
+            questions={questions}
+            sections={parseSections(a.sections)}
+            showSections={a.show_sections !== false}
+          />
+        )}
         {activeTab === 'students' && <StudentsTab submissions={submissions} assignmentId={a.id} />}
         {activeTab === 'analytics' && <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />}
       </div>
@@ -347,7 +354,14 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
 
 // ─── Questions Tab ────────────────────────────────────────────────────────────
 
-function QuestionsTab({ questions }: { questions: Question[] }) {
+function QuestionsTab({ questions, sections, showSections }: {
+  questions: Question[]
+  sections: QuestionSetSection[]
+  showSections: boolean
+}) {
+  // The teacher always sees the หัวข้อ they grouped by, even when students
+  // don't — with a note saying so, rather than the grouping vanishing.
+  const sectionOwner = sectionByQuestionId(sections)
   const diffCounts = questions.reduce((acc, q) => {
     acc[q.difficulty] = (acc[q.difficulty] ?? 0) + 1; return acc
   }, {} as Record<string, number>)
@@ -370,9 +384,19 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
       <Card edge="ring" className="overflow-hidden">
         {questions.map((q, i) => {
           const diff = DIFF_META[q.difficulty]
+          const section = sectionOwner.get(q.id)
+          const isSectionStart = !!section?.title && sectionOwner.get(questions[i - 1]?.id)?.id !== section.id
           return (
+            <div key={q.id}>
+            {isSectionStart && (
+              <p className="flex items-center gap-2 px-5 py-2 bg-muted/60 text-xs font-semibold text-muted-foreground border-b border-border">
+                {section!.title}
+                {!showSections && (
+                  <span className="font-normal">(ไม่แสดงให้นักเรียนเห็น)</span>
+                )}
+              </p>
+            )}
             <div
-              key={q.id}
               className="flex items-center gap-4 px-5 py-3.5 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
             >
               <span className="text-sm text-muted-foreground font-medium w-7 shrink-0 text-right">{i + 1}</span>
@@ -388,6 +412,7 @@ function QuestionsTab({ questions }: { questions: Question[] }) {
                   {TYPE_SHORT[q.question_type] ?? q.question_type}
                 </span>
               </div>
+            </div>
             </div>
           )
         })}

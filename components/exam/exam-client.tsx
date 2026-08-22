@@ -24,6 +24,7 @@ import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { partLabels } from '@/lib/part-labels'
+import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, CompositePart } from '@/lib/types'
@@ -83,6 +84,9 @@ interface Props {
   durationMinutes: number | null
   startedAt: string
   config: ExamConfig
+  /** หัวข้อ snapshotted onto the assignment, already filtered by the server to
+   *  what this assignment contains. Empty/omitted = plain numbered list. */
+  sections?: QuestionSetSection[]
   // Teacher-facing "see it as a student would" mode: renders the exact same
   // UI/interactions but never calls the save/submit server actions (there is
   // no real submission row behind `submissionId` to write to), and exits via
@@ -108,7 +112,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, previewMode = false, previewReturnHref }: Props) {
+export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], previewMode = false, previewReturnHref }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, setLocalAnswers, localAnswersRef,
@@ -124,6 +128,11 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   )
   const [submitting, setSubmitting] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
+  // Runs follow the order this student actually sees (shuffling reorders
+  // submission_answers), so a shuffled exam simply breaks into short runs
+  // instead of printing headings over the wrong questions.
+  const sectionOwner = sectionByQuestionId(sections)
+  const sectionRuns = groupQuestionsBySection(answers.map(a => a.question_id), sections)
   // Preview-only: the client-side (never persisted) grading result shown
   // after a teacher clicks submit in previewMode, in place of the real
   // /submissions/[id] results page.
@@ -360,6 +369,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         <Card padding="lg" className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="font-mono text-xs">ข้อ {currentIndex + 1} / {answers.length}</Badge>
+            {sectionOwner.get(current.question_id)?.title && (
+              <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
+            )}
             {current.questions.question_type === 'mcq' && (
               <Badge variant="outline" className="text-xs">ปรนัย</Badge>
             )}
@@ -579,26 +591,42 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         {/* Nav grid */}
         <Card padding="md" className="flex-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">นำทางข้อ</p>
-          <div className="grid grid-cols-5 gap-1.5">
-            {answers.map((a, i) => {
-              const isCur = i === currentIndex
-              const isAns = hasAnswered(a.id)
-              const isFlg = flagged.has(a.id)
-              let cls = 'bg-muted text-muted-foreground'
-              if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
-              else if (isFlg) cls = 'bg-flag text-white'
-              else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
+          {(() => {
+            let numbered = 0
+            return sectionRuns.map((run, runIndex) => {
+              const startIndex = numbered
+              numbered += run.question_ids.length
               return (
-                <button
-                  key={i}
-                  onClick={() => setCurrentIndex(i)}
-                  className={`w-8 h-8 rounded-lg text-[11px] font-bold transition-all hover:scale-105 ${cls}`}
-                >
-                  {i + 1}
-                </button>
+                <div key={runIndex} className={runIndex > 0 ? 'mt-3' : undefined}>
+                  {run.title && (
+                    <p className="text-[10px] font-semibold text-muted-foreground truncate mb-1.5">{run.title}</p>
+                  )}
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {run.question_ids.map((_, offset) => {
+                      const i = startIndex + offset
+                      const a = answers[i]
+                      const isCur = i === currentIndex
+                      const isAns = hasAnswered(a.id)
+                      const isFlg = flagged.has(a.id)
+                      let cls = 'bg-muted text-muted-foreground'
+                      if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
+                      else if (isFlg) cls = 'bg-flag text-white'
+                      else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentIndex(i)}
+                          className={`w-8 h-8 rounded-lg text-[11px] font-bold transition-all hover:scale-105 ${cls}`}
+                        >
+                          {i + 1}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               )
-            })}
-          </div>
+            })
+          })()}
           <div className="mt-3 border-t pt-3 space-y-1.5">
             {[
               { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },

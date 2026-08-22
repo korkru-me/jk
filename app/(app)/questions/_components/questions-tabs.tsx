@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 const TABS = [
   { href: '/questions', label: 'โจทย์รายข้อ' },
-  { href: '/questions/sets', label: 'ชุดโจทย์' },
+  { href: '/questions/sets', label: 'แฟ้มโจทย์' },
 ]
 
 // Only shown on the two browse pages themselves — not on /questions/new,

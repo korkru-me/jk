@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { setRequiresWorkImage } from '@/lib/actions/questions'
-import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
+import { DIFF_META, TYPE_SHORT, questionExcerpt } from '@/lib/question-display'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
 import { Card } from '@/components/ui/card'
 
@@ -19,11 +19,17 @@ interface Props {
   diffFilter: string
   onDiffFilterChange: (v: string) => void
   title?: string
+  /** Rendered above the list — the set editor uses it to show which หัวข้อ
+   *  newly ticked questions will land in. */
+  banner?: React.ReactNode
+  /** The chip list of picked questions at the bottom. Off where a richer
+   *  panel already shows the selection (the set editor). */
+  showSelectedFooter?: boolean
 }
 
 export function QuestionPicker({
   questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
-  title = 'เลือกโจทย์',
+  title = 'เลือกโจทย์', banner, showSelectedFooter = true,
 }: Props) {
   const [tagFilters, setTagFilters] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
@@ -54,7 +60,10 @@ export function QuestionPicker({
 
   const filteredQs = questions.filter(q => {
     if (diffFilter !== 'all' && q.difficulty !== diffFilter) return false
-    if (search && !q.title.toLowerCase().includes(search.toLowerCase()) && !q.question_text.toLowerCase().includes(search.toLowerCase())) return false
+    // Matched against the text a teacher can actually see: searching the raw
+    // value hits markup ("class", "span") and misses a phrase that happens to
+    // straddle a tag.
+    if (search && !q.title.toLowerCase().includes(search.toLowerCase()) && !questionExcerpt(q.question_text).toLowerCase().includes(search.toLowerCase())) return false
     if (tagFilters.length > 0) {
       const qTags = (q.tags ?? []).map(t => t.toLowerCase())
       if (!tagFilters.every(f => qTags.includes(f.toLowerCase()))) return false
@@ -75,7 +84,7 @@ export function QuestionPicker({
   const orderedQs = [...pinnedQs, ...restQs]
 
   return (
-    <Card padding="xl" className="space-y-4">
+    <Card padding="xl" className="min-w-0 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-foreground">{title}</h2>
         <span className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
@@ -133,6 +142,8 @@ export function QuestionPicker({
         ))}
       </div>
 
+      {banner}
+
       <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
         {filteredQs.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground text-sm">ไม่พบโจทย์ที่ตรงกัน</div>
@@ -163,7 +174,7 @@ export function QuestionPicker({
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{q.question_text}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{questionExcerpt(q.question_text)}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`text-xs px-1.5 py-0.5 rounded border ${diff ? `${diff.badge} ${diff.border}` : 'bg-muted text-muted-foreground border-border'}`}>
@@ -189,7 +200,7 @@ export function QuestionPicker({
         })}
       </div>
 
-      {selectedIds.length > 0 && (
+      {showSelectedFooter && selectedIds.length > 0 && (
         <div className="border-t border-border pt-3">
           <p className="text-xs text-muted-foreground mb-2">โจทย์ที่เลือก ({selectedIds.length} ข้อ)</p>
           <div className="flex flex-wrap gap-1.5">

@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import { ExamClient } from '@/components/exam/exam-client'
 import { buildAssignmentAttempt } from '@/lib/assignment-attempt'
+import { parseSections } from '@/lib/question-set-sections'
 import type { Assignment, MCQOption, Question, MatchingPair } from '@/lib/types'
 
 export const metadata = { title: 'ตัวอย่างมุมมองนักเรียน — KorKru' }
@@ -130,6 +131,7 @@ export default async function AssignmentPreviewPage({
         durationMinutes={a.duration_minutes}
         startedAt={new Date().toISOString()}
         config={examConfig}
+        sections={a.show_sections === false ? [] : parseSections(a.sections)}
         previewMode
         previewReturnHref={`/assignments/${id}`}
       />
