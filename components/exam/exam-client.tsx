@@ -84,7 +84,7 @@ interface Props {
   durationMinutes: number | null
   startedAt: string
   config: ExamConfig
-  /** หัวข้อ snapshotted onto the assignment, already filtered by the server to
+  /** แฟ้มย่อย snapshotted onto the assignment, already filtered by the server to
    *  what this assignment contains. Empty/omitted = plain numbered list. */
   sections?: QuestionSetSection[]
   // Teacher-facing "see it as a student would" mode: renders the exact same

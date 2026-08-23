@@ -39,7 +39,7 @@ export default async function ExportPage({
   ])
 
   // `.in()` doesn't preserve the assignment's question order — the printed
-  // sheet and its หัวข้อ headings depend on it.
+  // sheet and its แฟ้มย่อย headings depend on it.
   const byId = new Map(((questionRows ?? []) as Question[]).map(q => [q.id, q]))
   const questions = (assignment.question_ids as string[])
     .map(qid => byId.get(qid))

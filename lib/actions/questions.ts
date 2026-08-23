@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { getMyTeamOrgs } from '@/lib/actions/team-org'
+import { dedupeTags } from '@/lib/tag-suggest'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
 
 export interface QuestionFormData {
@@ -278,6 +279,39 @@ export async function setRequiresWorkImage(id: string, value: boolean) {
   revalidatePath('/questions')
   revalidatePath('/questions/sets/[id]/edit', 'page')
   revalidatePath('/assignments/new')
+}
+
+/**
+ * Replaces the whole tag list of one question.
+ *
+ * The question bank edits tags in place on the card, so this is the one write
+ * that touches tags without going through the edit form. Ownership is checked
+ * the same way `setRequiresWorkImage` does; `.select()` is what tells an
+ * unauthorized write apart from a successful one, because an update that
+ * matches no row is not an error.
+ */
+export async function updateQuestionTags(id: string, tags: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  // Same normalization the tag input applies, so a tag added from the card and
+  // the same tag added from the form stay one tag.
+  const cleaned = dedupeTags(tags)
+
+  const { data, error } = await supabase
+    .from('questions')
+    .update({ tags: cleaned.length > 0 ? cleaned : null })
+    .eq('id', id)
+    .eq('created_by', user.id)
+    .select('id')
+
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: 'แก้ไขแท็กได้เฉพาะโจทย์ที่คุณสร้างเอง' }
+
+  revalidatePath('/questions')
+  revalidatePath(`/questions/${id}/edit`)
+  return { tags: cleaned }
 }
 
 export async function deleteQuestion(id: string) {

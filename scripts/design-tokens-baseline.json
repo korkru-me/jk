@@ -449,12 +449,6 @@
     "control": 0,
     "button": 3
   },
-  "components/questions/answer-parts-editor.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 4
-  },
   "components/questions/answer-set-controls.tsx": {
     "palette": 0,
     "card": 0,

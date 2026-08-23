@@ -34,7 +34,7 @@ export default async function PrintPage({
 
   // `.in()` returns rows in whatever order the database picked — the sheet has
   // to follow the assignment's own question order, which is also what makes
-  // หัวข้อ print as headings rather than scattered labels.
+  // แฟ้มย่อย print as headings rather than scattered labels.
   const byId = new Map(((questionRows ?? []) as Question[]).map(q => [q.id, q]))
   const questions = (assignment.question_ids as string[])
     .map(id => byId.get(id))

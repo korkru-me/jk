@@ -1,13 +1,21 @@
 /**
- * หัวข้อ (sections) inside a question set — the one optional grouping level
+ * แฟ้มย่อย (sections) inside a question set — the one optional grouping level
  * between a set and its questions.
  *
- * The flat `question_ids` array stays the source of truth for order and
- * membership: everything downstream (assignments, grading, export, print)
- * already reads it and must keep working for sets that have no sections at
- * all. `sections` is a *view* over that array — it may only reference ids the
- * set already contains, and normalising it rewrites `question_ids` so the two
- * can never drift apart.
+ * The flat `question_ids` array is the source of truth for membership *and*
+ * order: everything downstream (assignments, grading, export, print) already
+ * reads it and must keep working for sets that have no sections at all.
+ *
+ * `sections` label that array. A section may only reference ids the set
+ * already contains, and **the same question may be labelled by several
+ * sections** — a งาน–พลังงาน question belongs in both แฟ้มย่อย, and teachers
+ * assign either one. Two consequences follow, and callers must respect them:
+ *
+ * - question order is the teacher's own order in `question_ids`; it is not
+ *   derived from section order, because a question in two sections has no
+ *   single place to sit
+ * - anything that needs one section per question (printed headings, the exam
+ *   navigator) takes the first one — see `sectionByQuestionId`
  */
 
 export interface QuestionSetSection {
@@ -34,9 +42,9 @@ export function newSectionId(): string {
  * the only thing that should ever write either of them.
  *
  * - ids in a section that the set doesn't contain are dropped
- * - a question claimed by two sections stays in the first one
- * - `question_ids` is rebuilt as [section 1, section 2, …, ungrouped],
- *   so a teacher's section order *is* the question order
+ * - a question may appear in several sections, but only once within one
+ * - `question_ids` keeps the order it was given: it is the แฟ้ม's own order,
+ *   which the teacher sets in the question list
  * - empty sections are kept: a teacher naturally creates the heading first
  *   and fills it afterwards
  */
@@ -52,7 +60,6 @@ export function normalizeSetSections(
   }
 
   const usedIds = new Set<string>()
-  const claimed = new Set<string>()
   const sections: QuestionSetSection[] = []
 
   for (const raw of rawSections) {
@@ -65,21 +72,18 @@ export function normalizeSetSections(
 
     const title = typeof candidate.title === 'string' ? candidate.title.trim().slice(0, MAX_TITLE_LENGTH) : ''
 
+    const seen = new Set<string>()
     const ids: string[] = []
     for (const qid of Array.isArray(candidate.question_ids) ? candidate.question_ids : []) {
-      if (typeof qid !== 'string' || !available.has(qid) || claimed.has(qid)) continue
-      claimed.add(qid)
+      if (typeof qid !== 'string' || !available.has(qid) || seen.has(qid)) continue
+      seen.add(qid)
       ids.push(qid)
     }
 
     sections.push({ id, title, question_ids: ids })
   }
 
-  const ungrouped = questionIds.filter(id => !claimed.has(id))
-  return {
-    sections,
-    question_ids: [...sections.flatMap(s => s.question_ids), ...ungrouped],
-  }
+  return { sections, question_ids: questionIds }
 }
 
 /** Questions in the set that no section has claimed, in set order. */
@@ -91,13 +95,36 @@ export function ungroupedQuestionIds(
   return questionIds.filter(id => !claimed.has(id))
 }
 
-/** question_id → the section that owns it. */
+/**
+ * question_id → the *first* section holding it.
+ *
+ * For the surfaces that can only show one label per question: printed
+ * headings, the exam navigator, the teacher's answer view. The editor uses
+ * `sectionsByQuestionId` instead, which keeps all of them.
+ */
 export function sectionByQuestionId(
   sections: readonly QuestionSetSection[]
 ): Map<string, QuestionSetSection> {
   const map = new Map<string, QuestionSetSection>()
   for (const section of sections) {
-    for (const qid of section.question_ids) map.set(qid, section)
+    for (const qid of section.question_ids) {
+      if (!map.has(qid)) map.set(qid, section)
+    }
+  }
+  return map
+}
+
+/** question_id → every section holding it, in section order. */
+export function sectionsByQuestionId(
+  sections: readonly QuestionSetSection[]
+): Map<string, QuestionSetSection[]> {
+  const map = new Map<string, QuestionSetSection[]>()
+  for (const section of sections) {
+    for (const qid of section.question_ids) {
+      const list = map.get(qid)
+      if (list) list.push(section)
+      else map.set(qid, [section])
+    }
   }
   return map
 }
@@ -160,13 +187,20 @@ export function filterSectionsToQuestions(
     .filter(s => s.question_ids.length > 0)
 }
 
-/** Question ids belonging to the given sections, in section order. */
+/**
+ * Question ids belonging to the given sections.
+ *
+ * Deduped, and in the แฟ้ม's own order when `order` is given: a question that
+ * two of the chosen แฟ้มย่อย both hold must be assigned once, not twice.
+ */
 export function questionIdsForSections(
   sections: readonly QuestionSetSection[],
-  sectionIds: readonly string[]
+  sectionIds: readonly string[],
+  order?: readonly string[]
 ): string[] {
   const wanted = new Set(sectionIds)
-  return sections.filter(s => wanted.has(s.id)).flatMap(s => s.question_ids)
+  const ids = new Set(sections.filter(s => wanted.has(s.id)).flatMap(s => s.question_ids))
+  return order ? order.filter(id => ids.has(id)) : [...ids]
 }
 
 /** Parses whatever came back from jsonb into sections, without trusting it. */
@@ -195,8 +229,8 @@ function moveWithin<T>(items: readonly T[], index: number, delta: number): T[] {
   return next
 }
 
-/** Reorders the sections themselves. Question order follows, because
- *  normalizing rebuilds question_ids from the section order. */
+/** Reorders the แฟ้มย่อย cards. Question order is independent of this — it
+ *  lives in `question_ids` — so only the sections move. */
 export function moveSection(
   sections: readonly QuestionSetSection[],
   sectionId: string,
@@ -207,43 +241,52 @@ export function moveSection(
   return normalizeSetSections(moveWithin(sections, index, delta), questionIds)
 }
 
-/** Moves a question into a section, or out of every section when
- *  `targetSectionId` is null. Appends at the end of the target. */
-export function moveQuestionToSection(
+/**
+ * Adds or removes one section's label on one question. Other sections keep
+ * whatever they had — a question can carry several.
+ */
+export function setQuestionInSection(
   sections: readonly QuestionSetSection[],
   questionIds: readonly string[],
   questionId: string,
-  targetSectionId: string | null
+  sectionId: string,
+  member: boolean
 ): { sections: QuestionSetSection[]; question_ids: string[] } {
-  const stripped = sections.map(s => ({ ...s, question_ids: s.question_ids.filter(id => id !== questionId) }))
-  const next = targetSectionId === null
-    ? stripped
-    : stripped.map(s => (s.id === targetSectionId ? { ...s, question_ids: [...s.question_ids, questionId] } : s))
+  const next = sections.map(s => {
+    if (s.id !== sectionId) return s
+    const without = s.question_ids.filter(id => id !== questionId)
+    return { ...s, question_ids: member ? [...without, questionId] : without }
+  })
   return normalizeSetSections(next, questionIds)
 }
 
-/** Reorders a question among its own neighbours — inside its section, or
- *  among the ungrouped questions. Never moves it across that boundary; use
- *  moveQuestionToSection for that. */
-export function moveQuestionWithinGroup(
+/** Takes one question out of every section, leaving it in the แฟ้ม. */
+export function clearQuestionSections(
+  sections: readonly QuestionSetSection[],
+  questionIds: readonly string[],
+  questionId: string
+): { sections: QuestionSetSection[]; question_ids: string[] } {
+  const next = sections.map(s => ({ ...s, question_ids: s.question_ids.filter(id => id !== questionId) }))
+  return normalizeSetSections(next, questionIds)
+}
+
+/** Reorders one question within the แฟ้ม — the order students see. */
+export function moveQuestionInSet(
   sections: readonly QuestionSetSection[],
   questionIds: readonly string[],
   questionId: string,
   delta: number
 ): { sections: QuestionSetSection[]; question_ids: string[] } {
-  const owner = sections.find(s => s.question_ids.includes(questionId))
+  const index = questionIds.indexOf(questionId)
+  return normalizeSetSections(sections, moveWithin(questionIds, index, delta))
+}
 
-  if (owner) {
-    const nextSections = sections.map(s =>
-      s.id === owner.id
-        ? { ...s, question_ids: moveWithin(s.question_ids, s.question_ids.indexOf(questionId), delta) }
-        : s
-    )
-    return normalizeSetSections(nextSections, questionIds)
-  }
-
-  const loose = ungroupedQuestionIds(sections, questionIds)
-  const reordered = moveWithin(loose, loose.indexOf(questionId), delta)
-  const claimed = sections.flatMap(s => s.question_ids)
-  return normalizeSetSections(sections, [...claimed, ...reordered])
+/** Removes several questions from the set entirely. */
+export function removeQuestionsFromSet(
+  sections: readonly QuestionSetSection[],
+  questionIds: readonly string[],
+  removingIds: readonly string[]
+): { sections: QuestionSetSection[]; question_ids: string[] } {
+  const removing = new Set(removingIds)
+  return normalizeSetSections(sections, questionIds.filter(id => !removing.has(id)))
 }

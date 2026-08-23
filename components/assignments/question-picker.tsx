@@ -19,17 +19,29 @@ interface Props {
   diffFilter: string
   onDiffFilterChange: (v: string) => void
   title?: string
-  /** Rendered above the list — the set editor uses it to show which หัวข้อ
+  /** Rendered above the list — the set editor uses it to show which แฟ้มย่อย
    *  newly ticked questions will land in. */
   banner?: React.ReactNode
   /** The chip list of picked questions at the bottom. Off where a richer
    *  panel already shows the selection (the set editor). */
   showSelectedFooter?: boolean
+  /** The heading row. Off inside a dialog, which titles itself. */
+  showHeader?: boolean
+  /** `plain` drops the card surface — for embedding in a dialog, which draws
+   *  its own. */
+  surface?: 'card' | 'plain'
+  /**
+   * What the selection was before this session of picking. Given it, the list
+   * marks each row จะเพิ่ม / จะเอาออก instead of silently changing, and keeps
+   * a question the teacher just unticked pinned where they can put it back.
+   */
+  baselineIds?: string[]
 }
 
 export function QuestionPicker({
   questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
-  title = 'เลือกโจทย์', banner, showSelectedFooter = true,
+  title = 'เลือกโจทย์', banner, showSelectedFooter = true, showHeader = true, surface = 'card',
+  baselineIds,
 }: Props) {
   const [tagFilters, setTagFilters] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
@@ -76,21 +88,32 @@ export function QuestionPicker({
   // ones are already checked is painful, so piling them up front instead
   // makes review/toggling fast regardless of list size.
   const filteredIdSet = new Set(filteredQs.map(q => q.id))
-  const pinnedQs = selectedIds
+  // Pending removals stay pinned alongside the picks: unticking a question
+  // must not fling it back into a bank of thousands, where undoing the
+  // mistake means finding it again.
+  const baseline = baselineIds ?? []
+  const pinnedIds = baselineIds
+    ? [...selectedIds, ...baseline.filter(id => !selectedIds.includes(id))]
+    : selectedIds
+  const pinnedQs = pinnedIds
     .filter(id => filteredIdSet.has(id))
     .map(id => filteredQs.find(q => q.id === id)!)
   const pinnedIdSet = new Set(pinnedQs.map(q => q.id))
   const restQs = filteredQs.filter(q => !pinnedIdSet.has(q.id))
   const orderedQs = [...pinnedQs, ...restQs]
 
+  const Surface = surface === 'plain' ? PlainSurface : CardSurface
+
   return (
-    <Card padding="xl" className="min-w-0 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-foreground">{title}</h2>
-        <span className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
-          {selectedIds.length} ข้อที่เลือก
-        </span>
-      </div>
+    <Surface>
+      {showHeader && (
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-foreground">{title}</h2>
+          <span className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
+            {selectedIds.length} ข้อที่เลือก
+          </span>
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-48">
@@ -150,6 +173,11 @@ export function QuestionPicker({
         ) : orderedQs.map((q, i) => {
           const diff = DIFF_META[q.difficulty]
           const isSelected = selectedIds.includes(q.id)
+          const wasSelected = baseline.includes(q.id)
+          const pending = !baselineIds ? null
+            : isSelected && !wasSelected ? 'add'
+            : !isSelected && wasSelected ? 'remove'
+            : null
           // Divider right where the pinned (selected) block ends, only when
           // both groups are present — makes the reordering self-explanatory
           // instead of the list just silently jumping around.
@@ -163,7 +191,10 @@ export function QuestionPicker({
               )}
               <label
                 className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
-                  isSelected ? 'bg-primary/10 border-primary/20' : 'border-transparent hover:bg-muted'
+                  pending === 'add' ? 'bg-success/10 border-success/30'
+                    : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
+                    : isSelected ? 'bg-primary/10 border-primary/20'
+                    : 'border-transparent hover:bg-muted'
                 }`}
               >
                 <input
@@ -174,7 +205,13 @@ export function QuestionPicker({
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{questionExcerpt(q.question_text)}</p>
+                  {pending ? (
+                    <p className={`text-xs mt-0.5 font-medium ${pending === 'add' ? 'text-success' : 'text-destructive'}`}>
+                      {pending === 'add' ? '+ จะเพิ่มเข้าแฟ้ม' : '− จะเอาออกจากแฟ้ม'}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{questionExcerpt(q.question_text)}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`text-xs px-1.5 py-0.5 rounded border ${diff ? `${diff.badge} ${diff.border}` : 'bg-muted text-muted-foreground border-border'}`}>
@@ -221,6 +258,14 @@ export function QuestionPicker({
           </div>
         </div>
       )}
-    </Card>
+    </Surface>
   )
+}
+
+function CardSurface({ children }: { children: React.ReactNode }) {
+  return <Card padding="xl" className="min-w-0 space-y-4">{children}</Card>
+}
+
+function PlainSurface({ children }: { children: React.ReactNode }) {
+  return <div className="min-w-0 space-y-4">{children}</div>
 }

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AssignmentStatus } from '@/lib/types'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface Props {
   assignmentId: string
@@ -19,6 +20,7 @@ interface Props {
 export function AssignmentActions({ assignmentId, currentStatus, mode }: Props) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const [confirm, confirmDialog] = useConfirm()
 
   async function changeStatus(status: AssignmentStatus) {
     setLoading(true)
@@ -34,7 +36,13 @@ export function AssignmentActions({ assignmentId, currentStatus, mode }: Props) 
   }
 
   async function handleDelete() {
-    if (!confirm('ลบชุดข้อสอบนี้? ข้อมูลการสอบทั้งหมดจะถูกลบด้วย')) return
+    const ok = await confirm({
+      title: 'ลบชุดข้อสอบนี้?',
+      description: 'ข้อมูลการสอบและการส่งทั้งหมดของชุดนี้จะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     setLoading(true)
     await deleteAssignment(assignmentId)
   }
@@ -74,6 +82,7 @@ export function AssignmentActions({ assignmentId, currentStatus, mode }: Props) 
       >
         ลบ
       </Button>
+      {confirmDialog}
     </div>
   )
 }

@@ -4,8 +4,10 @@ import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Search, Layers, Trash2, Edit2, Send, Download, Users, ChevronDown } from 'lucide-react'
+import { Plus, Search, Layers, Trash2, Send, Download, Users, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { deleteQuestionSet } from '@/lib/actions/question-sets'
 import { exportQuestionSet } from '@/lib/actions/question-export'
@@ -43,8 +45,8 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
 
   return (
     <div className="space-y-4 max-w-[1200px]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-foreground">คลังแฟ้มโจทย์</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{totalCount} แฟ้มโจทย์ — รวมโจทย์ไว้เป็นแฟ้มเพื่อใช้ซ้ำ</p>
         </div>
@@ -150,11 +152,17 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
 function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; currentUserId: string }) {
   const [isPending, startTransition] = useTransition()
   const [deleted, setDeleted] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const isOwner = set.created_by === currentUserId
   const sections = parseSections(set.sections)
+  const questionCount = set.valid_question_count ?? set.question_ids.length
+  const assignHref = `/assignments/new?set=${set.id}`
+  // Clicking the card goes where the teacher can actually act: their own set
+  // opens for editing, a teammate's set (which /edit refuses) goes to มอบหมาย.
+  const cardHref = isOwner ? `/questions/sets/${set.id}/edit` : assignHref
+  const cardAction = isOwner ? 'แก้ไขแฟ้มโจทย์' : 'มอบหมายแฟ้มโจทย์'
 
   function handleDelete() {
-    if (!confirm(`ลบแฟ้มโจทย์ "${set.title}"? ไม่สามารถกู้คืนได้`)) return
     startTransition(async () => {
       const res = await deleteQuestionSet(set.id)
       if (res?.error) toast.error(res.error)
@@ -174,45 +182,43 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
   if (deleted) return null
 
   return (
-    <Card edge="ring" padding="md" className="space-y-3 flex flex-col">
-      <div className="flex items-start justify-between gap-2">
+    <Card
+      edge="ring"
+      padding="md"
+      interactive
+      className="group relative flex flex-col gap-3 transition-colors hover:ring-primary/30 focus-within:ring-primary/30"
+    >
+      {/* The whole card is the link, laid over the content rather than wrapped
+          around it: an <a> around the footer would swallow its buttons and
+          nest interactive elements. The footer sits above it on z-10. */}
+      <Link
+        href={cardHref}
+        aria-label={`${cardAction} ${set.title}`}
+        className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      />
+
+      <div className="flex items-start gap-3">
         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
           <Layers className="w-4 h-4 text-primary" />
         </div>
-        {isOwner && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleExport}
-              disabled={isPending}
-              className="text-muted-foreground/40 hover:text-primary transition-colors p-1"
-              title="ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={isPending}
-              className="text-muted-foreground/40 hover:text-destructive transition-colors p-1"
-              title="ลบแฟ้มโจทย์"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-foreground text-sm truncate transition-colors group-hover:text-primary">
+            {set.title}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {sections.length > 0 && <>{sections.length} แฟ้มย่อย · </>}
+            {questionCount} ข้อ
+          </p>
+        </div>
       </div>
 
-      <div className="flex-1">
-        <p className="font-semibold text-foreground text-sm truncate">{set.title}</p>
+      <div className="flex-1 space-y-2">
         {set.description && (
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{set.description}</p>
+          <p className="text-xs text-muted-foreground line-clamp-2">{set.description}</p>
         )}
-        <p className="text-xs text-muted-foreground mt-1.5">
-          {sections.length > 0 && <>{sections.length} หัวข้อ · </>}
-          {set.valid_question_count ?? set.question_ids.length} ข้อ
-        </p>
 
         {sections.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {sections.slice(0, 3).map(section => (
               <span key={section.id} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                 {section.title || 'ไม่ได้ตั้งชื่อ'}
@@ -225,7 +231,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         )}
 
         {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
-          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {set.organizations?.name && (
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-tint-1/10 text-tint-1">
                 {set.organizations.name}
@@ -241,57 +247,84 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
             )}
           </div>
         )}
-
       </div>
 
-      <div className="flex items-center gap-2 pt-2 border-t border-border">
-        {isOwner && (
-          <Link href={`/questions/sets/${set.id}/edit`} className="flex-1">
-            <Button variant="outline" size="sm" className="w-full gap-1.5">
-              <Edit2 className="w-3.5 h-3.5" /> แก้ไข
-            </Button>
-          </Link>
-        )}
-        {sections.length > 0 ? (
-          <div className="flex-1 flex">
-            <Link href={`/assignments/new?set=${set.id}`} className="flex-1">
-              <Button size="sm" className="w-full gap-1.5 rounded-r-none">
-                <Send className="w-3.5 h-3.5" /> ใช้มอบหมาย
-              </Button>
-            </Link>
+      <div className="relative z-10 flex items-center gap-2 pt-3 border-t border-border">
+        <div className="flex flex-1 min-w-0">
+          <Button
+            render={<Link href={assignHref} />}
+            className={cn('flex-1 min-w-0 gap-1.5', sections.length > 0 && 'rounded-r-none')}
+          >
+            <Send className="w-3.5 h-3.5" /> มอบหมาย
+          </Button>
+          {sections.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button size="sm" className="rounded-l-none border-l border-primary-foreground/20 px-2" aria-label="เลือกหัวข้อที่จะมอบหมาย" />}
+                render={<Button className="rounded-l-none border-l border-primary-foreground/20 px-2" aria-label="เลือกแฟ้มย่อยที่จะมอบหมาย" />}
               >
                 <ChevronDown className="w-3.5 h-3.5" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel>มอบหมายเฉพาะหัวข้อ</DropdownMenuLabel>
+                  <DropdownMenuLabel>มอบหมายเฉพาะแฟ้มย่อย</DropdownMenuLabel>
                   {sections.map(section => (
                     <DropdownMenuItem
                       key={section.id}
                       render={<Link href={`/assignments/new?set=${set.id}&sections=${section.id}`} />}
                     >
-                      {section.title || 'หัวข้อที่ยังไม่ตั้งชื่อ'} ({section.question_ids.length} ข้อ)
+                      {section.title || 'แฟ้มย่อยที่ยังไม่ตั้งชื่อ'} ({section.question_ids.length} ข้อ)
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link href={`/assignments/new?set=${set.id}`} />}>
-                  ทั้งแฟ้ม ({set.valid_question_count ?? set.question_ids.length} ข้อ)
+                <DropdownMenuItem render={<Link href={assignHref} />}>
+                  ทั้งแฟ้ม ({questionCount} ข้อ)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        ) : (
-          <Link href={`/assignments/new?set=${set.id}`} className="flex-1">
-            <Button size="sm" className="w-full gap-1.5">
-              <Send className="w-3.5 h-3.5" /> ใช้มอบหมาย
-            </Button>
-          </Link>
+          )}
+        </div>
+
+        {isOwner && (
+          <>
+            {/* Keeps ดาวน์โหลด/ลบ from reading as one control with มอบหมาย. */}
+            <span aria-hidden className="w-px h-5 bg-border shrink-0" />
+            <IconButton
+              label="ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)"
+              onClick={handleExport}
+              disabled={isPending}
+              className="text-muted-foreground/60 hover:text-primary"
+            >
+              <Download className="w-4 h-4" />
+            </IconButton>
+            <IconButton
+              label="ลบแฟ้มโจทย์"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={isPending}
+              className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="w-4 h-4" />
+            </IconButton>
+          </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`ลบแฟ้มโจทย์ “${set.title}”?`}
+        description={
+          <span className="space-y-2 block">
+            <span className="block">แฟ้มนี้จะถูกลบถาวร กู้คืนไม่ได้</span>
+            <span className="block">
+              โจทย์ {questionCount} ข้อข้างในยังอยู่ในคลังโจทย์ และงานที่มอบหมายไปแล้วจากแฟ้มนี้ไม่ได้รับผลกระทบ
+            </span>
+          </span>
+        }
+        confirmLabel="ลบถาวร"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
     </Card>
   )
 }

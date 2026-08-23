@@ -15,6 +15,7 @@ import { adminDeleteQuestion } from '@/lib/actions/admin'
 import type { Question, QuestionCategory } from '@/lib/types'
 import Link from 'next/link'
 import { questionExcerpt } from '@/lib/question-display'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 // ─── Filter bar ─────────────────────────────────────────────
 export function QuestionsFilter({ categories }: { categories: QuestionCategory[] }) {
@@ -107,9 +108,16 @@ type Row = Question & {
 export function QuestionTable({ questions }: { questions: Row[] }) {
   const [preview, setPreview] = useState<Row | null>(null)
   const [, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
-  function handleDelete(id: string, title: string) {
-    if (!confirm(`ลบโจทย์ "${title}"?`)) return
+  async function handleDelete(id: string, title: string) {
+    const ok = await confirm({
+      title: `ลบโจทย์ “${title}”?`,
+      description: 'โจทย์จะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await adminDeleteQuestion(id)
       if (res?.error) toast.error(res.error)
@@ -236,6 +244,7 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

@@ -11,6 +11,7 @@ import {
 import { approveQuestion, rejectQuestion } from '@/lib/actions/admin'
 import type { Question } from '@/lib/types'
 import { questionExcerpt } from '@/lib/question-display'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type Row = Question & {
   question_categories: { name: string } | null
@@ -22,9 +23,15 @@ export function PendingTable({ questions }: { questions: Row[] }) {
   const [rejectTarget, setRejectTarget] = useState<Row | null>(null)
   const [reason, setReason] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
-  function handleApprove(id: string, title: string) {
-    if (!confirm(`อนุมัติโจทย์ "${title}" เป็น Public?`)) return
+  async function handleApprove(id: string, title: string) {
+    const ok = await confirm({
+      title: `อนุมัติโจทย์ “${title}” เป็น Public?`,
+      description: 'ครูทุกคนในระบบจะเห็นและนำโจทย์ข้อนี้ไปใช้ได้',
+      confirmLabel: 'อนุมัติ',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await approveQuestion(id)
       if (res?.error) toast.error(res.error)
@@ -182,6 +189,7 @@ export function PendingTable({ questions }: { questions: Row[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

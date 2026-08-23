@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { changeUserRole, toggleSuspendUser, adminDeleteUser } from '@/lib/actions/admin'
 import type { User } from '@/lib/types'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type Row = User & { question_count: number }
 
@@ -78,6 +79,7 @@ export function UsersTable({ users }: { users: Row[] }) {
   const [roleTarget, setRoleTarget] = useState<Row | null>(null)
   const [newRole, setNewRole] = useState<'teacher' | 'student'>('teacher')
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
   function handleRoleChange() {
     if (!roleTarget) return
@@ -88,9 +90,17 @@ export function UsersTable({ users }: { users: Row[] }) {
     })
   }
 
-  function handleSuspend(user: Row) {
+  async function handleSuspend(user: Row) {
     const action = user.status === 'suspended' ? 'คืนสิทธิ์' : 'ระงับ'
-    if (!confirm(`${action}บัญชี "${user.full_name}"?`)) return
+    const ok = await confirm({
+      title: `${action}บัญชี “${user.full_name}”?`,
+      description: user.status === 'suspended'
+        ? 'ผู้ใช้จะกลับมาเข้าสู่ระบบและใช้งานได้ตามปกติ'
+        : 'ผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะคืนสิทธิ์',
+      confirmLabel: action,
+      variant: user.status === 'suspended' ? 'default' : 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await toggleSuspendUser(user.id, user.status !== 'suspended')
       if (res?.error) toast.error(res.error)
@@ -98,8 +108,14 @@ export function UsersTable({ users }: { users: Row[] }) {
     })
   }
 
-  function handleDelete(user: Row) {
-    if (!confirm(`ลบบัญชี "${user.full_name}" (${user.email}) ถาวร?`)) return
+  async function handleDelete(user: Row) {
+    const ok = await confirm({
+      title: `ลบบัญชี “${user.full_name}” ถาวร?`,
+      description: `${user.email} — บัญชีและข้อมูลของผู้ใช้นี้จะถูกลบถาวร กู้คืนไม่ได้`,
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await adminDeleteUser(user.id)
       if (res?.error) toast.error(res.error)
@@ -203,6 +219,7 @@ export function UsersTable({ users }: { users: Row[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

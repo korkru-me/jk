@@ -280,7 +280,7 @@ interface Props {
   settings: PrintSettings
   onPatch: (p: Partial<PrintSettings>) => void
   questions: Question[]
-  /** หัวข้อ headings for the sheet, empty when the งาน has none or the teacher
+  /** แฟ้มย่อย headings for the sheet, empty when the งาน has none or the teacher
    *  chose not to show them. */
   sections?: QuestionSetSection[]
   assignmentTitle: string

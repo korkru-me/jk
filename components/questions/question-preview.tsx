@@ -624,7 +624,7 @@ export function QuestionPreviewContent({
                 ? '🎉 ถูกต้องทุกข้อ!'
                 : writtenResults.some(r => r === true)
                   ? `✅ ถูก ${writtenResults.filter(r => r === true).length}/${answerParts.length} ข้อ`
-                  : '❌ ผิดทุกข้อ — ดูเฉลยด้านบน'
+                  : '❌ ผิด'
               }
             </div>
           )}

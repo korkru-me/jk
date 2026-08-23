@@ -17,6 +17,7 @@ import type { SubmissionRow } from '../page'
 import { Card } from '@/components/ui/card'
 import { questionExcerpt } from '@/lib/question-display'
 import { sectionByQuestionId, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
@@ -47,6 +48,7 @@ function seedRand(str: string, i: number) {
 export function AssignmentDetailClient({ assignment: a, questions, submissions }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
 
   const statusMeta = STATUS_META[a.status]
@@ -72,8 +74,14 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
     })
   }
 
-  function handleDelete() {
-    if (!confirm('ลบชุดข้อสอบนี้? ข้อมูลการส่งทั้งหมดจะถูกลบด้วย')) return
+  async function handleDelete() {
+    const ok = await confirm({
+      title: 'ลบชุดข้อสอบนี้?',
+      description: 'ข้อมูลการสอบและการส่งทั้งหมดของชุดนี้จะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => { await deleteAssignment(a.id) })
   }
 
@@ -269,6 +277,7 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
         {activeTab === 'students' && <StudentsTab submissions={submissions} assignmentId={a.id} />}
         {activeTab === 'analytics' && <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />}
       </div>
+      {confirmDialog}
     </div>
   )
 }
@@ -359,7 +368,7 @@ function QuestionsTab({ questions, sections, showSections }: {
   sections: QuestionSetSection[]
   showSections: boolean
 }) {
-  // The teacher always sees the หัวข้อ they grouped by, even when students
+  // The teacher always sees the แฟ้มย่อย they grouped by, even when students
   // don't — with a note saying so, rather than the grouping vanishing.
   const sectionOwner = sectionByQuestionId(sections)
   const diffCounts = questions.reduce((acc, q) => {

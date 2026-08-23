@@ -12,7 +12,7 @@ interface QuestionSetData {
   title: string
   description: string
   question_ids: string[]
-  /** หัวข้อ inside the set. Normalized server-side against question_ids, so a
+  /** แฟ้มย่อย inside the set. Normalized server-side against question_ids, so a
    *  client that sends stale or invented ids can't corrupt the set. */
   sections?: QuestionSetSection[]
   /** Optional and no longer edited anywhere: sets are found by title now. Left

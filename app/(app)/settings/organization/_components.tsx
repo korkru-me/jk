@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   Select,
   SelectContent,
@@ -249,6 +250,7 @@ function MembersList({
 }) {
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [confirm, confirmDialog] = useConfirm()
   const canManage = myRole === 'owner' || myRole === 'admin'
 
   function handleRoleChange(userId: string, newRole: 'admin' | 'teacher' | 'student') {
@@ -261,8 +263,14 @@ function MembersList({
     })
   }
 
-  function handleRemove(userId: string, name: string) {
-    if (!confirm(`ต้องการลบ "${name}" ออกจากทีมใช่ไหม?`)) return
+  async function handleRemove(userId: string, name: string) {
+    const ok = await confirm({
+      title: `นำ “${name}” ออกจากทีม?`,
+      description: 'สมาชิกจะไม่เห็นโจทย์และแฟ้มโจทย์ที่ทีมนี้แชร์ไว้อีก',
+      confirmLabel: 'นำออก',
+      variant: 'destructive',
+    })
+    if (!ok) return
     setLoadingId(userId)
     startTransition(async () => {
       const res = await removeMember(userId)
@@ -322,6 +330,7 @@ function MembersList({
           </div>
         )
       })}
+      {confirmDialog}
     </div>
   )
 }

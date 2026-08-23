@@ -19,6 +19,7 @@ import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import type { SubQuestionData, QuestionGroupPayload } from '@/lib/actions/question-groups'
 import type { Variable, Difficulty, Visibility, QuestionCategory, FormulaPreset } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface MultiStepEditorProps {
   mode: 'create' | 'edit'
@@ -96,6 +97,7 @@ export function MultiStepEditor({
   const [expandedIndex, setExpandedIndex] = useState(0)
   const [previewResults, setPreviewResults] = useState<Array<{ values: Record<string, number>; answer: number | string }> | null>(null)
   const [teamChecked, setTeamChecked] = useState(false)
+  const [confirm, confirmDialog] = useConfirm()
 
   // teamOrgId can be left over from a *private* group — where it points at the
   // creator's personal workspace, not a real team. Only count it once it's confirmed
@@ -215,9 +217,15 @@ export function MultiStepEditor({
     })
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!groupId) return
-    if (!confirm('ลบโจทย์กลุ่มนี้ทั้งหมด?')) return
+    const ok = await confirm({
+      title: 'ลบโจทย์กลุ่มนี้ทั้งหมด?',
+      description: 'ทุกข้อย่อยในกลุ่มจะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await deleteQuestionGroup(groupId)
       if (res?.error) toast.error(res.error)
@@ -409,6 +417,7 @@ export function MultiStepEditor({
           </Button>
         )}
       </div>
+      {confirmDialog}
     </div>
   )
 }

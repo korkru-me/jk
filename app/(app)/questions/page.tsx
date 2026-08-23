@@ -5,6 +5,7 @@ import type { Question } from '@/lib/types'
 import { computeQuestionStats, type GradedAnswerRow, type QuestionStats } from '@/lib/question-stats'
 import { QuestionBankClient } from './_components/question-bank-client'
 import { escapeLike } from '@/lib/utils'
+import { rankTagsByUse } from '@/lib/tag-suggest'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
 
@@ -152,6 +153,32 @@ function readTeamFilters(sp: Record<string, string | string[] | undefined>): Tea
   }
 }
 
+/**
+ * The tags actually in this teacher's bank, most-used first.
+ *
+ * The tag filter used to run off a hardcoded list, which went stale the moment
+ * anyone tagged a question with something else. Reads only the `tags` column,
+ * and pages, because the 1,000-row cap would otherwise silently drop the tail
+ * of a large bank — the same reason `fetchAllRows` exists above.
+ */
+async function fetchOwnTags(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string[]> {
+  const { rows, error } = await fetchAllRows<{ tags: string[] | null }>((from, to) =>
+    supabase
+      .from('questions')
+      .select('tags')
+      .eq('created_by', userId)
+      .not('tags', 'is', null)
+      .order('id')
+      .range(from, to)
+  )
+  if (error) console.error('[questions/page] tag query failed:', error)
+
+  return rankTagsByUse(rows.map(row => row.tags))
+}
+
 export default async function QuestionsPage({
   searchParams,
 }: {
@@ -190,7 +217,7 @@ export default async function QuestionsPage({
   if (filters.difficulty !== 'all') ownQuery = ownQuery.eq('difficulty', filters.difficulty)
   if (filters.tag) ownQuery = ownQuery.contains('tags', [filters.tag])
 
-  const [{ data: questions, error, count: ownTotal }, { data: membershipRows }, { count: unfilteredTotal }] = await Promise.all([
+  const [{ data: questions, error, count: ownTotal }, { data: membershipRows }, { count: unfilteredTotal }, allTags] = await Promise.all([
     ownQuery.order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, from + QUESTIONS_PER_PAGE - 1),
     supabase
       .from('organization_members')
@@ -203,6 +230,7 @@ export default async function QuestionsPage({
       .select('id', { count: 'exact', head: true })
       .eq('created_by', user.id)
       .or('group_id.is.null,order_in_group.eq.0'),
+    fetchOwnTags(supabase, user.id),
   ])
 
   if (error) console.error('[questions/page] query failed:', error)
@@ -339,6 +367,7 @@ export default async function QuestionsPage({
       myTeams={myTeams.map(t => ({ id: t.id, name: t.name }))}
       currentUserId={user.id}
       filters={filters}
+      allTags={allTags}
       matchCount={ownTotal ?? 0}
       totalCount={unfilteredTotal ?? 0}
       perPage={QUESTIONS_PER_PAGE}

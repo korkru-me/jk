@@ -16,7 +16,7 @@ interface Props {
   classroomName: string
   questions: Question[]
   students: StudentSheet[]
-  /** หัวข้อ printed as headings between questions. Empty = plain list. */
+  /** แฟ้มย่อย printed as headings between questions. Empty = plain list. */
   sections?: QuestionSetSection[]
 }
 
@@ -66,8 +66,8 @@ interface WorksheetPageProps {
 
 function WorksheetPage({ student, questions, assignmentId, assignmentTitle, classroomName, seed, sections }: WorksheetPageProps) {
   // Headings come from the questions' own order on the sheet, so question
-  // numbering stays a single run 1..n across หัวข้อ — the number a student
-  // writes on the answer sheet must not restart per หัวข้อ.
+  // numbering stays a single run 1..n across แฟ้มย่อย — the number a student
+  // writes on the answer sheet must not restart per แฟ้มย่อย.
   const sectionOwner = sectionByQuestionId(sections)
   // Generate deterministic-ish random values per student using seed concept
   const questionValues = questions.map(q => {

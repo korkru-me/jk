@@ -11,11 +11,13 @@ import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-d
 import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { cn, downloadTextFile } from '@/lib/utils'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
+import { QuestionTagsEditor } from './question-tags-editor'
 import type { QuestionWithCategory } from '../page'
 import { questionExcerpt } from '@/lib/question-display'
 
@@ -28,10 +30,13 @@ interface Props {
   myTeams: { id: string; name: string }[]
   /** Item analysis, absent until the question has been answered in a graded attempt. */
   stats?: QuestionStats
+  /** Every tag in view, offered as suggestions when adding one from this card. */
+  allTags: string[]
 }
 
-export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats }: Props) {
+export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags }: Props) {
   const router = useRouter()
+  const [confirm, confirmDialog] = useConfirm()
   const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [requiresWorkImage, setRequiresWorkImageLocal] = useState(q.requires_work_image)
@@ -41,8 +46,14 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   const pPercent = stats ? Math.round(stats.pValue * 100) : null
   const rMeta = stats?.discrimination != null ? discriminationLabel(stats.discrimination) : null
 
-  function handleDelete() {
-    if (!confirm('ลบโจทย์นี้? ไม่สามารถกู้คืนได้')) return
+  async function handleDelete() {
+    const ok = await confirm({
+      title: 'ลบโจทย์นี้?',
+      description: `“${q.title}” จะถูกลบถาวร กู้คืนไม่ได้`,
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => { await deleteQuestion(q.id) })
   }
 
@@ -130,11 +141,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                   {q.question_categories.name}
                 </span>
               )}
-              {(q.tags ?? []).slice(0, 2).map(tag => (
-                <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                  #{tag}
-                </span>
-              ))}
+              <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />
             </div>
 
             {/* Work-image requirement toggle (written questions only) */}
@@ -305,6 +312,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
           </div>
         </div>
       </div>
+      {confirmDialog}
     </Card>
   )
 }

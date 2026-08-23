@@ -74,7 +74,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [selectedIds, setSelectedIds] = useState<string[]>(
     (preselectedSet?.question_ids ?? []).filter(id => questions.some(q => q.id === id))
   )
-  // หัวข้อ carried over from the แฟ้มโจทย์ these questions came from. Trimmed
+  // แฟ้มย่อย carried over from the แฟ้มโจทย์ these questions came from. Trimmed
   // down to the questions actually assigned when the งาน is created.
   const [sections, setSections] = useState<QuestionSetSection[]>(
     parseSections(preselectedSet?.sections)
@@ -118,7 +118,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setSelectedIds(prev => Array.from(new Set([...prev, ...validIds])))
     // Sections follow their questions in. Ids already claimed by an earlier
     // แฟ้ม stay where they are, so two แฟ้ม can be merged without a question
-    // showing up under two หัวข้อ.
+    // showing up under two แฟ้มย่อย.
     setSections(prev => {
       const claimed = new Set(prev.flatMap(sec => sec.question_ids))
       const incoming = parseSections(set.sections)
@@ -137,7 +137,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setClassroomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
-  // What survives of the หัวข้อ after the teacher's own picking.
+  // What survives of the แฟ้มย่อย after the teacher's own picking.
   const assignedSections = filterSectionsToQuestions(sections, selectedIds)
 
   const previewQuestions = selectedIds
@@ -608,10 +608,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           <div className="space-y-2">
             {[
               ...(assignedSections.length > 0 ? [{
-                label: 'แสดงชื่อหัวข้อให้นักเรียนเห็น',
+                label: 'แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น',
                 desc: shuffleQ
-                  ? `${assignedSections.length} หัวข้อ — สับลำดับข้ออยู่ หัวข้อจะแสดงกำกับรายข้อแทนหัวเรื่อง`
-                  : `${assignedSections.length} หัวข้อจากแฟ้มโจทย์ เช่น "${assignedSections[0].title || 'ไม่ได้ตั้งชื่อ'}"`,
+                  ? `${assignedSections.length} แฟ้มย่อย — สับลำดับข้ออยู่ ชื่อแฟ้มย่อยจะแสดงกำกับรายข้อแทนหัวเรื่อง`
+                  : `${assignedSections.length} แฟ้มย่อยจากแฟ้มโจทย์ เช่น "${assignedSections[0].title || 'ไม่ได้ตั้งชื่อ'}"`,
                 icon: Layers,
                 value: showSections,
                 set: setShowSections,

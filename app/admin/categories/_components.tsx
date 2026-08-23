@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { createCategory, updateCategory, deleteCategory, reorderCategory, seedGradeCategories, bulkCreateCategories } from '@/lib/actions/admin'
 import { Textarea } from '@/components/ui/textarea'
 import type { QuestionCategory } from '@/lib/types'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type CategoryWithCount = QuestionCategory & { question_count: number; children?: CategoryWithCount[] }
 
@@ -26,9 +27,16 @@ function CategoryRow({
   onAddChild: (parentId: string) => void
 }) {
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
-  function handleDelete() {
-    if (!confirm(`ลบหมวด "${cat.name}"?`)) return
+  async function handleDelete() {
+    const ok = await confirm({
+      title: `ลบหมวด “${cat.name}”?`,
+      description: 'หมวดนี้จะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await deleteCategory(cat.id)
       if (res?.error) toast.error(res.error)
@@ -61,6 +69,7 @@ function CategoryRow({
         <Button variant="link" size="xs" onClick={() => onEdit(cat)} className="text-muted-foreground">แก้ไข</Button>
         <Button variant="link" size="xs" onClick={handleDelete} disabled={isPending} className="disabled:opacity-50">ลบ</Button>
       </div>
+      {confirmDialog}
     </div>
   )
 }

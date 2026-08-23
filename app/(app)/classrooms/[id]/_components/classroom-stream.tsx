@@ -14,6 +14,7 @@ import {
 } from '@/lib/actions/classroom-posts'
 import type { ClassroomPost } from '@/lib/types'
 import { IconButton } from '@/components/ui/icon-button'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Card } from '@/components/ui/card'
 
 interface Props {
@@ -86,6 +87,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
   const [showComments, setShowComments] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
   const [isCommentPending, startCommentTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
   const authorName = post.users?.full_name ?? 'ครูผู้สอน'
   const initials = authorName.slice(0, 2)
@@ -117,8 +119,14 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
     })
   }
 
-  function remove() {
-    if (!confirm('ลบประกาศนี้?')) return
+  async function remove() {
+    const ok = await confirm({
+      title: 'ลบประกาศนี้?',
+      description: 'ประกาศและความคิดเห็นทั้งหมดจะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     setMenuOpen(false)
     startTransition(async () => {
       const res = await deleteClassroomPost(post.id, classroomId)
@@ -248,6 +256,7 @@ function PostCard({ post, classroomId, canManage }: { post: ClassroomPost; class
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   )
 }

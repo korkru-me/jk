@@ -229,9 +229,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
                 <Layers className="w-4 h-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">แสดงชื่อหัวข้อให้นักเรียนเห็น</p>
+                <p className="text-sm font-medium text-foreground">แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น</p>
                 <p className="text-xs text-muted-foreground">
-                  {assignmentSections.length} หัวข้อ — ลำดับและเลขข้อไม่เปลี่ยนไม่ว่าจะเปิดหรือปิด
+                  {assignmentSections.length} แฟ้มย่อย — ลำดับและเลขข้อไม่เปลี่ยนไม่ว่าจะเปิดหรือปิด
                 </p>
               </div>
             </div>

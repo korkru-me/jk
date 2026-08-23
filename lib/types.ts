@@ -354,11 +354,11 @@ export interface Assignment {
    *  NULL = show the raw structural total. */
   display_max_score: number | null
   set_id: string | null
-  /** Snapshot of the หัวข้อ the questions came from, taken when the assignment
+  /** Snapshot of the แฟ้มย่อย the questions came from, taken when the assignment
    *  is created — like question_ids, frozen, so editing the set afterwards
    *  never changes an assignment already handed out. NULL = no headings. */
   sections: QuestionSetSection[] | null
-  /** Whether those หัวข้อ are shown to students / on the printed sheet. The
+  /** Whether those แฟ้มย่อย are shown to students / on the printed sheet. The
    *  teacher can group for their own sake and still hand out a plain list. */
   show_sections: boolean
   start_at: string | null
@@ -391,7 +391,7 @@ export interface QuestionSet {
   title: string
   description: string | null
   question_ids: string[]
-  /** หัวข้อ — the optional grouping level inside a set. A view over
+  /** แฟ้มย่อย — the optional grouping level inside a set. A view over
    *  question_ids (see lib/question-set-sections.ts), never a second source of
    *  truth: [] means the set is one flat list, exactly as before sections
    *  existed. */

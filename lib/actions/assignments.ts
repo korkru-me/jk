@@ -17,11 +17,11 @@ interface CreateAssignmentData {
   question_points?: Record<string, number> | null
   display_max_score?: number | null
   set_id?: string
-  /** หัวข้อ to freeze onto this assignment, normally copied from the แฟ้มโจทย์
+  /** แฟ้มย่อย to freeze onto this assignment, normally copied from the แฟ้มโจทย์
    *  it was built from. Filtered server-side to questions this assignment
    *  actually contains. */
   sections?: QuestionSetSection[]
-  /** Whether those หัวข้อ appear for students and on the printed sheet. */
+  /** Whether those แฟ้มย่อย appear for students and on the printed sheet. */
   show_sections?: boolean
   start_at: string | null
   end_at: string | null
@@ -60,7 +60,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       .maybeSingle()
     if (!set) return { error: 'ไม่พบแฟ้มโจทย์' }
     // Keep the teacher's own choice and order — trimming questions, or
-    // assigning a single หัวข้อ, both have to survive this — while still
+    // assigning a single แฟ้มย่อย, both have to survive this — while still
     // refusing any id the แฟ้ม doesn't contain. Falls back to the whole แฟ้ม
     // when nothing survives, which is what a caller sending no question_ids
     // at all relies on.
@@ -169,7 +169,7 @@ interface UpdateAssignmentData {
   question_points?: Record<string, number> | null
   display_max_score?: number | null
   show_results: ShowResultsMode
-  /** Only the visibility of the frozen หัวข้อ is editable after the fact —
+  /** Only the visibility of the frozen แฟ้มย่อย is editable after the fact —
    *  the grouping itself belongs to the แฟ้มโจทย์ this งาน came from. */
   show_sections?: boolean
 }

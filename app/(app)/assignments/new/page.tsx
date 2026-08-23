@@ -85,10 +85,12 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     const allSections = parseSections(preselectedSet.sections)
     const chosen = allSections.filter(section => wanted.includes(section.id))
     if (chosen.length > 0) {
-      const questionIds = questionIdsForSections(allSections, wanted)
+      // Ordered by the แฟ้ม and deduped: a question two of the chosen
+      // แฟ้มย่อย both hold must be assigned once.
+      const questionIds = questionIdsForSections(allSections, wanted, preselectedSet.question_ids)
       preselectedSet = {
         ...preselectedSet,
-        // One หัวข้อ names the งาน; several keep the แฟ้ม's own name.
+        // One แฟ้มย่อย names the งาน; several keep the แฟ้ม's own name.
         title: chosen.length === 1 && chosen[0].title
           ? `${preselectedSet.title} — ${chosen[0].title}`
           : preselectedSet.title,

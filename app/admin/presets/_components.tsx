@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { createPreset, updatePreset, deletePreset } from '@/lib/actions/admin'
 import type { FormulaPreset, Variable, QuestionCategory } from '@/lib/types'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type Preset = FormulaPreset & { question_categories: { name: string } | null }
 
@@ -34,6 +35,7 @@ export function PresetsTable({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [jsonError, setJsonError] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
   function openCreate() {
     setForm(EMPTY_FORM)
@@ -93,8 +95,14 @@ export function PresetsTable({
     })
   }
 
-  function handleDelete(id: string, name: string) {
-    if (!confirm(`ลบสูตร "${name}"?`)) return
+  async function handleDelete(id: string, name: string) {
+    const ok = await confirm({
+      title: `ลบสูตร “${name}”?`,
+      description: 'สูตรนี้จะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await deletePreset(id)
       if (res?.error) toast.error(res.error)
@@ -197,6 +205,7 @@ export function PresetsTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

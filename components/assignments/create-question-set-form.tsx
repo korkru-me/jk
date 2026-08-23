@@ -13,7 +13,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { TeamShareChips } from '@/components/questions/general-info-section'
 import { QuestionPicker } from '@/components/assignments/question-picker'
-import { SetSectionsPanel } from '@/components/questions/set-sections-panel'
+import { SetStructurePanel } from '@/components/questions/set-structure-panel'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
+} from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { Question, QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
@@ -31,8 +35,12 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
   const [description, setDescription] = useState(initialSet?.description ?? '')
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSet?.question_ids ?? [])
   const [sections, setSections] = useState<QuestionSetSection[]>(initialSet?.sections ?? [])
-  // The หัวข้อ newly ticked questions drop into. null = leave them ungrouped.
-  const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
+  // The คลัง picker stages its changes: draftIds is what the teacher is
+  // building, applied to the แฟ้ม only when they confirm. Unticking a question
+  // by accident then has no effect until it is reviewed in the summary.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [draftIds, setDraftIds] = useState<string[]>([])
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
@@ -79,18 +87,29 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
     }
   }
 
-  function toggleQ(id: string) {
-    const isRemoving = selectedIds.includes(id)
-    const nextIds = isRemoving ? selectedIds.filter(i => i !== id) : [...selectedIds, id]
-    // Ticking a question while a หัวข้อ is focused files it there straight
-    // away — the alternative is picking everything first and then moving each
-    // question into place one by one.
-    const draft = (!isRemoving && activeSectionId)
-      ? sections.map(sec => sec.id === activeSectionId ? { ...sec, question_ids: [...sec.question_ids, id] } : sec)
-      : sections
-    const next = normalizeSetSections(draft, nextIds)
+  function openPicker() {
+    setDraftIds(selectedIds)
+    setPickerOpen(true)
+  }
+
+  /** The คลัง picker only ever adds to the แฟ้ม. Filing a question into a
+   *  แฟ้มย่อย is a separate step, in that แฟ้มย่อย's own dialog. */
+  function toggleDraft(id: string) {
+    setDraftIds(prev => (prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]))
+  }
+
+  const pickerAdded = draftIds.filter(id => !selectedIds.includes(id))
+  const pickerRemoved = selectedIds.filter(id => !draftIds.includes(id))
+
+  function confirmPicker() {
+    const next = normalizeSetSections(sections, draftIds)
     setSelectedIds(next.question_ids)
     setSections(next.sections)
+    setPickerOpen(false)
+    const parts = []
+    if (pickerAdded.length) parts.push(`เพิ่ม ${pickerAdded.length} ข้อ`)
+    if (pickerRemoved.length) parts.push(`เอาออก ${pickerRemoved.length} ข้อ`)
+    if (parts.length) toast.success(`${parts.join(' · ')} แล้ว — อย่าลืมกดบันทึก`)
   }
 
   const canSave = title.trim().length > 0
@@ -115,7 +134,6 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
 
   function handleDelete() {
     if (!initialSet) return
-    if (!confirm(`ลบแฟ้มโจทย์ "${initialSet.title}"? ไม่สามารถกู้คืนได้`)) return
     startTransition(async () => {
       const res = await deleteQuestionSet(initialSet.id)
       if ('error' in res) { toast.error(res.error); return }
@@ -200,48 +218,88 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
         </div>
       </Card>
 
-      <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_380px] items-start">
-        <QuestionPicker
-          questions={questions}
-          selectedIds={selectedIds}
-          onToggle={toggleQ}
-          search={search}
-          onSearchChange={setSearch}
-          diffFilter={diffFilter}
-          onDiffFilterChange={setDiffFilter}
-          showSelectedFooter={false}
-          banner={sections.length > 0 ? (
-            <div className="flex items-center gap-2 text-xs bg-primary/10 text-primary rounded-xl px-3 py-2">
-              <span className="shrink-0">กำลังเพิ่มเข้า:</span>
-              <select
-                value={activeSectionId ?? ''}
-                onChange={e => setActiveSectionId(e.target.value || null)}
-                className="bg-transparent font-medium outline-none max-w-full truncate"
-              >
-                <option value="">ยังไม่ได้จัดหัวข้อ</option>
-                {sections.map(sec => (
-                  <option key={sec.id} value={sec.id}>{sec.title || 'หัวข้อที่ยังไม่ตั้งชื่อ'}</option>
-                ))}
-              </select>
-            </div>
-          ) : undefined}
-        />
+      <SetStructurePanel
+        questions={questions}
+        questionIds={selectedIds}
+        sections={sections}
+        onChange={next => { setSelectedIds(next.questionIds); setSections(next.sections) }}
+        onAddQuestions={openPicker}
+      />
 
-        <Card padding="md" className="min-w-0 lg:sticky lg:top-4">
-          <SetSectionsPanel
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>เพิ่มโจทย์จากคลัง</DialogTitle>
+            <DialogDescription>
+              ติ๊กเพื่อเลือก แล้วกดยืนยันด้านล่าง — ยังไม่มีอะไรเปลี่ยนจนกว่าจะกดยืนยัน
+            </DialogDescription>
+          </DialogHeader>
+
+          <QuestionPicker
             questions={questions}
-            questionIds={selectedIds}
-            sections={sections}
-            activeSectionId={activeSectionId}
-            onActiveSectionChange={setActiveSectionId}
-            onChange={next => { setSelectedIds(next.questionIds); setSections(next.sections) }}
+            selectedIds={draftIds}
+            baselineIds={selectedIds}
+            onToggle={toggleDraft}
+            search={search}
+            onSearchChange={setSearch}
+            diffFilter={diffFilter}
+            onDiffFilterChange={setDiffFilter}
+            showSelectedFooter={false}
+            showHeader={false}
+            surface="plain"
           />
-        </Card>
-      </div>
+
+          <DialogFooter className="sm:items-center sm:justify-between">
+            <span className="text-sm">
+              {pickerAdded.length === 0 && pickerRemoved.length === 0 ? (
+                <span className="text-muted-foreground">ในแฟ้มนี้มี {selectedIds.length} ข้อ</span>
+              ) : (
+                <span className="flex items-center gap-2 flex-wrap">
+                  {pickerAdded.length > 0 && (
+                    <span className="text-success font-medium">+ เพิ่ม {pickerAdded.length} ข้อ</span>
+                  )}
+                  {pickerRemoved.length > 0 && (
+                    <span className="text-destructive font-medium">− เอาออก {pickerRemoved.length} ข้อ</span>
+                  )}
+                </span>
+              )}
+            </span>
+            <span className="flex items-center gap-2">
+              <DialogClose render={<Button type="button" variant="outline" />}>ยกเลิก</DialogClose>
+              <Button
+                type="button"
+                onClick={confirmPicker}
+                disabled={pickerAdded.length === 0 && pickerRemoved.length === 0}
+              >
+                ยืนยันการเปลี่ยนแปลง
+              </Button>
+            </span>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {initialSet && (
+        <ConfirmDialog
+          open={confirmingDelete}
+          onOpenChange={setConfirmingDelete}
+          title={`ลบแฟ้มโจทย์ “${initialSet.title}”?`}
+          description={
+            <span className="space-y-2 block">
+              <span className="block">แฟ้มนี้จะถูกลบถาวร กู้คืนไม่ได้</span>
+              <span className="block">
+                โจทย์ {selectedIds.length} ข้อข้างในยังอยู่ในคลังโจทย์ และงานที่มอบหมายไปแล้วจากแฟ้มนี้ไม่ได้รับผลกระทบ
+              </span>
+            </span>
+          }
+          confirmLabel="ลบถาวร"
+          variant="destructive"
+          onConfirm={handleDelete}
+        />
+      )}
 
       <div className="flex items-center justify-between pt-2">
         {initialSet ? (
-          <Button type="button" variant="outline" onClick={handleDelete} disabled={isPending} className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
+          <Button type="button" variant="outline" onClick={() => setConfirmingDelete(true)} disabled={isPending} className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
             <Trash2 className="w-4 h-4" /> ลบแฟ้มโจทย์
           </Button>
         ) : (
