@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { ArrowRight, Sparkles } from 'lucide-react'
 
+import { HeroHeadline } from '@/components/landing/hero-headline'
+
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden bg-card">
@@ -18,14 +20,7 @@ export function HeroSection() {
         </div>
 
         {/* Headline */}
-        <h1 className="mx-auto max-w-4xl text-5xl font-extrabold leading-tight tracking-tight text-foreground sm:text-6xl lg:text-7xl">
-          ก่อการเรียนรู้{' '}
-          <span className="relative">
-            <span className="relative z-10 bg-gradient-to-r from-primary to-ring bg-clip-text text-transparent">
-              โดยครู
-            </span>
-          </span>
-        </h1>
+        <HeroHeadline />
 
         {/* CTA Buttons */}
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
