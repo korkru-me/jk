@@ -6,21 +6,23 @@
  *
  * วิทยาศาสตร์และเทคโนโลยีแยกเป็นรายวิชาย่อย เพราะคลังข้อสอบตั้งต้นจาก
  * ฟิสิกส์ และต้องรู้ว่าครูที่เข้ามาสอนวิชาไหนในกลุ่มสาระเดียวกัน
+ *
+ * เรียงเป็นรายการเดียวไม่แบ่งหัวข้อย่อย — ทุกกลุ่มสาระอยู่ระดับเดียวกัน
  */
 
 export const SUBJECT_GROUPS = [
-  { value: 'science_physics', label: 'วิทยาศาสตร์และเทคโนโลยี (ฟิสิกส์)', group: 'science' },
-  { value: 'science_chemistry', label: 'วิทยาศาสตร์และเทคโนโลยี (เคมี)', group: 'science' },
-  { value: 'science_biology', label: 'วิทยาศาสตร์และเทคโนโลยี (ชีววิทยา)', group: 'science' },
-  { value: 'science_general', label: 'วิทยาศาสตร์และเทคโนโลยี (วิทยาศาสตร์ทั่วไป)', group: 'science' },
-  { value: 'math', label: 'คณิตศาสตร์', group: 'other' },
-  { value: 'arts', label: 'ศิลปะ', group: 'other' },
-  { value: 'thai', label: 'ภาษาไทย', group: 'other' },
-  { value: 'foreign_language', label: 'ภาษาต่างประเทศ', group: 'other' },
-  { value: 'social_studies', label: 'สังคมศึกษา ศาสนา และวัฒนธรรม', group: 'other' },
-  { value: 'occupations', label: 'การงานอาชีพและเทคโนโลยี', group: 'other' },
-  { value: 'health_pe', label: 'สุขศึกษาและพลศึกษา', group: 'other' },
-  { value: 'other', label: 'อื่นๆ (โปรดระบุ)', group: 'other' },
+  { value: 'science_physics', label: 'วิทยาศาสตร์และเทคโนโลยี (ฟิสิกส์)' },
+  { value: 'science_chemistry', label: 'วิทยาศาสตร์และเทคโนโลยี (เคมี)' },
+  { value: 'science_biology', label: 'วิทยาศาสตร์และเทคโนโลยี (ชีววิทยา)' },
+  { value: 'science_general', label: 'วิทยาศาสตร์และเทคโนโลยี (วิทยาศาสตร์ทั่วไป)' },
+  { value: 'math', label: 'คณิตศาสตร์' },
+  { value: 'arts', label: 'ศิลปะ' },
+  { value: 'thai', label: 'ภาษาไทย' },
+  { value: 'foreign_language', label: 'ภาษาต่างประเทศ' },
+  { value: 'social_studies', label: 'สังคมศึกษา ศาสนา และวัฒนธรรม' },
+  { value: 'occupations', label: 'การงานอาชีพและเทคโนโลยี' },
+  { value: 'health_pe', label: 'สุขศึกษาและพลศึกษา' },
+  { value: 'other', label: 'อื่นๆ (โปรดระบุ)' },
 ] as const
 
 export type SubjectGroup = (typeof SUBJECT_GROUPS)[number]['value']

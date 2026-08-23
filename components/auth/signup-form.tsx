@@ -167,20 +167,11 @@ export function SignupForm() {
             <option value="" disabled>
               เลือกกลุ่มสาระการเรียนรู้
             </option>
-            <optgroup label="กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี">
-              {SUBJECT_GROUPS.filter((s) => s.group === 'science').map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="กลุ่มสาระการเรียนรู้อื่น">
-              {SUBJECT_GROUPS.filter((s) => s.group === 'other').map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </optgroup>
+            {SUBJECT_GROUPS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
           </NativeSelect>
           {errors.subject_group && (
             <p className="text-xs text-destructive">{errors.subject_group.message}</p>
