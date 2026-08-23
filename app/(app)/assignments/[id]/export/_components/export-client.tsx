@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { Assignment, Question } from '@/lib/types'
 import { PrintSettingsSidebar } from './print-settings-sidebar'
 import { PDFPreview } from './pdf-preview'
+import { parseSections } from '@/lib/question-set-sections'
 import { ExportProgressModal } from './export-progress-modal'
 
 export type PrintSettings = {
@@ -102,6 +103,7 @@ export function ExportClient({ assignment, questions, students, assignmentId }: 
             settings={settings}
             onPatch={patch}
             questions={questions}
+            sections={assignment.show_sections === false ? [] : parseSections(assignment.sections)}
             assignmentTitle={assignment.title}
             classroomName={assignment.classrooms?.name ?? ''}
             assignmentId={assignmentId}

@@ -12,7 +12,6 @@ import { SolutionSection } from '../solution-section'
 import { SubQuestionFromEquation } from './sub-question-from-equation'
 import { TestRunPanel } from './test-run-panel'
 import { TolerancePicker } from './tolerance-picker'
-import { UnitField } from './unit-field'
 import { VarChip } from './var-chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -191,6 +190,9 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       variables, logic_rules: logicRules,
       answer_parts: partsWithTolerance,
       answer_formula: first.formula,
+      // No editor writes `unit` any more — teachers type the unit into the answer
+      // template instead ("ตอบ [คำตอบ] J"). It is still carried through so questions
+      // saved with a unit keep showing it next to the answer box after an edit.
       answer_unit: first.unit,
       answer_tolerance: globalTolerance,
       mcq_options: [],
@@ -244,7 +246,6 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         </Button>
         <p className="text-[11px] text-muted-foreground">ใช้ <code className="bg-muted px-1 rounded">[คำตอบ]</code> เพื่อระบุตำแหน่งช่องกรอกคำตอบของนักเรียน</p>
       </div>
-      <UnitField value={answerParts[0].unit ?? ''} onChange={unit => updatePart(0, { unit })} />
     </>
   )
 
@@ -411,7 +412,6 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
                     onChange={e => updatePart(i, { formula: e.target.value })}
                     placeholder="เช่น 9.8"
                   />
-                  <UnitField value={answerParts[i]?.unit ?? ''} onChange={unit => updatePart(i, { unit })} />
                 </div>
               ))}
             </section>

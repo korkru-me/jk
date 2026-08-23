@@ -1,17 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
+import { fetchBankQuestions } from '@/lib/question-bank'
 import { redirect } from 'next/navigation'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
-import type { AssignmentClassroomOption, AssignmentQuestionOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
+import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
+import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 
 export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
 
 interface Props {
-  searchParams: Promise<{ classroom?: string; set?: string }>
+  searchParams: Promise<{ classroom?: string; set?: string; sections?: string }>
 }
 
 export default async function NewAssignmentPage({ searchParams }: Props) {
-  const { classroom: classroomParam, set: setParam } = await searchParams
+  const { classroom: classroomParam, set: setParam, sections: sectionsParam } = await searchParams
 
   const supabase = await createClient()
   const user = await getAuthUser()
@@ -20,7 +22,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   const preselectedSetQuery = setParam
     ? supabase
         .from('question_sets')
-        .select('id, title, description, question_ids')
+        .select('id, title, description, question_ids, sections')
         .eq('id', setParam)
         .maybeSingle()
     : Promise.resolve({ data: null })
@@ -29,7 +31,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     { data: profile },
     { data: ownedClassrooms },
     { data: coTeaching },
-    { data: questions },
+    questions,
     { data: questionSets },
     { data: preselectedSetRow },
   ] = await Promise.all([
@@ -45,15 +47,10 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       .select('classrooms(id, name, description, status, classroom_type)')
       .eq('user_id', user.id)
       .in('permission', ['admin', 'manage']),
-    supabase
-      .from('questions')
-      .select('id, title, question_text, difficulty, question_type, requires_work_image, tags')
-      .eq('created_by', user.id)
-      .neq('visibility', 'pending')
-      .order('created_at', { ascending: false }),
+    fetchBankQuestions(supabase, user.id),
     supabase
       .from('question_sets')
-      .select('id, title, description, question_ids')
+      .select('id, title, description, question_ids, sections')
       .eq('created_by', user.id)
       .order('created_at', { ascending: false }),
     preselectedSetQuery,
@@ -74,7 +71,30 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   }
 
   const preselectedClassroomId = classroomParam && seen.has(classroomParam) ? classroomParam : undefined
-  const preselectedSet = (preselectedSetRow ?? undefined) as AssignmentQuestionSetOption | undefined
+  let preselectedSet = (preselectedSetRow ?? undefined) as AssignmentQuestionSetOption | undefined
+
+  // ?sections=... — assigning only part of a แฟ้ม ("this week, projectiles
+  // only"). Narrowed here rather than in the client so an unknown section id
+  // simply selects nothing instead of quietly falling back to the whole แฟ้ม.
+  if (preselectedSet && sectionsParam) {
+    const wanted = sectionsParam.split(',').map(id => id.trim()).filter(Boolean)
+    const allSections = parseSections(preselectedSet.sections)
+    const chosen = allSections.filter(section => wanted.includes(section.id))
+    if (chosen.length > 0) {
+      // Ordered by the แฟ้ม and deduped: a question two of the chosen
+      // แฟ้มย่อย both hold must be assigned once.
+      const questionIds = questionIdsForSections(allSections, wanted, preselectedSet.question_ids)
+      preselectedSet = {
+        ...preselectedSet,
+        // One แฟ้มย่อย names the งาน; several keep the แฟ้ม's own name.
+        title: chosen.length === 1 && chosen[0].title
+          ? `${preselectedSet.title} — ${chosen[0].title}`
+          : preselectedSet.title,
+        question_ids: questionIds,
+        sections: filterSectionsToQuestions(chosen, questionIds),
+      }
+    }
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -93,7 +113,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
 
       <CreateAssignmentForm
         classrooms={classrooms}
-        questions={(questions ?? []) as unknown as AssignmentQuestionOption[]}
+        questions={questions}
         questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
         preselectedClassroomId={preselectedClassroomId}
         preselectedSet={preselectedSet}

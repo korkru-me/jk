@@ -72,10 +72,10 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
       .select('created_by, org_id, visibility, team_edit_allowed')
       .eq('id', payload.parentId)
       .maybeSingle()
-    if (!data) return { error: 'ไม่พบชุดโจทย์นี้' }
+    if (!data) return { error: 'ไม่พบโจทย์กลุ่มนี้' }
     isOwner = data.created_by === user.id
     if (!isOwner && !data.team_edit_allowed) {
-      return { error: 'เจ้าของชุดโจทย์ไม่อนุญาตให้ทีมแก้ไขชุดโจทย์นี้' }
+      return { error: 'เจ้าของโจทย์กลุ่มไม่อนุญาตให้ทีมแก้ไขโจทย์กลุ่มนี้' }
     }
     existing = data
   }

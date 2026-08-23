@@ -11,6 +11,7 @@ import type { Question } from '@/lib/types'
 import type { AnalyticsSubmissionRow } from '../page'
 import { DistractorChart } from './distractor-chart'
 import { Card } from '@/components/ui/card'
+import { questionExcerpt } from '@/lib/question-display'
 
 function seedRand(seed: string, index: number): number {
   const h = [...seed].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
@@ -151,7 +152,7 @@ export function ItemAnalysisSection({ questions, submissions, assignmentId }: Pr
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">{item.q.title}</p>
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{item.q.question_text}</p>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{questionExcerpt(item.q.question_text)}</p>
             </div>
             <div className="text-right shrink-0">
               <p className={`text-lg font-black tabular-nums ${

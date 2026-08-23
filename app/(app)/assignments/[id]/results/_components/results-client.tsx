@@ -10,6 +10,7 @@ import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSort
 import type { Question } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
+import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 
 export interface SubmittedRow {
   id: string
@@ -59,7 +60,17 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
   const studentAnswer = a.student_answer
   const correctAnswer = a.correct_answer ?? ''
 
-  if (q?.question_type === 'mcq') return studentAnswer
+  // An mcq answer is recorded as MCQ:<position>, so it has to be turned back
+  // into the option's words before a teacher reads it. Older answers stored
+  // the text itself and are shown as-is.
+  if (q?.question_type === 'mcq') {
+    const position = studentAnswer.startsWith('MCQ:') ? Number(studentAnswer.slice(4)) : NaN
+    if (Number.isInteger(position)) {
+      const option = (q.mcq_options as { text?: string }[] | null)?.[position]
+      return option?.text?.trim() || `ตัวเลือกที่ ${position + 1}`
+    }
+    return studentAnswer
+  }
 
   if (q?.question_type === 'file_upload') {
     try {
@@ -78,7 +89,7 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
     } catch { return studentAnswer }
   }
 
-  if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:') || correctAnswer.startsWith('COMP:')) {
+  if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:') || correctAnswer.startsWith('COMP:') || correctAnswer.startsWith('MATCH:')) {
     try {
       const arr = JSON.parse(studentAnswer)
       return Array.isArray(arr) ? arr.map(v => (v === '' || v == null ? '—' : String(v))).join(', ') : studentAnswer
@@ -414,9 +425,9 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
 }
 
 function QuestionText({ text }: { text: string }) {
-  const isHtml = /<[a-z][\s\S]*>/i.test(text)
+  const isHtml = /<[a-z][\s\S]*>/i.test(text) || containsMath(text)
   if (isHtml) {
-    return <div className="rich-text-content text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: text }} />
+    return <div className="rich-text-content text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
   }
   return <p className="whitespace-pre-line text-sm text-muted-foreground">{text}</p>
 }

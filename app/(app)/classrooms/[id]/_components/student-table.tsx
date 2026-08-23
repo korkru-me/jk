@@ -17,6 +17,7 @@ import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export type SortKey = StudentSortKey
 export type SortDir = StudentSortDir
@@ -55,6 +56,7 @@ export function StudentTable({
   classroomId, students, otherClassrooms, profiles = {}, showRoster = false, showProfiles = false,
   sortKey, sortDir, onToggleSort,
 }: Props) {
+  const [confirm, confirmDialog] = useConfirm()
   const GRID_COLS = showRoster ? GRID_COLS_WITH_ROSTER : GRID_COLS_DEFAULT
   const augmented: Student[] = students.map(s => ({
     ...s,
@@ -72,8 +74,14 @@ export function StudentTable({
     )
     .sort((a, b) => compareStudents(a, b, profiles, sortKey, sortDir))
 
-  function handleRemove(studentId: string, name: string) {
-    if (!confirm(`ลบ "${name}" ออกจากห้องเรียน?`)) return
+  async function handleRemove(studentId: string, name: string) {
+    const ok = await confirm({
+      title: `นำ “${name}” ออกจากห้องเรียน?`,
+      description: 'นักเรียนจะไม่เห็นห้องเรียนนี้อีก และเพิ่มกลับเข้ามาใหม่ได้ภายหลัง',
+      confirmLabel: 'นำออก',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await removeStudent(classroomId, studentId)
       if (res?.error) toast.error(res.error)
@@ -238,6 +246,7 @@ export function StudentTable({
           {viewingProfile && <StudentProfilePanel profile={profiles[viewingProfile.id]} />}
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }

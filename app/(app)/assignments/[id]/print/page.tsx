@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import { PrintWorksheet } from '@/components/exam/print-worksheet'
+import { parseSections } from '@/lib/question-set-sections'
 import type { Question } from '@/lib/types'
 
 export const metadata = { title: 'พิมพ์ใบงาน — KorKru' }
@@ -26,10 +27,18 @@ export default async function PrintPage({
 
   if (!assignment) notFound()
 
-  const { data: questions } = await supabase
+  const { data: questionRows } = await supabase
     .from('questions')
     .select('*')
     .in('id', assignment.question_ids)
+
+  // `.in()` returns rows in whatever order the database picked — the sheet has
+  // to follow the assignment's own question order, which is also what makes
+  // แฟ้มย่อย print as headings rather than scattered labels.
+  const byId = new Map(((questionRows ?? []) as Question[]).map(q => [q.id, q]))
+  const questions = (assignment.question_ids as string[])
+    .map(id => byId.get(id))
+    .filter((q): q is Question => !!q)
 
   const classroomId = (assignment as any).classrooms?.id
   const { data: memberships } = await supabase
@@ -48,7 +57,7 @@ export default async function PrintPage({
         <div>
           <h1 className="text-xl font-bold">พิมพ์ใบงาน: {assignment.title}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {students.length} คน · {(questions ?? []).length} ข้อ
+            {students.length} คน · {questions.length} ข้อ
           </p>
         </div>
         <button
@@ -63,8 +72,9 @@ export default async function PrintPage({
         assignmentId={id}
         assignmentTitle={assignment.title}
         classroomName={(assignment as any).classrooms?.name ?? ''}
-        questions={(questions ?? []) as Question[]}
+        questions={questions}
         students={students}
+        sections={assignment.show_sections === false ? [] : parseSections(assignment.sections)}
       />
     </div>
   )

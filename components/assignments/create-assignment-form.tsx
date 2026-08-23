@@ -15,8 +15,12 @@ import {
   Check, ChevronRight, ChevronLeft, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale,
 } from 'lucide-react'
+import {
+  filterSectionsToQuestions, parseSections, type QuestionSetSection,
+} from '@/lib/question-set-sections'
 import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { questionExcerpt } from '@/lib/question-display'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -30,7 +34,7 @@ export type AssignmentQuestionOption = Pick<
   Question,
   'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'requires_work_image' | 'tags'
 >
-export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'description' | 'question_ids'>
+export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'description' | 'question_ids' | 'sections'>
 
 interface Props {
   classrooms: AssignmentClassroomOption[]
@@ -70,6 +74,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [selectedIds, setSelectedIds] = useState<string[]>(
     (preselectedSet?.question_ids ?? []).filter(id => questions.some(q => q.id === id))
   )
+  // แฟ้มย่อย carried over from the แฟ้มโจทย์ these questions came from. Trimmed
+  // down to the questions actually assigned when the งาน is created.
+  const [sections, setSections] = useState<QuestionSetSection[]>(
+    parseSections(preselectedSet?.sections)
+  )
+  const [showSections, setShowSections] = useState(true)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
@@ -106,16 +116,29 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     const validIds = set.question_ids.filter(id => questions.some(q => q.id === id))
     const missingCount = set.question_ids.length - validIds.length
     setSelectedIds(prev => Array.from(new Set([...prev, ...validIds])))
+    // Sections follow their questions in. Ids already claimed by an earlier
+    // แฟ้ม stay where they are, so two แฟ้ม can be merged without a question
+    // showing up under two แฟ้มย่อย.
+    setSections(prev => {
+      const claimed = new Set(prev.flatMap(sec => sec.question_ids))
+      const incoming = parseSections(set.sections)
+        .map(sec => ({ ...sec, question_ids: sec.question_ids.filter(id => validIds.includes(id) && !claimed.has(id)) }))
+        .filter(sec => sec.question_ids.length > 0)
+      return [...prev, ...incoming]
+    })
     if (missingCount > 0) {
-      toast.success(`เพิ่ม ${validIds.length} ข้อจากชุด "${set.title}" (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
+      toast.success(`เพิ่ม ${validIds.length} ข้อจากแฟ้ม "${set.title}" (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
     } else {
-      toast.success(`เพิ่ม ${validIds.length} ข้อจากชุด "${set.title}"`)
+      toast.success(`เพิ่ม ${validIds.length} ข้อจากแฟ้ม "${set.title}"`)
     }
   }
 
   function toggleClassroom(id: string) {
     setClassroomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
+
+  // What survives of the แฟ้มย่อย after the teacher's own picking.
+  const assignedSections = filterSectionsToQuestions(sections, selectedIds)
 
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
@@ -178,16 +201,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       let setId = preselectedSet?.id
 
       if (!preselectedSet && saveAsSet) {
-        const classroomName = classrooms.find(c => c.id === classroomIds[0])?.name
         const setRes = await createQuestionSet({
           title: title.trim(),
           description: description.trim(),
           question_ids: selectedIds,
-          tags: classroomName ? [classroomName] : [],
           visibility: 'private',
         })
         if ('error' in setRes) {
-          toast.error(`บันทึกชุดโจทย์ลงคลังไม่สำเร็จ: ${setRes.error} (จะมอบหมายต่อโดยไม่บันทึกลงคลัง)`)
+          toast.error(`บันทึกแฟ้มโจทย์ลงคลังไม่สำเร็จ: ${setRes.error} (จะมอบหมายต่อโดยไม่บันทึกลงคลัง)`)
         } else {
           setId = setRes.id
         }
@@ -212,6 +233,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
+        sections: filterSectionsToQuestions(sections, selectedIds),
+        show_sections: showSections,
         question_points: questionPoints,
         display_max_score: displayMax,
         set_id: setId,
@@ -269,7 +292,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             {preselectedSet && (
               <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-xl px-3 py-2.5">
                 <Layers className="w-4 h-4 shrink-0" />
-                ใช้ชุดโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({selectedIds.length} ข้อ) — ปรับโจทย์ที่เลือกได้ในขั้นตอนถัดไป
+                ใช้แฟ้มโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({selectedIds.length} ข้อ) — ปรับโจทย์ที่เลือกได้ในขั้นตอนถัดไป
               </div>
             )}
 
@@ -339,8 +362,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     <Layers className="w-4 h-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">บันทึกชุดโจทย์นี้ไว้ในคลังเพื่อใช้ซ้ำ</p>
-                    <p className="text-xs text-muted-foreground">โจทย์ที่เลือกจะถูกบันทึกเป็นชุดในคลังชุดโจทย์ ติดแท็กชื่อห้องเรียนให้อัตโนมัติ</p>
+                    <p className="text-sm font-medium text-foreground">บันทึกเป็นแฟ้มโจทย์ไว้ใช้ซ้ำ</p>
+                    <p className="text-xs text-muted-foreground">โจทย์ที่เลือกจะถูกบันทึกเป็นแฟ้มในคลังแฟ้มโจทย์ ค้นหาภายหลังด้วยชื่อแฟ้ม</p>
                   </div>
                 </div>
                 <input
@@ -409,9 +432,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             <Card padding="md" className="space-y-2.5">
               <div className="flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">เพิ่มจากชุดโจทย์ที่มีอยู่</h3>
+                <h3 className="text-sm font-semibold text-foreground">เพิ่มจากแฟ้มโจทย์ที่มีอยู่</h3>
               </div>
-              <p className="text-xs text-muted-foreground">เลือกชุดเพื่อเพิ่มโจทย์ทั้งหมดเข้ามา — ปรับเพิ่ม/ลดทีละข้อได้ด้านล่าง</p>
+              <p className="text-xs text-muted-foreground">เลือกแฟ้มเพื่อเพิ่มโจทย์ทั้งหมดเข้ามา — ปรับเพิ่ม/ลดทีละข้อได้ด้านล่าง</p>
               <div className="flex flex-wrap gap-2">
                 {questionSets.map(s => {
                   const validCount = s.question_ids.filter(id => questions.some(q => q.id === id)).length
@@ -462,7 +485,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{q.question_text}</p>
+                    <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
                   </div>
                   <Input
                     type="number"
@@ -584,6 +607,15 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           <div className="space-y-2">
             {[
+              ...(assignedSections.length > 0 ? [{
+                label: 'แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น',
+                desc: shuffleQ
+                  ? `${assignedSections.length} แฟ้มย่อย — สับลำดับข้ออยู่ ชื่อแฟ้มย่อยจะแสดงกำกับรายข้อแทนหัวเรื่อง`
+                  : `${assignedSections.length} แฟ้มย่อยจากแฟ้มโจทย์ เช่น "${assignedSections[0].title || 'ไม่ได้ตั้งชื่อ'}"`,
+                icon: Layers,
+                value: showSections,
+                set: setShowSections,
+              }] : []),
               {
                 label: 'สับลำดับข้อ',
                 desc: 'นักเรียนแต่ละคนได้ลำดับข้อต่างกัน',

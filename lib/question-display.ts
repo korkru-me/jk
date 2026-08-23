@@ -74,3 +74,24 @@ export const TYPE_SHORT: Record<string, string> = {
   file_upload: 'ไฟล์งาน',
   composite: 'ผสม',
 }
+
+/**
+ * One line of readable text from a question's body, for list rows and cards.
+ *
+ * `question_text` is rich text — tiptap markup from the editor, or whatever
+ * markup an imported bank carried — so printing it raw shows the reader
+ * `<pre class="...">` instead of the question.
+ */
+export function questionExcerpt(html: string | null | undefined): string {
+  if (!html) return ''
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+}

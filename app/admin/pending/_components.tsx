@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { approveQuestion, rejectQuestion } from '@/lib/actions/admin'
 import type { Question } from '@/lib/types'
+import { questionExcerpt } from '@/lib/question-display'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type Row = Question & {
   question_categories: { name: string } | null
@@ -21,9 +23,15 @@ export function PendingTable({ questions }: { questions: Row[] }) {
   const [rejectTarget, setRejectTarget] = useState<Row | null>(null)
   const [reason, setReason] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
-  function handleApprove(id: string, title: string) {
-    if (!confirm(`อนุมัติโจทย์ "${title}" เป็น Public?`)) return
+  async function handleApprove(id: string, title: string) {
+    const ok = await confirm({
+      title: `อนุมัติโจทย์ “${title}” เป็น Public?`,
+      description: 'ครูทุกคนในระบบจะเห็นและนำโจทย์ข้อนี้ไปใช้ได้',
+      confirmLabel: 'อนุมัติ',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await approveQuestion(id)
       if (res?.error) toast.error(res.error)
@@ -70,7 +78,7 @@ export function PendingTable({ questions }: { questions: Row[] }) {
               <tr key={q.id} className="hover:bg-muted transition-colors">
                 <td className="px-4 py-3 max-w-xs">
                   <p className="font-medium text-foreground truncate">{q.title}</p>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{q.question_text}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{questionExcerpt(q.question_text)}</p>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{q.question_categories?.name ?? '—'}</td>
                 <td className="px-4 py-3">
@@ -111,7 +119,7 @@ export function PendingTable({ questions }: { questions: Row[] }) {
           </DialogHeader>
           {preview && (
             <div className="space-y-3 text-sm">
-              <p className="text-muted-foreground whitespace-pre-line border rounded-lg p-3 bg-muted">{preview.question_text}</p>
+              <p className="text-muted-foreground whitespace-pre-line border rounded-lg p-3 bg-muted">{questionExcerpt(preview.question_text)}</p>
               {preview.question_type === 'written' && preview.answer_formula && (
                 <div className="border rounded-lg p-3 bg-primary/10">
                   <p className="text-xs text-primary mb-1">สูตรคำตอบ</p>
@@ -181,6 +189,7 @@ export function PendingTable({ questions }: { questions: Row[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

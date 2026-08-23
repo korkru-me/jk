@@ -7,6 +7,7 @@ import { restoreClassroom, permanentDeleteClassroom } from '@/lib/actions/classr
 import type { Classroom } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface Props {
   classroom: Classroom
@@ -15,6 +16,7 @@ interface Props {
 
 export function TrashActionsClient({ classroom, daysLeft }: Props) {
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
   function handleRestore() {
     startTransition(async () => {
@@ -24,8 +26,14 @@ export function TrashActionsClient({ classroom, daysLeft }: Props) {
     })
   }
 
-  function handlePermanentDelete() {
-    if (!confirm(`ลบ "${classroom.name}" อย่างถาวร? ไม่สามารถกู้คืนได้`)) return
+  async function handlePermanentDelete() {
+    const ok = await confirm({
+      title: `ลบ “${classroom.name}” อย่างถาวร?`,
+      description: 'ห้องเรียน งาน และข้อมูลการส่งทั้งหมดจะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await permanentDeleteClassroom(classroom.id)
       if (res?.error) toast.error(res.error)
@@ -71,6 +79,7 @@ export function TrashActionsClient({ classroom, daysLeft }: Props) {
           ลบถาวร
         </button>
       </div>
+      {confirmDialog}
     </div>
   )
 }

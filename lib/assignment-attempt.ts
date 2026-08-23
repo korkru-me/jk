@@ -18,7 +18,12 @@ function shuffleArray<T>(arr: T[]): T[] {
 // answers count as correct). Must stay identical in both places: when no
 // override is set, this being equal to the stored max_score is exactly what
 // keeps grading unchanged from before this feature existed.
-export function naturalMaxScore(questionType: string, extraData: any, answerParts: unknown[] | null): number {
+export function naturalMaxScore(
+  questionType: string,
+  extraData: any,
+  answerParts: unknown[] | null,
+  matchingPairCount = 0,
+): number {
   if (questionType === 'true_false') {
     const statements: unknown[] = extraData?.statements ?? []
     const scoreAnswer: number = extraData?.score_answer ?? 1
@@ -33,6 +38,12 @@ export function naturalMaxScore(questionType: string, extraData: any, answerPart
   if (questionType === 'ordering') {
     const items: unknown[] = extraData?.items ?? []
     return items.length || 1
+  }
+  if (questionType === 'matching') {
+    // Matching pairs live in mcq_options rather than extra_data (see
+    // MatchingPair in lib/types.ts), so the count comes in explicitly — one
+    // point per pair.
+    return matchingPairCount || 1
   }
   if (questionType === 'file_upload') return 1
   if (questionType === 'composite') {
@@ -97,6 +108,21 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
     return { question_id: q.id, random_values: {}, correct_answer: 'ORDER:' + JSON.stringify(items.map((i) => i.id)), max_score: naturalMaxScore(q.question_type, extraData, null) }
   }
 
+  // Matching: the answer is which right-hand label belongs to each left-hand
+  // prompt, in the pairs' authored order. Storing the label rather than the
+  // pair's index is what makes two identically-labelled right-hand options
+  // interchangeable, which is the behaviour a teacher expects when they reuse
+  // a label across pairs.
+  if (q.question_type === 'matching') {
+    const pairs = (q.mcq_options ?? []) as unknown as import('@/lib/types').MatchingPair[]
+    return {
+      question_id: q.id,
+      random_values: {},
+      correct_answer: 'MATCH:' + JSON.stringify(pairs.map((p) => p.right_text)),
+      max_score: naturalMaxScore(q.question_type, extraData, null, pairs.length),
+    }
+  }
+
   // Composite: each part is graded independently by re-dispatching into
   // its own type's comparison rule (see the 'COMP:' branch below), so the
   // correct answer captures one { type, correct, ... } record per part —
@@ -129,11 +155,35 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
           score,
         }
       }
-      if (p.type === 'mcq') return { type: 'mcq', correct: (p.options ?? []).find((o) => o.is_correct)?.text ?? '', score }
+      // Index rather than text, for the same reason as a standalone mcq above.
+      if (p.type === 'mcq') return { type: 'mcq', correct: `MCQ:${(p.options ?? []).findIndex((o) => o.is_correct)}`, score }
       if (p.type === 'ordering') return { type: 'ordering', correct: (p.items ?? []).map((it) => it.id), score }
       return { type: p.type, correct: null, score }
     })
     return { question_id: q.id, random_values: {}, correct_answer: 'COMP:' + JSON.stringify(answers), max_score: naturalMaxScore(q.question_type, extraData, null) }
+  }
+
+  // Multiple choice: the answer is which option, recorded as its position in
+  // the question's own mcq_options.
+  //
+  // Position, not the option's text, for two reasons. Two options can carry
+  // the same words — a picture-only option has none at all — and comparing
+  // text then credits the wrong one. And an mcq question keeps `answer_formula`
+  // empty, so without a branch of its own it fell through to the numeric path
+  // below and every attempt was stored with the correct answer "undefined",
+  // which no student answer could ever match.
+  //
+  // The MCQ: prefix follows the same convention as TF:/ORDER:/MATCH: and is
+  // what tells a stored index apart from an option whose text is "2".
+  if (q.question_type === 'mcq') {
+    const options = (q.mcq_options ?? []) as import('@/lib/types').MCQOption[]
+    const correctIndex = options.findIndex((o) => o.is_correct)
+    return {
+      question_id: q.id,
+      random_values: {},
+      correct_answer: correctIndex >= 0 ? `MCQ:${correctIndex}` : '',
+      max_score: naturalMaxScore(q.question_type, extraData, null),
+    }
   }
 
   // File-upload: no meaningful correct answer to precompute — grading
@@ -180,7 +230,13 @@ export function buildAssignmentAttempt(
     .filter((qid) => questionsById.has(qid))
     .map((qid, orderIndex) => {
       const q = questionsById.get(qid) as Question
-      const optionOrder = assignment.shuffle_options && q.question_type === 'mcq' && q.mcq_options
+      // A matching question is only a question if the right-hand column is
+      // scrambled, so it shuffles regardless of the assignment's
+      // shuffle_options setting (which is about MCQ choices). Frozen into
+      // option_order either way, so the student sees one stable order.
+      const shufflesOptions = q.question_type === 'matching'
+        || (assignment.shuffle_options && q.question_type === 'mcq')
+      const optionOrder = shufflesOptions && q.mcq_options
         ? shuffleArray((q.mcq_options as unknown[]).map((_, i) => i))
         : null
 
@@ -358,6 +414,33 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
     const structuralMax = naturalMaxScore('composite', a.questions?.extra_data, null)
     const isFullyCorrect = Math.round(earned * 1000) === Math.round(structuralMax * 1000)
     return { id: a.id, is_correct: hasManual ? null : isFullyCorrect, score: scaleScore(earned, structuralMax, a.max_score) }
+  }
+
+  // Multiple-choice grading — compares which option was picked. Attempts
+  // started before the answer became an index stored the option's text; those
+  // fall through to the text comparison at the bottom, so an old submission
+  // still grades the way it did when it was taken.
+  if (correctAns.startsWith('MCQ:')) {
+    return {
+      id: a.id,
+      is_correct: studentAns.trim() === correctAns,
+      score: studentAns.trim() === correctAns ? a.max_score : 0,
+    }
+  }
+
+  // Matching grading — one point per correctly paired prompt. The pair count
+  // comes from the frozen correct answer rather than the question, so a pair
+  // added after this attempt started can't change what it is scored out of.
+  if (correctAns.startsWith('MATCH:')) {
+    const correctRights: string[] = JSON.parse(correctAns.slice(6))
+    let studentRights: string[] = []
+    try { studentRights = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
+    let matched = 0
+    for (let i = 0; i < correctRights.length; i++) {
+      if ((studentRights[i] ?? '').trim() === correctRights[i].trim()) matched++
+    }
+    const structuralMax = naturalMaxScore('matching', a.questions?.extra_data, null, correctRights.length)
+    return { id: a.id, is_correct: matched === correctRights.length, score: scaleScore(matched, structuralMax, a.max_score) }
   }
 
   // Ordering grading

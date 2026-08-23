@@ -142,6 +142,83 @@ export async function deleteCategory(id: string) {
   revalidatePath('/admin/categories')
 }
 
+/**
+ * Creates many categories at once from a newline-separated list, one path per
+ * line — either "หมวดหลัก" or "หมวดหลัก / หมวดย่อย" for a nested one.
+ *
+ * This is the admin-side counterpart to importing a question bank exported
+ * from elsewhere (see scripts/moodle-mbz-to-korkru.mjs, which prints the list
+ * to paste here). `question_categories` is a single global taxonomy shared by
+ * every organization and writable only through this admin path, so bulk
+ * creation deliberately stays here rather than running inside a teacher's
+ * import — one teacher's course structure must not become every tenant's
+ * category list. Once the categories exist, the import resolves them by name
+ * on its own.
+ *
+ * Idempotent: a path that already exists is skipped, so re-running after a
+ * partial run is safe.
+ */
+export async function bulkCreateCategories(rawList: string) {
+  const admin = await requireAdmin()
+
+  const paths = rawList
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => line.split('/').map(part => part.trim()).filter(Boolean))
+    .filter(parts => parts.length > 0 && parts.length <= 2)
+
+  if (paths.length === 0) return { error: 'ไม่พบชื่อหมวดในรายการ' }
+
+  const { data: existing, error: readError } = await admin
+    .from('question_categories')
+    .select('id, name, parent_id, order')
+  if (readError) return { error: readError.message }
+
+  // Keyed by "parentId\u0000name" so a child may share a name with a category
+  // under a different parent, which the Moodle trees do use.
+  const key = (parentId: string | null, name: string) => `${parentId ?? ''}\u0000${name}`
+  const byKey = new Map<string, string>()
+  for (const c of existing ?? []) byKey.set(key(c.parent_id, c.name), c.id)
+
+  const nextOrder = new Map<string, number>()
+  for (const c of existing ?? []) {
+    const k = c.parent_id ?? ''
+    nextOrder.set(k, Math.max(nextOrder.get(k) ?? -1, c.order))
+  }
+
+  let created = 0
+  let skipped = 0
+
+  // Sequential rather than batched: a child needs its parent's generated id,
+  // and 269 rows is a one-off setup cost, not a hot path.
+  for (const parts of paths) {
+    let parentId: string | null = null
+    for (const name of parts) {
+      const existingId: string | undefined = byKey.get(key(parentId, name))
+      if (existingId) {
+        parentId = existingId
+        skipped++
+        continue
+      }
+      const order = (nextOrder.get(parentId ?? '') ?? -1) + 1
+      nextOrder.set(parentId ?? '', order)
+      const { data, error } = await admin
+        .from('question_categories')
+        .insert({ name, parent_id: parentId, order })
+        .select('id')
+        .single()
+      if (error) return { error: error.message, created }
+      byKey.set(key(parentId, name), data.id as string)
+      parentId = data.id as string
+      created++
+    }
+  }
+
+  revalidatePath('/admin/categories')
+  return { message: `สร้าง ${created} หมวด (ข้ามที่มีอยู่แล้ว ${skipped} หมวด)` }
+}
+
 export async function seedGradeCategories() {
   const admin = await requireAdmin()
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
+import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { RichText } from '@/components/ui/rich-text'
 
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
@@ -57,13 +58,13 @@ function substituteVars(text: string, values: Record<string, number>) {
 }
 
 function renderUnit(unit: string) {
-  const isHtmlUnit = /<[a-z][\s\S]*>/i.test(unit)
-  if (isHtmlUnit) return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: unit }} />
+  if (isHtml(unit)) return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(unit) }} />
   return <span>{unit}</span>
 }
 
+// Text with TeX but no tags still needs the HTML path, since KaTeX emits markup.
 function isHtml(text: string) {
-  return /<[a-z][\s\S]*>/i.test(text)
+  return /<[a-z][\s\S]*>/i.test(text) || containsMath(text)
 }
 
 function formatAnswer(n: number): string {
@@ -80,7 +81,7 @@ function RenderText({ text }: { text: string }) {
   if (!text) return <p className="text-muted-foreground italic text-[15px]">ยังไม่มีเนื้อหาโจทย์</p>
   if (isHtml(text)) return (
     <div className="text-foreground leading-relaxed text-[15px] rich-text-content"
-      dangerouslySetInnerHTML={{ __html: text }} />
+      dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
   )
   return <p className="text-foreground leading-relaxed whitespace-pre-line text-[15px]">{text}</p>
 }
@@ -623,7 +624,7 @@ export function QuestionPreviewContent({
                 ? '🎉 ถูกต้องทุกข้อ!'
                 : writtenResults.some(r => r === true)
                   ? `✅ ถูก ${writtenResults.filter(r => r === true).length}/${answerParts.length} ข้อ`
-                  : '❌ ผิดทุกข้อ — ดูเฉลยด้านบน'
+                  : '❌ ผิด'
               }
             </div>
           )}

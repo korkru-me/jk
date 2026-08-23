@@ -11,26 +11,39 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { SmartTagInput } from '@/components/ui/smart-tag-input'
 import { TeamShareChips } from '@/components/questions/general-info-section'
 import { QuestionPicker } from '@/components/assignments/question-picker'
-import type { Question, QuestionSet, Visibility } from '@/lib/types'
+import { SetStructurePanel } from '@/components/questions/set-structure-panel'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
+} from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
+import type { BankQuestion } from '@/lib/question-bank'
+import type { QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 
 interface Props {
-  questions: Question[]
-  allTags: string[]
+  /** The whole คลัง, as the picker needs it — including `tags`, which it
+   *  filters and searches on. */
+  questions: BankQuestion[]
   initialSet?: QuestionSet
 }
 
-export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props) {
+export function CreateQuestionSetForm({ questions, initialSet }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const [title, setTitle] = useState(initialSet?.title ?? '')
   const [description, setDescription] = useState(initialSet?.description ?? '')
-  const [tags, setTags] = useState<string[]>(initialSet?.tags ?? [])
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSet?.question_ids ?? [])
+  const [sections, setSections] = useState<QuestionSetSection[]>(initialSet?.sections ?? [])
+  // The คลัง picker stages its changes: draftIds is what the teacher is
+  // building, applied to the แฟ้ม only when they confirm. Unticking a question
+  // by accident then has no effect until it is reviewed in the summary.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [draftIds, setDraftIds] = useState<string[]>([])
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
@@ -77,16 +90,38 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
     }
   }
 
-  function toggleQ(id: string) {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  function openPicker() {
+    setDraftIds(selectedIds)
+    setPickerOpen(true)
   }
 
-  const canSave = title.trim().length > 0 && selectedIds.length > 0
+  /** The คลัง picker only ever adds to the แฟ้ม. Filing a question into a
+   *  แฟ้มย่อย is a separate step, in that แฟ้มย่อย's own dialog. */
+  function toggleDraft(id: string) {
+    setDraftIds(prev => (prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]))
+  }
+
+  const pickerAdded = draftIds.filter(id => !selectedIds.includes(id))
+  const pickerRemoved = selectedIds.filter(id => !draftIds.includes(id))
+
+  function confirmPicker() {
+    const next = normalizeSetSections(sections, draftIds)
+    setSelectedIds(next.question_ids)
+    setSections(next.sections)
+    setPickerOpen(false)
+    const parts = []
+    if (pickerAdded.length) parts.push(`เพิ่ม ${pickerAdded.length} ข้อ`)
+    if (pickerRemoved.length) parts.push(`เอาออก ${pickerRemoved.length} ข้อ`)
+    if (parts.length) toast.success(`${parts.join(' · ')} แล้ว — อย่าลืมกดบันทึก`)
+  }
+
+  const canSave = title.trim().length > 0
 
   function handleSubmit() {
     startTransition(async () => {
       const payload = {
-        title: title.trim(), description: description.trim(), question_ids: selectedIds, tags,
+        title: title.trim(), description: description.trim(), question_ids: selectedIds,
+        sections,
         visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds,
       }
       const res = initialSet
@@ -94,7 +129,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
         : await createQuestionSet(payload)
       if ('error' in res) { toast.error(res.error); return }
       if (!initialSet && 'id' in res) {
-        toast.success('สร้างชุดโจทย์แล้ว')
+        toast.success('สร้างแฟ้มโจทย์แล้ว')
         router.push('/questions/sets')
       }
     })
@@ -102,7 +137,6 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
 
   function handleDelete() {
     if (!initialSet) return
-    if (!confirm(`ลบชุดโจทย์ "${initialSet.title}"? ไม่สามารถกู้คืนได้`)) return
     startTransition(async () => {
       const res = await deleteQuestionSet(initialSet.id)
       if ('error' in res) { toast.error(res.error); return }
@@ -113,10 +147,10 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
   return (
     <div className="space-y-4">
       <Card padding="xl" className="space-y-4">
-        <h2 className="font-semibold text-foreground">ข้อมูลชุดโจทย์</h2>
+        <h2 className="font-semibold text-foreground">ข้อมูลแฟ้มโจทย์</h2>
 
         <div className="space-y-1.5">
-          <Label htmlFor="set-title">ชื่อชุดโจทย์ <span className="text-destructive">*</span></Label>
+          <Label htmlFor="set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
           <Input
             id="set-title"
             value={title}
@@ -135,12 +169,6 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
             placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
             rows={2}
           />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>แท็ก</Label>
-          <p className="text-xs text-muted-foreground">ใช้ค้นหา/กรองชุดโจทย์ในคลัง เช่น ฟิสิกส์ ม.4, กลศาสตร์</p>
-          <SmartTagInput allTags={allTags} tags={tags} onTagsChange={setTags} />
         </div>
 
         <div className="space-y-1.5">
@@ -168,7 +196,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นชุดโจทย์นี้</SelectItem>
+              <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้</SelectItem>
               <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
                 ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
               </SelectItem>
@@ -193,20 +221,89 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
         </div>
       </Card>
 
-      <QuestionPicker
+      <SetStructurePanel
         questions={questions}
-        selectedIds={selectedIds}
-        onToggle={toggleQ}
-        search={search}
-        onSearchChange={setSearch}
-        diffFilter={diffFilter}
-        onDiffFilterChange={setDiffFilter}
+        questionIds={selectedIds}
+        sections={sections}
+        onChange={next => { setSelectedIds(next.questionIds); setSections(next.sections) }}
+        onAddQuestions={openPicker}
       />
+
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>เพิ่มโจทย์จากคลัง</DialogTitle>
+            <DialogDescription>
+              ติ๊กเพื่อเลือก แล้วกดยืนยันด้านล่าง — ยังไม่มีอะไรเปลี่ยนจนกว่าจะกดยืนยัน
+            </DialogDescription>
+          </DialogHeader>
+
+          <QuestionPicker
+            questions={questions}
+            selectedIds={draftIds}
+            baselineIds={selectedIds}
+            onToggle={toggleDraft}
+            search={search}
+            onSearchChange={setSearch}
+            diffFilter={diffFilter}
+            onDiffFilterChange={setDiffFilter}
+            showSelectedFooter={false}
+            showHeader={false}
+            surface="plain"
+          />
+
+          <DialogFooter className="sm:items-center sm:justify-between">
+            <span className="text-sm">
+              {pickerAdded.length === 0 && pickerRemoved.length === 0 ? (
+                <span className="text-muted-foreground">ในแฟ้มนี้มี {selectedIds.length} ข้อ</span>
+              ) : (
+                <span className="flex items-center gap-2 flex-wrap">
+                  {pickerAdded.length > 0 && (
+                    <span className="text-success font-medium">+ เพิ่ม {pickerAdded.length} ข้อ</span>
+                  )}
+                  {pickerRemoved.length > 0 && (
+                    <span className="text-destructive font-medium">− เอาออก {pickerRemoved.length} ข้อ</span>
+                  )}
+                </span>
+              )}
+            </span>
+            <span className="flex items-center gap-2">
+              <DialogClose render={<Button type="button" variant="outline" />}>ยกเลิก</DialogClose>
+              <Button
+                type="button"
+                onClick={confirmPicker}
+                disabled={pickerAdded.length === 0 && pickerRemoved.length === 0}
+              >
+                ยืนยันการเปลี่ยนแปลง
+              </Button>
+            </span>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {initialSet && (
+        <ConfirmDialog
+          open={confirmingDelete}
+          onOpenChange={setConfirmingDelete}
+          title={`ลบแฟ้มโจทย์ “${initialSet.title}”?`}
+          description={
+            <span className="space-y-2 block">
+              <span className="block">แฟ้มนี้จะถูกลบถาวร กู้คืนไม่ได้</span>
+              <span className="block">
+                โจทย์ {selectedIds.length} ข้อข้างในยังอยู่ในคลังโจทย์ และงานที่มอบหมายไปแล้วจากแฟ้มนี้ไม่ได้รับผลกระทบ
+              </span>
+            </span>
+          }
+          confirmLabel="ลบถาวร"
+          variant="destructive"
+          onConfirm={handleDelete}
+        />
+      )}
 
       <div className="flex items-center justify-between pt-2">
         {initialSet ? (
-          <Button type="button" variant="outline" onClick={handleDelete} disabled={isPending} className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
-            <Trash2 className="w-4 h-4" /> ลบชุดโจทย์
+          <Button type="button" variant="outline" onClick={() => setConfirmingDelete(true)} disabled={isPending} className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
+            <Trash2 className="w-4 h-4" /> ลบแฟ้มโจทย์
           </Button>
         ) : (
           <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>
@@ -215,7 +312,7 @@ export function CreateQuestionSetForm({ questions, allTags, initialSet }: Props)
         )}
         <Button type="button" onClick={handleSubmit} disabled={isPending || !canSave} className="gap-2">
           <Save className="w-4 h-4" />
-          {isPending ? 'กำลังบันทึก...' : initialSet ? 'บันทึกการแก้ไข' : 'สร้างชุดโจทย์'}
+          {isPending ? 'กำลังบันทึก...' : initialSet ? 'บันทึกการแก้ไข' : 'สร้างแฟ้มโจทย์'}
         </Button>
       </div>
     </div>

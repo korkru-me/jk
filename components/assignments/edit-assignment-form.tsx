@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Calendar, Clock, Layers, Target, FileText, Scale, Eye } from 'lucide-react'
+import { parseSections } from '@/lib/question-set-sections'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +13,7 @@ import { updateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import type { Assignment, Question, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { questionExcerpt } from '@/lib/question-display'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -42,6 +44,8 @@ export type EditableAssignment = Pick<
   | 'passing_type'
   | 'passing_value'
   | 'show_results'
+  | 'sections'
+  | 'show_sections'
 >
 
 export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text'>
@@ -60,6 +64,8 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
   )
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(a.score_strategy)
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
+  const [showSections, setShowSections] = useState(a.show_sections !== false)
+  const assignmentSections = parseSections(a.sections)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
@@ -113,6 +119,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         question_points: questionPoints,
         display_max_score: displayMax,
         show_results: showResults,
+        show_sections: showSections,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -148,7 +155,7 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
               <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{q.question_text}</p>
+                <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
               </div>
               <Input
                 type="number"
@@ -214,6 +221,28 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
             className="accent-primary w-4 h-4 shrink-0"
           />
         </label>
+
+        {assignmentSections.length > 0 && (
+          <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <Layers className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น</p>
+                <p className="text-xs text-muted-foreground">
+                  {assignmentSections.length} แฟ้มย่อย — ลำดับและเลขข้อไม่เปลี่ยนไม่ว่าจะเปิดหรือปิด
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={showSections}
+              onChange={e => setShowSections(e.target.checked)}
+              className="accent-primary w-4 h-4 shrink-0"
+            />
+          </label>
+        )}
 
         {passingEnabled && (
           <div className="flex items-center gap-2 p-3 rounded-xl border border-border">

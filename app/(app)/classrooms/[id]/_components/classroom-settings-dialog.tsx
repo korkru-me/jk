@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
@@ -41,6 +42,7 @@ export function ClassroomSettingsDialog({
   const [name, setName] = useState(classroom.name)
   const [meta, setMeta] = useState<ClassroomMeta>(() => parseDescription(classroom.description))
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
 
   const isHomeroom = classroom.classroom_type === 'homeroom'
@@ -86,8 +88,13 @@ export function ClassroomSettingsDialog({
     })
   }
 
-  function handleArchive() {
-    if (!confirm('เก็บห้องเรียนนี้เข้าคลัง? ห้องเรียนจะหายจากรายการหลัก แต่กู้คืนได้ภายหลัง')) return
+  async function handleArchive() {
+    const ok = await confirm({
+      title: 'เก็บห้องเรียนนี้เข้าคลัง?',
+      description: 'ห้องเรียนจะหายจากรายการหลัก แต่กู้คืนได้ภายหลังจากหน้าถังขยะ',
+      confirmLabel: 'เก็บเข้าคลัง',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await archiveClassroom(classroom.id)
       if (res?.error) toast.error(res.error)
@@ -357,6 +364,7 @@ export function ClassroomSettingsDialog({
           </Button>
         </div>
       </DialogContent>
+      {confirmDialog}
     </Dialog>
   )
 }

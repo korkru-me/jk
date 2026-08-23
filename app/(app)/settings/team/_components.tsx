@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -226,10 +227,17 @@ function MemberList({ members }: { members: TeamOrgMember[] }) {
 function TeamCard({ team }: { team: TeamOrgData }) {
   const [expanded, setExpanded] = useState(false)
   const [pending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
   const isOwner = team.myRole === 'owner'
 
-  function handleLeave() {
-    if (!confirm(`ต้องการออกจาก "${team.org.name}" ใช่ไหม?`)) return
+  async function handleLeave() {
+    const ok = await confirm({
+      title: `ออกจาก “${team.org.name}”?`,
+      description: 'คุณจะไม่เห็นโจทย์และแฟ้มโจทย์ที่ทีมนี้แชร์ไว้อีก',
+      confirmLabel: 'ออกจากทีม',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await leaveTeamOrg(team.org.id)
       if (res.error) toast.error(res.error)
@@ -237,8 +245,14 @@ function TeamCard({ team }: { team: TeamOrgData }) {
     })
   }
 
-  function handleDelete() {
-    if (!confirm(`ต้องการลบ "${team.org.name}" ใช่ไหม? สมาชิกทั้งหมดจะถูกนำออก และโจทย์ของทุกคนจะกลายเป็นส่วนตัว การกระทำนี้ย้อนกลับไม่ได้`)) return
+  async function handleDelete() {
+    const ok = await confirm({
+      title: `ลบทีม “${team.org.name}”?`,
+      description: 'สมาชิกทั้งหมดจะถูกนำออก และโจทย์ที่แชร์ไว้จะกลายเป็นส่วนตัวของเจ้าของเดิม การกระทำนี้ย้อนกลับไม่ได้',
+      confirmLabel: 'ลบทีมถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await deleteTeamOrg(team.org.id)
       if (res.error) toast.error(res.error)
@@ -290,6 +304,7 @@ function TeamCard({ team }: { team: TeamOrgData }) {
           </section>
         </div>
       )}
+      {confirmDialog}
     </Card>
   )
 }

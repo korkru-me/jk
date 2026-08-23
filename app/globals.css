@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* KaTeX renders \(...\) / \[...\] inside question text — see lib/math/latex.ts. */
+@import "katex/dist/katex.min.css";
 
 @custom-variant dark (&:is(.dark *));
 

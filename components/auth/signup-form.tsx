@@ -14,15 +14,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
+import { SUBJECT_GROUPS } from '@/lib/subject-groups'
 
 const NAME_PREFIXES = ['เด็กหญิง', 'เด็กชาย', 'นาย', 'นางสาว'] as const
 
 const SURVEY_ROLES = [
   { value: 'teacher', label: 'ครูผู้สอน', icon: '👨‍🏫', desc: 'ในโรงเรียนหรือมหาวิทยาลัย' },
-  { value: 'tutor', label: 'ติวเตอร์อิสระ', icon: '📚', desc: 'หรือสถาบันกวดวิชา' },
-  { value: 'admin', label: 'ผู้บริหารสถานศึกษา', icon: '🏫', desc: 'ผู้อำนวยการ / หัวหน้ากลุ่มสาระ' },
   { value: 'student', label: 'นักเรียน', icon: '🎒', desc: 'ม.ต้น / ม.ปลาย / มหาวิทยาลัย' },
-  { value: 'other', label: 'อื่นๆ', icon: '✏️', desc: 'บทบาทที่ไม่ได้ระบุ' },
 ] as const
 
 const schema = z
@@ -37,17 +35,27 @@ const schema = z
       .regex(/[A-Za-z]/, 'รหัสผ่านต้องมีตัวอักษรอย่างน้อย 1 ตัว')
       .regex(/[0-9]/, 'รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว'),
     survey_role: z.string().min(1, 'กรุณาเลือกบทบาทของคุณ'),
-    role_custom: z.string().optional(),
+    subject_group: z.string().optional(),
+    subject_group_other: z.string().optional(),
     agreed: z.literal(true, {
       message: 'กรุณายอมรับเงื่อนไขการให้บริการก่อนสมัคร',
     }),
   })
   .superRefine((data, ctx) => {
-    if (data.survey_role === 'other' && !data.role_custom?.trim()) {
+    if (data.survey_role !== 'teacher') return
+    if (!data.subject_group) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['role_custom'],
-        message: 'กรุณาระบุบทบาทของคุณ',
+        path: ['subject_group'],
+        message: 'กรุณาเลือกกลุ่มสาระการเรียนรู้',
+      })
+      return
+    }
+    if (data.subject_group === 'other' && !data.subject_group_other?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['subject_group_other'],
+        message: 'กรุณาระบุกลุ่มสาระการเรียนรู้',
       })
     }
   })
@@ -67,10 +75,11 @@ export function SignupForm() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { survey_role: '' },
+    defaultValues: { survey_role: '', subject_group: '', subject_group_other: '' },
   })
 
   const selectedRole = watch('survey_role')
+  const subjectGroup = watch('subject_group')
   const agreed = watch('agreed')
 
   async function onSubmit(values: FormValues) {
@@ -82,7 +91,12 @@ export function SignupForm() {
     fd.set('email', values.email)
     fd.set('password', values.password)
     fd.set('survey_role', values.survey_role)
-    if (values.role_custom) fd.set('role_custom', values.role_custom)
+    if (values.survey_role === 'teacher' && values.subject_group) {
+      fd.set('subject_group', values.subject_group)
+      if (values.subject_group === 'other' && values.subject_group_other) {
+        fd.set('subject_group_other', values.subject_group_other.trim())
+      }
+    }
 
     try {
       const result = await register(fd)
@@ -108,14 +122,17 @@ export function SignupForm() {
       {/* Role selection */}
       <div className="space-y-2">
         <Label>คุณใช้งานระบบในฐานะอะไร?</Label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2">
           {SURVEY_ROLES.map((r) => (
             <button
               key={r.value}
               type="button"
               onClick={() => {
                 setValue('survey_role', r.value, { shouldValidate: true })
-                if (r.value !== 'other') setValue('role_custom', '')
+                if (r.value !== 'teacher') {
+                  setValue('subject_group', '')
+                  setValue('subject_group_other', '')
+                }
               }}
               className={[
                 'flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-sm font-medium transition-all',
@@ -137,17 +154,42 @@ export function SignupForm() {
         )}
       </div>
 
-      {/* Other — custom text */}
-      {selectedRole === 'other' && (
+      {/* Subject group — teachers only */}
+      {selectedRole === 'teacher' && (
         <div className="space-y-1.5">
-          <Label htmlFor="role_custom">โปรดระบุ</Label>
+          <Label htmlFor="subject_group">คุณสอนกลุ่มสาระการเรียนรู้ใด?</Label>
+          <NativeSelect
+            id="subject_group"
+            className="flex w-full"
+            aria-invalid={!!errors.subject_group}
+            {...reg('subject_group')}
+          >
+            <option value="" disabled>
+              เลือกกลุ่มสาระการเรียนรู้
+            </option>
+            {SUBJECT_GROUPS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </NativeSelect>
+          {errors.subject_group && (
+            <p className="text-xs text-destructive">{errors.subject_group.message}</p>
+          )}
+        </div>
+      )}
+
+      {/* Subject group — free text for อื่นๆ */}
+      {selectedRole === 'teacher' && subjectGroup === 'other' && (
+        <div className="space-y-1.5">
+          <Label htmlFor="subject_group_other">โปรดระบุกลุ่มสาระการเรียนรู้</Label>
           <Input
-            id="role_custom"
-            placeholder="เช่น นักวิชาการ, ผู้สร้างเนื้อหา"
-            {...reg('role_custom')}
+            id="subject_group_other"
+            placeholder="เช่น แนะแนว, กิจกรรมพัฒนาผู้เรียน"
+            {...reg('subject_group_other')}
           />
-          {errors.role_custom && (
-            <p className="text-xs text-destructive">{errors.role_custom.message}</p>
+          {errors.subject_group_other && (
+            <p className="text-xs text-destructive">{errors.subject_group_other.message}</p>
           )}
         </div>
       )}

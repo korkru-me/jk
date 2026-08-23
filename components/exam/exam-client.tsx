@@ -22,7 +22,9 @@ import { Calculator } from './calculator'
 import { FormulaSheet } from './formula-sheet'
 import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
+import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { partLabels } from '@/lib/part-labels'
+import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, CompositePart } from '@/lib/types'
@@ -52,7 +54,11 @@ interface AnswerRow {
     answer_unit: string | null
     // is_correct is intentionally stripped server-side before this reaches
     // the client — never trust/display it here pre-submission.
-    mcq_options: Array<{ text: string }> | null
+    // MCQ options for 'mcq'; for 'matching' this instead carries the left-hand
+    // prompts, with the shuffled right-hand column in `matching_options`
+    // (split apart server-side so the pairing isn't shipped to the client).
+    mcq_options: Array<{ text?: string; image_url?: string; index?: number; left_text?: string; left_image?: string }> | null
+    matching_options?: Array<{ right_text: string; right_image?: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
     answer_parts: AnswerPart[] | null
     extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | null
@@ -78,6 +84,9 @@ interface Props {
   durationMinutes: number | null
   startedAt: string
   config: ExamConfig
+  /** แฟ้มย่อย snapshotted onto the assignment, already filtered by the server to
+   *  what this assignment contains. Empty/omitted = plain numbered list. */
+  sections?: QuestionSetSection[]
   // Teacher-facing "see it as a student would" mode: renders the exact same
   // UI/interactions but never calls the save/submit server actions (there is
   // no real submission row behind `submissionId` to write to), and exits via
@@ -103,7 +112,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, previewMode = false, previewReturnHref }: Props) {
+export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], previewMode = false, previewReturnHref }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, setLocalAnswers, localAnswersRef,
@@ -119,6 +128,11 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   )
   const [submitting, setSubmitting] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
+  // Runs follow the order this student actually sees (shuffling reorders
+  // submission_answers), so a shuffled exam simply breaks into short runs
+  // instead of printing headings over the wrong questions.
+  const sectionOwner = sectionByQuestionId(sections)
+  const sectionRuns = groupQuestionsBySection(answers.map(a => a.question_id), sections)
   // Preview-only: the client-side (never persisted) grading result shown
   // after a teacher clicks submit in previewMode, in place of the real
   // /submissions/[id] results page.
@@ -355,6 +369,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         <Card padding="lg" className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="font-mono text-xs">ข้อ {currentIndex + 1} / {answers.length}</Badge>
+            {sectionOwner.get(current.question_id)?.title && (
+              <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
+            )}
             {current.questions.question_type === 'mcq' && (
               <Badge variant="outline" className="text-xs">ปรนัย</Badge>
             )}
@@ -427,10 +444,17 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
         {/* Answer inputs */}
         <Card padding="lg">
-          {current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
+          {current.questions.question_type === 'matching' && current.questions.mcq_options ? (
+            <MatchingAnswerInput
+              prompts={current.questions.mcq_options}
+              options={current.questions.matching_options ?? []}
+              rawValue={localAnswers[current.id] ?? ''}
+              onChange={val => handleAnswerChange(current.id, val)}
+            />
+          ) : current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
             <MCQInput
               answerId={current.id}
-              options={current.questions.mcq_options}
+              options={current.questions.mcq_options as Array<{ text: string; image_url?: string; index: number }>}
               selected={localAnswers[current.id] ?? ''}
               eliminatedSet={eliminated[current.id] ?? new Set()}
               onSelect={val => handleAnswerChange(current.id, val)}
@@ -567,26 +591,42 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         {/* Nav grid */}
         <Card padding="md" className="flex-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">นำทางข้อ</p>
-          <div className="grid grid-cols-5 gap-1.5">
-            {answers.map((a, i) => {
-              const isCur = i === currentIndex
-              const isAns = hasAnswered(a.id)
-              const isFlg = flagged.has(a.id)
-              let cls = 'bg-muted text-muted-foreground'
-              if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
-              else if (isFlg) cls = 'bg-flag text-white'
-              else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
+          {(() => {
+            let numbered = 0
+            return sectionRuns.map((run, runIndex) => {
+              const startIndex = numbered
+              numbered += run.question_ids.length
               return (
-                <button
-                  key={i}
-                  onClick={() => setCurrentIndex(i)}
-                  className={`w-8 h-8 rounded-lg text-[11px] font-bold transition-all hover:scale-105 ${cls}`}
-                >
-                  {i + 1}
-                </button>
+                <div key={runIndex} className={runIndex > 0 ? 'mt-3' : undefined}>
+                  {run.title && (
+                    <p className="text-[10px] font-semibold text-muted-foreground truncate mb-1.5">{run.title}</p>
+                  )}
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {run.question_ids.map((_, offset) => {
+                      const i = startIndex + offset
+                      const a = answers[i]
+                      const isCur = i === currentIndex
+                      const isAns = hasAnswered(a.id)
+                      const isFlg = flagged.has(a.id)
+                      let cls = 'bg-muted text-muted-foreground'
+                      if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
+                      else if (isFlg) cls = 'bg-flag text-white'
+                      else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentIndex(i)}
+                          className={`w-8 h-8 rounded-lg text-[11px] font-bold transition-all hover:scale-105 ${cls}`}
+                        >
+                          {i + 1}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               )
-            })}
-          </div>
+            })
+          })()}
           <div className="mt-3 border-t pt-3 space-y-1.5">
             {[
               { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
@@ -1008,11 +1048,18 @@ function ExamToolbar({
 
 // ─── MCQ Input ────────────────────────────────────────────────────────────────
 
+// The answer is stored as MCQ:<position in the question's own option list>,
+// not as the option's text — two options can read the same, or be pictures
+// with no text at all. See the MCQ: branch in lib/assignment-attempt.ts.
+function mcqValue(option: { index?: number }, fallbackIndex: number) {
+  return `MCQ:${option.index ?? fallbackIndex}`
+}
+
 function MCQInput({
   answerId, options, selected, eliminatedSet, onSelect, onToggleEliminate,
 }: {
   answerId: string
-  options: Array<{ text: string }>
+  options: Array<{ text: string; image_url?: string; index?: number }>
   selected: string
   eliminatedSet: Set<number>
   onSelect: (val: string) => void
@@ -1022,7 +1069,8 @@ function MCQInput({
     <div className="space-y-2">
       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">เลือกคำตอบ</p>
       {options.map((opt, i) => {
-        const isSelected  = selected === opt.text
+        const value = mcqValue(opt, i)
+        const isSelected  = selected === value
         const isEliminated = eliminatedSet.has(i)
         return (
           <div
@@ -1042,16 +1090,23 @@ function MCQInput({
                 {isSelected && <div className="w-2 h-2 rounded-full bg-card" />}
               </div>
               <span className="font-bold text-sm text-muted-foreground shrink-0 w-5">{CHOICE_LABELS[i]}</span>
-              <span className={`text-sm flex-1 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
-                {opt.text}
-              </span>
+              <div className={`flex-1 min-w-0 flex items-center gap-2 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
+                {opt.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={opt.image_url} alt="" className="max-h-28 w-auto object-contain rounded border shrink-0" />
+                )}
+                {/* A picture-only option carries the choice letter as its text
+                    (the answer's identity is opt.text, so it can't be blank) —
+                    printing it here would just repeat the label beside it. */}
+                {opt.text !== CHOICE_LABELS[i] && <span className="text-sm min-w-0">{opt.text}</span>}
+              </div>
               <input
                 type="radio"
                 className="sr-only"
                 name={`answer-${answerId}`}
-                value={opt.text}
+                value={value}
                 checked={isSelected}
-                onChange={() => !isEliminated && onSelect(opt.text)}
+                onChange={() => !isEliminated && onSelect(value)}
               />
             </label>
             <button
@@ -1407,6 +1462,58 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
 
 // ─── Ordering ─────────────────────────────────────────────────────────────────
 
+// ─── Matching ────────────────────────────────────────────────────────────────
+// One dropdown per left-hand prompt, listing the whole (already shuffled)
+// right-hand column. The answer is stored as the chosen right_text per prompt,
+// in prompt order — the shape the 'MATCH:' branch in lib/assignment-attempt.ts
+// grades against. Options are deliberately not struck off as they're used: a
+// teacher may legitimately reuse a label across pairs.
+function MatchingAnswerInput({ prompts, options, rawValue, onChange }: {
+  prompts: Array<{ left_text?: string; left_image?: string }>
+  options: Array<{ right_text: string; right_image?: string }>
+  rawValue: string
+  onChange: (v: string) => void
+}) {
+  let picked: string[] = []
+  try { picked = rawValue ? JSON.parse(rawValue) : [] } catch { picked = [] }
+  if (!Array.isArray(picked)) picked = []
+
+  const filled = prompts.every((_, i) => picked[i])
+
+  function update(index: number, value: string) {
+    const next = prompts.map((_, i) => (i === index ? value : picked[i] ?? ''))
+    onChange(JSON.stringify(next))
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">จับคู่แต่ละข้อกับคำตอบที่ถูกต้อง:</p>
+      <div className="space-y-2">
+        {prompts.map((prompt, i) => (
+          <Card radius="md" className="flex items-center gap-3 p-2.5" key={i}>
+            {prompt.left_image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={prompt.left_image} alt="" className="w-12 h-12 object-contain rounded border shrink-0" />
+            )}
+            <span className="flex-1 min-w-0 text-sm"><RichText text={prompt.left_text ?? ''} /></span>
+            <NativeSelect
+              value={picked[i] ?? ''}
+              onChange={e => update(i, e.target.value)}
+              className="w-44 shrink-0"
+            >
+              <option value="">— เลือก —</option>
+              {options.map((o, j) => (
+                <option key={j} value={o.right_text}>{o.right_text}</option>
+              ))}
+            </NativeSelect>
+          </Card>
+        ))}
+      </div>
+      {filled && prompts.length > 0 && <p className="text-xs text-success">✓ จับคู่ครบแล้ว</p>}
+    </div>
+  )
+}
+
 function OrderingAnswerInput({ config, rawValue, onChange }: {
   answerId: string; config: OrderingConfig | null; rawValue: string; onChange: (v: string) => void
 }) {
@@ -1568,14 +1675,20 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
             <>
               <RichText text={part.text} className="text-sm block" />
               <div className="space-y-1.5">
-                {(part.options ?? []).map((opt, oi) => (
-                  <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
-                    answers[i] === opt.text ? 'border-tint-1 bg-tint-1/10' : 'border-border'
-                  }`}>
-                    <input type="radio" name={`composite-${part.id}`} checked={answers[i] === opt.text} onChange={() => updatePart(i, opt.text)} />
-                    <RichText text={opt.text} />
-                  </label>
-                ))}
+                {(part.options ?? []).map((opt, oi) => {
+                  // Same MCQ:<position> identity a standalone mcq uses; a
+                  // composite part's options aren't shuffled, so the position
+                  // is just where it sits in the list.
+                  const value = `MCQ:${oi}`
+                  return (
+                    <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
+                      answers[i] === value ? 'border-tint-1 bg-tint-1/10' : 'border-border'
+                    }`}>
+                      <input type="radio" name={`composite-${part.id}`} checked={answers[i] === value} onChange={() => updatePart(i, value)} />
+                      <RichText text={opt.text} />
+                    </label>
+                  )
+                })}
               </div>
             </>
           )}
@@ -1652,18 +1765,18 @@ function interpolateValues(text: string, values: Record<string, number>, variabl
 }
 
 function UnitDisplay({ html }: { html: string }) {
-  return /<[a-z][\s\S]*>/i.test(html)
-    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: html }} />
+  return /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
+    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
     : <span className="text-sm text-muted-foreground">{html}</span>
 }
 
 function QuestionText({ text }: { text: string }) {
-  // Support: HTML, MathML (<math>), plain text
-  if (/<[a-z][\s\S]*>/i.test(text)) {
+  // Support: HTML, MathML (<math>), TeX via KaTeX, plain text
+  if (/<[a-z][\s\S]*>/i.test(text) || containsMath(text)) {
     return (
       <div
         className="leading-relaxed rich-text-content text-base [&_math]:my-1 [&_math]:inline-block"
-        dangerouslySetInnerHTML={{ __html: text }}
+        dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }}
       />
     )
   }

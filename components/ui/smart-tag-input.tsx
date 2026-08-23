@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { X } from 'lucide-react'
+import { useTagHistory } from '@/hooks/use-tag-history'
+import { canonicalTag, hasTag, mergeTagPool, normalizeTag, suggestTags, tagKey } from '@/lib/tag-suggest'
 
 export function SmartTagInput({ allTags, tags, onTagsChange }: {
   allTags: string[]
@@ -11,19 +13,43 @@ export function SmartTagInput({ allTags, tags, onTagsChange }: {
 }) {
   const [inputValue, setInputValue] = useState('')
   const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const { history, remember, forget } = useTagHistory()
 
-  const trimmed = inputValue.trim()
-  const filtered = allTags.filter(
-    t => t.toLowerCase().includes(inputValue.toLowerCase()) && !tags.includes(t)
+  const pool = useMemo(() => mergeTagPool(allTags, history), [allTags, history])
+  const savedKeys = useMemo(() => new Set(allTags.map(tagKey)), [allTags])
+
+  const trimmed = normalizeTag(inputValue)
+  const suggestions = useMemo(
+    () => suggestTags(pool, trimmed, tags),
+    [pool, trimmed, tags]
   )
-  const canCreate = !!trimmed && !tags.includes(trimmed) && !allTags.includes(trimmed)
-  const showDropdown = open && (filtered.length > 0 || canCreate)
+  const canCreate = !!trimmed && !hasTag(tags, trimmed) && !hasTag(pool, trimmed)
+  const showDropdown = open && (suggestions.length > 0 || canCreate)
+  /** The create row sits after the suggestions and can be reached with the arrow keys too. */
+  const optionCount = suggestions.length + (canCreate ? 1 : 0)
+
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => setActiveIndex(0), [trimmed])
+
+  useEffect(() => {
+    listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, showDropdown])
 
   function addTag(tag: string) {
-    const t = tag.trim()
-    if (t && !tags.includes(t)) onTagsChange([...tags, t])
+    const t = canonicalTag(pool, tag)
+    if (t && !hasTag(tags, t)) onTagsChange([...tags, t])
+    // Remembered even when it was already picked: typing it is what makes it a
+    // tag this teacher uses, and the question it belongs to may never be saved.
+    if (t) remember(t)
     setInputValue('')
     setOpen(false)
+  }
+
+  function commitActive() {
+    if (activeIndex < suggestions.length) return addTag(suggestions[activeIndex])
+    if (canCreate) addTag(trimmed)
   }
 
   function removeTag(i: number) {
@@ -37,31 +63,85 @@ export function SmartTagInput({ allTags, tags, onTagsChange }: {
           value={inputValue}
           onChange={e => { setInputValue(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={e => {
-            if (e.key === 'Enter') { e.preventDefault(); if (trimmed) addTag(trimmed) }
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              if (showDropdown) commitActive()
+              else if (trimmed) addTag(trimmed)
+              return
+            }
+            if (e.key === 'ArrowDown' && optionCount > 0) {
+              e.preventDefault()
+              setOpen(true)
+              setActiveIndex(i => (i + 1) % optionCount)
+              return
+            }
+            if (e.key === 'ArrowUp' && optionCount > 0) {
+              e.preventDefault()
+              setOpen(true)
+              setActiveIndex(i => (i - 1 + optionCount) % optionCount)
+              return
+            }
             if (e.key === 'Escape') setOpen(false)
           }}
+          role="combobox"
+          aria-expanded={showDropdown}
+          aria-autocomplete="list"
           placeholder="พิมพ์แท็ก แล้วกด Enter หรือเลือกจากรายการ"
           className="text-sm"
         />
         {showDropdown && (
-          <div className="absolute z-50 top-full mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-            {filtered.map(t => (
-              <button
-                key={t}
-                type="button"
-                onMouseDown={e => { e.preventDefault(); addTag(t) }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors"
-              >
-                {t}
-              </button>
-            ))}
+          <div
+            ref={listRef}
+            role="listbox"
+            className="absolute z-50 top-full mt-1 w-full border border-border rounded-lg bg-popover text-popover-foreground shadow-lg overflow-hidden max-h-48 overflow-y-auto"
+          >
+            {suggestions.map((t, i) => {
+              const onlyRemembered = !savedKeys.has(tagKey(t))
+              return (
+                <div
+                  key={t}
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  data-active={i === activeIndex}
+                  className={`flex items-center gap-2 text-sm transition-colors ${i === activeIndex ? 'bg-accent text-accent-foreground' : ''}`}
+                >
+                  <button
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); addTag(t) }}
+                    onMouseEnter={() => setActiveIndex(i)}
+                    className="flex-1 text-left px-3 py-2 truncate"
+                  >
+                    {t}
+                    {onlyRemembered && (
+                      <span className="ml-2 text-xs text-muted-foreground">เคยพิมพ์ไว้</span>
+                    )}
+                  </button>
+                  {onlyRemembered && (
+                    <button
+                      type="button"
+                      title="ลบออกจากแท็กที่เคยพิมพ์"
+                      aria-label={`ลบ ${t} ออกจากแท็กที่เคยพิมพ์`}
+                      onMouseDown={e => { e.preventDefault(); forget(t) }}
+                      className="px-2 py-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
             {canCreate && (
               <button
                 type="button"
+                role="option"
+                aria-selected={activeIndex === suggestions.length}
+                data-active={activeIndex === suggestions.length}
                 onMouseDown={e => { e.preventDefault(); addTag(trimmed) }}
-                className="w-full text-left px-3 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50 border-t border-gray-100"
+                onMouseEnter={() => setActiveIndex(suggestions.length)}
+                className={`w-full text-left px-3 py-2 text-sm text-primary font-medium border-t border-border ${activeIndex === suggestions.length ? 'bg-accent' : ''}`}
               >
                 + สร้างแท็กใหม่ &ldquo;{trimmed}&rdquo;
               </button>

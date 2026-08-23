@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { ChevronLeft, ChevronRight, FileText, ScanLine, Eye } from 'lucide-react'
 import type { Question, MCQOption, Variable } from '@/lib/types'
+import { sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { PrintSettings } from './export-client'
 import { OMRSheetPreview } from './omr-sheet-preview'
 import { IconButton } from '@/components/ui/icon-button'
@@ -111,16 +112,18 @@ function SecurityStrip({ examId, studentName }: { examId: string; studentName?: 
 // ─── Exam Sheet Page ──────────────────────────────────────────────────────────
 
 function ExamSheetPage({
-  settings, questions, assignmentTitle, classroomName, assignmentId, copyIndex,
+  settings, questions, sections, assignmentTitle, classroomName, assignmentId, copyIndex,
 }: {
   settings: PrintSettings
   questions: Question[]
+  sections: QuestionSetSection[]
   assignmentTitle: string
   classroomName: string
   assignmentId: string
   copyIndex: number
 }) {
   const displayQuestions = questions.length > 0 ? questions : MOCK_QUESTIONS as any[]
+  const sectionOwner = sectionByQuestionId(sections)
   const fontSize = settings.ecoMode ? 10 : 12
   const lineHeight = settings.ecoMode ? 1.3 : 1.6
   const padding = settings.ecoMode ? 24 : 32
@@ -199,8 +202,16 @@ function ExamSheetPage({
             ? (q.mcq_options as MCQOption[]).map((o: MCQOption) => o.text)
             : q.opts ?? []
 
+          const section = sectionOwner.get(q.id)
+          const isSectionStart = !!section?.title && sectionOwner.get(displayQuestions[i - 1]?.id)?.id !== section.id
+
           return (
             <div key={q.id ?? i} style={{ marginBottom: settings.ecoMode ? 8 : 14, breakInside: 'avoid' }}>
+              {isSectionStart && (
+                <p style={{ fontWeight: 700, marginBottom: 6, paddingBottom: 2, borderBottom: '1px solid #9ca3af' }}>
+                  {section!.title}
+                </p>
+              )}
               <p style={{ fontWeight: 600, marginBottom: 3 }}>
                 <span style={{ color: '#1f2937' }}>ข้อ {i + 1}. </span>
                 {text}
@@ -269,12 +280,15 @@ interface Props {
   settings: PrintSettings
   onPatch: (p: Partial<PrintSettings>) => void
   questions: Question[]
+  /** แฟ้มย่อย headings for the sheet, empty when the งาน has none or the teacher
+   *  chose not to show them. */
+  sections?: QuestionSetSection[]
   assignmentTitle: string
   classroomName: string
   assignmentId: string
 }
 
-export function PDFPreview({ settings, onPatch, questions, assignmentTitle, classroomName, assignmentId }: Props) {
+export function PDFPreview({ settings, onPatch, questions, sections = [], assignmentTitle, classroomName, assignmentId }: Props) {
   const totalCopies = settings.copies
 
   return (
@@ -338,6 +352,7 @@ export function PDFPreview({ settings, onPatch, questions, assignmentTitle, clas
           <ExamSheetPage
             settings={settings}
             questions={questions}
+            sections={sections}
             assignmentTitle={assignmentTitle}
             classroomName={classroomName}
             assignmentId={assignmentId}

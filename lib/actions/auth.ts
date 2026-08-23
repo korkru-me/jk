@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { buildFullName } from '@/lib/utils'
+import { isSubjectGroup } from '@/lib/subject-groups'
 
 export async function login(_prevState: unknown, formData: FormData) {
   const supabase = await createClient()
@@ -61,6 +62,8 @@ export async function register(formData: FormData) {
   const last_name = formData.get('last_name') as string
   const survey_role = formData.get('survey_role') as string
   const role_custom = formData.get('role_custom') as string | null
+  const subject_group_raw = formData.get('subject_group') as string | null
+  const subject_group_other = formData.get('subject_group_other') as string | null
 
   if (!prefix?.trim() || !first_name?.trim() || !last_name?.trim()) {
     return { error: 'กรุณากรอกคำนำหน้าชื่อ ชื่อ และสกุล' }
@@ -76,11 +79,30 @@ export async function register(formData: FormData) {
     ? survey_role
     : null
 
+  // กลุ่มสาระการเรียนรู้ถามเฉพาะครูผู้สอน — บทบาทอื่นไม่เก็บค่า
+  const subject_group =
+    survey_role === 'teacher' && subject_group_raw && isSubjectGroup(subject_group_raw)
+      ? subject_group_raw
+      : null
+  const subject_group_other_value =
+    subject_group === 'other' ? subject_group_other?.trim() || null : null
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { full_name, prefix, first_name, last_name, role, instructor_type, survey_role, role_custom },
+      data: {
+        full_name,
+        prefix,
+        first_name,
+        last_name,
+        role,
+        instructor_type,
+        survey_role,
+        role_custom,
+        subject_group,
+        subject_group_other: subject_group_other_value,
+      },
     },
   })
 
@@ -104,8 +126,10 @@ export async function register(formData: FormData) {
           instructor_type: instructor_type || null,
           survey_role: survey_role || null,
           role_custom: survey_role === 'other' ? (role_custom || null) : null,
+          subject_group,
+          subject_group_other: subject_group_other_value,
         },
-        { onConflict: 'id', ignoreDuplicates: true }
+        { onConflict: 'id' }
       )
 
     if (profileError) {

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint:tokens": "node scripts/check-design-tokens.mjs"
+    "lint:tokens": "node scripts/check-design-tokens.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -20,9 +22,11 @@
     "@tiptap/pm": "^3.22.5",
     "@tiptap/react": "^3.22.5",
     "@tiptap/starter-kit": "^3.22.5",
+    "@types/katex": "^0.16.8",
     "@types/recharts": "^1.8.29",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "katex": "^0.18.4",
     "lucide-react": "^1.11.0",
     "mathjs": "^15.2.0",
     "nerdamer": "^1.1.13",
@@ -47,7 +51,9 @@
     "@types/qrcode.react": "^1.0.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "fast-xml-parser": "^5.11.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { createCategory, updateCategory, deleteCategory, reorderCategory, seedGradeCategories } from '@/lib/actions/admin'
+import { createCategory, updateCategory, deleteCategory, reorderCategory, seedGradeCategories, bulkCreateCategories } from '@/lib/actions/admin'
+import { Textarea } from '@/components/ui/textarea'
 import type { QuestionCategory } from '@/lib/types'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type CategoryWithCount = QuestionCategory & { question_count: number; children?: CategoryWithCount[] }
 
@@ -25,9 +27,16 @@ function CategoryRow({
   onAddChild: (parentId: string) => void
 }) {
   const [isPending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
-  function handleDelete() {
-    if (!confirm(`ลบหมวด "${cat.name}"?`)) return
+  async function handleDelete() {
+    const ok = await confirm({
+      title: `ลบหมวด “${cat.name}”?`,
+      description: 'หมวดนี้จะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await deleteCategory(cat.id)
       if (res?.error) toast.error(res.error)
@@ -60,6 +69,7 @@ function CategoryRow({
         <Button variant="link" size="xs" onClick={() => onEdit(cat)} className="text-muted-foreground">แก้ไข</Button>
         <Button variant="link" size="xs" onClick={handleDelete} disabled={isPending} className="disabled:opacity-50">ลบ</Button>
       </div>
+      {confirmDialog}
     </div>
   )
 }
@@ -80,6 +90,62 @@ function SeedButton() {
     <Button variant="outline" onClick={handleSeed} disabled={isPending}>
       {isPending ? 'กำลังสร้าง...' : 'สร้างหมวดหมู่ตามระดับชั้น'}
     </Button>
+  )
+}
+
+// ─── Bulk paste ──────────────────────────────────────────────
+// For standing up a whole category tree at once — e.g. the list printed by
+// scripts/moodle-mbz-to-korkru.mjs when converting a Moodle question bank.
+function BulkAddButton() {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [isPending, startTransition] = useTransition()
+
+  const lineCount = text.split('\n').filter(l => l.trim()).length
+
+  function handleSubmit() {
+    if (!text.trim()) { toast.error('วางรายการหมวดก่อน'); return }
+    startTransition(async () => {
+      const res = await bulkCreateCategories(text)
+      if (res?.error) toast.error(res.error)
+      else { toast.success(res?.message ?? 'เสร็จแล้ว'); setText(''); setOpen(false) }
+    })
+  }
+
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(true)}>วางรายการหมวด</Button>
+      <Dialog open={open} onOpenChange={(v) => !v && setOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>เพิ่มหมวดจากรายการ</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>หนึ่งบรรทัดต่อหนึ่งหมวด — ใช้ <code>/</code> คั่นเพื่อสร้างหมวดย่อย</Label>
+            {/* Textarea grows with its content (field-sizing-content), and a
+                pasted category tree runs to hundreds of lines — so it needs a
+                ceiling of its own, or it pushes the dialog's own scrolling to
+                its limit and buries the submit button. */}
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={12}
+              className="max-h-[45vh] overflow-y-auto font-mono text-sm"
+              placeholder={'กลศาสตร์\nกลศาสตร์ / เวกเตอร์และการแตกแรง\nคลื่นกล / ส่วนประกอบคลื่น'}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              {lineCount > 0 ? `${lineCount} บรรทัด` : 'ยังไม่มีรายการ'} — หมวดที่มีอยู่แล้วจะถูกข้าม
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending ? 'กำลังสร้าง...' : 'สร้าง'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -137,7 +203,10 @@ export function CategoriesTree({
   return (
     <>
       <div className="flex justify-between mb-4">
-        <SeedButton />
+        <div className="flex gap-2">
+          <SeedButton />
+          <BulkAddButton />
+        </div>
         <Button onClick={() => openAdd()}>+ เพิ่มหมวดหลัก</Button>
       </div>
 

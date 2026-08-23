@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { startSubmission } from '@/lib/actions/submissions'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
+import { parseSections } from '@/lib/question-set-sections'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
 
@@ -47,7 +48,7 @@ export default async function TakeExamPage({
   const [submissionRes, answersRes] = await Promise.all([
     supabase
       .from('submissions')
-      .select('*, assignments(title, duration_minutes, end_at, require_work_image)')
+      .select('*, assignments(title, duration_minutes, end_at, require_work_image, sections, show_sections)')
       .eq('id', result.submissionId!)
       .single(),
     supabase
@@ -59,15 +60,56 @@ export default async function TakeExamPage({
   const submission = submissionRes.data
   const answers = answersRes.data
 
-  // Reorder MCQ options per the persisted shuffle (option_order) and strip
-  // is_correct — the exam-taking client must never receive the answer key
-  // before the student submits.
+  // Reorder options per the persisted shuffle (option_order) and strip the
+  // answer key — the exam-taking client must never receive it before the
+  // student submits.
   const safeAnswers = (answers ?? []).map((a: any) => {
     const q = a.questions
-    if (q?.question_type !== 'mcq' || !q.mcq_options) return a
+    if (!q?.mcq_options) return a
     const order: number[] | null = a.option_order
-    const ordered = order ? order.map(i => q.mcq_options[i]) : q.mcq_options
-    return { ...a, questions: { ...q, mcq_options: ordered.map((o: any) => ({ text: o.text })) } }
+
+    if (q.question_type === 'mcq') {
+      // `index` is the option's position in the question's own mcq_options,
+      // carried through the shuffle because that position — not the option's
+      // text — is what the answer is recorded as. See the MCQ: branch in
+      // lib/assignment-attempt.ts.
+      const positions: number[] = order ?? q.mcq_options.map((_: unknown, i: number) => i)
+      return {
+        ...a,
+        questions: {
+          ...q,
+          mcq_options: positions
+            .filter((i: number) => q.mcq_options[i])
+            .map((i: number) => ({
+              text: q.mcq_options[i].text,
+              image_url: q.mcq_options[i].image_url,
+              index: i,
+            })),
+        },
+      }
+    }
+
+    // Matching pairs are stored side by side in mcq_options, so sending them
+    // as-is would hand over the answer key: pair i's right_text *is* the
+    // answer for prompt i. The two columns are split apart instead, and only
+    // the right-hand one is shuffled (option_order), leaving the prompts in
+    // their authored order — which is the order grading expects them back in.
+    if (q.question_type === 'matching') {
+      const pairs = q.mcq_options as any[]
+      const rightOrder = order ?? pairs.map((_, i) => i)
+      return {
+        ...a,
+        questions: {
+          ...q,
+          mcq_options: pairs.map((p: any) => ({ left_text: p.left_text, left_image: p.left_image })),
+          matching_options: rightOrder
+            .filter(i => pairs[i])
+            .map(i => ({ right_text: pairs[i].right_text, right_image: pairs[i].right_image })),
+        },
+      }
+    }
+
+    return a
   })
 
   const assignment = (submission as any).assignments
@@ -87,6 +129,7 @@ export default async function TakeExamPage({
         durationMinutes={assignment.duration_minutes}
         startedAt={submission!.started_at}
         config={examConfig}
+        sections={assignment.show_sections === false ? [] : parseSections(assignment.sections)}
       />
     </div>
   )

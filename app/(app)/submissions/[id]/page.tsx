@@ -15,16 +15,23 @@ import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStuden
 import { sortStudents } from '@/lib/student-sort'
 import { ScoreEditor } from '@/components/assignments/score-editor'
 import { Card } from '@/components/ui/card'
+import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 
 export const metadata = { title: 'ผลการสอบ — KorKru' }
 
-function reorderOptions<T>(options: T[] | null, order: number[] | null): T[] | null {
+/**
+ * Puts the options back in the order the student saw them, keeping each one's
+ * position in the question's own list alongside — the answer was recorded as
+ * that position (MCQ:<index>), so the review needs it to say which option was
+ * picked.
+ */
+function reorderOptions<T>(options: T[] | null, order: number[] | null): (T & { index: number })[] | null {
   if (!options) return null
-  if (!order) return options
-  return order.map(i => options[i])
+  const positions = order ?? options.map((_, i) => i)
+  return positions.filter(i => options[i]).map(i => ({ ...options[i], index: i }))
 }
 
 function formatAnswer(n: number): string {
@@ -447,7 +454,14 @@ async function SubmissionAnswerDetails({
                     answerUnit={q.answer_unit}
                     questionType={q.question_type}
                     extraData={q.extra_data}
-                    mcqOptions={reorderOptions(q.mcq_options, a.option_order)}
+                    mcqOptions={
+                      // For matching, option_order shuffled only the choices the
+                      // student picked from — the pairs themselves must stay in
+                      // authored order so pair i lines up with answer i.
+                      q.question_type === 'matching'
+                        ? q.mcq_options
+                        : reorderOptions(q.mcq_options, a.option_order)
+                    }
                     workImages={a.work_images ?? null}
                   />
                 </div>
@@ -490,15 +504,63 @@ function AnswerReview({
   answerUnit: string | null
   questionType?: string
   extraData?: Record<string, unknown>
-  mcqOptions: Array<{ text: string; is_correct: boolean }> | null
+  mcqOptions: Array<{ text: string; is_correct: boolean; index?: number; image_url?: string; left_text?: string; right_text?: string; left_image?: string }> | null
   workImages?: (string | null)[] | null
 }) {
+  // ─── Matching: the pairs in their authored order, each showing what the
+  // student picked next to the right answer. mcqOptions holds MatchingPair
+  // rows here (see MatchingPair in lib/types.ts); option_order shuffled only
+  // the choices the student saw, not the prompts, so pair i still lines up
+  // with the i-th entry of the stored answer.
+  if (questionType === 'matching' && correctAnswer.startsWith('MATCH:')) {
+    let correctRights: string[] = []
+    let studentRights: string[] = []
+    try { correctRights = JSON.parse(correctAnswer.slice(6)) } catch { /* keep empty */ }
+    try { studentRights = JSON.parse(studentAnswer || '[]') } catch { /* keep empty */ }
+
+    return (
+      <div className="space-y-2 mt-2">
+        {correctRights.map((right, i) => {
+          const picked = studentRights[i] ?? ''
+          const ok = picked.trim() === right.trim()
+          const pair = mcqOptions?.[i]
+          return (
+            <div
+              key={i}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 ${
+                ok ? 'border-success bg-success/10' : 'border-destructive bg-destructive/10'
+              }`}
+            >
+              {pair?.left_image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={pair.left_image} alt="" className="w-10 h-10 object-contain rounded border shrink-0" />
+              )}
+              <span className="text-sm flex-1 min-w-0">{pair?.left_text ?? `ข้อ ${i + 1}`}</span>
+              <span className={`text-sm font-medium shrink-0 ${ok ? 'text-success' : 'text-destructive'}`}>
+                {picked || '—'}
+              </span>
+              {!ok && (
+                <span className="text-xs font-semibold text-success shrink-0 flex items-center gap-1">
+                  <CheckCircle2 size={13} /> {right}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   // ─── MCQ: show all options with color highlighting ───────────────────────
   if (questionType === 'mcq' && mcqOptions && mcqOptions.length > 0) {
     return (
       <div className="space-y-2 mt-2">
         {mcqOptions.map((opt, i) => {
-          const isStudentChoice = studentAnswer === opt.text
+          // Answers are recorded as MCQ:<position>; anything older stored the
+          // option's text, so both are accepted here.
+          const optionIndex = opt.index ?? i
+          const isStudentChoice = studentAnswer === `MCQ:${optionIndex}`
+            || (!studentAnswer?.startsWith('MCQ:') && studentAnswer === opt.text)
           const isCorrectOpt = opt.is_correct
 
           let wrapClass = 'border-border bg-background'
@@ -526,9 +588,15 @@ function AnswerReview({
           return (
             <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all ${wrapClass}`}>
               <span className={`text-sm font-bold shrink-0 w-5 ${labelClass}`}>{CHOICE_LABELS[i]}</span>
-              <span className={`text-sm flex-1 ${isCorrectOpt || (isStudentChoice && !isCorrectOpt) ? 'font-medium ' + labelClass : 'text-foreground'}`}>
-                {opt.text}
-              </span>
+              {opt.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={opt.image_url} alt="" className="max-h-24 w-auto object-contain rounded border shrink-0" />
+              )}
+              {opt.text !== CHOICE_LABELS[i] && (
+                <span className={`text-sm flex-1 ${isCorrectOpt || (isStudentChoice && !isCorrectOpt) ? 'font-medium ' + labelClass : 'text-foreground'}`}>
+                  {opt.text}
+                </span>
+              )}
               {indicator}
             </div>
           )
@@ -792,9 +860,9 @@ function formatAnswerDisplay(val: string): string {
 }
 
 function UnitText({ html }: { html: string }) {
-  const isHtml = /<[a-z][\s\S]*>/i.test(html)
+  const isHtml = /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
   if (isHtml) {
-    return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: html }} />
+    return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
   }
   return <>{html}</>
 }
@@ -807,9 +875,9 @@ function substituteVars(text: string, values: Record<string, number>) {
 }
 
 function QuestionText({ text, className }: { text: string; className?: string }) {
-  const isHtml = /<[a-z][\s\S]*>/i.test(text)
+  const isHtml = /<[a-z][\s\S]*>/i.test(text) || containsMath(text)
   if (isHtml) {
-    return <div className={`rich-text-content ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: text }} />
+    return <div className={`rich-text-content ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
   }
   return <p className={`whitespace-pre-line ${className ?? ''}`}>{text}</p>
 }

@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 18 สิงหาคม 2026
+อัปเดตล่าสุด: 21 สิงหาคม 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -21,16 +21,18 @@ Invariant สำคัญ:
 
 ## คลังโจทย์
 
-- `question_categories` — หมวดหมู่แบบ parent/child
+- `question_categories` — หมวดหมู่แบบ parent/child เป็น taxonomy กลางร่วมทุก organization เขียนได้เฉพาะทาง admin action (`lib/actions/admin.ts`) การนำเข้าไฟล์จึงจับคู่ตามชื่อเท่านั้น ไม่สร้างหมวดใหม่
 - `questions` — เนื้อหา ชนิด เฉลย ตัวแปร การมองเห็น และ metadata
 - `formula_presets` — สมการ/ตัวแปรที่นำกลับมาใช้
-- `question_sets` — รายการ `question_ids` ที่บันทึกเป็นชุด
+- `question_sets` — รายการ `question_ids` ที่บันทึกเป็นแฟ้ม พร้อม `sections` (jsonb) สำหรับแฟ้มย่อยในแฟ้ม
 - `question_shares` และ `question_set_shares` — แชร์เข้าทีม/organization เพิ่มเติม
 
 ความสัมพันธ์สำคัญ:
 
 - Question อาจมี parent/group/order สำหรับโจทย์หลายข้อที่สัมพันธ์กัน
 - QuestionSet เก็บ array ของ IDs ซึ่งอาจเกิด dangling reference เมื่อโจทย์ถูกลบ โค้ดต้องรับมือ
+- `question_sets.sections` เป็นมุมมองบน `question_ids` ไม่ใช่แหล่งความจริงคู่ขนาน: `[{ id, title, question_ids }]` โดย id ทุกตัวต้องอยู่ใน `question_ids`, ห้ามซ้ำภายในแฟ้มย่อยเดียวกัน (แต่ข้ามแฟ้มย่อยซ้ำได้ — ข้อเดียวอยู่ได้หลายแฟ้มย่อย) ส่วน `question_ids` เป็นลำดับของแฟ้มเองที่ครูจัด ไม่ได้สร้างใหม่จากลำดับแฟ้มย่อย ทุกครั้งที่บันทึก server จะผ่าน `normalizeSetSections` ใน `lib/question-set-sections.ts` — ห้ามเขียนคอลัมน์ใดคอลัมน์หนึ่งโดยไม่ผ่านฟังก์ชันนี้
+- `assignments.sections` เป็น snapshot ของแฟ้มย่อยตอนสร้างงาน (แช่แข็งเหมือน `question_ids`) และ `assignments.show_sections` คุมว่านักเรียน/ใบงานจะเห็นชื่อแฟ้มย่อยหรือไม่ การแก้แฟ้มโจทย์ภายหลังไม่ย้อนไปเปลี่ยนงานที่มอบหมายไปแล้ว
 - visibility ไม่แทน authorization ทั้งหมด ต้องพิจารณา owner, org, share และ assignment access ร่วมกัน
 
 ## ห้องเรียน

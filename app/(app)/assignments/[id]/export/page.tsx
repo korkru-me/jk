@@ -28,7 +28,7 @@ export default async function ExportPage({
 
   const classroomId = (assignment as any).classrooms?.id
 
-  const [{ data: questions }, membershipsResult] = await Promise.all([
+  const [{ data: questionRows }, membershipsResult] = await Promise.all([
     supabase.from('questions').select('*').in('id', assignment.question_ids),
     classroomId
       ? supabase
@@ -38,6 +38,13 @@ export default async function ExportPage({
       : Promise.resolve({ data: [] as any[] }),
   ])
 
+  // `.in()` doesn't preserve the assignment's question order — the printed
+  // sheet and its แฟ้มย่อย headings depend on it.
+  const byId = new Map(((questionRows ?? []) as Question[]).map(q => [q.id, q]))
+  const questions = (assignment.question_ids as string[])
+    .map(qid => byId.get(qid))
+    .filter((q): q is Question => !!q)
+
   const students = ((membershipsResult as any).data ?? []).map((m: any) => ({
     id: m.users.id,
     name: m.users.full_name,
@@ -46,7 +53,7 @@ export default async function ExportPage({
   return (
     <ExportClient
       assignment={assignment as Assignment & { classrooms: { name: string } | null }}
-      questions={(questions ?? []) as Question[]}
+      questions={questions}
       students={students}
       assignmentId={id}
     />

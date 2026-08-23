@@ -14,6 +14,8 @@ import { RichText } from '@/components/ui/rich-text'
 import { adminDeleteQuestion } from '@/lib/actions/admin'
 import type { Question, QuestionCategory } from '@/lib/types'
 import Link from 'next/link'
+import { questionExcerpt } from '@/lib/question-display'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 // ─── Filter bar ─────────────────────────────────────────────
 export function QuestionsFilter({ categories }: { categories: QuestionCategory[] }) {
@@ -106,9 +108,16 @@ type Row = Question & {
 export function QuestionTable({ questions }: { questions: Row[] }) {
   const [preview, setPreview] = useState<Row | null>(null)
   const [, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
-  function handleDelete(id: string, title: string) {
-    if (!confirm(`ลบโจทย์ "${title}"?`)) return
+  async function handleDelete(id: string, title: string) {
+    const ok = await confirm({
+      title: `ลบโจทย์ “${title}”?`,
+      description: 'โจทย์จะถูกลบถาวร กู้คืนไม่ได้',
+      confirmLabel: 'ลบถาวร',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await adminDeleteQuestion(id)
       if (res?.error) toast.error(res.error)
@@ -140,7 +149,7 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
               <tr key={q.id} className="hover:bg-muted transition-colors">
                 <td className="px-4 py-3 max-w-xs">
                   <p className="font-medium text-foreground truncate">{q.title}</p>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{q.question_text}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{questionExcerpt(q.question_text)}</p>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{q.question_categories?.name ?? '—'}</td>
                 <td className="px-4 py-3">
@@ -198,7 +207,7 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
                   <span className="px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">{preview.question_categories.name}</span>
                 )}
               </div>
-              <p className="text-muted-foreground whitespace-pre-line border rounded-lg p-3 bg-muted">{preview.question_text}</p>
+              <p className="text-muted-foreground whitespace-pre-line border rounded-lg p-3 bg-muted">{questionExcerpt(preview.question_text)}</p>
               {preview.question_type === 'written' && preview.answer_formula && (
                 <div className="border rounded-lg p-3 bg-primary/10">
                   <p className="text-xs text-primary mb-1">สูตรคำตอบ</p>
@@ -235,6 +244,7 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

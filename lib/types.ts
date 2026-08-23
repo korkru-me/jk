@@ -1,4 +1,5 @@
 import type { PartLabelStyle } from './part-labels'
+import type { SubjectGroup } from './subject-groups'
 
 export type UserRole = 'teacher' | 'student' | 'admin'
 export type UserStatus = 'active' | 'suspended'
@@ -18,6 +19,8 @@ export interface User {
   instructor_type: InstructorType | null
   survey_role: SurveyRole | null
   role_custom: string | null
+  subject_group: SubjectGroup | null
+  subject_group_other: string | null
   status: UserStatus
   created_at: string
   updated_at: string
@@ -218,6 +221,19 @@ export interface Variable {
   min: number
   max: number
   step: number
+  /** Draw from this explicit list instead of the min/max/step ladder. Used for
+   *  quantities whose sensible values aren't evenly spaced (mu = 0.1, 0.2, 0.5;
+   *  m = 1, 4, 9, 16). When present and non-empty it takes precedence over
+   *  min/max/step everywhere values are sampled; min/max are still kept in sync
+   *  with the list's ends so older readers degrade to a plausible range. */
+  values?: number[]
+  /** Computed from the other variables instead of drawn at random — the beam
+   *  length `l` is random, the load sits at `lm = l*0.4`. Evaluated right after
+   *  sampling (so logic rules and `{lm}` in the question text both see it) and
+   *  frozen into the attempt's random_values like any other value. Takes
+   *  precedence over `values`/min/max/step; may reference other derived
+   *  variables, but a reference cycle simply leaves the variable unset. */
+  formula?: string
   unit?: string
   type?: 'value' | 'reference'
   reference_question_order?: number
@@ -319,6 +335,9 @@ export type AssignmentType = 'exercise' | 'exam'
 export type ShowResultsMode = 'immediate' | 'score_only' | 'after_due' | 'never'
 export type ScoreStrategy = 'best' | 'average' | 'latest'
 
+export type { QuestionSetSection } from '@/lib/question-set-sections'
+import type { QuestionSetSection } from '@/lib/question-set-sections'
+
 export interface Assignment {
   id: string
   org_id: string
@@ -338,6 +357,13 @@ export interface Assignment {
    *  NULL = show the raw structural total. */
   display_max_score: number | null
   set_id: string | null
+  /** Snapshot of the แฟ้มย่อย the questions came from, taken when the assignment
+   *  is created — like question_ids, frozen, so editing the set afterwards
+   *  never changes an assignment already handed out. NULL = no headings. */
+  sections: QuestionSetSection[] | null
+  /** Whether those แฟ้มย่อย are shown to students / on the printed sheet. The
+   *  teacher can group for their own sake and still hand out a plain list. */
+  show_sections: boolean
   start_at: string | null
   end_at: string | null
   duration_minutes: number | null
@@ -368,6 +394,11 @@ export interface QuestionSet {
   title: string
   description: string | null
   question_ids: string[]
+  /** แฟ้มย่อย — the optional grouping level inside a set. A view over
+   *  question_ids (see lib/question-set-sections.ts), never a second source of
+   *  truth: [] means the set is one flat list, exactly as before sections
+   *  existed. */
+  sections: QuestionSetSection[]
   /** Count of question_ids that still resolve to an existing, visible
    *  question — question_ids can go stale (dangling) once a question is
    *  deleted, so this is never assumed equal to question_ids.length.

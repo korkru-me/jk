@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { removeStudent, leaveClassroom } from '@/lib/actions/classrooms'
 import type { User } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface ClassroomMembersProps {
   classroomId: string
@@ -42,9 +43,16 @@ function StudentRow({
 }) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+  const [confirm, confirmDialog] = useConfirm()
 
-  function handleRemove() {
-    if (!confirm(`นำ ${student.full_name} ออกจากห้องเรียน?`)) return
+  async function handleRemove() {
+    const ok = await confirm({
+      title: `นำ “${student.full_name}” ออกจากห้องเรียน?`,
+      description: 'นักเรียนจะไม่เห็นห้องเรียนนี้อีก และเพิ่มกลับเข้ามาใหม่ได้ภายหลัง',
+      confirmLabel: 'นำออก',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await removeStudent(classroomId, student.id)
       if (res?.error) toast.error(res.error)
@@ -52,8 +60,14 @@ function StudentRow({
     })
   }
 
-  function handleLeave() {
-    if (!confirm('ออกจากห้องเรียนนี้?')) return
+  async function handleLeave() {
+    const ok = await confirm({
+      title: 'ออกจากห้องเรียนนี้?',
+      description: 'คุณจะไม่เห็นงานและประกาศของห้องเรียนนี้อีก',
+      confirmLabel: 'ออกจากห้องเรียน',
+      variant: 'destructive',
+    })
+    if (!ok) return
     startTransition(async () => {
       const res = await leaveClassroom(classroomId)
       if (res?.error) toast.error(res.error)
@@ -87,6 +101,7 @@ function StudentRow({
           ออก
         </button>
       )}
+      {confirmDialog}
     </Card>
   )
 }

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
+import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
@@ -16,6 +17,12 @@ interface CreateAssignmentData {
   question_points?: Record<string, number> | null
   display_max_score?: number | null
   set_id?: string
+  /** แฟ้มย่อย to freeze onto this assignment, normally copied from the แฟ้มโจทย์
+   *  it was built from. Filtered server-side to questions this assignment
+   *  actually contains. */
+  sections?: QuestionSetSection[]
+  /** Whether those แฟ้มย่อย appear for students and on the printed sheet. */
+  show_sections?: boolean
   start_at: string | null
   end_at: string | null
   duration_minutes: number | null
@@ -44,14 +51,23 @@ export async function createAssignment(data: CreateAssignmentData) {
   // server-side under RLS) rather than whatever the client sent, so a
   // tampered request can't smuggle in questions the set doesn't contain.
   let questionIds = data.question_ids
+  let sections = data.sections ?? []
   if (data.set_id) {
     const { data: set } = await supabase
       .from('question_sets')
-      .select('question_ids')
+      .select('question_ids, sections')
       .eq('id', data.set_id)
       .maybeSingle()
-    if (!set) return { error: 'ไม่พบชุดโจทย์' }
-    questionIds = set.question_ids
+    if (!set) return { error: 'ไม่พบแฟ้มโจทย์' }
+    // Keep the teacher's own choice and order — trimming questions, or
+    // assigning a single แฟ้มย่อย, both have to survive this — while still
+    // refusing any id the แฟ้ม doesn't contain. Falls back to the whole แฟ้ม
+    // when nothing survives, which is what a caller sending no question_ids
+    // at all relies on.
+    const setIds = new Set<string>(set.question_ids)
+    const kept = questionIds.filter(id => setIds.has(id))
+    questionIds = kept.length > 0 ? kept : set.question_ids
+    if (sections.length === 0) sections = parseSections(set.sections)
   }
 
   if (questionIds.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
@@ -87,6 +103,8 @@ export async function createAssignment(data: CreateAssignmentData) {
       question_points: questionPoints,
       display_max_score: displayMaxScore,
       set_id: data.set_id ?? null,
+      sections: sections.length > 0 ? filterSectionsToQuestions(sections, questionIds) : null,
+      show_sections: data.show_sections ?? true,
       start_at: data.start_at || null,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
@@ -151,6 +169,9 @@ interface UpdateAssignmentData {
   question_points?: Record<string, number> | null
   display_max_score?: number | null
   show_results: ShowResultsMode
+  /** Only the visibility of the frozen แฟ้มย่อย is editable after the fact —
+   *  the grouping itself belongs to the แฟ้มโจทย์ this งาน came from. */
+  show_sections?: boolean
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -192,6 +213,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     .update({
       title: data.title.trim(),
       description: data.description.trim() || null,
+      ...(data.show_sections === undefined ? {} : { show_sections: data.show_sections }),
       start_at: data.start_at || null,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
@@ -272,6 +294,8 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       title: `${source.title} (สำเนา)`,
       description: source.description,
       question_ids: source.question_ids,
+      sections: source.sections ?? null,
+      show_sections: source.show_sections ?? true,
       question_points: source.question_points,
       display_max_score: source.display_max_score,
       set_id: null,
