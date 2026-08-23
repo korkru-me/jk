@@ -1,4 +1,5 @@
 import type { PartLabelStyle } from './part-labels'
+import type { SubjectGroup } from './subject-groups'
 
 export type UserRole = 'teacher' | 'student' | 'admin'
 export type UserStatus = 'active' | 'suspended'
@@ -18,6 +19,8 @@ export interface User {
   instructor_type: InstructorType | null
   survey_role: SurveyRole | null
   role_custom: string | null
+  subject_group: SubjectGroup | null
+  subject_group_other: string | null
   status: UserStatus
   created_at: string
   updated_at: string
