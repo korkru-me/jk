@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
-import type { Question } from '@/lib/types'
+import { fetchBankQuestions } from '@/lib/question-bank'
 
 export const metadata = { title: 'สร้างแฟ้มโจทย์ — KorKru' }
 
@@ -15,12 +15,7 @@ export default async function NewQuestionSetPage() {
     .from('users').select('role').eq('id', user.id).single()
   if (profile?.role !== 'teacher' && profile?.role !== 'admin') redirect('/dashboard')
 
-  const { data: questions } = await supabase
-    .from('questions')
-    .select('id, title, question_text, difficulty, question_type, visibility, requires_work_image')
-    .eq('created_by', user.id)
-    .neq('visibility', 'pending')
-    .order('created_at', { ascending: false })
+  const questions = await fetchBankQuestions(supabase, user.id)
 
   return (
     <div className="max-w-[1200px] space-y-6">
@@ -29,7 +24,7 @@ export default async function NewQuestionSetPage() {
         <p className="text-sm text-muted-foreground mt-1">รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
       </div>
 
-      <CreateQuestionSetForm questions={(questions ?? []) as Question[]} />
+      <CreateQuestionSetForm questions={questions} />
     </div>
   )
 }

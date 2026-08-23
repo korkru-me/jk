@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
+import { fetchBankQuestions } from '@/lib/question-bank'
 import { redirect } from 'next/navigation'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
-import type { AssignmentClassroomOption, AssignmentQuestionOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
+import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 
 export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
@@ -30,7 +31,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     { data: profile },
     { data: ownedClassrooms },
     { data: coTeaching },
-    { data: questions },
+    questions,
     { data: questionSets },
     { data: preselectedSetRow },
   ] = await Promise.all([
@@ -46,12 +47,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       .select('classrooms(id, name, description, status, classroom_type)')
       .eq('user_id', user.id)
       .in('permission', ['admin', 'manage']),
-    supabase
-      .from('questions')
-      .select('id, title, question_text, difficulty, question_type, requires_work_image, tags')
-      .eq('created_by', user.id)
-      .neq('visibility', 'pending')
-      .order('created_at', { ascending: false }),
+    fetchBankQuestions(supabase, user.id),
     supabase
       .from('question_sets')
       .select('id, title, description, question_ids, sections')
@@ -117,7 +113,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
 
       <CreateAssignmentForm
         classrooms={classrooms}
-        questions={(questions ?? []) as unknown as AssignmentQuestionOption[]}
+        questions={questions}
         questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
         preselectedClassroomId={preselectedClassroomId}
         preselectedSet={preselectedSet}

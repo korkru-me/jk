@@ -4,8 +4,9 @@ import { redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
 import { computeQuestionStats, type GradedAnswerRow, type QuestionStats } from '@/lib/question-stats'
 import { QuestionBankClient } from './_components/question-bank-client'
-import { escapeLike } from '@/lib/utils'
+import { questionSearchOrClauses } from '@/lib/question-search'
 import { rankTagsByUse } from '@/lib/tag-suggest'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
 
@@ -44,25 +45,6 @@ export type QuestionWithCreator = QuestionWithCategory & {
  * performed in my classes". Only submitted/graded attempts count — an
  * in-progress one has no meaningful score yet.
  */
-// PostgREST caps a response at 1,000 rows server-side (db-max-rows), and
-// `.range()` cannot lift it — so a bank past a thousand questions silently
-// loses the tail. Pages through instead, stopping as soon as a page comes back
-// short. Loading the whole bank at once is what the client-side search and
-// filters expect today; real pagination is the longer-term answer.
-const PAGE_SIZE = 1000
-
-async function fetchAllRows<T>(
-  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<{ rows: T[]; error: unknown }> {
-  const rows: T[] = []
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await page(from, from + PAGE_SIZE - 1)
-    if (error) return { rows, error }
-    const batch = data ?? []
-    rows.push(...batch)
-    if (batch.length < PAGE_SIZE) return { rows, error: null }
-  }
-}
 
 // PostgREST puts an `.in(...)` list in the URL, so asking about every question
 // at once stops working as a bank grows — a thousand ids is a ~45 KB query
@@ -153,31 +135,38 @@ function readTeamFilters(sp: Record<string, string | string[] | undefined>): Tea
   }
 }
 
+function tagQuery(supabase: Awaited<ReturnType<typeof createClient>>) {
+  return supabase.from('questions').select('tags').not('tags', 'is', null)
+}
+
 /**
- * The tags actually in this teacher's bank, most-used first.
+ * Every tag in reach of one scope of the bank, most-used first.
  *
- * The tag filter used to run off a hardcoded list, which went stale the moment
- * anyone tagged a question with something else. Reads only the `tags` column,
- * and pages, because the 1,000-row cap would otherwise silently drop the tail
- * of a large bank — the same reason `fetchAllRows` exists above.
+ * Two things need it: the tag filter, which used to run off a hardcoded list
+ * that went stale the moment anyone tagged a question with something else, and
+ * the search — a typed word can only reach a tag by matching a whole array
+ * element, so the words are resolved against this list first.
+ *
+ * Reads only the `tags` column, and pages, because the 1,000-row cap would
+ * otherwise silently drop the tail of a large bank — the same reason
+ * `fetchAllRows` exists.
  */
-async function fetchOwnTags(
+async function fetchTags(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
+  narrow: (q: ReturnType<typeof tagQuery>) => ReturnType<typeof tagQuery>,
 ): Promise<string[]> {
   const { rows, error } = await fetchAllRows<{ tags: string[] | null }>((from, to) =>
-    supabase
-      .from('questions')
-      .select('tags')
-      .eq('created_by', userId)
-      .not('tags', 'is', null)
-      .order('id')
-      .range(from, to)
+    narrow(tagQuery(supabase)).order('id').range(from, to)
   )
   if (error) console.error('[questions/page] tag query failed:', error)
 
   return rankTagsByUse(rows.map(row => row.tags))
 }
+
+const fetchOwnTags = (
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+) => fetchTags(supabase, q => q.eq('created_by', userId))
 
 export default async function QuestionsPage({
   searchParams,
@@ -209,9 +198,15 @@ export default async function QuestionsPage({
     .eq('created_by', user.id)
     .or('group_id.is.null,order_in_group.eq.0')
 
+  // Tags take part in the search, so the words have to be resolved against the
+  // tags that exist before the query goes out — `ov` matches whole array
+  // elements, never a substring of one.
+  const ownTagsPromise = fetchOwnTags(supabase, user.id)
   if (filters.q) {
-    const term = `%${escapeLike(filters.q)}%`
-    ownQuery = ownQuery.or(`title.ilike.${term},question_text.ilike.${term}`)
+    for (const clause of questionSearchOrClauses(filters.q, await ownTagsPromise)) {
+      // One clause per word, ANDed: every word has to land somewhere.
+      ownQuery = ownQuery.or(clause)
+    }
   }
   if (filters.type !== 'all') ownQuery = ownQuery.eq('question_type', filters.type)
   if (filters.difficulty !== 'all') ownQuery = ownQuery.eq('difficulty', filters.difficulty)
@@ -230,7 +225,7 @@ export default async function QuestionsPage({
       .select('id', { count: 'exact', head: true })
       .eq('created_by', user.id)
       .or('group_id.is.null,order_in_group.eq.0'),
-    fetchOwnTags(supabase, user.id),
+    ownTagsPromise,
   ])
 
   if (error) console.error('[questions/page] query failed:', error)
@@ -287,8 +282,11 @@ export default async function QuestionsPage({
         .or('group_id.is.null,order_in_group.eq.0')
 
       if (teamFilters.q) {
-        const term = `%${escapeLike(teamFilters.q)}%`
-        teamQuery = teamQuery.or(`title.ilike.${term},question_text.ilike.${term}`)
+        // Same rule as the โจทย์ของฉัน tab, against the tags this tab can see.
+        const teamTags = await fetchTags(supabase, q => q.or(unionFilter))
+        for (const clause of questionSearchOrClauses(teamFilters.q, teamTags)) {
+          teamQuery = teamQuery.or(clause)
+        }
       }
       // Narrowing to one team means either it owns the question, or the
       // question was shared to it.

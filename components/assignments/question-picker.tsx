@@ -3,10 +3,12 @@
 import { useState, useTransition } from 'react'
 import { Search } from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { setRequiresWorkImage } from '@/lib/actions/questions'
 import { DIFF_META, TYPE_SHORT, questionExcerpt } from '@/lib/question-display'
+import { filterQuestions, tagsMatchingTerm } from '@/lib/question-search'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
 import { Card } from '@/components/ui/card'
 
@@ -43,11 +45,16 @@ export function QuestionPicker({
   title = 'เลือกโจทย์', banner, showSelectedFooter = true, showHeader = true, surface = 'card',
   baselineIds,
 }: Props) {
-  const [tagFilters, setTagFilters] = useState<string[]>([])
-  const [tagInput, setTagInput] = useState('')
   const [workImageOverrides, setWorkImageOverrides] = useState<Record<string, boolean>>({})
   const [, startTransition] = useTransition()
   const allTags = Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort()
+  // The tags the last word typed points at — shown as shortcuts, not as a
+  // filter of their own: one box searches names, bodies and tags together,
+  // the same rule the คลังโจทย์ page runs server-side.
+  const lastWord = search.trim().split(/\s+/).pop() ?? ''
+  const tagSuggestions = tagsMatchingTerm(allTags, lastWord)
+    .filter(t => t.toLowerCase() !== lastWord.toLowerCase())
+    .slice(0, 8)
 
   function handleToggleWorkImage(id: string, next: boolean) {
     setWorkImageOverrides(prev => ({ ...prev, [id]: next }))
@@ -60,28 +67,21 @@ export function QuestionPicker({
     })
   }
 
-  function addTagFilter(tag: string) {
-    const t = tag.trim()
-    if (!t || tagFilters.some(f => f.toLowerCase() === t.toLowerCase())) return
-    setTagFilters(prev => [...prev, t])
-    setTagInput('')
-  }
-  function removeTagFilter(tag: string) {
-    setTagFilters(prev => prev.filter(f => f !== tag))
+  /** Swaps the word being typed for the whole tag it pointed at. */
+  function completeWithTag(tag: string) {
+    const words = search.trim().split(/\s+/).filter(Boolean)
+    words[Math.max(0, words.length - 1)] = tag
+    onSearchChange(`${words.join(' ')} `)
   }
 
-  const filteredQs = questions.filter(q => {
-    if (diffFilter !== 'all' && q.difficulty !== diffFilter) return false
-    // Matched against the text a teacher can actually see: searching the raw
-    // value hits markup ("class", "span") and misses a phrase that happens to
-    // straddle a tag.
-    if (search && !q.title.toLowerCase().includes(search.toLowerCase()) && !questionExcerpt(q.question_text).toLowerCase().includes(search.toLowerCase())) return false
-    if (tagFilters.length > 0) {
-      const qTags = (q.tags ?? []).map(t => t.toLowerCase())
-      if (!tagFilters.every(f => qTags.includes(f.toLowerCase()))) return false
-    }
-    return true
-  })
+  // Title, body text and tags, word by word — see lib/question-search.
+  const filteredQs = filterQuestions(questions, { search, difficulty: diffFilter })
+  const hasFilters = search.trim().length > 0 || diffFilter !== 'all'
+
+  function clearFilters() {
+    onSearchChange('')
+    onDiffFilterChange('all')
+  }
 
   // Pin selected questions to the top, in the order they were picked — with
   // a bank of hundreds/thousands of questions, scrolling to find whichever
@@ -119,7 +119,7 @@ export function QuestionPicker({
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="ค้นหาโจทย์..."
+            placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             className="pl-9"
@@ -141,35 +141,60 @@ export function QuestionPicker({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-40">
-          <Input
-            list="question-picker-tags"
-            placeholder="พิมพ์แท็กแล้วกด Enter เพื่อเพิ่มตัวกรอง..."
-            value={tagInput}
-            onChange={e => setTagInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTagFilter(tagInput) }
-            }}
-            className="text-sm"
-          />
-          <datalist id="question-picker-tags">
-            {allTags.map(t => <option key={t} value={t} />)}
-          </datalist>
+      {/* Tag shortcuts for the word being typed. Spelled out rather than left
+          to a <datalist>: the native dropdown never opens for some
+          browsers/IMEs, so there was no hint that a tag existed at all. */}
+      {tagSuggestions.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground">แท็กที่ตรง:</span>
+          {tagSuggestions.map(t => (
+            <Button
+              key={t}
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => completeWithTag(t)}
+            >
+              #{t}
+            </Button>
+          ))}
         </div>
-        {tagFilters.map(t => (
-          <span key={t} className="flex items-center gap-1 text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded-lg">
-            #{t}
-            <button type="button" onClick={() => removeTagFilter(t)} className="text-primary hover:text-destructive transition-colors ml-0.5">×</button>
-          </span>
-        ))}
-      </div>
+      )}
 
       {banner}
 
+      {/* A count, because a filtered list that comes back short otherwise
+          looks the same as one that failed to search. */}
+      {hasFilters && filteredQs.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          พบ {filteredQs.length} ข้อ จากทั้งหมด {questions.length} ข้อ
+        </p>
+      )}
+
       <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
         {filteredQs.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground text-sm">ไม่พบโจทย์ที่ตรงกัน</div>
+          <div className="text-center py-12 text-sm space-y-2">
+            <p className="text-muted-foreground">
+              {questions.length === 0 ? 'ยังไม่มีโจทย์ในคลัง' : 'ไม่พบโจทย์ที่ตรงกัน'}
+            </p>
+            {/* Which filters are on, spelled out: a tag chip left over from an
+                earlier search is easy to miss, and it silently empties the
+                list no matter what is typed in the search box. */}
+            {hasFilters && (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  กำลังกรองด้วย{' '}
+                  {[
+                    search.trim() && `คำค้น “${search.trim()}”`,
+                    diffFilter !== 'all' && `ระดับ ${DIFF_META[diffFilter]?.label ?? diffFilter}`,
+                  ].filter(Boolean).join(' · ')}
+                </p>
+                <Button type="button" variant="link" size="xs" onClick={clearFilters}>
+                  ล้างตัวกรองทั้งหมด
+                </Button>
+              </>
+            )}
+          </div>
         ) : orderedQs.map((q, i) => {
           const diff = DIFF_META[q.difficulty]
           const isSelected = selectedIds.includes(q.id)

@@ -19,11 +19,14 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
-import type { Question, QuestionSet, Visibility } from '@/lib/types'
+import type { BankQuestion } from '@/lib/question-bank'
+import type { QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 
 interface Props {
-  questions: Question[]
+  /** The whole คลัง, as the picker needs it — including `tags`, which it
+   *  filters and searches on. */
+  questions: BankQuestion[]
   initialSet?: QuestionSet
 }
 

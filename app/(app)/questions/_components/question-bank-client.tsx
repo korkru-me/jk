@@ -255,7 +255,7 @@ export function QuestionBankClient({
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
+              placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
               value={searchDraft}
               onChange={e => setSearchDraft(e.target.value)}
               className="pl-9 bg-card"
@@ -479,7 +479,7 @@ export function QuestionBankClient({
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="ค้นหาชื่อโจทย์ หรือเนื้อหา..."
+                      placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
                       value={teamSearchDraft}
                       onChange={e => setTeamSearchDraft(e.target.value)}
                       className="pl-9 bg-card"

@@ -3,7 +3,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import { getQuestionSet, getQuestionSetShareOrgIds } from '@/lib/actions/question-sets'
 import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
-import type { Question } from '@/lib/types'
+import { fetchBankQuestions } from '@/lib/question-bank'
 
 export const metadata = { title: 'แก้ไขแฟ้มโจทย์ — KorKru' }
 
@@ -22,13 +22,8 @@ export default async function EditQuestionSetPage({ params }: Props) {
   // Editing a set stays creator-only — teammates can view/use a shared set, not edit its question list.
   if (set.created_by !== user.id) notFound()
 
-  const [{ data: questions }, sharedOrgIds] = await Promise.all([
-    supabase
-      .from('questions')
-      .select('id, title, question_text, difficulty, question_type, visibility, requires_work_image')
-      .eq('created_by', user.id)
-      .neq('visibility', 'pending')
-      .order('created_at', { ascending: false }),
+  const [questions, sharedOrgIds] = await Promise.all([
+    fetchBankQuestions(supabase, user.id),
     getQuestionSetShareOrgIds(id),
   ])
 
@@ -40,7 +35,7 @@ export default async function EditQuestionSetPage({ params }: Props) {
       </div>
 
       <CreateQuestionSetForm
-        questions={(questions ?? []) as Question[]}
+        questions={questions}
         initialSet={{ ...set, shared_org_ids: sharedOrgIds }}
       />
     </div>
