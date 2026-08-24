@@ -16,6 +16,7 @@ import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, OrderingConfig, OrderingItem, Question } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 interface OrderingFormProps {
   allTags: string[]
@@ -39,7 +40,8 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
 
 export function OrderingForm({ allTags, mode = 'create', question, isOwner = true }: OrderingFormProps) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 

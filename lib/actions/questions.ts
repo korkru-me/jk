@@ -7,6 +7,7 @@ import { getMyOrgId } from '@/lib/actions/org'
 import { getMyTeamOrgs } from '@/lib/actions/team-org'
 import { dedupeTags } from '@/lib/tag-suggest'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
+import { safeQuestionsRedirect } from '@/lib/question-return'
 
 export interface QuestionFormData {
   title: string
@@ -234,7 +235,9 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   revalidatePath('/questions')
   revalidatePath(`/questions/${id}/edit`)
-  redirect(data.redirect_to || '/questions')
+  // `redirect_to` comes from the browser, so it is only ever allowed to be the
+  // question bank and the view the teacher started the edit from.
+  redirect(safeQuestionsRedirect(data.redirect_to))
 }
 
 /**

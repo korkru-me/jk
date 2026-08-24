@@ -27,6 +27,7 @@ import type {
 } from '../page'
 import { questionExcerpt } from '@/lib/question-display'
 import { mergeTagPool } from '@/lib/tag-suggest'
+import { questionEditHref } from '@/lib/question-return'
 import type {
   QuestionSearchGroup,
   QuestionSearchGroupCounts,
@@ -454,6 +455,19 @@ export function QuestionBankClient({
           </div>
         )}
 
+        {/* Paging above the list as well as below it — a full page of cards is a
+            long scroll to reach the controls at the bottom. */}
+        {totalPages > 1 && (
+          <Pagination
+            page={filters.page}
+            totalPages={totalPages}
+            isPending={isPending}
+            label="หน้าของคลังโจทย์ (ด้านบน)"
+            className="pt-0 pb-1"
+            onGo={p => setParams({ page: String(p) })}
+          />
+        )}
+
         {/* Question list */}
         {totalCount === 0 ? (
           <EmptyState />
@@ -511,6 +525,7 @@ export function QuestionBankClient({
             page={filters.page}
             totalPages={totalPages}
             isPending={isPending}
+            label="หน้าของคลังโจทย์ (ท้ายรายการ)"
             onGo={p => {
               setParams({ page: String(p) })
               // The controls sit at the bottom of the list, so without this the
@@ -589,6 +604,16 @@ export function QuestionBankClient({
                   </Card>
                 ) : (
                   <>
+                    {teamPaged && teamTotalPages > 1 && (
+                      <Pagination
+                        page={teamFilters.page}
+                        totalPages={teamTotalPages}
+                        isPending={isPending}
+                        label="หน้าของโจทย์ในทีม (ด้านบน)"
+                        className="pt-0 pb-1"
+                        onGo={p => setParams({ tpage: String(p) })}
+                      />
+                    )}
                     {teamSearch ? (
                       <div className="space-y-7">
                         {teamSearchGroups.map(result => result.questions.length > 0 && (
@@ -618,6 +643,7 @@ export function QuestionBankClient({
                         page={teamFilters.page}
                         totalPages={teamTotalPages}
                         isPending={isPending}
+                        label="หน้าของโจทย์ในทีม (ท้ายรายการ)"
                         onGo={p => {
                           setParams({ tpage: String(p) })
                           window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -742,6 +768,9 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
   currentUserId: string
   onPreview: () => void
 }) {
+  // The edit page carries the bank's current view back with it, so returning
+  // from an edit lands on the same search, filters and page.
+  const returnQuery = useSearchParams().toString()
   const diff = DIFF_META[q.difficulty]
   const isGroup = q.order_in_group === 0
   const isOwner = q.created_by === currentUserId
@@ -791,7 +820,11 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
         <div className="flex items-center gap-1.5">
           {canEdit && (
             <Link
-              href={isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit?tab=team`}
+              href={questionEditHref(
+                isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`,
+                returnQuery,
+                { tab: 'team' },
+              )}
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground bg-muted hover:bg-accent rounded-lg transition-all"
             >
               <Edit2 className="w-3.5 h-3.5" /> แก้ไข
@@ -818,17 +851,20 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
  * the transition that rewrites the URL, since navigation is what fetches the
  * next page.
  */
-function Pagination({ page, totalPages, isPending, onGo }: {
+function Pagination({ page, totalPages, isPending, onGo, label, className }: {
   page: number
   totalPages: number
   isPending: boolean
   onGo: (page: number) => void
+  /** Distinguishes the copy above the list from the one below it for screen readers. */
+  label: string
+  className?: string
 }) {
   const window = new Set([1, totalPages, page, page - 1, page + 1])
   const pages = [...window].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b)
 
   return (
-    <nav className="flex items-center justify-center gap-1 pt-2" aria-label="หน้าของคลังโจทย์">
+    <nav className={cn('flex items-center justify-center gap-1 pt-2', className)} aria-label={label}>
       <Button
         variant="outline"
         size="sm"

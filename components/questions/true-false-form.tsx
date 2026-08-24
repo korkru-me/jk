@@ -17,6 +17,7 @@ import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
 import type { Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement, TrueFalseAnswerMode, TrueFalseSelectTarget, Question } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 interface TrueFalseFormProps {
   allTags: string[]
@@ -90,7 +91,8 @@ function TrueFalseMainItem({
 
 export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = true }: TrueFalseFormProps) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 

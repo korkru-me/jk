@@ -14,6 +14,7 @@ import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, Question, FileUploadConfig } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 interface FileUploadFormProps {
   allTags: string[]
@@ -24,7 +25,8 @@ interface FileUploadFormProps {
 
 export function FileUploadForm({ allTags, mode = 'create', question, isOwner = true }: FileUploadFormProps) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 

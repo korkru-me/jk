@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download, Users } from 'lucide-react'
 import { deleteQuestion, getQuestionClientDetail, setRequiresWorkImage, shareQuestionToOrg } from '@/lib/actions/questions'
@@ -20,6 +20,7 @@ import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/
 import { QuestionTagsEditor } from './question-tags-editor'
 import type { QuestionWithCategory } from '../page'
 import { questionExcerpt } from '@/lib/question-display'
+import { questionEditHref } from '@/lib/question-return'
 
 interface Props {
   question: QuestionWithCategory
@@ -36,6 +37,9 @@ interface Props {
 
 export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags }: Props) {
   const router = useRouter()
+  // The edit page carries the bank's current view back with it, so returning
+  // from an edit lands on the same search, filters and page.
+  const returnQuery = useSearchParams().toString()
   const [confirm, confirmDialog] = useConfirm()
   const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -293,7 +297,10 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
 
               {/* Edit */}
               <Link
-                href={isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`}
+                href={questionEditHref(
+                  isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`,
+                  returnQuery,
+                )}
                 title="แก้ไข"
                 aria-label="แก้ไข"
                 className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
