@@ -16,6 +16,12 @@ import {
 } from '@/lib/question-search'
 import { rankTagsByUse } from '@/lib/tag-suggest'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import {
+  CONTENT_COLUMNS,
+  countContentTwins,
+  groupIdsBySharedText,
+  type QuestionContent,
+} from '@/lib/question-content-match'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
 
@@ -183,10 +189,64 @@ async function fetchTags(
   return rankTagsByUse(rows.map(row => row.tags))
 }
 
+/** Ids per `in(...)` round in the duplicate content pass — keeps the URL short. */
+const DUPLICATE_ID_CHUNK = 100
+
 const fetchOwnTags = (
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ) => fetchTags(supabase, q => q.eq('created_by', userId))
+
+/**
+ * Which of a teacher's questions are the same question twice.
+ *
+ * Two passes, because the fingerprint needs the answer configuration as well
+ * as the body, and shipping all of that for a thousand-question bank on every
+ * visit would cost more than the warning is worth. The first pass reads only
+ * the wording, which is enough to rule out nearly everything; the second reads
+ * the full content of the handful that are left. A bank with no duplicates
+ * pays for one text column and nothing else.
+ */
+async function fetchDuplicateCounts(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<Record<string, number>> {
+  // Same rows the list itself shows: this teacher's own questions, no research
+  // snapshots, and a group counted once by its parent.
+  const textQuery = () => supabase
+    .from('questions')
+    .select('id, question_text')
+    .eq('created_by', userId)
+    .eq('is_research_snapshot', false)
+    .or('group_id.is.null,order_in_group.eq.0')
+
+  const { rows, error } = await fetchAllRows<{ id: string; question_text: string | null }>(
+    (from, to) => textQuery().order('id').range(from, to)
+  )
+  if (error) {
+    console.error('[questions/page] duplicate text pass failed:', error)
+    return {}
+  }
+
+  const candidates = groupIdsBySharedText(rows)
+  if (candidates.length === 0) return {}
+
+  // The ids are already narrowed by the pass above, so this only has to fetch.
+  const contents: QuestionContent[] = []
+  for (let i = 0; i < candidates.length; i += DUPLICATE_ID_CHUNK) {
+    const { data, error: contentError } = await supabase
+      .from('questions')
+      .select(CONTENT_COLUMNS)
+      .in('id', candidates.slice(i, i + DUPLICATE_ID_CHUNK))
+    if (contentError) {
+      console.error('[questions/page] duplicate content pass failed:', contentError)
+      return {}
+    }
+    contents.push(...((data ?? []) as unknown as QuestionContent[]))
+  }
+
+  return countContentTwins(contents)
+}
 
 export default async function QuestionsPage({
   searchParams,
@@ -369,7 +429,7 @@ export default async function QuestionsPage({
     }
   }
 
-  const [ownResult, { data: membershipRows }, { count: unfilteredTotal }, allTags] = await Promise.all([
+  const [ownResult, { data: membershipRows }, { count: unfilteredTotal }, allTags, duplicateCounts] = await Promise.all([
     loadOwnQuestions(),
     supabase
       .from('organization_members')
@@ -384,6 +444,7 @@ export default async function QuestionsPage({
       .eq('is_research_snapshot', false)
       .or('group_id.is.null,order_in_group.eq.0'),
     ownTagsPromise,
+    fetchDuplicateCounts(supabase, userId),
   ])
 
   const myTeams = (membershipRows ?? []).map((row: any) => ({
@@ -671,6 +732,7 @@ export default async function QuestionsPage({
       searchGroups={ownResult.groups}
       searchGroupCounts={ownResult.groupCounts}
       totalCount={unfilteredTotal ?? 0}
+      duplicateCounts={duplicateCounts}
       perPage={QUESTIONS_PER_PAGE}
       teamFilters={teamFilters}
       teamMatchCount={teamTotal}

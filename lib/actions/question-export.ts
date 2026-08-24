@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { getMyOrgId } from '@/lib/actions/org'
 import { toPortableQuestion, buildExportFile, parseExportFile, type PortableQuestion } from '@/lib/question-portable'
 import type { Question } from '@/lib/types'
+// One rule for "is this the same wording?", shared with the คลัง's duplicate badge.
+import { normalizeQuestionText } from '@/lib/question-content-match'
 
 type QuestionRow = Question & { question_categories?: { name: string } | null }
 
@@ -77,10 +79,6 @@ export async function exportQuestionSet(setId: string) {
   return { content: JSON.stringify(file, null, 2), filename: `${slugifyFilename(set.title)}.korkru.json` }
 }
 
-function normalizeForCompare(s: string) {
-  return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
-}
-
 export interface DuplicateHit { index: number; title: string }
 
 export async function checkImportDuplicates(raw: string): Promise<
@@ -102,14 +100,14 @@ export async function checkImportDuplicates(raw: string): Promise<
 
   if (error) return { error: error.message }
 
-  const existingTitles = new Set((existing ?? []).map(r => normalizeForCompare(r.title as string)))
-  const existingTexts = new Set((existing ?? []).map(r => normalizeForCompare(r.question_text as string)))
+  const existingTitles = new Set((existing ?? []).map(r => normalizeQuestionText(r.title as string)))
+  const existingTexts = new Set((existing ?? []).map(r => normalizeQuestionText(r.question_text as string)))
 
   const duplicates: DuplicateHit[] = file.questions
     .map((pq, index) => ({
       index,
       title: pq.title,
-      isDup: existingTitles.has(normalizeForCompare(pq.title)) || existingTexts.has(normalizeForCompare(pq.question_text)),
+      isDup: existingTitles.has(normalizeQuestionText(pq.title)) || existingTexts.has(normalizeQuestionText(pq.question_text)),
     }))
     .filter(d => d.isDup)
     .map(({ index, title }) => ({ index, title }))

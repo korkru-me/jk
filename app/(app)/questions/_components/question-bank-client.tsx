@@ -81,6 +81,8 @@ interface Props {
   searchGroupCounts: QuestionSearchGroupCounts
   /** Every question the user owns, regardless of filters (for the tab badge). */
   totalCount: number
+  /** question id → how many other questions share its content. Absent = none. */
+  duplicateCounts: Record<string, number>
   perPage: number
   teamFilters: { q: string; match: QuestionSearchScope; team: string; page: number }
   teamMatchCount: number
@@ -93,7 +95,7 @@ interface Props {
 
 export function QuestionBankClient({
   questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
-  allTags, filters, matchCount, searchGroups, searchGroupCounts, totalCount, perPage,
+  allTags, filters, matchCount, searchGroups, searchGroupCounts, totalCount, perPage, duplicateCounts,
   teamFilters, teamMatchCount, teamSearchGroups, teamSearchGroupCounts, teamPaged,
 }: Props) {
   const router = useRouter()
@@ -497,6 +499,7 @@ export function QuestionBankClient({
                       myTeams={myTeams}
                       stats={stats[q.id]}
                       allTags={tagPool}
+                      duplicateCount={duplicateCounts[q.id] ?? 0}
                     />
                   ))}
                 </div>
@@ -515,6 +518,7 @@ export function QuestionBankClient({
                 myTeams={myTeams}
                 stats={stats[q.id]}
                 allTags={tagPool}
+                duplicateCount={duplicateCounts[q.id] ?? 0}
               />
             ))}
           </div>

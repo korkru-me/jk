@@ -33,9 +33,11 @@ interface Props {
   stats?: QuestionStats
   /** Every tag in view, offered as suggestions when adding one from this card. */
   allTags: string[]
+  /** How many other questions in the bank have exactly this content. 0 = none. */
+  duplicateCount: number
 }
 
-export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags }: Props) {
+export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags, duplicateCount }: Props) {
   const router = useRouter()
   // The edit page carries the bank's current view back with it, so returning
   // from an edit lands on the same search, filters and page.
@@ -133,6 +135,17 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             <div className="flex items-center gap-1.5 flex-wrap mb-2">
               {isGroup && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
+              )}
+              {/* Same question twice — a re-import or an unedited copy. Only the
+                  content counts, so a renamed or retagged twin still shows up. */}
+              {duplicateCount > 0 && (
+                <span
+                  title={`เนื้อหาโจทย์ตรงกับโจทย์อื่นในคลังอีก ${duplicateCount} ข้อ (เทียบเฉพาะเนื้อโจทย์ รูป ตัวเลือก และคำตอบ ไม่นับชื่อโจทย์ แท็ก และระดับความยาก)`}
+                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium"
+                >
+                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                  ซ้ำกับอีก {duplicateCount} ข้อ
+                </span>
               )}
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diff?.badge}`}>
                 {diff?.label}
