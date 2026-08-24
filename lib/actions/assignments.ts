@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import { normalizeSetSections } from '@/lib/question-set-sections'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -184,6 +185,8 @@ interface UpdateAssignmentData {
   score_strategy: ScoreStrategy
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
+  /** The question set and its order. Omit to leave both untouched. */
+  question_ids?: string[]
   question_points?: Record<string, number> | null
   display_max_score?: number | null
   show_results: ShowResultsMode
@@ -213,14 +216,56 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, type, mode, random_question_count')
+    .select('question_ids, sections, type, mode, random_question_count')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
 
+  const existingIds = existing.question_ids as string[]
+  // `sections` and `question_ids` are only ever written together, through
+  // normalizeSetSections — a แฟ้มย่อย must not be left pointing at a question
+  // the assignment no longer contains.
+  const questionSet = data.question_ids
+    ? normalizeSetSections(existing.sections, data.question_ids)
+    : null
+  const nextIds = questionSet?.question_ids ?? existingIds
+  const questionsChanged = questionSet !== null
+    && (nextIds.length !== existingIds.length || nextIds.some((qid, i) => qid !== existingIds[i]))
+
+  if (questionSet && nextIds.length === 0) return { error: 'ชุดข้อสอบต้องมีโจทย์อย่างน้อย 1 ข้อ' }
+
+  if (questionsChanged) {
+    // Only questions this teacher may actually assign. RLS decides that — ids
+    // it will not return are dropped by the `in` filter, so a short result
+    // means something in the list was not theirs to add.
+    const { data: allowed, error: allowedError } = await supabase
+      .from('questions')
+      .select('id')
+      .in('id', nextIds)
+      .eq('is_research_snapshot', false)
+    if (allowedError) return { error: 'ตรวจสอบโจทย์ไม่สำเร็จ กรุณาลองใหม่' }
+    if ((allowed ?? []).length !== nextIds.length) {
+      return { error: 'มีโจทย์บางข้อที่เพิ่มเข้าชุดนี้ไม่ได้ กรุณารีเฟรชหน้าแล้วลองใหม่' }
+    }
+
+    // Every attempt freezes the question set as it starts, so changing it
+    // after anyone has begun hands later students a different paper — and a
+    // different คะแนนเต็ม — from the same งาน.
+    const { data: startedSubmission, error: startedError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'แก้ไขชุดโจทย์ไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
+    }
+  }
+
   // Same sanitization as createAssignment — only keep overrides for
   // questions actually in this assignment, with a valid positive value.
-  const questionIdSet = new Set(existing.question_ids as string[])
+  const questionIdSet = new Set(nextIds)
   const sanitizedPoints = Object.fromEntries(
     Object.entries(data.question_points ?? {}).filter(
       ([qid, pts]) => questionIdSet.has(qid) && Number.isFinite(pts) && pts > 0
@@ -236,7 +281,9 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     && Number.isInteger(data.random_question_count)
     && data.random_question_count !== null
     && data.random_question_count > 0
-    && data.random_question_count < existing.question_ids.length
+    // Against the set being saved, not the one on disk: dropping questions
+    // could otherwise leave a draw larger than the exam it draws from.
+    && data.random_question_count < nextIds.length
       ? data.random_question_count
       : null
 
@@ -260,6 +307,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       title: data.title.trim(),
       description: data.description.trim() || null,
       ...(data.show_sections === undefined ? {} : { show_sections: data.show_sections }),
+      ...(questionSet ? { question_ids: questionSet.question_ids, sections: questionSet.sections } : {}),
       start_at: data.start_at || null,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,

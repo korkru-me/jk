@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
+import { fetchBankQuestions } from '@/lib/question-bank'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
@@ -34,10 +35,26 @@ export default async function EditAssignmentPage({
   if (!assignment) notFound()
   const a = assignment as EditableAssignment
 
-  const { data: questionRows } = await supabase
-    .from('questions')
-    .select('id, title, question_text')
-    .in('id', a.question_ids)
+  // The bank doubles as the lookup for the questions already in this
+  // assignment, so one read serves both the list and the "เพิ่มโจทย์" picker.
+  // A question shared by a teammate can be in the assignment without being in
+  // this teacher's own bank, so those are still read by id.
+  const [bank, { data: questionRows }, { data: startedSubmission }] = await Promise.all([
+    fetchBankQuestions(supabase, user.id),
+    supabase
+      .from('questions')
+      .select('id, title, question_text')
+      .in('id', a.question_ids),
+    // One row is enough: the question set is frozen into every attempt as it
+    // starts, so once anyone has begun, changing it would hand later students
+    // a different paper — and a different คะแนนเต็ม — from the same งาน.
+    supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle(),
+  ])
 
   // Preserve the assignment's own question order rather than whatever the
   // `in` query happens to return.
@@ -57,7 +74,12 @@ export default async function EditAssignmentPage({
         <p className="text-sm text-muted-foreground mt-1">{a.title}</p>
       </div>
 
-      <EditAssignmentForm assignment={a} questions={questions} />
+      <EditAssignmentForm
+        assignment={a}
+        questions={questions}
+        bank={bank}
+        hasSubmissions={!!startedSubmission}
+      />
     </div>
   )
 }
