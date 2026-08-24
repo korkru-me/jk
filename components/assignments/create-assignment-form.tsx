@@ -19,9 +19,11 @@ import {
 import {
   filterSectionsToQuestions, parseSections, type QuestionSetSection,
 } from '@/lib/question-set-sections'
-import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { BankQuestion } from '@/lib/question-bank'
 import { Card } from '@/components/ui/card'
 import { questionExcerpt } from '@/lib/question-display'
+import { subQuestionUnit } from '@/lib/question-parts'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -31,10 +33,9 @@ const QuestionPicker = dynamic(
 const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
 export type AssignmentClassroomOption = Pick<Classroom, 'id' | 'name' | 'description'>
-export type AssignmentQuestionOption = Pick<
-  Question,
-  'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'requires_work_image' | 'tags'
->
+/** A question the picker can offer, carrying the point value it is worth by
+ *  default (see `default_points` in lib/question-bank.ts). */
+export type AssignmentQuestionOption = BankQuestion
 export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'description' | 'question_ids' | 'sections'>
 
 interface Props {
@@ -84,8 +85,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
-  // Step 3 (คะแนน) — every question defaults to 1 point; teacher can edit
-  // individual questions and the total recalculates automatically.
+  // Step 3 (คะแนน) — a question starts at the point value its own structure
+  // gives it (one per ข้อย่อย); teacher can edit individual questions and the
+  // total recalculates automatically.
   const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>({})
   // Independent of the per-question points above — rescales what's
   // *reported* only (never the underlying structure), and can be changed
@@ -149,8 +151,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
     .filter((q): q is AssignmentQuestionOption => !!q)
+  // What a question is worth until the teacher types over it.
+  const defaultPointsById = new Map(questions.map(q => [q.id, q.default_points]))
+  const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
+
   const pointsSum = Math.round(
-    previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(questionPointDrafts[q.id] ?? '1') || 0), 0) * 100
+    previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(pointsDraft(q.id)) || 0), 0) * 100
   ) / 100
 
   function canNext() {
@@ -220,11 +226,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         }
       }
 
-      // Every question gets an explicit point value — defaults to 1 unless
-      // the teacher edited it, and falls back to 1 for invalid input.
+      // Every question gets an explicit point value — its own structural value
+      // unless the teacher edited it, and 1 for invalid input.
       const questionPoints = Object.fromEntries(
         selectedIds.map(id => {
-          const parsed = Number.parseFloat(questionPointDrafts[id] ?? '1')
+          const parsed = Number.parseFloat(pointsDraft(id))
           return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
         })
       )
@@ -494,7 +500,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               <span className="text-sm font-semibold text-primary">รวม {pointsSum} คะแนน</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              ค่าเริ่มต้นข้อละ 1 คะแนน — แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
+              ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
+              แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
             </p>
 
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
@@ -505,11 +512,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
                   </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {q.sub_question_count} {subQuestionUnit(q.question_type)}
+                  </span>
                   <Input
                     type="number"
                     min={0}
                     step="any"
-                    value={questionPointDrafts[q.id] ?? '1'}
+                    value={pointsDraft(q.id)}
                     onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
                     className="w-20 text-center shrink-0"
                   />

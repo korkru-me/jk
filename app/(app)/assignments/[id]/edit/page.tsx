@@ -1,13 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
-import { fetchBankQuestions } from '@/lib/question-bank'
+import { fetchBankQuestions, withQuestionPoints, QUESTION_POINT_FIELDS } from '@/lib/question-bank'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { EditAssignmentForm } from '@/components/assignments/edit-assignment-form'
 import type { EditableAssignment, EditableAssignmentQuestion } from '@/components/assignments/edit-assignment-form'
+import type { CountableQuestion } from '@/lib/question-parts'
 
 export const metadata = { title: 'แก้ไขชุดข้อสอบ — KorKru' }
+
+/** One assignment question as read here: what the form lists, plus what its
+ *  default คะแนน is counted from. */
+type QuestionPointRow = Pick<EditableAssignmentQuestion, 'id' | 'title' | 'question_text'> & CountableQuestion
 
 export default async function EditAssignmentPage({
   params,
@@ -43,7 +48,7 @@ export default async function EditAssignmentPage({
     fetchBankQuestions(supabase, user.id),
     supabase
       .from('questions')
-      .select('id, title, question_text')
+      .select(`id, title, question_text, ${QUESTION_POINT_FIELDS}`)
       .in('id', a.question_ids),
     // One row is enough: the question set is frozen into every attempt as it
     // starts, so once anyone has begun, changing it would hand later students
@@ -57,11 +62,16 @@ export default async function EditAssignmentPage({
   ])
 
   // Preserve the assignment's own question order rather than whatever the
-  // `in` query happens to return.
-  const questionsById = new Map((questionRows ?? []).map(q => [q.id, q]))
+  // `in` query happens to return. withQuestionPoints turns each row's
+  // structure into the คะแนน it is worth by default, and drops the jsonb it
+  // read that from.
+  const questionsById = new Map(
+    ((questionRows ?? []) as unknown as QuestionPointRow[])
+      .map(q => [q.id, withQuestionPoints(q)] as const)
+  )
   const questions = a.question_ids
     .map(id => questionsById.get(id))
-    .filter((q): q is NonNullable<typeof q> => !!q) as EditableAssignmentQuestion[]
+    .filter((q): q is NonNullable<typeof q> => !!q)
 
   return (
     <div className="max-w-2xl space-y-6">

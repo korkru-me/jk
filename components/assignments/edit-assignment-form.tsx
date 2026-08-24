@@ -66,7 +66,10 @@ export type EditableAssignment = Pick<
   | 'exam_watermark_enabled'
 >
 
-export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text'>
+export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text'> & {
+  /** What this question is worth before any override — see lib/question-bank.ts. */
+  default_points: number
+}
 
 export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions }: Props) {
   const router = useRouter()
@@ -139,14 +142,23 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
     setPickerOpen(false)
   }
 
-  // Every question defaults to 1 point (or its existing override); teacher
-  // can edit individual questions and the total recalculates automatically.
+  // Every question starts at its existing override, or at the point value its
+  // own structure gives it; teacher can edit individual questions and the
+  // total recalculates automatically.
   const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>(
-    Object.fromEntries(questions.map(q => [q.id, String(a.question_points?.[q.id] ?? 1)]))
+    Object.fromEntries(questions.map(q => [q.id, String(a.question_points?.[q.id] ?? q.default_points)]))
   )
 
+  // What a question is worth until the teacher types over it — one คะแนน per
+  // ข้อย่อย. A question the picker adds later needs it too, so this covers the
+  // bank as well as the questions the งาน came with.
+  const defaultPointsById = new Map<string, number>(
+    [...questions, ...bank].map(q => [q.id, q.default_points]),
+  )
+  const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
+
   const pointsSum = Math.round(
-    questionIds.reduce((sum, id) => sum + (Number.parseFloat(questionPointDrafts[id] ?? '1') || 0), 0) * 100
+    questionIds.reduce((sum, id) => sum + (Number.parseFloat(pointsDraft(id)) || 0), 0) * 100
   ) / 100
 
   // Independent from the per-question points above — this only rescales
@@ -166,7 +178,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
     const questionPoints = Object.fromEntries(
       questionIds.map(id => {
-        const parsed = Number.parseFloat(questionPointDrafts[id] ?? '1')
+        const parsed = Number.parseFloat(pointsDraft(id))
         return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
       })
     )
@@ -340,7 +352,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           <p className="text-xs text-muted-foreground">
             เพิ่ม เอาออก และสลับลำดับข้อได้ เพราะยังไม่มีนักเรียนเริ่มทำชุดนี้ —
             ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
-            ค่าเริ่มต้นข้อละ 1 คะแนน ระบบรวมให้อัตโนมัติ
+            ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ (ข้อย่อย 1 ข้อ = 1 คะแนน) ระบบรวมให้อัตโนมัติ
           </p>
         ) : (
           <p className="flex items-start gap-2 text-xs text-warning">
@@ -393,7 +405,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 type="number"
                 min={0}
                 step="any"
-                value={questionPointDrafts[q.id] ?? '1'}
+                value={pointsDraft(q.id)}
                 onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
                 className="w-20 text-center shrink-0"
               />
