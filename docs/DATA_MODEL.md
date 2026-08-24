@@ -83,6 +83,7 @@ Invariant สำคัญ:
 - ช่องทางเขียนคะแนนจริงทั้งหมดผ่าน trigger/RPC: submission sync สำหรับ `korkru_exam`, manual confirm สำหรับ `manual`, import confirm สำหรับ `excel`; browser role ถูก revoke สิทธิ์ `INSERT/UPDATE/DELETE` ตรงกับตารางคะแนน/ร่าง/import
 - ช่องว่างใน manual/Excel ไม่สร้างหรือลบ score; การเปลี่ยนคะแนนเดิมต้องมีเหตุผลใน audit และ Excel ต้องมีการยืนยัน overwrite ชัดเจน
 - Excel import ตรวจ template/project/row token/ตัวตน/ช่วงคะแนนตอนสร้าง preview และตรวจ roster/ค่าปัจจุบันซ้ำตอน confirm เพื่อให้ทั้งชุดสำเร็จหรือ rollback พร้อมกัน
+- ค่าเฉลี่ย, sample S.D., paired/one-sample t-test, ช่วงเชื่อมั่น และ effect size เป็นผลคำนวณ request-time จาก `education_research_scores` ไม่ใช่ entity ที่เก็บซ้ำในฐานข้อมูล เมื่อคะแนนเปลี่ยนหน้าผลจึงใช้ข้อมูลล่าสุดโดยไม่ต้อง sync summary row
 
 ## Snapshot ที่ต้องคงที่ต่อ attempt
 
