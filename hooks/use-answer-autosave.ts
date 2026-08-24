@@ -38,6 +38,23 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const pendingValuesRef = useRef<Map<string, string>>(new Map())
   const inFlightRef = useRef<Map<string, Promise<boolean>>>(new Map())
+  // Only dirty values belong in localStorage. Keeping every server-confirmed
+  // value there would let an old backup overwrite a newer answer from another
+  // device the next time this attempt opens.
+  const backupValuesRef = useRef<Map<string, string>>(new Map())
+
+  const persistPendingBackup = useCallback(() => {
+    try {
+      if (backupValuesRef.current.size === 0) {
+        localStorage.removeItem(LS_KEY(submissionId))
+        return
+      }
+      localStorage.setItem(
+        LS_KEY(submissionId),
+        JSON.stringify(Object.fromEntries(backupValuesRef.current)),
+      )
+    } catch { /* ignore quota errors */ }
+  }, [submissionId])
 
   const refreshSavingState = useCallback(() => {
     setSaving(
@@ -71,12 +88,17 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
           next.delete(answerId)
           return next
         })
+        if (backupValuesRef.current.get(answerId) === value && !pendingValuesRef.current.has(answerId)) {
+          backupValuesRef.current.delete(answerId)
+          persistPendingBackup()
+        }
         return true
       })
       .catch(() => {
-        if (!pendingValuesRef.current.has(answerId)) {
-          pendingValuesRef.current.set(answerId, localAnswersRef.current[answerId] ?? value)
-        }
+        const latest = localAnswersRef.current[answerId] ?? value
+        if (!pendingValuesRef.current.has(answerId)) pendingValuesRef.current.set(answerId, latest)
+        backupValuesRef.current.set(answerId, latest)
+        persistPendingBackup()
         setPendingSync(prev => new Set(prev).add(answerId))
         return false
       })
@@ -90,13 +112,14 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
     inFlightRef.current.set(answerId, task)
     setSaving(true)
     return task
-  }, [refreshSavingState, previewMode])
+  }, [persistPendingBackup, refreshSavingState, previewMode])
 
-  /** Force every queued edit out and wait for the in-flight ones. */
-  const flushQueuedAnswers = useCallback(async () => {
+  /** Force every queued edit out and report whether every write reached the server. */
+  const flushQueuedAnswers = useCallback(async (): Promise<boolean> => {
     const queuedIds = [...pendingValuesRef.current.keys()]
-    await Promise.all(queuedIds.map(id => flushAnswer(id)))
-    await Promise.all([...inFlightRef.current.values()])
+    const queuedResults = await Promise.all(queuedIds.map(id => flushAnswer(id)))
+    const inFlightResults = await Promise.all([...inFlightRef.current.values()])
+    return [...queuedResults, ...inFlightResults].every(Boolean)
   }, [flushAnswer])
 
   /** Record an edit and schedule it to be persisted. */
@@ -104,6 +127,8 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
     localAnswersRef.current = { ...localAnswersRef.current, [answerId]: value }
     setLocalAnswers(prev => ({ ...prev, [answerId]: value }))
     pendingValuesRef.current.set(answerId, value)
+    backupValuesRef.current.set(answerId, value)
+    persistPendingBackup()
 
     const existingTimer = saveTimersRef.current.get(answerId)
     if (existingTimer) clearTimeout(existingTimer)
@@ -121,7 +146,7 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
       void flushAnswer(answerId)
     }, DEBOUNCE_MS)
     saveTimersRef.current.set(answerId, timer)
-  }, [flushAnswer, refreshSavingState])
+  }, [flushAnswer, persistPendingBackup, refreshSavingState])
 
   /**
    * Re-send everything that failed while offline. Resolves to whether all of
@@ -141,34 +166,50 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
 
   /** Drop the local backup once the attempt is committed. */
   const clearSavedAnswers = useCallback(() => {
+    backupValuesRef.current.clear()
     try {
       localStorage.removeItem(LS_KEY(submissionId))
     } catch { /* ignore */ }
   }, [submissionId])
 
-  // Restore anything the last session left behind. A value already loaded from
-  // the DB wins; localStorage only fills the gaps.
+  // Restore anything the last session left behind. A differing local value is
+  // treated as a write that may have missed the server (for example the tab
+  // closed inside the debounce window), so it wins on this device and is
+  // immediately queued for server sync instead of remaining a display-only
+  // recovery that disappears on the next device/reload.
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY(submissionId))
       if (!saved) return
       const savedAnswers: Record<string, string> = JSON.parse(saved)
-      setLocalAnswers(prev => {
-        const merged: Record<string, string> = { ...savedAnswers }
-        for (const [k, v] of Object.entries(prev)) {
-          if (v !== '') merged[k] = v
-        }
-        return merged
-      })
+      const current = localAnswersRef.current
+      const merged = { ...current, ...savedAnswers }
+      const restoredIds = Object.keys(savedAnswers).filter(id => savedAnswers[id] !== current[id])
+      if (restoredIds.length === 0) {
+        // The server already has the same values, so this backup is no longer dirty.
+        backupValuesRef.current.clear()
+        persistPendingBackup()
+        return
+      }
+      for (const id of restoredIds) backupValuesRef.current.set(id, savedAnswers[id])
+      persistPendingBackup()
+
+      localAnswersRef.current = merged
+      setLocalAnswers(merged)
+      for (const id of restoredIds) pendingValuesRef.current.set(id, merged[id])
+
+      if (navigator.onLine) {
+        void Promise.all(restoredIds.map(id => flushAnswer(id)))
+      } else {
+        setPendingSync(prev => new Set([...prev, ...restoredIds]))
+        refreshSavingState()
+      }
     } catch { /* ignore corrupt data */ }
-  }, [submissionId])
+  }, [submissionId, flushAnswer, persistPendingBackup, refreshSavingState])
 
   useEffect(() => {
     localAnswersRef.current = localAnswers
-    try {
-      localStorage.setItem(LS_KEY(submissionId), JSON.stringify(localAnswers))
-    } catch { /* ignore quota errors */ }
-  }, [localAnswers, submissionId])
+  }, [localAnswers])
 
   // A debounce timer must not outlive this attempt view. Whatever it was about
   // to write is still in localStorage as a recovery fallback.
@@ -179,8 +220,6 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
 
   return {
     localAnswers,
-    /** Direct write, for values persisted by their own server action. */
-    setLocalAnswers,
     localAnswersRef,
     setAnswer,
     flushAnswer,

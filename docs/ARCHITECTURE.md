@@ -67,9 +67,10 @@
 3. `assignment_classrooms` เชื่อมงานหนึ่งรายการกับหลายห้อง
 4. เมื่อเริ่มทำ `startSubmission()` จะสร้าง `submissions` และ `submission_answers`
 5. ค่าตัวแปรสุ่ม เฉลย ลำดับข้อ และลำดับตัวเลือกถูกตรึงใน attempt
-6. นักเรียนบันทึกคำตอบระหว่างทำ
-7. เมื่อส่ง ระบบตรวจชนิดที่รองรับ และคงงานที่ต้องตรวจโดยครูไว้
-8. การแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
+6. `getExamTakingData()` อ่าน attempt ด้วย trusted server client หลังตรวจ owner แล้วแปลงผ่าน `toSafeExamAnswer()`; browser ไม่ได้รับ answer snapshot, สูตร, correct flags หรือ canonical ordering
+7. นักเรียนบันทึกคำตอบระหว่างทำผ่าน Server Action; direct browser mutation ของ `submissions`/`submission_answers` ถูก revoke
+8. เมื่อส่ง ระบบตรวจชนิดที่รองรับ และคงงานที่ต้องตรวจโดยครูไว้
+9. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
 
 ### โฮมรูม
 

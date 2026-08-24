@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 18 สิงหาคม 2026
+อัปเดตล่าสุด: 24 สิงหาคม 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -56,6 +56,16 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - การแก้คะแนนต้องตรวจสิทธิ์ เก็บผู้แก้ และเวลา
 - score rescaling และ attempt strategy ต้องให้ผลเหมือนกันทุกหน้าที่อ่านคะแนน
 - ห้ามให้นักเรียนอ่านเฉลยก่อนนโยบาย `show_results` อนุญาต
+
+### Exam-taking data boundary
+
+- `questions`, `assignments` และ `submission_answers` มี secret/answer-bearing columns จึงห้ามส่ง `select('*')` จากแถวเหล่านี้เข้า Client Component ของนักเรียน
+- ระหว่างทำข้อสอบ browser รับเฉพาะ DTO จาก `lib/exam-safe.ts`; ต้องเพิ่ม field ใหม่ด้วย allowlist และ regression test ไม่ใช้ object spread จาก database row
+- student RLS ห้ามอ่าน question-bank row และ assignment row เต็ม; `assignments.access_code` ต้องอยู่ฝั่ง server เท่านั้น
+- นักเรียนอ่าน answer snapshot/เฉลยได้หลังส่งเมื่อ `show_results` เป็น `immediate` หรือ `after_due` ที่พ้นกำหนดแล้วเท่านั้น; `score_only` ห้ามอ่านคำตอบรายข้อและ `never` ห้ามอ่านคะแนนด้วย
+- การบันทึกคำตอบ รูปวิธีทำ ไฟล์ การส่ง และการแก้คะแนนผ่าน server boundary หลังตรวจ session + exact owner/teacher + attempt status + deadline; browser role ไม่มีสิทธิ์เขียน `submissions`/`submission_answers` โดยตรง
+- `users_update_own` ใช้สำหรับโปรไฟล์เท่านั้น ต้องมี trigger ป้องกัน self-update ของ authority fields (`role`, `status`)
+- Fullscreen, tab visibility, copy/paste และ screenshot deterrence เป็นเพียงสัญญาณ/แรงเสียดทาน ไม่ใช่ security boundary และห้ามใช้แทนการปกป้องเฉลยฝั่ง server
 
 ## Uploads และ exports
 

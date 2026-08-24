@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -8,6 +9,7 @@ import { ListChecks, ListTodo, AlertTriangle, CheckCircle2, XCircle, Clock, Chev
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { Card } from '@/components/ui/card'
+import { canStudentViewScore } from '@/lib/result-visibility'
 
 export const metadata = { title: 'สรุปงานของฉัน — KorKru' }
 
@@ -29,13 +31,14 @@ export default async function MySubmissionsPage() {
   const supabase = await createClient()
   const user = await getAuthUser()
   if (!user) redirect('/login')
+  const admin = createAdminClient()
 
   // Submission history and classroom memberships are independent. Loading
   // them together removes a full round trip from this student landing page.
   const [submissionsRes, membershipsRes] = await Promise.all([
-    supabase
+    admin
       .from('submissions')
-      .select('*, assignments(title, type, classrooms(name), duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results)')
+      .select('*, assignments(title, type, classrooms(name), duration_minutes, end_at, passing_type, passing_value, score_strategy, display_max_score, show_results)')
       .eq('student_id', user.id)
       .order('created_at', { ascending: false }),
     supabase
@@ -101,7 +104,7 @@ export default async function MySubmissionsPage() {
   // Use assignment_classrooms as the authoritative relation in the same
   // query, avoiding a separate link lookup before loading published work.
   const { data: publishedAssignments } = classroomIds.length > 0
-    ? await supabase
+    ? await admin
         .from('assignments')
         .select('id, title, end_at, duration_minutes, classrooms(name), assignment_classrooms!inner(classroom_id)')
         .in('assignment_classrooms.classroom_id', classroomIds)
@@ -216,7 +219,10 @@ export default async function MySubmissionsPage() {
                       </div>
 
                       <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                        {a.previousScore && a.previousScore.assignments?.show_results !== 'never' && (
+                        {a.previousScore && canStudentViewScore(
+                          a.previousScore.assignments?.show_results,
+                          a.previousScore.assignments?.end_at,
+                        ) && (
                           <p className="text-xs text-muted-foreground">
                             ครั้งก่อน {a.previousScore.total_score}/{a.previousScore.max_score}
                           </p>
@@ -249,7 +255,10 @@ export default async function MySubmissionsPage() {
 
               <div className="divide-y">
                 {completed.map((s: any) => {
-                  const canShowResults = s.assignments?.show_results !== 'never'
+                  const canShowResults = canStudentViewScore(
+                    s.assignments?.show_results,
+                    s.assignments?.end_at,
+                  )
                   const pct = s.max_score > 0
                     ? Math.round((s.total_score / s.max_score) * 100)
                     : 0

@@ -343,27 +343,3 @@ export async function getMyAssignments() {
 
   return data ?? []
 }
-
-export async function getStudentAssignments() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data: memberships } = await supabase
-    .from('classroom_students')
-    .select('classroom_id')
-    .eq('student_id', user.id)
-
-  if (!memberships || memberships.length === 0) return []
-
-  const classroomIds = memberships.map((m: { classroom_id: string }) => m.classroom_id)
-
-  const { data } = await supabase
-    .from('assignments')
-    .select('*, classrooms(name), submissions(id, status, total_score, max_score)')
-    .in('classroom_id', classroomIds)
-    .eq('status', 'published')
-    .order('created_at', { ascending: false })
-
-  return data ?? []
-}

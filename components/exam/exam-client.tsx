@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { saveWorkImage, saveFileSubmission, submitSubmission } from '@/lib/actions/submissions'
+import { saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 import { gradeAnswer, type GradedAnswer } from '@/lib/assignment-attempt'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
@@ -27,7 +27,17 @@ import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, CompositePart } from '@/lib/types'
+import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
+import type {
+  SafeAnswerPart,
+  SafeCompositeConfig,
+  SafeExamAnswer,
+  SafeFillBlankConfig,
+  SafeOrderingConfig,
+  SafeRandomQuestionConfig,
+  SafeTrueFalseConfig,
+  SafeTrueFalseStatement,
+} from '@/lib/exam-safe'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -36,13 +46,8 @@ import { NativeSelect } from '@/components/ui/native-select'
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 
-interface AnswerRow {
-  id: string
-  question_id: string
-  random_values: Record<string, number>
-  correct_answer: string
-  student_answer: string | null
-  work_images: (string | null)[] | null
+interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
+  correct_answer?: string
   // Only populated for a teacher's preview (see previewMode) — real
   // submission_answers rows carry this column too, but the real exam-taking
   // route never needs it client-side since grading happens server-side.
@@ -60,8 +65,8 @@ interface AnswerRow {
     mcq_options: Array<{ text?: string; image_url?: string; index?: number; left_text?: string; left_image?: string }> | null
     matching_options?: Array<{ right_text: string; right_image?: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
-    answer_parts: AnswerPart[] | null
-    extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | null
+    answer_parts: SafeAnswerPart[] | AnswerPart[] | null
+    extra_data: SafeExamAnswer['questions']['extra_data'] | TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | CompositeConfig
     image_urls: string[] | null
     requires_work_image: boolean
     // Preview-only, see AnswerRow.max_score above.
@@ -115,7 +120,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
 export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], previewMode = false, previewReturnHref }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
-    localAnswers, setLocalAnswers, localAnswersRef,
+    localAnswers, localAnswersRef,
     setAnswer, flushQueuedAnswers, retryPending, clearSavedAnswers,
     saving, pendingCount,
   } = useAnswerAutosave({
@@ -201,21 +206,16 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     })
     if (previewMode) return
     try {
-      await saveWorkImage(answerId, partIndex, url)
+      const result = await saveWorkImage(answerId, partIndex, url)
+      if (result.error) throw new Error(result.error)
     } catch {
       toast.error('บันทึกรูปวิธีทำไม่สำเร็จ ลองใหม่อีกครั้ง')
     }
   }, [previewMode])
 
-  const handleFileSubmissionChange = useCallback(async (answerId: string, files: SubmittedFile[]) => {
-    setLocalAnswers(prev => ({ ...prev, [answerId]: JSON.stringify(files) }))
-    if (previewMode) return
-    try {
-      await saveFileSubmission(answerId, files)
-    } catch {
-      toast.error('บันทึกไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง')
-    }
-  }, [previewMode])
+  const handleFileSubmissionChange = useCallback((answerId: string, files: SubmittedFile[]) => {
+    handleAnswerChange(answerId, JSON.stringify(files))
+  }, [handleAnswerChange])
 
   function toggleFlag(answerId: string) {
     setFlagged(prev => {
@@ -238,20 +238,25 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     setSubmitting(true)
     // Do not grade against stale DB values when the student confirms within
     // the debounce window or while an earlier save is still in flight.
-    await flushQueuedAnswers()
+    const allAnswersSynced = await flushQueuedAnswers()
+    if (!previewMode && !allAnswersSynced) {
+      toast.error('ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองส่งอีกครั้ง')
+      setSubmitting(false)
+      return
+    }
     if (previewMode) {
       // Grade locally with the exact same rules a real submission would get
       // (see gradeAnswer) — nothing is written anywhere, so this costs
       // nothing and leaves no trace.
       const graded = answers.map(a => gradeAnswer({
         id: a.id,
-        correct_answer: a.correct_answer,
+        correct_answer: a.correct_answer ?? '',
         student_answer: localAnswersRef.current[a.id] ?? null,
         max_score: a.max_score ?? 0,
         questions: {
           question_type: a.questions.question_type,
           answer_tolerance: a.questions.answer_tolerance ?? 0.1,
-          answer_parts: a.questions.answer_parts,
+          answer_parts: a.questions.answer_parts as AnswerPart[] | null,
           extra_data: a.questions.extra_data,
         },
       }))
@@ -463,21 +468,21 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           ) : current.questions.question_type === 'true_false' ? (
             <TrueFalseAnswerInput
               answerId={current.id}
-              config={current.questions.extra_data as TrueFalseConfig}
+              config={current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
           ) : current.questions.question_type === 'fill_blank' ? (
             <FillBlankAnswerInput
               questionText={current.questions.question_text}
-              config={current.questions.extra_data as FillBlankConfig}
+              config={current.questions.extra_data as FillBlankConfig | SafeFillBlankConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
           ) : current.questions.question_type === 'ordering' ? (
             <OrderingAnswerInput
               answerId={current.id}
-              config={current.questions.extra_data as OrderingConfig}
+              config={current.questions.extra_data as OrderingConfig | SafeOrderingConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
@@ -488,7 +493,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             />
           ) : current.questions.question_type === 'composite' ? (
             <CompositeAnswerInput
-              config={current.questions.extra_data as CompositeConfig}
+              config={current.questions.extra_data as CompositeConfig | SafeCompositeConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
@@ -497,7 +502,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               answerId={current.id}
               parts={current.questions.answer_parts}
               questionText={currentQuestionText}
-              labels={partLabels((current.questions.extra_data as RandomQuestionConfig | null)?.part_label_style)}
+              labels={partLabels((current.questions.extra_data as RandomQuestionConfig | SafeRandomQuestionConfig | null)?.part_label_style)}
               fallbackUnit={current.questions.answer_unit}
               rawValue={localAnswers[current.id] ?? ''}
               onSingleChange={val => handleAnswerChange(current.id, val)}
@@ -1137,7 +1142,7 @@ function MultiPartAnswerInput({
   requiresWorkImage, workImages, onWorkImageChange,
 }: {
   answerId: string
-  parts: AnswerPart[] | null
+  parts: SafeAnswerPart[] | AnswerPart[] | null
   questionText?: string
   labels: string[]
   fallbackUnit: string | null
@@ -1271,7 +1276,9 @@ function MultiPartAnswerInput({
 // mode below: answers[i] === 'true' means "ticked", compared directly
 // against the pre-flipped target built in submissions.ts.
 function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChange }: {
-  config: TrueFalseConfig | null; subStatements: TrueFalseStatement[]; mode: TrueFalseExplanationMode
+  config: TrueFalseConfig | SafeTrueFalseConfig | null
+  subStatements: Array<TrueFalseStatement | SafeTrueFalseStatement>
+  mode: TrueFalseExplanationMode
   rawValue: string; onChange: (v: string) => void
 }) {
   let answers: string[] = []; let explanation = ''
@@ -1322,7 +1329,10 @@ function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChan
 }
 
 function TrueFalseAnswerInput({ config, rawValue, onChange }: {
-  answerId: string; config: TrueFalseConfig | null; rawValue: string; onChange: (v: string) => void
+  answerId: string
+  config: TrueFalseConfig | SafeTrueFalseConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const mode = config?.explanation_mode ?? 'none'
   const subStatements = config?.statements ?? []
@@ -1423,7 +1433,10 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
 // ─── Fill-blank ───────────────────────────────────────────────────────────────
 
 function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
-  questionText: string; config: FillBlankConfig | null; rawValue: string; onChange: (v: string) => void
+  questionText: string
+  config: FillBlankConfig | SafeFillBlankConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const blanks = config?.blanks ?? []
   const parts  = splitFillBlankHtml(questionText)
@@ -1515,7 +1528,10 @@ function MatchingAnswerInput({ prompts, options, rawValue, onChange }: {
 }
 
 function OrderingAnswerInput({ config, rawValue, onChange }: {
-  answerId: string; config: OrderingConfig | null; rawValue: string; onChange: (v: string) => void
+  answerId: string
+  config: OrderingConfig | SafeOrderingConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const items: OrderingItem[] = config?.items ?? []
   const n = items.length
@@ -1582,7 +1598,9 @@ function orderSelFromRaw(raw: string): Record<string, string> {
 }
 
 function CompositeAnswerInput({ config, rawValue, onChange }: {
-  config: CompositeConfig | null; rawValue: string; onChange: (v: string) => void
+  config: CompositeConfig | SafeCompositeConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const parts = config?.parts ?? []
   const labels = partLabels(config?.part_label_style)

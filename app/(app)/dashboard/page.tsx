@@ -12,6 +12,7 @@ import {
 import { AssignmentCalendar, type CalendarEvent } from './_components/assignment-calendar'
 import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
+import { canStudentViewScore } from '@/lib/result-visibility'
 import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 
@@ -115,9 +116,9 @@ export default async function DashboardPage() {
       .from('classroom_students')
       .select('classroom_id')
       .eq('student_id', user.id),
-    supabase
+    admin
       .from('submissions')
-      .select('id, total_score, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results)')
+      .select('id, total_score, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results, end_at)')
       .eq('student_id', user.id),
   ])
 
@@ -130,9 +131,9 @@ export default async function DashboardPage() {
     s.assignment_id as string,
     (s.assignments?.display_max_score ?? null) as number | null,
   ]))
-  const showResultsByAssignment = new Map(rawSubmissions.map((s: any) => [
+  const scoreVisibilityByAssignment = new Map(rawSubmissions.map((s: any) => [
     s.assignment_id as string,
-    s.assignments?.show_results as string | undefined,
+    canStudentViewScore(s.assignments?.show_results, s.assignments?.end_at),
   ]))
   const allSubmissions = rescaleToDisplayMax(
     rawSubmissions as any[],
@@ -142,7 +143,7 @@ export default async function DashboardPage() {
     (s: any) => s.status === 'submitted' || s.status === 'graded'
   )
   const completedWithVisibleResults = completed.filter(
-    (s: any) => showResultsByAssignment.get(s.assignment_id) !== 'never'
+    (s: any) => scoreVisibilityByAssignment.get(s.assignment_id) === true
   )
   const avgPct = completedWithVisibleResults.length > 0
     ? Math.round(
@@ -158,7 +159,7 @@ export default async function DashboardPage() {
   // waterfall while still using assignment_classrooms as the source of truth.
   const [assignmentsRes, recentPostsRes] = classroomIds.length > 0
     ? await Promise.all([
-        supabase
+        admin
           .from('assignments')
           .select('id, title, question_ids, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
           .in('assignment_classrooms.classroom_id', classroomIds)

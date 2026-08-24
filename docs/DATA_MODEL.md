@@ -60,6 +60,9 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - `submissions.org_id` ต้องเท่ากับ `assignments.org_id` ของงานนั้น ไม่ใช่ organization หลักหรือ personal workspace ของนักเรียน
 - `submission_answers.org_id` ต้องเท่ากับ `submissions.org_id`
 - นักเรียนอาจเข้าร่วมห้องผ่าน `classroom_students` โดยไม่เป็น `organization_members`; สิทธิ์เริ่ม attempt ต้องมาจาก assignment ที่เผยแพร่และ roster ของห้อง
+- `assignments.access_code`, `submission_answers.correct_answer`/คะแนน และ answer-bearing fields ใน `questions` เป็น server-only ระหว่าง attempt; RLS แบบรายแถวปกป้องคอลัมน์ลับกับคอลัมน์สาธารณะในแถวเดียวกันไม่ได้ จึงห้ามเปิด full row ให้นักเรียนแล้วพยายาม strip เฉพาะใน UI
+- browser role ไม่มีสิทธิ์ `INSERT/UPDATE/DELETE` ตาราง `submissions` และ `submission_answers`; mutation ต้องผ่าน server action ที่ตรวจเจ้าของ/ครู สถานะ และเวลา ก่อนใช้ service role แบบ exact resource
+- นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
 
 ## วิจัยการศึกษา
 

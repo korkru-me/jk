@@ -132,17 +132,21 @@
 - หน้าชุดข้อสอบและสรุปงานของนักเรียนโหลดข้อมูลอิสระพร้อมกัน และดึงงานผ่าน `assignment_classrooms` โดยตรงเพื่อลด query ที่ต้องรอต่อกัน
 - หน้าสร้างงานโหลดบทบาท ห้องเรียน โจทย์ และแฟ้มโจทย์พร้อมกันด้วย payload สำหรับตัวเลือกโดยเฉพาะ และโหลด JavaScript ของคลังตัวเลือกเมื่อเข้าสู่ขั้นเลือกโจทย์ ส่วนหน้าแก้ไขดึงเฉพาะค่าที่แก้ได้
 - หน้าผลคะแนนครูดึงเฉพาะคอลัมน์ที่ใช้ โหลดข้อมูลคำตอบกับข้อมูลเรียงรายชื่อพร้อมกัน และยังใช้ score strategy กลางชุดเดียวกับหน้าคะแนนอื่น
+- นักเรียนอ่านแถว `assignments` โดยตรงไม่ได้แล้ว เพราะแถว legacy ยังมี `access_code` แบบ plaintext; หน้านักเรียนอ่านเฉพาะคอลัมน์ปลอดภัยผ่าน server หลังตรวจ roster ส่วนหน้าเริ่มสอบตรวจรหัสและสิทธิ์ฝั่ง server
 - ต้องทดสอบ flow ครูและนักเรียนแบบครบเส้นทาง รวม expiry/retry/concurrent save
 
 ### การส่งคำตอบและตรวจคะแนน — มีโค้ดรองรับ
 
 - สร้าง attempt, ตรึง random/answer/order, autosave และบังคับเวลาฝั่ง server
+- หน้าทำข้อสอบใช้ student-safe DTO ที่สร้างแบบ allowlist ฝั่ง server: ไม่ส่ง `correct_answer`, คะแนน/ผลตรวจ, สูตร, `solution_text`, `mcq_options.is_correct` หรือเฉลยที่ซ้อนใน true/false, fill-blank, ordering และ composite เข้า browser; matching แยก prompt/choice ออกจากคู่เฉลยก่อนส่ง
+- นักเรียนอ่าน `submission_answers` ได้เฉพาะหลังส่งและเมื่อ `show_results` อนุญาตให้ตรวจคำตอบ และอ่าน question-bank row เต็มได้เฉพาะจุดเดียวกัน; ระหว่างทำ การบันทึก/ส่ง/ตรวจคะแนนผ่าน Server Action ที่ตรวจ owner, สถานะ และเวลาแล้วจึงใช้ service role แบบจำกัด resource
+- สิทธิ์เขียน `submissions`/`submission_answers` โดยตรงของ `anon`/`authenticated` ถูก revoke และ self-update ของ `users` เปลี่ยน `role`/`status` ไม่ได้ ป้องกันทั้งการแก้คะแนนเองและยกระดับสิทธิ์ผ่าน DevTools
 - Attempt และ answer snapshot รับ `org_id` จาก assignment โดยตรง จึงรองรับนักเรียนที่เข้าห้องแต่ไม่ได้เป็น `organization_members`
 - มี auto-grading หลาย question types, manual score edit, feedback และ work images/files
-- หน้าทำข้อสอบโหลดข้อมูลเริ่ม attempt และ answer snapshot แบบคู่ขนาน, รวม autosave ขณะพิมพ์ภายในช่วงสั้น และเขียนผลตรวจเป็นชุดย่อยพร้อมกันเพื่อลดเวลารอโดยยัง flush คำตอบล่าสุดก่อนส่ง
+- หน้าทำข้อสอบ resume จาก answer snapshot ที่บันทึกในฐานข้อมูล, รวม autosave ขณะพิมพ์ภายในช่วงสั้น, สำรองค่าล่าสุดใน `localStorage` เมื่อ offline/ก่อน debounce และเขียนผลตรวจเป็นชุดย่อยพร้อมกัน โดยยัง flush คำตอบล่าสุดก่อนส่ง; reload หรือหลุดแล้วกลับเข้ามาจึงได้คำตอบ server เดิม และค่าที่ยัง sync ไม่ทันจะกู้จากเครื่องเดิม
 - หลังส่งคำตอบจะโหลดหน้าสรุปจากสถานะล่าสุดของ server และอยู่ที่หน้าสรุปจนกว่านักเรียนจะเลือกกลับหรือเริ่มทำใหม่เอง
 - หน้าสรุปผลโหลดเฉพาะข้อมูลคะแนนขั้นต่ำก่อน และโหลดรายละเอียดคำตอบแบบ streaming เฉพาะเมื่อสิทธิ์การแสดงผลอนุญาต โดยไม่ส่ง JavaScript ฝั่ง client สำหรับแผนซ่อมเสริมที่ไม่มี interaction
-- ต้องเพิ่ม regression tests สำหรับทุก question type และการ rescale/attempt strategy
+- มี regression test ของ student-safe DTO ครอบคลุม answer key แบบตรง/ซ้อนและ result-visibility helper แล้ว; ยังต้องเพิ่ม integration test ของ RLS/Server Action, ทุก question type และการ rescale/attempt strategy
 - ต้องยืนยันคำจำกัดความของ `submitted` เทียบกับ `graded` สำหรับคำตอบ manual
 
 ### โฮมรูม — มีโค้ดรองรับ แต่ข้อมูลอ่อนไหวต้องตรวจเพิ่ม

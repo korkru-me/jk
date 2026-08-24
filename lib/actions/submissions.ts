@@ -1,37 +1,39 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isAttemptExpired } from '@/lib/grading'
 import { buildAssignmentAttempt, gradeAnswer } from '@/lib/assignment-attempt'
-import type { Question, SubmittedFile } from '@/lib/types'
+import type { Question } from '@/lib/types'
 
 export async function startSubmission(assignmentId: string, accessCode?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
+  const admin = createAdminClient()
 
   // Assignment metadata, classroom links, an individual extension, and the
   // latest attempt are independent after authentication. Fetch them in one
   // stage instead of a four-query waterfall on every exam resume.
   const [assignmentRes, linksRes, extensionRes, existingRes] = await Promise.all([
-    supabase
+    admin
       .from('assignments')
       .select('*')
       .eq('id', assignmentId)
       .eq('status', 'published')
       .maybeSingle(),
-    supabase
+    admin
       .from('assignment_classrooms')
       .select('classroom_id')
       .eq('assignment_id', assignmentId),
-    supabase
+    admin
       .from('assignment_extensions')
       .select('extended_end_at')
       .eq('assignment_id', assignmentId)
       .eq('student_id', user.id)
       .maybeSingle(),
-    supabase
+    admin
       .from('submissions')
       .select('id, status, attempt_number, started_at')
       .eq('assignment_id', assignmentId)
@@ -56,7 +58,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   const classroomIds = (links ?? []).map((l: any) => l.classroom_id)
 
   const { data: membership } = classroomIds.length > 0
-    ? await supabase
+    ? await admin
         .from('classroom_students')
         .select('id')
         .eq('student_id', user.id)
@@ -88,7 +90,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
       // with whatever was answered instead of resuming into a countdown
       // that's already at zero, then fall through to the normal
       // retry/attempt-limit logic below as if it had just been submitted.
-      await gradeAndFinalizeSubmission(supabase, existing.id, user.id, { enforceWorkImage: false })
+      await gradeAndFinalizeSubmission(admin, existing.id, user.id, { enforceWorkImage: false })
     }
     // submitted / graded: retry up to max_attempts. Exercises are unlimited
     // when not set; exams fall back to single-attempt for legacy rows saved
@@ -112,7 +114,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   }
 
   // Fetch questions
-  const { data: questions } = await supabase
+  const { data: questions } = await admin
     .from('questions')
     .select('*')
     .in('id', assignment.question_ids)
@@ -129,7 +131,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   const orgId = assignment.org_id
 
   // Create submission with correct total max_score
-  const { data: submission, error: subError } = await supabase
+  const { data: submission, error: subError } = await admin
     .from('submissions')
     .insert({
       org_id: orgId,
@@ -144,7 +146,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
 
   if (subError) return { error: subError.message }
 
-  const { error: answersError } = await supabase.from('submission_answers').insert(
+  const { error: answersError } = await admin.from('submission_answers').insert(
     skeletons.map(s => ({ ...s, org_id: orgId, submission_id: submission.id }))
   )
   if (answersError) return { error: answersError.message }
@@ -152,36 +154,67 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   return { submissionId: submission.id }
 }
 
+async function getWritableStudentAnswer(
+  admin: ReturnType<typeof createAdminClient>,
+  submissionAnswerId: string,
+  studentId: string,
+) {
+  const { data: answer } = await admin
+    .from('submission_answers')
+    .select(`
+      id, submission_id, work_images,
+      submissions(
+        id, student_id, status, started_at, assignment_id,
+        assignments(id, duration_minutes, end_at)
+      )
+    `)
+    .eq('id', submissionAnswerId)
+    .maybeSingle()
+
+  if (!answer) return { error: 'ไม่พบคำตอบ' as const }
+  const submission = Array.isArray(answer.submissions) ? answer.submissions[0] : answer.submissions
+  if (!submission || submission.student_id !== studentId) return { error: 'ไม่มีสิทธิ์' as const }
+  if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว' as const }
+
+  const assignment = Array.isArray(submission.assignments)
+    ? submission.assignments[0]
+    : submission.assignments
+  const durationMinutes = assignment?.duration_minutes
+  if (durationMinutes) {
+    const deadline = new Date(submission.started_at).getTime() + durationMinutes * 60_000
+    if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' as const }
+  }
+
+  if (assignment?.end_at && new Date(assignment.end_at).getTime() < Date.now()) {
+    const { data: extension } = await admin
+      .from('assignment_extensions')
+      .select('extended_end_at')
+      .eq('assignment_id', submission.assignment_id)
+      .eq('student_id', studentId)
+      .maybeSingle()
+    if (!extension?.extended_end_at || new Date(extension.extended_end_at).getTime() < Date.now()) {
+      return { error: 'หมดเวลาส่งแล้ว' as const }
+    }
+  }
+
+  return { answer, submission }
+}
+
 export async function saveAnswer(submissionAnswerId: string, studentAnswer: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (studentAnswer.length > 500_000) return { error: 'คำตอบมีขนาดใหญ่เกินไป' }
+  const admin = createAdminClient()
 
-  // Verify ownership
-  const { data: sa } = await supabase
-    .from('submission_answers')
-    .select('id, submission_id, submissions(student_id, status, started_at, assignments(duration_minutes))')
-    .eq('id', submissionAnswerId)
-    .maybeSingle()
+  const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
+  if ('error' in writable) return { error: writable.error }
 
-  if (!sa) return { error: 'ไม่พบคำตอบ' }
-  const sub = (sa as any).submissions
-  if (sub?.student_id !== user.id) return { error: 'ไม่มีสิทธิ์' }
-  if (sub?.status !== 'in_progress') return { error: 'ส่งงานแล้ว' }
-
-  // Server-side time-limit enforcement — the exam-taking UI only
-  // auto-submits via a client-side setInterval, which a tampered client
-  // could stall to keep saving answers past the allotted duration.
-  const durationMinutes = sub?.assignments?.duration_minutes
-  if (durationMinutes) {
-    const deadline = new Date(sub.started_at).getTime() + durationMinutes * 60_000
-    if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' }
-  }
-
-  const { error } = await supabase
+  const { error } = await admin
     .from('submission_answers')
     .update({ student_answer: studentAnswer })
     .eq('id', submissionAnswerId)
+    .eq('submission_id', writable.submission.id)
 
   if (error) return { error: error.message }
   return { success: true }
@@ -194,68 +227,23 @@ export async function saveWorkImage(submissionAnswerId: string, partIndex: numbe
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!Number.isInteger(partIndex) || partIndex < 0 || partIndex > 50) return { error: 'ตำแหน่งรูปไม่ถูกต้อง' }
+  const admin = createAdminClient()
 
-  const { data: sa } = await supabase
-    .from('submission_answers')
-    .select('id, work_images, submissions(student_id, status, started_at, assignments(duration_minutes))')
-    .eq('id', submissionAnswerId)
-    .maybeSingle()
+  const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
+  if ('error' in writable) return { error: writable.error }
 
-  if (!sa) return { error: 'ไม่พบคำตอบ' }
-  const sub = (sa as any).submissions
-  if (sub?.student_id !== user.id) return { error: 'ไม่มีสิทธิ์' }
-  if (sub?.status !== 'in_progress') return { error: 'ส่งงานแล้ว' }
-
-  const durationMinutes = sub?.assignments?.duration_minutes
-  if (durationMinutes) {
-    const deadline = new Date(sub.started_at).getTime() + durationMinutes * 60_000
-    if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' }
-  }
-
-  const current: (string | null)[] = Array.isArray((sa as any).work_images) ? [...(sa as any).work_images] : []
+  const current: (string | null)[] = Array.isArray(writable.answer.work_images)
+    ? [...writable.answer.work_images]
+    : []
   while (current.length <= partIndex) current.push(null)
   current[partIndex] = url
 
-  const { error } = await supabase
+  const { error } = await admin
     .from('submission_answers')
     .update({ work_images: current })
     .eq('id', submissionAnswerId)
-
-  if (error) return { error: error.message }
-  return { success: true }
-}
-
-// Persists a student's `file_upload` answer — the full attached-files array,
-// JSON-stringified into the generic `student_answer` text column (same
-// encoding spirit as ordering's/fill_blank's JSON arrays, just with object
-// elements instead of strings). Mirrors saveAnswer/saveWorkImage's
-// ownership + time-limit re-check.
-export async function saveFileSubmission(submissionAnswerId: string, files: SubmittedFile[]) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-
-  const { data: sa } = await supabase
-    .from('submission_answers')
-    .select('id, submission_id, submissions(student_id, status, started_at, assignments(duration_minutes))')
-    .eq('id', submissionAnswerId)
-    .maybeSingle()
-
-  if (!sa) return { error: 'ไม่พบคำตอบ' }
-  const sub = (sa as any).submissions
-  if (sub?.student_id !== user.id) return { error: 'ไม่มีสิทธิ์' }
-  if (sub?.status !== 'in_progress') return { error: 'ส่งงานแล้ว' }
-
-  const durationMinutes = sub?.assignments?.duration_minutes
-  if (durationMinutes) {
-    const deadline = new Date(sub.started_at).getTime() + durationMinutes * 60_000
-    if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' }
-  }
-
-  const { error } = await supabase
-    .from('submission_answers')
-    .update({ student_answer: JSON.stringify(files) })
-    .eq('id', submissionAnswerId)
+    .eq('submission_id', writable.submission.id)
 
   if (error) return { error: error.message }
   return { success: true }
@@ -270,10 +258,11 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const admin = createAdminClient()
 
   if (!Number.isFinite(newScore) || newScore < 0) return { error: 'คะแนนไม่ถูกต้อง' }
 
-  const { data: sa } = await supabase
+  const { data: sa } = await admin
     .from('submission_answers')
     .select('id, submission_id, max_score, submissions(id, status, assignment_id, assignments(created_by))')
     .eq('id', submissionAnswerId)
@@ -286,7 +275,7 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
   if (submission?.status === 'in_progress') return { error: 'นักเรียนยังทำไม่เสร็จ แก้คะแนนไม่ได้' }
   if (newScore > sa.max_score) return { error: `คะแนนต้องไม่เกิน ${sa.max_score}` }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await admin
     .from('submission_answers')
     .update({
       score: newScore,
@@ -298,14 +287,14 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
 
   if (updateError) return { error: updateError.message }
 
-  const { data: allAnswers } = await supabase
+  const { data: allAnswers } = await admin
     .from('submission_answers')
     .select('score')
     .eq('submission_id', sa.submission_id)
 
   const totalScore = (allAnswers ?? []).reduce((sum: number, a: any) => sum + (a.score ?? 0), 0)
 
-  const { error: subError } = await supabase
+  const { error: subError } = await admin
     .from('submissions')
     .update({ total_score: totalScore, status: 'graded' })
     .eq('id', sa.submission_id)
@@ -326,12 +315,12 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
 // expired attempt shouldn't block on a requirement the student can no
 // longer satisfy.
 async function gradeAndFinalizeSubmission(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  admin: ReturnType<typeof createAdminClient>,
   submissionId: string,
   studentId: string,
   opts: { enforceWorkImage: boolean }
 ): Promise<{ error?: string; success?: true; totalScore?: number }> {
-  const { data: submission } = await supabase
+  const { data: submission } = await admin
     .from('submissions')
     .select('*, assignments(duration_minutes, end_at, require_work_image)')
     .eq('id', submissionId)
@@ -341,7 +330,7 @@ async function gradeAndFinalizeSubmission(
   if (!submission) return { error: 'ไม่พบการสอบ' }
   if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว' }
 
-  const { data: answers } = await supabase
+  const { data: answers } = await admin
     .from('submission_answers')
     .select('*, questions(answer_tolerance, answer_parts, question_type, extra_data, requires_work_image)')
     .eq('submission_id', submissionId)
@@ -375,7 +364,7 @@ async function gradeAndFinalizeSubmission(
   const gradeWriteConcurrency = 10
   for (let i = 0; i < updates.length; i += gradeWriteConcurrency) {
     await Promise.all(updates.slice(i, i + gradeWriteConcurrency).map(u =>
-      supabase
+      admin
         .from('submission_answers')
         .update({ is_correct: u.is_correct, score: u.score })
         .eq('id', u.id)
@@ -384,7 +373,7 @@ async function gradeAndFinalizeSubmission(
 
   const totalScore = updates.reduce((sum: number, u: any) => sum + u.score, 0)
 
-  const { error } = await supabase
+  const { error } = await admin
     .from('submissions')
     .update({
       status: 'submitted',
@@ -403,23 +392,6 @@ export async function submitSubmission(submissionId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-  return gradeAndFinalizeSubmission(supabase, submissionId, user.id, { enforceWorkImage: true })
-}
-
-export async function getSubmissionWithAnswers(submissionId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data } = await supabase
-    .from('submissions')
-    .select(`
-      *,
-      assignments(*, classrooms(name)),
-      submission_answers(*, questions(*))
-    `)
-    .eq('id', submissionId)
-    .maybeSingle()
-
-  return data
+  const admin = createAdminClient()
+  return gradeAndFinalizeSubmission(admin, submissionId, user.id, { enforceWorkImage: true })
 }
