@@ -441,20 +441,13 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             )
           )}
 
-          {Object.keys(current.random_values).length > 0 && (
-            <div className="bg-muted/40 rounded-xl p-3 border border-border/50">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">ค่าที่กำหนด</p>
-              <div className="flex flex-wrap gap-2">
-                {current.questions.variables
-                  .filter((v) => v.type !== 'reference')
-                  .map(v => (
-                    <span key={v.name} className="text-sm font-mono bg-background border rounded-lg px-2.5 py-1">
-                      {v.name} = {current.random_values[v.name]}
-                    </span>
-                  ))}
-              </div>
-            </div>
-          )}
+          {/* No "ค่าที่กำหนด" readout while sitting the exam. Every {name} in the
+              question text is already replaced with the value this student drew,
+              so the panel restated the same numbers underneath the question.
+              Note this leaves a variable that the question text never mentions
+              with nowhere to appear — write such a value into the text itself.
+              The submission review still lists them, where a teacher marking an
+              attempt has to see what that student was given. */}
         </Card>
 
         {/* Answer inputs */}
