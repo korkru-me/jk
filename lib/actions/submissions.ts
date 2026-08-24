@@ -103,7 +103,7 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   // Access code is only checked when creating a genuinely new attempt —
   // resuming an in-progress submission (handled above) never re-prompts.
   if (assignment.access_code) {
-    if (!accessCode || accessCode.trim() !== assignment.access_code) {
+    if (!accessCode || accessCode.trim().toUpperCase() !== assignment.access_code.trim().toUpperCase()) {
       return {
         error: accessCode ? 'รหัสผ่านไม่ถูกต้อง' : 'กรุณากรอกรหัสผ่านก่อนเริ่มทำ',
         requiresAccessCode: true,

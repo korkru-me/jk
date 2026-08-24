@@ -15,6 +15,7 @@ export default async function AdminQuestionsPage({ searchParams }: Props) {
   let query = admin
     .from('questions')
     .select('*, question_categories(name), users:created_by(full_name, email)')
+    .eq('is_research_snapshot', false)
     .order('created_at', { ascending: false })
 
   if (search) query = (query as any).ilike('title', `%${search}%`)

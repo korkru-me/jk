@@ -83,10 +83,11 @@
 ### วิจัยการศึกษา
 
 1. `/research` เป็น Server Component และอ่านโครงการผ่าน session-bound Supabase client เพื่อให้ RLS เป็นขอบเขตหลัก หน้า production ไม่เติมข้อมูลตัวอย่างเมื่อไม่มีโครงการ
-2. โครงการผูกกับ subject classroom เดียว ผู้เข้าร่วมถูกตรึงจาก roster และรอบวัดก่อน/หลังอาจเชื่อม assignment เดิมของห้องเรียน
+2. `/research/new` ส่งการตั้งค่าครั้งเดียวเข้า RPC แบบ atomic ซึ่งผูกโครงการกับ subject classroom เดียว ตรึงผู้เข้าร่วมจาก roster สร้าง immutable question snapshots และสร้าง assignment ก่อน/หลังในห้องนั้น
 3. คะแนนแต่ละค่าผ่าน composite foreign keys ที่ยืนยัน project/participant/measurement/org เดียวกัน และ trigger สร้าง audit history อัตโนมัติ
 4. RLS แยก project metadata ออกจาก student-level scores: co-teacher `view` อ่าน metadata ได้ แต่ข้อมูลผู้เข้าร่วม คะแนน และประวัติต้องเป็น owner หรือ `admin/manage`
-5. นักเรียนไม่มี route หรือ policy สำหรับโมดูลวิจัย งานก่อน/หลังยังคงใช้ assignment/submission runtime เดิมเพื่อไม่สร้างระบบสอบซ้ำ
+5. นักเรียนไม่มี route หรือ policy สำหรับโมดูลวิจัย งานก่อน/หลังยังคงใช้ assignment/submission runtime เดิมเพื่อไม่สร้างระบบสอบซ้ำ สำเนาโจทย์วิจัยถูกซ่อนจากคลังและ admin listings แต่ยังอ่านได้ตามเส้นทาง assignment ที่ได้รับสิทธิ์
+6. `/research/[id]` เป็น Server Component ที่อ่าน project/measurements/assignments/counts ภายใต้ RLS แล้วส่งเฉพาะข้อมูล serializable ไปยัง client dialogs สำหรับแก้รายละเอียดและกำหนดการ
 
 ## Compatibility hotspots
 

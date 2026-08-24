@@ -123,6 +123,12 @@ export interface EducationResearchMeasurement {
   source_type: EducationResearchSourceType | null
   assignment_id: string | null
   max_score: number | null
+  selection_mode: 'set' | 'sections' | 'individual' | 'same_as_pretest' | null
+  source_set_id: string | null
+  source_sections: QuestionSetSection[]
+  source_question_ids: string[]
+  snapshot_question_ids: string[]
+  duration_minutes: number | null
   created_at: string
   updated_at: string
 }
@@ -385,6 +391,9 @@ export interface Question {
   shared_org_ids?: string[]
   /** Whether teammates with access to this question (via org_id/question_shares) may edit it. Default true. */
   team_edit_allowed: boolean
+  is_research_snapshot: boolean
+  research_snapshot_project_id: string | null
+  research_snapshot_source_id: string | null
   category_id: string
   grade_level: string | null
   subject: string | null

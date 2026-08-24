@@ -1,4 +1,5 @@
 import { BarChart3, FlaskConical, LockKeyhole, Users } from 'lucide-react'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -82,12 +83,9 @@ export default async function ResearchPage() {
           </p>
         </div>
         <div className="text-left sm:text-right">
-          <Button disabled aria-describedby="research-create-note">
+          <Button render={<Link href="/research/new" />}>
             สร้างโครงการวิจัย
           </Button>
-          <p id="research-create-note" className="mt-1.5 text-xs text-muted-foreground">
-            เปิดใช้งานในขั้น 2.2
-          </p>
         </div>
       </div>
 
@@ -95,9 +93,9 @@ export default async function ResearchPage() {
         <div className="flex gap-3">
           <LockKeyhole className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
           <div>
-            <p className="text-sm font-semibold text-foreground">ฐานข้อมูลและสิทธิ์พร้อมสำหรับระยะ 2.1</p>
+            <p className="text-sm font-semibold text-foreground">ข้อมูลจริงและสิทธิ์ของห้องเรียน</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              หน้านี้ใช้เฉพาะข้อมูลจริงตามสิทธิ์ของห้องเรียน นักเรียนยังเข้าทำข้อสอบจากห้องเรียนตามปกติ
+              แต่ละโครงการตรึงรายชื่อนักเรียนและสำเนาข้อสอบไว้เพื่อให้ผลวิจัยตรวจสอบย้อนหลังได้ นักเรียนยังเข้าทำข้อสอบจากห้องเรียนตามปกติ
             </p>
           </div>
         </div>
@@ -116,13 +114,14 @@ export default async function ResearchPage() {
           </div>
           <h2 className="mt-4 text-lg font-semibold text-foreground">ยังไม่มีโครงการวิจัย</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            ยังไม่มีข้อมูลโครงการจริงในบัญชีนี้ ขั้น 2.2 จะเพิ่มเส้นทางสร้างโครงการจากห้องเรียนและข้อสอบของคุณ
+            เริ่มจากเลือกห้องเรียนจริง แล้วกำหนดข้อสอบก่อนเรียนและหลังเรียนจากคลังหรือแฟ้มโจทย์ของคุณ
           </p>
+          <Button className="mt-4" render={<Link href="/research/new" />}>สร้างโครงการแรก</Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {projects.map(project => (
-            <Card key={project.id} padding="lg">
+            <Card key={project.id} padding="lg" className="transition-colors hover:border-primary/40">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold text-foreground">{project.title}</h2>
@@ -136,6 +135,9 @@ export default async function ResearchPage() {
                 <span>ห้องเรียน: {project.classrooms?.name ?? 'ไม่พบห้องเรียน'}</span>
                 <span>เกณฑ์ผ่าน: {project.passing_threshold_percent}%</span>
               </div>
+              <Button className="mt-4" variant="outline" render={<Link href={`/research/${project.id}`} />}>
+                เปิดโครงการ
+              </Button>
             </Card>
           ))}
         </div>

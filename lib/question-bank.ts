@@ -33,6 +33,7 @@ export async function fetchBankQuestions(
       .from('questions')
       .select(BANK_FIELDS)
       .eq('created_by', userId)
+      .eq('is_research_snapshot', false)
       .neq('visibility', 'pending')
       // created_at alone is not unique — a bulk import stamps a whole batch
       // with the same instant — so pages would repeat and skip rows without a

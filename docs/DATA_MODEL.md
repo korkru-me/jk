@@ -65,7 +65,7 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 
 - `education_research_projects` — โครงการหนึ่งกลุ่มวัดก่อน–หลัง ผูก `org_id`, ห้องเรียนรายวิชา ผู้สร้าง เกณฑ์ผ่าน ระดับนัยสำคัญ และ lifecycle; `org_id`, `classroom_id`, `created_by` และแบบแผนวิจัยเปลี่ยนไม่ได้หลังสร้าง
 - `education_research_participants` — cohort ที่ตรึงจาก roster ของห้อง โดยใช้ `student_id` เป็นตัวจับคู่ ไม่ใช้ชื่อหรือลำดับแถว และหนึ่งนักเรียนอยู่ได้หนึ่งครั้งต่อโครงการ
-- `education_research_measurements` — การตั้งค่ารอบ `pretest`/`posttest`, แหล่งคะแนน และ optional assignment ที่ต้องอยู่ในห้อง/organization เดียวกับโครงการ
+- `education_research_measurements` — การตั้งค่ารอบ `pretest`/`posttest`, แหล่งคะแนน, วิธีเลือกแฟ้ม/แฟ้มย่อย/รายข้อ, source IDs, immutable snapshot IDs, เวลา และ optional assignment ที่ต้องอยู่ในห้อง/organization เดียวกับโครงการ
 - `education_research_scores` — observation คะแนนหนึ่งค่าต่อผู้เข้าร่วมต่อรอบวัด พร้อมคะแนนเต็ม แหล่งที่มา submission ที่เกี่ยวข้อง และผู้บันทึก; บังคับ `0 <= raw_score <= max_score` และ composite foreign key ป้องกันการเชื่อมข้ามโครงการ/organization
 - `education_research_score_history` — audit แบบ append-only ที่ trigger สร้างเมื่อคะแนนถูกเพิ่ม แก้ หรือลบ ผู้ใช้ทั่วไปอ่านได้ตามสิทธิ์โครงการแต่เขียนประวัติโดยตรงไม่ได้
 
@@ -75,6 +75,8 @@ Invariant สำคัญ:
 - ข้อมูลที่หายคือไม่มีแถว score ไม่ใช่คะแนน 0 และการวิเคราะห์ก่อน–หลังใช้เฉพาะ student เดียวกันที่มี observation ครบสองรอบ
 - สิทธิ์ข้อมูลระดับบุคคลมาจากเจ้าของห้องหรือ co-teacher `admin/manage` ไม่ใช่เพียงเป็นสมาชิก organization; co-teacher `view` เห็นได้เฉพาะ metadata โครงการ/รอบวัด
 - ตารางใหม่ทุกตารางมี `org_id`, index สำหรับ join/RLS และ RLS ป้องกันการเรียก API โดยตรงจากนักเรียนหรือผู้ใช้คนละห้อง
+- `questions.is_research_snapshot` แยกสำเนาเครื่องมือวัดออกจากโจทย์ในคลัง แต่ละสำเนาผูก `research_snapshot_project_id`, เก็บ source ID เพื่ออ้างอิงย้อนหลังโดยไม่ใช้ foreign key และ trigger ห้ามแก้หรือลบสำเนาหลังสร้าง
+- assignment ออนไลน์ของโครงการต้องใช้ snapshot IDs ของ measurement นั้น เป็น `exam/online` ทำได้ครั้งเดียว และคะแนนเต็มคำนวณซ้ำจากโครงสร้างสำเนาในฐานข้อมูล ห้ามเชื่อค่าคะแนนเต็มจาก client
 
 ## Snapshot ที่ต้องคงที่ต่อ attempt
 

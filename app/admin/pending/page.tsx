@@ -6,6 +6,7 @@ export default async function AdminPendingPage() {
   const { data: questions } = await admin
     .from('questions')
     .select('*, question_categories(name), users:created_by(full_name, email)')
+    .eq('is_research_snapshot', false)
     .eq('visibility', 'pending')
     .order('created_at', { ascending: true })
 

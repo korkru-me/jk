@@ -24,6 +24,7 @@ export async function exportQuestions(ids: string[]) {
     .select('*, question_categories(name)')
     .in('id', ids)
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
 
   if (error) return { error: error.message }
   const rows = (data ?? []) as QuestionRow[]
@@ -97,6 +98,7 @@ export async function checkImportDuplicates(raw: string): Promise<
     .from('questions')
     .select('title, question_text')
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
 
   if (error) return { error: error.message }
 
@@ -248,7 +250,7 @@ export async function importQuestionsFromFile(
   const [{ data: categories }, { data: existing }] = await Promise.all([
     supabase.from('question_categories').select('id, name, parent_id'),
     duplicateDecision === 'rename'
-      ? supabase.from('questions').select('title').eq('created_by', user.id)
+      ? supabase.from('questions').select('title').eq('created_by', user.id).eq('is_research_snapshot', false)
       : Promise.resolve({ data: [] as { title: string }[] }),
   ])
 

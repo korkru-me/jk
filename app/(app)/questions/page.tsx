@@ -136,7 +136,7 @@ function readTeamFilters(sp: Record<string, string | string[] | undefined>): Tea
 }
 
 function tagQuery(supabase: Awaited<ReturnType<typeof createClient>>) {
-  return supabase.from('questions').select('tags').not('tags', 'is', null)
+  return supabase.from('questions').select('tags').eq('is_research_snapshot', false).not('tags', 'is', null)
 }
 
 /**
@@ -196,6 +196,7 @@ export default async function QuestionsPage({
     .from('questions')
     .select(`${summaryFields}, question_categories(name)`, { count: 'exact' })
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
     .or('group_id.is.null,order_in_group.eq.0')
 
   // Tags take part in the search, so the words have to be resolved against the
@@ -224,6 +225,7 @@ export default async function QuestionsPage({
       .from('questions')
       .select('id', { count: 'exact', head: true })
       .eq('created_by', user.id)
+      .eq('is_research_snapshot', false)
       .or('group_id.is.null,order_in_group.eq.0'),
     ownTagsPromise,
   ])
@@ -278,6 +280,7 @@ export default async function QuestionsPage({
       let teamQuery = supabase
         .from('questions')
         .select(teamSelect, { count: 'exact' })
+        .eq('is_research_snapshot', false)
         .or(unionFilter)
         .or('group_id.is.null,order_in_group.eq.0')
 
@@ -318,6 +321,7 @@ export default async function QuestionsPage({
         supabase
           .from('questions')
           .select(teamSelect)
+          .eq('is_research_snapshot', false)
           .or(ownedByTeam)
           .or('group_id.is.null,order_in_group.eq.0')
           .order('created_at', { ascending: false })
@@ -332,6 +336,7 @@ export default async function QuestionsPage({
           const { data } = await supabase
             .from('questions')
             .select(teamSelect)
+            .eq('is_research_snapshot', false)
             .in('id', sharedIds.slice(i, i + 500))
             .or('group_id.is.null,order_in_group.eq.0')
           for (const q of (data ?? []) as unknown as QuestionWithCreator[]) byId.set(q.id, q)

@@ -53,6 +53,7 @@ export default async function DashboardPage() {
         .from('questions')
         .select('id, title, question_type', { count: 'exact' })
         .eq('created_by', user.id)
+        .eq('is_research_snapshot', false)
         // Grouped questions are stored one row per member; only the first row
         // represents the question in a list.
         .or('group_id.is.null,order_in_group.eq.0')

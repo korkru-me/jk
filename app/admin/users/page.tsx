@@ -25,6 +25,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
   const { data: qCounts } = await admin
     .from('questions')
     .select('created_by')
+    .eq('is_research_snapshot', false)
 
   const countMap: Record<string, number> = {}
   for (const q of qCounts ?? []) {

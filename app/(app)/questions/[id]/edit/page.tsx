@@ -30,6 +30,7 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
       .from('questions')
       .select('*')
       .eq('id', id)
+      .eq('is_research_snapshot', false)
       .single(),
     getAllTags(),
     getFormulaPresets(),
