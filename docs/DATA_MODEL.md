@@ -52,6 +52,8 @@ Invariant สำคัญ:
 - `assignment_extensions` — ขยายเวลารายคน
 - `submissions` — attempt ต่อผู้เรียน
 - `submission_answers` — answer snapshot และคะแนนรายข้อ
+- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด
+- `exam_proctor_events` — browser-level event แบบ append-only ที่เก็บเฉพาะชนิดเหตุการณ์ เวลา และ foreign keys; ไม่เก็บภาพหน้าจอ เสียง กล้อง เนื้อหาคำตอบ หรือ keystroke
 
 `assignments.classroom_id` ยังมีไว้เป็น home/legacy reference อย่า query เฉพาะ field นี้เมื่อความหมายต้องรองรับหลายห้อง
 
@@ -62,6 +64,8 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - นักเรียนอาจเข้าร่วมห้องผ่าน `classroom_students` โดยไม่เป็น `organization_members`; สิทธิ์เริ่ม attempt ต้องมาจาก assignment ที่เผยแพร่และ roster ของห้อง
 - `assignments.access_code`, `submission_answers.correct_answer`/คะแนน และ answer-bearing fields ใน `questions` เป็น server-only ระหว่าง attempt; RLS แบบรายแถวปกป้องคอลัมน์ลับกับคอลัมน์สาธารณะในแถวเดียวกันไม่ได้ จึงห้ามเปิด full row ให้นักเรียนแล้วพยายาม strip เฉพาะใน UI
 - browser role ไม่มีสิทธิ์ `INSERT/UPDATE/DELETE` ตาราง `submissions` และ `submission_answers`; mutation ต้องผ่าน server action ที่ตรวจเจ้าของ/ครู สถานะ และเวลา ก่อนใช้ service role แบบ exact resource
+- browser role ไม่มีสิทธิ์เขียน `exam_proctor_sessions`/`exam_proctor_events` โดยตรง; `record_exam_proctor_signal` เรียกได้เฉพาะ service role หลัง Server Action ตรวจว่าเป็น attempt ของนักเรียนคนนั้น ยัง `in_progress`, เป็นข้อสอบ online และเปิด proctoring ส่วนครูอ่านผ่าน RLS ตาม assignment ที่จัดการได้
+- `assignments.proctoring_enabled`, `fullscreen_required` และ `block_clipboard` เป็นการตั้งค่าแรงเสียดทาน/สัญญาณระดับ browser ไม่ใช่ kiosk mode หรือ security boundary; อายุข้อมูล proctor ยังใช้ lifecycle เดียวกับ submission/assignment และต้องกำหนด retention แยกก่อน production
 - นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
 
 ## วิจัยการศึกษา

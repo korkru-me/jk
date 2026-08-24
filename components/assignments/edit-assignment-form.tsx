@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize } from 'lucide-react'
 import { parseSections } from '@/lib/question-set-sections'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +39,7 @@ export type EditableAssignment = Pick<
   | 'end_at'
   | 'duration_minutes'
   | 'max_attempts'
+  | 'mode'
   | 'type'
   | 'score_strategy'
   | 'passing_type'
@@ -46,6 +47,9 @@ export type EditableAssignment = Pick<
   | 'show_results'
   | 'sections'
   | 'show_sections'
+  | 'proctoring_enabled'
+  | 'fullscreen_required'
+  | 'block_clipboard'
 >
 
 export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text'>
@@ -65,6 +69,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(a.score_strategy)
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
   const [showSections, setShowSections] = useState(a.show_sections !== false)
+  const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
+  const [fullscreenRequired, setFullscreenRequired] = useState(a.fullscreen_required)
+  const [blockClipboard, setBlockClipboard] = useState(a.block_clipboard)
   const assignmentSections = parseSections(a.sections)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
@@ -120,6 +127,9 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         display_max_score: displayMax,
         show_results: showResults,
         show_sections: showSections,
+        proctoring_enabled: proctoringEnabled,
+        fullscreen_required: fullscreenRequired,
+        block_clipboard: blockClipboard,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -139,6 +149,65 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
           <Textarea id="edit-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
         </div>
       </Card>
+
+      {a.mode === 'online' && a.type === 'exam' && (
+        <Card padding="xl" className="space-y-3">
+          <label className="flex items-center justify-between gap-4 cursor-pointer">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ครูเห็นสถานะออนไลน์ การออกจากแท็บ/เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={proctoringEnabled}
+              onChange={event => setProctoringEnabled(event.target.checked)}
+              className="accent-primary w-4 h-4 shrink-0"
+            />
+          </label>
+
+          {proctoringEnabled && (
+            <div className="space-y-3 border-t border-border pt-3 pl-11">
+              <label className="flex items-center justify-between gap-4 cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <Maximize className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
+                    <p className="text-xs text-muted-foreground">หน้าข้อสอบจะถูกบังจนกว่านักเรียนจะกลับเข้าเต็มจอ</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={fullscreenRequired}
+                  onChange={event => setFullscreenRequired(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-4 cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-foreground">ปิดการคัดลอก วาง และเมนูคลิกขวา</p>
+                  <p className="text-xs text-muted-foreground">เป็นแรงเสียดทานในเบราว์เซอร์ ไม่สามารถกันภาพถ่ายหรือเครื่องมือระดับระบบได้ทั้งหมด</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={blockClipboard}
+                  onChange={event => setBlockClipboard(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+              <p className="text-xs text-warning">
+                เวลาในข้อสอบยังเดินต่อเมื่อออกจากแท็บหรือเต็มจอ เพื่อไม่ให้ใช้การออกจากหน้าเป็นวิธีหยุดเวลา
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card padding="xl" className="space-y-4">
         <div className="flex items-center justify-between">

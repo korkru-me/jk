@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, Eye, Timer,
-  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale,
+  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, parseSections, type QuestionSetSection,
@@ -100,6 +100,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
   const [accessCode, setAccessCode] = useState('')
+  const [proctoringEnabled, setProctoringEnabled] = useState(false)
+  const [fullscreenRequired, setFullscreenRequired] = useState(false)
+  const [blockClipboard, setBlockClipboard] = useState(false)
   const [passingEnabled, setPassingEnabled] = useState(false)
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
@@ -252,6 +255,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
         require_work_image: requireWorkImage,
+        proctoring_enabled: proctoringEnabled,
+        fullscreen_required: fullscreenRequired,
+        block_clipboard: blockClipboard,
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -657,6 +663,65 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             })}
           </div>
 
+          {mode === 'online' && assignmentType === 'exam' && (
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <label className="flex items-center justify-between gap-4 cursor-pointer">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      ครูเห็นสถานะออนไลน์ การออกจากแท็บ/เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={proctoringEnabled}
+                  onChange={event => setProctoringEnabled(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+
+              {proctoringEnabled && (
+                <div className="space-y-2 border-t border-border pt-3 pl-11">
+                  <label className="flex items-center justify-between gap-4 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Maximize className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
+                        <p className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={fullscreenRequired}
+                      onChange={event => setFullscreenRequired(event.target.checked)}
+                      className="accent-primary w-4 h-4 shrink-0"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-4 cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">ปิดการคัดลอก วาง และเมนูคลิกขวา</p>
+                      <p className="text-xs text-muted-foreground">ลดการนำข้อความออกจากหน้า แต่ไม่สามารถกันภาพถ่ายหรือเครื่องมือระดับระบบได้ทั้งหมด</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={blockClipboard}
+                      onChange={event => setBlockClipboard(event.target.checked)}
+                      className="accent-primary w-4 h-4 shrink-0"
+                    />
+                  </label>
+                  <p className="text-xs text-warning">
+                    เวลาในข้อสอบยังเดินต่อเมื่อออกจากแท็บหรือเต็มจอ เพื่อไม่ให้ใช้การออกจากหน้าเป็นวิธีหยุดเวลา
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5">
               <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
@@ -783,6 +848,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
                 ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
                 ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
+                ...(mode === 'online' && assignmentType === 'exam' && proctoringEnabled
+                  ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
+                  : []),
                 { label: 'แสดงผล',    value: showResults === 'immediate' ? 'ทันทีหลังส่ง' : 'หลังพ้นกำหนดส่ง' },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">

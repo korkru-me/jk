@@ -45,10 +45,11 @@ export default async function TakeExamPage({
   if (!exam) redirect('/assignments')
   const { assignment, submission, answers } = exam
 
-  // Mock teacher config — replace with DB columns when added to schema
   const examConfig: ExamConfig = {
     isCalculatorEnabled: true,
-    isFullscreenEnforced: false,
+    proctoringEnabled: assignment.proctoring_enabled,
+    isFullscreenEnforced: assignment.fullscreen_required,
+    blockClipboard: assignment.block_clipboard,
     isWorkImageEnforced: assignment.require_work_image ?? true,
   }
 

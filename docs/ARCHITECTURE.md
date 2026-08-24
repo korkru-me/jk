@@ -69,8 +69,9 @@
 5. ค่าตัวแปรสุ่ม เฉลย ลำดับข้อ และลำดับตัวเลือกถูกตรึงใน attempt
 6. `getExamTakingData()` อ่าน attempt ด้วย trusted server client หลังตรวจ owner แล้วแปลงผ่าน `toSafeExamAnswer()`; browser ไม่ได้รับ answer snapshot, สูตร, correct flags หรือ canonical ordering
 7. นักเรียนบันทึกคำตอบระหว่างทำผ่าน Server Action; direct browser mutation ของ `submissions`/`submission_answers` ถูก revoke
-8. เมื่อส่ง ระบบตรวจชนิดที่รองรับ และคงงานที่ต้องตรวจโดยครูไว้
-9. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
+8. หาก assignment เปิดคุมสอบ `useExamProctor()` ส่ง heartbeat/เหตุการณ์แบบ batch ไปยัง `recordProctorSignal()`; action ตรวจ session + exact attempt แล้วให้ service role เรียก RPC ที่ตรวจซ้ำและเขียน `exam_proctor_sessions`/`exam_proctor_events` แบบ atomic ครูรับการเปลี่ยนแปลงผ่าน Supabase Realtime ภายใต้ RLS
+9. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
+10. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
 
 ### โฮมรูม
 

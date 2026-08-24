@@ -538,6 +538,11 @@ export interface Assignment {
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   require_work_image: boolean
+  /** Browser-level presence/integrity signals. This is not kiosk-mode or an
+   * operating-system security boundary. */
+  proctoring_enabled: boolean
+  fullscreen_required: boolean
+  block_clipboard: boolean
   created_at: string
   updated_at: string
 }

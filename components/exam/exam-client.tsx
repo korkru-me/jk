@@ -9,6 +9,7 @@ import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
 import { useExamTimer } from '@/hooks/use-exam-timer'
 import { useOnlineStatus } from '@/hooks/use-online-status'
+import { useExamProctor } from '@/hooks/use-exam-proctor'
 import { WorkImageUpload } from './work-image-upload'
 import { FileSubmissionUpload } from './file-submission-upload'
 import { Button } from '@/components/ui/button'
@@ -76,7 +77,9 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
 
 export interface ExamConfig {
   isCalculatorEnabled: boolean
+  proctoringEnabled: boolean
   isFullscreenEnforced: boolean
+  blockClipboard: boolean
   // Assignment-level override of each question's own requires_work_image —
   // asked of the teacher at assignment-creation time; false switches the
   // work-image requirement off for every question in this assignment.
@@ -158,6 +161,11 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
   const { showFullscreenWarning, requestFullscreen } = useFullscreenGuard(config.isFullscreenEnforced)
+  const { status: proctorStatus } = useExamProctor({
+    enabled: config.proctoringEnabled && !previewMode,
+    submissionId,
+    blockClipboard: config.blockClipboard,
+  })
 
   // ── Auto-sync whatever went unsaved while offline ───────────────────────────
   const isOnline = useOnlineStatus({
@@ -685,25 +693,29 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
       {/* ── Fullscreen warning overlay ─────────────────────────────────────── */}
       {config.isFullscreenEnforced && showFullscreenWarning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-destructive/15 backdrop-blur-sm">
-          <div className="text-center max-w-md px-8">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
+          <Card padding="2xl" elevation="xl" className="text-center max-w-md">
             <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-5">
               <ShieldAlert size={40} className="text-destructive" />
             </div>
-            <h2 className="text-2xl font-black text-white mb-2">⚠️ ออกจากโหมดเต็มจอ</h2>
-            <p className="text-destructive text-sm mb-6">
+            <h2 className="text-2xl font-black text-foreground mb-2">ออกจากโหมดเต็มจอ</h2>
+            <p className="text-muted-foreground text-sm mb-6">
               ระบบตรวจจับว่าคุณออกจากโหมดเต็มจอ<br />
               กรุณากลับสู่โหมดเต็มจอเพื่อทำข้อสอบต่อ
             </p>
-            <button
+            <Button
               onClick={enterFullscreen}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold px-8 py-3 rounded-xl transition-colors flex items-center gap-2 mx-auto"
+              variant="destructive"
+              size="lg"
+              className="mx-auto"
             >
               <Maximize size={18} />
               กลับสู่โหมดเต็มจอ
-            </button>
-            <p className="text-destructive/60 text-xs mt-4">เหตุการณ์นี้ถูกบันทึกไว้ในระบบ</p>
-          </div>
+            </Button>
+            <p className="text-muted-foreground text-xs mt-4">
+              {config.proctoringEnabled ? 'เหตุการณ์นี้จะแสดงในห้องคุมสอบของครู' : 'กรุณากลับเข้าเต็มจอเพื่อทำต่อ'}
+            </p>
+          </Card>
         </div>
       )}
 
@@ -745,6 +757,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             pendingSync={pendingCount}
             tabSwitchCount={tabSwitchCount}
             config={config}
+            proctorStatus={proctorStatus}
             showCalculator={showCalculator}
             showFormulaSheet={showFormulaSheet}
             showScratchpad={showScratchpad}
@@ -975,6 +988,7 @@ function PreviewResultSummary({
 
 function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
+  proctorStatus,
   config, showCalculator, showFormulaSheet, showScratchpad,
   onToggleCalc, onToggleFormula, onToggleScratch, onFocusMode, toolBtn,
 }: {
@@ -982,6 +996,7 @@ function ExamToolbar({
   isOnline: boolean
   pendingSync: number
   tabSwitchCount: number
+  proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
   config: ExamConfig
   showCalculator: boolean
   showFormulaSheet: boolean
@@ -1035,6 +1050,18 @@ function ExamToolbar({
         {tabSwitchCount > 0 && (
           <span className="text-destructive flex items-center gap-1">
             <ShieldAlert size={11} /> สลับแท็บ {tabSwitchCount}×
+          </span>
+        )}
+        {config.proctoringEnabled && (
+          <span className={`flex items-center gap-1 ${
+            proctorStatus === 'connected' ? 'text-success' : 'text-warning'
+          }`}>
+            <ShieldAlert size={11} />
+            {proctorStatus === 'connected'
+              ? 'เชื่อมห้องคุมสอบแล้ว'
+              : proctorStatus === 'offline'
+                ? 'ห้องคุมสอบรอเชื่อมต่อ'
+                : 'กำลังเชื่อมห้องคุมสอบ'}
           </span>
         )}
       </div>

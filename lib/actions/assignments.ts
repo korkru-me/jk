@@ -37,6 +37,9 @@ interface CreateAssignmentData {
   passing_type?: 'score' | 'percent' | null
   passing_value?: number | null
   require_work_image?: boolean
+  proctoring_enabled?: boolean
+  fullscreen_required?: boolean
+  block_clipboard?: boolean
   status?: AssignmentStatus
 }
 
@@ -74,6 +77,7 @@ export async function createAssignment(data: CreateAssignmentData) {
 
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
+  const proctoringEnabled = data.mode === 'online' && data.type === 'exam' && data.proctoring_enabled === true
 
   // Only keep overrides for questions actually in this assignment, with a
   // valid positive point value — drops anything a tampered client might add.
@@ -119,6 +123,9 @@ export async function createAssignment(data: CreateAssignmentData) {
       passing_type: data.passing_type ?? null,
       passing_value: data.passing_value ?? null,
       require_work_image: data.require_work_image ?? true,
+      proctoring_enabled: proctoringEnabled,
+      fullscreen_required: proctoringEnabled && data.fullscreen_required === true,
+      block_clipboard: proctoringEnabled && data.block_clipboard === true,
       status: data.status ?? 'draft',
     })
     .select('id')
@@ -172,6 +179,9 @@ interface UpdateAssignmentData {
   /** Only the visibility of the frozen แฟ้มย่อย is editable after the fact —
    *  the grouping itself belongs to the แฟ้มโจทย์ this งาน came from. */
   show_sections?: boolean
+  proctoring_enabled: boolean
+  fullscreen_required: boolean
+  block_clipboard: boolean
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -190,7 +200,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids')
+    .select('question_ids, type, mode')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -207,6 +217,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
     ? data.display_max_score
     : null
+  const proctoringEnabled = existing.mode === 'online' && existing.type === 'exam' && data.proctoring_enabled
 
   const { error } = await supabase
     .from('assignments')
@@ -224,6 +235,9 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       question_points: questionPoints,
       display_max_score: displayMaxScore,
       show_results: data.show_results,
+      proctoring_enabled: proctoringEnabled,
+      fullscreen_required: proctoringEnabled && data.fullscreen_required,
+      block_clipboard: proctoringEnabled && data.block_clipboard,
     })
     .eq('id', id)
 
@@ -313,6 +327,9 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       passing_type: source.passing_type,
       passing_value: source.passing_value,
       require_work_image: source.require_work_image,
+      proctoring_enabled: source.proctoring_enabled ?? false,
+      fullscreen_required: source.fullscreen_required ?? false,
+      block_clipboard: source.block_clipboard ?? false,
       status: 'draft',
     })
     .select('id')

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
-  AlertCircle, Activity, Copy, Pencil, Eye,
+  AlertCircle, Activity, Copy, Pencil, Eye, Radio,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
@@ -190,6 +190,13 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             <Link href={`/assignments/${a.id}/preview`} target="_blank">
               <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
                 <Eye className="w-3.5 h-3.5" /> ดูตัวอย่างมุมมองนักเรียน
+              </Button>
+            </Link>
+          )}
+          {a.mode === 'online' && a.type === 'exam' && (
+            <Link href={`/assignments/${a.id}/proctor`}>
+              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
+                <Radio className="w-3.5 h-3.5" /> ห้องคุมสอบสด
               </Button>
             </Link>
           )}

@@ -15,6 +15,9 @@ export interface ExamTakingData {
     require_work_image: boolean | null
     sections: unknown
     show_sections: boolean | null
+    proctoring_enabled: boolean
+    fullscreen_required: boolean
+    block_clipboard: boolean
   }
   answers: SafeExamAnswer[]
 }
@@ -32,7 +35,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, assignments(duration_minutes, require_work_image, sections, show_sections)')
+    .select('id, started_at, assignment_id, student_id, status, assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -71,6 +74,9 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       require_work_image: assignment.require_work_image,
       sections: assignment.sections,
       show_sections: assignment.show_sections,
+      proctoring_enabled: assignment.proctoring_enabled ?? false,
+      fullscreen_required: assignment.fullscreen_required ?? false,
+      block_clipboard: assignment.block_clipboard ?? false,
     },
     answers,
   }

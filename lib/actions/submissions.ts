@@ -384,6 +384,19 @@ async function gradeAndFinalizeSubmission(
 
   if (error) return { error: error.message }
 
+  // If this attempt used the live proctor room, stop its presence heartbeat
+  // immediately. This is best-effort supporting state; a failure here must
+  // never roll back or hide an otherwise successful exam submission.
+  await admin
+    .from('exam_proctor_sessions')
+    .update({
+      is_online: false,
+      completed_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('submission_id', submissionId)
+
   revalidatePath(`/submissions/${submissionId}`)
   return { success: true, totalScore }
 }
