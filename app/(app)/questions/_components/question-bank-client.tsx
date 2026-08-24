@@ -9,6 +9,7 @@ import {
   Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -18,14 +19,42 @@ import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import type { QuestionStats } from '@/lib/question-stats'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
-import type { QuestionDetailWithCategory, QuestionWithCategory, QuestionWithCreator } from '../page'
+import type {
+  QuestionDetailWithCategory,
+  QuestionSearchResultGroup,
+  QuestionWithCategory,
+  QuestionWithCreator,
+} from '../page'
 import { questionExcerpt } from '@/lib/question-display'
 import { mergeTagPool } from '@/lib/tag-suggest'
+import type {
+  QuestionSearchGroup,
+  QuestionSearchGroupCounts,
+  QuestionSearchScope,
+} from '@/lib/question-search'
 
 const PreviewModal = dynamic(
   () => import('./preview-modal').then(mod => mod.PreviewModal),
   { loading: () => <PreviewLoadingOverlay /> }
 )
+
+const SEARCH_GROUP_META: Record<QuestionSearchGroup, { label: string; heading: string; description: string }> = {
+  tag: {
+    label: 'แท็ก',
+    heading: 'พบจากแท็ก',
+    description: 'คำค้นตรงกับแท็กที่ใช้จัดหมวดหมู่โจทย์',
+  },
+  title: {
+    label: 'ชื่อโจทย์',
+    heading: 'พบจากชื่อโจทย์',
+    description: 'คำค้นตรงกับชื่อโจทย์',
+  },
+  content: {
+    label: 'เนื้อหาโจทย์',
+    heading: 'พบจากเนื้อหาโจทย์',
+    description: 'คำค้นตรงกับข้อความภายในโจทย์',
+  },
+}
 
 /** How many tags the filter shows before asking to be expanded. */
 const TAG_FILTER_PREVIEW = 12
@@ -44,14 +73,18 @@ interface Props {
   /** Every tag used in this teacher's own bank, most-used first. */
   allTags: string[]
   /** Search and filters, as read from the URL by the page. */
-  filters: { q: string; type: string; difficulty: string; tag: string; page: number }
+  filters: { q: string; match: QuestionSearchScope; type: string; difficulty: string; tag: string; page: number }
   /** Questions matching the current filters — the number being paged through. */
   matchCount: number
+  searchGroups: QuestionSearchResultGroup<QuestionWithCategory>[]
+  searchGroupCounts: QuestionSearchGroupCounts
   /** Every question the user owns, regardless of filters (for the tab badge). */
   totalCount: number
   perPage: number
-  teamFilters: { q: string; team: string; page: number }
+  teamFilters: { q: string; match: QuestionSearchScope; team: string; page: number }
   teamMatchCount: number
+  teamSearchGroups: QuestionSearchResultGroup<QuestionWithCreator>[]
+  teamSearchGroupCounts: QuestionSearchGroupCounts
   /** False when the share list was too large to page in one query — the team
    *  list then arrives whole and its controls are hidden. */
   teamPaged: boolean
@@ -59,8 +92,8 @@ interface Props {
 
 export function QuestionBankClient({
   questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
-  allTags, filters, matchCount, totalCount, perPage,
-  teamFilters, teamMatchCount, teamPaged,
+  allTags, filters, matchCount, searchGroups, searchGroupCounts, totalCount, perPage,
+  teamFilters, teamMatchCount, teamSearchGroups, teamSearchGroupCounts, teamPaged,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
@@ -168,15 +201,9 @@ export function QuestionBankClient({
     return activeTag && !head.includes(activeTag) ? [...head, activeTag] : head
   }, [allTags, showAllTags, activeTag])
 
-  // Already filtered by the server when it could page; otherwise the whole
-  // list arrived and still needs narrowing here.
-  const filteredTeam = useMemo(() => teamPaged ? teamQuestions : teamQuestions.filter(q => {
-    if (teamFilter !== 'all' && q.org_id !== teamFilter && !q.shared_org_ids?.includes(teamFilter)) return false
-    // Excerpt, not the raw value: imported questions carry HTML, and matching
-    // that makes "class" a hit while a phrase split by a tag is a miss.
-    if (teamSearch && !q.title.toLowerCase().includes(teamSearch.toLowerCase()) && !questionExcerpt(q.question_text).toLowerCase().includes(teamSearch.toLowerCase())) return false
-    return true
-  }), [teamPaged, teamQuestions, teamSearch, teamFilter])
+  // The server returns only the current team slice, including the rare
+  // unpaged fallback used when a share list is too large for one URL.
+  const filteredTeam = teamQuestions
 
   return (
     <div className="space-y-4">
@@ -263,6 +290,7 @@ export function QuestionBankClient({
             {searchDraft && (
               <button
                 onClick={() => setSearchDraft('')}
+                aria-label="ล้างคำค้นหาโจทย์ของฉัน"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -300,6 +328,15 @@ export function QuestionBankClient({
             </button>
           </div>
         </div>
+
+        {search && (
+          <SearchGroupSelector
+            value={filters.match}
+            counts={searchGroupCounts}
+            onChange={match => setParams({ match, page: null })}
+            label="เลือกแหล่งที่พบคำค้นในโจทย์ของฉัน"
+          />
+        )}
 
         {/* Expanded filter panel */}
         {showFilters && (
@@ -426,6 +463,32 @@ export function QuestionBankClient({
             <p className="text-muted-foreground font-medium">ไม่พบโจทย์ที่ตรงกัน</p>
             <p className="text-sm text-muted-foreground mt-1">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
           </Card>
+        ) : search ? (
+          <div className="space-y-7">
+            {searchGroups.map(result => result.questions.length > 0 && (
+              <section key={result.group} aria-labelledby={`own-search-${result.group}`} className="space-y-3">
+                <SearchGroupHeading
+                  id={`own-search-${result.group}`}
+                  group={result.group}
+                  count={searchGroupCounts[result.group]}
+                />
+                <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'space-y-2.5'}>
+                  {result.questions.map(q => (
+                    <QuestionCard
+                      key={q.id}
+                      question={q}
+                      isFlagged={flaggedIds.has(q.id)}
+                      onPreview={() => void openPreview(q.id)}
+                      onToggleFlag={() => toggleFlag(q.id)}
+                      myTeams={myTeams}
+                      stats={stats[q.id]}
+                      allTags={tagPool}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
         ) : (
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'space-y-2.5'}>
             {filtered.map(q => (
@@ -502,6 +565,15 @@ export function QuestionBankClient({
                   )}
                 </div>
 
+                {teamSearch && (
+                  <SearchGroupSelector
+                    value={teamFilters.match}
+                    counts={teamSearchGroupCounts}
+                    onChange={match => setParams({ teammatch: match, tpage: null })}
+                    label="เลือกแหล่งที่พบคำค้นในโจทย์ที่แชร์ในทีม"
+                  />
+                )}
+
                 {teamMatchCount === 0 && !teamFilters.q && !teamFilters.team ? (
                   <Card edge="ring" className="text-center py-24">
                     <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -517,11 +589,30 @@ export function QuestionBankClient({
                   </Card>
                 ) : (
                   <>
-                    <div className="space-y-2.5">
-                      {filteredTeam.map(q => (
-                        <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
-                      ))}
-                    </div>
+                    {teamSearch ? (
+                      <div className="space-y-7">
+                        {teamSearchGroups.map(result => result.questions.length > 0 && (
+                          <section key={result.group} aria-labelledby={`team-search-${result.group}`} className="space-y-3">
+                            <SearchGroupHeading
+                              id={`team-search-${result.group}`}
+                              group={result.group}
+                              count={teamSearchGroupCounts[result.group]}
+                            />
+                            <div className="space-y-2.5">
+                              {result.questions.map(q => (
+                                <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {filteredTeam.map(q => (
+                          <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
+                        ))}
+                      </div>
+                    )}
                     {teamPaged && teamTotalPages > 1 && (
                       <Pagination
                         page={teamFilters.page}
@@ -551,6 +642,67 @@ export function QuestionBankClient({
           stats={stats[previewQ.id]}
         />
       )}
+    </div>
+  )
+}
+
+function SearchGroupSelector({ value, counts, onChange, label }: {
+  value: QuestionSearchScope
+  counts: QuestionSearchGroupCounts
+  onChange: (value: QuestionSearchScope) => void
+  label: string
+}) {
+  const options: { value: QuestionSearchScope; label: string; count: number }[] = [
+    {
+      value: 'all',
+      label: 'ทั้งหมด',
+      count: counts.tag + counts.title + counts.content,
+    },
+    ...(['tag', 'title', 'content'] as const).map(group => ({
+      value: group,
+      label: SEARCH_GROUP_META[group].label,
+      count: counts[group],
+    })),
+  ]
+
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-muted-foreground">
+        เรียงผลจากแท็ก → ชื่อโจทย์ → เนื้อหาโจทย์ และแสดงแต่ละข้อเพียงกลุ่มเดียว
+      </p>
+      <div className="flex flex-wrap items-center gap-1" role="group" aria-label={label}>
+        <span className="mr-1 text-xs font-medium text-muted-foreground">แสดง:</span>
+        {options.map(option => (
+          <Button
+            key={option.value}
+            type="button"
+            size="xs"
+            variant={value === option.value ? 'default' : 'outline'}
+            aria-pressed={value === option.value}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+            <span aria-hidden="true">{option.count}</span>
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SearchGroupHeading({ id, group, count }: {
+  id: string
+  group: QuestionSearchGroup
+  count: number
+}) {
+  const meta = SEARCH_GROUP_META[group]
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border pb-2">
+      <div>
+        <h3 id={id} className="text-sm font-semibold text-foreground">{meta.heading}</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{meta.description}</p>
+      </div>
+      <Badge variant="outline">{count} ข้อ</Badge>
     </div>
   )
 }

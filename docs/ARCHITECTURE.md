@@ -117,6 +117,7 @@
 ## Database performance
 
 - App shell ดึงเฉพาะ `id`, `email`, `full_name` และ `role`; หน้ารวมห้องเรียนใช้ embedded relation counts สำหรับ roster และ `assignment_classrooms` แทน query ตาม `assignments.classroom_id` รุ่นเก่า
+- การค้นหาในคลังโจทย์ยังคงกรองและแบ่งหน้าที่ฐานข้อมูล: เมื่อมีคำค้น server นับกลุ่มแท็ก/ชื่อ/เนื้อหาแบบไม่ซ้ำตามลำดับความสำคัญ แล้วใช้ `questionSearchGroupSlices` ประกอบผลหน้าปัจจุบัน หน้าแรกดึงช่วงสั้นของแต่ละกลุ่มพร้อมจำนวนใน database round เดียว ส่วนหน้าถัดไปนับก่อนคำนวณ offset และทุกกรณีส่งเข้า browser ไม่เกิน 24 ข้อแทนการส่งคลังทั้งหมดไปจัดกลุ่ม
 - Migration `20260819090000_core_query_indexes.sql` เติม index สำหรับ query หลักและ `SECURITY DEFINER` RLS helpers โดยไม่เปลี่ยนขอบเขตสิทธิ์
 - Migration `20260819091000_rls_initplan_performance.sql` ทำให้ direct `auth.uid()` ใน policy หลักถูกคำนวณครั้งเดียวต่อ query โดยรักษาเงื่อนไขสิทธิ์เดิม
 - `classroom_students` ต้องมี index ที่ขึ้นต้นด้วย `student_id`; unique index เดิมขึ้นต้นด้วย `classroom_id` และใช้แทนกันไม่ได้

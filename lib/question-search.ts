@@ -22,6 +22,29 @@ export interface SearchableQuestion {
   tags?: string[] | null
 }
 
+export const QUESTION_SEARCH_GROUPS = ['tag', 'title', 'content'] as const
+export type QuestionSearchGroup = (typeof QUESTION_SEARCH_GROUPS)[number]
+export type QuestionSearchScope = 'all' | QuestionSearchGroup
+
+export interface QuestionSearchGroupFilters {
+  /** The existing broad search rule: every term must match somewhere. */
+  broadOrClauses: string[]
+  /** Tags reached by at least one term, using the same cap as the broad rule. */
+  matchingTags: string[]
+  /** One OR clause that asks whether at least one term appears in the title. */
+  titleOrClause: string
+  /** LIKE patterns used to exclude every possible title match. */
+  titlePatterns: string[]
+  /** Raw PostgREST array literal for a `not.ov` filter. */
+  matchingTagsLiteral: string
+}
+
+export type QuestionSearchGroupCounts = Record<QuestionSearchGroup, number>
+
+export type QuestionSearchGroupSlices = Partial<
+  Record<QuestionSearchGroup, { from: number; to: number }>
+>
+
 /** Case-folded, whitespace-collapsed — the form both sides of a match take. */
 function normalize(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toLowerCase()
@@ -53,6 +76,31 @@ export function matchesSearch(q: SearchableQuestion, search: string): boolean {
   if (terms.length === 0) return true
   const text = haystack(q)
   return terms.every(term => text.includes(term))
+}
+
+/**
+ * Why a broad search result was found, with the priority teachers see in the
+ * bank: tag first, then title, then body content. A result belongs to exactly
+ * one group even when the same word appears in more than one field.
+ *
+ * For a multi-word search, all terms still have to match somewhere. Once that
+ * is true, any tag hit wins; otherwise any title hit wins; the remainder was
+ * found entirely through the readable question body.
+ */
+export function questionSearchGroup(
+  q: SearchableQuestion,
+  search: string,
+): QuestionSearchGroup | null {
+  const terms = searchTerms(search)
+  if (terms.length === 0 || !matchesSearch(q, search)) return null
+
+  const tags = (q.tags ?? []).map(normalize)
+  if (terms.some(term => tags.some(tag => tag.includes(term)))) return 'tag'
+
+  const title = normalize(q.title)
+  if (terms.some(term => title.includes(term))) return 'title'
+
+  return 'content'
 }
 
 /** True when the question carries every tag being filtered on. */
@@ -97,6 +145,80 @@ export function tagsMatchingTerm(tagUniverse: string[], term: string): string[] 
 /** PostgREST needs a value with commas, dots or braces in it quoted. */
 function quoteForPostgrest(value: string): string {
   return `"${value.replace(/[\\"]/g, m => `\\${m}`)}"`
+}
+
+function tagsReachedByTerms(tagUniverse: string[], terms: string[]): string[] {
+  const unique = new Set<string>()
+  for (const term of terms) {
+    for (const tag of tagsMatchingTerm(tagUniverse, term).slice(0, 100)) unique.add(tag)
+  }
+  return [...unique]
+}
+
+/**
+ * Database filter pieces for the three exclusive result groups.
+ *
+ * The page first applies `broadOrClauses`, then:
+ * - tag: overlaps `matchingTags`;
+ * - title: does not overlap those tags, and matches `titleOrClause`;
+ * - content: does not overlap those tags, and excludes every `titlePatterns`
+ *   entry.
+ *
+ * This mirrors `questionSearchGroup` without asking the browser to download a
+ * large bank merely to classify it.
+ */
+export function questionSearchGroupFilters(
+  search: string,
+  tagUniverse: string[] = [],
+): QuestionSearchGroupFilters {
+  const terms = searchTerms(search)
+  const titlePatterns = terms.map(term => `%${escapeLike(term)}%`)
+  const matchingTags = tagsReachedByTerms(tagUniverse, terms)
+
+  return {
+    broadOrClauses: questionSearchOrClauses(search, tagUniverse),
+    matchingTags,
+    titleOrClause: titlePatterns
+      .map(pattern => `title.ilike.${quoteForPostgrest(pattern)}`)
+      .join(','),
+    titlePatterns,
+    matchingTagsLiteral: `{${matchingTags.map(quoteForPostgrest).join(',')}}`,
+  }
+}
+
+/**
+ * Slice one ordinary page across the ordered groups. The returned offsets are
+ * relative to each group, so a page can end with title results and continue
+ * with content results without duplicates or oversized payloads.
+ */
+export function questionSearchGroupSlices(
+  counts: QuestionSearchGroupCounts,
+  scope: QuestionSearchScope,
+  page: number,
+  perPage: number,
+): QuestionSearchGroupSlices {
+  if (perPage <= 0) return {}
+
+  const visibleGroups = scope === 'all' ? QUESTION_SEARCH_GROUPS : [scope]
+  const pageStart = Math.max(0, page - 1) * perPage
+  const pageEnd = pageStart + perPage
+  let groupStart = 0
+  const slices: QuestionSearchGroupSlices = {}
+
+  for (const group of visibleGroups) {
+    const groupEnd = groupStart + counts[group]
+    const intersectionStart = Math.max(pageStart, groupStart)
+    const intersectionEnd = Math.min(pageEnd, groupEnd)
+    if (intersectionStart < intersectionEnd) {
+      slices[group] = {
+        from: intersectionStart - groupStart,
+        to: intersectionEnd - groupStart - 1,
+      }
+    }
+    groupStart = groupEnd
+  }
+
+  return slices
 }
 
 /**
