@@ -17,6 +17,7 @@ const teacherNav: NavItem[] = [
   { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
   { href: '/questions', label: 'คลังโจทย์', icon: '📚' },
   { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
+  { href: '/research', label: 'วิจัยการศึกษา', icon: '🧪' },
   { href: '/settings/profile', label: 'ตั้งค่า', icon: '⚙️' },
 ]
 

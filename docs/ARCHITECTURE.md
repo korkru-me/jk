@@ -1,6 +1,6 @@
 # Architecture
 
-อัปเดตล่าสุด: 19 สิงหาคม 2026
+อัปเดตล่าสุด: 24 สิงหาคม 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
 
@@ -79,6 +79,14 @@
 4. แสดง compliance, ปฏิทิน และภาพรวมแก่ครูประจำชั้นหรือนักเรียนตามสิทธิ์
 
 โฮมรูมไม่ควรสร้าง assignment ของตัวเองตามโมเดลปัจจุบัน
+
+### วิจัยการศึกษา
+
+1. `/research` เป็น Server Component และอ่านโครงการผ่าน session-bound Supabase client เพื่อให้ RLS เป็นขอบเขตหลัก หน้า production ไม่เติมข้อมูลตัวอย่างเมื่อไม่มีโครงการ
+2. โครงการผูกกับ subject classroom เดียว ผู้เข้าร่วมถูกตรึงจาก roster และรอบวัดก่อน/หลังอาจเชื่อม assignment เดิมของห้องเรียน
+3. คะแนนแต่ละค่าผ่าน composite foreign keys ที่ยืนยัน project/participant/measurement/org เดียวกัน และ trigger สร้าง audit history อัตโนมัติ
+4. RLS แยก project metadata ออกจาก student-level scores: co-teacher `view` อ่าน metadata ได้ แต่ข้อมูลผู้เข้าร่วม คะแนน และประวัติต้องเป็น owner หรือ `admin/manage`
+5. นักเรียนไม่มี route หรือ policy สำหรับโมดูลวิจัย งานก่อน/หลังยังคงใช้ assignment/submission runtime เดิมเพื่อไม่สร้างระบบสอบซ้ำ
 
 ## Compatibility hotspots
 

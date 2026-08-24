@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 21 สิงหาคม 2026
+อัปเดตล่าสุด: 24 สิงหาคม 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -60,6 +60,21 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - `submissions.org_id` ต้องเท่ากับ `assignments.org_id` ของงานนั้น ไม่ใช่ organization หลักหรือ personal workspace ของนักเรียน
 - `submission_answers.org_id` ต้องเท่ากับ `submissions.org_id`
 - นักเรียนอาจเข้าร่วมห้องผ่าน `classroom_students` โดยไม่เป็น `organization_members`; สิทธิ์เริ่ม attempt ต้องมาจาก assignment ที่เผยแพร่และ roster ของห้อง
+
+## วิจัยการศึกษา
+
+- `education_research_projects` — โครงการหนึ่งกลุ่มวัดก่อน–หลัง ผูก `org_id`, ห้องเรียนรายวิชา ผู้สร้าง เกณฑ์ผ่าน ระดับนัยสำคัญ และ lifecycle; `org_id`, `classroom_id`, `created_by` และแบบแผนวิจัยเปลี่ยนไม่ได้หลังสร้าง
+- `education_research_participants` — cohort ที่ตรึงจาก roster ของห้อง โดยใช้ `student_id` เป็นตัวจับคู่ ไม่ใช้ชื่อหรือลำดับแถว และหนึ่งนักเรียนอยู่ได้หนึ่งครั้งต่อโครงการ
+- `education_research_measurements` — การตั้งค่ารอบ `pretest`/`posttest`, แหล่งคะแนน และ optional assignment ที่ต้องอยู่ในห้อง/organization เดียวกับโครงการ
+- `education_research_scores` — observation คะแนนหนึ่งค่าต่อผู้เข้าร่วมต่อรอบวัด พร้อมคะแนนเต็ม แหล่งที่มา submission ที่เกี่ยวข้อง และผู้บันทึก; บังคับ `0 <= raw_score <= max_score` และ composite foreign key ป้องกันการเชื่อมข้ามโครงการ/organization
+- `education_research_score_history` — audit แบบ append-only ที่ trigger สร้างเมื่อคะแนนถูกเพิ่ม แก้ หรือลบ ผู้ใช้ทั่วไปอ่านได้ตามสิทธิ์โครงการแต่เขียนประวัติโดยตรงไม่ได้
+
+Invariant สำคัญ:
+
+- โครงการรับได้เฉพาะ classroom ชนิด `subject`; ผู้เข้าร่วมใหม่ต้องเป็นสมาชิก roster ปัจจุบัน แต่การออกจากห้องภายหลังไม่ลบ cohort ที่ตรึงไว้โดยอัตโนมัติ
+- ข้อมูลที่หายคือไม่มีแถว score ไม่ใช่คะแนน 0 และการวิเคราะห์ก่อน–หลังใช้เฉพาะ student เดียวกันที่มี observation ครบสองรอบ
+- สิทธิ์ข้อมูลระดับบุคคลมาจากเจ้าของห้องหรือ co-teacher `admin/manage` ไม่ใช่เพียงเป็นสมาชิก organization; co-teacher `view` เห็นได้เฉพาะ metadata โครงการ/รอบวัด
+- ตารางใหม่ทุกตารางมี `org_id`, index สำหรับ join/RLS และ RLS ป้องกันการเรียก API โดยตรงจากนักเรียนหรือผู้ใช้คนละห้อง
 
 ## Snapshot ที่ต้องคงที่ต่อ attempt
 

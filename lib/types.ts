@@ -76,6 +76,93 @@ export interface ClassroomStudent {
   joined_at: string
 }
 
+export type EducationResearchDesign = 'one_group_pretest_posttest'
+export type EducationResearchProjectStatus =
+  | 'draft'
+  | 'collecting_pretest'
+  | 'teaching'
+  | 'collecting_posttest'
+  | 'ready_for_analysis'
+  | 'completed'
+  | 'archived'
+export type EducationResearchMeasurementType = 'pretest' | 'posttest'
+export type EducationResearchSourceType = 'korkru_exam' | 'manual' | 'excel'
+export type EducationResearchScoreHistoryAction = 'insert' | 'update' | 'delete'
+
+export interface EducationResearchProject {
+  id: string
+  org_id: string
+  classroom_id: string
+  created_by: string
+  title: string
+  topic: string
+  research_design: EducationResearchDesign
+  status: EducationResearchProjectStatus
+  passing_threshold_percent: number
+  significance_level: number
+  criterion_test_sides: 2
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EducationResearchParticipant {
+  id: string
+  org_id: string
+  project_id: string
+  student_id: string
+  roster_order: number | null
+  created_at: string
+}
+
+export interface EducationResearchMeasurement {
+  id: string
+  org_id: string
+  project_id: string
+  measurement_type: EducationResearchMeasurementType
+  source_type: EducationResearchSourceType | null
+  assignment_id: string | null
+  max_score: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EducationResearchScore {
+  id: string
+  org_id: string
+  project_id: string
+  participant_id: string
+  measurement_id: string
+  raw_score: number
+  max_score: number
+  score_source: EducationResearchSourceType
+  submission_id: string | null
+  recorded_by: string | null
+  updated_by: string | null
+  change_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EducationResearchScoreHistory {
+  id: number
+  org_id: string
+  project_id: string
+  score_id: string | null
+  participant_id: string
+  measurement_id: string
+  action: EducationResearchScoreHistoryAction
+  old_score: number | null
+  new_score: number | null
+  old_max_score: number | null
+  new_max_score: number | null
+  old_source: EducationResearchSourceType | null
+  new_source: EducationResearchSourceType | null
+  reason: string | null
+  changed_by: string | null
+  changed_at: string
+}
+
 export interface QuestionCategory {
   id: string
   name: string
