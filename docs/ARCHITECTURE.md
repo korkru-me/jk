@@ -70,8 +70,9 @@
 6. `getExamTakingData()` อ่าน attempt ด้วย trusted server client หลังตรวจ owner แล้วแปลงผ่าน `toSafeExamAnswer()`; browser ไม่ได้รับ answer snapshot, สูตร, correct flags หรือ canonical ordering
 7. นักเรียนบันทึกคำตอบระหว่างทำผ่าน Server Action; direct browser mutation ของ `submissions`/`submission_answers` ถูก revoke
 8. หาก assignment เปิดคุมสอบ `useExamProctor()` ส่ง heartbeat/เหตุการณ์แบบ batch พร้อม opaque id ต่อแท็บไปยัง `recordProctorSignal()`; action ตรวจ session + exact attempt แล้วให้ service role เรียก RPC ที่ตรวจซ้ำและเขียน lease ใน `exam_proctor_connections` พร้อมสรุป/เหตุการณ์ใน `exam_proctor_sessions`/`exam_proctor_events` แบบ atomic หากมี lease สดเกินหนึ่งจะสร้าง `concurrent_connection` ฝั่งฐานข้อมูล ครูรับการเปลี่ยนแปลงผ่าน Supabase Realtime ภายใต้ RLS ส่วน `exam_watermark_enabled` แสดงชื่อกับรหัส attempt เฉพาะบน client เพื่อเป็นแรงเสียดทานต่อการส่งภาพ ไม่ได้บันทึกภาพหน้าจอ
-9. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
-10. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
+9. `pg_cron` เรียก `purge_expired_exam_proctor_data()` วันละครั้งเพื่อลบ event, connection lease และ session summary ของ attempt ที่ไม่มี heartbeat เกิน 90 วัน; ครูที่มีสิทธิ์จัดการกดล้างราย assignment ได้ผ่าน Server Action + service-role-only RPC ซึ่งตรวจ actor ซ้ำและไม่ยอมล้างขณะมี session สด คำตอบ คะแนน และ submission ไม่อยู่ในขอบเขตการล้างนี้
+10. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
+11. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
 
 ### โฮมรูม
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeProctorEvents } from './exam-proctor'
+import {
+  EXAM_PROCTOR_RETENTION_DAYS,
+  normalizeProctorPurgeCounts,
+  totalPurgedProctorRecords,
+} from './exam-proctor-retention'
 
 describe('normalizeProctorEvents', () => {
   it('accepts only the allowlisted, minimal event shape', () => {
@@ -26,5 +31,26 @@ describe('normalizeProctorEvents', () => {
       type: 'window_blur',
       clientAt: new Date().toISOString(),
     })))).toBeNull()
+  })
+})
+
+describe('exam proctor retention boundary', () => {
+  it('publishes the 90-day product retention window', () => {
+    expect(EXAM_PROCTOR_RETENTION_DAYS).toBe(90)
+  })
+
+  it('accepts only complete non-negative integer purge counts', () => {
+    const counts = normalizeProctorPurgeCounts({
+      eventsDeleted: 12,
+      connectionsDeleted: 3,
+      sessionsDeleted: 2,
+      ignored: 'not exposed',
+    })
+    expect(counts).toEqual({ eventsDeleted: 12, connectionsDeleted: 3, sessionsDeleted: 2 })
+    expect(counts && totalPurgedProctorRecords(counts)).toBe(17)
+
+    expect(normalizeProctorPurgeCounts({ eventsDeleted: '12', connectionsDeleted: 3, sessionsDeleted: 2 })).toBeNull()
+    expect(normalizeProctorPurgeCounts({ eventsDeleted: 12, connectionsDeleted: -1, sessionsDeleted: 2 })).toBeNull()
+    expect(normalizeProctorPurgeCounts({ eventsDeleted: 12, connectionsDeleted: 3 })).toBeNull()
   })
 })

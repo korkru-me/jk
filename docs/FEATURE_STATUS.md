@@ -138,7 +138,7 @@
 - ข้อสอบออนไลน์เลือกใช้ `question_ids` เป็นคลังและสุ่มจำนวนข้อราย attempt ได้ ระบบตรึง subset ใน answer snapshot เดิมจึงไม่เปลี่ยนเมื่อ reload/resume และไม่อนุญาตให้แก้จำนวนสุ่มหลังมีนักเรียนเริ่มทำ; หน้าครูแยกจำนวน “ข้อสุ่ม/คลัง” ให้เห็นชัด
 - ครูเปิดลายน้ำผู้เข้าสอบได้ หน้าข้อสอบจะแสดงชื่อ รหัส attempt ส่วนสั้น และเวลาปัจจุบันซ้ำบนจอเพื่อให้ภาพที่ส่งต่อระบุที่มาได้ง่ายขึ้น โดยไม่กล่าวอ้างว่าสามารถกัน screenshot/กล้อง/DevTools ระดับระบบได้
 - ห้องคุมสอบตรวจ attempt เดียวที่เปิดพร้อมกันหลายแท็บ/อุปกรณ์ด้วย heartbeat lease แบบ UUID สุ่มต่อแท็บ นักเรียนเห็นคำเตือนให้ปิดหน้าซ้ำ ครูเห็นจำนวนจุดที่ยัง active, จำนวน transition และ event แบบ realtime; reload ใช้ id เดิมและ duplicated tab มี BroadcastChannel handshake ลด false positive โดยไม่เก็บ IP, user-agent หรือ device fingerprint
-- ห้องคุมสอบมีสถานะเชื่อมต่อสด รายชื่อนักเรียน counter และ feed เหตุการณ์ล่าสุด โดย RLS เปิดอ่านเฉพาะเจ้าของ assignment, co-teacher `admin/manage` และ super admin; ยังไม่ได้ทดสอบ Realtime/RLS แบบ end-to-end หลายบทบาท และยังต้องกำหนด data-retention policy ก่อนเปิดใช้จริง
+- ห้องคุมสอบมีสถานะเชื่อมต่อสด รายชื่อนักเรียน counter และ feed เหตุการณ์ล่าสุด โดย RLS เปิดอ่านเฉพาะเจ้าของ assignment, co-teacher `admin/manage` และ super admin; ข้อมูล attempt ที่ไม่มี heartbeat เกิน 90 วันถูกลบอัตโนมัติรายวัน และครูล้างเฉพาะข้อมูลคุมสอบก่อนกำหนดได้เมื่อไม่มี session สด โดยคำตอบ/คะแนน/submission ยังอยู่ครบ; ยังไม่ได้ทดสอบ Realtime/RLS และ retention job แบบ end-to-end หลายบทบาท
 - ต้องทดสอบ flow ครูและนักเรียนแบบครบเส้นทาง รวม expiry/retry/concurrent save
 
 ### การส่งคำตอบและตรวจคะแนน — มีโค้ดรองรับ

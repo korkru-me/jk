@@ -1,8 +1,10 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeProctorEvents } from '@/lib/exam-proctor'
+import { normalizeProctorPurgeCounts } from '@/lib/exam-proctor-retention'
 
 interface RecordProctorSignalInput {
   submissionId: string
@@ -70,4 +72,40 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
       ? Math.max(0, Math.floor(activeConnectionCount))
       : 0,
   }
+}
+
+export async function purgeAssignmentProctorData(assignmentId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลชุดข้อสอบไม่ถูกต้อง' }
+
+  // Use the session-bound client as the first authorization boundary. The
+  // assignment RLS exposes this row only to its owner, admin/manage
+  // co-teachers, and the configured super-admin path.
+  const { data: assignment, error: assignmentError } = await supabase
+    .from('assignments')
+    .select('id')
+    .eq('id', assignmentId)
+    .maybeSingle()
+  if (assignmentError || !assignment) return { error: 'ไม่พบชุดข้อสอบหรือไม่มีสิทธิ์จัดการ' }
+
+  // The RPC repeats the exact actor/assignment authorization and performs all
+  // three deletes in one transaction. It also refuses to interrupt a room
+  // that has received a live heartbeat within the last 45 seconds.
+  const admin = createAdminClient()
+  const { data, error } = await admin.rpc('purge_exam_proctor_data_for_assignment', {
+    p_assignment_id: assignmentId,
+    p_actor_id: user.id,
+  })
+  if (error?.code === '55006') {
+    return { error: 'ยังล้างข้อมูลไม่ได้ เพราะมีนักเรียนเชื่อมต่อห้องคุมสอบอยู่' }
+  }
+  if (error) return { error: 'ล้างข้อมูลคุมสอบไม่สำเร็จ กรุณาลองใหม่' }
+
+  const deleted = normalizeProctorPurgeCounts(data)
+  if (!deleted) return { error: 'ระบบตอบกลับข้อมูลการล้างไม่ครบ กรุณาลองใหม่' }
+
+  revalidatePath(`/assignments/${assignmentId}/proctor`)
+  return { success: true as const, deleted }
 }

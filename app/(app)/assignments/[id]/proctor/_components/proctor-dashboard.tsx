@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { toast } from 'sonner'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,14 +18,21 @@ import {
   Radio,
   Settings,
   ShieldAlert,
+  Trash2,
   Users,
   Wifi,
   WifiOff,
 } from 'lucide-react'
+import { purgeAssignmentProctorData } from '@/lib/actions/exam-proctor'
+import {
+  EXAM_PROCTOR_RETENTION_DAYS,
+  totalPurgedProctorRecords,
+} from '@/lib/exam-proctor-retention'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export interface ProctorParticipant {
   studentId: string
@@ -135,10 +144,13 @@ function sessionHasFlags(session: ProctorSessionRow): boolean {
 }
 
 export function ProctorDashboard({ assignment, initialParticipants, initialSessions, initialEvents }: Props) {
+  const router = useRouter()
   const [sessions, setSessions] = useState(initialSessions)
   const [events, setEvents] = useState(initialEvents)
   const [realtimeConnected, setRealtimeConnected] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [isPurging, startPurgeTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 5_000)
@@ -159,6 +171,13 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           filter: `assignment_id=eq.${assignment.id}`,
         },
         payload => {
+          if (payload.eventType === 'DELETE') {
+            const previous = payload.old as Pick<ProctorSessionRow, 'submission_id'>
+            if (previous?.submission_id) {
+              setSessions(current => current.filter(row => row.submission_id !== previous.submission_id))
+            }
+            return
+          }
           const next = payload.new as ProctorSessionRow
           if (!next?.submission_id) return
           setSessions(current => {
@@ -170,12 +189,17 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'exam_proctor_events',
           filter: `assignment_id=eq.${assignment.id}`,
         },
         payload => {
+          if (payload.eventType === 'DELETE') {
+            const previous = payload.old as Pick<ProctorEventRow, 'id'>
+            if (previous?.id) setEvents(current => current.filter(row => row.id !== previous.id))
+            return
+          }
           const next = payload.new as ProctorEventRow
           if (!next?.id) return
           setEvents(current => [next, ...current.filter(row => row.id !== next.id)].slice(0, 100))
@@ -239,6 +263,36 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
   const offlineCount = rows.filter(row => row.session && !row.active && !row.completed).length
   const concurrentCount = rows.filter(row => (row.session?.concurrent_connection_count ?? 0) > 0).length
 
+  async function handlePurge() {
+    const ok = await confirm({
+      title: 'ล้างข้อมูลคุมสอบของชุดนี้?',
+      description: (
+        <span>
+          เหตุการณ์ ตัวนับสถานะ และข้อมูลการเชื่อมต่อจะถูกลบถาวร แต่คำตอบ คะแนน และประวัติการส่งข้อสอบยังอยู่ครบ
+        </span>
+      ),
+      confirmLabel: 'ล้างข้อมูลคุมสอบ',
+      variant: 'destructive',
+    })
+    if (!ok) return
+
+    startPurgeTransition(async () => {
+      const result = await purgeAssignmentProctorData(assignment.id)
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+
+      setSessions([])
+      setEvents([])
+      const totalDeleted = totalPurgedProctorRecords(result.deleted)
+      toast.success(totalDeleted > 0
+        ? `ล้างข้อมูลคุมสอบแล้ว ${totalDeleted} รายการ`
+        : 'ไม่มีข้อมูลคุมสอบที่ต้องล้าง')
+      router.refresh()
+    })
+  }
+
   if (!assignment.enabled) {
     return (
       <div className="mx-auto max-w-3xl space-y-5 py-8">
@@ -291,6 +345,30 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
             เหตุการณ์เหล่านี้เป็นสัญญาณให้ครูพิจารณาร่วมกับบริบท ไม่ใช่ข้อสรุปว่านักเรียนทุจริต
             เบราว์เซอร์ไม่สามารถกันภาพถ่ายหน้าจอหรือควบคุมอุปกรณ์อื่นได้ทั้งหมด
           </p>
+        </div>
+      </Card>
+
+      <Card padding="md">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <Clock3 className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium text-foreground">เก็บข้อมูลคุมสอบไม่เกิน {EXAM_PROCTOR_RETENTION_DAYS} วัน</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                ระบบลบอัตโนมัติหลังไม่มี heartbeat ตามระยะที่กำหนด การล้างส่วนนี้ไม่กระทบคำตอบ คะแนน หรือ submission
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePurge}
+            disabled={isPurging || activeCount > 0}
+            className="shrink-0 text-destructive"
+          >
+            <Trash2 aria-hidden="true" />
+            {isPurging ? 'กำลังล้าง…' : activeCount > 0 ? 'รอให้นักเรียนออฟไลน์' : 'ล้างข้อมูลคุมสอบ'}
+          </Button>
         </div>
       </Card>
 
@@ -367,6 +445,7 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           )}
         </Card>
       </div>
+      {confirmDialog}
     </div>
   )
 }
