@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { getAuthUser } from '@/lib/auth/server'
 import type { ProctorEventRow, ProctorSessionRow } from '@/lib/exam-proctor-realtime'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -20,11 +21,10 @@ interface SubmissionRow {
   started_at: string
   submitted_at: string | null
   attempt_number: number
-  users: { full_name: string | null } | { full_name: string | null }[] | null
 }
-function relatedName(value: SubmissionRow['users']): string {
-  const user = Array.isArray(value) ? value[0] : value
-  return user?.full_name?.trim() || 'นักเรียน'
+
+function fallbackStudentName(studentId: string): string {
+  return `นักเรียน (รหัส ${studentId.slice(0, 8)})`
 }
 
 export default async function ProctorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,7 +53,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   const [submissionsResult, sessionsResult, eventsResult, rosterResult] = await Promise.all([
     supabase
       .from('submissions')
-      .select('id, student_id, status, started_at, submitted_at, attempt_number, users(full_name)')
+      .select('id, student_id, status, started_at, submitted_at, attempt_number')
       .eq('assignment_id', id)
       .order('attempt_number', { ascending: false }),
     supabase
@@ -70,16 +70,34 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     classroomIds.length > 0
       ? supabase
           .from('classroom_students')
-          .select('student_id, users(full_name)')
+          .select('student_id')
           .in('classroom_id', classroomIds)
       : Promise.resolve({ data: [], error: null }),
   ])
+
+  const studentIds = new Set<string>()
+  for (const row of submissionsResult.data ?? []) studentIds.add(row.student_id)
+  for (const row of sessionsResult.data ?? []) studentIds.add(row.student_id)
+  for (const row of eventsResult.data ?? []) studentIds.add(row.student_id)
+  for (const row of rosterResult.data ?? []) studentIds.add(row.student_id)
+
+  // The session-bound assignment query above is the authorization boundary.
+  // Only after it succeeds do we bypass the restrictive users RLS, and then
+  // only for the exact student IDs already visible within this assignment.
+  const admin = createAdminClient()
+  const namesResult = studentIds.size > 0
+    ? await admin
+        .from('users')
+        .select('id, full_name')
+        .in('id', [...studentIds])
+    : { data: [], error: null }
 
   const loadError = linksError
     ?? submissionsResult.error
     ?? sessionsResult.error
     ?? eventsResult.error
     ?? rosterResult.error
+    ?? namesResult.error
 
   if (loadError) {
     return (
@@ -101,6 +119,15 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   }
 
   const submissions = (submissionsResult.data ?? []) as unknown as SubmissionRow[]
+  const studentNameById = new Map(
+    (namesResult.data ?? []).map(row => [
+      row.id,
+      row.full_name?.trim() || fallbackStudentName(row.id),
+    ]),
+  )
+  const studentName = (studentId: string) => (
+    studentNameById.get(studentId) ?? fallbackStudentName(studentId)
+  )
   const latestSubmissionByStudent = new Map<string, SubmissionRow>()
   for (const submission of submissions) {
     if (!latestSubmissionByStudent.has(submission.student_id)) {
@@ -109,14 +136,10 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   }
 
   const participantByStudent = new Map<string, ProctorParticipant>()
-  for (const row of (rosterResult.data ?? []) as Array<{
-    student_id: string
-    users: { full_name: string | null } | { full_name: string | null }[] | null
-  }>) {
-    const related = Array.isArray(row.users) ? row.users[0] : row.users
+  for (const row of rosterResult.data ?? []) {
     participantByStudent.set(row.student_id, {
       studentId: row.student_id,
-      name: related?.full_name?.trim() || 'นักเรียน',
+      name: studentName(row.student_id),
       submissionId: null,
       submissionStatus: 'not_started',
       startedAt: null,
@@ -126,7 +149,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   for (const submission of latestSubmissionByStudent.values()) {
     participantByStudent.set(submission.student_id, {
       studentId: submission.student_id,
-      name: relatedName(submission.users),
+      name: studentName(submission.student_id),
       submissionId: submission.id,
       submissionStatus: submission.status,
       startedAt: submission.started_at,
