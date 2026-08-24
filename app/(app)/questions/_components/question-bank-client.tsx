@@ -864,11 +864,14 @@ function Pagination({ page, totalPages, isPending, onGo, label, className }: {
   label: string
   className?: string
 }) {
-  const window = new Set([1, totalPages, page, page - 1, page + 1])
-  const pages = [...window].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b)
+  // Two pages either side, not one: from page 3 the reader could see 4 but not
+  // 5, so reaching 5 meant a stop at 4 first.
+  const nearby = new Set([1, totalPages, page - 2, page - 1, page, page + 1, page + 2])
+  const pages = [...nearby].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b)
+  const allPages = Array.from({ length: totalPages }, (_, i) => i + 1)
 
   return (
-    <nav className={cn('flex items-center justify-center gap-1 pt-2', className)} aria-label={label}>
+    <nav className={cn('flex flex-wrap items-center justify-center gap-1 pt-2', className)} aria-label={label}>
       <Button
         variant="outline"
         size="sm"
@@ -904,6 +907,28 @@ function Pagination({ page, totalPages, isPending, onGo, label, className }: {
       >
         ถัดไป →
       </Button>
+
+      {/* Any page in one pick. The numbered buttons only ever reach as far as
+          the neighbours, so a jump to a far page had to be walked to. */}
+      {totalPages > 3 && (
+        <span className="ml-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+          ไปหน้า
+          <Select
+            value={String(page)}
+            onValueChange={v => v !== null && Number(v) !== page && onGo(Number(v))}
+          >
+            <SelectTrigger size="sm" disabled={isPending} aria-label={`ไปยังหน้าที่ต้องการ — ${label}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {allPages.map(p => (
+                <SelectItem key={p} value={String(p)}>หน้า {p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          จาก {totalPages}
+        </span>
+      )}
     </nav>
   )
 }
