@@ -13,14 +13,17 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, Eye, Timer,
-  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale,
+  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
+  Fingerprint, ListFilter,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, parseSections, type QuestionSetSection,
 } from '@/lib/question-set-sections'
-import type { Question, Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { BankQuestion } from '@/lib/question-bank'
 import { Card } from '@/components/ui/card'
 import { questionExcerpt } from '@/lib/question-display'
+import { subQuestionUnit } from '@/lib/question-parts'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -30,10 +33,9 @@ const QuestionPicker = dynamic(
 const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
 export type AssignmentClassroomOption = Pick<Classroom, 'id' | 'name' | 'description'>
-export type AssignmentQuestionOption = Pick<
-  Question,
-  'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'requires_work_image' | 'tags'
->
+/** A question the picker can offer, carrying the point value it is worth by
+ *  default (see `default_points` in lib/question-bank.ts). */
+export type AssignmentQuestionOption = BankQuestion
 export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'description' | 'question_ids' | 'sections'>
 
 interface Props {
@@ -83,8 +85,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
-  // Step 3 (คะแนน) — every question defaults to 1 point; teacher can edit
-  // individual questions and the total recalculates automatically.
+  // Step 3 (คะแนน) — a question starts at the point value its own structure
+  // gives it (one per ข้อย่อย); teacher can edit individual questions and the
+  // total recalculates automatically.
   const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>({})
   // Independent of the per-question points above — rescales what's
   // *reported* only (never the underlying structure), and can be changed
@@ -95,11 +98,16 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
+  const [randomQuestionCount, setRandomQuestionCount] = useState('')
   const [showResults, setShowResults] = useState<ShowResultsMode>('immediate')
   const [maxAttempts, setMaxAttempts] = useState('')
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
   const [accessCode, setAccessCode] = useState('')
+  const [proctoringEnabled, setProctoringEnabled] = useState(false)
+  const [fullscreenRequired, setFullscreenRequired] = useState(false)
+  const [blockClipboard, setBlockClipboard] = useState(false)
+  const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
   const [passingEnabled, setPassingEnabled] = useState(false)
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
@@ -143,8 +151,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
     .filter((q): q is AssignmentQuestionOption => !!q)
+  // What a question is worth until the teacher types over it.
+  const defaultPointsById = new Map(questions.map(q => [q.id, q.default_points]))
+  const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
+
   const pointsSum = Math.round(
-    previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(questionPointDrafts[q.id] ?? '1') || 0), 0) * 100
+    previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(pointsDraft(q.id)) || 0), 0) * 100
   ) / 100
 
   function canNext() {
@@ -214,11 +226,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         }
       }
 
-      // Every question gets an explicit point value — defaults to 1 unless
-      // the teacher edited it, and falls back to 1 for invalid input.
+      // Every question gets an explicit point value — its own structural value
+      // unless the teacher edited it, and 1 for invalid input.
       const questionPoints = Object.fromEntries(
         selectedIds.map(id => {
-          const parsed = Number.parseFloat(questionPointDrafts[id] ?? '1')
+          const parsed = Number.parseFloat(pointsDraft(id))
           return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
         })
       )
@@ -227,6 +239,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       const displayMax = displayMaxScore.trim() !== '' && Number.isFinite(parsedDisplayMax) && parsedDisplayMax > 0
         ? parsedDisplayMax
         : null
+      const parsedRandomCount = Number(randomQuestionCount)
+      const selectedRandomCount = randomQuestionCount.trim() !== ''
+        && Number.isInteger(parsedRandomCount)
+        && parsedRandomCount > 0
+        && parsedRandomCount < selectedIds.length
+          ? parsedRandomCount
+          : null
 
       const res = await createAssignment({
         classroom_ids: classroomIds,
@@ -245,6 +264,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         type: assignmentType,
         shuffle_questions: shuffleQ,
         shuffle_options: shuffleA,
+        random_question_count: selectedRandomCount,
         show_results: showResults,
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
@@ -252,6 +272,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
         require_work_image: requireWorkImage,
+        proctoring_enabled: proctoringEnabled,
+        fullscreen_required: fullscreenRequired,
+        block_clipboard: blockClipboard,
+        exam_watermark_enabled: examWatermarkEnabled,
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -476,7 +500,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               <span className="text-sm font-semibold text-primary">รวม {pointsSum} คะแนน</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              ค่าเริ่มต้นข้อละ 1 คะแนน — แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
+              ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
+              แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
             </p>
 
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
@@ -487,11 +512,16 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
                   </div>
+                  {q.sub_question_count > 1 && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {q.sub_question_count} {subQuestionUnit(q.question_type)}
+                    </span>
+                  )}
                   <Input
                     type="number"
                     min={0}
                     step="any"
-                    value={questionPointDrafts[q.id] ?? '1'}
+                    value={pointsDraft(q.id)}
                     onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
                     className="w-20 text-center shrink-0"
                   />
@@ -657,6 +687,115 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             })}
           </div>
 
+          {mode === 'online' && assignmentType === 'exam' && (
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <ListFilter className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">สุ่มชุดข้อสอบรายคน</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    เลือกจากคลัง {selectedIds.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอด attempt รวมถึงหลัง reload
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pl-11">
+                <Input
+                  id="random-question-count"
+                  type="number"
+                  min={1}
+                  max={Math.max(1, selectedIds.length - 1)}
+                  value={randomQuestionCount}
+                  onChange={event => setRandomQuestionCount(event.target.value)}
+                  placeholder={`ครบทั้ง ${selectedIds.length} ข้อ`}
+                  disabled={selectedIds.length < 2}
+                  className="max-w-[150px]"
+                />
+                <Label htmlFor="random-question-count" className="text-sm text-muted-foreground">
+                  ข้อต่อคน
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground pl-11">
+                เว้นว่างเพื่อใช้ครบทุกข้อ หากคะแนนแต่ละข้อไม่เท่ากัน ควรตั้ง “คะแนนเต็มที่แสดงผล” เพื่อให้เปรียบเทียบกันได้ง่าย
+              </p>
+              <label className="flex items-center justify-between gap-4 border-t border-border pt-3 cursor-pointer">
+                <div className="flex items-start gap-3">
+                  <Fingerprint className="w-4 h-4 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">แสดงลายน้ำผู้เข้าสอบ</p>
+                    <p className="text-xs text-muted-foreground">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={examWatermarkEnabled}
+                  onChange={event => setExamWatermarkEnabled(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+            </div>
+          )}
+
+          {mode === 'online' && assignmentType === 'exam' && (
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <label className="flex items-center justify-between gap-4 cursor-pointer">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      ครูเห็นสถานะออนไลน์ การออกจากแท็บ/เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={proctoringEnabled}
+                  onChange={event => setProctoringEnabled(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+
+              {proctoringEnabled && (
+                <div className="space-y-2 border-t border-border pt-3 pl-11">
+                  <label className="flex items-center justify-between gap-4 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Maximize className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
+                        <p className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={fullscreenRequired}
+                      onChange={event => setFullscreenRequired(event.target.checked)}
+                      className="accent-primary w-4 h-4 shrink-0"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-4 cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">ปิดการคัดลอก วาง และเมนูคลิกขวา</p>
+                      <p className="text-xs text-muted-foreground">ลดการนำข้อความออกจากหน้า แต่ไม่สามารถกันภาพถ่ายหรือเครื่องมือระดับระบบได้ทั้งหมด</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={blockClipboard}
+                      onChange={event => setBlockClipboard(event.target.checked)}
+                      className="accent-primary w-4 h-4 shrink-0"
+                    />
+                  </label>
+                  <p className="text-xs text-warning">
+                    เวลาในข้อสอบยังเดินต่อเมื่อออกจากแท็บหรือเต็มจอ เพื่อไม่ให้ใช้การออกจากหน้าเป็นวิธีหยุดเวลา
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5">
               <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
@@ -783,6 +922,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
                 ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
                 ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
+                ...(mode === 'online' && assignmentType === 'exam' && proctoringEnabled
+                  ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
+                  : []),
                 { label: 'แสดงผล',    value: showResults === 'immediate' ? 'ทันทีหลังส่ง' : 'หลังพ้นกำหนดส่ง' },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">

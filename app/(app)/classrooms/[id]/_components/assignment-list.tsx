@@ -120,7 +120,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
   const due = getDueInfo(a.end_at)
   const typeCfg = TYPE_CFG[a.type] ?? TYPE_CFG.exam
   const TypeIcon = typeCfg.icon
-  const questionCount = a.question_ids.length
+  const questionCount = a.random_question_count ?? a.question_ids.length
   // `a.submission` reflects the best/official-strategy attempt for score
   // display, which may not be the student's latest attempt — e.g. they
   // scored higher on attempt 1 but attempt 2 (a retry) is still in
@@ -158,7 +158,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <BookOpen size={11} />
-          {questionCount} ข้อ
+          {questionCount} ข้อ{a.random_question_count ? ` (สุ่มจาก ${a.question_ids.length})` : ''}
         </span>
         {a.duration_minutes && (
           <span className="flex items-center gap-1">

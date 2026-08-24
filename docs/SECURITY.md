@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 18 สิงหาคม 2026
+อัปเดตล่าสุด: 24 สิงหาคม 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -57,6 +57,21 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - score rescaling และ attempt strategy ต้องให้ผลเหมือนกันทุกหน้าที่อ่านคะแนน
 - ห้ามให้นักเรียนอ่านเฉลยก่อนนโยบาย `show_results` อนุญาต
 
+### Exam-taking data boundary
+
+- `questions`, `assignments` และ `submission_answers` มี secret/answer-bearing columns จึงห้ามส่ง `select('*')` จากแถวเหล่านี้เข้า Client Component ของนักเรียน
+- ระหว่างทำข้อสอบ browser รับเฉพาะ DTO จาก `lib/exam-safe.ts`; ต้องเพิ่ม field ใหม่ด้วย allowlist และ regression test ไม่ใช้ object spread จาก database row
+- student RLS ห้ามอ่าน question-bank row และ assignment row เต็ม; `assignments.access_code` ต้องอยู่ฝั่ง server เท่านั้น
+- นักเรียนอ่าน answer snapshot/เฉลยได้หลังส่งเมื่อ `show_results` เป็น `immediate` หรือ `after_due` ที่พ้นกำหนดแล้วเท่านั้น; `score_only` ห้ามอ่านคำตอบรายข้อและ `never` ห้ามอ่านคะแนนด้วย
+- การบันทึกคำตอบ รูปวิธีทำ ไฟล์ การส่ง และการแก้คะแนนผ่าน server boundary หลังตรวจ session + exact owner/teacher + attempt status + deadline; browser role ไม่มีสิทธิ์เขียน `submissions`/`submission_answers` โดยตรง
+- `users_update_own` ใช้สำหรับโปรไฟล์เท่านั้น ต้องมี trigger ป้องกัน self-update ของ authority fields (`role`, `status`)
+- Fullscreen, tab visibility, copy/paste และ screenshot deterrence เป็นเพียงสัญญาณ/แรงเสียดทาน ไม่ใช่ security boundary และห้ามใช้แทนการปกป้องเฉลยฝั่ง server
+- ลายน้ำข้อสอบแสดงเฉพาะชื่อเจ้าของ attempt, UUID ส่วนสั้น และเวลาปัจจุบันเพื่อให้ภาพที่ส่งต่อระบุที่มาได้ง่ายขึ้น ไม่ใช่การป้องกัน screenshot; ห้ามใส่อีเมล เบอร์โทร ข้อมูลอ่อนไหว หรือ answer content ลงในลายน้ำ
+- ข้อมูลคุมสอบต้องเก็บเท่าที่จำเป็น: ชนิด browser event, เวลา, presence/counter, foreign keys และ UUID สุ่มต่อแท็บสำหรับ heartbeat lease เท่านั้น ห้ามเพิ่ม IP, user-agent, device fingerprint, ภาพหน้าจอ กล้อง ไมโครโฟน เนื้อหาคำตอบ หรือ keystroke โดยไม่มีการออกแบบวัตถุประสงค์ consent retention และสิทธิ์ใหม่
+- ข้อมูลคุมสอบระดับ attempt ลบอัตโนมัติหลังไม่มี heartbeat 90 วันด้วย job รายวัน; การล้างก่อนกำหนดต้องตรวจ owner/co-teacher `admin/manage`/super admin ซ้ำใน service-role-only RPC, ปฏิเสธเมื่อยังมี session สด และห้ามลบ submission, คำตอบ หรือคะแนนร่วมไปด้วย
+- เหตุการณ์เปิดหลายหน้าจอต้องคำนวณฝั่งฐานข้อมูลจาก lease ที่ยังสด ไม่เชื่อ counter/event จาก client และเป็นเพียงสัญญาณให้ครูพิจารณา การ reload ปกติต้องนำ id เดิมกลับมาใช้เพื่อลด false positive
+- นักเรียนห้ามเขียนตาราง proctor โดยตรง; Server Action ต้องตรวจ exact submission owner + `in_progress` ก่อนใช้ service role และครูอ่านได้เฉพาะ assignment ที่ตนจัดการ ข้อมูลเหล่านี้เป็นหลักฐานประกอบการพิจารณา ไม่ใช่การตัดสินทุจริตอัตโนมัติ
+
 ## Uploads และ exports
 
 - ตรวจ MIME type, ขนาด และจำนวนไฟล์ฝั่ง server/storage policy
@@ -65,6 +80,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ระวัง orphan files เมื่อแก้หรือลบ resource
 - Export ต้องตรวจผู้ขอและข้อมูลทุกแถวก่อนสร้างไฟล์
 - PDF/CSV/รูปที่ส่งออกอาจมีข้อมูลส่วนบุคคล ต้องไม่ใช้ public URL ถ้าไม่จำเป็น
+- ผลวิจัยระดับบุคคลและแท็บข้อมูลที่ใช้ต้องตรวจสิทธิ์จัดการโครงการก่อน query; pagination/filtering ทำฝั่ง server และไม่ส่ง roster ทั้งโครงการเข้า Client Component เมื่อผู้ใช้ดูเพียงหน้าปัจจุบัน
 
 ## Logging และ errors
 

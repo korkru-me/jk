@@ -15,7 +15,11 @@ export function useFullscreenGuard(enabled: boolean) {
   const [showFullscreenWarning, setShowFullscreenWarning] = useState(false)
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) {
+      setIsFullscreen(false)
+      setShowFullscreenWarning(false)
+      return
+    }
     const onChange = () => {
       const inFS = !!document.fullscreenElement
       setIsFullscreen(inFS)
@@ -24,8 +28,11 @@ export function useFullscreenGuard(enabled: boolean) {
     document.addEventListener('fullscreenchange', onChange)
     document.documentElement
       .requestFullscreen()
-      .then(() => setIsFullscreen(true))
-      .catch(() => {})
+      .then(() => {
+        setIsFullscreen(true)
+        setShowFullscreenWarning(false)
+      })
+      .catch(() => setShowFullscreenWarning(true))
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [enabled])
 

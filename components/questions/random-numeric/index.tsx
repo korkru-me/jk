@@ -29,6 +29,7 @@ import type { CreationMode, PresetWithCat } from './shared'
 import type { RichTextEditorHandle } from '@/components/ui/rich-text-editor'
 import type { PartLabelStyle } from '@/lib/part-labels'
 import type { AnswerPart, Difficulty, LogicRule, PythagoreanGroup, Question, RandomQuestionConfig, Variable, Visibility } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 // ─── Main Form ────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,8 @@ interface RandomNumericFormProps {
 
 export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'create', question, isOwner = true }: RandomNumericFormProps) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
   const subTextEditorRef = useRef<RichTextEditorHandle>(null)

@@ -22,6 +22,7 @@ export interface ClassroomAssignmentRow {
   start_at: string | null
   end_at: string | null
   question_ids: string[]
+  random_question_count: number | null
   created_at: string
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
@@ -149,7 +150,9 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                        <span className="text-xs text-muted-foreground">{a.question_ids.length} ข้อ</span>
+                        <span className="text-xs text-muted-foreground">
+                          {a.random_question_count ? `${a.random_question_count} ข้อ/คน · คลัง ${a.question_ids.length}` : `${a.question_ids.length} ข้อ`}
+                        </span>
                         {a.max_attempts != null && (
                           <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                             <RefreshCw className="w-3 h-3" /> ทำได้ {a.max_attempts} ครั้ง

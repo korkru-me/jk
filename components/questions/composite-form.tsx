@@ -27,6 +27,7 @@ import type {
   CompositeConfig, CompositePart, CompositePartType,
   FillBlankType, FillBlankItem, OrderingItem, MCQOption,
 } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 interface CompositeFormProps {
   allTags: string[]
@@ -496,7 +497,8 @@ function CompositePartCard({ part, label, update, onRemove, onMoveUp, onMoveDown
 
 export function CompositeForm({ allTags, mode = 'create', question, isOwner = true }: CompositeFormProps) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 

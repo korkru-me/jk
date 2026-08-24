@@ -4,6 +4,7 @@ export interface StudentAssignmentRow {
   id: string
   title: string
   question_ids: string[]
+  random_question_count: number | null
   end_at: string | null
   duration_minutes: number | null
   type: string

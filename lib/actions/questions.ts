@@ -7,6 +7,7 @@ import { getMyOrgId } from '@/lib/actions/org'
 import { getMyTeamOrgs } from '@/lib/actions/team-org'
 import { dedupeTags } from '@/lib/tag-suggest'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
+import { safeQuestionsRedirect } from '@/lib/question-return'
 
 export interface QuestionFormData {
   title: string
@@ -78,6 +79,7 @@ export async function getQuestionClientDetail(questionId: string): Promise<
     .from('questions')
     .select('*, question_categories(name)')
     .eq('id', questionId)
+    .eq('is_research_snapshot', false)
     .maybeSingle()
 
   const [{ data: { user } }, { data, error }] = await Promise.all([
@@ -173,10 +175,11 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   const { data: existing } = await supabase
     .from('questions')
-    .select('created_by, org_id, visibility, team_edit_allowed')
+    .select('created_by, org_id, visibility, team_edit_allowed, is_research_snapshot')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบโจทย์นี้' }
+  if (existing.is_research_snapshot) return { error: 'สำเนาข้อสอบวิจัยถูกตรึงไว้และแก้ไขไม่ได้' }
 
   const isOwner = existing.created_by === user.id
   if (!isOwner && !existing.team_edit_allowed) {
@@ -232,7 +235,9 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   revalidatePath('/questions')
   revalidatePath(`/questions/${id}/edit`)
-  redirect(data.redirect_to || '/questions')
+  // `redirect_to` comes from the browser, so it is only ever allowed to be the
+  // question bank and the view the teacher started the edit from.
+  redirect(safeQuestionsRedirect(data.redirect_to))
 }
 
 /**
@@ -273,6 +278,7 @@ export async function setRequiresWorkImage(id: string, value: boolean) {
     .update({ requires_work_image: value })
     .eq('id', id)
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
 
   if (error) return { error: error.message }
 
@@ -304,6 +310,7 @@ export async function updateQuestionTags(id: string, tags: string[]) {
     .update({ tags: cleaned.length > 0 ? cleaned : null })
     .eq('id', id)
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
     .select('id')
 
   if (error) return { error: error.message }
@@ -324,6 +331,7 @@ export async function deleteQuestion(id: string) {
     .delete()
     .eq('id', id)
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
 
   if (error) return { error: error.message }
 
@@ -341,7 +349,7 @@ export async function getCategories() {
 
 export async function getAllTags(): Promise<string[]> {
   const supabase = await createClient()
-  const { data } = await supabase.from('questions').select('tags')
+  const { data } = await supabase.from('questions').select('tags').eq('is_research_snapshot', false)
   if (!data) return []
   const tagSet = new Set<string>()
   for (const row of data) {
@@ -400,6 +408,7 @@ export async function searchQuestions(query: string) {
     .from('questions')
     .select('id, title, answer_formula, variables, answer_unit')
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
     .ilike('title', `%${query}%`)
     .limit(10)
 

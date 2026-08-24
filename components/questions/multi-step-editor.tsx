@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import type { SubQuestionData, QuestionGroupPayload } from '@/lib/actions/questi
 import type { Variable, Difficulty, Visibility, QuestionCategory, FormulaPreset } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { questionsReturnTo, RETURN_PARAM } from '@/lib/question-return'
 
 interface MultiStepEditorProps {
   mode: 'create' | 'edit'
@@ -78,6 +79,9 @@ export function MultiStepEditor({
   isOwner = true,
 }: MultiStepEditorProps) {
   const router = useRouter()
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const searchParams = useSearchParams()
+  const returnTo = questionsReturnTo(searchParams)
   const [isPending, startTransition] = useTransition()
 
   const [title, setTitle] = useState(initialTitle)
@@ -204,6 +208,7 @@ export function MultiStepEditor({
       team_edit_allowed: teamEditAllowed,
       difficulty,
       subQuestions,
+      return_query: searchParams.get(RETURN_PARAM) ?? undefined,
     }
 
     startTransition(async () => {
@@ -229,7 +234,7 @@ export function MultiStepEditor({
     startTransition(async () => {
       const res = await deleteQuestionGroup(groupId)
       if (res?.error) toast.error(res.error)
-      else { toast.success('ลบแล้ว'); router.push('/questions') }
+      else { toast.success('ลบแล้ว'); router.push(returnTo) }
     })
   }
 
@@ -408,7 +413,7 @@ export function MultiStepEditor({
         <Button onClick={handleSave} disabled={isPending}>
           {isPending ? 'กำลังบันทึก...' : mode === 'create' ? 'สร้างโจทย์กลุ่ม' : 'บันทึกการแก้ไข'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push('/questions')}>
+        <Button type="button" variant="outline" onClick={() => router.push(returnTo)}>
           ยกเลิก
         </Button>
         {mode === 'edit' && groupId && (

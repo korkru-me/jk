@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 21 สิงหาคม 2026
+อัปเดตล่าสุด: 24 สิงหาคม 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -47,11 +47,14 @@ Invariant สำคัญ:
 
 ## งานและการส่งคำตอบ
 
-- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ
+- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt และ `exam_watermark_enabled` เปิดลายน้ำระบุตัวผู้เข้าสอบบนหน้าข้อสอบ
 - `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom
 - `assignment_extensions` — ขยายเวลารายคน
 - `submissions` — attempt ต่อผู้เรียน
 - `submission_answers` — answer snapshot และคะแนนรายข้อ
+- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด
+- `exam_proctor_events` — browser-level event แบบ append-only ที่เก็บเฉพาะชนิดเหตุการณ์ เวลา และ foreign keys; ไม่เก็บภาพหน้าจอ เสียง กล้อง เนื้อหาคำตอบ หรือ keystroke
+- `exam_proctor_connections` — heartbeat lease ต่อแท็บด้วย UUID สุ่มและเวลาเห็นล่าสุด ใช้นับการเปิด attempt พร้อมกันหลายจุด; ไม่เก็บ IP, user-agent, device fingerprint หรือเนื้อหาบนจอ
 
 `assignments.classroom_id` ยังมีไว้เป็น home/legacy reference อย่า query เฉพาะ field นี้เมื่อความหมายต้องรองรับหลายห้อง
 
@@ -60,6 +63,37 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - `submissions.org_id` ต้องเท่ากับ `assignments.org_id` ของงานนั้น ไม่ใช่ organization หลักหรือ personal workspace ของนักเรียน
 - `submission_answers.org_id` ต้องเท่ากับ `submissions.org_id`
 - นักเรียนอาจเข้าร่วมห้องผ่าน `classroom_students` โดยไม่เป็น `organization_members`; สิทธิ์เริ่ม attempt ต้องมาจาก assignment ที่เผยแพร่และ roster ของห้อง
+- `assignments.access_code`, `submission_answers.correct_answer`/คะแนน และ answer-bearing fields ใน `questions` เป็น server-only ระหว่าง attempt; RLS แบบรายแถวปกป้องคอลัมน์ลับกับคอลัมน์สาธารณะในแถวเดียวกันไม่ได้ จึงห้ามเปิด full row ให้นักเรียนแล้วพยายาม strip เฉพาะใน UI
+- browser role ไม่มีสิทธิ์ `INSERT/UPDATE/DELETE` ตาราง `submissions` และ `submission_answers`; mutation ต้องผ่าน server action ที่ตรวจเจ้าของ/ครู สถานะ และเวลา ก่อนใช้ service role แบบ exact resource
+- browser role ไม่มีสิทธิ์เขียน `exam_proctor_sessions`/`exam_proctor_events` โดยตรง; `record_exam_proctor_signal` เรียกได้เฉพาะ service role หลัง Server Action ตรวจว่าเป็น attempt ของนักเรียนคนนั้น ยัง `in_progress`, เป็นข้อสอบ online และเปิด proctoring ส่วนครูอ่านผ่าน RLS ตาม assignment ที่จัดการได้
+- browser role ไม่มีสิทธิ์เขียน `exam_proctor_connections` โดยตรงเช่นกัน RPC ใช้ advisory lock ต่อ submission เพื่อคำนวณ transition จากหนึ่งเป็นหลาย lease แบบ atomic; `concurrent_connection` สร้างโดยฐานข้อมูลเท่านั้นและ client ปลอม event ชนิดนี้ไม่ได้
+- `assignments.proctoring_enabled`, `fullscreen_required`, `block_clipboard` และ `exam_watermark_enabled` เป็นการตั้งค่าแรงเสียดทาน/สัญญาณระดับ browser ไม่ใช่ kiosk mode หรือ security boundary; event, connection lease และ session summary ของ attempt ถูกลบเมื่อไม่มี heartbeat เกิน 90 วัน โดยไม่ลบ submission, answer หรือ score และครูผู้จัดการ assignment ล้างก่อนกำหนดได้เมื่อไม่มี session สด
+- `random_question_count` ต้องไม่เกินจำนวน `question_ids`; การแก้จำนวนถูกปิดหลังมี submission แรก และ subset จริงไม่เก็บซ้ำใน assignment แต่ดูจาก `submission_answers` ที่สร้างและตรึงไว้ต่อ attempt
+- นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
+
+## วิจัยการศึกษา
+
+- `education_research_projects` — โครงการหนึ่งกลุ่มวัดก่อน–หลัง ผูก `org_id`, ห้องเรียนรายวิชา ผู้สร้าง เกณฑ์ผ่าน ระดับนัยสำคัญ และ lifecycle; `org_id`, `classroom_id`, `created_by` และแบบแผนวิจัยเปลี่ยนไม่ได้หลังสร้าง
+- `education_research_participants` — cohort ที่ตรึงจาก roster ของห้อง โดยใช้ `student_id` เป็นตัวจับคู่ ไม่ใช้ชื่อหรือลำดับแถว และหนึ่งนักเรียนอยู่ได้หนึ่งครั้งต่อโครงการ
+- `education_research_measurements` — การตั้งค่ารอบ `pretest`/`posttest`, แหล่งคะแนน, วิธีเลือกแฟ้ม/แฟ้มย่อย/รายข้อ, source IDs, immutable snapshot IDs, เวลา และ optional assignment ที่ต้องอยู่ในห้อง/organization เดียวกับโครงการ
+- `education_research_scores` — observation คะแนนหนึ่งค่าต่อผู้เข้าร่วมต่อรอบวัด พร้อมคะแนนเต็ม แหล่งที่มา submission ที่เกี่ยวข้อง และผู้บันทึก; บังคับ `0 <= raw_score <= max_score` และ composite foreign key ป้องกันการเชื่อมข้ามโครงการ/organization
+- `education_research_score_history` — audit แบบ append-only ที่ trigger สร้างเมื่อคะแนนถูกเพิ่ม แก้ หรือลบ ผู้ใช้ทั่วไปอ่านได้ตามสิทธิ์โครงการแต่เขียนประวัติโดยตรงไม่ได้
+- `education_research_score_drafts` — ฉบับร่างคะแนน manual แยกตามครูผู้บันทึกและ project/participant/measurement; การบันทึกร่างครั้งใหม่แทนชุดเดิมของครูคนนั้นและยังไม่ถือเป็นคะแนนวิจัยจริง
+- `education_research_import_templates` / `education_research_import_template_rows` — รุ่นแม่แบบและ snapshot รายชื่อสำหรับดาวน์โหลด Excel แต่ละแถวผูก participant ด้วย UUID token สุ่มที่ซ่อนใน workbook และตรวจกลับฝั่ง server
+- `education_research_import_batches` / `education_research_import_batch_rows` — normalized preview ของไฟล์ที่อัปโหลด เก็บค่า incoming/current, action, สถานะ และข้อความตรวจ ไม่เก็บ binary workbook; batch ยืนยันได้ครั้งเดียวและใช้เป็น audit ของผลกระทบทั้งชุด
+
+Invariant สำคัญ:
+
+- โครงการรับได้เฉพาะ classroom ชนิด `subject`; ผู้เข้าร่วมใหม่ต้องเป็นสมาชิก roster ปัจจุบัน แต่การออกจากห้องภายหลังไม่ลบ cohort ที่ตรึงไว้โดยอัตโนมัติ
+- ข้อมูลที่หายคือไม่มีแถว score ไม่ใช่คะแนน 0 และการวิเคราะห์ก่อน–หลังใช้เฉพาะ student เดียวกันที่มี observation ครบสองรอบ
+- สิทธิ์ข้อมูลระดับบุคคลมาจากเจ้าของห้องหรือ co-teacher `admin/manage` ไม่ใช่เพียงเป็นสมาชิก organization; co-teacher `view` เห็นได้เฉพาะ metadata โครงการ/รอบวัด
+- ตารางใหม่ทุกตารางมี `org_id`, index สำหรับ join/RLS และ RLS ป้องกันการเรียก API โดยตรงจากนักเรียนหรือผู้ใช้คนละห้อง
+- `questions.is_research_snapshot` แยกสำเนาเครื่องมือวัดออกจากโจทย์ในคลัง แต่ละสำเนาผูก `research_snapshot_project_id`, เก็บ source ID เพื่ออ้างอิงย้อนหลังโดยไม่ใช้ foreign key และ trigger ห้ามแก้หรือลบสำเนาหลังสร้าง
+- assignment ออนไลน์ของโครงการต้องใช้ snapshot IDs ของ measurement นั้น เป็น `exam/online` ทำได้ครั้งเดียว และคะแนนเต็มคำนวณซ้ำจากโครงสร้างสำเนาในฐานข้อมูล ห้ามเชื่อค่าคะแนนเต็มจาก client
+- ช่องทางเขียนคะแนนจริงทั้งหมดผ่าน trigger/RPC: submission sync สำหรับ `korkru_exam`, manual confirm สำหรับ `manual`, import confirm สำหรับ `excel`; browser role ถูก revoke สิทธิ์ `INSERT/UPDATE/DELETE` ตรงกับตารางคะแนน/ร่าง/import
+- ช่องว่างใน manual/Excel ไม่สร้างหรือลบ score; การเปลี่ยนคะแนนเดิมต้องมีเหตุผลใน audit และ Excel ต้องมีการยืนยัน overwrite ชัดเจน
+- Excel import ตรวจ template/project/row token/ตัวตน/ช่วงคะแนนตอนสร้าง preview และตรวจ roster/ค่าปัจจุบันซ้ำตอน confirm เพื่อให้ทั้งชุดสำเร็จหรือ rollback พร้อมกัน
+- ค่าเฉลี่ย, sample S.D., paired/one-sample t-test, ช่วงเชื่อมั่น และ effect size เป็นผลคำนวณ request-time จาก `education_research_scores` ไม่ใช่ entity ที่เก็บซ้ำในฐานข้อมูล เมื่อคะแนนเปลี่ยนหน้าผลจึงใช้ข้อมูลล่าสุดโดยไม่ต้อง sync summary row
 
 ## Snapshot ที่ต้องคงที่ต่อ attempt
 

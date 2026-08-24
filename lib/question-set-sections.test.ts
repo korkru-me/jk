@@ -9,6 +9,7 @@ import {
   parseSections,
   moveSection,
   moveQuestionInSet,
+  moveQuestionToIndex,
   setQuestionInSection,
   clearQuestionSections,
   sectionsByQuestionId,
@@ -132,6 +133,25 @@ describe('reordering', () => {
   it('stops at the ends of the set', () => {
     expect(moveQuestionInSet(sections, ids, 'a', -1).question_ids).toEqual(ids)
     expect(moveQuestionInSet(sections, ids, 'd', 1).question_ids).toEqual(ids)
+  })
+
+  it('sends a question straight to a position, in either direction', () => {
+    expect(moveQuestionToIndex(sections, ids, 'd', 0).question_ids).toEqual(['d', 'a', 'b', 'c'])
+    expect(moveQuestionToIndex(sections, ids, 'a', 3).question_ids).toEqual(['b', 'c', 'd', 'a'])
+  })
+
+  it('clamps a position outside the set instead of dropping the question', () => {
+    expect(moveQuestionToIndex(sections, ids, 'b', -5).question_ids).toEqual(['b', 'a', 'c', 'd'])
+    expect(moveQuestionToIndex(sections, ids, 'b', 99).question_ids).toEqual(['a', 'c', 'd', 'b'])
+  })
+
+  it('leaves the set alone when the question is not in it', () => {
+    expect(moveQuestionToIndex(sections, ids, 'zz', 0).question_ids).toEqual(ids)
+  })
+
+  it('keeps section membership through a move', () => {
+    const { sections: next } = moveQuestionToIndex(sections, ids, 'a', 3)
+    expect(next.map(x => x.question_ids)).toEqual([['a', 'b'], ['c']])
   })
 })
 

@@ -17,6 +17,7 @@ import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { getBlankType, numberedBlankMarker, countBlanks, extractBlankNumbers, nextBlankNumber, acceptedAnswers } from '@/lib/fill-blank'
 import type { Difficulty, Visibility, FillBlankConfig, FillBlankItem, FillBlankType, Question } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 interface FillBlankFormProps {
   allTags: string[]
@@ -66,7 +67,8 @@ const BLANK_TYPES: Array<{ value: FillBlankType; label: string; desc: string; ic
 
 export function FillBlankForm({ allTags, mode = 'create', question, isOwner = true }: FillBlankFormProps) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 

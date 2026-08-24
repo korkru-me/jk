@@ -210,24 +210,40 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
 // keeping this in one place is what guarantees a preview actually matches
 // what a real attempt would ask.
 export function buildAssignmentAttempt(
-  assignment: Pick<Assignment, 'question_ids' | 'shuffle_questions' | 'shuffle_options' | 'question_points'>,
+  assignment: Pick<Assignment, 'question_ids' | 'shuffle_questions' | 'shuffle_options' | 'question_points' | 'random_question_count'>,
   questions: Question[]
 ): AssignmentAttemptSkeleton[] {
   const questionsById = new Map(questions.map((q) => [q.id, q]))
 
-  // Question order: the natural order is assignment.question_ids itself
-  // (a `.in()` fetch does not preserve it), optionally shuffled per-attempt
-  // when shuffle_questions is on.
+  // A deleted question can leave a dangling id behind. Remove those before
+  // sampling so a missing row never consumes one of the sampled slots. The
+  // real start flow separately refuses to start if fewer than the configured
+  // count remain available.
+  const availableQuestionIds = assignment.question_ids.filter((qid) => questionsById.has(qid))
+  const requestedCount = assignment.random_question_count
+  const sampleCount = Number.isInteger(requestedCount) && (requestedCount as number) > 0
+    ? Math.min(requestedCount as number, availableQuestionIds.length)
+    : availableQuestionIds.length
+
+  // Sampling and ordering are deliberately separate. A teacher may want each
+  // student to receive a different subset while keeping the authored order
+  // within that subset. `shuffle_questions` still controls that second step.
+  // The result is persisted once in submission_answers, so resuming/reloading
+  // the same attempt never calls this again or draws another set.
+  const sampledQuestionIds = sampleCount < availableQuestionIds.length
+    ? (() => {
+        const sampled = new Set(shuffleArray(availableQuestionIds).slice(0, sampleCount))
+        return availableQuestionIds.filter((qid) => sampled.has(qid))
+      })()
+    : availableQuestionIds
+
   const questionOrder = assignment.shuffle_questions
-    ? shuffleArray(assignment.question_ids)
-    : assignment.question_ids
+    ? shuffleArray(sampledQuestionIds)
+    : sampledQuestionIds
 
   const questionPoints = assignment.question_points
 
-  // A question referenced by assignment.question_ids may have since been
-  // deleted — skip dangling ids instead of crashing the whole attempt.
   return questionOrder
-    .filter((qid) => questionsById.has(qid))
     .map((qid, orderIndex) => {
       const q = questionsById.get(qid) as Question
       // A matching question is only a question if the right-hand column is

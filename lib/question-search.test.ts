@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   matchesSearch, matchesTags, filterQuestions, searchTerms,
-  questionSearchOrClauses, tagsMatchingTerm,
+  questionSearchOrClauses, tagsMatchingTerm, questionSearchGroup,
+  questionSearchGroupFilters, questionSearchGroupSlices,
 } from './question-search'
 
 const rain = {
@@ -130,5 +131,73 @@ describe('tagsMatchingTerm', () => {
 
   it('is empty for a blank term', () => {
     expect(tagsMatchingTerm(['งาน'], '  ')).toEqual([])
+  })
+})
+
+describe('questionSearchGroup', () => {
+  it('uses the visible priority tag, then title, then content', () => {
+    expect(questionSearchGroup(rain, 'ฝน')).toBe('tag')
+    expect(questionSearchGroup({ ...rain, tags: [] }, 'มิลลิเมตร')).toBe('title')
+    expect(questionSearchGroup({ ...rain, title: 'ปริมาณน้ำ', tags: [] }, 'เกณฑ์ใด')).toBe('content')
+  })
+
+  it('puts a result in only the highest-priority group', () => {
+    expect(questionSearchGroup({
+      ...rain,
+      title: 'ฝนรายวัน',
+      question_text: '<p>ฝนตกหนัก</p>',
+      tags: ['ฝน'],
+    }, 'ฝน')).toBe('tag')
+  })
+
+  it('keeps the every-term broad matching rule before grouping', () => {
+    expect(questionSearchGroup(rain, 'ฝน หิมะ')).toBeNull()
+    expect(questionSearchGroup(rain, '')).toBeNull()
+  })
+})
+
+describe('questionSearchGroupFilters', () => {
+  it('builds the tag and title pieces used for exclusive server groups', () => {
+    const filters = questionSearchGroupFilters('พลัง งาน', ['พลังงาน', 'งาน', 'แรง'])
+    expect(filters.broadOrClauses).toHaveLength(2)
+    expect(filters.matchingTags).toEqual(['พลังงาน', 'งาน'])
+    expect(filters.titleOrClause).toContain('title.ilike."%พลัง%"')
+    expect(filters.titleOrClause).toContain('title.ilike."%งาน%"')
+    expect(filters.matchingTagsLiteral).toBe('{"พลังงาน","งาน"}')
+  })
+
+  it('returns safe empty group pieces for a blank query', () => {
+    expect(questionSearchGroupFilters('  ', ['งาน'])).toEqual({
+      broadOrClauses: [],
+      matchingTags: [],
+      titleOrClause: '',
+      titlePatterns: [],
+      matchingTagsLiteral: '{}',
+    })
+  })
+})
+
+describe('questionSearchGroupSlices', () => {
+  const counts = { tag: 10, title: 20, content: 30 }
+
+  it('fills one page in tag-title-content order', () => {
+    expect(questionSearchGroupSlices(counts, 'all', 1, 24)).toEqual({
+      tag: { from: 0, to: 9 },
+      title: { from: 0, to: 13 },
+    })
+    expect(questionSearchGroupSlices(counts, 'all', 2, 24)).toEqual({
+      title: { from: 14, to: 19 },
+      content: { from: 0, to: 17 },
+    })
+  })
+
+  it('pages a selected group independently', () => {
+    expect(questionSearchGroupSlices(counts, 'content', 2, 24)).toEqual({
+      content: { from: 24, to: 29 },
+    })
+  })
+
+  it('returns no slice past the final result', () => {
+    expect(questionSearchGroupSlices(counts, 'all', 4, 24)).toEqual({})
   })
 })

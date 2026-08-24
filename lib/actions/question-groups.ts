@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { randomUUID } from 'crypto'
 import { resolveOrgId } from '@/lib/actions/questions'
 import type { Variable, Difficulty, Visibility } from '@/lib/types'
+import { RETURN_PARAM } from '@/lib/question-return'
 
 export interface SubQuestionData {
   id?: string
@@ -33,6 +34,8 @@ export interface QuestionGroupPayload {
   team_edit_allowed?: boolean
   difficulty: Difficulty
   subQuestions: SubQuestionData[]
+  /** The bank view the editor was opened from, carried through the save redirect. */
+  return_query?: string
 }
 
 /** Replaces question_shares for every row in the group (parent + sub-questions) with `orgIds`. */
@@ -172,7 +175,11 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
 
   revalidatePath('/questions')
   revalidatePath(`/questions/multi/${groupId}`)
-  redirect(`/questions/multi/${groupId}`)
+  redirect(
+    payload.return_query
+      ? `/questions/multi/${groupId}?${RETURN_PARAM}=${encodeURIComponent(payload.return_query)}`
+      : `/questions/multi/${groupId}`
+  )
 }
 
 export async function deleteQuestionGroup(groupId: string) {

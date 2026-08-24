@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import { normalizeSetSections } from '@/lib/question-set-sections'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -30,6 +31,7 @@ interface CreateAssignmentData {
   type?: 'exercise' | 'exam'
   shuffle_questions?: boolean
   shuffle_options?: boolean
+  random_question_count?: number | null
   show_results?: ShowResultsMode
   max_attempts?: number | null
   score_strategy?: ScoreStrategy
@@ -37,6 +39,10 @@ interface CreateAssignmentData {
   passing_type?: 'score' | 'percent' | null
   passing_value?: number | null
   require_work_image?: boolean
+  proctoring_enabled?: boolean
+  fullscreen_required?: boolean
+  block_clipboard?: boolean
+  exam_watermark_enabled?: boolean
   status?: AssignmentStatus
 }
 
@@ -74,6 +80,14 @@ export async function createAssignment(data: CreateAssignmentData) {
 
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
+  const isOnlineExam = data.mode === 'online' && data.type === 'exam'
+  const proctoringEnabled = isOnlineExam && data.proctoring_enabled === true
+  const randomQuestionCount = isOnlineExam
+    && Number.isInteger(data.random_question_count)
+    && (data.random_question_count as number) > 0
+    && (data.random_question_count as number) < questionIds.length
+      ? data.random_question_count
+      : null
 
   // Only keep overrides for questions actually in this assignment, with a
   // valid positive point value — drops anything a tampered client might add.
@@ -112,6 +126,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       ...(data.type ? { type: data.type } : {}),
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? false,
+      random_question_count: randomQuestionCount,
       show_results: showResults,
       max_attempts: data.max_attempts || null,
       score_strategy: data.score_strategy ?? 'best',
@@ -119,6 +134,10 @@ export async function createAssignment(data: CreateAssignmentData) {
       passing_type: data.passing_type ?? null,
       passing_value: data.passing_value ?? null,
       require_work_image: data.require_work_image ?? true,
+      proctoring_enabled: proctoringEnabled,
+      fullscreen_required: proctoringEnabled && data.fullscreen_required === true,
+      block_clipboard: proctoringEnabled && data.block_clipboard === true,
+      exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled === true,
       status: data.status ?? 'draft',
     })
     .select('id')
@@ -166,12 +185,19 @@ interface UpdateAssignmentData {
   score_strategy: ScoreStrategy
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
+  /** The question set and its order. Omit to leave both untouched. */
+  question_ids?: string[]
   question_points?: Record<string, number> | null
   display_max_score?: number | null
   show_results: ShowResultsMode
   /** Only the visibility of the frozen แฟ้มย่อย is editable after the fact —
    *  the grouping itself belongs to the แฟ้มโจทย์ this งาน came from. */
   show_sections?: boolean
+  proctoring_enabled: boolean
+  fullscreen_required: boolean
+  block_clipboard: boolean
+  random_question_count: number | null
+  exam_watermark_enabled: boolean
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -190,14 +216,56 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids')
+    .select('question_ids, sections, type, mode, random_question_count')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
 
+  const existingIds = existing.question_ids as string[]
+  // `sections` and `question_ids` are only ever written together, through
+  // normalizeSetSections — a แฟ้มย่อย must not be left pointing at a question
+  // the assignment no longer contains.
+  const questionSet = data.question_ids
+    ? normalizeSetSections(existing.sections, data.question_ids)
+    : null
+  const nextIds = questionSet?.question_ids ?? existingIds
+  const questionsChanged = questionSet !== null
+    && (nextIds.length !== existingIds.length || nextIds.some((qid, i) => qid !== existingIds[i]))
+
+  if (questionSet && nextIds.length === 0) return { error: 'ชุดข้อสอบต้องมีโจทย์อย่างน้อย 1 ข้อ' }
+
+  if (questionsChanged) {
+    // Only questions this teacher may actually assign. RLS decides that — ids
+    // it will not return are dropped by the `in` filter, so a short result
+    // means something in the list was not theirs to add.
+    const { data: allowed, error: allowedError } = await supabase
+      .from('questions')
+      .select('id')
+      .in('id', nextIds)
+      .eq('is_research_snapshot', false)
+    if (allowedError) return { error: 'ตรวจสอบโจทย์ไม่สำเร็จ กรุณาลองใหม่' }
+    if ((allowed ?? []).length !== nextIds.length) {
+      return { error: 'มีโจทย์บางข้อที่เพิ่มเข้าชุดนี้ไม่ได้ กรุณารีเฟรชหน้าแล้วลองใหม่' }
+    }
+
+    // Every attempt freezes the question set as it starts, so changing it
+    // after anyone has begun hands later students a different paper — and a
+    // different คะแนนเต็ม — from the same งาน.
+    const { data: startedSubmission, error: startedError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'แก้ไขชุดโจทย์ไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
+    }
+  }
+
   // Same sanitization as createAssignment — only keep overrides for
   // questions actually in this assignment, with a valid positive value.
-  const questionIdSet = new Set(existing.question_ids as string[])
+  const questionIdSet = new Set(nextIds)
   const sanitizedPoints = Object.fromEntries(
     Object.entries(data.question_points ?? {}).filter(
       ([qid, pts]) => questionIdSet.has(qid) && Number.isFinite(pts) && pts > 0
@@ -207,6 +275,31 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
     ? data.display_max_score
     : null
+  const isOnlineExam = existing.mode === 'online' && existing.type === 'exam'
+  const proctoringEnabled = isOnlineExam && data.proctoring_enabled
+  const randomQuestionCount = isOnlineExam
+    && Number.isInteger(data.random_question_count)
+    && data.random_question_count !== null
+    && data.random_question_count > 0
+    // Against the set being saved, not the one on disk: dropping questions
+    // could otherwise leave a draw larger than the exam it draws from.
+    && data.random_question_count < nextIds.length
+      ? data.random_question_count
+      : null
+
+  // Existing attempts already have their subset frozen. Refuse to change the
+  // draw size after anyone has started so later students do not receive a
+  // materially different exam by accident.
+  if (randomQuestionCount !== existing.random_question_count) {
+    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) return { error: 'เปลี่ยนจำนวนข้อสุ่มไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
+  }
 
   const { error } = await supabase
     .from('assignments')
@@ -214,6 +307,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       title: data.title.trim(),
       description: data.description.trim() || null,
       ...(data.show_sections === undefined ? {} : { show_sections: data.show_sections }),
+      ...(questionSet ? { question_ids: questionSet.question_ids, sections: questionSet.sections } : {}),
       start_at: data.start_at || null,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
@@ -224,6 +318,11 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       question_points: questionPoints,
       display_max_score: displayMaxScore,
       show_results: data.show_results,
+      random_question_count: randomQuestionCount,
+      proctoring_enabled: proctoringEnabled,
+      fullscreen_required: proctoringEnabled && data.fullscreen_required,
+      block_clipboard: proctoringEnabled && data.block_clipboard,
+      exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled,
     })
     .eq('id', id)
 
@@ -306,6 +405,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       type: source.type,
       shuffle_questions: source.shuffle_questions,
       shuffle_options: source.shuffle_options,
+      random_question_count: source.random_question_count ?? null,
       show_results: source.show_results,
       max_attempts: source.max_attempts,
       score_strategy: source.score_strategy,
@@ -313,6 +413,10 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       passing_type: source.passing_type,
       passing_value: source.passing_value,
       require_work_image: source.require_work_image,
+      proctoring_enabled: source.proctoring_enabled ?? false,
+      fullscreen_required: source.fullscreen_required ?? false,
+      block_clipboard: source.block_clipboard ?? false,
+      exam_watermark_enabled: source.exam_watermark_enabled ?? false,
       status: 'draft',
     })
     .select('id')
@@ -339,30 +443,6 @@ export async function getMyAssignments() {
     .from('assignments')
     .select('*, classrooms(name)')
     .eq('created_by', user.id)
-    .order('created_at', { ascending: false })
-
-  return data ?? []
-}
-
-export async function getStudentAssignments() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data: memberships } = await supabase
-    .from('classroom_students')
-    .select('classroom_id')
-    .eq('student_id', user.id)
-
-  if (!memberships || memberships.length === 0) return []
-
-  const classroomIds = memberships.map((m: { classroom_id: string }) => m.classroom_id)
-
-  const { data } = await supabase
-    .from('assignments')
-    .select('*, classrooms(name), submissions(id, status, total_score, max_score)')
-    .in('classroom_id', classroomIds)
-    .eq('status', 'published')
     .order('created_at', { ascending: false })
 
   return data ?? []

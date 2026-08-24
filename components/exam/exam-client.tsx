@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { saveWorkImage, saveFileSubmission, submitSubmission } from '@/lib/actions/submissions'
+import { saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 import { gradeAnswer, type GradedAnswer } from '@/lib/assignment-attempt'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
 import { useExamTimer } from '@/hooks/use-exam-timer'
 import { useOnlineStatus } from '@/hooks/use-online-status'
+import { useExamProctor } from '@/hooks/use-exam-proctor'
 import { WorkImageUpload } from './work-image-upload'
 import { FileSubmissionUpload } from './file-submission-upload'
 import { Button } from '@/components/ui/button'
@@ -16,33 +17,36 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Calculator as CalcIcon, BookOpen, PenLine, Wifi, WifiOff, ShieldAlert, Maximize,
+  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone,
 } from 'lucide-react'
-import { Calculator } from './calculator'
-import { FormulaSheet } from './formula-sheet'
-import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, CompositePart } from '@/lib/types'
+import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
+import type {
+  SafeAnswerPart,
+  SafeCompositeConfig,
+  SafeExamAnswer,
+  SafeFillBlankConfig,
+  SafeOrderingConfig,
+  SafeRandomQuestionConfig,
+  SafeTrueFalseConfig,
+  SafeTrueFalseStatement,
+} from '@/lib/exam-safe'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
+import { ExamWatermark } from './exam-watermark'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 
-interface AnswerRow {
-  id: string
-  question_id: string
-  random_values: Record<string, number>
-  correct_answer: string
-  student_answer: string | null
-  work_images: (string | null)[] | null
+interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
+  correct_answer?: string
   // Only populated for a teacher's preview (see previewMode) — real
   // submission_answers rows carry this column too, but the real exam-taking
   // route never needs it client-side since grading happens server-side.
@@ -60,8 +64,8 @@ interface AnswerRow {
     mcq_options: Array<{ text?: string; image_url?: string; index?: number; left_text?: string; left_image?: string }> | null
     matching_options?: Array<{ right_text: string; right_image?: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
-    answer_parts: AnswerPart[] | null
-    extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | null
+    answer_parts: SafeAnswerPart[] | AnswerPart[] | null
+    extra_data: SafeExamAnswer['questions']['extra_data'] | TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | CompositeConfig
     image_urls: string[] | null
     requires_work_image: boolean
     // Preview-only, see AnswerRow.max_score above.
@@ -70,8 +74,10 @@ interface AnswerRow {
 }
 
 export interface ExamConfig {
-  isCalculatorEnabled: boolean
+  proctoringEnabled: boolean
   isFullscreenEnforced: boolean
+  blockClipboard: boolean
+  watermarkText: string | null
   // Assignment-level override of each question's own requires_work_image —
   // asked of the teacher at assignment-creation time; false switches the
   // work-image requirement off for every question in this assignment.
@@ -115,7 +121,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
 export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], previewMode = false, previewReturnHref }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
-    localAnswers, setLocalAnswers, localAnswersRef,
+    localAnswers, localAnswersRef,
     setAnswer, flushQueuedAnswers, retryPending, clearSavedAnswers,
     saving, pendingCount,
   } = useAnswerAutosave({
@@ -145,14 +151,14 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitCountdown, setSubmitCountdown] = useState(0)
 
-  // ── Tool panels ─────────────────────────────────────────────────────────────
-  const [showCalculator, setShowCalculator] = useState(false)
-  const [showFormulaSheet, setShowFormulaSheet] = useState(false)
-  const [showScratchpad, setShowScratchpad] = useState(false)
-
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
   const { showFullscreenWarning, requestFullscreen } = useFullscreenGuard(config.isFullscreenEnforced)
+  const { status: proctorStatus, activeConnectionCount: proctorActiveConnectionCount } = useExamProctor({
+    enabled: config.proctoringEnabled && !previewMode,
+    submissionId,
+    blockClipboard: config.blockClipboard,
+  })
 
   // ── Auto-sync whatever went unsaved while offline ───────────────────────────
   const isOnline = useOnlineStatus({
@@ -201,21 +207,16 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     })
     if (previewMode) return
     try {
-      await saveWorkImage(answerId, partIndex, url)
+      const result = await saveWorkImage(answerId, partIndex, url)
+      if (result.error) throw new Error(result.error)
     } catch {
       toast.error('บันทึกรูปวิธีทำไม่สำเร็จ ลองใหม่อีกครั้ง')
     }
   }, [previewMode])
 
-  const handleFileSubmissionChange = useCallback(async (answerId: string, files: SubmittedFile[]) => {
-    setLocalAnswers(prev => ({ ...prev, [answerId]: JSON.stringify(files) }))
-    if (previewMode) return
-    try {
-      await saveFileSubmission(answerId, files)
-    } catch {
-      toast.error('บันทึกไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง')
-    }
-  }, [previewMode])
+  const handleFileSubmissionChange = useCallback((answerId: string, files: SubmittedFile[]) => {
+    handleAnswerChange(answerId, JSON.stringify(files))
+  }, [handleAnswerChange])
 
   function toggleFlag(answerId: string) {
     setFlagged(prev => {
@@ -238,20 +239,25 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     setSubmitting(true)
     // Do not grade against stale DB values when the student confirms within
     // the debounce window or while an earlier save is still in flight.
-    await flushQueuedAnswers()
+    const allAnswersSynced = await flushQueuedAnswers()
+    if (!previewMode && !allAnswersSynced) {
+      toast.error('ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองส่งอีกครั้ง')
+      setSubmitting(false)
+      return
+    }
     if (previewMode) {
       // Grade locally with the exact same rules a real submission would get
       // (see gradeAnswer) — nothing is written anywhere, so this costs
       // nothing and leaves no trace.
       const graded = answers.map(a => gradeAnswer({
         id: a.id,
-        correct_answer: a.correct_answer,
+        correct_answer: a.correct_answer ?? '',
         student_answer: localAnswersRef.current[a.id] ?? null,
         max_score: a.max_score ?? 0,
         questions: {
           question_type: a.questions.question_type,
           answer_tolerance: a.questions.answer_tolerance ?? 0.1,
-          answer_parts: a.questions.answer_parts,
+          answer_parts: a.questions.answer_parts as AnswerPart[] | null,
           extra_data: a.questions.extra_data,
         },
       }))
@@ -348,15 +354,6 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const mainInlineBlank = current.questions.question_type === 'written'
     && countAnswerBlanks(currentQuestionText) > 0
 
-  // ── Toolbar buttons ───────────────────────────────────────────────────────────
-
-  const toolBtn = (active: boolean) =>
-    `flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
-      active
-        ? 'bg-primary/15 border-primary/40 text-primary'
-        : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
-    }`
-
   // ── Exam body (shared between normal + focus mode) ────────────────────────────
 
   const examBody = (
@@ -426,20 +423,13 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             )
           )}
 
-          {Object.keys(current.random_values).length > 0 && (
-            <div className="bg-muted/40 rounded-xl p-3 border border-border/50">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">ค่าที่กำหนด</p>
-              <div className="flex flex-wrap gap-2">
-                {current.questions.variables
-                  .filter((v) => v.type !== 'reference')
-                  .map(v => (
-                    <span key={v.name} className="text-sm font-mono bg-background border rounded-lg px-2.5 py-1">
-                      {v.name} = {current.random_values[v.name]}
-                    </span>
-                  ))}
-              </div>
-            </div>
-          )}
+          {/* No "ค่าที่กำหนด" readout while sitting the exam. Every {name} in the
+              question text is already replaced with the value this student drew,
+              so the panel restated the same numbers underneath the question.
+              Note this leaves a variable that the question text never mentions
+              with nowhere to appear — write such a value into the text itself.
+              The submission review still lists them, where a teacher marking an
+              attempt has to see what that student was given. */}
         </Card>
 
         {/* Answer inputs */}
@@ -463,21 +453,21 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           ) : current.questions.question_type === 'true_false' ? (
             <TrueFalseAnswerInput
               answerId={current.id}
-              config={current.questions.extra_data as TrueFalseConfig}
+              config={current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
           ) : current.questions.question_type === 'fill_blank' ? (
             <FillBlankAnswerInput
               questionText={current.questions.question_text}
-              config={current.questions.extra_data as FillBlankConfig}
+              config={current.questions.extra_data as FillBlankConfig | SafeFillBlankConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
           ) : current.questions.question_type === 'ordering' ? (
             <OrderingAnswerInput
               answerId={current.id}
-              config={current.questions.extra_data as OrderingConfig}
+              config={current.questions.extra_data as OrderingConfig | SafeOrderingConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
@@ -488,7 +478,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             />
           ) : current.questions.question_type === 'composite' ? (
             <CompositeAnswerInput
-              config={current.questions.extra_data as CompositeConfig}
+              config={current.questions.extra_data as CompositeConfig | SafeCompositeConfig}
               rawValue={localAnswers[current.id] ?? ''}
               onChange={val => handleAnswerChange(current.id, val)}
             />
@@ -497,7 +487,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               answerId={current.id}
               parts={current.questions.answer_parts}
               questionText={currentQuestionText}
-              labels={partLabels((current.questions.extra_data as RandomQuestionConfig | null)?.part_label_style)}
+              labels={partLabels((current.questions.extra_data as RandomQuestionConfig | SafeRandomQuestionConfig | null)?.part_label_style)}
               fallbackUnit={current.questions.answer_unit}
               rawValue={localAnswers[current.id] ?? ''}
               onSingleChange={val => handleAnswerChange(current.id, val)}
@@ -668,6 +658,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
   return (
     <>
+      {config.watermarkText && <ExamWatermark text={config.watermarkText} />}
+
       {/* ── Preview mode banner ────────────────────────────────────────────── */}
       {previewMode && (
         <div className="fixed top-0 inset-x-0 z-[110] bg-warning text-amber-950 text-xs font-semibold px-4 py-1.5 flex items-center justify-center gap-3">
@@ -680,44 +672,48 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
       {/* ── Fullscreen warning overlay ─────────────────────────────────────── */}
       {config.isFullscreenEnforced && showFullscreenWarning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-destructive/15 backdrop-blur-sm">
-          <div className="text-center max-w-md px-8">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
+          <Card padding="2xl" elevation="xl" className="text-center max-w-md">
             <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-5">
               <ShieldAlert size={40} className="text-destructive" />
             </div>
-            <h2 className="text-2xl font-black text-white mb-2">⚠️ ออกจากโหมดเต็มจอ</h2>
-            <p className="text-destructive text-sm mb-6">
+            <h2 className="text-2xl font-black text-foreground mb-2">ออกจากโหมดเต็มจอ</h2>
+            <p className="text-muted-foreground text-sm mb-6">
               ระบบตรวจจับว่าคุณออกจากโหมดเต็มจอ<br />
               กรุณากลับสู่โหมดเต็มจอเพื่อทำข้อสอบต่อ
             </p>
-            <button
+            <Button
               onClick={enterFullscreen}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold px-8 py-3 rounded-xl transition-colors flex items-center gap-2 mx-auto"
+              variant="destructive"
+              size="lg"
+              className="mx-auto"
             >
               <Maximize size={18} />
               กลับสู่โหมดเต็มจอ
-            </button>
-            <p className="text-destructive/60 text-xs mt-4">เหตุการณ์นี้ถูกบันทึกไว้ในระบบ</p>
-          </div>
+            </Button>
+            <p className="text-muted-foreground text-xs mt-4">
+              {config.proctoringEnabled ? 'เหตุการณ์นี้จะแสดงในห้องคุมสอบของครู' : 'กรุณากลับเข้าเต็มจอเพื่อทำต่อ'}
+            </p>
+          </Card>
         </div>
       )}
 
       {/* ── Tab switch warning toast ───────────────────────────────────────── */}
+      {proctorActiveConnectionCount > 1 && (
+        <div className="fixed left-1/2 top-4 z-[90] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl bg-destructive px-5 py-3 text-sm font-semibold text-destructive-foreground shadow-2xl">
+          <MonitorSmartphone className="size-4 shrink-0" aria-hidden="true" />
+          ตรวจพบหน้าสอบนี้เปิดพร้อมกัน {proctorActiveConnectionCount} จุด — กรุณาปิดหน้าที่ซ้ำ ครูได้รับแจ้งแล้ว
+        </div>
+      )}
+
       {showTabWarning && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] bg-destructive text-destructive-foreground px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
+        <div className={`fixed left-1/2 z-[90] flex -translate-x-1/2 items-center gap-3 rounded-xl bg-destructive px-5 py-3 text-sm font-semibold text-destructive-foreground shadow-2xl ${
+          proctorActiveConnectionCount > 1 ? 'top-20' : 'top-4'
+        }`}>
           <ShieldAlert size={16} />
           ตรวจพบการสลับแท็บ — ครั้งที่ {tabSwitchCount}
         </div>
       )}
-
-      {/* ── Tool panels ────────────────────────────────────────────────────── */}
-      {showCalculator && (
-        <div className="fixed bottom-4 left-4 z-50">
-          <Calculator onClose={() => setShowCalculator(false)} />
-        </div>
-      )}
-      {showFormulaSheet && <FormulaSheet onClose={() => setShowFormulaSheet(false)} />}
-      {showScratchpad   && <Scratchpad  onClose={() => setShowScratchpad(false)}  />}
 
       {/* ── Preview results (previewMode only, after submit) ─────────────────── */}
       {previewResult && (
@@ -740,14 +736,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             pendingSync={pendingCount}
             tabSwitchCount={tabSwitchCount}
             config={config}
-            showCalculator={showCalculator}
-            showFormulaSheet={showFormulaSheet}
-            showScratchpad={showScratchpad}
-            onToggleCalc={() => setShowCalculator(v => !v)}
-            onToggleFormula={() => setShowFormulaSheet(v => !v)}
-            onToggleScratch={() => setShowScratchpad(v => !v)}
+            proctorStatus={proctorStatus}
+            proctorActiveConnectionCount={proctorActiveConnectionCount}
             onFocusMode={() => setFocusMode(true)}
-            toolBtn={toolBtn}
           />
           {/* Progress bar */}
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -774,19 +765,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                 <p className="text-sm font-medium truncate">{current.questions.title || 'ชุดข้อสอบ'}</p>
               </div>
 
-              {/* Toolbar in focus mode */}
               <div className="flex items-center gap-2 shrink-0">
-                {config.isCalculatorEnabled && (
-                  <button onClick={() => setShowCalculator(v => !v)} className={toolBtn(showCalculator)}>
-                    <CalcIcon size={12} /> คิดเลข
-                  </button>
-                )}
-                <button onClick={() => setShowFormulaSheet(v => !v)} className={toolBtn(showFormulaSheet)}>
-                  <BookOpen size={12} /> สูตร
-                </button>
-                <button onClick={() => setShowScratchpad(v => !v)} className={toolBtn(showScratchpad)}>
-                  <PenLine size={12} /> ทด
-                </button>
                 <button
                   onClick={() => setFocusMode(false)}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -970,46 +949,21 @@ function PreviewResultSummary({
 
 function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
-  config, showCalculator, showFormulaSheet, showScratchpad,
-  onToggleCalc, onToggleFormula, onToggleScratch, onFocusMode, toolBtn,
+  proctorStatus,
+  proctorActiveConnectionCount,
+  config, onFocusMode,
 }: {
   saving: boolean
   isOnline: boolean
   pendingSync: number
   tabSwitchCount: number
+  proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
+  proctorActiveConnectionCount: number
   config: ExamConfig
-  showCalculator: boolean
-  showFormulaSheet: boolean
-  showScratchpad: boolean
-  onToggleCalc: () => void
-  onToggleFormula: () => void
-  onToggleScratch: () => void
   onFocusMode: () => void
-  toolBtn: (active: boolean) => string
 }) {
   return (
     <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
-      {/* Left: Tool buttons */}
-      <div className="flex items-center gap-2">
-        {config.isCalculatorEnabled && (
-          <button onClick={onToggleCalc} className={toolBtn(showCalculator)} title="เครื่องคิดเลขวิทยาศาสตร์">
-            <CalcIcon size={13} />
-            <span className="hidden sm:inline">คิดเลข</span>
-          </button>
-        )}
-        <button onClick={onToggleFormula} className={toolBtn(showFormulaSheet)} title="สูตรและค่าคงที่">
-          <BookOpen size={13} />
-          <span className="hidden sm:inline">สูตร</span>
-        </button>
-        <button onClick={onToggleScratch} className={toolBtn(showScratchpad)} title="กระดาษทด">
-          <PenLine size={13} />
-          <span className="hidden sm:inline">ทด</span>
-        </button>
-      </div>
-
-      {/* Divider */}
-      <div className="h-4 w-px bg-border" />
-
       {/* Status indicators */}
       <div className="flex items-center gap-2 text-xs">
         {saving ? (
@@ -1030,6 +984,23 @@ function ExamToolbar({
         {tabSwitchCount > 0 && (
           <span className="text-destructive flex items-center gap-1">
             <ShieldAlert size={11} /> สลับแท็บ {tabSwitchCount}×
+          </span>
+        )}
+        {config.proctoringEnabled && (
+          <span className={`flex items-center gap-1 ${
+            proctorStatus === 'connected' ? 'text-success' : 'text-warning'
+          }`}>
+            <ShieldAlert size={11} />
+            {proctorStatus === 'connected'
+              ? 'เชื่อมห้องคุมสอบแล้ว'
+              : proctorStatus === 'offline'
+                ? 'ห้องคุมสอบรอเชื่อมต่อ'
+                : 'กำลังเชื่อมห้องคุมสอบ'}
+          </span>
+        )}
+        {proctorActiveConnectionCount > 1 && (
+          <span className="flex items-center gap-1 text-destructive">
+            <MonitorSmartphone size={11} /> เปิดพร้อมกัน {proctorActiveConnectionCount} จุด
           </span>
         )}
       </div>
@@ -1137,7 +1108,7 @@ function MultiPartAnswerInput({
   requiresWorkImage, workImages, onWorkImageChange,
 }: {
   answerId: string
-  parts: AnswerPart[] | null
+  parts: SafeAnswerPart[] | AnswerPart[] | null
   questionText?: string
   labels: string[]
   fallbackUnit: string | null
@@ -1271,7 +1242,9 @@ function MultiPartAnswerInput({
 // mode below: answers[i] === 'true' means "ticked", compared directly
 // against the pre-flipped target built in submissions.ts.
 function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChange }: {
-  config: TrueFalseConfig | null; subStatements: TrueFalseStatement[]; mode: TrueFalseExplanationMode
+  config: TrueFalseConfig | SafeTrueFalseConfig | null
+  subStatements: Array<TrueFalseStatement | SafeTrueFalseStatement>
+  mode: TrueFalseExplanationMode
   rawValue: string; onChange: (v: string) => void
 }) {
   let answers: string[] = []; let explanation = ''
@@ -1322,7 +1295,10 @@ function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChan
 }
 
 function TrueFalseAnswerInput({ config, rawValue, onChange }: {
-  answerId: string; config: TrueFalseConfig | null; rawValue: string; onChange: (v: string) => void
+  answerId: string
+  config: TrueFalseConfig | SafeTrueFalseConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const mode = config?.explanation_mode ?? 'none'
   const subStatements = config?.statements ?? []
@@ -1423,7 +1399,10 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
 // ─── Fill-blank ───────────────────────────────────────────────────────────────
 
 function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
-  questionText: string; config: FillBlankConfig | null; rawValue: string; onChange: (v: string) => void
+  questionText: string
+  config: FillBlankConfig | SafeFillBlankConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const blanks = config?.blanks ?? []
   const parts  = splitFillBlankHtml(questionText)
@@ -1515,7 +1494,10 @@ function MatchingAnswerInput({ prompts, options, rawValue, onChange }: {
 }
 
 function OrderingAnswerInput({ config, rawValue, onChange }: {
-  answerId: string; config: OrderingConfig | null; rawValue: string; onChange: (v: string) => void
+  answerId: string
+  config: OrderingConfig | SafeOrderingConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const items: OrderingItem[] = config?.items ?? []
   const n = items.length
@@ -1582,7 +1564,9 @@ function orderSelFromRaw(raw: string): Record<string, string> {
 }
 
 function CompositeAnswerInput({ config, rawValue, onChange }: {
-  config: CompositeConfig | null; rawValue: string; onChange: (v: string) => void
+  config: CompositeConfig | SafeCompositeConfig | null
+  rawValue: string
+  onChange: (v: string) => void
 }) {
   const parts = config?.parts ?? []
   const labels = partLabels(config?.part_label_style)

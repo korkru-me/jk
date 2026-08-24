@@ -18,6 +18,7 @@ import { McqAutoForm } from './mcq-auto-form'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, MCQOption, FormulaPreset, Question } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 const OPTION_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ']
 
@@ -115,7 +116,8 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
 
 function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: { allTags: string[]; mode?: 'create' | 'edit'; question?: Question; isOwner?: boolean }) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 

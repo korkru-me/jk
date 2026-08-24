@@ -12,6 +12,7 @@ import {
 import { AssignmentCalendar, type CalendarEvent } from './_components/assignment-calendar'
 import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
+import { canStudentViewScore } from '@/lib/result-visibility'
 import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 
@@ -53,6 +54,7 @@ export default async function DashboardPage() {
         .from('questions')
         .select('id, title, question_type', { count: 'exact' })
         .eq('created_by', user.id)
+        .eq('is_research_snapshot', false)
         // Grouped questions are stored one row per member; only the first row
         // represents the question in a list.
         .or('group_id.is.null,order_in_group.eq.0')
@@ -114,9 +116,9 @@ export default async function DashboardPage() {
       .from('classroom_students')
       .select('classroom_id')
       .eq('student_id', user.id),
-    supabase
+    admin
       .from('submissions')
-      .select('id, total_score, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results)')
+      .select('id, total_score, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results, end_at)')
       .eq('student_id', user.id),
   ])
 
@@ -129,9 +131,9 @@ export default async function DashboardPage() {
     s.assignment_id as string,
     (s.assignments?.display_max_score ?? null) as number | null,
   ]))
-  const showResultsByAssignment = new Map(rawSubmissions.map((s: any) => [
+  const scoreVisibilityByAssignment = new Map(rawSubmissions.map((s: any) => [
     s.assignment_id as string,
-    s.assignments?.show_results as string | undefined,
+    canStudentViewScore(s.assignments?.show_results, s.assignments?.end_at),
   ]))
   const allSubmissions = rescaleToDisplayMax(
     rawSubmissions as any[],
@@ -141,7 +143,7 @@ export default async function DashboardPage() {
     (s: any) => s.status === 'submitted' || s.status === 'graded'
   )
   const completedWithVisibleResults = completed.filter(
-    (s: any) => showResultsByAssignment.get(s.assignment_id) !== 'never'
+    (s: any) => scoreVisibilityByAssignment.get(s.assignment_id) === true
   )
   const avgPct = completedWithVisibleResults.length > 0
     ? Math.round(
@@ -157,9 +159,9 @@ export default async function DashboardPage() {
   // waterfall while still using assignment_classrooms as the source of truth.
   const [assignmentsRes, recentPostsRes] = classroomIds.length > 0
     ? await Promise.all([
-        supabase
+        admin
           .from('assignments')
-          .select('id, title, question_ids, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
+          .select('id, title, question_ids, random_question_count, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
           .in('assignment_classrooms.classroom_id', classroomIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),
@@ -212,6 +214,7 @@ export default async function DashboardPage() {
         id: a.id,
         title: a.title,
         question_ids: a.question_ids,
+        random_question_count: a.random_question_count,
         classrooms: a.classrooms,
         end_at: a.end_at,
         duration_minutes: a.duration_minutes,
@@ -445,7 +448,8 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
 
 function AssignmentCard({ assignment: a }: { assignment: any }) {
   const due = getDueInfo(a.end_at)
-  const questionCount = (a.question_ids as string[] | null)?.length ?? 0
+  const poolCount = (a.question_ids as string[] | null)?.length ?? 0
+  const questionCount = (a.random_question_count as number | null) ?? poolCount
 
   return (
     <div className={`bg-card border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-all ${
@@ -466,7 +470,7 @@ function AssignmentCard({ assignment: a }: { assignment: any }) {
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <BookOpen size={11} />
-          {questionCount} ข้อ
+          {questionCount} ข้อ{a.random_question_count ? ` (สุ่มจาก ${poolCount})` : ''}
         </span>
         {a.duration_minutes && (
           <span className="flex items-center gap-1">

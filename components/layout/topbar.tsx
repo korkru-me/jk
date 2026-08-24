@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { logout } from '@/lib/actions/auth'
@@ -23,7 +24,10 @@ interface TopbarProps {
 
 export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, onSidebarCollapseToggle }: TopbarProps) {
   const { resolvedTheme, setTheme } = useTheme()
+  const [themeMounted, setThemeMounted] = useState(false)
   const isDark = resolvedTheme === 'dark'
+
+  useEffect(() => setThemeMounted(true), [])
 
   return (
     <header className="h-16 border-b bg-card flex items-center justify-between px-4 sm:px-6 shrink-0">
@@ -52,27 +56,29 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
         <NotificationsBell initialUnreadCount={initialUnreadCount} />
 
         {/* Dark / Light toggle switch */}
-        <div className="flex items-center gap-1.5">
-          <Sun size={13} className={isDark ? 'text-muted-foreground' : 'text-warning'} />
-          <button
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            aria-label="สลับโหมดสี"
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-              isDark ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-flex h-5 w-5 items-center justify-center rounded-full bg-card shadow-md ring-0 transition-transform duration-200 ${
-                isDark ? 'translate-x-5' : 'translate-x-0'
+        {themeMounted ? (
+          <div className="flex items-center gap-1.5">
+            <Sun size={13} className={isDark ? 'text-muted-foreground' : 'text-warning'} />
+            <button
+              onClick={() => setTheme(isDark ? 'light' : 'dark')}
+              aria-label="สลับโหมดสี"
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                isDark ? 'bg-primary' : 'bg-muted'
               }`}
             >
-              {isDark
-                ? <Moon size={10} className="text-primary" />
-                : <Sun size={10} className="text-warning" />}
-            </span>
-          </button>
-          <Moon size={13} className={isDark ? 'text-primary' : 'text-muted-foreground'} />
-        </div>
+              <span
+                className={`pointer-events-none inline-flex h-5 w-5 items-center justify-center rounded-full bg-card shadow-md ring-0 transition-transform duration-200 ${
+                  isDark ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              >
+                {isDark
+                  ? <Moon size={10} className="text-primary" />
+                  : <Sun size={10} className="text-warning" />}
+              </span>
+            </button>
+            <Moon size={13} className={isDark ? 'text-primary' : 'text-muted-foreground'} />
+          </div>
+        ) : <div className="h-6 w-[81px]" aria-hidden="true" />}
 
         {/* User dropdown */}
         <DropdownMenu>

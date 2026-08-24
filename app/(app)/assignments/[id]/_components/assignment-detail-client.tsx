@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
-  AlertCircle, Activity, Copy, Pencil, Eye,
+  AlertCircle, Activity, Copy, Pencil, Eye, Radio,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
@@ -121,10 +121,12 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
 
             {/* Quick stats */}
             <div className="flex items-center gap-5 mt-4 text-sm">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" title={a.random_question_count ? `สุ่มจากคลัง ${a.question_ids.length} ข้อ` : undefined}>
                 <FileText className="w-4 h-4 text-surface-inverse-muted" />
-                <span className="font-semibold">{a.question_ids.length}</span>
-                <span className="text-surface-inverse-muted">ข้อ</span>
+                <span className="font-semibold">
+                  {a.random_question_count ? `${a.random_question_count}/${a.question_ids.length}` : a.question_ids.length}
+                </span>
+                <span className="text-surface-inverse-muted">{a.random_question_count ? 'ข้อสุ่ม/คลัง' : 'ข้อ'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-surface-inverse-muted" />
@@ -190,6 +192,13 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             <Link href={`/assignments/${a.id}/preview`} target="_blank">
               <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
                 <Eye className="w-3.5 h-3.5" /> ดูตัวอย่างมุมมองนักเรียน
+              </Button>
+            </Link>
+          )}
+          {a.mode === 'online' && a.type === 'exam' && (
+            <Link href={`/assignments/${a.id}/proctor`}>
+              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
+                <Radio className="w-3.5 h-3.5" /> ห้องคุมสอบสด
               </Button>
             </Link>
           )}

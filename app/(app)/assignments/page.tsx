@@ -1,26 +1,40 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
-import type { Assignment } from '@/lib/types'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
+import { canStudentViewScore } from '@/lib/result-visibility'
 import { ExamDashboard } from './_components/exam-dashboard'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
 
-export type AssignmentRow = Assignment & { classrooms: { name: string } | null }
+export interface AssignmentRow {
+  id: string
+  title: string
+  question_ids: string[]
+  random_question_count: number | null
+  duration_minutes: number | null
+  end_at: string | null
+  show_results: string
+  max_attempts: number | null
+  score_strategy: 'best' | 'average' | 'latest'
+  display_max_score: number | null
+  classrooms: { name: string } | null
+}
 
 export default async function AssignmentsPage() {
   const supabase = await createClient()
   const user = await getAuthUser()
   if (!user) redirect('/login')
+  const admin = createAdminClient()
 
   // Role, memberships, and the student's attempts are independent once the
   // auth user is known. Pull them together instead of waiting on three
   // separate database round trips.
   const [profileRes, membershipsRes, submissionsRes] = await Promise.all([
     supabase.from('users').select('role').eq('id', user.id).single(),
-    supabase
+    admin
       .from('classroom_students')
       .select('classroom_id')
       .eq('student_id', user.id),
@@ -45,15 +59,27 @@ export default async function AssignmentsPage() {
   // Join assignment_classrooms directly so multi-classroom assignments stay
   // correct without a links -> ids -> assignments waterfall.
   const { data: published } = cids.length > 0
-    ? await supabase
+    ? await admin
         .from('assignments')
-        .select('*, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .select('id, title, question_ids, random_question_count, duration_minutes, end_at, show_results, max_attempts, score_strategy, display_max_score, classrooms(name), assignment_classrooms!inner(classroom_id)')
         .in('assignment_classrooms.classroom_id', cids)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
     : { data: [] }
 
-  const pList = (published ?? []) as AssignmentRow[]
+  const pList: AssignmentRow[] = (published ?? []).map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    question_ids: row.question_ids ?? [],
+    random_question_count: row.random_question_count ?? null,
+    duration_minutes: row.duration_minutes,
+    end_at: row.end_at,
+    show_results: row.show_results,
+    max_attempts: row.max_attempts,
+    score_strategy: row.score_strategy,
+    display_max_score: row.display_max_score,
+    classrooms: Array.isArray(row.classrooms) ? row.classrooms[0] ?? null : row.classrooms,
+  }))
   const publishedIds = new Set(pList.map(a => a.id))
   const rawMySubs = (submissionsRes.data ?? []).filter((s: any) => publishedIds.has(s.assignment_id))
 
@@ -88,7 +114,14 @@ export default async function AssignmentsPage() {
   for (const [assignmentId, attempts] of attemptsByAssignment) {
     const official = selectOfficialAttempt(attempts, strategyByAssignment.get(assignmentId) ?? 'best')
     if (official) {
-      mySubMap[assignmentId] = { id: official.representative.id, status: official.representative.status, total_score: official.total_score, max_score: official.max_score }
+      const assignment = pList.find(row => row.id === assignmentId)
+      const scoreVisible = canStudentViewScore(assignment?.show_results, assignment?.end_at)
+      mySubMap[assignmentId] = {
+        id: official.representative.id,
+        status: official.representative.status,
+        total_score: scoreVisible ? official.total_score : null,
+        max_score: official.max_score,
+      }
     }
   }
 

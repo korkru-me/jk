@@ -38,12 +38,14 @@ interface Props {
    * a question the teacher just unticked pinned where they can put it back.
    */
   baselineIds?: string[]
+  /** What the picks go into, for the จะเพิ่ม/จะเอาออก notes on each row. */
+  collectionNoun?: string
 }
 
 export function QuestionPicker({
   questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
   title = 'เลือกโจทย์', banner, showSelectedFooter = true, showHeader = true, surface = 'card',
-  baselineIds,
+  baselineIds, collectionNoun = 'แฟ้ม',
 }: Props) {
   const [workImageOverrides, setWorkImageOverrides] = useState<Record<string, boolean>>({})
   const [, startTransition] = useTransition()
@@ -203,6 +205,7 @@ export function QuestionPicker({
             : isSelected && !wasSelected ? 'add'
             : !isSelected && wasSelected ? 'remove'
             : null
+          const orderNumber = isSelected ? selectedIds.indexOf(q.id) + 1 : null
           // Divider right where the pinned (selected) block ends, only when
           // both groups are present — makes the reordering self-explanatory
           // instead of the list just silently jumping around.
@@ -229,10 +232,19 @@ export function QuestionPicker({
                   className="mt-0.5 accent-primary"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {/* Which number this question will carry in the finished
+                        paper. The footer chips numbered the picks already; the
+                        rows did not, so the order was only visible by counting
+                        chips against a list of titles. */}
+                    {orderNumber !== null && (
+                      <span className="text-primary font-semibold mr-1.5">ข้อ {orderNumber}</span>
+                    )}
+                    {q.title}
+                  </p>
                   {pending ? (
                     <p className={`text-xs mt-0.5 font-medium ${pending === 'add' ? 'text-success' : 'text-destructive'}`}>
-                      {pending === 'add' ? '+ จะเพิ่มเข้าแฟ้ม' : '− จะเอาออกจากแฟ้ม'}
+                      {pending === 'add' ? `+ จะเพิ่มเข้า${collectionNoun}` : `− จะเอาออกจาก${collectionNoun}`}
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{questionExcerpt(q.question_text)}</p>

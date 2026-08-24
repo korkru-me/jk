@@ -281,6 +281,24 @@ export function moveQuestionInSet(
   return normalizeSetSections(sections, moveWithin(questionIds, index, delta))
 }
 
+/**
+ * Moves one question to an absolute position — 0-based, clamped to the list.
+ *
+ * `moveQuestionInSet` nudges by one, which is nineteen clicks to get ข้อ 20 up
+ * to ข้อ 1, so the order number is editable as well as the arrows.
+ */
+export function moveQuestionToIndex(
+  sections: readonly QuestionSetSection[],
+  questionIds: readonly string[],
+  questionId: string,
+  targetIndex: number
+): { sections: QuestionSetSection[]; question_ids: string[] } {
+  const index = questionIds.indexOf(questionId)
+  if (index < 0) return normalizeSetSections(sections, questionIds)
+  const clamped = Math.max(0, Math.min(questionIds.length - 1, Math.trunc(targetIndex)))
+  return normalizeSetSections(sections, moveWithin(questionIds, index, clamped - index))
+}
+
 /** Removes several questions from the set entirely. */
 export function removeQuestionsFromSet(
   sections: readonly QuestionSetSection[],

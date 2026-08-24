@@ -76,6 +76,162 @@ export interface ClassroomStudent {
   joined_at: string
 }
 
+export type EducationResearchDesign = 'one_group_pretest_posttest'
+export type EducationResearchProjectStatus =
+  | 'draft'
+  | 'collecting_pretest'
+  | 'teaching'
+  | 'collecting_posttest'
+  | 'ready_for_analysis'
+  | 'completed'
+  | 'archived'
+export type EducationResearchMeasurementType = 'pretest' | 'posttest'
+export type EducationResearchSourceType = 'korkru_exam' | 'manual' | 'excel'
+export type EducationResearchScoreHistoryAction = 'insert' | 'update' | 'delete'
+
+export interface EducationResearchProject {
+  id: string
+  org_id: string
+  classroom_id: string
+  created_by: string
+  title: string
+  topic: string
+  research_design: EducationResearchDesign
+  status: EducationResearchProjectStatus
+  passing_threshold_percent: number
+  significance_level: number
+  criterion_test_sides: 2
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EducationResearchParticipant {
+  id: string
+  org_id: string
+  project_id: string
+  student_id: string
+  roster_order: number | null
+  created_at: string
+}
+
+export interface EducationResearchMeasurement {
+  id: string
+  org_id: string
+  project_id: string
+  measurement_type: EducationResearchMeasurementType
+  source_type: EducationResearchSourceType | null
+  assignment_id: string | null
+  max_score: number | null
+  selection_mode: 'set' | 'sections' | 'individual' | 'same_as_pretest' | null
+  source_set_id: string | null
+  source_sections: QuestionSetSection[]
+  source_question_ids: string[]
+  snapshot_question_ids: string[]
+  duration_minutes: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EducationResearchScore {
+  id: string
+  org_id: string
+  project_id: string
+  participant_id: string
+  measurement_id: string
+  raw_score: number
+  max_score: number
+  score_source: EducationResearchSourceType
+  submission_id: string | null
+  recorded_by: string | null
+  updated_by: string | null
+  change_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EducationResearchScoreHistory {
+  id: number
+  org_id: string
+  project_id: string
+  score_id: string | null
+  participant_id: string
+  measurement_id: string
+  action: EducationResearchScoreHistoryAction
+  old_score: number | null
+  new_score: number | null
+  old_max_score: number | null
+  new_max_score: number | null
+  old_source: EducationResearchSourceType | null
+  new_source: EducationResearchSourceType | null
+  reason: string | null
+  changed_by: string | null
+  changed_at: string
+}
+
+export interface EducationResearchScoreDraft {
+  id: string
+  org_id: string
+  project_id: string
+  participant_id: string
+  measurement_id: string
+  raw_score: number
+  saved_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type EducationResearchImportBatchStatus = 'previewed' | 'invalid' | 'confirmed' | 'cancelled'
+export type EducationResearchImportRowStatus = 'ready' | 'warning' | 'error'
+export type EducationResearchImportScoreAction = 'add' | 'update' | 'unchanged' | 'blank'
+
+export interface EducationResearchImportTemplate {
+  id: string
+  org_id: string
+  project_id: string
+  version: number
+  created_by: string
+  created_at: string
+}
+
+export interface EducationResearchImportBatch {
+  id: string
+  org_id: string
+  project_id: string
+  template_id: string
+  file_name: string
+  status: EducationResearchImportBatchStatus
+  row_count: number
+  ready_count: number
+  warning_count: number
+  error_count: number
+  created_by: string
+  confirmed_by: string | null
+  confirmed_at: string | null
+  created_at: string
+}
+
+export interface EducationResearchImportBatchRow {
+  id: string
+  org_id: string
+  project_id: string
+  batch_id: string
+  participant_id: string | null
+  row_number: number
+  student_code_file: string | null
+  full_name_file: string | null
+  note_file: string | null
+  incoming_pretest: number | null
+  incoming_posttest: number | null
+  current_pretest: number | null
+  current_posttest: number | null
+  pretest_action: EducationResearchImportScoreAction | null
+  posttest_action: EducationResearchImportScoreAction | null
+  validation_status: EducationResearchImportRowStatus
+  messages: string[]
+  created_at: string
+}
+
 export interface QuestionCategory {
   id: string
   name: string
@@ -298,6 +454,9 @@ export interface Question {
   shared_org_ids?: string[]
   /** Whether teammates with access to this question (via org_id/question_shares) may edit it. Default true. */
   team_edit_allowed: boolean
+  is_research_snapshot: boolean
+  research_snapshot_project_id: string | null
+  research_snapshot_source_id: string | null
   category_id: string
   grade_level: string | null
   subject: string | null
@@ -372,6 +531,9 @@ export interface Assignment {
   type: AssignmentType
   shuffle_questions: boolean
   shuffle_options: boolean
+  /** Optional per-attempt sample size from question_ids. The selected subset
+   * is frozen into submission_answers, so reloading never draws a new set. */
+  random_question_count: number | null
   show_results: ShowResultsMode
   max_attempts: number | null
   score_strategy: ScoreStrategy
@@ -379,6 +541,14 @@ export interface Assignment {
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   require_work_image: boolean
+  /** Browser-level presence/integrity signals. This is not kiosk-mode or an
+   * operating-system security boundary. */
+  proctoring_enabled: boolean
+  fullscreen_required: boolean
+  block_clipboard: boolean
+  /** Browser-level screenshot deterrence. It identifies the current student
+   * and attempt on screen but cannot block OS screenshots or camera photos. */
+  exam_watermark_enabled: boolean
   created_at: string
   updated_at: string
 }

@@ -6,7 +6,7 @@ export default async function AdminCategoriesPage() {
 
   const [{ data: categories }, { data: qCounts }] = await Promise.all([
     admin.from('question_categories').select('*').order('order'),
-    admin.from('questions').select('category_id'),
+    admin.from('questions').select('category_id').eq('is_research_snapshot', false),
   ])
 
   const countMap: Record<string, number> = {}

@@ -16,6 +16,7 @@ import { sortStudents } from '@/lib/student-sort'
 import { ScoreEditor } from '@/components/assignments/score-editor'
 import { Card } from '@/components/ui/card'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
+import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -54,17 +55,40 @@ export default async function SubmissionResultPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
+  const user = await getAuthUser()
+  if (!user) redirect('/login')
+  const admin = createAdminClient()
 
-  // No student_id filter here — RLS (submissions_student_own /
-  // submissions_org_teacher_select) already scopes this to the owning
-  // student or the assignment's teacher, so a teacher can review a
-  // student's submission (including any attached work-images) too.
-  // RLS reads the auth cookie directly, so the secured submission lookup can
-  // run alongside getUser instead of waiting for a separate network round
-  // trip first. An unauthenticated lookup simply returns no visible row.
-  const [user, submissionRes] = await Promise.all([
-    getAuthUser(),
-    supabase
+  // Student assignment rows are intentionally not readable directly because
+  // they contain access_code. Use an exact owner filter through the trusted
+  // server client, then attach only the small answer summary when review is
+  // already released. A non-owner falls through to teacher-scoped RLS.
+  const { data: ownSubmission } = await admin
+    .from('submissions')
+    .select(`
+      id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
+      users(full_name),
+      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, display_max_score)
+    `)
+    .eq('id', id)
+    .eq('student_id', user.id)
+    .maybeSingle()
+
+  let submission: any = null
+  if (ownSubmission) {
+    const ownAssignment = Array.isArray(ownSubmission.assignments)
+      ? ownSubmission.assignments[0]
+      : ownSubmission.assignments
+    const mayReview = canStudentReviewAnswers(ownAssignment?.show_results, ownAssignment?.end_at)
+    const { data: answerSummary } = mayReview
+      ? await admin
+          .from('submission_answers')
+          .select('id, correct_answer, is_correct')
+          .eq('submission_id', id)
+      : { data: [] }
+    submission = { ...ownSubmission, assignments: ownAssignment, submission_answers: answerSummary ?? [] }
+  } else {
+    const { data: teacherVisibleSubmission } = await supabase
       .from('submissions')
       .select(`
         id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
@@ -73,10 +97,9 @@ export default async function SubmissionResultPage({
         submission_answers(id, correct_answer, is_correct)
       `)
       .eq('id', id)
-      .maybeSingle(),
-  ])
-  if (!user) redirect('/login')
-  const submission = submissionRes.data
+      .maybeSingle()
+    submission = teacherVisibleSubmission
+  }
 
   if (!submission) notFound()
 
@@ -144,13 +167,8 @@ export default async function SubmissionResultPage({
   // policy. `never` hides both the score summary and answer review from the
   // student, `score_only` permanently withholds the answer review, and
   // `after_due` withholds answer details only until the deadline passes.
-  const canShowScore = isTeacherViewer || assignment.show_results !== 'never'
-  const canShowAnswers =
-    isTeacherViewer ||
-    assignment.show_results === 'immediate' ||
-    (assignment.show_results === 'after_due' && (
-      !assignment.end_at || new Date(assignment.end_at) < new Date()
-    ))
+  const canShowScore = isTeacherViewer || canStudentViewScore(assignment.show_results, assignment.end_at)
+  const canShowAnswers = isTeacherViewer || canStudentReviewAnswers(assignment.show_results, assignment.end_at)
 
   const answers = (submission as any).submission_answers as any[]
   const pendingManualCount = answers.filter(isManualFillBlank).length
@@ -243,22 +261,24 @@ export default async function SubmissionResultPage({
               <p className="text-4xl font-black">{displayScore}/{displayMax}</p>
               <p className="text-muted-foreground mt-1 text-sm">คะแนนที่ได้</p>
 
-              <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 text-success">
-                  <CheckCircle2 size={13} />
-                  ถูก {answers.filter(a => a.is_correct === true).length} ข้อ
-                </span>
-                <span className="flex items-center gap-1 text-destructive">
-                  <XCircle size={13} />
-                  ผิด {answers.filter(a => a.is_correct === false).length} ข้อ
-                </span>
-                {pendingManualCount > 0 && (
-                  <span className="flex items-center gap-1 text-warning">
-                    <Clock size={13} />
-                    รอตรวจ {pendingManualCount} ข้อ
+              {canShowAnswers && (
+                <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 text-success">
+                    <CheckCircle2 size={13} />
+                    ถูก {answers.filter(a => a.is_correct === true).length} ข้อ
                   </span>
-                )}
-              </div>
+                  <span className="flex items-center gap-1 text-destructive">
+                    <XCircle size={13} />
+                    ผิด {answers.filter(a => a.is_correct === false).length} ข้อ
+                  </span>
+                  {pendingManualCount > 0 && (
+                    <span className="flex items-center gap-1 text-warning">
+                      <Clock size={13} />
+                      รอตรวจ {pendingManualCount} ข้อ
+                    </span>
+                  )}
+                </div>
+              )}
 
               {pendingManualCount > 0 && (
                 <div className="mt-3 inline-flex items-center gap-1.5 bg-warning/10 border border-warning/20 text-warning text-xs font-medium px-3 py-1.5 rounded-full">

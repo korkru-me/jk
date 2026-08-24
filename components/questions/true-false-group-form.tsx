@@ -23,6 +23,7 @@ import type {
   Difficulty, Visibility, Question,
   CompositeConfig, CompositePart, TrueFalseStatement, TrueFalseSelectTarget,
 } from '@/lib/types'
+import { questionsReturnTo } from '@/lib/question-return'
 
 interface TrueFalseGroupFormProps {
   allTags: string[]
@@ -192,7 +193,8 @@ function SubQuestionCard({
 
 export function TrueFalseGroupForm({ allTags, mode = 'create', question, isOwner = true }: TrueFalseGroupFormProps) {
   const router = useRouter()
-  const returnTo = useSearchParams().get('tab') === 'team' ? '/questions?tab=team' : '/questions'
+  // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
+  const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
   const editorRef = useRef<RichTextEditorHandle>(null)
 

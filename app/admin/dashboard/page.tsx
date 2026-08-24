@@ -19,10 +19,10 @@ async function getStats() {
     admin.from('users').select('id', { count: 'exact', head: true }).eq('role', 'teacher'),
     admin.from('users').select('id', { count: 'exact', head: true }).eq('role', 'student'),
     admin.from('classrooms').select('id', { count: 'exact', head: true }),
-    admin.from('questions').select('id', { count: 'exact', head: true }),
-    admin.from('questions').select('id', { count: 'exact', head: true }).eq('visibility', 'public'),
-    admin.from('questions').select('id', { count: 'exact', head: true }).eq('visibility', 'private'),
-    admin.from('questions').select('id', { count: 'exact', head: true }).eq('visibility', 'pending'),
+    admin.from('questions').select('id', { count: 'exact', head: true }).eq('is_research_snapshot', false),
+    admin.from('questions').select('id', { count: 'exact', head: true }).eq('is_research_snapshot', false).eq('visibility', 'public'),
+    admin.from('questions').select('id', { count: 'exact', head: true }).eq('is_research_snapshot', false).eq('visibility', 'private'),
+    admin.from('questions').select('id', { count: 'exact', head: true }).eq('is_research_snapshot', false).eq('visibility', 'pending'),
     admin.from('submissions').select('id', { count: 'exact', head: true }),
     admin.from('submissions')
       .select('id', { count: 'exact', head: true })

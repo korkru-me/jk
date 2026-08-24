@@ -4,7 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getMyOrgId } from '@/lib/actions/org'
 import { toPortableQuestion, buildExportFile, parseExportFile, type PortableQuestion } from '@/lib/question-portable'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type { Question } from '@/lib/types'
+// One rule for "is this the same wording?", shared with the คลัง's duplicate badge.
+import { normalizeQuestionText } from '@/lib/question-content-match'
 
 type QuestionRow = Question & { question_categories?: { name: string } | null }
 
@@ -24,6 +27,7 @@ export async function exportQuestions(ids: string[]) {
     .select('*, question_categories(name)')
     .in('id', ids)
     .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
 
   if (error) return { error: error.message }
   const rows = (data ?? []) as QuestionRow[]
@@ -76,8 +80,14 @@ export async function exportQuestionSet(setId: string) {
   return { content: JSON.stringify(file, null, 2), filename: `${slugifyFilename(set.title)}.korkru.json` }
 }
 
-function normalizeForCompare(s: string) {
-  return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+/** `fetchAllRows` widens its error to unknown; Supabase's is a plain object with a message. */
+function readErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const { message } = error as { message: unknown }
+    if (typeof message === 'string') return message
+  }
+  return 'อ่านคลังโจทย์เดิมไม่สำเร็จ'
 }
 
 export interface DuplicateHit { index: number; title: string }
@@ -93,21 +103,29 @@ export async function checkImportDuplicates(raw: string): Promise<
   if ('error' in parsed) return { error: parsed.error }
   const file = parsed.data
 
-  const { data: existing, error } = await supabase
-    .from('questions')
-    .select('title, question_text')
-    .eq('created_by', user.id)
+  // Paged: PostgREST caps a response at 1,000 rows, so an unpaged read of a
+  // bank past that compared the incoming file against only part of it, and
+  // which part was left to whatever order the database happened to return.
+  // A re-import of a question in the missing tail came back as "ไม่ซ้ำ".
+  const { rows: existing, error } = await fetchAllRows<{ title: string; question_text: string }>(
+    (from, to) => supabase
+      .from('questions')
+      .select('title, question_text')
+      .eq('created_by', user.id)
+      .eq('is_research_snapshot', false)
+      .order('id')
+      .range(from, to)
+  )
+  if (error) return { error: readErrorMessage(error) }
 
-  if (error) return { error: error.message }
-
-  const existingTitles = new Set((existing ?? []).map(r => normalizeForCompare(r.title as string)))
-  const existingTexts = new Set((existing ?? []).map(r => normalizeForCompare(r.question_text as string)))
+  const existingTitles = new Set(existing.map(r => normalizeQuestionText(r.title)))
+  const existingTexts = new Set(existing.map(r => normalizeQuestionText(r.question_text)))
 
   const duplicates: DuplicateHit[] = file.questions
     .map((pq, index) => ({
       index,
       title: pq.title,
-      isDup: existingTitles.has(normalizeForCompare(pq.title)) || existingTexts.has(normalizeForCompare(pq.question_text)),
+      isDup: existingTitles.has(normalizeQuestionText(pq.title)) || existingTexts.has(normalizeQuestionText(pq.question_text)),
     }))
     .filter(d => d.isDup)
     .map(({ index, title }) => ({ index, title }))
@@ -245,15 +263,25 @@ export async function importQuestionsFromFile(
 
   // Both lookups are per batch rather than per question: the taxonomy to map
   // category names onto ids, the titles to rename around collisions.
-  const [{ data: categories }, { data: existing }] = await Promise.all([
+  const [{ data: categories }, existingTitles] = await Promise.all([
     supabase.from('question_categories').select('id, name, parent_id'),
+    // Paged for the same reason as the duplicate check: a title read that
+    // stopped at 1,000 rows could hand out a "(2)" that a later question in
+    // the same bank already answers to.
     duplicateDecision === 'rename'
-      ? supabase.from('questions').select('title').eq('created_by', user.id)
-      : Promise.resolve({ data: [] as { title: string }[] }),
+      ? fetchAllRows<{ title: string }>((from, to) => supabase
+        .from('questions')
+        .select('title')
+        .eq('created_by', user.id)
+        .eq('is_research_snapshot', false)
+        .order('id')
+        .range(from, to)
+      ).then(result => result.rows)
+      : Promise.resolve([] as { title: string }[]),
   ])
 
   const resolveCategory = makeCategoryResolver((categories ?? []) as CategoryRow[])
-  const resolveTitle = makeTitleResolver((existing ?? []).map(r => r.title as string))
+  const resolveTitle = makeTitleResolver(existingTitles.map(r => r.title))
 
   const rows = file.questions.flatMap((pq, i) => {
     if (dupSet.has(i) && duplicateDecision === 'skip') return []
