@@ -66,10 +66,10 @@
 2. ครูรวมโจทย์เป็น `question_sets` หรือเลือกตรงเข้า `assignments`
 3. `assignment_classrooms` เชื่อมงานหนึ่งรายการกับหลายห้อง
 4. เมื่อเริ่มทำ `startSubmission()` จะสร้าง `submissions` และ `submission_answers`
-5. ค่าตัวแปรสุ่ม เฉลย ลำดับข้อ และลำดับตัวเลือกถูกตรึงใน attempt
+5. หากตั้ง `random_question_count` ระบบสุ่ม subset จากคลัง `question_ids` ก่อน แล้วตรึง subset, ค่าตัวแปรสุ่ม เฉลย ลำดับข้อ และลำดับตัวเลือกไว้ใน `submission_answers` ของ attempt; reload/resume จึงไม่สุ่มใหม่
 6. `getExamTakingData()` อ่าน attempt ด้วย trusted server client หลังตรวจ owner แล้วแปลงผ่าน `toSafeExamAnswer()`; browser ไม่ได้รับ answer snapshot, สูตร, correct flags หรือ canonical ordering
 7. นักเรียนบันทึกคำตอบระหว่างทำผ่าน Server Action; direct browser mutation ของ `submissions`/`submission_answers` ถูก revoke
-8. หาก assignment เปิดคุมสอบ `useExamProctor()` ส่ง heartbeat/เหตุการณ์แบบ batch ไปยัง `recordProctorSignal()`; action ตรวจ session + exact attempt แล้วให้ service role เรียก RPC ที่ตรวจซ้ำและเขียน `exam_proctor_sessions`/`exam_proctor_events` แบบ atomic ครูรับการเปลี่ยนแปลงผ่าน Supabase Realtime ภายใต้ RLS
+8. หาก assignment เปิดคุมสอบ `useExamProctor()` ส่ง heartbeat/เหตุการณ์แบบ batch ไปยัง `recordProctorSignal()`; action ตรวจ session + exact attempt แล้วให้ service role เรียก RPC ที่ตรวจซ้ำและเขียน `exam_proctor_sessions`/`exam_proctor_events` แบบ atomic ครูรับการเปลี่ยนแปลงผ่าน Supabase Realtime ภายใต้ RLS ส่วน `exam_watermark_enabled` แสดงชื่อกับรหัส attempt เฉพาะบน client เพื่อเป็นแรงเสียดทานต่อการส่งภาพ ไม่ได้บันทึกภาพหน้าจอ
 9. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
 10. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
 

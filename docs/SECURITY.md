@@ -66,6 +66,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - การบันทึกคำตอบ รูปวิธีทำ ไฟล์ การส่ง และการแก้คะแนนผ่าน server boundary หลังตรวจ session + exact owner/teacher + attempt status + deadline; browser role ไม่มีสิทธิ์เขียน `submissions`/`submission_answers` โดยตรง
 - `users_update_own` ใช้สำหรับโปรไฟล์เท่านั้น ต้องมี trigger ป้องกัน self-update ของ authority fields (`role`, `status`)
 - Fullscreen, tab visibility, copy/paste และ screenshot deterrence เป็นเพียงสัญญาณ/แรงเสียดทาน ไม่ใช่ security boundary และห้ามใช้แทนการปกป้องเฉลยฝั่ง server
+- ลายน้ำข้อสอบแสดงเฉพาะชื่อเจ้าของ attempt, UUID ส่วนสั้น และเวลาปัจจุบันเพื่อให้ภาพที่ส่งต่อระบุที่มาได้ง่ายขึ้น ไม่ใช่การป้องกัน screenshot; ห้ามใส่อีเมล เบอร์โทร ข้อมูลอ่อนไหว หรือ answer content ลงในลายน้ำ
 - ข้อมูลคุมสอบต้องเก็บเท่าที่จำเป็น: ชนิด browser event, เวลา, presence/counter และ foreign keys เท่านั้น ห้ามเพิ่มภาพหน้าจอ กล้อง ไมโครโฟน เนื้อหาคำตอบ หรือ keystroke โดยไม่มีการออกแบบวัตถุประสงค์ consent retention และสิทธิ์ใหม่
 - นักเรียนห้ามเขียนตาราง proctor โดยตรง; Server Action ต้องตรวจ exact submission owner + `in_progress` ก่อนใช้ service role และครูอ่านได้เฉพาะ assignment ที่ตนจัดการ ข้อมูลเหล่านี้เป็นหลักฐานประกอบการพิจารณา ไม่ใช่การตัดสินทุจริตอัตโนมัติ
 

@@ -121,10 +121,12 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
 
             {/* Quick stats */}
             <div className="flex items-center gap-5 mt-4 text-sm">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" title={a.random_question_count ? `สุ่มจากคลัง ${a.question_ids.length} ข้อ` : undefined}>
                 <FileText className="w-4 h-4 text-surface-inverse-muted" />
-                <span className="font-semibold">{a.question_ids.length}</span>
-                <span className="text-surface-inverse-muted">ข้อ</span>
+                <span className="font-semibold">
+                  {a.random_question_count ? `${a.random_question_count}/${a.question_ids.length}` : a.question_ids.length}
+                </span>
+                <span className="text-surface-inverse-muted">{a.random_question_count ? 'ข้อสุ่ม/คลัง' : 'ข้อ'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-surface-inverse-muted" />

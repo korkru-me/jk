@@ -248,6 +248,7 @@ const assignment = {
   shuffle_questions: false,
   shuffle_options: false,
   question_points: null,
+  random_question_count: null,
 } as unknown as Assignment
 
 /** An mcq question shaped the way mcq-form.tsx saves one: the options carry
@@ -346,6 +347,52 @@ describe('multiple choice, from attempt to grade', () => {
     ])])
     expect(skeleton.correct_answer).toBe('')
     expect(gradeMcq(skeleton.correct_answer, 'MCQ:0').is_correct).toBe(false)
+  })
+})
+
+describe('buildAssignmentAttempt — random question pool', () => {
+  const poolQuestions = ['q1', 'q2', 'q3', 'q4'].map((id) => ({
+    ...mcqQuestion([
+      { text: 'ผิด', is_correct: false },
+      { text: 'ถูก', is_correct: true },
+    ]),
+    id,
+  }))
+
+  it('samples the configured number without duplicate questions', () => {
+    const result = buildAssignmentAttempt({
+      ...assignment,
+      question_ids: poolQuestions.map((question) => question.id),
+      random_question_count: 2,
+    }, poolQuestions)
+
+    expect(result).toHaveLength(2)
+    expect(new Set(result.map((row) => row.question_id)).size).toBe(2)
+    expect(result.every((row) => poolQuestions.some((question) => question.id === row.question_id))).toBe(true)
+    expect(result.map((row) => row.order_index)).toEqual([0, 1])
+  })
+
+  it('keeps authored order after sampling when question shuffling is off', () => {
+    const authoredOrder = poolQuestions.map((question) => question.id)
+    const result = buildAssignmentAttempt({
+      ...assignment,
+      question_ids: authoredOrder,
+      random_question_count: 3,
+    }, poolQuestions)
+    const selectedIndexes = result.map((row) => authoredOrder.indexOf(row.question_id))
+
+    expect(selectedIndexes).toEqual([...selectedIndexes].sort((a, b) => a - b))
+  })
+
+  it('samples only questions that still exist', () => {
+    const result = buildAssignmentAttempt({
+      ...assignment,
+      question_ids: ['deleted-question', ...poolQuestions.map((question) => question.id)],
+      random_question_count: 4,
+    }, poolQuestions)
+
+    expect(result).toHaveLength(4)
+    expect(result.some((row) => row.question_id === 'deleted-question')).toBe(false)
   })
 })
 

@@ -13,6 +13,7 @@ export interface AssignmentRow {
   id: string
   title: string
   question_ids: string[]
+  random_question_count: number | null
   duration_minutes: number | null
   end_at: string | null
   show_results: string
@@ -60,7 +61,7 @@ export default async function AssignmentsPage() {
   const { data: published } = cids.length > 0
     ? await admin
         .from('assignments')
-        .select('id, title, question_ids, duration_minutes, end_at, show_results, max_attempts, score_strategy, display_max_score, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .select('id, title, question_ids, random_question_count, duration_minutes, end_at, show_results, max_attempts, score_strategy, display_max_score, classrooms(name), assignment_classrooms!inner(classroom_id)')
         .in('assignment_classrooms.classroom_id', cids)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
@@ -70,6 +71,7 @@ export default async function AssignmentsPage() {
     id: row.id,
     title: row.title,
     question_ids: row.question_ids ?? [],
+    random_question_count: row.random_question_count ?? null,
     duration_minutes: row.duration_minutes,
     end_at: row.end_at,
     show_results: row.show_results,

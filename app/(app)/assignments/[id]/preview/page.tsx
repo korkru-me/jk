@@ -122,6 +122,7 @@ export default async function AssignmentPreviewPage({
     proctoringEnabled: false,
     isFullscreenEnforced: false,
     blockClipboard: false,
+    watermarkText: a.exam_watermark_enabled ? 'ตัวอย่างผู้เข้าสอบ • PREVIEW' : null,
     isWorkImageEnforced: a.require_work_image ?? true,
   }
 

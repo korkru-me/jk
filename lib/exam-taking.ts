@@ -18,6 +18,8 @@ export interface ExamTakingData {
     proctoring_enabled: boolean
     fullscreen_required: boolean
     block_clipboard: boolean
+    exam_watermark_enabled: boolean
+    watermark_text: string | null
   }
   answers: SafeExamAnswer[]
 }
@@ -35,7 +37,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard)')
+    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -58,6 +60,10 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
     ? submission.assignments[0]
     : submission.assignments
   if (!assignment) return null
+  const student = Array.isArray(submission.users) ? submission.users[0] : submission.users
+  const watermarkText = assignment.exam_watermark_enabled
+    ? `${student?.full_name?.trim() || 'ผู้เข้าสอบ'} • ครั้งสอบ ${submission.id.slice(0, 8).toUpperCase()}`
+    : null
 
   const answers = (answerRows ?? [])
     .map(row => toSafeExamAnswer(row as unknown as Parameters<typeof toSafeExamAnswer>[0]))
@@ -77,6 +83,8 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       proctoring_enabled: assignment.proctoring_enabled ?? false,
       fullscreen_required: assignment.fullscreen_required ?? false,
       block_clipboard: assignment.block_clipboard ?? false,
+      exam_watermark_enabled: assignment.exam_watermark_enabled ?? false,
+      watermark_text: watermarkText,
     },
     answers,
   }

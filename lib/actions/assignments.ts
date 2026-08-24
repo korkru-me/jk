@@ -30,6 +30,7 @@ interface CreateAssignmentData {
   type?: 'exercise' | 'exam'
   shuffle_questions?: boolean
   shuffle_options?: boolean
+  random_question_count?: number | null
   show_results?: ShowResultsMode
   max_attempts?: number | null
   score_strategy?: ScoreStrategy
@@ -40,6 +41,7 @@ interface CreateAssignmentData {
   proctoring_enabled?: boolean
   fullscreen_required?: boolean
   block_clipboard?: boolean
+  exam_watermark_enabled?: boolean
   status?: AssignmentStatus
 }
 
@@ -77,7 +79,14 @@ export async function createAssignment(data: CreateAssignmentData) {
 
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
-  const proctoringEnabled = data.mode === 'online' && data.type === 'exam' && data.proctoring_enabled === true
+  const isOnlineExam = data.mode === 'online' && data.type === 'exam'
+  const proctoringEnabled = isOnlineExam && data.proctoring_enabled === true
+  const randomQuestionCount = isOnlineExam
+    && Number.isInteger(data.random_question_count)
+    && (data.random_question_count as number) > 0
+    && (data.random_question_count as number) < questionIds.length
+      ? data.random_question_count
+      : null
 
   // Only keep overrides for questions actually in this assignment, with a
   // valid positive point value — drops anything a tampered client might add.
@@ -116,6 +125,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       ...(data.type ? { type: data.type } : {}),
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? false,
+      random_question_count: randomQuestionCount,
       show_results: showResults,
       max_attempts: data.max_attempts || null,
       score_strategy: data.score_strategy ?? 'best',
@@ -126,6 +136,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       proctoring_enabled: proctoringEnabled,
       fullscreen_required: proctoringEnabled && data.fullscreen_required === true,
       block_clipboard: proctoringEnabled && data.block_clipboard === true,
+      exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled === true,
       status: data.status ?? 'draft',
     })
     .select('id')
@@ -182,6 +193,8 @@ interface UpdateAssignmentData {
   proctoring_enabled: boolean
   fullscreen_required: boolean
   block_clipboard: boolean
+  random_question_count: number | null
+  exam_watermark_enabled: boolean
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -200,7 +213,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, type, mode')
+    .select('question_ids, type, mode, random_question_count')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -217,7 +230,29 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
     ? data.display_max_score
     : null
-  const proctoringEnabled = existing.mode === 'online' && existing.type === 'exam' && data.proctoring_enabled
+  const isOnlineExam = existing.mode === 'online' && existing.type === 'exam'
+  const proctoringEnabled = isOnlineExam && data.proctoring_enabled
+  const randomQuestionCount = isOnlineExam
+    && Number.isInteger(data.random_question_count)
+    && data.random_question_count !== null
+    && data.random_question_count > 0
+    && data.random_question_count < existing.question_ids.length
+      ? data.random_question_count
+      : null
+
+  // Existing attempts already have their subset frozen. Refuse to change the
+  // draw size after anyone has started so later students do not receive a
+  // materially different exam by accident.
+  if (randomQuestionCount !== existing.random_question_count) {
+    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) return { error: 'เปลี่ยนจำนวนข้อสุ่มไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
+  }
 
   const { error } = await supabase
     .from('assignments')
@@ -235,9 +270,11 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       question_points: questionPoints,
       display_max_score: displayMaxScore,
       show_results: data.show_results,
+      random_question_count: randomQuestionCount,
       proctoring_enabled: proctoringEnabled,
       fullscreen_required: proctoringEnabled && data.fullscreen_required,
       block_clipboard: proctoringEnabled && data.block_clipboard,
+      exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled,
     })
     .eq('id', id)
 
@@ -320,6 +357,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       type: source.type,
       shuffle_questions: source.shuffle_questions,
       shuffle_options: source.shuffle_options,
+      random_question_count: source.random_question_count ?? null,
       show_results: source.show_results,
       max_attempts: source.max_attempts,
       score_strategy: source.score_strategy,
@@ -330,6 +368,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       proctoring_enabled: source.proctoring_enabled ?? false,
       fullscreen_required: source.fullscreen_required ?? false,
       block_clipboard: source.block_clipboard ?? false,
+      exam_watermark_enabled: source.exam_watermark_enabled ?? false,
       status: 'draft',
     })
     .select('id')

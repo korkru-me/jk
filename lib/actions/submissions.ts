@@ -122,6 +122,9 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   if (!questions || questions.length === 0) return { error: 'ไม่พบโจทย์' }
 
   const skeletons = buildAssignmentAttempt(assignment, questions as Question[])
+  if (assignment.random_question_count && skeletons.length < assignment.random_question_count) {
+    return { error: 'ข้อสอบในคลังเหลือไม่ครบตามจำนวนที่ตั้งไว้ กรุณาแจ้งครูผู้สอน' }
+  }
   const totalMaxScore = skeletons.reduce((sum, s) => sum + s.max_score, 0)
 
   // A submission belongs to the same immutable tenant as its assignment.

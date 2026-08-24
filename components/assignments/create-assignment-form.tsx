@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
+  Fingerprint, ListFilter,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, parseSections, type QuestionSetSection,
@@ -95,6 +96,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
+  const [randomQuestionCount, setRandomQuestionCount] = useState('')
   const [showResults, setShowResults] = useState<ShowResultsMode>('immediate')
   const [maxAttempts, setMaxAttempts] = useState('')
   const [attemptsAuto, setAttemptsAuto] = useState(true)
@@ -103,6 +105,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
   const [fullscreenRequired, setFullscreenRequired] = useState(false)
   const [blockClipboard, setBlockClipboard] = useState(false)
+  const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
   const [passingEnabled, setPassingEnabled] = useState(false)
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
@@ -230,6 +233,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       const displayMax = displayMaxScore.trim() !== '' && Number.isFinite(parsedDisplayMax) && parsedDisplayMax > 0
         ? parsedDisplayMax
         : null
+      const parsedRandomCount = Number(randomQuestionCount)
+      const selectedRandomCount = randomQuestionCount.trim() !== ''
+        && Number.isInteger(parsedRandomCount)
+        && parsedRandomCount > 0
+        && parsedRandomCount < selectedIds.length
+          ? parsedRandomCount
+          : null
 
       const res = await createAssignment({
         classroom_ids: classroomIds,
@@ -248,6 +258,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         type: assignmentType,
         shuffle_questions: shuffleQ,
         shuffle_options: shuffleA,
+        random_question_count: selectedRandomCount,
         show_results: showResults,
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
@@ -258,6 +269,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
         block_clipboard: blockClipboard,
+        exam_watermark_enabled: examWatermarkEnabled,
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -662,6 +674,56 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               )
             })}
           </div>
+
+          {mode === 'online' && assignmentType === 'exam' && (
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <ListFilter className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">สุ่มชุดข้อสอบรายคน</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    เลือกจากคลัง {selectedIds.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอด attempt รวมถึงหลัง reload
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pl-11">
+                <Input
+                  id="random-question-count"
+                  type="number"
+                  min={1}
+                  max={Math.max(1, selectedIds.length - 1)}
+                  value={randomQuestionCount}
+                  onChange={event => setRandomQuestionCount(event.target.value)}
+                  placeholder={`ครบทั้ง ${selectedIds.length} ข้อ`}
+                  disabled={selectedIds.length < 2}
+                  className="max-w-[150px]"
+                />
+                <Label htmlFor="random-question-count" className="text-sm text-muted-foreground">
+                  ข้อต่อคน
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground pl-11">
+                เว้นว่างเพื่อใช้ครบทุกข้อ หากคะแนนแต่ละข้อไม่เท่ากัน ควรตั้ง “คะแนนเต็มที่แสดงผล” เพื่อให้เปรียบเทียบกันได้ง่าย
+              </p>
+              <label className="flex items-center justify-between gap-4 border-t border-border pt-3 cursor-pointer">
+                <div className="flex items-start gap-3">
+                  <Fingerprint className="w-4 h-4 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">แสดงลายน้ำผู้เข้าสอบ</p>
+                    <p className="text-xs text-muted-foreground">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={examWatermarkEnabled}
+                  onChange={event => setExamWatermarkEnabled(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+            </div>
+          )}
 
           {mode === 'online' && assignmentType === 'exam' && (
             <div className="space-y-3 rounded-xl border border-border p-4">

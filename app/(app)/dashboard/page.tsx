@@ -161,7 +161,7 @@ export default async function DashboardPage() {
     ? await Promise.all([
         admin
           .from('assignments')
-          .select('id, title, question_ids, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
+          .select('id, title, question_ids, random_question_count, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
           .in('assignment_classrooms.classroom_id', classroomIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),
@@ -214,6 +214,7 @@ export default async function DashboardPage() {
         id: a.id,
         title: a.title,
         question_ids: a.question_ids,
+        random_question_count: a.random_question_count,
         classrooms: a.classrooms,
         end_at: a.end_at,
         duration_minutes: a.duration_minutes,
@@ -447,7 +448,8 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
 
 function AssignmentCard({ assignment: a }: { assignment: any }) {
   const due = getDueInfo(a.end_at)
-  const questionCount = (a.question_ids as string[] | null)?.length ?? 0
+  const poolCount = (a.question_ids as string[] | null)?.length ?? 0
+  const questionCount = (a.random_question_count as number | null) ?? poolCount
 
   return (
     <div className={`bg-card border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-all ${
@@ -468,7 +470,7 @@ function AssignmentCard({ assignment: a }: { assignment: any }) {
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <BookOpen size={11} />
-          {questionCount} ข้อ
+          {questionCount} ข้อ{a.random_question_count ? ` (สุ่มจาก ${poolCount})` : ''}
         </span>
         {a.duration_minutes && (
           <span className="flex items-center gap-1">

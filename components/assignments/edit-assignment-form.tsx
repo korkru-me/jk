@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter } from 'lucide-react'
 import { parseSections } from '@/lib/question-set-sections'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,6 +50,8 @@ export type EditableAssignment = Pick<
   | 'proctoring_enabled'
   | 'fullscreen_required'
   | 'block_clipboard'
+  | 'random_question_count'
+  | 'exam_watermark_enabled'
 >
 
 export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text'>
@@ -72,6 +74,10 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
   const [fullscreenRequired, setFullscreenRequired] = useState(a.fullscreen_required)
   const [blockClipboard, setBlockClipboard] = useState(a.block_clipboard)
+  const [randomQuestionCount, setRandomQuestionCount] = useState(
+    a.random_question_count != null ? String(a.random_question_count) : ''
+  )
+  const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
   const assignmentSections = parseSections(a.sections)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
@@ -130,6 +136,8 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
         block_clipboard: blockClipboard,
+        random_question_count: randomQuestionCount ? Number(randomQuestionCount) : null,
+        exam_watermark_enabled: examWatermarkEnabled,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -149,6 +157,56 @@ export function EditAssignmentForm({ assignment: a, questions }: Props) {
           <Textarea id="edit-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
         </div>
       </Card>
+
+      {a.mode === 'online' && a.type === 'exam' && (
+        <Card padding="xl" className="space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <ListFilter className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">สุ่มชุดข้อสอบรายคน</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                เลือกจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอด attempt รวมถึงหลัง reload
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pl-11">
+            <Input
+              id="edit-random-question-count"
+              type="number"
+              min={1}
+              max={Math.max(1, a.question_ids.length - 1)}
+              value={randomQuestionCount}
+              onChange={event => setRandomQuestionCount(event.target.value)}
+              placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
+              disabled={a.question_ids.length < 2}
+              className="max-w-[150px]"
+            />
+            <Label htmlFor="edit-random-question-count" className="text-sm text-muted-foreground">
+              ข้อต่อคน
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground pl-11">
+            เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว
+          </p>
+          <label className="flex items-center justify-between gap-4 border-t border-border pt-3 cursor-pointer">
+            <div className="flex items-start gap-3">
+              <Fingerprint className="w-4 h-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">แสดงลายน้ำผู้เข้าสอบ</p>
+                <p className="text-xs text-muted-foreground">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={examWatermarkEnabled}
+              onChange={event => setExamWatermarkEnabled(event.target.checked)}
+              className="accent-primary w-4 h-4 shrink-0"
+            />
+          </label>
+        </Card>
+      )}
 
       {a.mode === 'online' && a.type === 'exam' && (
         <Card padding="xl" className="space-y-3">

@@ -42,6 +42,7 @@ import type {
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
+import { ExamWatermark } from './exam-watermark'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ export interface ExamConfig {
   proctoringEnabled: boolean
   isFullscreenEnforced: boolean
   blockClipboard: boolean
+  watermarkText: string | null
   // Assignment-level override of each question's own requires_work_image —
   // asked of the teacher at assignment-creation time; false switches the
   // work-image requirement off for every question in this assignment.
@@ -681,6 +683,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
   return (
     <>
+      {config.watermarkText && <ExamWatermark text={config.watermarkText} />}
+
       {/* ── Preview mode banner ────────────────────────────────────────────── */}
       {previewMode && (
         <div className="fixed top-0 inset-x-0 z-[110] bg-warning text-amber-950 text-xs font-semibold px-4 py-1.5 flex items-center justify-center gap-3">

@@ -50,6 +50,7 @@ export default async function TakeExamPage({
     proctoringEnabled: assignment.proctoring_enabled,
     isFullscreenEnforced: assignment.fullscreen_required,
     blockClipboard: assignment.block_clipboard,
+    watermarkText: assignment.watermark_text,
     isWorkImageEnforced: assignment.require_work_image ?? true,
   }
 

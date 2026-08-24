@@ -531,6 +531,9 @@ export interface Assignment {
   type: AssignmentType
   shuffle_questions: boolean
   shuffle_options: boolean
+  /** Optional per-attempt sample size from question_ids. The selected subset
+   * is frozen into submission_answers, so reloading never draws a new set. */
+  random_question_count: number | null
   show_results: ShowResultsMode
   max_attempts: number | null
   score_strategy: ScoreStrategy
@@ -543,6 +546,9 @@ export interface Assignment {
   proctoring_enabled: boolean
   fullscreen_required: boolean
   block_clipboard: boolean
+  /** Browser-level screenshot deterrence. It identifies the current student
+   * and attempt on screen but cannot block OS screenshots or camera photos. */
+  exam_watermark_enabled: boolean
   created_at: string
   updated_at: string
 }
