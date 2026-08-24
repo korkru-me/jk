@@ -6,8 +6,10 @@ import { normalizeProctorEvents } from '@/lib/exam-proctor'
 
 interface RecordProctorSignalInput {
   submissionId: string
+  clientInstanceId: string
   tabVisible: boolean
   fullscreen: boolean
+  connectionClosed?: boolean
   events: unknown
 }
 
@@ -19,6 +21,7 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (!UUID_PATTERN.test(input.submissionId)) return { error: 'ข้อมูลการสอบไม่ถูกต้อง' }
+  if (!UUID_PATTERN.test(input.clientInstanceId)) return { error: 'ข้อมูลการเชื่อมต่อไม่ถูกต้อง' }
   if (typeof input.tabVisible !== 'boolean' || typeof input.fullscreen !== 'boolean') {
     return { error: 'สถานะหน้าสอบไม่ถูกต้อง' }
   }
@@ -50,14 +53,21 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
     return { error: 'ไม่สามารถบันทึกสถานะคุมสอบนี้ได้' }
   }
 
-  const { error } = await admin.rpc('record_exam_proctor_signal', {
+  const { data: activeConnectionCount, error } = await admin.rpc('record_exam_proctor_signal', {
     p_submission_id: input.submissionId,
     p_student_id: user.id,
+    p_client_instance_id: input.clientInstanceId,
     p_tab_visible: input.tabVisible,
     p_fullscreen: input.fullscreen,
+    p_connection_closed: input.connectionClosed === true,
     p_events: events.map(event => ({ id: event.id, type: event.type, client_at: event.clientAt })),
   })
 
   if (error) return { error: 'บันทึกสถานะคุมสอบไม่สำเร็จ' }
-  return { success: true as const }
+  return {
+    success: true as const,
+    activeConnectionCount: typeof activeConnectionCount === 'number'
+      ? Math.max(0, Math.floor(activeConnectionCount))
+      : 0,
+  }
 }

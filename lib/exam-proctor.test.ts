@@ -13,6 +13,9 @@ describe('normalizeProctorEvents', () => {
   it('rejects unknown event types and invalid timestamps', () => {
     const id = 'd8f57df1-7fbf-4ac3-86ec-d384045838c3'
     expect(normalizeProctorEvents([{ id, type: 'camera_photo', clientAt: new Date().toISOString() }])).toBeNull()
+    // This alert is authored by the database after counting active leases;
+    // a student client must not be able to forge it in an event batch.
+    expect(normalizeProctorEvents([{ id, type: 'concurrent_connection', clientAt: new Date().toISOString() }])).toBeNull()
     expect(normalizeProctorEvents([{ id, type: 'tab_hidden', clientAt: 'not-a-date' }])).toBeNull()
     expect(normalizeProctorEvents([{ id: 'not-a-uuid', type: 'tab_hidden', clientAt: new Date().toISOString() }])).toBeNull()
   })

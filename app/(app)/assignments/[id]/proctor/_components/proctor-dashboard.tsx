@@ -12,6 +12,7 @@ import {
   Maximize,
   Minimize,
   MonitorCheck,
+  MonitorSmartphone,
   Radio,
   Settings,
   ShieldAlert,
@@ -49,6 +50,8 @@ export interface ProctorSessionRow {
   window_blur_count: number
   clipboard_attempt_count: number
   screenshot_key_count: number
+  active_connection_count: number
+  concurrent_connection_count: number
   last_event_type: string | null
   last_event_at: string | null
   created_at: string
@@ -97,6 +100,7 @@ const EVENT_LABELS: Record<string, string> = {
   paste_attempt: 'พยายามวางข้อความ',
   context_menu_attempt: 'เปิดเมนูคลิกขวา',
   screenshot_key: 'กดปุ่ม Print Screen',
+  concurrent_connection: 'ตรวจพบหน้าสอบเปิดพร้อมกันหลายจุด',
 }
 
 const REVIEW_EVENT_TYPES = new Set([
@@ -108,6 +112,7 @@ const REVIEW_EVENT_TYPES = new Set([
   'paste_attempt',
   'context_menu_attempt',
   'screenshot_key',
+  'concurrent_connection',
 ])
 
 function formatTime(value: string | null): string {
@@ -126,6 +131,7 @@ function sessionHasFlags(session: ProctorSessionRow): boolean {
     || session.window_blur_count > 0
     || session.clipboard_attempt_count > 0
     || session.screenshot_key_count > 0
+    || session.concurrent_connection_count > 0
 }
 
 export function ProctorDashboard({ assignment, initialParticipants, initialSessions, initialEvents }: Props) {
@@ -231,6 +237,7 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
   const flaggedCount = rows.filter(row => row.flagged).length
   const completedCount = rows.filter(row => row.completed).length
   const offlineCount = rows.filter(row => row.session && !row.active && !row.completed).length
+  const concurrentCount = rows.filter(row => (row.session?.concurrent_connection_count ?? 0) > 0).length
 
   if (!assignment.enabled) {
     return (
@@ -287,8 +294,9 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
         </div>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="กำลังทำและเชื่อมต่อ" value={activeCount} icon={Wifi} tone="success" />
+        <SummaryCard label="เคยเปิดพร้อมกันหลายจุด" value={concurrentCount} icon={MonitorSmartphone} tone="destructive" />
         <SummaryCard label="มีสัญญาณให้ตรวจ" value={flaggedCount} icon={ShieldAlert} tone="warning" />
         <SummaryCard label="ขาดการเชื่อมต่อ" value={offlineCount} icon={WifiOff} tone="destructive" />
         <SummaryCard label="ส่งแล้ว" value={completedCount} icon={CheckCircle2} />
@@ -411,6 +419,9 @@ function StudentStatusRow({ name, session, active, flagged, completed, fullscree
             <Badge variant="outline">ยังไม่เริ่ม</Badge>
           )}
           {flagged && <Badge variant="destructive"><ShieldAlert aria-hidden="true" /> ควรตรวจสอบ</Badge>}
+          {(session?.active_connection_count ?? 0) > 1 && (
+            <Badge variant="destructive"><MonitorSmartphone aria-hidden="true" /> เปิดพร้อมกัน {session?.active_connection_count} จุด</Badge>
+          )}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
           {session ? `สัญญาณล่าสุด ${formatTime(session.last_seen_at)}` : 'ยังไม่พบการเชื่อมต่อจากหน้าสอบ'}
@@ -431,6 +442,7 @@ function StudentStatusRow({ name, session, active, flagged, completed, fullscree
           <span className="text-muted-foreground">ออกเต็มจอ <strong className="text-foreground">{session.fullscreen_exit_count}</strong></span>
           <span className="text-muted-foreground">หน้าต่างหลุดโฟกัส <strong className="text-foreground">{session.window_blur_count}</strong></span>
           <span className="text-muted-foreground">คัดลอก/วาง <strong className="text-foreground">{session.clipboard_attempt_count}</strong></span>
+          <span className="text-muted-foreground">พบเปิดซ้ำ <strong className="text-foreground">{session.concurrent_connection_count}</strong> ครั้ง</span>
         </div>
       )}
     </div>

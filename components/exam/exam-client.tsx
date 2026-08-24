@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Calculator as CalcIcon, BookOpen, PenLine, Wifi, WifiOff, ShieldAlert, Maximize,
+  Calculator as CalcIcon, BookOpen, PenLine, Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone,
 } from 'lucide-react'
 import { Calculator } from './calculator'
 import { FormulaSheet } from './formula-sheet'
@@ -163,7 +163,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
   const { showFullscreenWarning, requestFullscreen } = useFullscreenGuard(config.isFullscreenEnforced)
-  const { status: proctorStatus } = useExamProctor({
+  const { status: proctorStatus, activeConnectionCount: proctorActiveConnectionCount } = useExamProctor({
     enabled: config.proctoringEnabled && !previewMode,
     submissionId,
     blockClipboard: config.blockClipboard,
@@ -724,8 +724,17 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       )}
 
       {/* ── Tab switch warning toast ───────────────────────────────────────── */}
+      {proctorActiveConnectionCount > 1 && (
+        <div className="fixed left-1/2 top-4 z-[90] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl bg-destructive px-5 py-3 text-sm font-semibold text-destructive-foreground shadow-2xl">
+          <MonitorSmartphone className="size-4 shrink-0" aria-hidden="true" />
+          ตรวจพบหน้าสอบนี้เปิดพร้อมกัน {proctorActiveConnectionCount} จุด — กรุณาปิดหน้าที่ซ้ำ ครูได้รับแจ้งแล้ว
+        </div>
+      )}
+
       {showTabWarning && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] bg-destructive text-destructive-foreground px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
+        <div className={`fixed left-1/2 z-[90] flex -translate-x-1/2 items-center gap-3 rounded-xl bg-destructive px-5 py-3 text-sm font-semibold text-destructive-foreground shadow-2xl ${
+          proctorActiveConnectionCount > 1 ? 'top-20' : 'top-4'
+        }`}>
           <ShieldAlert size={16} />
           ตรวจพบการสลับแท็บ — ครั้งที่ {tabSwitchCount}
         </div>
@@ -762,6 +771,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             tabSwitchCount={tabSwitchCount}
             config={config}
             proctorStatus={proctorStatus}
+            proctorActiveConnectionCount={proctorActiveConnectionCount}
             showCalculator={showCalculator}
             showFormulaSheet={showFormulaSheet}
             showScratchpad={showScratchpad}
@@ -993,6 +1003,7 @@ function PreviewResultSummary({
 function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
   proctorStatus,
+  proctorActiveConnectionCount,
   config, showCalculator, showFormulaSheet, showScratchpad,
   onToggleCalc, onToggleFormula, onToggleScratch, onFocusMode, toolBtn,
 }: {
@@ -1001,6 +1012,7 @@ function ExamToolbar({
   pendingSync: number
   tabSwitchCount: number
   proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
+  proctorActiveConnectionCount: number
   config: ExamConfig
   showCalculator: boolean
   showFormulaSheet: boolean
@@ -1066,6 +1078,11 @@ function ExamToolbar({
               : proctorStatus === 'offline'
                 ? 'ห้องคุมสอบรอเชื่อมต่อ'
                 : 'กำลังเชื่อมห้องคุมสอบ'}
+          </span>
+        )}
+        {proctorActiveConnectionCount > 1 && (
+          <span className="flex items-center gap-1 text-destructive">
+            <MonitorSmartphone size={11} /> เปิดพร้อมกัน {proctorActiveConnectionCount} จุด
           </span>
         )}
       </div>

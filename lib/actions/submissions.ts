@@ -390,15 +390,23 @@ async function gradeAndFinalizeSubmission(
   // If this attempt used the live proctor room, stop its presence heartbeat
   // immediately. This is best-effort supporting state; a failure here must
   // never roll back or hide an otherwise successful exam submission.
-  await admin
-    .from('exam_proctor_sessions')
-    .update({
-      is_online: false,
-      completed_at: new Date().toISOString(),
-      last_seen_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('submission_id', submissionId)
+  const proctorCompletedAt = new Date().toISOString()
+  await Promise.all([
+    admin
+      .from('exam_proctor_connections')
+      .update({ closed_at: proctorCompletedAt, last_seen_at: proctorCompletedAt })
+      .eq('submission_id', submissionId),
+    admin
+      .from('exam_proctor_sessions')
+      .update({
+        is_online: false,
+        active_connection_count: 0,
+        completed_at: proctorCompletedAt,
+        last_seen_at: proctorCompletedAt,
+        updated_at: proctorCompletedAt,
+      })
+      .eq('submission_id', submissionId),
+  ])
 
   revalidatePath(`/submissions/${submissionId}`)
   return { success: true, totalScore }
