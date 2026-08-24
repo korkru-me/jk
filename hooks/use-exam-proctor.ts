@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { recordProctorSignal } from '@/lib/actions/exam-proctor'
 import type { ProctorEvent, ProctorEventType } from '@/lib/exam-proctor'
+import { proctorSignalRetryDelay } from '@/lib/exam-proctor-realtime'
 
 type ProctorConnectionStatus = 'disabled' | 'connecting' | 'connected' | 'offline'
 
@@ -40,6 +41,8 @@ export function useExamProctor({ enabled, submissionId, blockClipboard }: UseExa
     let active = true
     let monitoringStarted = false
     let heartbeat: ReturnType<typeof setInterval> | null = null
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let consecutiveFailures = 0
     let startupTimer: ReturnType<typeof setTimeout> | null = null
     let clientInstanceId = ''
     let candidateInstanceId = ''
@@ -88,7 +91,16 @@ export function useExamProctor({ enabled, submissionId, blockClipboard }: UseExa
       broadcast.postMessage({ type: 'probe', instanceId: candidateInstanceId, nonce: probeNonce })
     }
 
-    const flush = async (connectionClosed = false) => {
+    let flush: (connectionClosed?: boolean) => Promise<void>
+    const scheduleRetry = () => {
+      if (!active || retryTimer || !navigator.onLine) return
+      retryTimer = setTimeout(() => {
+        retryTimer = null
+        void flush()
+      }, proctorSignalRetryDelay(consecutiveFailures))
+    }
+
+    flush = async (connectionClosed = false) => {
       if (!active || !clientInstanceId || flushingRef.current) return
       const batch = queueRef.current.splice(0, 20)
       flushingRef.current = true
@@ -104,13 +116,20 @@ export function useExamProctor({ enabled, submissionId, blockClipboard }: UseExa
         if (!active) return
         if (result.error) {
           if (!connectionClosed) queueRef.current = [...batch, ...queueRef.current].slice(-60)
+          consecutiveFailures += 1
+          if (!connectionClosed) scheduleRetry()
           setStatus(navigator.onLine ? 'connecting' : 'offline')
         } else {
+          consecutiveFailures = 0
+          if (retryTimer) clearTimeout(retryTimer)
+          retryTimer = null
           setStatus('connected')
           setActiveConnectionCount(result.activeConnectionCount ?? 0)
         }
       } catch {
         if (!connectionClosed) queueRef.current = [...batch, ...queueRef.current].slice(-60)
+        consecutiveFailures += 1
+        if (!connectionClosed) scheduleRetry()
         if (active) setStatus(navigator.onLine ? 'connecting' : 'offline')
       } finally {
         flushingRef.current = false
@@ -134,6 +153,8 @@ export function useExamProctor({ enabled, submissionId, blockClipboard }: UseExa
     const onFocus = () => record('window_focus')
     const onOnline = () => {
       setStatus('connecting')
+      if (retryTimer) clearTimeout(retryTimer)
+      retryTimer = null
       void flush()
     }
     const onPageShow = () => {
@@ -221,6 +242,7 @@ export function useExamProctor({ enabled, submissionId, blockClipboard }: UseExa
       active = false
       if (startupTimer) clearTimeout(startupTimer)
       if (heartbeat) clearInterval(heartbeat)
+      if (retryTimer) clearTimeout(retryTimer)
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
       if (monitoringStarted) detachListeners()
       broadcast?.close()

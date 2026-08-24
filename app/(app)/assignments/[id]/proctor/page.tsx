@@ -2,14 +2,13 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { getAuthUser } from '@/lib/auth/server'
+import type { ProctorEventRow, ProctorSessionRow } from '@/lib/exam-proctor-realtime'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   ProctorDashboard,
-  type ProctorEventRow,
   type ProctorParticipant,
-  type ProctorSessionRow,
 } from './_components/proctor-dashboard'
 
 export const metadata = { title: 'ห้องคุมสอบสด — KorKru' }

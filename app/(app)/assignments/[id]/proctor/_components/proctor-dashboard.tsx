@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
   AlertTriangle,
@@ -16,6 +16,7 @@ import {
   MonitorCheck,
   MonitorSmartphone,
   Radio,
+  RefreshCw,
   Settings,
   ShieldAlert,
   Trash2,
@@ -28,6 +29,18 @@ import {
   EXAM_PROCTOR_RETENTION_DAYS,
   totalPurgedProctorRecords,
 } from '@/lib/exam-proctor-retention'
+import {
+  applyProctorEventChanges,
+  applyProctorSessionChanges,
+  proctorDashboardConnectionMode,
+  PROCTOR_FALLBACK_POLL_MS,
+  PROCTOR_LIVE_RECONCILE_MS,
+  type ProctorDashboardConnectionMode,
+  type ProctorEventChange,
+  type ProctorEventRow,
+  type ProctorSessionChange,
+  type ProctorSessionRow,
+} from '@/lib/exam-proctor-realtime'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,41 +54,6 @@ export interface ProctorParticipant {
   submissionStatus: string
   startedAt: string | null
   submittedAt: string | null
-}
-
-export interface ProctorSessionRow {
-  submission_id: string
-  org_id: string
-  assignment_id: string
-  student_id: string
-  started_monitoring_at: string
-  last_seen_at: string
-  is_online: boolean
-  is_tab_visible: boolean
-  is_fullscreen: boolean
-  completed_at: string | null
-  tab_switch_count: number
-  fullscreen_exit_count: number
-  window_blur_count: number
-  clipboard_attempt_count: number
-  screenshot_key_count: number
-  active_connection_count: number
-  concurrent_connection_count: number
-  last_event_type: string | null
-  last_event_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface ProctorEventRow {
-  id: number
-  org_id: string
-  assignment_id: string
-  submission_id: string
-  student_id: string
-  event_type: string
-  occurred_at_client: string | null
-  created_at: string
 }
 
 interface AssignmentSummary {
@@ -95,6 +73,8 @@ interface Props {
 }
 
 const ACTIVE_WINDOW_MS = 45_000
+const PROCTOR_SESSION_SELECT = 'submission_id, org_id, assignment_id, student_id, started_monitoring_at, last_seen_at, is_online, is_tab_visible, is_fullscreen, completed_at, tab_switch_count, fullscreen_exit_count, window_blur_count, clipboard_attempt_count, screenshot_key_count, active_connection_count, concurrent_connection_count, last_event_type, last_event_at, created_at, updated_at'
+const PROCTOR_EVENT_SELECT = 'id, org_id, assignment_id, submission_id, student_id, event_type, occurred_at_client, created_at'
 
 const EVENT_LABELS: Record<string, string> = {
   monitoring_started: 'เริ่มเชื่อมต่อห้องคุมสอบ',
@@ -145,12 +125,69 @@ function sessionHasFlags(session: ProctorSessionRow): boolean {
 
 export function ProctorDashboard({ assignment, initialParticipants, initialSessions, initialEvents }: Props) {
   const router = useRouter()
+  const [supabase] = useState(() => createClient())
   const [sessions, setSessions] = useState(initialSessions)
   const [events, setEvents] = useState(initialEvents)
-  const [realtimeConnected, setRealtimeConnected] = useState(false)
+  const [connectionMode, setConnectionMode] = useState<ProctorDashboardConnectionMode>('connecting')
+  const [snapshotRefreshing, setSnapshotRefreshing] = useState(false)
+  const [snapshotError, setSnapshotError] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [isPurging, startPurgeTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
+  const snapshotInFlightRef = useRef(false)
+  const pendingSessionChangesRef = useRef<ProctorSessionChange[]>([])
+  const pendingEventChangesRef = useRef<ProctorEventChange[]>([])
+
+  const refreshSnapshot = useCallback(async () => {
+    if (!assignment.enabled || snapshotInFlightRef.current) return
+    snapshotInFlightRef.current = true
+    pendingSessionChangesRef.current = []
+    pendingEventChangesRef.current = []
+    setSnapshotRefreshing(true)
+    setSnapshotError(false)
+
+    try {
+      const [sessionsResult, eventsResult] = await Promise.all([
+        supabase
+          .from('exam_proctor_sessions')
+          .select(PROCTOR_SESSION_SELECT)
+          .eq('assignment_id', assignment.id)
+          .order('last_seen_at', { ascending: false }),
+        supabase
+          .from('exam_proctor_events')
+          .select(PROCTOR_EVENT_SELECT)
+          .eq('assignment_id', assignment.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+      ])
+
+      if (sessionsResult.error || eventsResult.error) {
+        setSnapshotError(true)
+        return
+      }
+
+      // Reapply changes delivered after these queries started. React then
+      // processes any later Realtime callback after this replacement, so a
+      // slow snapshot can never roll a newer heartbeat/event backwards.
+      const sessionChanges = [...pendingSessionChangesRef.current]
+      const eventChanges = [...pendingEventChangesRef.current]
+      setSessions(applyProctorSessionChanges(
+        (sessionsResult.data ?? []) as unknown as ProctorSessionRow[],
+        sessionChanges,
+      ))
+      setEvents(applyProctorEventChanges(
+        (eventsResult.data ?? []) as unknown as ProctorEventRow[],
+        eventChanges,
+      ))
+    } catch {
+      setSnapshotError(true)
+    } finally {
+      snapshotInFlightRef.current = false
+      pendingSessionChangesRef.current = []
+      pendingEventChangesRef.current = []
+      setSnapshotRefreshing(false)
+    }
+  }, [assignment.enabled, assignment.id, supabase])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 5_000)
@@ -159,7 +196,6 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
 
   useEffect(() => {
     if (!assignment.enabled) return
-    const supabase = createClient()
     const channel = supabase
       .channel(`exam-proctor:${assignment.id}`)
       .on(
@@ -171,19 +207,17 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           filter: `assignment_id=eq.${assignment.id}`,
         },
         payload => {
+          let change: ProctorSessionChange | null = null
           if (payload.eventType === 'DELETE') {
             const previous = payload.old as Pick<ProctorSessionRow, 'submission_id'>
-            if (previous?.submission_id) {
-              setSessions(current => current.filter(row => row.submission_id !== previous.submission_id))
-            }
-            return
+            if (previous?.submission_id) change = { type: 'delete', submissionId: previous.submission_id }
+          } else {
+            const next = payload.new as ProctorSessionRow
+            if (next?.submission_id) change = { type: 'upsert', row: next }
           }
-          const next = payload.new as ProctorSessionRow
-          if (!next?.submission_id) return
-          setSessions(current => {
-            const withoutCurrent = current.filter(row => row.submission_id !== next.submission_id)
-            return [next, ...withoutCurrent]
-          })
+          if (!change) return
+          if (snapshotInFlightRef.current) pendingSessionChangesRef.current.push(change)
+          setSessions(current => applyProctorSessionChanges(current, [change]))
         },
       )
       .on(
@@ -195,22 +229,46 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           filter: `assignment_id=eq.${assignment.id}`,
         },
         payload => {
+          let change: ProctorEventChange | null = null
           if (payload.eventType === 'DELETE') {
             const previous = payload.old as Pick<ProctorEventRow, 'id'>
-            if (previous?.id) setEvents(current => current.filter(row => row.id !== previous.id))
-            return
+            if (previous?.id) change = { type: 'delete', eventId: previous.id }
+          } else {
+            const next = payload.new as ProctorEventRow
+            if (next?.id) change = { type: 'upsert', row: next }
           }
-          const next = payload.new as ProctorEventRow
-          if (!next?.id) return
-          setEvents(current => [next, ...current.filter(row => row.id !== next.id)].slice(0, 100))
+          if (!change) return
+          if (snapshotInFlightRef.current) pendingEventChangesRef.current.push(change)
+          setEvents(current => applyProctorEventChanges(current, [change]))
         },
       )
-      .subscribe(status => setRealtimeConnected(status === 'SUBSCRIBED'))
+      .subscribe(status => {
+        const nextMode = proctorDashboardConnectionMode(status)
+        setConnectionMode(nextMode)
+        if (nextMode === 'live') void refreshSnapshot()
+      })
 
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [assignment.enabled, assignment.id])
+  }, [assignment.enabled, assignment.id, refreshSnapshot, supabase])
+
+  useEffect(() => {
+    if (!assignment.enabled) return
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') void refreshSnapshot()
+    }
+    const timer = setInterval(
+      refreshIfVisible,
+      connectionMode === 'live' ? PROCTOR_LIVE_RECONCILE_MS : PROCTOR_FALLBACK_POLL_MS,
+    )
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    if (connectionMode !== 'live') refreshIfVisible()
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+    }
+  }, [assignment.enabled, connectionMode, refreshSnapshot])
 
   const participantByStudent = useMemo(
     () => new Map(initialParticipants.map(participant => [participant.studentId, participant])),
@@ -262,6 +320,14 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
   const completedCount = rows.filter(row => row.completed).length
   const offlineCount = rows.filter(row => row.session && !row.active && !row.completed).length
   const concurrentCount = rows.filter(row => (row.session?.concurrent_connection_count ?? 0) > 0).length
+  const isRealtimeLive = connectionMode === 'live'
+  const connectionLabel = isRealtimeLive
+    ? 'รับข้อมูลสดแล้ว'
+    : snapshotError
+      ? 'ตรวจข้อมูลสำรองไม่สำเร็จ'
+      : connectionMode === 'fallback'
+        ? 'ใช้การตรวจซ้ำอัตโนมัติ'
+        : 'กำลังเชื่อมต่อข้อมูลสด'
 
   async function handlePurge() {
     const ok = await confirm({
@@ -329,10 +395,19 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           <p className="mt-1 text-sm text-muted-foreground">{assignment.title} · {assignment.classroomName}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={realtimeConnected ? 'secondary' : 'outline'} className={realtimeConnected ? 'text-success' : 'text-warning'}>
-            {realtimeConnected ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
-            {realtimeConnected ? 'รับข้อมูลสดแล้ว' : 'กำลังเชื่อมต่อข้อมูลสด'}
+          <Badge
+            variant={isRealtimeLive ? 'secondary' : 'outline'}
+            className={isRealtimeLive ? 'text-success' : snapshotError ? 'text-destructive' : 'text-warning'}
+          >
+            {isRealtimeLive ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
+            {connectionLabel}
           </Badge>
+          {!isRealtimeLive && (
+            <Button type="button" size="sm" variant="outline" onClick={() => void refreshSnapshot()} disabled={snapshotRefreshing}>
+              <RefreshCw className={snapshotRefreshing ? 'animate-spin' : undefined} aria-hidden="true" />
+              {snapshotRefreshing ? 'กำลังตรวจ…' : 'ตรวจข้อมูลล่าสุด'}
+            </Button>
+          )}
           {assignment.fullscreenRequired && <Badge variant="outline"><Maximize aria-hidden="true" /> บังคับเต็มจอ</Badge>}
           {assignment.blockClipboard && <Badge variant="outline"><ShieldAlert aria-hidden="true" /> ปิดคัดลอก/วาง</Badge>}
         </div>
