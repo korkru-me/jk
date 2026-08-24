@@ -62,9 +62,9 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
             <Image
               src="/logo.png"
               alt="KorKru"
-              width={100}
-              height={40}
-              className="h-9 w-auto object-contain dark:brightness-0 dark:invert"
+              width={423}
+              height={576}
+              className="h-11 w-auto object-contain dark:brightness-0 dark:invert"
             />
           </Link>
         </div>
