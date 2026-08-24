@@ -85,6 +85,24 @@ const projectDetailsSchema = z.object({
   passing_threshold_percent: z.number().positive().max(100),
 })
 
+const researchScoreCellSchema = z.object({
+  participant_id: z.string().uuid(),
+  measurement_id: z.string().uuid(),
+  raw_score: z.number().finite().min(0).max(100000),
+})
+
+const manualScoresSchema = z.object({
+  project_id: z.string().uuid(),
+  rows: z.array(researchScoreCellSchema).max(2000),
+  reason: z.string().trim().max(500).nullable().optional(),
+})
+
+const importConfirmSchema = z.object({
+  project_id: z.string().uuid(),
+  batch_id: z.string().uuid(),
+  confirm_overwrites: z.boolean(),
+})
+
 function firstValidationError(error: z.ZodError): string {
   return error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง'
 }
@@ -257,4 +275,82 @@ export async function updateEducationResearchProjectDetails(input: z.input<typeo
   revalidatePath('/research')
   revalidatePath(`/research/${project.id}`)
   return { success: true }
+}
+
+export async function saveManualResearchScoreDraft(input: z.input<typeof manualScoresSchema>) {
+  const parsed = manualScoresSchema.safeParse(input)
+  if (!parsed.success) return { error: firstValidationError(parsed.error) }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const { data, error } = await supabase.rpc('save_education_research_manual_draft', {
+    p_project_id: parsed.data.project_id,
+    p_rows: parsed.data.rows,
+  })
+  if (error) return { error: 'บันทึกฉบับร่างไม่สำเร็จ กรุณาตรวจคะแนนและสิทธิ์แล้วลองใหม่' }
+
+  revalidatePath(`/research/${parsed.data.project_id}/data/manual`)
+  return { success: true, saved_count: Number(data ?? 0) }
+}
+
+export async function confirmManualResearchScores(input: z.input<typeof manualScoresSchema>) {
+  const parsed = manualScoresSchema.safeParse(input)
+  if (!parsed.success) return { error: firstValidationError(parsed.error) }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const { data, error } = await supabase.rpc('confirm_education_research_manual_scores', {
+    p_project_id: parsed.data.project_id,
+    p_rows: parsed.data.rows,
+    p_reason: parsed.data.reason?.trim() || null,
+  })
+  if (error) {
+    if (error.message.includes('reason is required')) return { error: 'กรุณาระบุเหตุผลเมื่อเปลี่ยนคะแนนเดิม' }
+    if (error.message.includes('outside the configured range')) return { error: 'มีคะแนนอยู่นอกช่วง กรุณาตรวจสอบอีกครั้ง' }
+    return { error: 'ยืนยันคะแนนไม่สำเร็จ ข้อมูลอาจเปลี่ยนแปลง กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง' }
+  }
+
+  revalidatePath(`/research/${parsed.data.project_id}`)
+  revalidatePath(`/research/${parsed.data.project_id}/data`)
+  revalidatePath(`/research/${parsed.data.project_id}/data/manual`)
+  revalidatePath('/research')
+  return { success: true, saved_count: Number(data ?? 0) }
+}
+
+export async function confirmEducationResearchImportBatch(input: z.input<typeof importConfirmSchema>) {
+  const parsed = importConfirmSchema.safeParse(input)
+  if (!parsed.success) return { error: firstValidationError(parsed.error) }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const { data: batch } = await supabase
+    .from('education_research_import_batches')
+    .select('id, project_id')
+    .eq('id', parsed.data.batch_id)
+    .eq('project_id', parsed.data.project_id)
+    .maybeSingle()
+  if (!batch) return { error: 'ไม่พบรายการนำเข้าหรือคุณไม่มีสิทธิ์เข้าถึง' }
+
+  const { data, error } = await supabase.rpc('confirm_education_research_import_batch', {
+    p_batch_id: parsed.data.batch_id,
+    p_confirm_overwrites: parsed.data.confirm_overwrites,
+  })
+  if (error) {
+    if (error.message.includes('changed after preview')) return { error: 'คะแนนมีการเปลี่ยนหลังตรวจไฟล์ กรุณาอัปโหลดและตรวจสอบใหม่' }
+    if (error.message.includes('explicit confirmation')) return { error: 'กรุณายืนยันว่าตรวจสอบคะแนนเดิมและคะแนนใหม่แล้ว' }
+    return { error: 'นำเข้าคะแนนไม่สำเร็จ ระบบไม่ได้บันทึกคะแนนบางส่วน กรุณาตรวจสอบแล้วลองใหม่' }
+  }
+
+  revalidatePath(`/research/${parsed.data.project_id}`)
+  revalidatePath(`/research/${parsed.data.project_id}/data`)
+  revalidatePath(`/research/${parsed.data.project_id}/data/import`)
+  revalidatePath(`/research/${parsed.data.project_id}/data/import/${parsed.data.batch_id}`)
+  revalidatePath('/research')
+  return { success: true, saved_count: Number(data ?? 0) }
 }

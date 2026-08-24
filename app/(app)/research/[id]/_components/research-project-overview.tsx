@@ -40,6 +40,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { EducationResearchProject, EducationResearchProjectStatus } from '@/lib/types'
 import type { ResearchMeasurementSummary } from '../page'
+import { ResearchProjectNav } from './research-project-nav'
 
 type ProjectWithClassroom = EducationResearchProject & {
   classrooms: { id: string; name: string } | null
@@ -116,11 +117,7 @@ export function ResearchProjectOverview({
         </div>
       </div>
 
-      <nav className="flex gap-1 border-b" aria-label="ส่วนของโครงการวิจัย">
-        <span className="border-b-2 border-primary px-3 py-2 text-sm font-semibold text-primary">ภาพรวม</span>
-        <span className="px-3 py-2 text-sm text-muted-foreground" title="จะเปิดใช้งานในขั้นข้อมูลคะแนน">ข้อมูลคะแนน · ขั้นถัดไป</span>
-        <span className="px-3 py-2 text-sm text-muted-foreground" title="จะเปิดใช้งานหลังข้อมูลคะแนนพร้อม">ผลวิเคราะห์ · ขั้นถัดไป</span>
-      </nav>
+      <ResearchProjectNav projectId={project.id} active="overview" />
 
       <NextActionCard pretest={pretest} posttest={posttest} canManage={canManage} />
 
@@ -151,8 +148,8 @@ export function ResearchProjectOverview({
                   <School aria-hidden="true" /> เปิดห้องเรียน <ArrowRight className="ml-auto" aria-hidden="true" />
                 </Button>
               )}
-              <Button className="w-full justify-start" variant="ghost" disabled title="เปิดในขั้นข้อมูลคะแนน">
-                <ClipboardCheck aria-hidden="true" /> ตรวจรายชื่อและคะแนน <span className="ml-auto text-xs">ขั้นถัดไป</span>
+              <Button className="w-full justify-start" variant="ghost" render={<Link href={`/research/${project.id}/data`} />}>
+                <ClipboardCheck aria-hidden="true" /> ตรวจรายชื่อและคะแนน <ArrowRight className="ml-auto" aria-hidden="true" />
               </Button>
               <Button className="w-full justify-start" variant="ghost" disabled title="เปิดเมื่อคะแนนก่อนและหลังพร้อม">
                 <FlaskConical aria-hidden="true" /> ดูผลวิเคราะห์ <span className="ml-auto text-xs">ขั้นถัดไป</span>

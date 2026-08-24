@@ -169,6 +169,69 @@ export interface EducationResearchScoreHistory {
   changed_at: string
 }
 
+export interface EducationResearchScoreDraft {
+  id: string
+  org_id: string
+  project_id: string
+  participant_id: string
+  measurement_id: string
+  raw_score: number
+  saved_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type EducationResearchImportBatchStatus = 'previewed' | 'invalid' | 'confirmed' | 'cancelled'
+export type EducationResearchImportRowStatus = 'ready' | 'warning' | 'error'
+export type EducationResearchImportScoreAction = 'add' | 'update' | 'unchanged' | 'blank'
+
+export interface EducationResearchImportTemplate {
+  id: string
+  org_id: string
+  project_id: string
+  version: number
+  created_by: string
+  created_at: string
+}
+
+export interface EducationResearchImportBatch {
+  id: string
+  org_id: string
+  project_id: string
+  template_id: string
+  file_name: string
+  status: EducationResearchImportBatchStatus
+  row_count: number
+  ready_count: number
+  warning_count: number
+  error_count: number
+  created_by: string
+  confirmed_by: string | null
+  confirmed_at: string | null
+  created_at: string
+}
+
+export interface EducationResearchImportBatchRow {
+  id: string
+  org_id: string
+  project_id: string
+  batch_id: string
+  participant_id: string | null
+  row_number: number
+  student_code_file: string | null
+  full_name_file: string | null
+  note_file: string | null
+  incoming_pretest: number | null
+  incoming_posttest: number | null
+  current_pretest: number | null
+  current_posttest: number | null
+  pretest_action: EducationResearchImportScoreAction | null
+  posttest_action: EducationResearchImportScoreAction | null
+  validation_status: EducationResearchImportRowStatus
+  messages: string[]
+  created_at: string
+}
+
 export interface QuestionCategory {
   id: string
   name: string

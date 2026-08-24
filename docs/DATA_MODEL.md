@@ -68,6 +68,9 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - `education_research_measurements` — การตั้งค่ารอบ `pretest`/`posttest`, แหล่งคะแนน, วิธีเลือกแฟ้ม/แฟ้มย่อย/รายข้อ, source IDs, immutable snapshot IDs, เวลา และ optional assignment ที่ต้องอยู่ในห้อง/organization เดียวกับโครงการ
 - `education_research_scores` — observation คะแนนหนึ่งค่าต่อผู้เข้าร่วมต่อรอบวัด พร้อมคะแนนเต็ม แหล่งที่มา submission ที่เกี่ยวข้อง และผู้บันทึก; บังคับ `0 <= raw_score <= max_score` และ composite foreign key ป้องกันการเชื่อมข้ามโครงการ/organization
 - `education_research_score_history` — audit แบบ append-only ที่ trigger สร้างเมื่อคะแนนถูกเพิ่ม แก้ หรือลบ ผู้ใช้ทั่วไปอ่านได้ตามสิทธิ์โครงการแต่เขียนประวัติโดยตรงไม่ได้
+- `education_research_score_drafts` — ฉบับร่างคะแนน manual แยกตามครูผู้บันทึกและ project/participant/measurement; การบันทึกร่างครั้งใหม่แทนชุดเดิมของครูคนนั้นและยังไม่ถือเป็นคะแนนวิจัยจริง
+- `education_research_import_templates` / `education_research_import_template_rows` — รุ่นแม่แบบและ snapshot รายชื่อสำหรับดาวน์โหลด Excel แต่ละแถวผูก participant ด้วย UUID token สุ่มที่ซ่อนใน workbook และตรวจกลับฝั่ง server
+- `education_research_import_batches` / `education_research_import_batch_rows` — normalized preview ของไฟล์ที่อัปโหลด เก็บค่า incoming/current, action, สถานะ และข้อความตรวจ ไม่เก็บ binary workbook; batch ยืนยันได้ครั้งเดียวและใช้เป็น audit ของผลกระทบทั้งชุด
 
 Invariant สำคัญ:
 
@@ -77,6 +80,9 @@ Invariant สำคัญ:
 - ตารางใหม่ทุกตารางมี `org_id`, index สำหรับ join/RLS และ RLS ป้องกันการเรียก API โดยตรงจากนักเรียนหรือผู้ใช้คนละห้อง
 - `questions.is_research_snapshot` แยกสำเนาเครื่องมือวัดออกจากโจทย์ในคลัง แต่ละสำเนาผูก `research_snapshot_project_id`, เก็บ source ID เพื่ออ้างอิงย้อนหลังโดยไม่ใช้ foreign key และ trigger ห้ามแก้หรือลบสำเนาหลังสร้าง
 - assignment ออนไลน์ของโครงการต้องใช้ snapshot IDs ของ measurement นั้น เป็น `exam/online` ทำได้ครั้งเดียว และคะแนนเต็มคำนวณซ้ำจากโครงสร้างสำเนาในฐานข้อมูล ห้ามเชื่อค่าคะแนนเต็มจาก client
+- ช่องทางเขียนคะแนนจริงทั้งหมดผ่าน trigger/RPC: submission sync สำหรับ `korkru_exam`, manual confirm สำหรับ `manual`, import confirm สำหรับ `excel`; browser role ถูก revoke สิทธิ์ `INSERT/UPDATE/DELETE` ตรงกับตารางคะแนน/ร่าง/import
+- ช่องว่างใน manual/Excel ไม่สร้างหรือลบ score; การเปลี่ยนคะแนนเดิมต้องมีเหตุผลใน audit และ Excel ต้องมีการยืนยัน overwrite ชัดเจน
+- Excel import ตรวจ template/project/row token/ตัวตน/ช่วงคะแนนตอนสร้าง preview และตรวจ roster/ค่าปัจจุบันซ้ำตอน confirm เพื่อให้ทั้งชุดสำเร็จหรือ rollback พร้อมกัน
 
 ## Snapshot ที่ต้องคงที่ต่อ attempt
 
