@@ -1,6 +1,6 @@
 # วิจัยการศึกษา
 
-สถานะ: ระยะที่ 2.1 — ภาพระยะที่ 1 ได้รับอนุมัติครบแล้ว; กำลังวางฐานข้อมูล สิทธิ์ เมนู และหน้า `/research` ที่ใช้ข้อมูลจริง โดยยังไม่เปิดสร้างโครงการจนถึงระยะ 2.2
+สถานะ: ระยะที่ 2.1 เสร็จแล้ว — ภาพระยะที่ 1 ได้รับอนุมัติครบ และฐานข้อมูล สิทธิ์ เมนู กับหน้า `/research` ที่ใช้ข้อมูลจริงถูกนำขึ้นระบบแล้ว โดยยังไม่เปิดสร้างโครงการจนถึงระยะ 2.2
 
 อัปเดตล่าสุด: 24 สิงหาคม 2569
 
@@ -422,7 +422,7 @@
 
 ### ระยะ 2.1 — ฐานข้อมูล สิทธิ์ และทางเข้าระบบ
 
-- migration `20260824013312_education_research_foundation.sql` สร้าง `education_research_projects`, `education_research_participants`, `education_research_measurements`, `education_research_scores` และ `education_research_score_history` โดยไม่มีข้อมูลตัวอย่าง
+- migration `20260824013312_education_research_foundation.sql` ถูก apply บน Supabase ที่เชื่อมกับโปรเจกต์แล้ว สร้าง `education_research_projects`, `education_research_participants`, `education_research_measurements`, `education_research_scores` และ `education_research_score_history` โดยไม่มีข้อมูลตัวอย่าง
 - โครงการจำกัดแบบแผนรุ่นแรกเป็น `one_group_pretest_posttest`, ผูกหนึ่ง subject classroom และหนึ่ง organization พร้อมเกณฑ์ผ่านที่ครูกำหนด ระดับนัยสำคัญ .05 และ one-sample test สองด้านตาม spec ที่อนุมัติ
 - ผู้เข้าร่วมต้องเป็นบัญชี KorKru ใน roster ตอนเพิ่มเข้า cohort และคะแนนใช้ composite foreign keys ป้องกันการเชื่อม participant/measurement/project/org ผิดชุด ช่องว่างแทนด้วยการไม่มีแถว score ไม่ใช่ 0
 - trigger ป้องกันเปลี่ยน scope ของโครงการ ตรวจ assignment ให้อยู่ในห้องเดียวกัน และสร้าง score history แบบ append-only เมื่อคะแนนเพิ่ม แก้ หรือลบ
