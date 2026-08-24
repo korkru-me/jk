@@ -512,9 +512,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {q.sub_question_count} {subQuestionUnit(q.question_type)}
-                  </span>
+                  {q.sub_question_count > 1 && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {q.sub_question_count} {subQuestionUnit(q.question_type)}
+                    </span>
+                  )}
                   <Input
                     type="number"
                     min={0}
