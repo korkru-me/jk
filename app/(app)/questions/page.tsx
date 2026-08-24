@@ -22,6 +22,7 @@ import {
   groupIdsBySharedText,
   type QuestionContent,
 } from '@/lib/question-content-match'
+import { subQuestionCount, type CountableQuestion } from '@/lib/question-parts'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
 
@@ -246,6 +247,77 @@ async function fetchDuplicateCounts(
   }
 
   return countContentTwins(contents)
+}
+
+/** Ids per `in(...)` round in the part-count pass — keeps the URL short. */
+const PART_COUNT_ID_CHUNK = 100
+
+/** The fields on a listed row that decide where its part count comes from. */
+type CountablePlacement = { id: string; group_id: string | null; order_in_group: number | null }
+
+/**
+ * How many ข้อย่อย each question on screen holds.
+ *
+ * The list itself deliberately carries only what it filters and renders on, so
+ * the shape a count is read from — blanks, statements, parts, pairs — is
+ * fetched separately for the couple of dozen rows actually shown rather than
+ * widening every query the bank runs. A โจทย์หลายขั้นตอน keeps its parts in
+ * sibling rows instead of its own columns, so those are counted in a second
+ * pass by group.
+ */
+async function fetchSubQuestionCounts(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  questions: CountablePlacement[],
+): Promise<Record<string, number>> {
+  if (questions.length === 0) return {}
+
+  const ids = questions.map(question => question.id)
+  const rows: (CountableQuestion & { id: string })[] = []
+  for (let i = 0; i < ids.length; i += PART_COUNT_ID_CHUNK) {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('id, question_type, extra_data, answer_parts, mcq_options')
+      .in('id', ids.slice(i, i + PART_COUNT_ID_CHUNK))
+    if (error) {
+      // Losing the count costs a badge, not the page.
+      console.error('[questions/page] part count query failed:', error)
+      return {}
+    }
+    rows.push(...((data ?? []) as unknown as (CountableQuestion & { id: string })[]))
+  }
+
+  // Parent row -> its group, for the rows whose parts are siblings.
+  const groupByParent = new Map<string, string>()
+  for (const question of questions) {
+    if (question.order_in_group === 0 && question.group_id) {
+      groupByParent.set(question.id, question.group_id)
+    }
+  }
+
+  const membersByGroup = new Map<string, number>()
+  const groupIds = [...new Set(groupByParent.values())]
+  for (let i = 0; i < groupIds.length; i += PART_COUNT_ID_CHUNK) {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('group_id')
+      .in('group_id', groupIds.slice(i, i + PART_COUNT_ID_CHUNK))
+      .gt('order_in_group', 0)
+    if (error) {
+      // A group whose members stay unread falls back to its own shape (1),
+      // which is wrong but harmless — better than dropping every count.
+      console.error('[questions/page] group part count query failed:', error)
+      break
+    }
+    for (const row of (data ?? []) as { group_id: string | null }[]) {
+      if (!row.group_id) continue
+      membersByGroup.set(row.group_id, (membersByGroup.get(row.group_id) ?? 0) + 1)
+    }
+  }
+
+  return Object.fromEntries(rows.map(row => {
+    const groupId = groupByParent.get(row.id)
+    return [row.id, subQuestionCount(row, groupId ? membersByGroup.get(groupId) : undefined)]
+  }))
 }
 
 export default async function QuestionsPage({
@@ -711,11 +783,12 @@ export default async function QuestionsPage({
   }
 
   const ownQuestions = ownResult.questions
-  // Only the questions actually on screen need stats now.
-  const stats = await fetchQuestionStats(
-    supabase,
-    [...ownQuestions, ...teamQuestions].map(q => q.id),
-  )
+  // Only the questions actually on screen need stats or part counts now.
+  const visibleQuestions = [...ownQuestions, ...teamQuestions]
+  const [stats, subQuestionCounts] = await Promise.all([
+    fetchQuestionStats(supabase, visibleQuestions.map(q => q.id)),
+    fetchSubQuestionCounts(supabase, visibleQuestions),
+  ])
 
   return (
     <QuestionBankClient
@@ -733,6 +806,7 @@ export default async function QuestionsPage({
       searchGroupCounts={ownResult.groupCounts}
       totalCount={unfilteredTotal ?? 0}
       duplicateCounts={duplicateCounts}
+      subQuestionCounts={subQuestionCounts}
       perPage={QUESTIONS_PER_PAGE}
       teamFilters={teamFilters}
       teamMatchCount={teamTotal}

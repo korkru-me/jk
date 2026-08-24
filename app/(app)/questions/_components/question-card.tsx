@@ -18,6 +18,7 @@ import { cn, downloadTextFile } from '@/lib/utils'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import { QuestionTagsEditor } from './question-tags-editor'
+import { SubQuestionCountBadge } from './sub-question-count-badge'
 import type { QuestionWithCategory } from '../page'
 import { questionExcerpt } from '@/lib/question-display'
 import { questionEditHref } from '@/lib/question-return'
@@ -35,9 +36,11 @@ interface Props {
   allTags: string[]
   /** How many other questions in the bank have exactly this content. 0 = none. */
   duplicateCount: number
+  /** How many ข้อย่อย the question holds; absent when the count could not be read. */
+  subQuestionCount?: number
 }
 
-export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags, duplicateCount }: Props) {
+export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags, duplicateCount, subQuestionCount }: Props) {
   const router = useRouter()
   // The edit page carries the bank's current view back with it, so returning
   // from an edit lands on the same search, filters and page.
@@ -153,6 +156,7 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                 {TYPE_LABEL[q.question_type] ?? q.question_type}
               </span>
+              <SubQuestionCountBadge questionType={q.question_type} count={subQuestionCount} />
               {q.question_categories?.name && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                   {q.question_categories.name}

@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { QuestionCard } from './question-card'
+import { SubQuestionCountBadge } from './sub-question-count-badge'
 import { Card } from '@/components/ui/card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import type { QuestionStats } from '@/lib/question-stats'
@@ -83,6 +84,8 @@ interface Props {
   totalCount: number
   /** question id → how many other questions share its content. Absent = none. */
   duplicateCounts: Record<string, number>
+  /** question id → how many ข้อย่อย it holds. Absent = not counted, badge hidden. */
+  subQuestionCounts: Record<string, number>
   perPage: number
   teamFilters: { q: string; match: QuestionSearchScope; team: string; page: number }
   teamMatchCount: number
@@ -96,6 +99,7 @@ interface Props {
 export function QuestionBankClient({
   questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
   allTags, filters, matchCount, searchGroups, searchGroupCounts, totalCount, perPage, duplicateCounts,
+  subQuestionCounts,
   teamFilters, teamMatchCount, teamSearchGroups, teamSearchGroupCounts, teamPaged,
 }: Props) {
   const router = useRouter()
@@ -500,6 +504,7 @@ export function QuestionBankClient({
                       stats={stats[q.id]}
                       allTags={tagPool}
                       duplicateCount={duplicateCounts[q.id] ?? 0}
+                      subQuestionCount={subQuestionCounts[q.id]}
                     />
                   ))}
                 </div>
@@ -519,6 +524,7 @@ export function QuestionBankClient({
                 stats={stats[q.id]}
                 allTags={tagPool}
                 duplicateCount={duplicateCounts[q.id] ?? 0}
+                subQuestionCount={subQuestionCounts[q.id]}
               />
             ))}
           </div>
@@ -629,7 +635,7 @@ export function QuestionBankClient({
                             />
                             <div className="space-y-2.5">
                               {result.questions.map(q => (
-                                <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
+                                <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} onPreview={() => void openPreview(q.id)} />
                               ))}
                             </div>
                           </section>
@@ -638,7 +644,7 @@ export function QuestionBankClient({
                     ) : (
                       <div className="space-y-2.5">
                         {filteredTeam.map(q => (
-                          <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} onPreview={() => void openPreview(q.id)} />
+                          <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} onPreview={() => void openPreview(q.id)} />
                         ))}
                       </div>
                     )}
@@ -766,10 +772,12 @@ function EmptyState() {
 // The creator can always edit their own question here; a teammate can too, but
 // only if the creator turned on "อนุญาตให้เพื่อนในทีมแก้ไข" — enforced server-side.
 
-function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview }: {
+function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestionCount, onPreview }: {
   question: QuestionWithCreator
   showTeamName: boolean
   currentUserId: string
+  /** How many ข้อย่อย the question holds; absent when the count could not be read. */
+  subQuestionCount?: number
   onPreview: () => void
 }) {
   // The edit page carries the bank's current view back with it, so returning
@@ -792,6 +800,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, onPreview 
         <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
           {TYPE_LABEL[q.question_type] ?? q.question_type}
         </span>
+        <SubQuestionCountBadge questionType={q.question_type} count={subQuestionCount} />
         {q.question_categories?.name && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
             {q.question_categories.name}
