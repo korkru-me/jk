@@ -362,7 +362,7 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
   if (!assignment.enabled) {
     return (
       <div className="mx-auto max-w-3xl space-y-5 py-8">
-        <Button variant="ghost" render={<Link href={`/assignments/${assignment.id}`} />}>
+        <Button nativeButton={false} variant="ghost" render={<Link href={`/assignments/${assignment.id}`} />}>
           <ArrowLeft aria-hidden="true" /> กลับหน้าชุดข้อสอบ
         </Button>
         <Card padding="2xl" className="text-center">
@@ -373,7 +373,7 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
             เปิดได้จากหน้าตั้งค่าชุดข้อสอบ แล้วระบบจะเริ่มรับเฉพาะสัญญาณจากเบราว์เซอร์เมื่อนักเรียนเริ่มทำครั้งถัดไป
           </p>
-          <Button className="mt-5" render={<Link href={`/assignments/${assignment.id}/edit`} />}>
+          <Button nativeButton={false} className="mt-5" render={<Link href={`/assignments/${assignment.id}/edit`} />}>
             <Settings aria-hidden="true" /> ไปตั้งค่าชุดข้อสอบ
           </Button>
         </Card>
@@ -385,7 +385,7 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
     <div className="mx-auto max-w-7xl space-y-5 py-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Button variant="ghost" render={<Link href={`/assignments/${assignment.id}`} />}>
+          <Button nativeButton={false} variant="ghost" render={<Link href={`/assignments/${assignment.id}`} />}>
             <ArrowLeft aria-hidden="true" /> กลับหน้าชุดข้อสอบ
           </Button>
           <div className="mt-2 flex items-center gap-2">

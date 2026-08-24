@@ -127,10 +127,12 @@
 
 ## คุณภาพและการทดสอบ
 
-Repository ยังไม่มี automated test suite และไม่มี lint script การเปลี่ยน critical path ต้องเพิ่มหรือบันทึก manual verification ให้ชัด อย่างน้อยให้รัน:
+Repository มี Vitest unit test สำหรับ critical pure logic และมี design-token check แต่ยังไม่มี browser E2E suite อัตโนมัติ การเปลี่ยน critical path ต้องเพิ่ม test ที่เหมาะสมหรือบันทึก manual verification ให้ชัด อย่างน้อยให้รัน:
 
 ```bash
 npx tsc --noEmit
+npm test
+npm run lint:tokens
 npm run build
 ```
 

@@ -84,7 +84,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   if (loadError) {
     return (
       <div className="mx-auto max-w-3xl space-y-4 py-8">
-        <Button variant="ghost" render={<Link href={`/assignments/${id}`} />}>
+        <Button nativeButton={false} variant="ghost" render={<Link href={`/assignments/${id}`} />}>
           <ArrowLeft aria-hidden="true" /> กลับหน้าชุดข้อสอบ
         </Button>
         <Card padding="xl" className="border-destructive/30">
