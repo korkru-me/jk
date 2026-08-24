@@ -118,7 +118,6 @@ export default async function AssignmentPreviewPage({
   })
 
   const examConfig = {
-    isCalculatorEnabled: true,
     proctoringEnabled: false,
     isFullscreenEnforced: false,
     blockClipboard: false,

@@ -46,7 +46,6 @@ export default async function TakeExamPage({
   const { assignment, submission, answers } = exam
 
   const examConfig: ExamConfig = {
-    isCalculatorEnabled: true,
     proctoringEnabled: assignment.proctoring_enabled,
     isFullscreenEnforced: assignment.fullscreen_required,
     blockClipboard: assignment.block_clipboard,

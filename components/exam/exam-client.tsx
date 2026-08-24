@@ -17,11 +17,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Calculator as CalcIcon, BookOpen, PenLine, Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone,
+  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone,
 } from 'lucide-react'
-import { Calculator } from './calculator'
-import { FormulaSheet } from './formula-sheet'
-import { Scratchpad } from './scratchpad'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { partLabels } from '@/lib/part-labels'
@@ -77,7 +74,6 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
 }
 
 export interface ExamConfig {
-  isCalculatorEnabled: boolean
   proctoringEnabled: boolean
   isFullscreenEnforced: boolean
   blockClipboard: boolean
@@ -154,11 +150,6 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [focusMode, setFocusMode] = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitCountdown, setSubmitCountdown] = useState(0)
-
-  // ── Tool panels ─────────────────────────────────────────────────────────────
-  const [showCalculator, setShowCalculator] = useState(false)
-  const [showFormulaSheet, setShowFormulaSheet] = useState(false)
-  const [showScratchpad, setShowScratchpad] = useState(false)
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
@@ -362,15 +353,6 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   )
   const mainInlineBlank = current.questions.question_type === 'written'
     && countAnswerBlanks(currentQuestionText) > 0
-
-  // ── Toolbar buttons ───────────────────────────────────────────────────────────
-
-  const toolBtn = (active: boolean) =>
-    `flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
-      active
-        ? 'bg-primary/15 border-primary/40 text-primary'
-        : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
-    }`
 
   // ── Exam body (shared between normal + focus mode) ────────────────────────────
 
@@ -733,15 +715,6 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         </div>
       )}
 
-      {/* ── Tool panels ────────────────────────────────────────────────────── */}
-      {showCalculator && (
-        <div className="fixed bottom-4 left-4 z-50">
-          <Calculator onClose={() => setShowCalculator(false)} />
-        </div>
-      )}
-      {showFormulaSheet && <FormulaSheet onClose={() => setShowFormulaSheet(false)} />}
-      {showScratchpad   && <Scratchpad  onClose={() => setShowScratchpad(false)}  />}
-
       {/* ── Preview results (previewMode only, after submit) ─────────────────── */}
       {previewResult && (
         <PreviewResultSummary
@@ -765,14 +738,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             config={config}
             proctorStatus={proctorStatus}
             proctorActiveConnectionCount={proctorActiveConnectionCount}
-            showCalculator={showCalculator}
-            showFormulaSheet={showFormulaSheet}
-            showScratchpad={showScratchpad}
-            onToggleCalc={() => setShowCalculator(v => !v)}
-            onToggleFormula={() => setShowFormulaSheet(v => !v)}
-            onToggleScratch={() => setShowScratchpad(v => !v)}
             onFocusMode={() => setFocusMode(true)}
-            toolBtn={toolBtn}
           />
           {/* Progress bar */}
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -799,19 +765,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                 <p className="text-sm font-medium truncate">{current.questions.title || 'ชุดข้อสอบ'}</p>
               </div>
 
-              {/* Toolbar in focus mode */}
               <div className="flex items-center gap-2 shrink-0">
-                {config.isCalculatorEnabled && (
-                  <button onClick={() => setShowCalculator(v => !v)} className={toolBtn(showCalculator)}>
-                    <CalcIcon size={12} /> คิดเลข
-                  </button>
-                )}
-                <button onClick={() => setShowFormulaSheet(v => !v)} className={toolBtn(showFormulaSheet)}>
-                  <BookOpen size={12} /> สูตร
-                </button>
-                <button onClick={() => setShowScratchpad(v => !v)} className={toolBtn(showScratchpad)}>
-                  <PenLine size={12} /> ทด
-                </button>
                 <button
                   onClick={() => setFocusMode(false)}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -997,8 +951,7 @@ function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
   proctorStatus,
   proctorActiveConnectionCount,
-  config, showCalculator, showFormulaSheet, showScratchpad,
-  onToggleCalc, onToggleFormula, onToggleScratch, onFocusMode, toolBtn,
+  config, onFocusMode,
 }: {
   saving: boolean
   isOnline: boolean
@@ -1007,38 +960,10 @@ function ExamToolbar({
   proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
   proctorActiveConnectionCount: number
   config: ExamConfig
-  showCalculator: boolean
-  showFormulaSheet: boolean
-  showScratchpad: boolean
-  onToggleCalc: () => void
-  onToggleFormula: () => void
-  onToggleScratch: () => void
   onFocusMode: () => void
-  toolBtn: (active: boolean) => string
 }) {
   return (
     <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
-      {/* Left: Tool buttons */}
-      <div className="flex items-center gap-2">
-        {config.isCalculatorEnabled && (
-          <button onClick={onToggleCalc} className={toolBtn(showCalculator)} title="เครื่องคิดเลขวิทยาศาสตร์">
-            <CalcIcon size={13} />
-            <span className="hidden sm:inline">คิดเลข</span>
-          </button>
-        )}
-        <button onClick={onToggleFormula} className={toolBtn(showFormulaSheet)} title="สูตรและค่าคงที่">
-          <BookOpen size={13} />
-          <span className="hidden sm:inline">สูตร</span>
-        </button>
-        <button onClick={onToggleScratch} className={toolBtn(showScratchpad)} title="กระดาษทด">
-          <PenLine size={13} />
-          <span className="hidden sm:inline">ทด</span>
-        </button>
-      </div>
-
-      {/* Divider */}
-      <div className="h-4 w-px bg-border" />
-
       {/* Status indicators */}
       <div className="flex items-center gap-2 text-xs">
         {saving ? (
