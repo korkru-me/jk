@@ -8,6 +8,7 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type { Question } from '@/lib/types'
 // One rule for "is this the same wording?", shared with the คลัง's duplicate badge.
 import { normalizeQuestionText } from '@/lib/question-content-match'
+import { withContentFingerprint } from '@/lib/question-fingerprint'
 
 type QuestionRow = Question & { question_categories?: { name: string } | null }
 
@@ -202,7 +203,7 @@ function toQuestionRow(
 ) {
   const category_id = resolveCategory(pq.category_name)
 
-  return {
+  return withContentFingerprint({
     org_id: orgId,
     created_by: userId,
     category_id,
@@ -227,7 +228,7 @@ function toQuestionRow(
     tags: pq.tags,
     image_urls: pq.image_urls ?? [],
     requires_work_image: pq.requires_work_image,
-  }
+  })
 }
 
 /**

@@ -75,8 +75,17 @@ function canonical(value: unknown, verbatim = false): unknown {
   return value
 }
 
+/**
+ * The content a fingerprint is built from, without the row's identity.
+ *
+ * Every field is optional so that the server actions can fingerprint the
+ * payload they are about to write, which names only the columns that path ever
+ * sets — a group's parent row, for one, never carries mcq_options.
+ */
+export type FingerprintableContent = Omit<Partial<QuestionContent>, 'id'>
+
 /** A stable string standing for one question's content, and nothing else. */
-export function questionFingerprint(q: QuestionContent): string {
+export function questionFingerprint(q: FingerprintableContent): string {
   return JSON.stringify([
     normalizeQuestionText(q.question_text ?? ''),
     q.question_type ?? null,

@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { getMyTeamOrgs } from '@/lib/actions/team-org'
 import { dedupeTags } from '@/lib/tag-suggest'
+import { withContentFingerprint } from '@/lib/question-fingerprint'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
 import { safeQuestionsRedirect } from '@/lib/question-return'
 
@@ -122,7 +123,7 @@ export async function createQuestion(data: QuestionFormData) {
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
   if ('error' in orgResult) return orgResult
 
-  const { data: inserted, error } = await supabase.from('questions').insert({
+  const { data: inserted, error } = await supabase.from('questions').insert(withContentFingerprint({
     org_id: orgResult.orgId,
     created_by: user.id,
     category_id: data.category_id || null,
@@ -148,7 +149,7 @@ export async function createQuestion(data: QuestionFormData) {
     image_urls: data.image_urls.length > 0 ? data.image_urls : [],
     requires_work_image: data.question_type === 'written' ? (data.requires_work_image ?? false) : false,
     team_edit_allowed: data.team_edit_allowed ?? true,
-  }).select('id').single()
+  })).select('id').single()
 
   if (error) return { error: error.message }
 
@@ -195,7 +196,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   const { error } = await supabase
     .from('questions')
-    .update({
+    .update(withContentFingerprint({
       org_id: orgResult.orgId,
       category_id: data.category_id || null,
       grade_level: data.grade_level || null,
@@ -220,7 +221,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
       image_urls: data.image_urls,
       requires_work_image: data.question_type === 'written' ? (data.requires_work_image ?? false) : false,
       team_edit_allowed: isOwner ? (data.team_edit_allowed ?? true) : existing.team_edit_allowed,
-    })
+    }))
     .eq('id', id)
 
   if (error) return { error: error.message }

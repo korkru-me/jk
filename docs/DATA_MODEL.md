@@ -22,7 +22,7 @@ Invariant สำคัญ:
 ## คลังโจทย์
 
 - `question_categories` — หมวดหมู่แบบ parent/child เป็น taxonomy กลางร่วมทุก organization เขียนได้เฉพาะทาง admin action (`lib/actions/admin.ts`) การนำเข้าไฟล์จึงจับคู่ตามชื่อเท่านั้น ไม่สร้างหมวดใหม่
-- `questions` — เนื้อหา ชนิด เฉลย ตัวแปร การมองเห็น และ metadata
+- `questions` — เนื้อหา ชนิด เฉลย ตัวแปร การมองเห็น และ metadata; `content_fingerprint` เป็น SHA-256 ของเนื้อหาในรูป canonical (`questionFingerprint()` ใน `lib/question-content-match.ts`) ใช้หาโจทย์ซ้ำโดยไม่ต้องอ่านทั้งคลัง เขียนโดย server action ที่บันทึกโจทย์ผ่าน `withContentFingerprint()` และ backfill ด้วย `scripts/backfill-content-fingerprint.mjs` ค่า NULL แปลว่ายังไม่คำนวณ ไม่ใช่ไม่ซ้ำกับใคร
 - `formula_presets` — สมการ/ตัวแปรที่นำกลับมาใช้
 - `question_sets` — รายการ `question_ids` ที่บันทึกเป็นแฟ้ม พร้อม `sections` (jsonb) สำหรับแฟ้มย่อยในแฟ้ม
 - `question_shares` และ `question_set_shares` — แชร์เข้าทีม/organization เพิ่มเติม
@@ -34,6 +34,7 @@ Invariant สำคัญ:
 - `question_sets.sections` เป็นมุมมองบน `question_ids` ไม่ใช่แหล่งความจริงคู่ขนาน: `[{ id, title, question_ids }]` โดย id ทุกตัวต้องอยู่ใน `question_ids`, ห้ามซ้ำภายในแฟ้มย่อยเดียวกัน (แต่ข้ามแฟ้มย่อยซ้ำได้ — ข้อเดียวอยู่ได้หลายแฟ้มย่อย) ส่วน `question_ids` เป็นลำดับของแฟ้มเองที่ครูจัด ไม่ได้สร้างใหม่จากลำดับแฟ้มย่อย ทุกครั้งที่บันทึก server จะผ่าน `normalizeSetSections` ใน `lib/question-set-sections.ts` — ห้ามเขียนคอลัมน์ใดคอลัมน์หนึ่งโดยไม่ผ่านฟังก์ชันนี้
 - `assignments.sections` เป็น snapshot ของแฟ้มย่อยตอนสร้างงาน (แช่แข็งเหมือน `question_ids`) และ `assignments.show_sections` คุมว่านักเรียน/ใบงานจะเห็นชื่อแฟ้มย่อยหรือไม่ การแก้แฟ้มโจทย์ภายหลังไม่ย้อนไปเปลี่ยนงานที่มอบหมายไปแล้ว
 - visibility ไม่แทน authorization ทั้งหมด ต้องพิจารณา owner, org, share และ assignment access ร่วมกัน
+- `content_fingerprint` นับเฉพาะสิ่งที่นักเรียนเห็นและสิ่งที่ถือว่าตอบถูก ไม่นับ label (ชื่อโจทย์ แท็ก ระดับความยาก หมวด การแชร์ เฉลย และสวิตช์แนบรูปวิธีทำ) การเปลี่ยน label จึงไม่เปลี่ยน fingerprint และไม่ทำให้โจทย์ซ้ำหลุดจากการตรวจจับ
 
 ## ห้องเรียน
 

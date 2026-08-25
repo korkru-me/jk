@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { randomUUID } from 'crypto'
 import { resolveOrgId } from '@/lib/actions/questions'
+import { withContentFingerprint } from '@/lib/question-fingerprint'
 import type { Variable, Difficulty, Visibility } from '@/lib/types'
 import { RETURN_PARAM } from '@/lib/question-return'
 
@@ -94,7 +95,7 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
   const groupId = payload.groupId ?? randomUUID()
 
   // Upsert parent (order_in_group = 0, holds shared context)
-  const parentPayload = {
+  const parentPayload = withContentFingerprint({
     org_id: orgResult.orgId,
     category_id: payload.category_id || null,
     title: payload.title,
@@ -110,7 +111,7 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
     answer_tolerance: 0.01,
     group_id: groupId,
     order_in_group: 0,
-  }
+  })
 
   let parentId = payload.parentId
   if (parentId) {
@@ -137,7 +138,7 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
   // Upsert each sub-question
   for (let i = 0; i < payload.subQuestions.length; i++) {
     const sq = payload.subQuestions[i]
-    const subPayload = {
+    const subPayload = withContentFingerprint({
       org_id: orgResult.orgId,
       category_id: payload.category_id || null,
       title: `${payload.title} — ข้อ ${i + 1}`,
@@ -156,7 +157,7 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
       parent_question_id: parentId,
       group_id: groupId,
       order_in_group: i + 1,
-    }
+    })
     if (sq.id) {
       const { error } = await supabase.from('questions').update(subPayload).eq('id', sq.id)
       if (error) return { error: error.message }

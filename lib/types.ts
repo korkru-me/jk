@@ -483,6 +483,9 @@ export interface Question {
   parent_question_id: string | null
   group_id: string | null
   order_in_group: number | null
+  /** SHA-256 of this question's canonical content, used to spot โจทย์ซ้ำ without
+   *  reading the whole bank. NULL until a write path or the backfill sets it. */
+  content_fingerprint: string | null
   created_at: string
   updated_at: string
 }

@@ -16,12 +16,6 @@ import {
 } from '@/lib/question-search'
 import { rankTagsByUse } from '@/lib/tag-suggest'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
-import {
-  CONTENT_COLUMNS,
-  countContentTwins,
-  groupIdsBySharedText,
-  type QuestionContent,
-} from '@/lib/question-content-match'
 import { subQuestionCount, type CountableQuestion } from '@/lib/question-parts'
 
 export const metadata = { title: 'คลังโจทย์ — KorKru' }
@@ -40,6 +34,7 @@ export type QuestionSummary = Pick<
   | 'group_id'
   | 'order_in_group'
   | 'team_edit_allowed'
+  | 'content_fingerprint'
   | 'created_at'
 >
 
@@ -190,7 +185,7 @@ async function fetchTags(
   return rankTagsByUse(rows.map(row => row.tags))
 }
 
-/** Ids per `in(...)` round in the duplicate content pass — keeps the URL short. */
+/** Fingerprints per `in(...)` round in the duplicate pass — keeps the URL short. */
 const DUPLICATE_ID_CHUNK = 100
 
 const fetchOwnTags = (
@@ -201,52 +196,57 @@ const fetchOwnTags = (
 /**
  * Which of a teacher's questions are the same question twice.
  *
- * Two passes, because the fingerprint needs the answer configuration as well
- * as the body, and shipping all of that for a thousand-question bank on every
- * visit would cost more than the warning is worth. The first pass reads only
- * the wording, which is enough to rule out nearly everything; the second reads
- * the full content of the handful that are left. A bank with no duplicates
- * pays for one text column and nothing else.
+ * This used to read the wording of the entire bank on every render — search,
+ * tag click, page turn alike — and rebuild the fingerprints from scratch to
+ * draw a badge that is usually absent. The fingerprint now lives on the row
+ * (`content_fingerprint`, written by the server actions that save a question),
+ * so the question here is only "how many of this teacher's questions carry the
+ * fingerprints already on screen": one indexed lookup over at most a page of
+ * distinct values, instead of a pass over the whole คลัง.
+ *
+ * A row whose fingerprint has not been backfilled yet is skipped rather than
+ * guessed at, which shows up as a missing badge, never as a wrong count.
  */
 async function fetchDuplicateCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  questions: { id: string; content_fingerprint: string | null }[],
 ): Promise<Record<string, number>> {
-  // Same rows the list itself shows: this teacher's own questions, no research
-  // snapshots, and a group counted once by its parent.
-  const textQuery = () => supabase
-    .from('questions')
-    .select('id, question_text')
-    .eq('created_by', userId)
-    .eq('is_research_snapshot', false)
-    .or('group_id.is.null,order_in_group.eq.0')
+  const fingerprints = [...new Set(
+    questions.map(question => question.content_fingerprint).filter((f): f is string => !!f)
+  )]
+  if (fingerprints.length === 0) return {}
 
-  const { rows, error } = await fetchAllRows<{ id: string; question_text: string | null }>(
-    (from, to) => textQuery().order('id').range(from, to)
-  )
-  if (error) {
-    console.error('[questions/page] duplicate text pass failed:', error)
-    return {}
-  }
-
-  const candidates = groupIdsBySharedText(rows)
-  if (candidates.length === 0) return {}
-
-  // The ids are already narrowed by the pass above, so this only has to fetch.
-  const contents: QuestionContent[] = []
-  for (let i = 0; i < candidates.length; i += DUPLICATE_ID_CHUNK) {
-    const { data, error: contentError } = await supabase
+  // Counted over the same rows the list itself shows: this teacher's own
+  // questions, no research snapshots, and a group counted once by its parent.
+  const totals = new Map<string, number>()
+  for (let i = 0; i < fingerprints.length; i += DUPLICATE_ID_CHUNK) {
+    const { data, error } = await supabase
       .from('questions')
-      .select(CONTENT_COLUMNS)
-      .in('id', candidates.slice(i, i + DUPLICATE_ID_CHUNK))
-    if (contentError) {
-      console.error('[questions/page] duplicate content pass failed:', contentError)
+      .select('content_fingerprint')
+      .eq('created_by', userId)
+      .eq('is_research_snapshot', false)
+      .or('group_id.is.null,order_in_group.eq.0')
+      .in('content_fingerprint', fingerprints.slice(i, i + DUPLICATE_ID_CHUNK))
+    if (error) {
+      // Losing the count costs a badge, not the page.
+      console.error('[questions/page] duplicate count query failed:', error)
       return {}
     }
-    contents.push(...((data ?? []) as unknown as QuestionContent[]))
+    for (const row of (data ?? []) as { content_fingerprint: string | null }[]) {
+      if (!row.content_fingerprint) continue
+      totals.set(row.content_fingerprint, (totals.get(row.content_fingerprint) ?? 0) + 1)
+    }
   }
 
-  return countContentTwins(contents)
+  // The badge says how many *other* questions say the same thing.
+  const counts: Record<string, number> = {}
+  for (const question of questions) {
+    if (!question.content_fingerprint) continue
+    const total = totals.get(question.content_fingerprint) ?? 0
+    if (total > 1) counts[question.id] = total - 1
+  }
+  return counts
 }
 
 /** Ids per `in(...)` round in the part-count pass — keeps the URL short. */
@@ -334,7 +334,7 @@ export default async function QuestionsPage({
   const filters = readFilters(sp)
   const teamFilters = readTeamFilters(sp)
 
-  const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, created_at'
+  const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, content_fingerprint, created_at'
 
   // Filtering and paging happen in the database rather than in the browser:
   // the bank is already past a thousand questions, and shipping all of them on
@@ -501,7 +501,7 @@ export default async function QuestionsPage({
     }
   }
 
-  const [ownResult, { data: membershipRows }, { count: unfilteredTotal }, allTags, duplicateCounts] = await Promise.all([
+  const [ownResult, { data: membershipRows }, { count: unfilteredTotal }, allTags] = await Promise.all([
     loadOwnQuestions(),
     supabase
       .from('organization_members')
@@ -516,7 +516,6 @@ export default async function QuestionsPage({
       .eq('is_research_snapshot', false)
       .or('group_id.is.null,order_in_group.eq.0'),
     ownTagsPromise,
-    fetchDuplicateCounts(supabase, userId),
   ])
 
   const myTeams = (membershipRows ?? []).map((row: any) => ({
@@ -783,11 +782,14 @@ export default async function QuestionsPage({
   }
 
   const ownQuestions = ownResult.questions
-  // Only the questions actually on screen need stats or part counts now.
+  // Only the questions actually on screen need stats, part counts or a
+  // duplicate check now. The duplicate badge stays an own-bank question, so it
+  // is asked about `ownQuestions` alone — a teammate's card never shows one.
   const visibleQuestions = [...ownQuestions, ...teamQuestions]
-  const [stats, subQuestionCounts] = await Promise.all([
+  const [stats, subQuestionCounts, duplicateCounts] = await Promise.all([
     fetchQuestionStats(supabase, visibleQuestions.map(q => q.id)),
     fetchSubQuestionCounts(supabase, visibleQuestions),
+    fetchDuplicateCounts(supabase, userId, ownQuestions),
   ])
 
   return (
