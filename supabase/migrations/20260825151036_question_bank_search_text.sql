@@ -45,15 +45,18 @@ ALTER TABLE public.questions
       btrim(
         regexp_replace(
           coalesce(title, '') || ' ' ||
-          replace(
-            regexp_replace(
-              replace(
-                replace(
-                  replace(
-                    regexp_replace(coalesce(question_text, ''), '<[^>]*>', ' ', 'g'),
-                    '&nbsp;', ' '),
-                  '&lt;', '<'),
-                '&gt;', '>'),
+          replace(                                    -- 7. &amp; last of all
+            regexp_replace(                           -- 6. &#39; / &#039;
+              replace(                                -- 5. &quot;
+                replace(                              -- 4. &gt;
+                  replace(                            -- 3. &lt;
+                    replace(                          -- 2. &nbsp;
+                      regexp_replace(                 -- 1. strip the markup
+                        coalesce(question_text, ''), '<[^>]*>', ' ', 'g'),
+                      '&nbsp;', ' '),
+                    '&lt;', '<'),
+                  '&gt;', '>'),
+                '&quot;', '"'),
               '&#0?39;', '''', 'g'),
             '&amp;', '&'),
           '[[:space:]]+', ' ', 'g')))
