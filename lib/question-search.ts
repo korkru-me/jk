@@ -65,6 +65,22 @@ function haystack(q: SearchableQuestion): string {
 }
 
 /**
+ * What `questions.search_text` holds for a given row.
+ *
+ * The column is generated in the database, so this is not what fills it — it is
+ * the same rule written where it can be read and tested, and what the migration
+ * `20260825151036_question_bank_search_text.sql` is expected to reproduce. If
+ * `questionExcerpt()` ever changes, that migration has to change with it, and
+ * this is the function that says so.
+ *
+ * Tags are deliberately absent: they are matched as whole array elements
+ * through `tags && ...`, not by substring against the body.
+ */
+export function questionSearchText(title: string, questionText: string): string {
+  return normalize(`${title} ${questionExcerpt(questionText)}`)
+}
+
+/**
  * True when every word of the query appears somewhere in the question.
  *
  * Words rather than the raw string, so word order and the spacing between them
@@ -230,6 +246,14 @@ export function questionSearchGroupSlices(
  * of drifting apart — which is exactly what had happened: the bank searched
  * title and body, the picker only the title, and neither searched tags.
  *
+ * The body is reached through `search_text`, not `question_text`. That column
+ * holds what `questionExcerpt()` produces — the same readable string
+ * `haystack()` builds above — so the two sides finally agree on what a question
+ * says. Searching the raw column matched the markup around the words (a query
+ * of "span" found questions that never say it) and missed any phrase a tag
+ * happened to interrupt. `search_text` also carries the trigram index; HTML in
+ * a text column could not.
+ *
  * A tag can only be matched by an exact array element (`ov`), so the words are
  * resolved against the tags that actually exist first — that is what
  * `tagUniverse` is for. Without it, tags simply do not take part.
@@ -237,7 +261,9 @@ export function questionSearchGroupSlices(
 export function questionSearchOrClauses(search: string, tagUniverse: string[] = []): string[] {
   return searchTerms(search).map(term => {
     const like = `%${escapeLike(term)}%`
-    const parts = [`title.ilike.${quoteForPostgrest(like)}`, `question_text.ilike.${quoteForPostgrest(like)}`]
+    // One column covers title and body: search_text is the two joined by a
+    // space, and a term never contains one, so a match cannot straddle them.
+    const parts = [`search_text.ilike.${quoteForPostgrest(like)}`]
     // Capped: a one-letter word can point at hundreds of tags, and every one
     // of them rides in the query string.
     const tags = tagsMatchingTerm(tagUniverse, term).slice(0, 100)

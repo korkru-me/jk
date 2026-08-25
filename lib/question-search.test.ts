@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   matchesSearch, matchesTags, filterQuestions, searchTerms,
   questionSearchOrClauses, tagsMatchingTerm, questionSearchGroup,
-  questionSearchGroupFilters, questionSearchGroupSlices,
+  questionSearchGroupFilters, questionSearchGroupSlices, questionSearchText,
 } from './question-search'
 
 const rain = {
@@ -90,21 +90,57 @@ describe('searchTerms', () => {
   })
 })
 
+describe('questionSearchText', () => {
+  // The database generates this column. These cases pin what the migration's
+  // expression has to reproduce — change questionExcerpt() and a new migration
+  // has to follow, or the two sides start disagreeing about what a question says.
+  it('drops the markup and keeps the words', () => {
+    expect(questionSearchText('งาน', '<p>แรง <strong>F</strong> ขนาด 10 นิวตัน</p>'))
+      .toBe('งาน แรง f ขนาด 10 นิวตัน')
+  })
+
+  it('joins a phrase a tag had interrupted', () => {
+    // แรง<strong>เสียด</strong>ทาน reads as one word once the tags are gone,
+    // which is why searching the raw column could never find it.
+    expect(questionSearchText('', 'แรง<strong>เสียด</strong>ทาน'))
+      .toContain('แรง เสียด ทาน')
+  })
+
+  it('decodes entities, with &amp; resolved last', () => {
+    expect(questionSearchText('', '<p>a&nbsp;b &lt;c&gt; &quot;d&quot; &#39;e&#39;</p>'))
+      .toBe('a b <c> "d" \'e\'')
+    // &amp;lt; is a literal "&lt;", not a "<"
+    expect(questionSearchText('', '&amp;lt;')).toBe('&lt;')
+  })
+
+  it('collapses whitespace and lowercases', () => {
+    expect(questionSearchText('  Work   Done  ', '<p>\n  A  </p>')).toBe('work done a')
+  })
+})
+
 describe('questionSearchOrClauses', () => {
   it('is empty for a blank query — no clause to AND in', () => {
     expect(questionSearchOrClauses('', ['ฝน'])).toEqual([])
     expect(questionSearchOrClauses('   ')).toEqual([])
   })
 
-  it('searches title and body when no tag matches', () => {
+  it('searches the readable text when no tag matches', () => {
+    // search_text is title and body already joined and stripped of markup, so
+    // one clause covers both — and matches what the browser side searches.
     expect(questionSearchOrClauses('ฝน', ['งาน'])).toEqual([
-      'title.ilike."%ฝน%",question_text.ilike."%ฝน%"',
+      'search_text.ilike."%ฝน%"',
     ])
+  })
+
+  it('never searches the raw markup', () => {
+    // question_text is TipTap HTML. Searching it matched tag names ("span",
+    // "class") and missed any phrase a tag interrupted.
+    expect(questionSearchOrClauses('span')[0]).not.toContain('question_text')
   })
 
   it('adds the tags a word points at, by substring', () => {
     expect(questionSearchOrClauses('พลัง', ['พลังงาน', 'งาน', 'พลังงานกล'])).toEqual([
-      'title.ilike."%พลัง%",question_text.ilike."%พลัง%",tags.ov.{"พลังงาน","พลังงานกล"}',
+      'search_text.ilike."%พลัง%",tags.ov.{"พลังงาน","พลังงานกล"}',
     ])
   })
 
@@ -113,14 +149,14 @@ describe('questionSearchOrClauses', () => {
   })
 
   it('quotes values so a comma or a dot cannot break the filter', () => {
-    expect(questionSearchOrClauses('a,b')[0]).toContain('title.ilike."%a,b%"')
+    expect(questionSearchOrClauses('a,b')[0]).toContain('search_text.ilike."%a,b%"')
     expect(questionSearchOrClauses('a', ['a,b'])[0]).toContain('tags.ov.{"a,b"}')
   })
 
   it('escapes the wildcards LIKE would otherwise read as pattern', () => {
     // \% reaches LIKE as a literal per cent — the extra backslash is the one
     // PostgREST strips when it unquotes the value.
-    expect(questionSearchOrClauses('50%')[0]).toContain(String.raw`title.ilike."%50\\%%"`)
+    expect(questionSearchOrClauses('50%')[0]).toContain(String.raw`search_text.ilike."%50\\%%"`)
   })
 })
 

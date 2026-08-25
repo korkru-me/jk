@@ -35,6 +35,7 @@ Invariant สำคัญ:
 - `assignments.sections` เป็น snapshot ของแฟ้มย่อยตอนสร้างงาน (แช่แข็งเหมือน `question_ids`) และ `assignments.show_sections` คุมว่านักเรียน/ใบงานจะเห็นชื่อแฟ้มย่อยหรือไม่ การแก้แฟ้มโจทย์ภายหลังไม่ย้อนไปเปลี่ยนงานที่มอบหมายไปแล้ว
 - visibility ไม่แทน authorization ทั้งหมด ต้องพิจารณา owner, org, share และ assignment access ร่วมกัน
 - `content_fingerprint` นับเฉพาะสิ่งที่นักเรียนเห็นและสิ่งที่ถือว่าตอบถูก ไม่นับ label (ชื่อโจทย์ แท็ก ระดับความยาก หมวด การแชร์ เฉลย และสวิตช์แนบรูปวิธีทำ) การเปลี่ยน label จึงไม่เปลี่ยน fingerprint และไม่ทำให้โจทย์ซ้ำหลุดจากการตรวจจับ
+- `search_text` เป็น generated column (`title` + เนื้อโจทย์ที่ถอด markup แล้ว lowercase) ฐานข้อมูลคำนวณเองทุกครั้งที่แถวเปลี่ยน ห้ามเขียนทับ และห้ามใช้เป็นแหล่งความจริงของเนื้อหา — `question_text` ยังเป็นตัวจริงที่เก็บ markup ไว้แสดงผล คอลัมน์นี้มีไว้ให้ค้นหาอย่างเดียว และมีคู่ฝาฝั่ง TypeScript คือ `questionSearchText()` ใน `lib/question-search.ts`
 
 ## ห้องเรียน
 
