@@ -12,16 +12,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Check, ChevronRight, ChevronLeft, Eye, Timer,
+  Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter,
 } from 'lucide-react'
 import {
-  filterSectionsToQuestions, parseSections, type QuestionSetSection,
+  filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
+  type QuestionSetSection,
 } from '@/lib/question-set-sections'
 import type { Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import type { BankQuestion } from '@/lib/question-bank'
 import { Card } from '@/components/ui/card'
+import { IconButton } from '@/components/ui/icon-button'
+import { OrderNumberInput } from '@/components/assignments/order-number-input'
+import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
 
@@ -89,6 +93,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   // gives it (one per ข้อย่อย); teacher can edit individual questions and the
   // total recalculates automatically.
   const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>({})
+  // Which row's มุมมองนักเรียน is open, as an index into selectedIds so the
+  // dialog's ข้อถัดไป walks the teacher's own order. null = closed.
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   // Independent of the per-question points above — rescales what's
   // *reported* only (never the underlying structure), and can be changed
   // any time later from the edit page too, even after students finish.
@@ -118,6 +125,19 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
   function toggleQ(id: string) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  }
+
+  // Question order is the teacher's own order in selectedIds — the same array
+  // that becomes the งาน's question_ids — so reordering here is what students
+  // will see (unless สลับลำดับข้อแบบสุ่ม is turned on in ตั้งค่า). `sections`
+  // is deliberately left alone: it still carries แฟ้มย่อย for questions that
+  // are currently unticked, and is trimmed to the real selection at submit.
+  function moveQuestion(id: string, delta: number) {
+    setSelectedIds(prev => moveQuestionOrder(prev, id, delta))
+  }
+
+  function moveQuestionTo(id: string, position: number) {
+    setSelectedIds(prev => moveQuestionOrderToIndex(prev, id, position - 1))
   }
 
   function importSet(set: AssignmentQuestionSetOption) {
@@ -151,6 +171,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
     .filter((q): q is AssignmentQuestionOption => !!q)
+  // Indexes line up with previewQuestions, not selectedIds: a selected id that
+  // no longer resolves to a question is dropped from the list on screen, and
+  // the ดูตัวอย่าง dialog must page through exactly what is shown.
+  const previewIds = previewQuestions.map(q => q.id)
   // What a question is worth until the teacher types over it.
   const defaultPointsById = new Map(questions.map(q => [q.id, q.default_points]))
   const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
@@ -502,12 +526,36 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             <p className="text-xs text-muted-foreground">
               ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
               แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
+              สลับลำดับข้อได้ที่นี่ — ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
+              และกดรูปตาเพื่อดูตัวอย่างข้อนั้นแบบที่นักเรียนเห็น
             </p>
 
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
               {previewQuestions.map((q, i) => (
-                <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-border">
-                  <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
+                <div key={q.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-border">
+                  <OrderNumberInput
+                    position={i + 1}
+                    total={previewQuestions.length}
+                    onMove={to => moveQuestionTo(q.id, to)}
+                  />
+                  <div className="flex flex-col shrink-0">
+                    <IconButton
+                      label="ย้ายขึ้น"
+                      size="2xs"
+                      disabled={i === 0}
+                      onClick={() => moveQuestion(q.id, -1)}
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </IconButton>
+                    <IconButton
+                      label="ย้ายลง"
+                      size="2xs"
+                      disabled={i === previewQuestions.length - 1}
+                      onClick={() => moveQuestion(q.id, 1)}
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </IconButton>
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
@@ -517,6 +565,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                       {q.sub_question_count} {subQuestionUnit(q.question_type)}
                     </span>
                   )}
+                  <IconButton
+                    label={`ดูตัวอย่างข้อ ${i + 1}`}
+                    size="2xs"
+                    className="shrink-0"
+                    onClick={() => setPreviewIndex(i)}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </IconButton>
                   <Input
                     type="number"
                     min={0}
@@ -529,6 +585,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 </div>
               ))}
             </div>
+
+            <QuestionPreviewDialog
+              ids={previewIds}
+              open={previewIndex !== null}
+              startIndex={previewIndex ?? 0}
+              onOpenChange={open => { if (!open) setPreviewIndex(null) }}
+            />
           </Card>
 
           <Card padding="xl" className="space-y-3">

@@ -10,6 +10,8 @@ import {
   moveSection,
   moveQuestionInSet,
   moveQuestionToIndex,
+  moveQuestionOrder,
+  moveQuestionOrderToIndex,
   setQuestionInSection,
   clearQuestionSections,
   sectionsByQuestionId,
@@ -152,6 +154,34 @@ describe('reordering', () => {
   it('keeps section membership through a move', () => {
     const { sections: next } = moveQuestionToIndex(sections, ids, 'a', 3)
     expect(next.map(x => x.question_ids)).toEqual([['a', 'b'], ['c']])
+  })
+})
+
+describe('question order without sections', () => {
+  const ids = ['a', 'b', 'c', 'd']
+
+  it('nudges and clamps the same way the set version does', () => {
+    expect(moveQuestionOrder(ids, 'c', -1)).toEqual(['a', 'c', 'b', 'd'])
+    expect(moveQuestionOrder(ids, 'a', -1)).toEqual(ids)
+    expect(moveQuestionOrder(ids, 'd', 1)).toEqual(ids)
+  })
+
+  it('sends a question to a position, clamped to the list', () => {
+    expect(moveQuestionOrderToIndex(ids, 'd', 0)).toEqual(['d', 'a', 'b', 'c'])
+    expect(moveQuestionOrderToIndex(ids, 'b', 99)).toEqual(['a', 'c', 'd', 'b'])
+    expect(moveQuestionOrderToIndex(ids, 'b', -5)).toEqual(['b', 'a', 'c', 'd'])
+  })
+
+  it('leaves the list alone for an id it does not hold', () => {
+    expect(moveQuestionOrder(ids, 'zz', 1)).toEqual(ids)
+    expect(moveQuestionOrderToIndex(ids, 'zz', 0)).toEqual(ids)
+  })
+
+  it('does not mutate the list it was given', () => {
+    const original = [...ids]
+    moveQuestionOrder(ids, 'a', 1)
+    moveQuestionOrderToIndex(ids, 'a', 3)
+    expect(ids).toEqual(original)
   })
 })
 
