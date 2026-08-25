@@ -35,8 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { QuestionPreviewContent } from '@/components/questions/question-preview'
-import { getQuestionClientDetail } from '@/lib/actions/questions'
+import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { createEducationResearchProject } from '@/lib/actions/education-research'
 import {
   selectedResearchMaxScore,
@@ -49,16 +48,6 @@ import {
   type ResearchQuestionSetOption,
 } from '@/lib/education-research'
 import { cn } from '@/lib/utils'
-import type {
-  CompositeConfig,
-  FileUploadConfig,
-  FillBlankConfig,
-  MatchingPair,
-  MCQOption,
-  OrderingConfig,
-  RandomQuestionConfig,
-  TrueFalseConfig,
-} from '@/lib/types'
 import type { QuestionSetSection } from '@/lib/question-set-sections'
 
 const STEPS = ['ข้อมูลโครงการ', 'ก่อนเรียน', 'หลังเรียน', 'ตรวจสอบ']
@@ -340,7 +329,7 @@ export function ResearchProjectWizard({
         }}
       />
 
-      <ExamPreviewDialog ids={previewIds ?? []} open={previewIds !== null} onOpenChange={open => !open && setPreviewIds(null)} />
+      <QuestionPreviewDialog ids={previewIds ?? []} open={previewIds !== null} onOpenChange={open => !open && setPreviewIds(null)} />
 
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -733,38 +722,6 @@ function ExamPickerDialog({ open, onOpenChange, initial, questions, questionSets
           <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
           <Button disabled={selectedIds.length === 0 || maxScore <= 0} onClick={() => onConfirm({ ...initial, question_ids: selectedIds, selection_mode: selectionMode, source_set_id: sourceSetId, source_sections: sections })}>ยืนยันข้อสอบที่เลือก</Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function ExamPreviewDialog({ ids, open, onOpenChange }: { ids: string[]; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [index, setIndex] = useState(0)
-  const [detail, setDetail] = useState<Awaited<ReturnType<typeof getQuestionClientDetail>> | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    setIndex(0)
-  }, [open, ids])
-
-  useEffect(() => {
-    if (!open || !ids[index]) return
-    let active = true
-    setDetail(null)
-    getQuestionClientDetail(ids[index]).then(result => { if (active) setDetail(result) })
-    return () => { active = false }
-  }, [open, ids, index])
-
-  const question = detail && 'data' in detail ? detail.data : null
-  const extraData = question?.extra_data
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader><DialogTitle>มุมมองนักเรียน</DialogTitle><DialogDescription>ตัวอย่างข้อ {ids.length === 0 ? 0 : index + 1} จาก {ids.length} · คำตอบในตัวอย่างจะไม่ถูกบันทึก</DialogDescription></DialogHeader>
-        {!detail && <div className="h-64 animate-pulse rounded-xl bg-muted" />}
-        {detail && 'error' in detail && <p className="py-12 text-center text-sm text-destructive">{detail.error}</p>}
-        {question && <QuestionPreviewContent key={question.id} questionText={question.question_text} variables={question.variables ?? []} answerParts={question.question_type === 'written' ? (question.answer_parts ?? []) : []} isRandom={question.is_random} questionType={question.question_type} mcqOptions={question.question_type === 'mcq' ? ((question.mcq_options ?? []) as MCQOption[]) : []} matchingPairs={question.question_type === 'matching' ? ((question.mcq_options ?? []) as unknown as MatchingPair[]) : []} imageUrls={question.image_urls ?? []} trueFalseConfig={question.question_type === 'true_false' ? (extraData as TrueFalseConfig) : undefined} fillBlankConfig={question.question_type === 'fill_blank' ? (extraData as FillBlankConfig) : undefined} orderingConfig={question.question_type === 'ordering' ? (extraData as OrderingConfig) : undefined} compositeConfig={question.question_type === 'composite' ? (extraData as CompositeConfig) : undefined} partLabelStyle={(extraData as RandomQuestionConfig)?.part_label_style} attachmentUrls={question.question_type === 'file_upload' ? ((extraData as FileUploadConfig)?.attachment_urls ?? []) : []} />}
-        <DialogFooter><Button variant="outline" disabled={index === 0} onClick={() => setIndex(current => current - 1)}><ArrowLeft aria-hidden="true" /> ข้อก่อนหน้า</Button><Button disabled={index >= ids.length - 1} onClick={() => setIndex(current => current + 1)}>ข้อถัดไป <ArrowRight aria-hidden="true" /></Button></DialogFooter>
       </DialogContent>
     </Dialog>
   )

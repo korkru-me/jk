@@ -270,6 +270,36 @@ export function clearQuestionSections(
   return normalizeSetSections(next, questionIds)
 }
 
+/**
+ * Question order on its own — no sections involved.
+ *
+ * For a list that is still being picked, where `sections` may legitimately
+ * name questions the teacher has not selected (yet): the งาน wizard carries
+ * the แฟ้มย่อย of every แฟ้ม imported and only trims them at submit, so
+ * normalizing against the half-picked selection here would throw away the
+ * labels of anything currently unticked. Order never depends on sections
+ * anyway — it lives in `question_ids`.
+ */
+export function moveQuestionOrder(
+  questionIds: readonly string[],
+  questionId: string,
+  delta: number
+): string[] {
+  return moveWithin(questionIds, questionIds.indexOf(questionId), delta)
+}
+
+/** `moveQuestionOrder` to an absolute 0-based position, clamped to the list. */
+export function moveQuestionOrderToIndex(
+  questionIds: readonly string[],
+  questionId: string,
+  targetIndex: number
+): string[] {
+  const index = questionIds.indexOf(questionId)
+  if (index < 0) return [...questionIds]
+  const clamped = Math.max(0, Math.min(questionIds.length - 1, Math.trunc(targetIndex)))
+  return moveWithin(questionIds, index, clamped - index)
+}
+
 /** Reorders one question within the แฟ้ม — the order students see. */
 export function moveQuestionInSet(
   sections: readonly QuestionSetSection[],
@@ -277,8 +307,7 @@ export function moveQuestionInSet(
   questionId: string,
   delta: number
 ): { sections: QuestionSetSection[]; question_ids: string[] } {
-  const index = questionIds.indexOf(questionId)
-  return normalizeSetSections(sections, moveWithin(questionIds, index, delta))
+  return normalizeSetSections(sections, moveQuestionOrder(questionIds, questionId, delta))
 }
 
 /**
@@ -293,10 +322,7 @@ export function moveQuestionToIndex(
   questionId: string,
   targetIndex: number
 ): { sections: QuestionSetSection[]; question_ids: string[] } {
-  const index = questionIds.indexOf(questionId)
-  if (index < 0) return normalizeSetSections(sections, questionIds)
-  const clamped = Math.max(0, Math.min(questionIds.length - 1, Math.trunc(targetIndex)))
-  return normalizeSetSections(sections, moveWithin(questionIds, index, clamped - index))
+  return normalizeSetSections(sections, moveQuestionOrderToIndex(questionIds, questionId, targetIndex))
 }
 
 /** Removes several questions from the set entirely. */

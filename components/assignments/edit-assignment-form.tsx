@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock } from 'lucide-react'
@@ -19,6 +19,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import {
   Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
@@ -710,49 +711,5 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </DialogContent>
       </Dialog>
     </form>
-  )
-}
-
-/**
- * The order number, typed rather than only nudged.
- *
- * The arrows move one place at a time, which is nineteen clicks to lift ข้อ 20
- * to the front. This takes the destination directly: type it and press Enter,
- * or leave the field. An out-of-range number clamps rather than doing nothing,
- * and anything unparseable snaps back to where the question actually is.
- */
-function OrderNumberInput({ position, total, onMove }: {
-  position: number
-  total: number
-  onMove: (to: number) => void
-}) {
-  const [draft, setDraft] = useState(String(position))
-
-  // The list reorders under this field whenever any row moves, so the draft
-  // has to follow the row's real position rather than whatever was typed last.
-  useEffect(() => { setDraft(String(position)) }, [position])
-
-  function commit() {
-    const parsed = Number.parseInt(draft, 10)
-    if (!Number.isFinite(parsed) || parsed === position) { setDraft(String(position)); return }
-    onMove(Math.max(1, Math.min(total, parsed)))
-  }
-
-  return (
-    <Input
-      type="number"
-      min={1}
-      max={total}
-      value={draft}
-      aria-label={`ลำดับข้อ (ตอนนี้อยู่ข้อ ${position} จาก ${total})`}
-      title="พิมพ์เลขข้อที่ต้องการแล้วกด Enter"
-      onChange={e => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={e => {
-        if (e.key === 'Enter') { e.preventDefault(); commit() }
-        if (e.key === 'Escape') setDraft(String(position))
-      }}
-      className="w-12 shrink-0 px-1 text-center text-xs font-semibold"
-    />
   )
 }
