@@ -271,13 +271,41 @@ async function fetchSubQuestionCounts(
 ): Promise<Record<string, number>> {
   if (questions.length === 0) return {}
 
+  // Parent row -> its group, for the rows whose parts are siblings. Read off
+  // the rows already in hand, which is why the two reads below are independent
+  // of each other: neither needs the other's answer, so they go out together
+  // rather than one after the other.
+  const groupByParent = new Map<string, string>()
+  for (const question of questions) {
+    if (question.order_in_group === 0 && question.group_id) {
+      groupByParent.set(question.id, question.group_id)
+    }
+  }
+
   const ids = questions.map(question => question.id)
-  const rows: (CountableQuestion & { id: string })[] = []
-  for (let i = 0; i < ids.length; i += PART_COUNT_ID_CHUNK) {
-    const { data, error } = await supabase
+  const groupIds = [...new Set(groupByParent.values())]
+  const chunks = <T,>(all: T[]) => {
+    const out: T[][] = []
+    for (let i = 0; i < all.length; i += PART_COUNT_ID_CHUNK) {
+      out.push(all.slice(i, i + PART_COUNT_ID_CHUNK))
+    }
+    return out
+  }
+
+  const [shapeResults, memberResults] = await Promise.all([
+    Promise.all(chunks(ids).map(slice => supabase
       .from('questions')
       .select('id, question_type, extra_data, answer_parts, mcq_options')
-      .in('id', ids.slice(i, i + PART_COUNT_ID_CHUNK))
+      .in('id', slice))),
+    Promise.all(chunks(groupIds).map(slice => supabase
+      .from('questions')
+      .select('group_id')
+      .in('group_id', slice)
+      .gt('order_in_group', 0))),
+  ])
+
+  const rows: (CountableQuestion & { id: string })[] = []
+  for (const { data, error } of shapeResults) {
     if (error) {
       // Losing the count costs a badge, not the page.
       console.error('[questions/page] part count query failed:', error)
@@ -286,22 +314,8 @@ async function fetchSubQuestionCounts(
     rows.push(...((data ?? []) as unknown as (CountableQuestion & { id: string })[]))
   }
 
-  // Parent row -> its group, for the rows whose parts are siblings.
-  const groupByParent = new Map<string, string>()
-  for (const question of questions) {
-    if (question.order_in_group === 0 && question.group_id) {
-      groupByParent.set(question.id, question.group_id)
-    }
-  }
-
   const membersByGroup = new Map<string, number>()
-  const groupIds = [...new Set(groupByParent.values())]
-  for (let i = 0; i < groupIds.length; i += PART_COUNT_ID_CHUNK) {
-    const { data, error } = await supabase
-      .from('questions')
-      .select('group_id')
-      .in('group_id', groupIds.slice(i, i + PART_COUNT_ID_CHUNK))
-      .gt('order_in_group', 0)
+  for (const { data, error } of memberResults) {
     if (error) {
       // A group whose members stay unread falls back to its own shape (1),
       // which is wrong but harmless — better than dropping every count.
@@ -350,9 +364,12 @@ export default async function QuestionsPage({
   const ownTagsPromise = fetchOwnTags(supabase)
 
   async function loadOwnQuestions() {
-    const ownTags = await ownTagsPromise
+    // Only a typed query needs the tag universe, and only to turn its words
+    // into whole tags. A tag click or a page turn has no words to resolve, so
+    // it must not sit behind the tag count — which is what the unconditional
+    // await here used to make every one of them do.
     const searchSpec = filters.q
-      ? questionSearchGroupFilters(filters.q, ownTags)
+      ? questionSearchGroupFilters(filters.q, await ownTagsPromise)
       : null
 
     const buildQuery = (group?: QuestionSearchGroup, head = false) => {
@@ -501,13 +518,299 @@ export default async function QuestionsPage({
     }
   }
 
-  const [ownResult, { data: membershipRows }, { count: unfilteredTotal }, allTags] = await Promise.all([
-    loadOwnQuestions(),
-    supabase
+  /**
+   * The team tab, loaded alongside the teacher's own list rather than after it.
+   *
+   * Nothing in here depends on the own-bank queries — it needs the caller's
+   * team memberships and nothing else — but it used to sit behind the whole
+   * first Promise.all and so waited out the search queries before its own
+   * first read even went out. Two independent chains of round trips ran end
+   * to end; now they overlap.
+   */
+  async function loadTeamContext() {
+    const { data: membershipRows, error: membershipError } = await supabase
       .from('organization_members')
       .select('org_role, organizations!inner(id, name, is_personal)')
       .eq('user_id', userId)
-      .eq('organizations.is_personal', false),
+      .eq('organizations.is_personal', false)
+    if (membershipError) console.error('[questions/page] membership query failed:', membershipError)
+
+    const myTeams = (membershipRows ?? []).map((row: any) => ({
+      id: row.organizations.id as string,
+      name: row.organizations.name as string,
+    }))
+    const teamOrgIds = myTeams.map(t => t.id)
+
+    // A share list is small in practice — sharing is a deliberate per-question
+    // action — but it rides in the URL of the query below, and PostgREST rejects
+    // a query string past roughly a thousand ids. Beyond this the team tab falls
+    // back to loading in full: still correct, just not paged.
+    const MAX_SHARED_IDS_IN_QUERY = 700
+
+    let teamQuestions: QuestionWithCreator[] = []
+    let teamTotal = 0
+    let teamPaged = false
+    let teamSearchGroups: QuestionSearchResultGroup<QuestionWithCreator>[] = []
+    let teamSearchGroupCounts: QuestionSearchGroupCounts = { tag: 0, title: 0, content: 0 }
+
+    if (teamOrgIds.length > 0) {
+      // `team_question_tag_uses` resolves the share membership itself, so the
+      // tag count no longer has to wait for the share list to come back — the
+      // two go out together and the pair costs one round trip instead of two.
+      const teamTagsPromise: Promise<string[]> = teamFilters.q
+        ? fetchTagUses(supabase.rpc('team_question_tag_uses', {
+          p_org_ids: teamOrgIds,
+        }) as unknown as PromiseLike<{ data: TagUseRow[] | null; error: unknown }>)
+        : Promise.resolve([])
+
+      const { data: shareRows, error: shareError } = await supabase
+        .from('question_shares')
+        .select('question_id, org_id, organizations(name)')
+        .in('org_id', teamOrgIds)
+      if (shareError) console.error('[questions/page] share query failed:', shareError)
+
+      // question_id -> extra teams it was shared to (id + name, for filtering + badges)
+      const sharedNamesByQuestion = new Map<string, string[]>()
+      const sharedIdsByQuestion = new Map<string, string[]>()
+      for (const row of (shareRows ?? []) as any[]) {
+        const name = row.organizations?.name
+        if (!name) continue
+        sharedNamesByQuestion.set(row.question_id, [...(sharedNamesByQuestion.get(row.question_id) ?? []), name])
+        sharedIdsByQuestion.set(row.question_id, [...(sharedIdsByQuestion.get(row.question_id) ?? []), row.org_id])
+      }
+      const sharedIds = [...sharedNamesByQuestion.keys()]
+
+      const teamSelect = `${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`
+      // The tab is a union: questions a team owns, plus questions shared into
+      // one. Expressed as a single OR so the database can order and slice the
+      // whole thing — two queries could each be paged, but not merged in order.
+      const ownedByTeam = `and(org_id.in.(${teamOrgIds.join(',')}),visibility.in.(organization,school))`
+      const unionFilter = sharedIds.length > 0
+        ? `${ownedByTeam},id.in.(${sharedIds.join(',')})`
+        : ownedByTeam
+
+      if (sharedIds.length <= MAX_SHARED_IDS_IN_QUERY) {
+        teamPaged = true
+        // Narrowing to one team means either it owns the question, or the
+        // question was shared to it.
+        let teamNarrowFilter = ''
+        if (teamFilters.team) {
+          const sharedToTeam = [...sharedIdsByQuestion.entries()]
+            .filter(([, orgIds]) => orgIds.includes(teamFilters.team))
+            .map(([questionId]) => questionId)
+          teamNarrowFilter = sharedToTeam.length > 0
+            ? `org_id.eq.${teamFilters.team},id.in.(${sharedToTeam.join(',')})`
+            : `org_id.eq.${teamFilters.team}`
+        }
+
+        const teamTags = await teamTagsPromise
+        const searchSpec = teamFilters.q
+          ? questionSearchGroupFilters(teamFilters.q, teamTags)
+          : null
+
+        const buildTeamQuery = (group?: QuestionSearchGroup, head = false) => {
+          let query = supabase
+            .from('questions')
+            .select(teamSelect, { count: 'exact', head })
+            .eq('is_research_snapshot', false)
+            .or(unionFilter)
+            .or('group_id.is.null,order_in_group.eq.0')
+
+          if (teamNarrowFilter) query = query.or(teamNarrowFilter)
+          if (searchSpec) {
+            for (const clause of searchSpec.broadOrClauses) query = query.or(clause)
+            if (group === 'tag') {
+              query = query.overlaps('tags', searchSpec.matchingTags)
+            } else if (group === 'title') {
+              if (searchSpec.matchingTags.length > 0) {
+                query = query.or(`tags.is.null,tags.not.ov.${searchSpec.matchingTagsLiteral}`)
+              }
+              query = query.or(searchSpec.titleOrClause)
+            } else if (group === 'content') {
+              if (searchSpec.matchingTags.length > 0) {
+                query = query.or(`tags.is.null,tags.not.ov.${searchSpec.matchingTagsLiteral}`)
+              }
+              for (const pattern of searchSpec.titlePatterns) {
+                query = query.not('title', 'ilike', pattern)
+              }
+            }
+          }
+          return query
+        }
+
+        if (!searchSpec) {
+          const teamFrom = (teamFilters.page - 1) * QUESTIONS_PER_PAGE
+          const { data, error: teamError, count } = await buildTeamQuery()
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .range(teamFrom, teamFrom + QUESTIONS_PER_PAGE - 1)
+          if (teamError) console.error('[questions/page] team query failed:', teamError)
+          teamTotal = count ?? 0
+          teamQuestions = (data ?? []) as unknown as QuestionWithCreator[]
+        } else {
+          const visibleGroups: readonly QuestionSearchGroup[] = teamFilters.match === 'all'
+            ? QUESTION_SEARCH_GROUPS
+            : [teamFilters.match]
+
+          if (teamFilters.match !== 'all' || teamFilters.page === 1) {
+            const directFrom = teamFilters.match === 'all'
+              ? 0
+              : (teamFilters.page - 1) * QUESTIONS_PER_PAGE
+            const directResults = await Promise.all(QUESTION_SEARCH_GROUPS.map(async group => {
+              if (group === 'tag' && searchSpec.matchingTags.length === 0) {
+                return { group, count: 0, questions: [] as QuestionWithCreator[] }
+              }
+              const shouldLoadRows = visibleGroups.includes(group)
+              const result = shouldLoadRows
+                ? await buildTeamQuery(group)
+                  .order('created_at', { ascending: false })
+                  .order('id', { ascending: false })
+                  .range(directFrom, directFrom + QUESTIONS_PER_PAGE - 1)
+                : await buildTeamQuery(group, true)
+              if (result.error) console.error(`[questions/page] team ${group} search query failed:`, result.error)
+              return {
+                group,
+                count: result.count ?? 0,
+                questions: (result.data ?? []) as unknown as QuestionWithCreator[],
+              }
+            }))
+            teamSearchGroupCounts = Object.fromEntries(
+              directResults.map(result => [result.group, result.count]),
+            ) as QuestionSearchGroupCounts
+            const slices = questionSearchGroupSlices(
+              teamSearchGroupCounts,
+              teamFilters.match,
+              teamFilters.page,
+              QUESTIONS_PER_PAGE,
+            )
+            teamSearchGroups = visibleGroups.map(group => {
+              const result = directResults.find(candidate => candidate.group === group)
+              const slice = slices[group]
+              if (!result || !slice) return { group, questions: [] }
+              return {
+                group,
+                questions: result.questions.slice(
+                  slice.from - directFrom,
+                  slice.to - directFrom + 1,
+                ),
+              }
+            })
+          } else {
+            const countPairs = await Promise.all(QUESTION_SEARCH_GROUPS.map(async group => {
+              if (group === 'tag' && searchSpec.matchingTags.length === 0) {
+                return [group, 0] as const
+              }
+              const { count, error: countError } = await buildTeamQuery(group, true)
+              if (countError) console.error(`[questions/page] team ${group} search count failed:`, countError)
+              return [group, count ?? 0] as const
+            }))
+            teamSearchGroupCounts = Object.fromEntries(countPairs) as QuestionSearchGroupCounts
+            const slices = questionSearchGroupSlices(
+              teamSearchGroupCounts,
+              teamFilters.match,
+              teamFilters.page,
+              QUESTIONS_PER_PAGE,
+            )
+            teamSearchGroups = await Promise.all(visibleGroups.map(async group => {
+              const slice = slices[group]
+              if (!slice) return { group, questions: [] }
+              const { data, error: groupError } = await buildTeamQuery(group)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .range(slice.from, slice.to)
+              if (groupError) console.error(`[questions/page] team ${group} search query failed:`, groupError)
+              return {
+                group,
+                questions: (data ?? []) as unknown as QuestionWithCreator[],
+              }
+            }))
+          }
+          teamQuestions = teamSearchGroups.flatMap(group => group.questions)
+          teamTotal = visibleGroups.reduce<number>((sum, group) => sum + teamSearchGroupCounts[group], 0)
+        }
+
+        const attachShareNames = (q: QuestionWithCreator): QuestionWithCreator => ({
+          ...q,
+          shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
+          shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
+        })
+        teamQuestions = teamQuestions.map(attachShareNames)
+        teamSearchGroups = teamSearchGroups.map(result => ({
+          ...result,
+          questions: result.questions.map(attachShareNames),
+        }))
+      } else {
+        const { rows, error: teamError } = await fetchAllRows<Record<string, unknown>>((rangeFrom, rangeTo) =>
+          supabase
+            .from('questions')
+            .select(teamSelect)
+            .eq('is_research_snapshot', false)
+            .or(ownedByTeam)
+            .or('group_id.is.null,order_in_group.eq.0')
+            .order('created_at', { ascending: false })
+            .range(rangeFrom, rangeTo)
+        )
+        if (teamError) console.error('[questions/page] team query failed:', teamError)
+
+        const byId = new Map<string, QuestionWithCreator>()
+        for (const q of rows as unknown as QuestionWithCreator[]) byId.set(q.id, q)
+        if (sharedIds.length > 0) {
+          for (let i = 0; i < sharedIds.length; i += 500) {
+            const { data } = await supabase
+              .from('questions')
+              .select(teamSelect)
+              .eq('is_research_snapshot', false)
+              .in('id', sharedIds.slice(i, i + 500))
+              .or('group_id.is.null,order_in_group.eq.0')
+            for (const q of (data ?? []) as unknown as QuestionWithCreator[]) byId.set(q.id, q)
+          }
+        }
+        teamQuestions = [...byId.values()]
+          .map(q => ({
+            ...q,
+            shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
+            shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
+          }))
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+        if (teamFilters.team) {
+          teamQuestions = teamQuestions.filter(q =>
+            q.org_id === teamFilters.team || q.shared_org_ids?.includes(teamFilters.team)
+          )
+        }
+
+        if (teamFilters.q) {
+          const grouped: Record<QuestionSearchGroup, QuestionWithCreator[]> = {
+            tag: [],
+            title: [],
+            content: [],
+          }
+          for (const question of teamQuestions) {
+            if (!matchesSearch(question, teamFilters.q)) continue
+            const group = questionSearchGroup(question, teamFilters.q)
+            if (group) grouped[group].push(question)
+          }
+          teamSearchGroupCounts = {
+            tag: grouped.tag.length,
+            title: grouped.title.length,
+            content: grouped.content.length,
+          }
+          const visibleGroups: readonly QuestionSearchGroup[] = teamFilters.match === 'all'
+            ? QUESTION_SEARCH_GROUPS
+            : [teamFilters.match]
+          teamSearchGroups = visibleGroups.map(group => ({ group, questions: grouped[group] }))
+          teamQuestions = teamSearchGroups.flatMap(group => group.questions)
+        }
+        teamTotal = teamQuestions.length
+      }
+    }
+
+    return { myTeams, teamQuestions, teamTotal, teamPaged, teamSearchGroups, teamSearchGroupCounts }
+  }
+
+  const [ownResult, teamContext, { count: unfilteredTotal }, allTags] = await Promise.all([
+    loadOwnQuestions(),
+    loadTeamContext(),
     // The tab badge counts the whole bank, not the filtered slice.
     supabase
       .from('questions')
@@ -518,271 +821,7 @@ export default async function QuestionsPage({
     ownTagsPromise,
   ])
 
-  const myTeams = (membershipRows ?? []).map((row: any) => ({
-    id: row.organizations.id as string,
-    name: row.organizations.name as string,
-  }))
-  const teamOrgIds = myTeams.map(t => t.id)
-
-  // A share list is small in practice — sharing is a deliberate per-question
-  // action — but it rides in the URL of the query below, and PostgREST rejects
-  // a query string past roughly a thousand ids. Beyond this the team tab falls
-  // back to loading in full: still correct, just not paged.
-  const MAX_SHARED_IDS_IN_QUERY = 700
-
-  let teamQuestions: QuestionWithCreator[] = []
-  let teamTotal = 0
-  let teamPaged = false
-  let teamSearchGroups: QuestionSearchResultGroup<QuestionWithCreator>[] = []
-  let teamSearchGroupCounts: QuestionSearchGroupCounts = { tag: 0, title: 0, content: 0 }
-
-  if (teamOrgIds.length > 0) {
-    const { data: shareRows, error: shareError } = await supabase
-      .from('question_shares')
-      .select('question_id, org_id, organizations(name)')
-      .in('org_id', teamOrgIds)
-    if (shareError) console.error('[questions/page] share query failed:', shareError)
-
-    // question_id -> extra teams it was shared to (id + name, for filtering + badges)
-    const sharedNamesByQuestion = new Map<string, string[]>()
-    const sharedIdsByQuestion = new Map<string, string[]>()
-    for (const row of (shareRows ?? []) as any[]) {
-      const name = row.organizations?.name
-      if (!name) continue
-      sharedNamesByQuestion.set(row.question_id, [...(sharedNamesByQuestion.get(row.question_id) ?? []), name])
-      sharedIdsByQuestion.set(row.question_id, [...(sharedIdsByQuestion.get(row.question_id) ?? []), row.org_id])
-    }
-    const sharedIds = [...sharedNamesByQuestion.keys()]
-
-    const teamSelect = `${summaryFields}, question_categories(name), users(full_name), organizations!questions_org_id_fkey(name)`
-    // The tab is a union: questions a team owns, plus questions shared into
-    // one. Expressed as a single OR so the database can order and slice the
-    // whole thing — two queries could each be paged, but not merged in order.
-    const ownedByTeam = `and(org_id.in.(${teamOrgIds.join(',')}),visibility.in.(organization,school))`
-    const unionFilter = sharedIds.length > 0
-      ? `${ownedByTeam},id.in.(${sharedIds.join(',')})`
-      : ownedByTeam
-
-    if (sharedIds.length <= MAX_SHARED_IDS_IN_QUERY) {
-      teamPaged = true
-      // Narrowing to one team means either it owns the question, or the
-      // question was shared to it.
-      let teamNarrowFilter = ''
-      if (teamFilters.team) {
-        const sharedToTeam = [...sharedIdsByQuestion.entries()]
-          .filter(([, orgIds]) => orgIds.includes(teamFilters.team))
-          .map(([questionId]) => questionId)
-        teamNarrowFilter = sharedToTeam.length > 0
-          ? `org_id.eq.${teamFilters.team},id.in.(${sharedToTeam.join(',')})`
-          : `org_id.eq.${teamFilters.team}`
-      }
-
-      const teamTags = teamFilters.q
-        ? await fetchTagUses(supabase.rpc('team_question_tag_uses', {
-          p_org_ids: teamOrgIds,
-          p_question_ids: sharedIds,
-        }) as unknown as PromiseLike<{ data: TagUseRow[] | null; error: unknown }>)
-        : []
-      const searchSpec = teamFilters.q
-        ? questionSearchGroupFilters(teamFilters.q, teamTags)
-        : null
-
-      const buildTeamQuery = (group?: QuestionSearchGroup, head = false) => {
-        let query = supabase
-          .from('questions')
-          .select(teamSelect, { count: 'exact', head })
-          .eq('is_research_snapshot', false)
-          .or(unionFilter)
-          .or('group_id.is.null,order_in_group.eq.0')
-
-        if (teamNarrowFilter) query = query.or(teamNarrowFilter)
-        if (searchSpec) {
-          for (const clause of searchSpec.broadOrClauses) query = query.or(clause)
-          if (group === 'tag') {
-            query = query.overlaps('tags', searchSpec.matchingTags)
-          } else if (group === 'title') {
-            if (searchSpec.matchingTags.length > 0) {
-              query = query.or(`tags.is.null,tags.not.ov.${searchSpec.matchingTagsLiteral}`)
-            }
-            query = query.or(searchSpec.titleOrClause)
-          } else if (group === 'content') {
-            if (searchSpec.matchingTags.length > 0) {
-              query = query.or(`tags.is.null,tags.not.ov.${searchSpec.matchingTagsLiteral}`)
-            }
-            for (const pattern of searchSpec.titlePatterns) {
-              query = query.not('title', 'ilike', pattern)
-            }
-          }
-        }
-        return query
-      }
-
-      if (!searchSpec) {
-        const teamFrom = (teamFilters.page - 1) * QUESTIONS_PER_PAGE
-        const { data, error: teamError, count } = await buildTeamQuery()
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .range(teamFrom, teamFrom + QUESTIONS_PER_PAGE - 1)
-        if (teamError) console.error('[questions/page] team query failed:', teamError)
-        teamTotal = count ?? 0
-        teamQuestions = (data ?? []) as unknown as QuestionWithCreator[]
-      } else {
-        const visibleGroups: readonly QuestionSearchGroup[] = teamFilters.match === 'all'
-          ? QUESTION_SEARCH_GROUPS
-          : [teamFilters.match]
-
-        if (teamFilters.match !== 'all' || teamFilters.page === 1) {
-          const directFrom = teamFilters.match === 'all'
-            ? 0
-            : (teamFilters.page - 1) * QUESTIONS_PER_PAGE
-          const directResults = await Promise.all(QUESTION_SEARCH_GROUPS.map(async group => {
-            if (group === 'tag' && searchSpec.matchingTags.length === 0) {
-              return { group, count: 0, questions: [] as QuestionWithCreator[] }
-            }
-            const shouldLoadRows = visibleGroups.includes(group)
-            const result = shouldLoadRows
-              ? await buildTeamQuery(group)
-                .order('created_at', { ascending: false })
-                .order('id', { ascending: false })
-                .range(directFrom, directFrom + QUESTIONS_PER_PAGE - 1)
-              : await buildTeamQuery(group, true)
-            if (result.error) console.error(`[questions/page] team ${group} search query failed:`, result.error)
-            return {
-              group,
-              count: result.count ?? 0,
-              questions: (result.data ?? []) as unknown as QuestionWithCreator[],
-            }
-          }))
-          teamSearchGroupCounts = Object.fromEntries(
-            directResults.map(result => [result.group, result.count]),
-          ) as QuestionSearchGroupCounts
-          const slices = questionSearchGroupSlices(
-            teamSearchGroupCounts,
-            teamFilters.match,
-            teamFilters.page,
-            QUESTIONS_PER_PAGE,
-          )
-          teamSearchGroups = visibleGroups.map(group => {
-            const result = directResults.find(candidate => candidate.group === group)
-            const slice = slices[group]
-            if (!result || !slice) return { group, questions: [] }
-            return {
-              group,
-              questions: result.questions.slice(
-                slice.from - directFrom,
-                slice.to - directFrom + 1,
-              ),
-            }
-          })
-        } else {
-          const countPairs = await Promise.all(QUESTION_SEARCH_GROUPS.map(async group => {
-            if (group === 'tag' && searchSpec.matchingTags.length === 0) {
-              return [group, 0] as const
-            }
-            const { count, error: countError } = await buildTeamQuery(group, true)
-            if (countError) console.error(`[questions/page] team ${group} search count failed:`, countError)
-            return [group, count ?? 0] as const
-          }))
-          teamSearchGroupCounts = Object.fromEntries(countPairs) as QuestionSearchGroupCounts
-          const slices = questionSearchGroupSlices(
-            teamSearchGroupCounts,
-            teamFilters.match,
-            teamFilters.page,
-            QUESTIONS_PER_PAGE,
-          )
-          teamSearchGroups = await Promise.all(visibleGroups.map(async group => {
-            const slice = slices[group]
-            if (!slice) return { group, questions: [] }
-            const { data, error: groupError } = await buildTeamQuery(group)
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: false })
-              .range(slice.from, slice.to)
-            if (groupError) console.error(`[questions/page] team ${group} search query failed:`, groupError)
-            return {
-              group,
-              questions: (data ?? []) as unknown as QuestionWithCreator[],
-            }
-          }))
-        }
-        teamQuestions = teamSearchGroups.flatMap(group => group.questions)
-        teamTotal = visibleGroups.reduce<number>((sum, group) => sum + teamSearchGroupCounts[group], 0)
-      }
-
-      const attachShareNames = (q: QuestionWithCreator): QuestionWithCreator => ({
-        ...q,
-        shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
-        shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
-      })
-      teamQuestions = teamQuestions.map(attachShareNames)
-      teamSearchGroups = teamSearchGroups.map(result => ({
-        ...result,
-        questions: result.questions.map(attachShareNames),
-      }))
-    } else {
-      const { rows, error: teamError } = await fetchAllRows<Record<string, unknown>>((rangeFrom, rangeTo) =>
-        supabase
-          .from('questions')
-          .select(teamSelect)
-          .eq('is_research_snapshot', false)
-          .or(ownedByTeam)
-          .or('group_id.is.null,order_in_group.eq.0')
-          .order('created_at', { ascending: false })
-          .range(rangeFrom, rangeTo)
-      )
-      if (teamError) console.error('[questions/page] team query failed:', teamError)
-
-      const byId = new Map<string, QuestionWithCreator>()
-      for (const q of rows as unknown as QuestionWithCreator[]) byId.set(q.id, q)
-      if (sharedIds.length > 0) {
-        for (let i = 0; i < sharedIds.length; i += 500) {
-          const { data } = await supabase
-            .from('questions')
-            .select(teamSelect)
-            .eq('is_research_snapshot', false)
-            .in('id', sharedIds.slice(i, i + 500))
-            .or('group_id.is.null,order_in_group.eq.0')
-          for (const q of (data ?? []) as unknown as QuestionWithCreator[]) byId.set(q.id, q)
-        }
-      }
-      teamQuestions = [...byId.values()]
-        .map(q => ({
-          ...q,
-          shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
-          shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
-        }))
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-      if (teamFilters.team) {
-        teamQuestions = teamQuestions.filter(q =>
-          q.org_id === teamFilters.team || q.shared_org_ids?.includes(teamFilters.team)
-        )
-      }
-
-      if (teamFilters.q) {
-        const grouped: Record<QuestionSearchGroup, QuestionWithCreator[]> = {
-          tag: [],
-          title: [],
-          content: [],
-        }
-        for (const question of teamQuestions) {
-          if (!matchesSearch(question, teamFilters.q)) continue
-          const group = questionSearchGroup(question, teamFilters.q)
-          if (group) grouped[group].push(question)
-        }
-        teamSearchGroupCounts = {
-          tag: grouped.tag.length,
-          title: grouped.title.length,
-          content: grouped.content.length,
-        }
-        const visibleGroups: readonly QuestionSearchGroup[] = teamFilters.match === 'all'
-          ? QUESTION_SEARCH_GROUPS
-          : [teamFilters.match]
-        teamSearchGroups = visibleGroups.map(group => ({ group, questions: grouped[group] }))
-        teamQuestions = teamSearchGroups.flatMap(group => group.questions)
-      }
-      teamTotal = teamQuestions.length
-    }
-  }
+  const { myTeams, teamQuestions, teamTotal, teamPaged, teamSearchGroups, teamSearchGroupCounts } = teamContext
 
   const ownQuestions = ownResult.questions
   // Only the questions actually on screen need stats, part counts or a
@@ -800,8 +839,8 @@ export default async function QuestionsPage({
       questions={ownQuestions}
       stats={stats}
       teamQuestions={teamQuestions}
-      hasTeamOrg={teamOrgIds.length > 0}
-      hasMultipleTeams={teamOrgIds.length > 1}
+      hasTeamOrg={myTeams.length > 0}
+      hasMultipleTeams={myTeams.length > 1}
       myTeams={myTeams.map(t => ({ id: t.id, name: t.name }))}
       currentUserId={userId}
       filters={filters}
