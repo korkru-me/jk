@@ -78,7 +78,24 @@ export function rankTagsByUse(tagLists: (string[] | null | undefined)[]): string
       else counts.set(tagKey(tag), { tag, uses: 1 })
     }
   }
-  return [...counts.values()]
+  return rankCountedTags([...counts.values()])
+}
+
+/**
+ * The same ordering, for counts that were tallied somewhere else.
+ *
+ * The คลัง gets its tags from `my_question_tag_uses()` now — counting them in
+ * the database beats shipping a whole bank's `tags` column to count it here —
+ * and this is the half that cannot move with them: `localeCompare(…, 'th')`
+ * decides ties, and Postgres collation is not the same comparator. Keeping the
+ * sort in one place is what stops the filter chips from reordering depending on
+ * which caller asked.
+ *
+ * Rows arrive one per tag identity already, so this only sorts; the dedupe
+ * above is what produces that shape on the JavaScript side.
+ */
+export function rankCountedTags(counted: { tag: string; uses: number }[]): string[] {
+  return [...counted]
     .sort((a, b) => b.uses - a.uses || a.tag.localeCompare(b.tag, 'th'))
     .map(entry => entry.tag)
 }

@@ -14,7 +14,7 @@ import {
   type QuestionSearchGroupCounts,
   type QuestionSearchScope,
 } from '@/lib/question-search'
-import { rankTagsByUse } from '@/lib/tag-suggest'
+import { rankCountedTags } from '@/lib/tag-suggest'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { subQuestionCount, type CountableQuestion } from '@/lib/question-parts'
 
@@ -157,9 +157,8 @@ function readTeamFilters(sp: Record<string, string | string[] | undefined>): Tea
   }
 }
 
-function tagQuery(supabase: Awaited<ReturnType<typeof createClient>>) {
-  return supabase.from('questions').select('tags').eq('is_research_snapshot', false).not('tags', 'is', null)
-}
+/** One row per distinct tag, as the tag-counting functions return them. */
+type TagUseRow = { tag: string; uses: number }
 
 /**
  * Every tag in reach of one scope of the bank, most-used first.
@@ -169,29 +168,30 @@ function tagQuery(supabase: Awaited<ReturnType<typeof createClient>>) {
  * the search — a typed word can only reach a tag by matching a whole array
  * element, so the words are resolved against this list first.
  *
- * Reads only the `tags` column, and pages, because the 1,000-row cap would
- * otherwise silently drop the tail of a large bank — the same reason
- * `fetchAllRows` exists.
+ * Counted in the database. This used to read the `tags` column of every
+ * question in scope and tally it here, which meant a whole bank crossing the
+ * wire to produce a couple of dozen strings — and it had to finish before the
+ * search query could even be built, so it delayed the query the page exists to
+ * run. `rankCountedTags` still decides the order, because ties are broken with
+ * Thai collation from JavaScript and Postgres does not sort the same way.
  */
-async function fetchTags(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  narrow: (q: ReturnType<typeof tagQuery>) => ReturnType<typeof tagQuery>,
+async function fetchTagUses(
+  rpc: PromiseLike<{ data: TagUseRow[] | null; error: unknown }>,
 ): Promise<string[]> {
-  const { rows, error } = await fetchAllRows<{ tags: string[] | null }>((from, to) =>
-    narrow(tagQuery(supabase)).order('id').range(from, to)
-  )
-  if (error) console.error('[questions/page] tag query failed:', error)
-
-  return rankTagsByUse(rows.map(row => row.tags))
+  const { data, error } = await rpc
+  if (error) {
+    console.error('[questions/page] tag count failed:', error)
+    return []
+  }
+  return rankCountedTags((data ?? []).map(row => ({ tag: row.tag, uses: Number(row.uses) })))
 }
 
 /** Fingerprints per `in(...)` round in the duplicate pass — keeps the URL short. */
 const DUPLICATE_ID_CHUNK = 100
 
-const fetchOwnTags = (
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-) => fetchTags(supabase, q => q.eq('created_by', userId))
+const fetchOwnTags = (supabase: Awaited<ReturnType<typeof createClient>>) =>
+  fetchTagUses(supabase.rpc('my_question_tag_uses') as unknown as
+    PromiseLike<{ data: TagUseRow[] | null; error: unknown }>)
 
 /**
  * Which of a teacher's questions are the same question twice.
@@ -347,7 +347,7 @@ export default async function QuestionsPage({
   // Tags take part in the search, so the words have to be resolved against the
   // tags that exist before the query goes out — `ov` matches whole array
   // elements, never a substring of one.
-  const ownTagsPromise = fetchOwnTags(supabase, userId)
+  const ownTagsPromise = fetchOwnTags(supabase)
 
   async function loadOwnQuestions() {
     const ownTags = await ownTagsPromise
@@ -578,7 +578,10 @@ export default async function QuestionsPage({
       }
 
       const teamTags = teamFilters.q
-        ? await fetchTags(supabase, q => q.or(unionFilter))
+        ? await fetchTagUses(supabase.rpc('team_question_tag_uses', {
+          p_org_ids: teamOrgIds,
+          p_question_ids: sharedIds,
+        }) as unknown as PromiseLike<{ data: TagUseRow[] | null; error: unknown }>)
         : []
       const searchSpec = teamFilters.q
         ? questionSearchGroupFilters(teamFilters.q, teamTags)

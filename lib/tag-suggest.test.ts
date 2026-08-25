@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   dedupeTags,
   rankTagsByUse,
+  rankCountedTags,
   normalizeTag,
   tagKey,
   mergeTagPool,
@@ -98,6 +99,34 @@ describe('dedupeTags', () => {
 
   it('drops blanks', () => {
     expect(dedupeTags(['  ', 'คลื่น', ''])).toEqual(['คลื่น'])
+  })
+})
+
+describe('rankCountedTags', () => {
+  // The คลัง gets tag counts from my_question_tag_uses() now. The database
+  // groups and counts; this decides the order, so the two halves have to agree
+  // on what "most-used first" means.
+  it('orders by use, then by Thai collation', () => {
+    expect(rankCountedTags([
+      { tag: 'งาน', uses: 1 },
+      { tag: 'กลศาสตร์', uses: 3 },
+      { tag: 'คลื่น', uses: 2 },
+    ])).toEqual(['กลศาสตร์', 'คลื่น', 'งาน'])
+  })
+
+  it('breaks a tie the same way rankTagsByUse does', () => {
+    const counted = rankCountedTags([
+      { tag: 'คลื่น', uses: 2 },
+      { tag: 'กลศาสตร์', uses: 2 },
+    ])
+    const tallied = rankTagsByUse([['กลศาสตร์', 'คลื่น'], ['กลศาสตร์', 'คลื่น']])
+    expect(counted).toEqual(tallied)
+  })
+
+  it('does not mutate what it was given', () => {
+    const input = [{ tag: 'ก', uses: 1 }, { tag: 'ข', uses: 9 }]
+    rankCountedTags(input)
+    expect(input[0].tag).toBe('ก')
   })
 })
 
