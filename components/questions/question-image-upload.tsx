@@ -1,9 +1,17 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { ImagePlus, X, Loader2 } from 'lucide-react'
+
+// Loaded on demand rather than imported at the top: @supabase/supabase-js is
+// ~220 KB, and it is only needed once the teacher actually picks a file. Every
+// question authoring route mounts this widget, so a static import charged all
+// of them for an upload most sessions never make.
+async function browserSupabase() {
+  const { createClient } = await import('@/lib/supabase/client')
+  return createClient()
+}
 
 interface QuestionImageUploadProps {
   value: string[]
@@ -19,7 +27,7 @@ export function QuestionImageUpload({ value, onChange }: QuestionImageUploadProp
     if (files.length === 0) return
 
     setUploading(true)
-    const supabase = createClient()
+    const supabase = await browserSupabase()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setUploading(false); return }
 
@@ -45,7 +53,7 @@ export function QuestionImageUpload({ value, onChange }: QuestionImageUploadProp
   }
 
   async function removeImage(url: string) {
-    const supabase = createClient()
+    const supabase = await browserSupabase()
     const match = url.match(/\/object\/public\/question-images\/(.+)/)
     if (match?.[1]) {
       await supabase.storage.from('question-images').remove([decodeURIComponent(match[1])])
