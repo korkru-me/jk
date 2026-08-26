@@ -1,6 +1,6 @@
 'use client'
 
-import { PYTHAGOREAN_FAMILIES } from '@/lib/math/evaluator'
+import { PYTHAGOREAN_FAMILIES } from '@/lib/math/pythagorean-families'
 import { Plus, X } from 'lucide-react'
 import type { PythagoreanGroup } from '@/lib/types'
 import { Card } from '@/components/ui/card'

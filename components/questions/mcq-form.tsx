@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -14,7 +15,18 @@ import { SpecialCharInput } from './special-char-input'
 import { QuestionImageUpload } from './question-image-upload'
 import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { McqAutoForm } from './mcq-auto-form'
+// The auto builder evaluates its formula live through mathjs (638 KB), so the
+// import cannot move into a handler without making that preview async. It is
+// reached only by switching entry mode away from the 'manual' default, which
+// is a boundary the manual path never crosses — so the whole form loads there
+// instead, and the live evaluation stays exactly as immediate once it does.
+const McqAutoForm = dynamic(() => import('./mcq-auto-form').then(m => m.McqAutoForm), {
+  loading: () => (
+    <p className="py-16 text-center text-sm text-muted-foreground">
+      กำลังเปิดตัวช่วยสร้างอัตโนมัติ...
+    </p>
+  ),
+})
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, MCQOption, FormulaPreset, Question } from '@/lib/types'

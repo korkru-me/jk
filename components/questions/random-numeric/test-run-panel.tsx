@@ -1,7 +1,6 @@
 'use client'
 
 import { SampleTable } from './sample-table'
-import { runTrials } from '@/lib/math/evaluator'
 import { Info } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -21,10 +20,22 @@ export function TestRunPanel({ variables, logicRules, formula, answerStep, pytha
   const [summary, setSummary] = useState<TrialSummary | null>(null)
   const [running, setRunning] = useState(false)
 
-  function run() {
+  // The evaluator carries mathjs (638 KB) and nothing on this form needs it
+  // until the teacher asks for a trial run. Fetching it inside the handler,
+  // where `running` already shows a busy state and the work was deferred by a
+  // timeout anyway, keeps the page light without changing what the click does.
+  async function run() {
     if (!formula.trim()) { toast.error('กรอกสมการก่อนทดสอบ'); return }
     setRunning(true)
     setSummary(null)
+    let runTrials: typeof import('@/lib/math/evaluator').runTrials
+    try {
+      ({ runTrials } = await import('@/lib/math/evaluator'))
+    } catch {
+      toast.error('โหลดตัวคำนวณไม่สำเร็จ ลองใหม่อีกครั้ง')
+      setRunning(false)
+      return
+    }
     setTimeout(() => {
       const result = runTrials(variables, logicRules, formula, {
         answerStep,
