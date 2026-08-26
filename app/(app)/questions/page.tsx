@@ -14,6 +14,15 @@ import {
   type QuestionSearchGroupCounts,
   type QuestionSearchScope,
 } from '@/lib/question-search'
+import {
+  applyQuestionSort,
+  compareQuestions,
+  DEFAULT_QUESTION_SORT,
+  isDatabaseSortable,
+  rankQuestionIds,
+  readQuestionSort,
+  type QuestionSort,
+} from '@/lib/question-sort'
 import { rankCountedTags } from '@/lib/tag-suggest'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { subQuestionCount, type CountableQuestion } from '@/lib/question-parts'
@@ -36,6 +45,8 @@ export type QuestionSummary = Pick<
   | 'team_edit_allowed'
   | 'content_fingerprint'
   | 'created_at'
+  | 'updated_at'
+  | 'subject'
 >
 
 export type QuestionWithCategory = QuestionSummary & { question_categories: { name: string } | null }
@@ -68,41 +79,85 @@ export interface QuestionSearchResultGroup<T> {
 // vanish from the page. Asking in slices keeps each URL small.
 const STATS_ID_BATCH = 200
 
+const STATS_SELECT =
+  'question_id, score, max_score, submissions!inner(assignment_id, total_score, status, submitted_at, created_at)'
+
+/** One PostgREST row from the stats select, before it is narrowed to a GradedAnswerRow. */
+type StatsRow = {
+  question_id: string
+  score: number | null
+  max_score: number | null
+  submissions?: {
+    assignment_id?: string | null
+    total_score?: number | null
+    submitted_at?: string | null
+    created_at?: string | null
+  } | null
+}
+
+const toGradedRow = (row: StatsRow): GradedAnswerRow => ({
+  question_id: row.question_id,
+  score: Number(row.score ?? 0),
+  max_score: Number(row.max_score ?? 0),
+  submission_total: Number(row.submissions?.total_score ?? 0),
+  assignment_id: row.submissions?.assignment_id ?? '',
+  // An attempt that was graded but never formally submitted still has a
+  // created_at, and "last used" should not skip it.
+  submitted_at: row.submissions?.submitted_at ?? row.submissions?.created_at ?? null,
+})
+
+/**
+ * Item-analysis stats for the listed questions.
+ *
+ * RLS on submission_answers already limits this to attempts on assignments the
+ * signed-in teacher created, which is the scope we want: "how has this question
+ * performed in my classes". Only submitted/graded attempts count — an
+ * in-progress one has no meaningful score yet.
+ *
+ * `'all'` asks for every graded answer in that scope instead of naming
+ * questions. Ordering the bank by item analysis needs the stats for the whole
+ * คลัง, and naming 883 questions in slices would send five long URLs to fetch
+ * the very same rows RLS would have handed over anyway.
+ *
+ * Either way the reads page through `fetchAllRows`: PostgREST caps a response
+ * at 1,000 rows, and a class set can pass that in a single slice — which would
+ * not fail, it would just quietly compute p from part of the evidence.
+ */
 async function fetchQuestionStats(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  questionIds: string[],
+  questionIds: string[] | 'all',
 ): Promise<Record<string, QuestionStats>> {
-  if (questionIds.length === 0) return {}
+  if (questionIds !== 'all' && questionIds.length === 0) return {}
 
-  const batches: string[][] = []
-  for (let i = 0; i < questionIds.length; i += STATS_ID_BATCH) {
-    batches.push(questionIds.slice(i, i + STATS_ID_BATCH))
+  const batches: (string[] | 'all')[] = []
+  if (questionIds === 'all') {
+    batches.push('all')
+  } else {
+    for (let i = 0; i < questionIds.length; i += STATS_ID_BATCH) {
+      batches.push(questionIds.slice(i, i + STATS_ID_BATCH))
+    }
   }
 
-  const results = await Promise.all(batches.map(ids =>
-    supabase
-      .from('submission_answers')
-      .select('question_id, score, max_score, submissions!inner(assignment_id, total_score, status)')
-      .in('question_id', ids)
-      .in('submissions.status', ['submitted', 'graded'])
+  const results = await Promise.all(batches.map(batch =>
+    fetchAllRows<StatsRow>((from, to) => {
+      let query = supabase
+        .from('submission_answers')
+        .select(STATS_SELECT)
+        .in('submissions.status', ['submitted', 'graded'])
+      if (batch !== 'all') query = query.in('question_id', batch)
+      return query.order('id', { ascending: true }).range(from, to) as unknown as
+        PromiseLike<{ data: StatsRow[] | null; error: unknown }>
+    })
   ))
 
   const rows: GradedAnswerRow[] = []
-  for (const { data, error } of results) {
+  for (const { rows: batchRows, error } of results) {
     if (error) {
       // One failed slice costs its questions their stats, not the whole page.
       console.error('[questions/page] stats query failed:', error)
       continue
     }
-    for (const row of (data ?? []) as any[]) {
-      rows.push({
-        question_id: row.question_id,
-        score: Number(row.score ?? 0),
-        max_score: Number(row.max_score ?? 0),
-        submission_total: Number(row.submissions?.total_score ?? 0),
-        assignment_id: row.submissions?.assignment_id ?? '',
-      })
-    }
+    for (const row of batchRows) rows.push(toGradedRow(row))
   }
 
   return Object.fromEntries(computeQuestionStats(rows))
@@ -118,14 +173,19 @@ export interface QuestionFilters {
   difficulty: string
   tag: string
   page: number
+  /** How the list is ordered. Absent from the URL means newest first. */
+  sort: QuestionSort
 }
 
-/** The team tab has its own search, team narrowing and page. */
+/** The team tab has its own search, team narrowing, page and order. */
 export interface TeamFilters {
   q: string
   match: QuestionSearchScope
   team: string
   page: number
+  /** Its own ordering, from its own params — the "ทั้งหมด" tab shows both
+   *  lists at once, and ordering one must not reorder the other. */
+  sort: QuestionSort
 }
 
 const readOne = (sp: Record<string, string | string[] | undefined>, k: string) =>
@@ -141,6 +201,7 @@ function readFilters(sp: Record<string, string | string[] | undefined>): Questio
     difficulty: one('difficulty') || 'all',
     tag: one('tag'),
     page: Math.max(1, Number(one('page')) || 1),
+    sort: readQuestionSort(sp),
   }
 }
 
@@ -154,6 +215,7 @@ function readTeamFilters(sp: Record<string, string | string[] | undefined>): Tea
     match: match === 'tag' || match === 'title' || match === 'content' ? match : 'all',
     team: one('team'),
     page: Math.max(1, Number(one('tpage')) || 1),
+    sort: readQuestionSort(sp, 't'),
   }
 }
 
@@ -348,7 +410,7 @@ export default async function QuestionsPage({
   const filters = readFilters(sp)
   const teamFilters = readTeamFilters(sp)
 
-  const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, content_fingerprint, created_at'
+  const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, content_fingerprint, created_at, updated_at, subject'
 
   // Filtering and paging happen in the database rather than in the browser:
   // the bank is already past a thousand questions, and shipping all of them on
@@ -372,10 +434,16 @@ export default async function QuestionsPage({
       ? questionSearchGroupFilters(filters.q, await ownTagsPromise)
       : null
 
-    const buildQuery = (group?: QuestionSearchGroup, head = false) => {
+    // 'rows' returns the cards, 'count' asks only how many there are, and
+    // 'ids' returns the identifiers alone — enough to rank the whole filtered
+    // bank in memory without carrying its text across the wire.
+    const buildQuery = (group?: QuestionSearchGroup, mode: 'rows' | 'count' | 'ids' = 'rows') => {
       let query = supabase
         .from('questions')
-        .select(`${summaryFields}, question_categories(name)`, { count: 'exact', head })
+        .select(
+          mode === 'ids' ? 'id' : `${summaryFields}, question_categories(name)`,
+          { count: 'exact', head: mode === 'count' },
+        )
         .eq('created_by', userId)
         .eq('is_research_snapshot', false)
         .or('group_id.is.null,order_in_group.eq.0')
@@ -406,11 +474,67 @@ export default async function QuestionsPage({
       return query
     }
 
+    /**
+     * One page of a bank ordered by something the database cannot sort by.
+     *
+     * The item-analysis keys rank on numbers that are computed from graded
+     * answers rather than stored on the question, so PostgREST has no column
+     * to order by and no `.range()` can page it. This does the paging instead:
+     * read the identifiers of every question the current filters match, rank
+     * those, and fetch the cards for the two dozen the ranking put on this
+     * page.
+     *
+     * Only the ids cross the wire for the whole bank — the reason the list
+     * pages in the database in the first place is the weight of the rows, not
+     * the count of them. It is still the one order that costs a read
+     * proportional to the bank rather than to the page, which is why it is
+     * reached only when one of those four keys is chosen.
+     */
+    async function rankedPage(group: QuestionSearchGroup | undefined, from: number, to: number) {
+      // The select string is chosen at runtime, so supabase-js cannot infer the
+      // narrower row type the 'ids' mode actually returns.
+      const { rows, error } = await fetchAllRows<{ id: string }>((rangeFrom, rangeTo) =>
+        applyQuestionSort(buildQuery(group, 'ids'), DEFAULT_QUESTION_SORT)
+          .range(rangeFrom, rangeTo) as unknown as
+          PromiseLike<{ data: { id: string }[] | null; error: unknown }>)
+      if (error) console.error('[questions/page] ranked id query failed:', error)
+      const ids = rows.map(row => row.id)
+
+      // Ranked from the same stats the cards show, so the order and the
+      // numbers printed on it can never be two different measurements. Asked
+      // for in one scope-wide read rather than by naming every id: the answer
+      // set is the same either way, and RLS is already the filter.
+      const stats = await fetchQuestionStats(supabase, 'all')
+      const pageIds = rankQuestionIds(ids, stats, filters.sort).slice(from, to + 1)
+      if (pageIds.length === 0) return { questions: [] as QuestionWithCategory[], count: ids.length }
+
+      const { data, error: rowError } = await buildQuery(group).in('id', pageIds)
+      if (rowError) console.error('[questions/page] ranked row query failed:', rowError)
+      const cards = (data ?? []) as unknown as QuestionWithCategory[]
+
+      // `in` answers in whatever order it likes; the ranking decides the page.
+      const byId = new Map(cards.map(card => [card.id, card]))
+      return {
+        questions: pageIds
+          .map(id => byId.get(id))
+          .filter((card): card is QuestionWithCategory => card != null),
+        count: ids.length,
+      }
+    }
+    const ranked = !isDatabaseSortable(filters.sort.key)
+
     if (!searchSpec) {
       const from = (filters.page - 1) * QUESTIONS_PER_PAGE
-      const { data, error, count } = await buildQuery()
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
+      if (ranked) {
+        const { questions, count } = await rankedPage(undefined, from, from + QUESTIONS_PER_PAGE - 1)
+        return {
+          questions,
+          total: count,
+          groups: [] as QuestionSearchResultGroup<QuestionWithCategory>[],
+          groupCounts: { tag: 0, title: 0, content: 0 } satisfies QuestionSearchGroupCounts,
+        }
+      }
+      const { data, error, count } = await applyQuestionSort(buildQuery(), filters.sort)
         .range(from, from + QUESTIONS_PER_PAGE - 1)
       if (error) console.error('[questions/page] query failed:', error)
       return {
@@ -437,12 +561,16 @@ export default async function QuestionsPage({
           return { group, count: 0, questions: [] as QuestionWithCategory[] }
         }
         const shouldLoadRows = visibleGroups.includes(group)
+        if (shouldLoadRows && ranked) {
+          const { questions, count } = await rankedPage(
+            group, directFrom, directFrom + QUESTIONS_PER_PAGE - 1,
+          )
+          return { group, count, questions }
+        }
         const result = shouldLoadRows
-          ? await buildQuery(group)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
+          ? await applyQuestionSort(buildQuery(group), filters.sort)
             .range(directFrom, directFrom + QUESTIONS_PER_PAGE - 1)
-          : await buildQuery(group, true)
+          : await buildQuery(group, 'count')
         if (result.error) console.error(`[questions/page] ${group} search query failed:`, result.error)
         return {
           group,
@@ -483,7 +611,7 @@ export default async function QuestionsPage({
       if (group === 'tag' && searchSpec.matchingTags.length === 0) {
         return [group, 0] as const
       }
-      const { count, error } = await buildQuery(group, true)
+      const { count, error } = await buildQuery(group, 'count')
       if (error) console.error(`[questions/page] ${group} search count failed:`, error)
       return [group, count ?? 0] as const
     }))
@@ -499,9 +627,12 @@ export default async function QuestionsPage({
       const slice = slices[group]
       if (!slice) return { group, questions: [] }
 
-      const { data, error } = await buildQuery(group)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
+      if (ranked) {
+        const { questions } = await rankedPage(group, slice.from, slice.to)
+        return { group, questions }
+      }
+
+      const { data, error } = await applyQuestionSort(buildQuery(group), filters.sort)
         .range(slice.from, slice.to)
       if (error) console.error(`[questions/page] ${group} search query failed:`, error)
       return {
@@ -640,10 +771,9 @@ export default async function QuestionsPage({
 
         if (!searchSpec) {
           const teamFrom = (teamFilters.page - 1) * QUESTIONS_PER_PAGE
-          const { data, error: teamError, count } = await buildTeamQuery()
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
-            .range(teamFrom, teamFrom + QUESTIONS_PER_PAGE - 1)
+          const { data, error: teamError, count } = await applyQuestionSort(
+            buildTeamQuery(), teamFilters.sort,
+          ).range(teamFrom, teamFrom + QUESTIONS_PER_PAGE - 1)
           if (teamError) console.error('[questions/page] team query failed:', teamError)
           teamTotal = count ?? 0
           teamQuestions = (data ?? []) as unknown as QuestionWithCreator[]
@@ -662,9 +792,7 @@ export default async function QuestionsPage({
               }
               const shouldLoadRows = visibleGroups.includes(group)
               const result = shouldLoadRows
-                ? await buildTeamQuery(group)
-                  .order('created_at', { ascending: false })
-                  .order('id', { ascending: false })
+                ? await applyQuestionSort(buildTeamQuery(group), teamFilters.sort)
                   .range(directFrom, directFrom + QUESTIONS_PER_PAGE - 1)
                 : await buildTeamQuery(group, true)
               if (result.error) console.error(`[questions/page] team ${group} search query failed:`, result.error)
@@ -714,10 +842,9 @@ export default async function QuestionsPage({
             teamSearchGroups = await Promise.all(visibleGroups.map(async group => {
               const slice = slices[group]
               if (!slice) return { group, questions: [] }
-              const { data, error: groupError } = await buildTeamQuery(group)
-                .order('created_at', { ascending: false })
-                .order('id', { ascending: false })
-                .range(slice.from, slice.to)
+              const { data, error: groupError } = await applyQuestionSort(
+                buildTeamQuery(group), teamFilters.sort,
+              ).range(slice.from, slice.to)
               if (groupError) console.error(`[questions/page] team ${group} search query failed:`, groupError)
               return {
                 group,
@@ -741,14 +868,21 @@ export default async function QuestionsPage({
         }))
       } else {
         const { rows, error: teamError } = await fetchAllRows<Record<string, unknown>>((rangeFrom, rangeTo) =>
-          supabase
-            .from('questions')
-            .select(teamSelect)
-            .eq('is_research_snapshot', false)
-            .or(ownedByTeam)
-            .or('group_id.is.null,order_in_group.eq.0')
-            .order('created_at', { ascending: false })
-            .range(rangeFrom, rangeTo)
+          // A fixed order here, not the chosen one: these rows are merged with
+          // a second query through a Map below, which discards the order they
+          // arrived in, so the list is ordered in memory afterwards instead.
+          // The order still has to be *stable* — this walks the list a range at
+          // a time, and rows tied on created_at with no tiebreaker would shift
+          // between one range and the next, dropping and repeating questions.
+          applyQuestionSort(
+            supabase
+              .from('questions')
+              .select(teamSelect)
+              .eq('is_research_snapshot', false)
+              .or(ownedByTeam)
+              .or('group_id.is.null,order_in_group.eq.0'),
+            DEFAULT_QUESTION_SORT,
+          ).range(rangeFrom, rangeTo)
         )
         if (teamError) console.error('[questions/page] team query failed:', teamError)
 
@@ -771,7 +905,7 @@ export default async function QuestionsPage({
             shared_org_names: sharedNamesByQuestion.get(q.id) ?? [],
             shared_org_ids: sharedIdsByQuestion.get(q.id) ?? [],
           }))
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .sort(compareQuestions(teamFilters.sort))
 
         if (teamFilters.team) {
           teamQuestions = teamQuestions.filter(q =>

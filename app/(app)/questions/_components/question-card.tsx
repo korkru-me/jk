@@ -157,6 +157,14 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                 {TYPE_LABEL[q.question_type] ?? q.question_type}
               </span>
               <SubQuestionCountBadge questionType={q.question_type} count={subQuestionCount} />
+              {/* วิชา, then the หมวดหมู่ inside it — the order they nest in.
+                  Added when the bank learned to order by วิชา: grouping a list
+                  by something the card never shows just reads as shuffled. */}
+              {q.subject && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-tint-4/10 text-tint-4">
+                  {q.subject}
+                </span>
+              )}
               {q.question_categories?.name && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                   {q.question_categories.name}

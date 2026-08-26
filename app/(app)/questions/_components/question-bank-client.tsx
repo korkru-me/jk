@@ -7,11 +7,13 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye,
+  ArrowUpDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 import { QuestionCard } from './question-card'
 import { SubQuestionCountBadge } from './sub-question-count-badge'
@@ -22,9 +24,11 @@ import { ImportQuestionsButton } from '@/components/questions/import-questions-b
 import { getQuestionClientDetail } from '@/lib/actions/questions'
 import type {
   QuestionDetailWithCategory,
+  QuestionFilters,
   QuestionSearchResultGroup,
   QuestionWithCategory,
   QuestionWithCreator,
+  TeamFilters,
 } from '../page'
 import { questionExcerpt } from '@/lib/question-display'
 import { mergeTagPool } from '@/lib/tag-suggest'
@@ -34,6 +38,16 @@ import type {
   QuestionSearchGroupCounts,
   QuestionSearchScope,
 } from '@/lib/question-search'
+import {
+  QUESTION_SORT_KEYS,
+  QUESTION_SORTS,
+  questionSortParams,
+  TEAM_QUESTION_SORT_KEYS,
+  type QuestionSort,
+  type QuestionSortDir,
+  type QuestionSortKey,
+  type QuestionSortScope,
+} from '@/lib/question-sort'
 
 const PreviewModal = dynamic(
   () => import('./preview-modal').then(mod => mod.PreviewModal),
@@ -84,8 +98,8 @@ interface Props {
   currentUserId: string
   /** Every tag used in this teacher's own bank, most-used first. */
   allTags: string[]
-  /** Search and filters, as read from the URL by the page. */
-  filters: { q: string; match: QuestionSearchScope; type: string; difficulty: string; tag: string; page: number }
+  /** Search, filters and ordering, as read from the URL by the page. */
+  filters: QuestionFilters
   /** Questions matching the current filters — the number being paged through. */
   matchCount: number
   searchGroups: QuestionSearchResultGroup<QuestionWithCategory>[]
@@ -97,7 +111,7 @@ interface Props {
   /** question id → how many ข้อย่อย it holds. Absent = not counted, badge hidden. */
   subQuestionCounts: Record<string, number>
   perPage: number
-  teamFilters: { q: string; match: QuestionSearchScope; team: string; page: number }
+  teamFilters: TeamFilters
   teamMatchCount: number
   teamSearchGroups: QuestionSearchResultGroup<QuestionWithCreator>[]
   teamSearchGroupCounts: QuestionSearchGroupCounts
@@ -155,6 +169,15 @@ export function QuestionBankClient({
   const typeFilter = shownParam('type', filters.type) || 'all'
   const activeTag = shownParam('tag', filters.tag) || null
   const matchScope = (shownParam('match', filters.match) || 'all') as QuestionSearchScope
+  // The order, like the filters, is the URL's to own — so a bank ordered by
+  // ชื่อโจทย์ survives a reload and can be sent to someone else as a link.
+  // Params matching the default are absent from the URL rather than spelled
+  // out, hence the fallbacks: an empty `dir` means "this key's usual end".
+  const sortKey = (shownParam('sort', filters.sort.key) || 'created') as QuestionSortKey
+  const sort: QuestionSort = {
+    key: sortKey,
+    dir: (shownParam('dir', filters.sort.dir) || QUESTION_SORTS[sortKey].defaultDir) as QuestionSortDir,
+  }
   const teamMatchScope = (shownParam('teammatch', teamFilters.match) || 'all') as QuestionSearchScope
   const totalPages = Math.max(1, Math.ceil(matchCount / perPage))
 
@@ -190,6 +213,14 @@ export function QuestionBankClient({
     })
   }
 
+  // Reordering restarts the list, so it cannot keep the reader on page 7 of an
+  // order that no longer exists. Each list clears only its own page param —
+  // the "ทั้งหมด" tab shows both at once and they page independently.
+  const setSort = (next: QuestionSort) =>
+    setParams({ ...questionSortParams(next), page: null })
+  const setTeamSort = (next: QuestionSort) =>
+    setParams({ ...questionSortParams(next, 't'), tpage: null })
+
   // Typing shouldn't fire a query per keystroke, so the input keeps its own
   // value and pushes it to the URL once the user pauses.
   const [searchDraft, setSearchDraft] = useState(filters.q)
@@ -206,6 +237,11 @@ export function QuestionBankClient({
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
   const teamSearch = teamFilters.q
   const teamFilter = teamFilters.team || 'all'
+  const teamSortKey = (shownParam('tsort', teamFilters.sort.key) || 'created') as QuestionSortKey
+  const teamSort: QuestionSort = {
+    key: teamSortKey,
+    dir: (shownParam('tdir', teamFilters.sort.dir) || QUESTION_SORTS[teamSortKey].defaultDir) as QuestionSortDir,
+  }
   const teamTotalPages = Math.max(1, Math.ceil(teamMatchCount / perPage))
 
   const [teamSearchDraft, setTeamSearchDraft] = useState(teamFilters.q)
@@ -339,8 +375,10 @@ export function QuestionBankClient({
             {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">โจทย์ของฉัน</h2>}
 
         {/* Search + controls */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        {/* Wraps rather than squeezes: on a phone the ordering controls drop to
+            their own line instead of shrinking the search box to nothing. */}
+        <div className="flex gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
@@ -358,6 +396,12 @@ export function QuestionBankClient({
               </button>
             )}
           </div>
+
+          <QuestionSortControl
+            sort={sort}
+            onChange={setSort}
+            label="เรียงลำดับโจทย์ของฉัน"
+          />
 
           <Button
             variant="outline"
@@ -620,8 +664,8 @@ export function QuestionBankClient({
               </Card>
             ) : (
               <>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
+                <div className="flex gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-48">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
@@ -630,6 +674,16 @@ export function QuestionBankClient({
                       className="pl-9 bg-card"
                     />
                   </div>
+
+                  <QuestionSortControl
+                    sort={teamSort}
+                    onChange={setTeamSort}
+                    label="เรียงลำดับโจทย์ที่แชร์ในทีม"
+                    // "ทีมเจ้าของโจทย์" only tells the reader anything when
+                    // more than one team is in the list to begin with.
+                    scope="t"
+                    omitKeys={hasMultipleTeams ? undefined : ['team']}
+                  />
                   {hasMultipleTeams && (
                     <Select value={teamFilter} onValueChange={(v) => v !== null && setParams({ team: v === 'all' ? null : v, tpage: null })}>
                       <SelectTrigger className="bg-card">
@@ -735,6 +789,69 @@ export function QuestionBankClient({
           stats={stats[previewQ.id]}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * Picking how the bank is ordered.
+ *
+ * Two controls rather than one menu of ten entries: "วันที่สร้าง ใหม่→เก่า"
+ * and "วันที่สร้าง เก่า→ใหม่" are the same key asked twice, and spelling out
+ * both ends of every key makes the menu twice as long to read for no more
+ * choice than this.
+ *
+ * The direction button is labelled in the terms of the key it belongs to —
+ * "ก → ฮ" on a column of names, "ใหม่ → เก่า" on a column of dates. "จากน้อย
+ * ไปมาก" would describe the database rather than the list on screen.
+ */
+function QuestionSortControl({ sort, onChange, label, scope = '', omitKeys }: {
+  sort: QuestionSort
+  onChange: (sort: QuestionSort) => void
+  label: string
+  /** Which list this belongs to — the team list offers two more keys. */
+  scope?: QuestionSortScope
+  /** Keys to leave out of the menu for this particular list. */
+  omitKeys?: QuestionSortKey[]
+}) {
+  const spec = QUESTION_SORTS[sort.key]
+  const flipped: QuestionSortDir = sort.dir === 'asc' ? 'desc' : 'asc'
+  const offered = (scope === 't' ? TEAM_QUESTION_SORT_KEYS : QUESTION_SORT_KEYS)
+    .filter(key => !omitKeys?.includes(key))
+  // A key can arrive from a URL that the menu no longer offers — a link shared
+  // by a teacher in several teams, opened by one in a single team. Show it
+  // rather than leave the menu pointing at something the list is not doing.
+  const keys = offered.includes(sort.key) ? offered : [...offered, sort.key]
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <ArrowUpDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <NativeSelect
+        aria-label={label}
+        className="w-auto"
+        value={sort.key}
+        onChange={e => {
+          // A newly chosen key starts at the end that makes sense for it —
+          // "แก้ไขล่าสุด" means what was touched today, not the oldest edit
+          // in the bank.
+          const key = e.target.value as QuestionSortKey
+          onChange({ key, dir: QUESTION_SORTS[key].defaultDir })
+        }}
+      >
+        {keys.map(key => (
+          <option key={key} value={key}>{QUESTION_SORTS[key].label}</option>
+        ))}
+      </NativeSelect>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="shrink-0"
+        aria-label={`ลำดับ ${spec.dirLabel[sort.dir]} — กดเพื่อสลับเป็น ${spec.dirLabel[flipped]}`}
+        onClick={() => onChange({ key: sort.key, dir: flipped })}
+      >
+        {spec.dirLabel[sort.dir]}
+      </Button>
     </div>
   )
 }
@@ -858,6 +975,11 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestio
           {TYPE_LABEL[q.question_type] ?? q.question_type}
         </span>
         <SubQuestionCountBadge questionType={q.question_type} count={subQuestionCount} />
+        {q.subject && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-tint-4/10 text-tint-4">
+            {q.subject}
+          </span>
+        )}
         {q.question_categories?.name && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
             {q.question_categories.name}

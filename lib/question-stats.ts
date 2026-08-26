@@ -16,6 +16,10 @@ export interface GradedAnswerRow {
   /** Total points earned across the whole attempt. */
   submission_total: number
   assignment_id: string
+  /** When the attempt this answer belongs to was made, ISO. Optional: it is
+   *  only read to answer "when was this question last used", and a caller that
+   *  does not need that need not fetch it. */
+  submitted_at?: string | null
 }
 
 export interface QuestionStats {
@@ -38,6 +42,11 @@ export interface QuestionStats {
   discrimination: number | null
   /** Distinct assignments this question has been used in. */
   usedIn: number
+  /**
+   * The most recent attempt on this question, ISO — "when did I last put this
+   * in front of students". `null` when no answer carried a date.
+   */
+  lastUsedAt: string | null
 }
 
 /** Below this, a correlation says more about the sample size than the item. */
@@ -96,9 +105,21 @@ export function computeQuestionStats(rows: GradedAnswerRow[]): Map<string, Quest
       pValue: mean(fractions),
       discrimination: pointBiserial(fractions, totals),
       usedIn: new Set(answers.map(a => a.assignment_id)).size,
+      lastUsedAt: latest(answers),
     })
   }
   return out
+}
+
+/** The most recent attempt among a question's answers, or null if none is dated. */
+function latest(answers: GradedAnswerRow[]): string | null {
+  let newest: string | null = null
+  for (const answer of answers) {
+    const at = answer.submitted_at
+    if (!at) continue
+    if (newest === null || at > newest) newest = at
+  }
+  return newest
 }
 
 /** Teacher-facing reading of a difficulty index. */
