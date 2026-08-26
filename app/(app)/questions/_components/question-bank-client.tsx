@@ -61,6 +61,16 @@ const SEARCH_GROUP_META: Record<QuestionSearchGroup, { label: string; heading: s
 /** How many tags the filter shows before asking to be expanded. */
 const TAG_FILTER_PREVIEW = 12
 
+/**
+ * How long typing pauses before the search is sent.
+ *
+ * A search costs a server render, so this is really "how sure are we the
+ * teacher has stopped typing". It used to be shorter than the render itself,
+ * which meant a word could put several requests in flight and the reader spent
+ * the whole time watching a list that never settled.
+ */
+const SEARCH_DEBOUNCE_MS = 500
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -106,19 +116,60 @@ export function QuestionBankClient({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+
+  /**
+   * The filters the reader has clicked but the server has not answered yet.
+   *
+   * The URL owns the filters and the server does the work, which left every
+   * control looking untouched until a whole render came back: you clicked a
+   * tag, nothing moved, and the page read as frozen rather than busy. These
+   * values stand in until the real ones arrive, so a click lands immediately
+   * on the control that received it.
+   */
+  const [optimisticParams, setOptimisticParams] = useState<Record<string, string | null>>({})
+  // Cleared when the request lands: either the transition finished, or the
+  // server sent different filters back. Both, because a navigation that
+  // resolves without ever reporting itself as pending would otherwise leave a
+  // control showing a value the list no longer reflects.
+  const settledParams = JSON.stringify([filters, teamFilters, searchParams.get('tab') ?? ''])
+  useEffect(() => {
+    if (isPending) return
+    setOptimisticParams(prev => (Object.keys(prev).length === 0 ? prev : {}))
+  }, [isPending, settledParams])
+
+  /** A filter's value as it should look right now: what was just clicked if
+   *  that is still in flight, otherwise what the server sent back. */
+  const shownParam = (key: string, settled: string) =>
+    key in optimisticParams ? (optimisticParams[key] ?? '') : settled
+
   // The tab lives in the URL alongside the filters, so a paged or filtered
   // view survives a reload and can be linked to.
-  const tabParam = searchParams.get('tab')
+  const tabParam = shownParam('tab', searchParams.get('tab') ?? '')
   const scope: 'all' | 'mine' | 'team' =
     tabParam === 'mine' || tabParam === 'team' ? tabParam : 'all'
 
   // The URL owns the search and filters, because the server does the filtering
   // now — local state would only describe a list the server never sent.
   const search = filters.q
-  const diffFilter = filters.difficulty
-  const typeFilter = filters.type
-  const activeTag = filters.tag || null
+  const diffFilter = shownParam('difficulty', filters.difficulty) || 'all'
+  const typeFilter = shownParam('type', filters.type) || 'all'
+  const activeTag = shownParam('tag', filters.tag) || null
+  const matchScope = (shownParam('match', filters.match) || 'all') as QuestionSearchScope
+  const teamMatchScope = (shownParam('teammatch', teamFilters.match) || 'all') as QuestionSearchScope
   const totalPages = Math.max(1, Math.ceil(matchCount / perPage))
+
+  /**
+   * Marks a list as answering a click that has not landed yet.
+   *
+   * Dimmed rather than replaced by a skeleton: the rows on screen are still
+   * the honest answer to the previous filter, and blanking them out would cost
+   * the reader their place for the sake of looking busy. Clicks stay live, so
+   * changing your mind mid-request does not need a wait first.
+   */
+  const busyList = cn(
+    'transition-opacity motion-reduce:transition-none',
+    isPending && 'opacity-50',
+  )
 
   /**
    * Rewrites the query string. Callers say explicitly which page param to
@@ -131,6 +182,9 @@ export function QuestionBankClient({
       if (value === null || value === '' || value === 'all') params.delete(key)
       else params.set(key, value)
     }
+    // Show the new state on the controls before asking for it, so the click
+    // registers now rather than when the server answers.
+    setOptimisticParams(prev => ({ ...prev, ...next }))
     startTransition(() => {
       router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false })
     })
@@ -142,7 +196,7 @@ export function QuestionBankClient({
   useEffect(() => { setSearchDraft(filters.q) }, [filters.q])
   useEffect(() => {
     if (searchDraft === filters.q) return
-    const timer = setTimeout(() => setParams({ q: searchDraft, page: null }), 350)
+    const timer = setTimeout(() => setParams({ q: searchDraft, page: null }), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchDraft])
@@ -158,7 +212,7 @@ export function QuestionBankClient({
   useEffect(() => { setTeamSearchDraft(teamFilters.q) }, [teamFilters.q])
   useEffect(() => {
     if (teamSearchDraft === teamFilters.q) return
-    const timer = setTimeout(() => setParams({ teamq: teamSearchDraft, tpage: null }), 350)
+    const timer = setTimeout(() => setParams({ teamq: teamSearchDraft, tpage: null }), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamSearchDraft])
@@ -338,7 +392,7 @@ export function QuestionBankClient({
 
         {search && (
           <SearchGroupSelector
-            value={filters.match}
+            value={matchScope}
             counts={searchGroupCounts}
             onChange={match => setParams({ match, page: null })}
             label="เลือกแหล่งที่พบคำค้นในโจทย์ของฉัน"
@@ -484,7 +538,7 @@ export function QuestionBankClient({
             <p className="text-sm text-muted-foreground mt-1">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
           </Card>
         ) : search ? (
-          <div className="space-y-7">
+          <div className={cn('space-y-7', busyList)} aria-busy={isPending}>
             {searchGroups.map(result => result.questions.length > 0 && (
               <section key={result.group} aria-labelledby={`own-search-${result.group}`} className="space-y-3">
                 <SearchGroupHeading
@@ -512,7 +566,10 @@ export function QuestionBankClient({
             ))}
           </div>
         ) : (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'space-y-2.5'}>
+          <div
+            className={cn(viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'space-y-2.5', busyList)}
+            aria-busy={isPending}
+          >
             {filtered.map(q => (
               <QuestionCard
                 key={q.id}
@@ -592,7 +649,7 @@ export function QuestionBankClient({
 
                 {teamSearch && (
                   <SearchGroupSelector
-                    value={teamFilters.match}
+                    value={teamMatchScope}
                     counts={teamSearchGroupCounts}
                     onChange={match => setParams({ teammatch: match, tpage: null })}
                     label="เลือกแหล่งที่พบคำค้นในโจทย์ที่แชร์ในทีม"
@@ -625,7 +682,7 @@ export function QuestionBankClient({
                       />
                     )}
                     {teamSearch ? (
-                      <div className="space-y-7">
+                      <div className={cn('space-y-7', busyList)} aria-busy={isPending}>
                         {teamSearchGroups.map(result => result.questions.length > 0 && (
                           <section key={result.group} aria-labelledby={`team-search-${result.group}`} className="space-y-3">
                             <SearchGroupHeading
@@ -642,7 +699,7 @@ export function QuestionBankClient({
                         ))}
                       </div>
                     ) : (
-                      <div className="space-y-2.5">
+                      <div className={cn('space-y-2.5', busyList)} aria-busy={isPending}>
                         {filteredTeam.map(q => (
                           <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} onPreview={() => void openPreview(q.id)} />
                         ))}
