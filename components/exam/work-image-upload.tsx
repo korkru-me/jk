@@ -1,8 +1,15 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Camera, Loader2, X } from 'lucide-react'
+
+// Loaded on demand rather than imported at the top: @supabase/supabase-js is
+// ~220 KB, and a student only needs it at the moment they attach a file. The
+// exam page's first load stays small enough for a phone to open it.
+async function browserSupabase() {
+  const { createClient } = await import('@/lib/supabase/client')
+  return createClient()
+}
 
 interface WorkImageUploadProps {
   value: string | null
@@ -22,7 +29,7 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
     if (!file) return
 
     setUploading(true)
-    const supabase = createClient()
+    const supabase = await browserSupabase()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setUploading(false); return }
 
@@ -46,7 +53,7 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
   }
 
   async function removeStoredImage(url: string) {
-    const supabase = createClient()
+    const supabase = await browserSupabase()
     const match = url.match(/\/object\/public\/work-images\/(.+)/)
     if (match?.[1]) {
       await supabase.storage.from('work-images').remove([decodeURIComponent(match[1])])

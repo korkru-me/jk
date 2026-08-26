@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
-import { gradeAnswer, type GradedAnswer } from '@/lib/assignment-attempt'
+// Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
+// previewMode grading ever runs. Importing it statically shipped that whole
+// evaluator to every student's phone and pushed the exam page past what a
+// mobile browser would allocate, so it is loaded on demand in handleSubmit.
+import type { GradedAnswer } from '@/lib/assignment-attempt'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
@@ -177,6 +181,17 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   // ── Countdown timer ─────────────────────────────────────────────────────────
   const secondsLeft = useExamTimer(durationMinutes, startedAt, () => handleSubmit())
 
+  // ── Teacher preview: warm the grading module ────────────────────────────────
+  // previewMode grades in the browser through gradeAnswer, which carries
+  // mathjs. Students never reach that path, so it is no longer imported at the
+  // top of this file. Fetching it here — on the preview route only, while the
+  // teacher is still reading the first question — keeps the submit click as
+  // instant and as offline-tolerant as it was when the import was static.
+  useEffect(() => {
+    if (!previewMode) return
+    void import('@/lib/assignment-attempt')
+  }, [previewMode])
+
   // ── 5. Submit countdown ─────────────────────────────────────────────────────
   useEffect(() => {
     if (submitCountdown <= 0) return
@@ -249,6 +264,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       // Grade locally with the exact same rules a real submission would get
       // (see gradeAnswer) — nothing is written anywhere, so this costs
       // nothing and leaves no trace.
+      const { gradeAnswer } = await import('@/lib/assignment-attempt')
       const graded = answers.map(a => gradeAnswer({
         id: a.id,
         correct_answer: a.correct_answer ?? '',

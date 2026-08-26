@@ -1,9 +1,16 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { FileUp, FileText, Loader2, X } from 'lucide-react'
 import type { SubmittedFile } from '@/lib/types'
+
+// Loaded on demand rather than imported at the top: @supabase/supabase-js is
+// ~220 KB, and a student only needs it at the moment they attach a file. The
+// exam page's first load stays small enough for a phone to open it.
+async function browserSupabase() {
+  const { createClient } = await import('@/lib/supabase/client')
+  return createClient()
+}
 
 interface FileSubmissionUploadProps {
   value: SubmittedFile[]
@@ -27,7 +34,7 @@ export function FileSubmissionUpload({ value, onChange }: FileSubmissionUploadPr
     if (files.length === 0) return
 
     setUploading(true)
-    const supabase = createClient()
+    const supabase = await browserSupabase()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setUploading(false); return }
 
@@ -53,7 +60,7 @@ export function FileSubmissionUpload({ value, onChange }: FileSubmissionUploadPr
   }
 
   async function removeFile(url: string) {
-    const supabase = createClient()
+    const supabase = await browserSupabase()
     const match = url.match(/\/object\/public\/submission-files\/(.+)/)
     if (match?.[1]) {
       await supabase.storage.from('submission-files').remove([decodeURIComponent(match[1])])
