@@ -5,7 +5,11 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { resolveOrgId } from '@/lib/actions/questions'
 import { getMyTeamOrgIds } from '@/lib/actions/team-org'
-import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
+import {
+  normalizeSetSections,
+  removeQuestionsFromSet as dropQuestionsFromSet,
+  type QuestionSetSection,
+} from '@/lib/question-set-sections'
 import type { QuestionSet, Visibility } from '@/lib/types'
 
 interface QuestionSetData {
@@ -125,6 +129,135 @@ export async function updateQuestionSet(id: string, data: QuestionSetData) {
 
   revalidatePath('/questions/sets')
   redirect('/questions/sets')
+}
+
+/**
+ * Files questions into แฟ้ม that already exist, without touching anything else
+ * about them.
+ *
+ * `updateQuestionSet` rewrites a แฟ้ม whole — title, description, visibility,
+ * shares, order — which is right for the editor and wrong for "put this โจทย์
+ * in that แฟ้ม": a client that only wants to add one id would have to send the
+ * แฟ้ม's entire current state back, and anything it got stale would be written
+ * over. This adds ids and leaves every other column alone.
+ *
+ * Several แฟ้ม at once, because the list this is called from drops a โจทย์ the
+ * moment it lands in one: a teacher who wants it in three แฟ้ม has to say so
+ * now or lose the chance. Several โจทย์ at once for the same reason the list
+ * has tick boxes.
+ *
+ * Order inside a แฟ้ม is the teacher's own, so new ids go at the end. An id the
+ * แฟ้ม already holds is skipped rather than repeated, and `sections` is
+ * re-normalized against the new membership so แฟ้มย่อย stay valid — a newly
+ * added โจทย์ belongs to no แฟ้มย่อย until someone puts it in one.
+ *
+ * Only the creator's own แฟ้ม can be written: editing a แฟ้ม is creator-only in
+ * RLS, and the read below filters by `created_by` as well so a set that is not
+ * the caller's is reported as such instead of failing silently.
+ */
+export type AddQuestionsToSetsResult =
+  | { error: string }
+  | {
+    /** Which แฟ้ม took something, for the message the list prints. A แฟ้ม that
+     *  already held every โจทย์ picked reports 0 rather than an error. */
+    sets: { title: string; added: number }[]
+    failedCount: number
+  }
+
+export async function addQuestionsToSets(
+  setIds: string[],
+  questionIds: string[],
+): Promise<AddQuestionsToSetsResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const wantedSetIds = [...new Set(setIds)].filter(Boolean)
+  const wantedQuestionIds = [...new Set(questionIds)].filter(Boolean)
+  if (wantedSetIds.length === 0) return { error: 'ยังไม่ได้เลือกแฟ้มโจทย์' }
+  if (wantedQuestionIds.length === 0) return { error: 'ยังไม่ได้เลือกโจทย์' }
+
+  const { data: sets, error: readError } = await supabase
+    .from('question_sets')
+    .select('id, title, question_ids, sections')
+    .in('id', wantedSetIds)
+    .eq('created_by', user.id)
+  if (readError) return { error: readError.message }
+  if (!sets || sets.length === 0) return { error: 'ไม่พบแฟ้มโจทย์ที่เลือก หรือไม่ใช่แฟ้มของคุณ' }
+
+  const results = await Promise.all(sets.map(async (set: any) => {
+    const current = (set.question_ids ?? []) as string[]
+    const existing = new Set(current)
+    const incoming = wantedQuestionIds.filter(id => !existing.has(id))
+    if (incoming.length === 0) return { title: set.title as string, added: 0, error: null }
+
+    const normalized = normalizeSetSections(set.sections ?? [], [...current, ...incoming])
+    const { error } = await supabase
+      .from('question_sets')
+      .update({ question_ids: normalized.question_ids, sections: normalized.sections })
+      .eq('id', set.id)
+    return { title: set.title as string, added: incoming.length, error: error?.message ?? null }
+  }))
+
+  const failed = results.filter(result => result.error)
+  if (failed.length === sets.length) return { error: failed[0].error ?? 'เพิ่มโจทย์เข้าแฟ้มไม่สำเร็จ' }
+
+  revalidatePath('/questions/sets')
+  return {
+    sets: results.filter(result => !result.error).map(({ title, added }) => ({ title, added })),
+    failedCount: failed.length,
+  }
+}
+
+export type RemoveQuestionsFromSetResult = { error: string } | { title: string; removed: number }
+
+/**
+ * Takes questions out of one แฟ้ม, leaving them in คลังโจทย์.
+ *
+ * The counterpart of `addQuestionsToSets`, and the reason the โจทย์ browser can
+ * show what is inside a แฟ้ม rather than only what is outside every แฟ้ม: a
+ * teacher reading through แฟ้ม พลังงาน and finding a question that does not
+ * belong there should be able to say so from where they are standing.
+ *
+ * Removing from a แฟ้ม is not deleting: the question stays in the คลัง, and งาน
+ * already assigned from this แฟ้ม are untouched — they snapshot their questions
+ * at creation. `sections` is re-normalized so a removed question also leaves
+ * whatever แฟ้มย่อย held it, which is what `removeQuestionsFromSet` in
+ * `lib/question-set-sections.ts` already encodes for the แฟ้ม editor.
+ */
+export async function removeQuestionsFromQuestionSet(
+  setId: string,
+  questionIds: string[],
+): Promise<RemoveQuestionsFromSetResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const removing = [...new Set(questionIds)].filter(Boolean)
+  if (removing.length === 0) return { error: 'ยังไม่ได้เลือกโจทย์' }
+
+  const { data: set, error: readError } = await supabase
+    .from('question_sets')
+    .select('id, title, question_ids, sections')
+    .eq('id', setId)
+    .eq('created_by', user.id)
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!set) return { error: 'ไม่พบแฟ้มโจทย์ หรือไม่ใช่แฟ้มของคุณ' }
+
+  const current = ((set as any).question_ids ?? []) as string[]
+  const held = removing.filter(id => current.includes(id))
+  if (held.length === 0) return { title: (set as any).title as string, removed: 0 }
+
+  const normalized = dropQuestionsFromSet((set as any).sections ?? [], current, held)
+  const { error } = await supabase
+    .from('question_sets')
+    .update({ question_ids: normalized.question_ids, sections: normalized.sections })
+    .eq('id', setId)
+  if (error) return { error: error.message }
+
+  revalidatePath('/questions/sets')
+  return { title: (set as any).title as string, removed: held.length }
 }
 
 export async function deleteQuestionSet(id: string) {

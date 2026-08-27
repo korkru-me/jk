@@ -7,15 +7,20 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye,
-  ArrowUpDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { NativeSelect } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 import { QuestionCard } from './question-card'
+import { QuestionSetBadges, type QuestionSetRef } from '@/components/questions/question-set-badges'
+import { Pagination } from '@/components/ui/pagination'
+import {
+  SEARCH_GROUP_META,
+  SearchGroupHeading,
+  SearchGroupSelector,
+} from '@/components/questions/question-search-groups'
+import { QuestionSortControl } from '@/components/questions/question-sort-control'
 import { SubQuestionCountBadge } from './sub-question-count-badge'
 import { Card } from '@/components/ui/card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
@@ -39,10 +44,8 @@ import type {
   QuestionSearchScope,
 } from '@/lib/question-search'
 import {
-  QUESTION_SORT_KEYS,
   QUESTION_SORTS,
   questionSortParams,
-  TEAM_QUESTION_SORT_KEYS,
   type QuestionSort,
   type QuestionSortDir,
   type QuestionSortKey,
@@ -53,24 +56,6 @@ const PreviewModal = dynamic(
   () => import('./preview-modal').then(mod => mod.PreviewModal),
   { loading: () => <PreviewLoadingOverlay /> }
 )
-
-const SEARCH_GROUP_META: Record<QuestionSearchGroup, { label: string; heading: string; description: string }> = {
-  tag: {
-    label: 'แท็ก',
-    heading: 'พบจากแท็ก',
-    description: 'คำค้นตรงกับแท็กที่ใช้จัดหมวดหมู่โจทย์',
-  },
-  title: {
-    label: 'ชื่อโจทย์',
-    heading: 'พบจากชื่อโจทย์',
-    description: 'คำค้นตรงกับชื่อโจทย์',
-  },
-  content: {
-    label: 'เนื้อหาโจทย์',
-    heading: 'พบจากเนื้อหาโจทย์',
-    description: 'คำค้นตรงกับข้อความภายในโจทย์',
-  },
-}
 
 /** How many tags the filter shows before asking to be expanded. */
 const TAG_FILTER_PREVIEW = 12
@@ -110,6 +95,8 @@ interface Props {
   duplicateCounts: Record<string, number>
   /** question id → how many ข้อย่อย it holds. Absent = not counted, badge hidden. */
   subQuestionCounts: Record<string, number>
+  /** question id → every แฟ้มโจทย์ in view holding it. Absent = in no แฟ้ม. */
+  setMemberships: Record<string, QuestionSetRef[]>
   perPage: number
   teamFilters: TeamFilters
   teamMatchCount: number
@@ -123,7 +110,7 @@ interface Props {
 export function QuestionBankClient({
   questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
   allTags, filters, matchCount, searchGroups, searchGroupCounts, totalCount, perPage, duplicateCounts,
-  subQuestionCounts,
+  subQuestionCounts, setMemberships,
   teamFilters, teamMatchCount, teamSearchGroups, teamSearchGroupCounts, teamPaged,
 }: Props) {
   const router = useRouter()
@@ -603,6 +590,7 @@ export function QuestionBankClient({
                       allTags={tagPool}
                       duplicateCount={duplicateCounts[q.id] ?? 0}
                       subQuestionCount={subQuestionCounts[q.id]}
+                      sets={setMemberships[q.id]}
                     />
                   ))}
                 </div>
@@ -626,6 +614,7 @@ export function QuestionBankClient({
                 allTags={tagPool}
                 duplicateCount={duplicateCounts[q.id] ?? 0}
                 subQuestionCount={subQuestionCounts[q.id]}
+                sets={setMemberships[q.id]}
               />
             ))}
           </div>
@@ -746,7 +735,7 @@ export function QuestionBankClient({
                             />
                             <div className="space-y-2.5">
                               {result.questions.map(q => (
-                                <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} onPreview={() => void openPreview(q.id)} />
+                                <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} sets={setMemberships[q.id]} onPreview={() => void openPreview(q.id)} />
                               ))}
                             </div>
                           </section>
@@ -755,7 +744,7 @@ export function QuestionBankClient({
                     ) : (
                       <div className={cn('space-y-2.5', busyList)} aria-busy={isPending}>
                         {filteredTeam.map(q => (
-                          <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} onPreview={() => void openPreview(q.id)} />
+                          <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} sets={setMemberships[q.id]} onPreview={() => void openPreview(q.id)} />
                         ))}
                       </div>
                     )}
@@ -805,117 +794,8 @@ export function QuestionBankClient({
  * "ก → ฮ" on a column of names, "ใหม่ → เก่า" on a column of dates. "จากน้อย
  * ไปมาก" would describe the database rather than the list on screen.
  */
-function QuestionSortControl({ sort, onChange, label, scope = '', omitKeys }: {
-  sort: QuestionSort
-  onChange: (sort: QuestionSort) => void
-  label: string
-  /** Which list this belongs to — the team list offers two more keys. */
-  scope?: QuestionSortScope
-  /** Keys to leave out of the menu for this particular list. */
-  omitKeys?: QuestionSortKey[]
-}) {
-  const spec = QUESTION_SORTS[sort.key]
-  const flipped: QuestionSortDir = sort.dir === 'asc' ? 'desc' : 'asc'
-  const offered = (scope === 't' ? TEAM_QUESTION_SORT_KEYS : QUESTION_SORT_KEYS)
-    .filter(key => !omitKeys?.includes(key))
-  // A key can arrive from a URL that the menu no longer offers — a link shared
-  // by a teacher in several teams, opened by one in a single team. Show it
-  // rather than leave the menu pointing at something the list is not doing.
-  const keys = offered.includes(sort.key) ? offered : [...offered, sort.key]
 
-  return (
-    <div className="flex items-center gap-1.5">
-      <ArrowUpDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <NativeSelect
-        aria-label={label}
-        className="w-auto"
-        value={sort.key}
-        onChange={e => {
-          // A newly chosen key starts at the end that makes sense for it —
-          // "แก้ไขล่าสุด" means what was touched today, not the oldest edit
-          // in the bank.
-          const key = e.target.value as QuestionSortKey
-          onChange({ key, dir: QUESTION_SORTS[key].defaultDir })
-        }}
-      >
-        {keys.map(key => (
-          <option key={key} value={key}>{QUESTION_SORTS[key].label}</option>
-        ))}
-      </NativeSelect>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="shrink-0"
-        aria-label={`ลำดับ ${spec.dirLabel[sort.dir]} — กดเพื่อสลับเป็น ${spec.dirLabel[flipped]}`}
-        onClick={() => onChange({ key: sort.key, dir: flipped })}
-      >
-        {spec.dirLabel[sort.dir]}
-      </Button>
-    </div>
-  )
-}
 
-function SearchGroupSelector({ value, counts, onChange, label }: {
-  value: QuestionSearchScope
-  counts: QuestionSearchGroupCounts
-  onChange: (value: QuestionSearchScope) => void
-  label: string
-}) {
-  const options: { value: QuestionSearchScope; label: string; count: number }[] = [
-    {
-      value: 'all',
-      label: 'ทั้งหมด',
-      count: counts.tag + counts.title + counts.content,
-    },
-    ...(['tag', 'title', 'content'] as const).map(group => ({
-      value: group,
-      label: SEARCH_GROUP_META[group].label,
-      count: counts[group],
-    })),
-  ]
-
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs text-muted-foreground">
-        เรียงผลจากแท็ก → ชื่อโจทย์ → เนื้อหาโจทย์ และแสดงแต่ละข้อเพียงกลุ่มเดียว
-      </p>
-      <div className="flex flex-wrap items-center gap-1" role="group" aria-label={label}>
-        <span className="mr-1 text-xs font-medium text-muted-foreground">แสดง:</span>
-        {options.map(option => (
-          <Button
-            key={option.value}
-            type="button"
-            size="xs"
-            variant={value === option.value ? 'default' : 'outline'}
-            aria-pressed={value === option.value}
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-            <span aria-hidden="true">{option.count}</span>
-          </Button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function SearchGroupHeading({ id, group, count }: {
-  id: string
-  group: QuestionSearchGroup
-  count: number
-}) {
-  const meta = SEARCH_GROUP_META[group]
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-border pb-2">
-      <div>
-        <h3 id={id} className="text-sm font-semibold text-foreground">{meta.heading}</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">{meta.description}</p>
-      </div>
-      <Badge variant="outline">{count} ข้อ</Badge>
-    </div>
-  )
-}
 
 function PreviewLoadingOverlay() {
   return (
@@ -946,12 +826,15 @@ function EmptyState() {
 // The creator can always edit their own question here; a teammate can too, but
 // only if the creator turned on "อนุญาตให้เพื่อนในทีมแก้ไข" — enforced server-side.
 
-function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestionCount, onPreview }: {
+function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestionCount, sets, onPreview }: {
   question: QuestionWithCreator
   showTeamName: boolean
   currentUserId: string
   /** How many ข้อย่อย the question holds; absent when the count could not be read. */
   subQuestionCount?: number
+  /** แฟ้มโจทย์ in view holding this question. Never says "none": a teammate's
+   *  own แฟ้ม may simply be private to them. */
+  sets?: QuestionSetRef[]
   onPreview: () => void
 }) {
   // The edit page carries the bank's current view back with it, so returning
@@ -995,6 +878,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestio
             + {name}
           </span>
         ))}
+        <QuestionSetBadges sets={sets} />
       </div>
 
       <button
@@ -1035,88 +919,3 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestio
 }
 
 
-/**
- * Page controls for the bank.
- *
- * Shows the first and last page plus a window around the current one, so a
- * bank of any size keeps the same handful of buttons. `isPending` comes from
- * the transition that rewrites the URL, since navigation is what fetches the
- * next page.
- */
-function Pagination({ page, totalPages, isPending, onGo, label, className }: {
-  page: number
-  totalPages: number
-  isPending: boolean
-  onGo: (page: number) => void
-  /** Distinguishes the copy above the list from the one below it for screen readers. */
-  label: string
-  className?: string
-}) {
-  // Two pages either side, not one: from page 3 the reader could see 4 but not
-  // 5, so reaching 5 meant a stop at 4 first.
-  const nearby = new Set([1, totalPages, page - 2, page - 1, page, page + 1, page + 2])
-  const pages = [...nearby].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b)
-  const allPages = Array.from({ length: totalPages }, (_, i) => i + 1)
-
-  return (
-    <nav className={cn('flex flex-wrap items-center justify-center gap-1 pt-2', className)} aria-label={label}>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={page <= 1 || isPending}
-        onClick={() => onGo(page - 1)}
-      >
-        ← ก่อนหน้า
-      </Button>
-
-      {pages.map((p, i) => (
-        <span key={p} className="flex items-center gap-1">
-          {i > 0 && pages[i - 1] !== p - 1 && (
-            <span className="px-1 text-sm text-muted-foreground">…</span>
-          )}
-          <Button
-            variant={p === page ? 'default' : 'ghost'}
-            size="sm"
-            disabled={isPending}
-            onClick={() => onGo(p)}
-            aria-current={p === page ? 'page' : undefined}
-            className="min-w-9"
-          >
-            {p}
-          </Button>
-        </span>
-      ))}
-
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={page >= totalPages || isPending}
-        onClick={() => onGo(page + 1)}
-      >
-        ถัดไป →
-      </Button>
-
-      {/* Any page in one pick. The numbered buttons only ever reach as far as
-          the neighbours, so a jump to a far page had to be walked to. */}
-      {totalPages > 3 && (
-        <span className="ml-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-          ไปหน้า
-          <Select
-            value={String(page)}
-            onValueChange={v => v !== null && Number(v) !== page && onGo(Number(v))}
-          >
-            <SelectTrigger size="sm" disabled={isPending} aria-label={`ไปยังหน้าที่ต้องการ — ${label}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {allPages.map(p => (
-                <SelectItem key={p} value={String(p)}>หน้า {p}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          จาก {totalPages}
-        </span>
-      )}
-    </nav>
-  )
-}

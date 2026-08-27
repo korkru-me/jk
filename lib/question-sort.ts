@@ -286,11 +286,24 @@ export const QUESTION_SORT_KEYS: QuestionSortKey[] =
 export const TEAM_QUESTION_SORT_KEYS: QuestionSortKey[] =
   [...SHARED_SORT_KEYS, 'creator', 'team']
 
-/** Which list a set of params belongs to. `'t'` is the แชร์ในทีม list. */
-export type QuestionSortScope = '' | 't'
+/**
+ * What the โจทย์ browser at the foot of คลังแฟ้มโจทย์ offers.
+ *
+ * The shared keys and nothing else: the four orders that rank from item
+ * analysis need the whole stats pipeline, which that page has no other reason
+ * to load. Offering an order the page cannot honour is worse than not
+ * offering it.
+ */
+export const LIBRARY_QUESTION_SORT_KEYS: QuestionSortKey[] = [...SHARED_SORT_KEYS]
+
+/** Which list a set of params belongs to. `'t'` is the แชร์ในทีม list, `'u'`
+ *  the โจทย์ browser under คลังแฟ้มโจทย์. */
+export type QuestionSortScope = '' | 't' | 'u'
 
 const keysFor = (scope: QuestionSortScope) =>
-  scope === 't' ? TEAM_QUESTION_SORT_KEYS : QUESTION_SORT_KEYS
+  scope === 't' ? TEAM_QUESTION_SORT_KEYS
+    : scope === 'u' ? LIBRARY_QUESTION_SORT_KEYS
+      : QUESTION_SORT_KEYS
 
 /** What the bank shows when nobody has chosen: the order it has always had. */
 export const DEFAULT_QUESTION_SORT: QuestionSort = { key: 'created', dir: 'desc' }

@@ -754,5 +754,11 @@
     "card": 0,
     "control": 0,
     "button": 5
+  },
+  "app/(app)/questions/sets/_components/library-question-card.tsx": {
+    "palette": 0,
+    "card": 0,
+    "control": 0,
+    "button": 1
   }
 }

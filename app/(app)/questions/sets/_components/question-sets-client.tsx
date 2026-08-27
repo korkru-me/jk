@@ -18,16 +18,46 @@ import {
   DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { parseSections } from '@/lib/question-set-sections'
-import type { QuestionSetSummary, QuestionSetSummaryWithCreator } from '../page'
+import { LibraryPanel } from './library-panel'
+import type { QuestionSetRef } from '@/components/questions/question-set-badges'
+import type { QuestionSearchScope } from '@/lib/question-search'
+import type { QuestionSort } from '@/lib/question-sort'
+import type {
+  LibraryResult,
+  LibraryScope,
+  QuestionSetSummary,
+  QuestionSetSummaryWithCreator,
+} from '../page'
 import { Card } from '@/components/ui/card'
 
 interface Props {
   mySets: QuestionSetSummary[]
   teamSets: QuestionSetSummaryWithCreator[]
   currentUserId: string
+  /** One page of the โจทย์ browser at the foot of the page. */
+  library: LibraryResult
+  libraryScope: LibraryScope
+  librarySearch: string
+  libraryMatch: QuestionSearchScope
+  librarySort: QuestionSort
+  unfiledPerPage: number
+  /** How many โจทย์ are in no แฟ้ม at all, whatever the browser is showing. */
+  unfiledTotal: number
+  /** The whole คลัง of this teacher, for the "N จาก M" line. */
+  ownQuestionTotal: number
+  /** ข้อย่อย per question id, for the cards on this page. */
+  subQuestionCounts: Record<string, number>
+  /** question id → every แฟ้ม holding it. */
+  setMemberships: Record<string, QuestionSetRef[]>
+  /** Tags already in the คลัง, offered when adding one from a card. */
+  allTags: string[]
 }
 
-export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
+export function QuestionSetsClient({
+  mySets, teamSets, currentUserId, library, libraryScope, librarySearch, libraryMatch,
+  librarySort, unfiledPerPage, unfiledTotal, ownQuestionTotal, subQuestionCounts,
+  setMemberships, allTags,
+}: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [scope, setScope] = useState<'all' | 'mine' | 'team'>('all')
@@ -42,6 +72,34 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
 
   const filteredMine = useMemo(() => mySets.filter(matches), [mySets, search])
   const filteredTeam = useMemo(() => teamSets.filter(matches), [teamSets, search])
+
+  // Filing targets are the teacher's own แฟ้ม: a แฟ้ม the team shared is
+  // read-only to everyone but its creator, in RLS as well as in the UI.
+  const filingTargets = useMemo(
+    () => mySets.map(set => ({
+      id: set.id,
+      title: set.title,
+      questionCount: set.valid_question_count ?? set.question_ids.length,
+    })),
+    [mySets],
+  )
+
+  const libraryPanel = (
+    <LibraryPanel
+      library={library}
+      scope={libraryScope}
+      search={librarySearch}
+      match={libraryMatch}
+      sort={librarySort}
+      perPage={unfiledPerPage}
+      unfiledTotal={unfiledTotal}
+      ownQuestionTotal={ownQuestionTotal}
+      sets={filingTargets}
+      setMemberships={setMemberships}
+      allTags={allTags}
+      subQuestionCounts={subQuestionCounts}
+    />
+  )
 
   return (
     <div className="space-y-4 max-w-[1200px]">
@@ -143,8 +201,14 @@ export function QuestionSetsClient({ mySets, teamSets, currentUserId }: Props) {
               )}
             </div>
           )}
+
+          {(scope === 'all' || scope === 'mine') && libraryPanel}
         </>
       )}
+
+      {/* A teacher with no แฟ้ม at all still needs to see the คลัง waiting to be
+          filed — that is exactly the state the empty card above describes. */}
+      {totalCount === 0 && libraryPanel}
     </div>
   )
 }

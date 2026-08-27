@@ -19,6 +19,7 @@ import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import { QuestionTagsEditor } from './question-tags-editor'
 import { SubQuestionCountBadge } from './sub-question-count-badge'
+import { QuestionSetBadges, type QuestionSetRef } from '@/components/questions/question-set-badges'
 import type { QuestionWithCategory } from '../page'
 import { questionExcerpt } from '@/lib/question-display'
 import { questionEditHref } from '@/lib/question-return'
@@ -38,9 +39,11 @@ interface Props {
   duplicateCount: number
   /** How many ข้อย่อย the question holds; absent when the count could not be read. */
   subQuestionCount?: number
+  /** Every แฟ้มโจทย์ in view that holds this question. Absent = none of them. */
+  sets?: QuestionSetRef[]
 }
 
-export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags, duplicateCount, subQuestionCount }: Props) {
+export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags, duplicateCount, subQuestionCount, sets }: Props) {
   const router = useRouter()
   // The edit page carries the bank's current view back with it, so returning
   // from an edit lands on the same search, filters and page.
@@ -170,6 +173,9 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                   {q.question_categories.name}
                 </span>
               )}
+              {/* Which แฟ้มโจทย์ this question was filed into — all of them,
+                  since a question can sit in several. */}
+              <QuestionSetBadges sets={sets} showEmpty />
               <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />
             </div>
 
