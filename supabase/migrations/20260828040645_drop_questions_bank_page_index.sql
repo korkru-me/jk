@@ -1,0 +1,27 @@
+-- The covering index added a migration ago did not pay for itself, so it goes
+-- back out. Measured on the same four queries, before and after, warm:
+--
+--                                   before        after
+--   24 rows + count (one query)   320, 343     311, 317
+--   24 rows, no count             233, 289     231, 248
+--   count only                    521, 575     476, 469
+--   the คลังโจทย์ page             866ms        833ms
+--
+-- A few percent on the count, nothing on the rows, and nothing at the page
+-- that a second run would not swallow. The theory it was built on — that the
+-- remaining per-row cost was a heap visit for the columns RLS reads — predicted
+-- a much larger drop, so it is not what is happening, or the planner is not
+-- choosing an index-only scan for it. Either way the index is not earning the
+-- write it costs on every question saved.
+--
+-- Kept in history rather than squashed away: the numbers above are the useful
+-- part. They rule an index out for whoever looks at this next, which is worth
+-- more than a clean migration list.
+--
+-- What the evidence now says is left: the page is bound by round trips rather
+-- than by any one query. Locally that is ~100ms each, and three of them run
+-- concurrently in the same wave and slow each other down. How much of that is
+-- real depends on how far the server sits from the database, which is not
+-- something a laptop in front of it can measure.
+
+DROP INDEX IF EXISTS public.idx_questions_bank_page;
