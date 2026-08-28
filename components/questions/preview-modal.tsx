@@ -7,13 +7,16 @@ import {
 } from 'lucide-react'
 import { DIFF_META } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
-import { QuestionPreviewContent } from '@/components/questions/question-preview'
+import { QuestionPreviewContent } from './question-preview'
 import { RichText } from '@/components/ui/rich-text'
 import type {
   Variable, MCQOption, MatchingPair, TrueFalseConfig, FillBlankConfig,
   OrderingConfig, FileUploadConfig, RandomQuestionConfig, CompositeConfig,
 } from '@/lib/types'
-import type { QuestionDetailWithCategory } from '../page'
+import type { Question } from '@/lib/types'
+
+/** A full question row plus the joined หมวดหมู่ the header prints. */
+export type QuestionDetailWithCategory = Question & { question_categories: { name: string } | null }
 import { IconButton } from '@/components/ui/icon-button'
 import { Card } from '@/components/ui/card'
 

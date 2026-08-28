@@ -47,3 +47,24 @@ describe('safeQuestionsRedirect', () => {
     expect(safeQuestionsRedirect(undefined)).toBe('/questions')
   })
 })
+
+describe('returning to a แฟ้มโจทย์ editor', () => {
+  const setId = '3f1a2b4c-5d6e-4f70-8a91-b2c3d4e5f607'
+
+  it('sends an edit started from a แฟ้ม back to that แฟ้ม', () => {
+    const href = questionEditHref('/questions/abc/edit', '', { set: setId })
+    expect(questionsReturnTo(new URLSearchParams(href.split('?')[1])))
+      .toBe(`/questions/sets/${setId}/edit`)
+  })
+
+  it('ignores a แฟ้ม id that is not one', () => {
+    const href = questionEditHref('/questions/abc/edit', '', { set: '../../settings/team' })
+    expect(questionsReturnTo(new URLSearchParams(href.split('?')[1]))).toBe('/questions')
+  })
+
+  it('lets the server redirect to a แฟ้ม editor, and nowhere else under it', () => {
+    expect(safeQuestionsRedirect(`/questions/sets/${setId}/edit`)).toBe(`/questions/sets/${setId}/edit`)
+    expect(safeQuestionsRedirect('/questions/sets/not-a-uuid/edit')).toBe('/questions')
+    expect(safeQuestionsRedirect(`/questions/sets/${setId}/edit/../../../admin`)).toBe('/questions')
+  })
+})

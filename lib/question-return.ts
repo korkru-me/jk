@@ -15,6 +15,24 @@ export const RETURN_PARAM = 'from'
 export const QUESTIONS_PATH = '/questions'
 
 /**
+ * Reserved key inside the remembered view naming a แฟ้มโจทย์ editor to go back
+ * to instead of the คลัง.
+ *
+ * A แฟ้ม's own editor lists its โจทย์ as full cards, so แก้ไข can now be
+ * reached from there as well as from the คลัง — and landing back in the คลัง
+ * afterwards would drop the teacher out of the แฟ้ม they were working through.
+ * Only the แฟ้ม's id travels, never a path: the destination is rebuilt here, so
+ * a hand-edited link cannot name somewhere else to redirect to.
+ */
+export const RETURN_SET_PARAM = 'set'
+
+/** The แฟ้ม editor a return id points at. */
+export const setEditPath = (setId: string) => `${QUESTIONS_PATH}/sets/${setId}/edit`
+
+/** Ids are uuids; anything else is not a แฟ้ม this app ever linked to. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
  * Builds the href of an edit page, tagging on the bank view to come back to.
  * `currentQuery` is the bank's own query string (`useSearchParams().toString()`).
  */
@@ -34,7 +52,10 @@ export function questionEditHref(editPath: string, currentQuery: string, extra?:
 export function questionsReturnTo(params: URLSearchParams | { get(name: string): string | null }): string {
   const encoded = params.get(RETURN_PARAM)
   if (encoded) {
-    const query = new URLSearchParams(encoded).toString()
+    const decoded = new URLSearchParams(encoded)
+    const setId = decoded.get(RETURN_SET_PARAM)
+    if (setId) return UUID.test(setId) ? setEditPath(setId) : QUESTIONS_PATH
+    const query = decoded.toString()
     if (query) return `${QUESTIONS_PATH}?${query}`
     return QUESTIONS_PATH
   }
@@ -48,6 +69,9 @@ export function questionsReturnTo(params: URLSearchParams | { get(name: string):
 export function safeQuestionsRedirect(target: string | undefined): string {
   if (!target) return QUESTIONS_PATH
   if (target === QUESTIONS_PATH) return target
+  // A แฟ้ม editor, rebuilt from its id rather than trusted as a path.
+  const setMatch = /^\/questions\/sets\/([^/?#]+)\/edit$/.exec(target)
+  if (setMatch && UUID.test(setMatch[1])) return setEditPath(setMatch[1])
   if (target.startsWith(`${QUESTIONS_PATH}?`)) {
     const query = new URLSearchParams(target.slice(QUESTIONS_PATH.length + 1)).toString()
     return query ? `${QUESTIONS_PATH}?${query}` : QUESTIONS_PATH

@@ -4,7 +4,10 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download, Users } from 'lucide-react'
+import {
+  Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download, Users,
+  ChevronUp, ChevronDown, FolderMinus, MoreVertical,
+} from 'lucide-react'
 import { deleteQuestion, getQuestionClientDetail, setRequiresWorkImage, shareQuestionToOrg } from '@/lib/actions/questions'
 import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
@@ -19,13 +22,69 @@ import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import { QuestionTagsEditor } from './question-tags-editor'
 import { SubQuestionCountBadge } from './sub-question-count-badge'
-import { QuestionSetBadges, type QuestionSetRef } from '@/components/questions/question-set-badges'
-import type { QuestionWithCategory } from '../page'
+import { QuestionSetBadges, type QuestionSetRef } from './question-set-badges'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
+import type { Question } from '@/lib/types'
+
 import { questionExcerpt } from '@/lib/question-display'
-import { questionEditHref } from '@/lib/question-return'
+import { questionEditHref, RETURN_SET_PARAM } from '@/lib/question-return'
+
+/**
+ * The row a full card draws from.
+ *
+ * Written as its own type rather than the คลังโจทย์ page's row so the card can
+ * be handed a question assembled anywhere — the แฟ้มโจทย์ editor builds one out
+ * of its picker list plus a lazily-fetched detail, and never has a page row to
+ * give.
+ */
+export type QuestionCardRow = Pick<
+  Question,
+  | 'id' | 'title' | 'question_text' | 'question_type' | 'difficulty' | 'tags'
+  | 'requires_work_image' | 'group_id' | 'order_in_group' | 'subject'
+> & { question_categories: { name: string } | null }
+
+/**
+ * The แฟ้ม controls a card grows when it is listed inside one.
+ *
+ * All of it is absent on the คลังโจทย์ page, where a โจทย์ has no position and
+ * belongs to no one list. Passing this object is what turns the card from "a
+ * โจทย์ in the คลัง" into "ข้อที่ 7 of this แฟ้ม".
+ */
+export interface QuestionCardSetContext {
+  /** 1-based position in the แฟ้ม — the number students will see. */
+  order: number
+  selected: boolean
+  onSelect: (selected: boolean) => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  canMoveUp: boolean
+  canMoveDown: boolean
+  /** Takes the โจทย์ out of this แฟ้ม. Never deletes it from the คลัง. */
+  onRemove: () => void
+  /** Names of the แฟ้มย่อย inside this แฟ้ม that hold it. */
+  sectionTitles: string[]
+  /**
+   * Runs before แก้ไข navigates away, and cancels the move by returning false.
+   *
+   * The แฟ้ม editor is a draft — nothing in it exists until บันทึก — so leaving
+   * for the โจทย์ editor would throw the draft away. This is where it gets
+   * saved first.
+   */
+  onBeforeEdit?: () => Promise<boolean>
+  /**
+   * The แฟ้ม's id — where แก้ไข comes back to once the โจทย์ is saved.
+   *
+   * Absent while a แฟ้ม is still being created: there is no แฟ้ม yet to save
+   * the draft into or to come back to, so the card offers no แก้ไข at all
+   * rather than one that would silently lose the list being built.
+   */
+  setId?: string
+}
 
 interface Props {
-  question: QuestionWithCategory
+  question: QuestionCardRow
   isFlagged: boolean
   onPreview: () => void
   onToggleFlag: () => void
@@ -33,6 +92,15 @@ interface Props {
   myTeams: { id: string; name: string }[]
   /** Item analysis, absent until the question has been answered in a graded attempt. */
   stats?: QuestionStats
+  /**
+   * False while the per-card read for this โจทย์ is still in flight.
+   *
+   * Two things then stay off the card rather than being guessed at: the สถิติ
+   * strip, which would otherwise print "ยังไม่มีสถิติ" — a claim about the
+   * โจทย์ when the truth is about the page — and the controls that only make
+   * sense once it is known whether this row is a โจทย์หลายขั้นตอน.
+   */
+  detailsLoaded?: boolean
   /** Every tag in view, offered as suggestions when adding one from this card. */
   allTags: string[]
   /** How many other questions in the bank have exactly this content. 0 = none. */
@@ -41,9 +109,14 @@ interface Props {
   subQuestionCount?: number
   /** Every แฟ้มโจทย์ in view that holds this question. Absent = none of them. */
   sets?: QuestionSetRef[]
+  /** Present only when the card is listed inside one แฟ้ม. See the type. */
+  setContext?: QuestionCardSetContext
 }
 
-export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, allTags, duplicateCount, subQuestionCount, sets }: Props) {
+export function QuestionCard({
+  question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, detailsLoaded = true,
+  allTags, duplicateCount, subQuestionCount, sets, setContext,
+}: Props) {
   const router = useRouter()
   // The edit page carries the bank's current view back with it, so returning
   // from an edit lands on the same search, filters and page.
@@ -58,15 +131,38 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
   const pPercent = stats ? Math.round(stats.pValue * 100) : null
   const rMeta = stats?.discrimination != null ? discriminationLabel(stats.discrimination) : null
 
+  const isGroupUnknown = !detailsLoaded
+
+  const editPath = isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`
+  // Inside a แฟ้ม the return trip is to that แฟ้ม, not to the คลัง view the
+  // bank's own cards remember.
+  // แก้ไข from a แฟ้ม needs somewhere to come back to and something to save
+  // the draft with; a แฟ้ม that has never been saved has neither.
+  const canEditFromSet = !!setContext?.setId && !!setContext.onBeforeEdit
+  const editHref = setContext?.setId
+    ? questionEditHref(editPath, '', { [RETURN_SET_PARAM]: setContext.setId })
+    : questionEditHref(editPath, returnQuery)
+
   async function handleDelete() {
     const ok = await confirm({
       title: 'ลบโจทย์นี้?',
-      description: `“${q.title}” จะถูกลบถาวร กู้คืนไม่ได้`,
+      description: setContext
+        ? `“${q.title}” จะถูกลบถาวรออกจากคลังโจทย์ทั้งหมด กู้คืนไม่ได้ — ถ้าต้องการแค่เอาออกจากแฟ้มนี้ ให้กด “เอาออกจากแฟ้ม”`
+        : `“${q.title}” จะถูกลบถาวร กู้คืนไม่ได้`,
       confirmLabel: 'ลบถาวร',
       variant: 'destructive',
     })
     if (!ok) return
     startTransition(async () => { await deleteQuestion(q.id) })
+  }
+
+  /** แก้ไข from inside a แฟ้ม: the draft is saved before the page is left. */
+  function handleEditFromSet() {
+    if (!setContext?.onBeforeEdit) return
+    const save = setContext.onBeforeEdit
+    startTransition(async () => {
+      if (await save()) router.push(editHref)
+    })
   }
 
   function handleShareToTeam(orgId: string, teamName: string) {
@@ -135,6 +231,24 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
 
       <div className="p-4">
         <div className="flex flex-col @md:flex-row @md:items-start gap-3">
+          {/* Inside a แฟ้ม, the tick and the position come before the โจทย์
+              itself: bulk actions and the numbering students will see are the
+              two things this list exists to control. */}
+          {setContext && (
+            <div className="flex @md:flex-col items-center gap-2 shrink-0 @md:pt-0.5">
+              <input
+                type="checkbox"
+                checked={setContext.selected}
+                onChange={event => setContext.onSelect(event.target.checked)}
+                aria-label={`เลือก ${q.title}`}
+                className="accent-primary shrink-0"
+              />
+              <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                {setContext.order}.
+              </span>
+            </div>
+          )}
+
           {/* Left: content */}
           <div className="flex-1 min-w-0">
             {/* Badge row */}
@@ -174,8 +288,19 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
                 </span>
               )}
               {/* Which แฟ้มโจทย์ this question was filed into — all of them,
-                  since a question can sit in several. */}
-              <QuestionSetBadges sets={sets} showEmpty />
+                  since a question can sit in several. Inside a แฟ้ม the
+                  แฟ้มย่อย holding it are the ones that matter, and "which แฟ้ม"
+                  is already answered by being on this page. */}
+              {setContext
+                ? setContext.sectionTitles.map(title => (
+                    <span
+                      key={title}
+                      className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary max-w-[10rem] truncate"
+                    >
+                      {title}
+                    </span>
+                  ))
+                : <QuestionSetBadges sets={sets} showEmpty />}
               <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />
             </div>
 
@@ -199,8 +324,13 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{questionExcerpt(q.question_text)}</p>
 
             {/* Stats row — measured from graded attempts, so absent on a question
-                nobody has answered yet */}
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-border">
+                nobody has answered yet. While the read is still in flight the
+                whole strip stays out: "ยังไม่มีสถิติ" would be a claim about
+                the โจทย์, not about the page. */}
+            <div className={cn(
+              'flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-border',
+              !detailsLoaded && 'hidden',
+            )}>
               {!stats || pPercent === null ? (
                 <p className="text-[10px] text-muted-foreground">ยังไม่มีสถิติ — จะคำนวณให้เมื่อมีนักเรียนส่งคำตอบข้อนี้</p>
               ) : (
@@ -319,34 +449,89 @@ export function QuestionCard({ question: q, isFlagged, onPreview, onToggleFlag, 
               </IconButton>
 
               {/* Duplicate (non-group only) */}
-              {!isGroup && (
+              {!isGroup && !isGroupUnknown && (
                 <IconButton onClick={handleDuplicate} label="ทำสำเนาเพื่อแก้ไข" size="sm"
                   className="hover:text-primary hover:bg-primary/10">
                   <Copy />
                 </IconButton>
               )}
 
-              {/* Edit */}
-              <Link
-                href={questionEditHref(
-                  isGroup ? `/questions/multi/${q.group_id}` : `/questions/${q.id}/edit`,
-                  returnQuery,
-                )}
-                title="แก้ไข"
-                aria-label="แก้ไข"
-                className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
-              >
-                <Edit2 />
-              </Link>
+              {/* Edit. From inside a แฟ้ม this cannot be a plain link: the แฟ้ม
+                  draft has to be written down before the page is left. */}
+              {setContext ? (canEditFromSet && (
+                <IconButton onClick={handleEditFromSet} disabled={isPending} label="แก้ไข" size="sm">
+                  <Edit2 />
+                </IconButton>
+              )) : (
+                <Link
+                  href={editHref}
+                  title="แก้ไข"
+                  aria-label="แก้ไข"
+                  className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
+                >
+                  <Edit2 />
+                </Link>
+              )}
 
-              {/* Delete (non-group only) */}
-              {!isGroup && (
+              {/* Delete (non-group only). Inside a แฟ้ม it moves into the ⋯ menu
+                  below — "ลบถาวรจากคลัง" and "เอาออกจากแฟ้ม" sitting side by
+                  side as two similar icons is exactly how a โจทย์ gets lost. */}
+              {!isGroup && !isGroupUnknown && !setContext && (
                 <IconButton onClick={handleDelete} disabled={isPending} label="ลบโจทย์" size="sm"
                   className="hover:text-destructive hover:bg-destructive/10">
                   <Trash2 />
                 </IconButton>
               )}
             </div>
+
+            {/* แฟ้ม controls: position, membership, and the destructive action
+                that belongs to the คลัง rather than to this list. */}
+            {setContext && (
+              <div className="flex items-center flex-wrap gap-0.5">
+                <IconButton
+                  label="ย้ายขึ้น"
+                  size="sm"
+                  disabled={!setContext.canMoveUp}
+                  onClick={setContext.onMoveUp}
+                >
+                  <ChevronUp />
+                </IconButton>
+                <IconButton
+                  label="ย้ายลง"
+                  size="sm"
+                  disabled={!setContext.canMoveDown}
+                  onClick={setContext.onMoveDown}
+                >
+                  <ChevronDown />
+                </IconButton>
+                <IconButton
+                  label="เอาออกจากแฟ้ม"
+                  size="sm"
+                  className="hover:text-destructive hover:bg-destructive/10"
+                  onClick={setContext.onRemove}
+                >
+                  <FolderMinus />
+                </IconButton>
+                {!isGroup && !isGroupUnknown && canEditFromSet && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={<Button variant="ghost" size="icon-sm" aria-label="เพิ่มเติม" title="เพิ่มเติม" />}
+                    >
+                      <MoreVertical />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={isPending}
+                        onClick={handleDelete}
+                      >
+                        <Trash2 className="w-4 h-4" /> ลบโจทย์ถาวรจากคลัง
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

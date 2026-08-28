@@ -97,7 +97,28 @@ export async function createQuestionSet(data: QuestionSetData) {
   return { id: set.id as string }
 }
 
+/**
+ * Rewrites a แฟ้ม and stays where it is.
+ *
+ * `updateQuestionSet` finishes with a redirect, which is right for บันทึก —
+ * the editor is done — and wrong for every other reason to save. The แฟ้ม
+ * editor also saves on the way to the โจทย์ editor, so that a draft is not
+ * thrown away by leaving; a redirect there would land the teacher on the
+ * คลังแฟ้ม instead of on the โจทย์ they clicked. Same write, no redirect, and
+ * an answer the caller can act on.
+ */
+export async function saveQuestionSet(id: string, data: QuestionSetData) {
+  return writeQuestionSet(id, data)
+}
+
 export async function updateQuestionSet(id: string, data: QuestionSetData) {
+  const result = await writeQuestionSet(id, data)
+  if ('error' in result) return result
+  redirect('/questions/sets')
+}
+
+/** The write both of the above share. Not an action — module-private. */
+async function writeQuestionSet(id: string, data: QuestionSetData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
@@ -128,7 +149,8 @@ export async function updateQuestionSet(id: string, data: QuestionSetData) {
   await syncQuestionSetShares(supabase, id, extraShares)
 
   revalidatePath('/questions/sets')
-  redirect('/questions/sets')
+  revalidatePath(`/questions/sets/${id}/edit`)
+  return { ok: true as const }
 }
 
 /**

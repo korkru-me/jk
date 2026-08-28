@@ -275,23 +275,17 @@
     "control": 0,
     "button": 0
   },
-  "app/(app)/questions/_components/preview-modal.tsx": {
-    "palette": 3,
-    "card": 0,
-    "control": 0,
-    "button": 2
-  },
   "app/(app)/questions/_components/question-bank-client.tsx": {
     "palette": 0,
     "card": 0,
     "control": 0,
     "button": 13
   },
-  "app/(app)/questions/_components/question-card.tsx": {
-    "palette": 2,
+  "app/(app)/questions/sets/_components/library-question-card.tsx": {
+    "palette": 0,
     "card": 0,
     "control": 0,
-    "button": 3
+    "button": 1
   },
   "app/(app)/questions/sets/_components/question-sets-client.tsx": {
     "palette": 0,
@@ -551,6 +545,18 @@
     "control": 0,
     "button": 4
   },
+  "components/questions/preview-modal.tsx": {
+    "palette": 3,
+    "card": 0,
+    "control": 0,
+    "button": 2
+  },
+  "components/questions/question-card.tsx": {
+    "palette": 2,
+    "card": 0,
+    "control": 0,
+    "button": 3
+  },
   "components/questions/question-file-upload.tsx": {
     "palette": 0,
     "card": 0,
@@ -642,6 +648,12 @@
     "button": 6
   },
   "components/questions/random-numeric/var-chip.tsx": {
+    "palette": 0,
+    "card": 0,
+    "control": 0,
+    "button": 1
+  },
+  "components/questions/set-question-list.tsx": {
     "palette": 0,
     "card": 0,
     "control": 0,
@@ -754,11 +766,5 @@
     "card": 0,
     "control": 0,
     "button": 5
-  },
-  "app/(app)/questions/sets/_components/library-question-card.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 1
   }
 }

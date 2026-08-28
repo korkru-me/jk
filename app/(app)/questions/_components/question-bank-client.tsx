@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { QuestionCard } from './question-card'
+import { QuestionCard } from '@/components/questions/question-card'
 import { QuestionSetBadges, type QuestionSetRef } from '@/components/questions/question-set-badges'
 import { Pagination } from '@/components/ui/pagination'
 import {
@@ -21,7 +21,7 @@ import {
   SearchGroupSelector,
 } from '@/components/questions/question-search-groups'
 import { QuestionSortControl } from '@/components/questions/question-sort-control'
-import { SubQuestionCountBadge } from './sub-question-count-badge'
+import { SubQuestionCountBadge } from '@/components/questions/sub-question-count-badge'
 import { Card } from '@/components/ui/card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import type { QuestionStats } from '@/lib/question-stats'
@@ -53,7 +53,7 @@ import {
 } from '@/lib/question-sort'
 
 const PreviewModal = dynamic(
-  () => import('./preview-modal').then(mod => mod.PreviewModal),
+  () => import('@/components/questions/preview-modal').then(mod => mod.PreviewModal),
   { loading: () => <PreviewLoadingOverlay /> }
 )
 
