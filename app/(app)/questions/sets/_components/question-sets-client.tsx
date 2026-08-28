@@ -18,13 +18,7 @@ import {
   DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { parseSections } from '@/lib/question-set-sections'
-import { LibraryPanel } from './library-panel'
-import type { QuestionSetRef } from '@/components/questions/question-set-badges'
-import type { QuestionSearchScope } from '@/lib/question-search'
-import type { QuestionSort } from '@/lib/question-sort'
 import type {
-  LibraryResult,
-  LibraryScope,
   QuestionSetSummary,
   QuestionSetSummaryWithCreator,
 } from '../page'
@@ -34,29 +28,20 @@ interface Props {
   mySets: QuestionSetSummary[]
   teamSets: QuestionSetSummaryWithCreator[]
   currentUserId: string
-  /** One page of the โจทย์ browser at the foot of the page. */
-  library: LibraryResult
-  libraryScope: LibraryScope
-  librarySearch: string
-  libraryMatch: QuestionSearchScope
-  librarySort: QuestionSort
-  unfiledPerPage: number
-  /** How many โจทย์ are in no แฟ้ม at all, whatever the browser is showing. */
-  unfiledTotal: number
-  /** The whole คลัง of this teacher, for the "N จาก M" line. */
-  ownQuestionTotal: number
-  /** ข้อย่อย per question id, for the cards on this page. */
-  subQuestionCounts: Record<string, number>
-  /** question id → every แฟ้ม holding it. */
-  setMemberships: Record<string, QuestionSetRef[]>
-  /** Tags already in the คลัง, offered when adding one from a card. */
-  allTags: string[]
+  /**
+   * The โจทย์ browser at the foot of the page, handed over already rendered.
+   *
+   * It arrives as a slot rather than as data because it is the slow half of
+   * this page and the แฟ้ม above it are the fast half. Kept as props, every
+   * แฟ้ม card waited for a list of โจทย์ nobody had scrolled to yet; as a slot
+   * the server can stream it in behind its own Suspense boundary while the
+   * แฟ้ม are already on screen.
+   */
+  libraryPanel: React.ReactNode
 }
 
 export function QuestionSetsClient({
-  mySets, teamSets, currentUserId, library, libraryScope, librarySearch, libraryMatch,
-  librarySort, unfiledPerPage, unfiledTotal, ownQuestionTotal, subQuestionCounts,
-  setMemberships, allTags,
+  mySets, teamSets, currentUserId, libraryPanel,
 }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -72,34 +57,6 @@ export function QuestionSetsClient({
 
   const filteredMine = useMemo(() => mySets.filter(matches), [mySets, search])
   const filteredTeam = useMemo(() => teamSets.filter(matches), [teamSets, search])
-
-  // Filing targets are the teacher's own แฟ้ม: a แฟ้ม the team shared is
-  // read-only to everyone but its creator, in RLS as well as in the UI.
-  const filingTargets = useMemo(
-    () => mySets.map(set => ({
-      id: set.id,
-      title: set.title,
-      questionCount: set.valid_question_count ?? set.question_ids.length,
-    })),
-    [mySets],
-  )
-
-  const libraryPanel = (
-    <LibraryPanel
-      library={library}
-      scope={libraryScope}
-      search={librarySearch}
-      match={libraryMatch}
-      sort={librarySort}
-      perPage={unfiledPerPage}
-      unfiledTotal={unfiledTotal}
-      ownQuestionTotal={ownQuestionTotal}
-      sets={filingTargets}
-      setMemberships={setMemberships}
-      allTags={allTags}
-      subQuestionCounts={subQuestionCounts}
-    />
-  )
 
   return (
     <div className="space-y-4 max-w-[1200px]">

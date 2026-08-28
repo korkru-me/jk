@@ -1,4 +1,8 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { Card } from '@/components/ui/card'
+import { LibraryPanel } from './_components/library-panel'
+import type { FilingTarget } from './_components/library-panel'
 import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import { QuestionSetsClient } from './_components/question-sets-client'
@@ -464,11 +468,6 @@ export default async function QuestionSetsPage({
     }
   }
 
-  // A typed query has to resolve its words against the tags that exist before
-  // it can reach one (`ov` matches whole array elements), and the same list is
-  // what the แท็ก chips offer. Read once, started at the top, used for both.
-  const allTags = await allTagsPromise
-
   const scopeParam = one('qscope')
   const scope: LibraryScope = scopeParam === 'all'
     ? { kind: 'all' }
@@ -476,37 +475,123 @@ export default async function QuestionSetsPage({
       ? { kind: 'set', setId: scopeParam }
       : { kind: 'unfiled' }
 
-  // The แฟ้ม cards' "how many of these โจทย์ still exist" and the โจทย์ list
-  // need nothing from each other, so they go out together.
-  const [allSets, library] = await Promise.all([
-    withValidCounts(supabase, rawSets),
-    fetchLibraryPage(
-      supabase, user.id, { ...libraryQueryBase, scope }, filedIds, setMemberIds, allTags,
-      ownQuestionError ? null : ownQuestionIds,
-    ),
-  ])
+  // Started here, not inside the Suspense boundary below: streaming decides
+  // *when the reader sees* the โจทย์ list, and this decides when the database
+  // is asked for it. Kicking it off before the แฟ้ม counts are awaited keeps
+  // the two halves of the page overlapping the way they did before the split.
+  const libraryDataPromise = loadLibraryData(
+    supabase, user.id, { ...libraryQueryBase, scope }, filedIds, setMemberIds,
+    ownQuestionError ? null : ownQuestionIds, allTagsPromise,
+  )
+
+  const allSets = await withValidCounts(supabase, rawSets)
   const mySets = allSets.slice(0, mySetsRaw.length)
   const teamSets = allSets.slice(mySetsRaw.length)
 
-  // Only the 24 cards actually on screen need a ข้อย่อย count.
-  const subQuestionCounts = await fetchSubQuestionCounts(supabase, library.questions)
+  // Filing targets are the teacher's own แฟ้ม: a แฟ้ม the team shared is
+  // read-only to everyone but its creator, in RLS as well as in the UI.
+  const filingTargets: FilingTarget[] = mySets.map(set => ({
+    id: set.id,
+    title: set.title,
+    questionCount: set.valid_question_count ?? set.question_ids.length,
+  }))
 
   return (
     <QuestionSetsClient
       mySets={mySets}
       teamSets={teamSets}
       currentUserId={user.id}
+      libraryPanel={
+        <Suspense fallback={<LibraryPanelSkeleton />}>
+          <LibrarySection
+            dataPromise={libraryDataPromise}
+            query={{ ...libraryQueryBase, scope }}
+            filedIds={filedIds}
+            setMemberships={setMemberships}
+            filingTargets={filingTargets}
+            ownQuestionIds={ownQuestionError ? null : ownQuestionIds}
+          />
+        </Suspense>
+      }
+    />
+  )
+}
+
+/**
+ * The โจทย์ browser at the foot of the page, read after the แฟ้ม are on screen.
+ *
+ * Everything above it — the แฟ้ม, their counts, their แฟ้มย่อย — is answered by
+ * three round trips. This is answered by three more, and it used to be in front
+ * of the first paint even though a reader has to scroll past every แฟ้ม to
+ * reach it. Behind its own Suspense boundary the two halves no longer wait for
+ * each other: the แฟ้ม render as soon as they are known, and this streams in
+ * underneath.
+ */
+/** The reads behind the browser, as one promise the boundary can wait on. */
+async function loadLibraryData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  query: LibraryQuery,
+  filedIds: Set<string>,
+  setMemberIds: Map<string, Set<string>>,
+  ownQuestionIds: string[] | null,
+  tagsPromise: Promise<string[]>,
+) {
+  const allTags = await tagsPromise
+  const library = await fetchLibraryPage(
+    supabase, userId, query, filedIds, setMemberIds, allTags, ownQuestionIds,
+  )
+  // Only the 24 cards actually on screen need a ข้อย่อย count.
+  const subQuestionCounts = await fetchSubQuestionCounts(supabase, library.questions)
+  return { allTags, library, subQuestionCounts }
+}
+
+async function LibrarySection({
+  dataPromise, query, filedIds, setMemberships, filingTargets, ownQuestionIds,
+}: {
+  dataPromise: ReturnType<typeof loadLibraryData>
+  query: LibraryQuery
+  filedIds: Set<string>
+  setMemberships: Record<string, QuestionSetRef[]>
+  filingTargets: FilingTarget[]
+  /** null when the id read failed; the list then asks for them itself. */
+  ownQuestionIds: string[] | null
+}) {
+  const { allTags, library, subQuestionCounts } = await dataPromise
+
+  return (
+    <LibraryPanel
       library={library}
-      libraryScope={scope}
-      librarySearch={libraryQueryBase.search}
-      libraryMatch={libraryQueryBase.match}
-      librarySort={libraryQueryBase.sort}
-      unfiledPerPage={UNFILED_PER_PAGE}
-      unfiledTotal={ownQuestionIds.filter(id => !filedIds.has(id)).length}
-      ownQuestionTotal={ownQuestionIds.length}
-      subQuestionCounts={subQuestionCounts}
+      scope={query.scope}
+      search={query.search}
+      match={query.match}
+      sort={query.sort}
+      perPage={UNFILED_PER_PAGE}
+      unfiledTotal={(ownQuestionIds ?? []).filter(id => !filedIds.has(id)).length}
+      ownQuestionTotal={(ownQuestionIds ?? []).length}
+      sets={filingTargets}
       setMemberships={setMemberships}
       allTags={allTags}
+      subQuestionCounts={subQuestionCounts}
     />
+  )
+}
+
+/** Holds the โจทย์ browser's place while it is being read. */
+function LibraryPanelSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse" aria-label="กำลังโหลดรายการโจทย์">
+      <div className="h-5 w-40 rounded bg-muted" />
+      <div className="h-8 w-72 rounded-lg bg-muted" />
+      <div className="h-10 w-full max-w-sm rounded-lg bg-muted" />
+      <div className="grid grid-cols-1 gap-3">
+        {[0, 1, 2].map(row => (
+          <Card key={row} edge="ring" className="p-4 space-y-2">
+            <div className="h-5 w-48 rounded-full bg-muted" />
+            <div className="h-4 w-3/4 rounded bg-muted" />
+          </Card>
+        ))}
+      </div>
+    </div>
   )
 }
