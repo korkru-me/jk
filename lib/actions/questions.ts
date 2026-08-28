@@ -8,6 +8,7 @@ import { getMyTeamOrgs } from '@/lib/actions/team-org'
 import { dedupeTags } from '@/lib/tag-suggest'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
+import { releaseQuestionFiles } from '@/lib/storage-release'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
 import { safeQuestionsRedirect } from '@/lib/question-return'
 
@@ -336,6 +337,16 @@ export async function deleteQuestion(id: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
+  // Read before deleting: once the row is gone there is nothing left to say
+  // which pictures belonged to it, and they would sit in Storage forever.
+  const { data: doomed } = await supabase
+    .from('questions')
+    .select('*')
+    .eq('id', id)
+    .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('questions')
     .delete()
@@ -344,6 +355,10 @@ export async function deleteQuestion(id: string) {
     .eq('is_research_snapshot', false)
 
   if (error) return { error: error.message }
+
+  // After the delete, so the โจทย์ being removed does not count as a reference
+  // to its own images. Anything a duplicate still points at survives.
+  if (doomed) await releaseQuestionFiles(supabase, user.id, [doomed])
 
   revalidatePath('/questions')
 }

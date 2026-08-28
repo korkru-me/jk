@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { resolveOrgId } from '@/lib/actions/questions'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
+import { releaseQuestionFiles } from '@/lib/storage-release'
 import type { Variable, Difficulty, Visibility } from '@/lib/types'
 import { RETURN_PARAM } from '@/lib/question-return'
 
@@ -208,8 +209,17 @@ export async function deleteQuestionGroup(groupId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  // Every row in the group, read before the delete — a group's pictures are
+  // spread across the parent and its ข้อย่อย.
+  const { data: doomed } = await supabase
+    .from('questions').select('*').eq('group_id', groupId).eq('created_by', user.id)
+
   const { error } = await supabase
     .from('questions').delete().eq('group_id', groupId).eq('created_by', user.id)
   if (error) return { error: error.message }
+
+  if (doomed && doomed.length > 0) await releaseQuestionFiles(supabase, user.id, doomed)
+
   revalidatePath('/questions')
 }
