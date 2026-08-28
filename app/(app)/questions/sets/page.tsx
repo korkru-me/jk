@@ -429,16 +429,17 @@ export default async function QuestionSetsPage({
     teamSetsRaw = [...byId.values()]
   }
 
-  // Validate every referenced question in one query. The previous two calls
-  // could request the same question ids twice when a set was also team-shared.
-  const allSets = await withValidCounts(supabase, [...mySetsRaw, ...teamSetsRaw])
-  const mySets = allSets.slice(0, mySetsRaw.length)
-  const teamSets = allSets.slice(mySetsRaw.length)
+  const rawSets = [...mySetsRaw, ...teamSetsRaw]
 
   // Filed = held by any แฟ้ม this page shows, the teacher's own and the team's
   // alike: a โจทย์ a colleague put in a shared แฟ้ม has a home, and listing it
   // as unfiled would send the teacher looking for one it already has.
-  const filedIds = new Set(allSets.flatMap(set => set.question_ids))
+  //
+  // Read off the rows as they arrived. Validation below only *adds* a count to
+  // each แฟ้ม; it never edits `question_ids`, so nothing here has to wait for
+  // it — and waiting is what it used to do, putting a whole round trip in front
+  // of the โจทย์ list for a number only the แฟ้ม cards read.
+  const filedIds = new Set(rawSets.flatMap(set => set.question_ids))
   const { rows: ownQuestionRows, error: ownQuestionError } = await ownQuestionIdsPromise
   if (ownQuestionError) {
     console.error('[questions/sets/page] own question id query failed:', ownQuestionError)
@@ -449,10 +450,10 @@ export default async function QuestionSetsPage({
   // browser filters by membership, and the cards name the แฟ้ม a question is
   // already in. No further query: `question_ids` is right here.
   const setMemberIds = new Map<string, Set<string>>(
-    allSets.map(set => [set.id, new Set(set.question_ids)]),
+    rawSets.map(set => [set.id, new Set(set.question_ids)]),
   )
   const setMemberships: Record<string, QuestionSetRef[]> = {}
-  for (const set of allSets) {
+  for (const set of rawSets) {
     const ref: QuestionSetRef = {
       id: set.id,
       title: set.title,
@@ -475,10 +476,17 @@ export default async function QuestionSetsPage({
       ? { kind: 'set', setId: scopeParam }
       : { kind: 'unfiled' }
 
-  const library = await fetchLibraryPage(
-    supabase, user.id, { ...libraryQueryBase, scope }, filedIds, setMemberIds, allTags,
-    ownQuestionError ? null : ownQuestionIds,
-  )
+  // The แฟ้ม cards' "how many of these โจทย์ still exist" and the โจทย์ list
+  // need nothing from each other, so they go out together.
+  const [allSets, library] = await Promise.all([
+    withValidCounts(supabase, rawSets),
+    fetchLibraryPage(
+      supabase, user.id, { ...libraryQueryBase, scope }, filedIds, setMemberIds, allTags,
+      ownQuestionError ? null : ownQuestionIds,
+    ),
+  ])
+  const mySets = allSets.slice(0, mySetsRaw.length)
+  const teamSets = allSets.slice(mySetsRaw.length)
 
   // Only the 24 cards actually on screen need a ข้อย่อย count.
   const subQuestionCounts = await fetchSubQuestionCounts(supabase, library.questions)
