@@ -1,7 +1,10 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { Camera, Loader2, X } from 'lucide-react'
+import { downscaleImage } from '@/lib/image-downscale'
+import { uploadErrorMessage } from '@/lib/upload-error'
 
 // Loaded on demand rather than imported at the top: @supabase/supabase-js is
 // ~220 KB, and a student only needs it at the moment they attach a file. The
@@ -10,6 +13,9 @@ async function browserSupabase() {
   const { createClient } = await import('@/lib/supabase/client')
   return createClient()
 }
+
+/** The `work-images` bucket's ceiling, set in its creating migration. */
+const WORK_IMAGE_MAX_MB = 5
 
 interface WorkImageUploadProps {
   value: string | null
@@ -25,14 +31,21 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const original = e.target.files?.[0]
+    if (!original) return
 
     setUploading(true)
     const supabase = await browserSupabase()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setUploading(false); return }
 
+    // The one upload in the app that is genuinely time-critical: the input
+    // above opens the phone camera, so this is a full-resolution photo of a
+    // page of working, and it is being pushed up during a timed exam on
+    // whatever the school's connection happens to be. Shrinking first turns
+    // several megabytes into a few hundred kilobytes, and the handwriting is
+    // still readable at 1600px.
+    const file = await downscaleImage(original)
     const previous = value
     const ext = file.name.split('.').pop() ?? 'jpg'
     const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
@@ -40,7 +53,9 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
       .from('work-images')
       .upload(path, file, { upsert: false })
 
-    if (!error) {
+    if (error) {
+      toast.error(uploadErrorMessage(error.message, undefined, WORK_IMAGE_MAX_MB))
+    } else {
       const { data: { publicUrl } } = supabase.storage
         .from('work-images')
         .getPublicUrl(path)

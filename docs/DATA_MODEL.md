@@ -138,6 +138,17 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 
 โค้ดมีการใช้รูปโจทย์ รูปเฉลย รูปวิธีทำ และไฟล์ส่งงาน ก่อนเปลี่ยน upload flow ต้องตรวจ bucket policy, MIME type, file size, ownership, signed/public URL และการลบไฟล์ orphan
 
+| bucket | ลิมิต | ชนิดที่รับ | ใครเขียน |
+| --- | --- | --- | --- |
+| `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์) และ `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้) |
+| `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย |
+| `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน |
+
+- ทั้งสาม bucket เป็น public-read และเก็บไฟล์ใต้ `{auth.uid()}/...` โดย `work-images`/`submission-files` มี RLS จำกัดให้เขียน/ลบได้เฉพาะโฟลเดอร์ของตัวเอง
+- **`question-images` เคยไม่มีลิมิตและไม่จำกัดชนิดไฟล์เลย** ทั้งที่ UI เขียนว่า "สูงสุด 5 MB" เพราะเป็น bucket เดียวที่ถูกสร้างจากหน้า dashboard ก่อนโปรเจกต์ใช้ CLI — migration `20260828073436` ตั้งค่าให้ตรงกับอีกสองตัว (ลิมิตเป็น 10 MB ไม่ใช่ 5 เพราะ widget ไฟล์แนบโฆษณา 10 MB ไว้ และ PDF ย่อไม่ได้)
+- **รูปถูกย่อในเบราว์เซอร์ก่อนอัปโหลดเสมอ** (`lib/image-downscale.ts`) ลิมิตของ bucket เป็นแค่ตาข่ายรับ ไม่ใช่ทางเดินปกติ
+- ยังไม่มีระบบเก็บกวาดไฟล์กำพร้า: ครูอัปรูปแล้วปิดหน้าโดยไม่บันทึกโจทย์ ไฟล์นั้นค้างถาวร (ตอนกดลบรูปในฟอร์มลบให้จริง)
+
 ## กฎการเปลี่ยน schema
 
 1. ตรวจ migration history และ schema ของฐานข้อมูลเป้าหมาย
