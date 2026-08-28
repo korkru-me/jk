@@ -1086,7 +1086,7 @@ function MCQInput({
               <div className={`flex-1 min-w-0 flex items-center gap-2 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
                 {opt.image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={opt.image_url} alt="" className="max-h-28 w-auto object-contain rounded border shrink-0" />
+                  <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-28 w-auto object-contain rounded border shrink-0" />
                 )}
                 {/* A picture-only option carries the choice letter as its text
                     (the answer's identity is opt.text, so it can't be blank) —
@@ -1494,7 +1494,7 @@ function MatchingAnswerInput({ prompts, options, rawValue, onChange }: {
           <Card radius="md" className="flex items-center gap-3 p-2.5" key={i}>
             {prompt.left_image && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={prompt.left_image} alt="" className="w-12 h-12 object-contain rounded border shrink-0" />
+              <img src={prompt.left_image} alt="" loading="lazy" decoding="async" className="w-12 h-12 object-contain rounded border shrink-0" />
             )}
             <span className="flex-1 min-w-0 text-sm"><RichText text={prompt.left_text ?? ''} /></span>
             <NativeSelect
@@ -1550,7 +1550,7 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
           <Card radius="md" className="flex items-center gap-3 p-2.5" key={item.id}>
             {item.image_url && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border flex-shrink-0" />
+              <img src={item.image_url} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border flex-shrink-0" />
             )}
             <span className="flex-1 text-sm">{item.text}</span>
             <NativeSelect value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)} className="w-20 text-center">

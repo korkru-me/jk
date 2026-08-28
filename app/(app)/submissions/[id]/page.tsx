@@ -553,7 +553,7 @@ function AnswerReview({
             >
               {pair?.left_image && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={pair.left_image} alt="" className="w-10 h-10 object-contain rounded border shrink-0" />
+                <img src={pair.left_image} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border shrink-0" />
               )}
               <span className="text-sm flex-1 min-w-0">{pair?.left_text ?? `ข้อ ${i + 1}`}</span>
               <span className={`text-sm font-medium shrink-0 ${ok ? 'text-success' : 'text-destructive'}`}>
@@ -610,7 +610,7 @@ function AnswerReview({
               <span className={`text-sm font-bold shrink-0 w-5 ${labelClass}`}>{CHOICE_LABELS[i]}</span>
               {opt.image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={opt.image_url} alt="" className="max-h-24 w-auto object-contain rounded border shrink-0" />
+                <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-24 w-auto object-contain rounded border shrink-0" />
               )}
               {opt.text !== CHOICE_LABELS[i] && (
                 <span className={`text-sm flex-1 ${isCorrectOpt || (isStudentChoice && !isCorrectOpt) ? 'font-medium ' + labelClass : 'text-foreground'}`}>
@@ -645,7 +645,7 @@ function AnswerReview({
               f.type.startsWith('image/') ? (
                 <a key={i} href={f.url} target="_blank" rel="noopener noreferrer">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={f.name} className="w-20 h-20 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
+                  <img src={f.url} alt={f.name} loading="lazy" decoding="async" className="w-20 h-20 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
                 </a>
               ) : (
                 <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
@@ -866,7 +866,7 @@ function WorkImageThumbnail({ url }: { url?: string | null }) {
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="inline-block mt-1">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="รูปวิธีทำ" className="w-24 h-24 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
+      <img src={url} alt="รูปวิธีทำ" loading="lazy" decoding="async" className="w-24 h-24 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
     </a>
   )
 }
