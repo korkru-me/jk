@@ -13,7 +13,9 @@ import {
   type QuestionSearchGroupCounts,
   type QuestionSearchScope,
 } from '@/lib/question-search'
-import { applyQuestionSort, readQuestionSort, type QuestionSort } from '@/lib/question-sort'
+import {
+  applyQuestionSort, DEFAULT_QUESTION_SORT, readQuestionSort, type QuestionSort,
+} from '@/lib/question-sort'
 import type { QuestionSetRef } from '@/components/questions/question-set-badges'
 import type { Question, QuestionSet } from '@/lib/types'
 
@@ -122,6 +124,20 @@ async function fetchLibraryPage(
   filedIds: Set<string>,
   setMemberIds: Map<string, Set<string>>,
   tagUniverse: string[],
+  /**
+   * Every โจทย์ id of this teacher's, newest first — the list the page has
+   * already read for its "ยังไม่อยู่ในแฟ้มใด" count.
+   *
+   * Unsearched and in the default order, that read and this one are the same
+   * query down to the tiebreak, so the คลัง's ids were being walked twice on
+   * every visit to a page that opens in exactly that state. Handed over, the
+   * common case costs no id query at all.
+   *
+   * `null` when that read failed. Its own caller only loses a count to such a
+   * failure, and the browser should not lose its whole list to it as well —
+   * so the list falls back to asking for the ids itself.
+   */
+  defaultOrderIds: string[] | null,
 ): Promise<LibraryResult> {
   const searchSpec = query.search
     ? questionSearchGroupFilters(query.search, tagUniverse)
@@ -160,9 +176,14 @@ async function fetchLibraryPage(
     return setMemberIds.get(query.scope.setId)?.has(id) ?? false
   }
 
+  /** Whether `defaultOrderIds` is already in the order being asked for. */
+  const isDefaultOrder = query.sort.key === DEFAULT_QUESTION_SORT.key
+    && query.sort.dir === DEFAULT_QUESTION_SORT.dir
+
   /** Every id this scope and group hold, in the reader's chosen order. */
   async function scopedIds(group?: QuestionSearchGroup): Promise<string[]> {
     if (group === 'tag' && searchSpec && searchSpec.matchingTags.length === 0) return []
+    if (!searchSpec && isDefaultOrder && defaultOrderIds) return defaultOrderIds.filter(inScope)
     const { rows, error } = await fetchAllRows<{ id: string }>((from, to) =>
       applyQuestionSort(buildIdQuery(group), query.sort)
         .range(from, to) as unknown as PromiseLike<{ data: { id: string }[] | null; error: unknown }>)
@@ -333,6 +354,16 @@ export default async function QuestionSetsPage({
     // missing list.
     .catch((error: unknown) => ({ rows: [] as { id: string }[], error }))
 
+  // The แท็ก universe depends on nothing this page reads, and it is not fast:
+  // it used to be awaited after the แฟ้ม queries had already finished, adding
+  // its whole round trip to the page rather than overlapping them. Started
+  // here, it is almost always resolved by the time anything needs it.
+  const allTagsPromise = fetchOwnTags(supabase)
+    .catch((error: unknown) => {
+      console.error('[questions/sets/page] tag query failed:', error)
+      return [] as string[]
+    })
+
   const [profileResult, mySetsResult, membershipResult] = await Promise.all([
     supabase.from('users').select('role').eq('id', user.id).single(),
     supabase
@@ -434,8 +465,8 @@ export default async function QuestionSetsPage({
 
   // A typed query has to resolve its words against the tags that exist before
   // it can reach one (`ov` matches whole array elements), and the same list is
-  // what the แท็ก chips offer. Read once, used for both.
-  const allTags = await fetchOwnTags(supabase)
+  // what the แท็ก chips offer. Read once, started at the top, used for both.
+  const allTags = await allTagsPromise
 
   const scopeParam = one('qscope')
   const scope: LibraryScope = scopeParam === 'all'
@@ -446,6 +477,7 @@ export default async function QuestionSetsPage({
 
   const library = await fetchLibraryPage(
     supabase, user.id, { ...libraryQueryBase, scope }, filedIds, setMemberIds, allTags,
+    ownQuestionError ? null : ownQuestionIds,
   )
 
   // Only the 24 cards actually on screen need a ข้อย่อย count.
