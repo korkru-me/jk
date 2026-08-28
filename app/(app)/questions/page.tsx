@@ -706,18 +706,37 @@ export default async function QuestionsPage({
     return { myTeams, teamQuestions, teamTotal, teamPaged, teamSearchGroups, teamSearchGroupCounts }
   }
 
-  const [ownResult, teamContext, { count: unfilteredTotal }, allTags] = await Promise.all([
+  /**
+   * Whether anything is narrowing the list — a search, a filter, a tag chip.
+   *
+   * When nothing is, the list's own count *is* the whole คลัง, and the badge
+   * query below asks the database the identical question a second time. Both
+   * are exact counts over every row a teacher owns, which is the most
+   * expensive thing this page does; running one of them twice on the view the
+   * tab opens in was pure duplication.
+   */
+  const narrowed = !!filters.q
+    || filters.type !== 'all'
+    || filters.difficulty !== 'all'
+    || !!filters.tag
+
+  const [ownResult, teamContext, narrowedTotal, allTags] = await Promise.all([
     loadOwnQuestions(),
     loadTeamContext(),
-    // The tab badge counts the whole bank, not the filtered slice.
-    supabase
-      .from('questions')
-      .select('id', { count: 'exact', head: true })
-      .eq('created_by', userId)
-      .eq('is_research_snapshot', false)
-      .or('group_id.is.null,order_in_group.eq.0'),
+    // The tab badge counts the whole bank, not the filtered slice — so it is
+    // only worth its own round trip once the two differ.
+    narrowed
+      ? supabase
+          .from('questions')
+          .select('id', { count: 'exact', head: true })
+          .eq('created_by', userId)
+          .eq('is_research_snapshot', false)
+          .or('group_id.is.null,order_in_group.eq.0')
+          .then(result => result.count ?? 0)
+      : Promise.resolve(null),
     ownTagsPromise,
   ])
+  const unfilteredTotal = narrowedTotal ?? ownResult.total
 
   const { myTeams, teamQuestions, teamTotal, teamPaged, teamSearchGroups, teamSearchGroupCounts } = teamContext
 
@@ -747,7 +766,7 @@ export default async function QuestionsPage({
       matchCount={ownResult.total}
       searchGroups={ownResult.groups}
       searchGroupCounts={ownResult.groupCounts}
-      totalCount={unfilteredTotal ?? 0}
+      totalCount={unfilteredTotal}
       duplicateCounts={duplicateCounts}
       subQuestionCounts={subQuestionCounts}
       setMemberships={setMemberships}
