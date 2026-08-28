@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, X, Layers, Search,
+  Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, X, Layers, Search, Eye, Edit2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
@@ -25,21 +25,49 @@ import {
   removeQuestionsFromSet, sectionsByQuestionId, ungroupedQuestionIds,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
+import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import { getQuestionClientDetail } from '@/lib/actions/questions'
+import { getQuestionCardData } from '@/lib/actions/question-card-data'
+import { questionEditHref, RETURN_SET_PARAM } from '@/lib/question-return'
+import { SetQuestionList, type SetListQuestion } from './set-question-list'
+import type { QuestionDetailWithCategory as PreviewQuestion } from './preview-modal'
 
-export interface PanelQuestion {
-  id: string
-  title: string
-  question_text?: string | null
-}
+const PreviewModal = dynamic(
+  () => import('./preview-modal').then(mod => mod.PreviewModal),
+  { ssr: false },
+)
+import type { QuestionCardData } from '@/lib/question-card-data'
+import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
+
+/**
+ * A โจทย์ as this panel receives it.
+ *
+ * Wider than the titles the แฟ้มย่อย dialog used to need, because the list
+ * below now draws the คลังโจทย์ card: ระดับ, ชนิด and แท็ก come straight from
+ * the picker's own rows, and only what neither has — วิชา, หมวดหมู่, สถิติ —
+ * is fetched per screenful. See SetQuestionList.
+ */
+export type PanelQuestion = SetListQuestion
 
 interface Props {
-  /** Every question the picker knows about — used for titles only. */
+  /** Every question the picker knows about. */
   questions: PanelQuestion[]
   questionIds: string[]
   sections: QuestionSetSection[]
   onChange: (next: { questionIds: string[]; sections: QuestionSetSection[] }) => void
   /** Opens the คลังโจทย์ picker. It only ever adds to the แฟ้ม itself. */
   onAddQuestions: () => void
+  /** Tags across the คลัง, offered by the in-card tag editor. */
+  allTags: string[]
+  /** Teams a โจทย์ can be shared to from its card. */
+  myTeams: { id: string; name: string }[]
+  /** The แฟ้ม's id, absent while it is still being created. */
+  setId?: string
+  /** Writes the แฟ้ม draft down before a card leaves for the โจทย์ editor. */
+  onSaveBeforeEdit?: () => Promise<boolean>
+  /** Card data for the แฟ้ม's first page, fetched with the page. */
+  initialCardData?: QuestionCardData
 }
 
 const UNNAMED = 'แฟ้มย่อยที่ยังไม่ตั้งชื่อ'
@@ -74,7 +102,10 @@ function namesPreview(ids: readonly string[], byId: Map<string, PanelQuestion>):
  * Reordering is buttons, not drag-and-drop: teachers arrange sets on phones
  * too, and a drag target that small is unusable there.
  */
-export function SetStructurePanel({ questions, questionIds, sections, onChange, onAddQuestions }: Props) {
+export function SetStructurePanel({
+  questions, questionIds, sections, onChange, onAddQuestions,
+  allTags, myTeams, setId, onSaveBeforeEdit, initialCardData,
+}: Props) {
   // The แฟ้มย่อย whose dialog is open — an id, or NEW_SECTION while creating.
   const [dialogSectionId, setDialogSectionId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string[]>([])
@@ -84,6 +115,13 @@ export function SetStructurePanel({ questions, questionIds, sections, onChange, 
 
   const byId = useMemo(() => new Map(questions.map(q => [q.id, q])), [questions])
   const owners = useMemo(() => sectionsByQuestionId(sections), [sections])
+  const sectionTitlesById = useMemo(() => {
+    const titles = new Map<string, string[]>()
+    for (const [id, sectionsHere] of owners) {
+      titles.set(id, sectionsHere.map(section => section.title || UNNAMED))
+    }
+    return titles
+  }, [owners])
   const loose = ungroupedQuestionIds(sections, questionIds)
   const grouped = questionIds.length - loose.length
   const isNewSection = dialogSectionId === NEW_SECTION
@@ -177,14 +215,13 @@ export function SetStructurePanel({ questions, questionIds, sections, onChange, 
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
               {sections.map((section, index) => (
                 <SectionCard
                   key={section.id}
                   section={section}
                   index={index}
                   total={sections.length}
-                  byId={byId}
                   onOpen={() => setDialogSectionId(section.id)}
                   onMove={delta => apply(moveSection(sections, section.id, delta, questionIds))}
                   onDelete={() => setDeleteSectionId(section.id)}
@@ -195,7 +232,7 @@ export function SetStructurePanel({ questions, questionIds, sections, onChange, 
                 type="button"
                 variant="ghost"
                 onClick={() => setDialogSectionId(NEW_SECTION)}
-                className="h-auto min-h-[168px] flex-col gap-2 rounded-2xl border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/[0.03]"
+                className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/[0.03]"
               >
                 <Plus className="w-5 h-5" />
                 <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
@@ -227,92 +264,21 @@ export function SetStructurePanel({ questions, questionIds, sections, onChange, 
             ยังไม่มีโจทย์ในแฟ้มนี้ — กด “เพิ่มโจทย์จากคลัง” เพื่อเลือกโจทย์เข้ามา
           </p>
         ) : (
-          <>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={() => setSelected(allSelected ? [] : [...questionIds])}
-                className="accent-primary"
-              />
-              เลือกทั้งหมด
-            </label>
-
-            <ul className="space-y-0.5">
-              {questionIds.map((id, index) => {
-                const inSections = owners.get(id) ?? []
-                const label = questionLabel(byId.get(id))
-                const isSelected = selected.includes(id)
-
-                return (
-                  <li
-                    key={id}
-                    className={cn(
-                      'group flex items-center gap-2 pl-2 pr-1 py-1.5 rounded-lg transition-colors',
-                      isSelected ? 'bg-primary/[0.06]' : 'hover:bg-muted/50'
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelected(id)}
-                      aria-label={`เลือก ${label}`}
-                      className="accent-primary shrink-0"
-                    />
-                    <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">{index + 1}.</span>
-                    <span className={cn('flex-1 min-w-0 text-sm truncate', byId.has(id) ? 'text-foreground' : 'text-destructive')}>
-                      {label}
-                    </span>
-
-                    {inSections.length > 0 && (
-                      <span className="hidden sm:flex items-center gap-1 shrink-0">
-                        {inSections.slice(0, 2).map(sec => (
-                          <span
-                            key={sec.id}
-                            className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary whitespace-nowrap max-w-[8rem] truncate"
-                          >
-                            {sec.title || UNNAMED}
-                          </span>
-                        ))}
-                        {inSections.length > 2 && (
-                          <span className="text-[11px] text-muted-foreground">+{inSections.length - 2}</span>
-                        )}
-                      </span>
-                    )}
-
-                    {/* Hover-to-reveal only from sm up: on a phone there is no
-                        hover, so controls that hide would be unreachable. */}
-                    <div className="flex items-center shrink-0 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
-                      <IconButton
-                        label="ย้ายขึ้น"
-                        size="2xs"
-                        disabled={index === 0}
-                        onClick={() => apply(moveQuestionInSet(sections, questionIds, id, -1))}
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </IconButton>
-                      <IconButton
-                        label="ย้ายลง"
-                        size="2xs"
-                        disabled={index === questionIds.length - 1}
-                        onClick={() => apply(moveQuestionInSet(sections, questionIds, id, 1))}
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </IconButton>
-                      <IconButton
-                        label="เอาออกจากแฟ้ม"
-                        size="2xs"
-                        className="hover:text-destructive"
-                        onClick={() => setRemoveIds([id])}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </IconButton>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </>
+          <SetQuestionList
+            byId={byId}
+            questionIds={questionIds}
+            sectionTitlesById={sectionTitlesById}
+            selected={selected}
+            onToggleSelected={toggleSelected}
+            onSelectAll={all => setSelected(all ? [...questionIds] : [])}
+            onMove={(id, delta) => apply(moveQuestionInSet(sections, questionIds, id, delta))}
+            onRemove={ids => setRemoveIds(ids)}
+            allTags={allTags}
+            myTeams={myTeams}
+            setId={setId}
+            onSaveBeforeEdit={onSaveBeforeEdit}
+            initialCardData={initialCardData}
+          />
         )}
 
         {selected.length > 0 && (
@@ -339,6 +305,8 @@ export function SetStructurePanel({ questions, questionIds, sections, onChange, 
         byId={byId}
         onCancel={() => setDialogSectionId(null)}
         onConfirm={applySectionDraft}
+        setId={setId}
+        onSaveBeforeEdit={onSaveBeforeEdit}
       />
 
       <ConfirmDialog
@@ -373,24 +341,29 @@ export function SetStructurePanel({ questions, questionIds, sections, onChange, 
   )
 }
 
+/**
+ * One แฟ้มย่อย, as small as it can be and still be recognised.
+ *
+ * It used to print the first two โจทย์ inside it, which read well with three
+ * แฟ้มย่อย and turned the page into a scroll with twenty. What a teacher needs
+ * from this grid is "which แฟ้มย่อย exist and how big is each" — the โจทย์
+ * themselves are one click away, in the dialog that can actually change them.
+ */
 function SectionCard({
-  section, index, total, byId, onOpen, onMove, onDelete,
+  section, index, total, onOpen, onMove, onDelete,
 }: {
   section: QuestionSetSection
   index: number
   total: number
-  byId: Map<string, PanelQuestion>
   onOpen: () => void
   onMove: (delta: number) => void
   onDelete: () => void
 }) {
-  const preview = section.question_ids.slice(0, 2).map(id => questionLabel(byId.get(id)))
-
   return (
     <Card
       edge="ring"
-      padding="md"
-      className="group relative flex flex-col gap-3 min-h-[168px] transition-colors hover:ring-primary/30"
+      padding="sm"
+      className="group relative flex items-center gap-2.5 transition-colors hover:ring-primary/30"
     >
       {/* The whole card opens the แฟ้มย่อย. It is laid over the content, not
           wrapped around it, so the ⋮ menu keeps its own clicks (z-10). */}
@@ -402,51 +375,32 @@ function SectionCard({
         className="absolute inset-0 h-auto rounded-2xl hover:bg-transparent"
       />
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <Folder className="w-4 h-4 text-primary" />
-        </div>
-        <div className="relative z-10">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label="ตัวเลือกแฟ้มย่อย" />}>
-              <MoreVertical className="w-4 h-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={index === 0} onClick={() => onMove(-1)}>ย้ายไปก่อนหน้า</DropdownMenuItem>
-              <DropdownMenuItem disabled={index === total - 1} onClick={() => onMove(1)}>ย้ายไปถัดไป</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={onDelete}>
-                ลบแฟ้มย่อย (โจทย์ยังอยู่ในแฟ้ม)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <Folder className="w-4 h-4 text-primary" />
       </div>
 
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground text-sm truncate transition-colors group-hover:text-primary">
           {section.title || <span className="text-muted-foreground font-medium">{UNNAMED}</span>}
         </p>
-        <p className="text-xs text-muted-foreground mt-1">{section.question_ids.length} ข้อ</p>
-
-        {preview.length > 0 && (
-          <ul className="mt-1.5 space-y-0.5">
-            {preview.map((text, i) => (
-              <li key={i} className="text-[11px] text-muted-foreground truncate">• {text}</li>
-            ))}
-            {section.question_ids.length > preview.length && (
-              <li className="text-[11px] text-muted-foreground">
-                + อีก {section.question_ids.length - preview.length} ข้อ
-              </li>
-            )}
-          </ul>
-        )}
+        <p className="text-xs text-muted-foreground">{section.question_ids.length} ข้อ</p>
       </div>
 
-      <div className="relative z-10 pt-2 border-t border-border">
-        <Button type="button" variant="outline" size="sm" onClick={onOpen} className="w-full gap-1.5">
-          <FolderOpen className="w-3.5 h-3.5" /> เปิดแฟ้มย่อย
-        </Button>
+      <div className="relative z-10 shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label="ตัวเลือกแฟ้มย่อย" />}>
+            <MoreVertical className="w-4 h-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onOpen}>เปิดแฟ้มย่อย</DropdownMenuItem>
+            <DropdownMenuItem disabled={index === 0} onClick={() => onMove(-1)}>ย้ายไปก่อนหน้า</DropdownMenuItem>
+            <DropdownMenuItem disabled={index === total - 1} onClick={() => onMove(1)}>ย้ายไปถัดไป</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+              ลบแฟ้มย่อย (โจทย์ยังอยู่ในแฟ้ม)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </Card>
   )
@@ -463,6 +417,7 @@ function SectionCard({
  */
 function SectionDialog({
   open, isNew, section, sections, questionIds, byId, onCancel, onConfirm,
+  setId, onSaveBeforeEdit,
 }: {
   open: boolean
   isNew: boolean
@@ -472,10 +427,18 @@ function SectionDialog({
   byId: Map<string, PanelQuestion>
   onCancel: () => void
   onConfirm: (title: string, memberIds: string[]) => void
+  /** The แฟ้ม's id, absent while it is still being created. */
+  setId?: string
+  /** Writes the แฟ้ม draft down before leaving for the โจทย์ editor. */
+  onSaveBeforeEdit?: () => Promise<boolean>
 }) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [draftIds, setDraftIds] = useState<string[]>([])
+  const [previewQ, setPreviewQ] = useState<PreviewQuestion | null>(null)
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
+  const [leavingId, setLeavingId] = useState<string | null>(null)
 
   const baselineTitle = section?.title ?? ''
   const baselineIds = useMemo(() => section?.question_ids ?? [], [section])
@@ -495,6 +458,46 @@ function SectionDialog({
   const removed = baselineIds.filter(id => !draftIds.includes(id))
   const titleChanged = draftTitle.trim() !== baselineTitle
   const canConfirm = isNew || added.length > 0 || removed.length > 0 || titleChanged
+
+  /**
+   * Ticking in here is a draft too, and แก้ไข leaves the page.
+   *
+   * Rather than saving the ticks behind the teacher's back — which would
+   * quietly create an unnamed แฟ้มย่อย when they were only browsing — แก้ไข is
+   * simply unavailable until ยืนยัน has settled what this แฟ้มย่อย holds.
+   * ดูตัวอย่าง opens over the dialog and navigates nowhere, so it is always
+   * offered.
+   */
+  const hasPendingChanges = isNew || added.length > 0 || removed.length > 0 || titleChanged
+  const canEditQuestions = !!setId && !!onSaveBeforeEdit
+
+  async function openPreview(id: string) {
+    setPreviewLoadingId(id)
+    const result = await getQuestionClientDetail(id)
+    setPreviewLoadingId(null)
+    if ('error' in result) return
+    setPreviewQ(result.data as unknown as PreviewQuestion)
+  }
+
+  /**
+   * A โจทย์หลายขั้นตอน is edited by its group, not by its row, and nothing in
+   * this dialog knows which rows are one. Asked for the single โจทย์ being
+   * opened, on the click that opens it.
+   */
+  async function editQuestion(id: string) {
+    if (!setId || !onSaveBeforeEdit) return
+    setLeavingId(id)
+    const [data, saved] = await Promise.all([
+      getQuestionCardData([id]),
+      onSaveBeforeEdit(),
+    ])
+    if (!saved) { setLeavingId(null); return }
+    const detail = data.details[id]
+    const path = detail?.order_in_group === 0 && detail.group_id
+      ? `/questions/multi/${detail.group_id}`
+      : `/questions/${id}/edit`
+    router.push(questionEditHref(path, '', { [RETURN_SET_PARAM]: setId }))
+  }
 
   const term = search.trim().toLowerCase()
   const visibleIds = term
@@ -563,42 +566,81 @@ function SectionDialog({
                     const wasMember = baselineIds.includes(id)
                     const pending = isMember && !wasMember ? 'add' : !isMember && wasMember ? 'remove' : null
                     const elsewhere = (owners.get(id) ?? []).filter(s => s.id !== section?.id)
+                    const q = byId.get(id)
 
                     return (
                       <li key={id} className="min-w-0">
-                        <label
+                        <div
                           className={cn(
-                            'flex items-start gap-3 p-2.5 rounded-xl border cursor-pointer transition-colors min-w-0',
+                            'flex items-start gap-3 p-2.5 rounded-xl border transition-colors min-w-0',
                             pending === 'add' ? 'bg-success/10 border-success/30'
                               : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
                               : isMember ? 'bg-primary/10 border-primary/20'
                               : 'border-transparent hover:bg-muted'
                           )}
                         >
-                          <input
-                            type="checkbox"
-                            checked={isMember}
-                            onChange={() => toggle(id)}
-                            className="mt-0.5 accent-primary shrink-0"
-                          />
-                          <span className="flex-1 min-w-0">
-                            <span className="block text-sm text-foreground truncate">
-                              {questionLabel(byId.get(id))}
+                          {/* Ticking is still the whole row, so the target stays
+                              as big as it was — only the two controls on the
+                              right sit outside the label. */}
+                          <label className="flex flex-1 items-start gap-3 min-w-0 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isMember}
+                              onChange={() => toggle(id)}
+                              className="mt-0.5 accent-primary shrink-0"
+                            />
+                            <span className="flex-1 min-w-0">
+                              <span className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                {q && (
+                                  <>
+                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DIFF_META[q.difficulty]?.badge}`}>
+                                      {DIFF_META[q.difficulty]?.label}
+                                    </span>
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                      {TYPE_LABEL[q.question_type] ?? q.question_type}
+                                    </span>
+                                  </>
+                                )}
+                              </span>
+                              <span className="block text-sm text-foreground truncate">
+                                {questionLabel(q)}
+                              </span>
+                              {pending ? (
+                                <span className={cn(
+                                  'block text-[11px] font-medium mt-0.5',
+                                  pending === 'add' ? 'text-success' : 'text-destructive'
+                                )}>
+                                  {pending === 'add' ? '+ จะเพิ่มเข้าแฟ้มย่อยนี้' : '− จะเอาออกจากแฟ้มย่อยนี้'}
+                                </span>
+                              ) : elsewhere.length > 0 ? (
+                                <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">
+                                  อยู่ใน {elsewhere.map(s => `“${s.title || UNNAMED}”`).join(' · ')} ด้วย
+                                </span>
+                              ) : null}
                             </span>
-                            {pending ? (
-                              <span className={cn(
-                                'block text-[11px] font-medium mt-0.5',
-                                pending === 'add' ? 'text-success' : 'text-destructive'
-                              )}>
-                                {pending === 'add' ? '+ จะเพิ่มเข้าแฟ้มย่อยนี้' : '− จะเอาออกจากแฟ้มย่อยนี้'}
-                              </span>
-                            ) : elsewhere.length > 0 ? (
-                              <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">
-                                อยู่ใน {elsewhere.map(s => `“${s.title || UNNAMED}”`).join(' · ')} ด้วย
-                              </span>
-                            ) : null}
+                          </label>
+
+                          <span className="flex items-center shrink-0">
+                            <IconButton
+                              label="ดูตัวอย่าง"
+                              size="2xs"
+                              disabled={!q}
+                              onClick={() => void openPreview(id)}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </IconButton>
+                            <IconButton
+                              label={hasPendingChanges
+                                ? 'กดยืนยันการเปลี่ยนแปลงก่อน จึงจะไปแก้ไขโจทย์ได้'
+                                : 'แก้ไขโจทย์ข้อนี้'}
+                              size="2xs"
+                              disabled={!q || !canEditQuestions || hasPendingChanges || leavingId !== null}
+                              onClick={() => void editQuestion(id)}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </IconButton>
                           </span>
-                        </label>
+                        </div>
                       </li>
                     )
                   })}
@@ -632,6 +674,20 @@ function SectionDialog({
             </Button>
           </span>
         </DialogFooter>
+
+        {previewLoadingId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4" aria-label="กำลังโหลดตัวอย่างโจทย์">
+            <div className="h-80 w-full max-w-2xl animate-pulse rounded-2xl bg-card" />
+          </div>
+        )}
+        {previewQ && (
+          <PreviewModal
+            question={previewQ}
+            isFlagged={false}
+            onClose={() => setPreviewQ(null)}
+            onToggleFlag={() => {}}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )

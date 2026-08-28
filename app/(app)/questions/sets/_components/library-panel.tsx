@@ -29,7 +29,7 @@ import type { QuestionDetailWithCategory } from '../../page'
 import type { LibraryResult, LibraryScope, UnfiledQuestion } from '../page'
 
 const PreviewModal = dynamic(
-  () => import('../../_components/preview-modal').then(mod => mod.PreviewModal),
+  () => import('@/components/questions/preview-modal').then(mod => mod.PreviewModal),
   { ssr: false },
 )
 

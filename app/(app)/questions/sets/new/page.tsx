@@ -19,11 +19,6 @@ export default async function NewQuestionSetPage() {
 
   return (
     <div className="max-w-[1200px] space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">สร้างแฟ้มโจทย์</h1>
-        <p className="text-sm text-muted-foreground mt-1">รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
-      </div>
-
       <CreateQuestionSetForm questions={questions} />
     </div>
   )

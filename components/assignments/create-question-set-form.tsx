@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Save, Trash2 } from 'lucide-react'
-import { createQuestionSet, updateQuestionSet, deleteQuestionSet } from '@/lib/actions/question-sets'
+import { Pencil, Save, Trash2 } from 'lucide-react'
+import { createQuestionSet, updateQuestionSet, saveQuestionSet, deleteQuestionSet } from '@/lib/actions/question-sets'
 import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,8 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { BankQuestion } from '@/lib/question-bank'
+import type { QuestionCardData } from '@/lib/question-card-data'
+import { rankCountedTags } from '@/lib/tag-suggest'
 import type { QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 
@@ -28,9 +30,17 @@ interface Props {
    *  filters and searches on. */
   questions: BankQuestion[]
   initialSet?: QuestionSet
+  /**
+   * Card data for the first page of this แฟ้ม's โจทย์, read alongside the page.
+   *
+   * Only the first page: the rest arrives as the reader turns to it. Without
+   * this the โจทย์ list would paint, then fill its badges in a beat later on
+   * every open, which reads as the page loading twice.
+   */
+  initialCardData?: QuestionCardData
 }
 
-export function CreateQuestionSetForm({ questions, initialSet }: Props) {
+export function CreateQuestionSetForm({ questions, initialSet, initialCardData }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -52,6 +62,15 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
   const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(initialSet?.shared_org_ids ?? [])
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [teamChecked, setTeamChecked] = useState(false)
+  /**
+   * ข้อมูลแฟ้มโจทย์ opens read-only on an existing แฟ้ม.
+   *
+   * A teacher lands here to work on the โจทย์ inside, not to rename the แฟ้ม,
+   * and three live form controls at the top of the page are three things a
+   * stray click can change without anyone noticing. A แฟ้ม being created has
+   * nothing to show yet, so it opens straight into the fields.
+   */
+  const [editingInfo, setEditingInfo] = useState(!initialSet)
 
   useEffect(() => {
     getMyTeamOrgOptions()
@@ -117,16 +136,17 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
 
   const canSave = title.trim().length > 0
 
+  const payload = () => ({
+    title: title.trim(), description: description.trim(), question_ids: selectedIds,
+    sections,
+    visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds,
+  })
+
   function handleSubmit() {
     startTransition(async () => {
-      const payload = {
-        title: title.trim(), description: description.trim(), question_ids: selectedIds,
-        sections,
-        visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds,
-      }
       const res = initialSet
-        ? await updateQuestionSet(initialSet.id, payload)
-        : await createQuestionSet(payload)
+        ? await updateQuestionSet(initialSet.id, payload())
+        : await createQuestionSet(payload())
       if ('error' in res) { toast.error(res.error); return }
       if (!initialSet && 'id' in res) {
         toast.success('สร้างแฟ้มโจทย์แล้ว')
@@ -134,6 +154,44 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
       }
     })
   }
+
+  /**
+   * Writes the แฟ้ม down before a card leaves for the โจทย์ editor.
+   *
+   * Everything on this page is a draft until บันทึก — a reordering, a new
+   * แฟ้มย่อย, a โจทย์ just added — and แก้ไข navigates away. Saving first is
+   * what stops that click from quietly throwing the draft out; refusing to
+   * leave when the save fails is what stops it from doing so loudly.
+   */
+  async function saveBeforeEdit(): Promise<boolean> {
+    if (!initialSet) return false
+    if (!canSave) {
+      toast.error('ตั้งชื่อแฟ้มก่อน จึงจะบันทึกและไปแก้ไขโจทย์ได้')
+      return false
+    }
+    const res = await saveQuestionSet(initialSet.id, payload())
+    if ('error' in res) {
+      toast.error(`บันทึกแฟ้มไม่สำเร็จ จึงยังไม่ได้ไปหน้าแก้ไขโจทย์ — ${res.error}`)
+      return false
+    }
+    toast.success('บันทึกแฟ้มแล้ว — กำลังไปหน้าแก้ไขโจทย์')
+    return true
+  }
+
+  // Suggestions for the add-a-tag control on each card, ranked by how much of
+  // the คลัง already uses them. Read off the rows the picker loaded, so it
+  // costs no query of its own.
+  const allTags = useMemo(
+    () => rankCountedTags(
+      Object.entries(
+        questions.reduce<Record<string, number>>((counts, question) => {
+          for (const tag of question.tags ?? []) counts[tag] = (counts[tag] ?? 0) + 1
+          return counts
+        }, {})
+      ).map(([tag, uses]) => ({ tag, uses }))
+    ),
+    [questions],
+  )
 
   function handleDelete() {
     if (!initialSet) return
@@ -144,11 +202,65 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
     })
   }
 
+  /** How the read-only card names the current การมองเห็น. */
+  const visibilityLabel = visibility === 'private'
+    ? 'ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้'
+    : allSelectedTeamIds.length > 1
+      ? `ทีมของฉัน (${allSelectedTeamIds.length} ทีม)`
+      : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน'
+
   return (
     <div className="space-y-4">
-      <Card padding="xl" className="space-y-4">
-        <h2 className="font-semibold text-foreground">ข้อมูลแฟ้มโจทย์</h2>
+      {/* The แฟ้ม's own name is the page's heading, read off the draft so a
+          rename shows up before it is saved. */}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">
+          {initialSet ? (
+            <>
+              <span className="text-muted-foreground font-semibold">แฟ้มโจทย์</span>{' '}
+              {title.trim() || <span className="text-muted-foreground">ไม่มีชื่อ</span>}
+            </>
+          ) : 'สร้างแฟ้มโจทย์'}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {initialSet
+            ? 'การแก้ไขจะไม่ย้อนกลับไปเปลี่ยนชุดข้อสอบที่มอบหมายไปแล้วจากแฟ้มนี้'
+            : 'รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ'}
+        </p>
+      </div>
 
+      <Card padding="xl" className="space-y-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="font-semibold text-foreground">ข้อมูลแฟ้มโจทย์</h2>
+          {initialSet && (
+            <Button
+              type="button"
+              variant={editingInfo ? 'ghost' : 'outline'}
+              size="sm"
+              onClick={() => setEditingInfo(v => !v)}
+              className="gap-1.5"
+            >
+              {editingInfo ? 'เสร็จสิ้น' : <><Pencil className="w-3.5 h-3.5" /> แก้ไข</>}
+            </Button>
+          )}
+        </div>
+
+        {!editingInfo && (
+          <dl className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">ชื่อแฟ้มโจทย์</dt>
+            <dd className="text-foreground">{title.trim() || <span className="text-muted-foreground">ยังไม่ได้ตั้งชื่อ</span>}</dd>
+
+            <dt className="text-muted-foreground">คำอธิบาย</dt>
+            <dd className="text-foreground whitespace-pre-wrap">
+              {description.trim() || <span className="text-muted-foreground">—</span>}
+            </dd>
+
+            <dt className="text-muted-foreground">การมองเห็น</dt>
+            <dd className="text-foreground">{visibilityLabel}</dd>
+          </dl>
+        )}
+
+        {editingInfo && <>
         <div className="space-y-1.5">
           <Label htmlFor="set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
           <Input
@@ -157,6 +269,7 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
             onChange={e => setTitle(e.target.value)}
             placeholder="เช่น แบบฝึกหัด กฎการเคลื่อนที่ของนิวตัน"
             autoFocus
+            key={editingInfo ? 'editing' : 'idle'}
           />
         </div>
 
@@ -219,6 +332,7 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
             />
           )}
         </div>
+        </>}
       </Card>
 
       <SetStructurePanel
@@ -227,6 +341,11 @@ export function CreateQuestionSetForm({ questions, initialSet }: Props) {
         sections={sections}
         onChange={next => { setSelectedIds(next.questionIds); setSections(next.sections) }}
         onAddQuestions={openPicker}
+        allTags={allTags}
+        myTeams={teams}
+        setId={initialSet?.id}
+        onSaveBeforeEdit={initialSet ? saveBeforeEdit : undefined}
+        initialCardData={initialCardData}
       />
 
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
