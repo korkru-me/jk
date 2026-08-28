@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { FileUp, FileText, X, Loader2 } from 'lucide-react'
+import { downscaleImage } from '@/lib/image-downscale'
+import { uploadErrorMessage } from '@/lib/upload-error'
 
 // Loaded on demand rather than imported at the top: @supabase/supabase-js is
 // ~220 KB, and it is only needed once the teacher actually picks a file. Every
@@ -12,6 +15,10 @@ async function browserSupabase() {
   const { createClient } = await import('@/lib/supabase/client')
   return createClient()
 }
+
+/** The `question-images` bucket's ceiling — this widget shares it with
+ *  QuestionImageUpload. */
+const QUESTION_FILE_MAX_MB = 10
 
 interface QuestionFileUploadProps {
   value: string[]
@@ -49,19 +56,23 @@ export function QuestionFileUpload({ value, onChange }: QuestionFileUploadProps)
     if (!user) { setUploading(false); return }
 
     const newUrls: string[] = []
-    for (const file of files) {
+    for (const original of files) {
+      // Returns PDFs untouched, so this can sit in front of every file here.
+      const file = await downscaleImage(original)
       const ext = file.name.split('.').pop() ?? 'jpg'
       const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
       const { error } = await supabase.storage
         .from('question-images')
         .upload(path, file, { upsert: false })
 
-      if (!error) {
-        const { data: { publicUrl } } = supabase.storage
-          .from('question-images')
-          .getPublicUrl(path)
-        newUrls.push(publicUrl)
+      if (error) {
+        toast.error(uploadErrorMessage(error.message, original.name, QUESTION_FILE_MAX_MB))
+        continue
       }
+      const { data: { publicUrl } } = supabase.storage
+        .from('question-images')
+        .getPublicUrl(path)
+      newUrls.push(publicUrl)
     }
 
     onChange([...value, ...newUrls])

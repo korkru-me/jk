@@ -1,12 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
 import { Search } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ToggleSwitch } from '@/components/ui/toggle-switch'
-import { setRequiresWorkImage } from '@/lib/actions/questions'
 import { DIFF_META, TYPE_SHORT, questionExcerpt } from '@/lib/question-display'
 import { filterQuestions, tagsMatchingTerm } from '@/lib/question-search'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
@@ -47,8 +43,6 @@ export function QuestionPicker({
   title = 'เลือกโจทย์', banner, showSelectedFooter = true, showHeader = true, surface = 'card',
   baselineIds, collectionNoun = 'แฟ้ม',
 }: Props) {
-  const [workImageOverrides, setWorkImageOverrides] = useState<Record<string, boolean>>({})
-  const [, startTransition] = useTransition()
   const allTags = Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort()
   // The tags the last word typed points at — shown as shortcuts, not as a
   // filter of their own: one box searches names, bodies and tags together,
@@ -57,17 +51,6 @@ export function QuestionPicker({
   const tagSuggestions = tagsMatchingTerm(allTags, lastWord)
     .filter(t => t.toLowerCase() !== lastWord.toLowerCase())
     .slice(0, 8)
-
-  function handleToggleWorkImage(id: string, next: boolean) {
-    setWorkImageOverrides(prev => ({ ...prev, [id]: next }))
-    startTransition(async () => {
-      const result = await setRequiresWorkImage(id, next)
-      if (result?.error) {
-        setWorkImageOverrides(prev => ({ ...prev, [id]: !next }))
-        toast.error(result.error)
-      }
-    })
-  }
 
   /** Swaps the word being typed for the whole tag it pointed at. */
   function completeWithTag(tag: string) {
@@ -255,18 +238,6 @@ export function QuestionPicker({
                     {diff?.label ?? q.difficulty}
                   </span>
                   <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
-                  {q.question_type === 'written' && (
-                    <div
-                      className="flex items-center gap-1"
-                      onClick={e => { e.preventDefault(); e.stopPropagation() }}
-                      title="บังคับแนบรูปวิธีทำ"
-                    >
-                      <ToggleSwitch
-                        checked={workImageOverrides[q.id] ?? q.requires_work_image}
-                        onChange={next => handleToggleWorkImage(q.id, next)}
-                      />
-                    </div>
-                  )}
                 </div>
               </label>
             </div>

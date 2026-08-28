@@ -133,7 +133,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       access_code: data.access_code?.trim() || null,
       passing_type: data.passing_type ?? null,
       passing_value: data.passing_value ?? null,
-      require_work_image: data.require_work_image ?? true,
+      require_work_image: data.require_work_image ?? false,
       proctoring_enabled: proctoringEnabled,
       fullscreen_required: proctoringEnabled && data.fullscreen_required === true,
       block_clipboard: proctoringEnabled && data.block_clipboard === true,
@@ -198,6 +198,9 @@ interface UpdateAssignmentData {
   block_clipboard: boolean
   random_question_count: number | null
   exam_watermark_enabled: boolean
+  /** Whether students must attach a photo of their working on every
+   *  เติมคำตอบตัวเลข question. Omit to leave the งาน's answer untouched. */
+  require_work_image?: boolean
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -323,6 +326,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       fullscreen_required: proctoringEnabled && data.fullscreen_required,
       block_clipboard: proctoringEnabled && data.block_clipboard,
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled,
+      ...(data.require_work_image === undefined ? {} : { require_work_image: data.require_work_image }),
     })
     .eq('id', id)
 

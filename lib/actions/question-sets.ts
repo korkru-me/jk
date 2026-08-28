@@ -10,6 +10,7 @@ import {
   removeQuestionsFromSet as dropQuestionsFromSet,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
+import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import type { QuestionSet, Visibility } from '@/lib/types'
 
 interface QuestionSetData {
@@ -161,21 +162,12 @@ async function writeQuestionSet(id: string, data: QuestionSetData) {
  * shares, order — which is right for the editor and wrong for "put this โจทย์
  * in that แฟ้ม": a client that only wants to add one id would have to send the
  * แฟ้ม's entire current state back, and anything it got stale would be written
- * over. This adds ids and leaves every other column alone.
+ * over. `fileQuestionsIntoSets` adds ids and leaves every other column alone.
  *
  * Several แฟ้ม at once, because the list this is called from drops a โจทย์ the
  * moment it lands in one: a teacher who wants it in three แฟ้ม has to say so
  * now or lose the chance. Several โจทย์ at once for the same reason the list
  * has tick boxes.
- *
- * Order inside a แฟ้ม is the teacher's own, so new ids go at the end. An id the
- * แฟ้ม already holds is skipped rather than repeated, and `sections` is
- * re-normalized against the new membership so แฟ้มย่อย stay valid — a newly
- * added โจทย์ belongs to no แฟ้มย่อย until someone puts it in one.
- *
- * Only the creator's own แฟ้ม can be written: editing a แฟ้ม is creator-only in
- * RLS, and the read below filters by `created_by` as well so a set that is not
- * the caller's is reported as such instead of failing silently.
  */
 export type AddQuestionsToSetsResult =
   | { error: string }
@@ -194,39 +186,17 @@ export async function addQuestionsToSets(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
-  const wantedSetIds = [...new Set(setIds)].filter(Boolean)
-  const wantedQuestionIds = [...new Set(questionIds)].filter(Boolean)
-  if (wantedSetIds.length === 0) return { error: 'ยังไม่ได้เลือกแฟ้มโจทย์' }
-  if (wantedQuestionIds.length === 0) return { error: 'ยังไม่ได้เลือกโจทย์' }
+  const result = await fileQuestionsIntoSets(supabase, user.id, setIds, questionIds)
+  if ('error' in result) return result
 
-  const { data: sets, error: readError } = await supabase
-    .from('question_sets')
-    .select('id, title, question_ids, sections')
-    .in('id', wantedSetIds)
-    .eq('created_by', user.id)
-  if (readError) return { error: readError.message }
-  if (!sets || sets.length === 0) return { error: 'ไม่พบแฟ้มโจทย์ที่เลือก หรือไม่ใช่แฟ้มของคุณ' }
-
-  const results = await Promise.all(sets.map(async (set: any) => {
-    const current = (set.question_ids ?? []) as string[]
-    const existing = new Set(current)
-    const incoming = wantedQuestionIds.filter(id => !existing.has(id))
-    if (incoming.length === 0) return { title: set.title as string, added: 0, error: null }
-
-    const normalized = normalizeSetSections(set.sections ?? [], [...current, ...incoming])
-    const { error } = await supabase
-      .from('question_sets')
-      .update({ question_ids: normalized.question_ids, sections: normalized.sections })
-      .eq('id', set.id)
-    return { title: set.title as string, added: incoming.length, error: error?.message ?? null }
-  }))
-
-  const failed = results.filter(result => result.error)
-  if (failed.length === sets.length) return { error: failed[0].error ?? 'เพิ่มโจทย์เข้าแฟ้มไม่สำเร็จ' }
+  const failed = result.outcomes.filter(outcome => outcome.error)
+  if (failed.length === result.outcomes.length) {
+    return { error: failed[0].error ?? 'เพิ่มโจทย์เข้าแฟ้มไม่สำเร็จ' }
+  }
 
   revalidatePath('/questions/sets')
   return {
-    sets: results.filter(result => !result.error).map(({ title, added }) => ({ title, added })),
+    sets: result.outcomes.filter(outcome => !outcome.error).map(({ title, added }) => ({ title, added })),
     failedCount: failed.length,
   }
 }
@@ -295,6 +265,35 @@ export async function deleteQuestionSet(id: string) {
   if (error) return { error: error.message }
   revalidatePath('/questions/sets')
   return { success: true }
+}
+
+/** A แฟ้ม a โจทย์ can be filed into, for a picker that only needs its name. */
+export interface QuestionSetOption {
+  id: string
+  title: string
+}
+
+/**
+ * The แฟ้ม a teacher may file into: their own, newest first.
+ *
+ * Deliberately thinner than `getMyQuestionSets` — the ฟอร์มสร้างโจทย์ asks for
+ * this on every load, and a แฟ้ม's `question_ids` can run to hundreds of uuids
+ * that a list of names never reads. It is also the same set of แฟ้ม
+ * `fileQuestionsIntoSets` will accept, so nothing offered here can be refused
+ * on save: แฟ้ม a teammate shared are readable but not writable.
+ */
+export async function getMyQuestionSetOptions(): Promise<QuestionSetOption[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data } = await supabase
+    .from('question_sets')
+    .select('id, title')
+    .eq('created_by', user.id)
+    .order('created_at', { ascending: false })
+
+  return (data ?? []) as QuestionSetOption[]
 }
 
 export async function getMyQuestionSets(): Promise<QuestionSet[]> {

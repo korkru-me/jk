@@ -8,11 +8,10 @@ import {
   Eye, Share2, Flag, Edit2, Trash2, AlertTriangle, Copy, Download, Users,
   ChevronUp, ChevronDown, FolderMinus, MoreVertical,
 } from 'lucide-react'
-import { deleteQuestion, getQuestionClientDetail, setRequiresWorkImage, shareQuestionToOrg } from '@/lib/actions/questions'
+import { deleteQuestion, getQuestionClientDetail, shareQuestionToOrg } from '@/lib/actions/questions'
 import { exportQuestions } from '@/lib/actions/question-export'
 import { storeDuplicateSeed, NEW_QUESTION_ROUTE_BY_TYPE } from '@/lib/question-duplicate'
 import { isTrueFalseGroupQuestion, TRUE_FALSE_GROUP_ROUTE } from '@/lib/true-false-group'
-import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -42,7 +41,7 @@ import { questionEditHref, RETURN_SET_PARAM } from '@/lib/question-return'
 export type QuestionCardRow = Pick<
   Question,
   | 'id' | 'title' | 'question_text' | 'question_type' | 'difficulty' | 'tags'
-  | 'requires_work_image' | 'group_id' | 'order_in_group' | 'subject'
+  | 'group_id' | 'order_in_group' | 'subject'
 > & { question_categories: { name: string } | null }
 
 /**
@@ -124,7 +123,6 @@ export function QuestionCard({
   const [confirm, confirmDialog] = useConfirm()
   const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [requiresWorkImage, setRequiresWorkImageLocal] = useState(q.requires_work_image)
   const diff = DIFF_META[q.difficulty]
   const isGroup = q.order_in_group === 0
 
@@ -197,17 +195,6 @@ export function QuestionCard({
       if ('error' in result) { toast.error(result.error); return }
       downloadTextFile(result.filename, result.content)
       toast.success('ดาวน์โหลดไฟล์โจทย์แล้ว')
-    })
-  }
-
-  function handleToggleWorkImage(next: boolean) {
-    setRequiresWorkImageLocal(next)
-    startTransition(async () => {
-      const result = await setRequiresWorkImage(q.id, next)
-      if (result?.error) {
-        setRequiresWorkImageLocal(!next)
-        toast.error(result.error)
-      }
     })
   }
 
@@ -303,14 +290,6 @@ export function QuestionCard({
                 : <QuestionSetBadges sets={sets} showEmpty />}
               <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />
             </div>
-
-            {/* Work-image requirement toggle (written questions only) */}
-            {q.question_type === 'written' && (
-              <div className="flex items-center gap-2 mb-2">
-                <ToggleSwitch checked={requiresWorkImage} onChange={handleToggleWorkImage} disabled={isPending} />
-                <span className="text-xs text-muted-foreground">บังคับแนบรูปวิธีทำ</span>
-              </div>
-            )}
 
             {/* Title */}
             <button

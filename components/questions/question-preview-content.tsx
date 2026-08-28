@@ -340,6 +340,7 @@ export function QuestionPreviewContent({
                   {opt.image_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={opt.image_url} alt={`ตัวเลือก ${PART_LABELS[i]}`}
+                      loading="lazy" decoding="async"
                       className="max-h-32 rounded border border-border object-contain" />
                   )}
                   {mcqChecked && isCorrect && (
@@ -400,7 +401,7 @@ export function QuestionPreviewContent({
                             <span className="text-foreground">{pair.left_text || `รายการ ${i + 1}`}</span>
                             {pair.left_image && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={pair.left_image} alt="" className="mt-1 max-h-16 rounded border border-border object-contain" />
+                              <img src={pair.left_image} alt="" loading="lazy" decoding="async" className="mt-1 max-h-16 rounded border border-border object-contain" />
                             )}
                           </div>
                         </div>
@@ -412,7 +413,7 @@ export function QuestionPreviewContent({
                             <span className="text-foreground">{rightPair?.right_text || `คำตรงกัน ${i + 1}`}</span>
                             {rightPair?.right_image && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={rightPair.right_image} alt="" className="mt-1 max-h-16 rounded border border-border object-contain" />
+                              <img src={rightPair.right_image} alt="" loading="lazy" decoding="async" className="mt-1 max-h-16 rounded border border-border object-contain" />
                             )}
                           </div>
                         </div>
@@ -968,7 +969,7 @@ export function QuestionPreviewContent({
                   }`}>
                     {item.image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.image_url} alt="" className="w-10 h-10 object-contain rounded border border-border" />
+                      <img src={item.image_url} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border border-border" />
                     )}
                     <span className="flex-1 text-sm text-foreground">{item.text}</span>
                     <NativeSelect

@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { countAnswerBlanks, extractAnswerBlankNumbers, nextAnswerBlankNumber, numberedAnswerBlank } from '@/lib/answer-blank'
 import { PART_LABEL_SETS } from '@/lib/part-labels'
@@ -67,6 +66,11 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
   const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
+  // Which แฟ้ม the โจทย์ is filed into on save. Create only: the แฟ้ม holding an
+  // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
+  // back out — a picker here could only ever add.
+  const [setIds, setSetIds] = useState<string[]>([])
+  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
@@ -84,7 +88,6 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   const [pythagoreanGroups, setPythagoreanGroups] = useState<PythagoreanGroup[]>(existingConfig?.pythagorean_groups ?? [])
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
   const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
-  const [requireWorkImage, setRequireWorkImage] = useState(question?.requires_work_image ?? false)
   const [initialEquationText, setInitialEquationText] = useState<string | undefined>(() => equationTextFromQuestion(question))
 
   useEffect(() => {
@@ -100,7 +103,6 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
     setImageUrls(seed.image_urls ?? [])
     setSolutionText(seed.solution_text ?? '')
     setSolutionImageUrls(seed.solution_image_urls ?? [])
-    setRequireWorkImage(seed.requires_work_image ?? false)
 
     setCreationMode(seed.is_random ? 'from-equation' : 'fixed')
     setVariables(seed.variables ?? [])
@@ -203,8 +205,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         pythagorean_groups: pythagoreanGroups.length > 0 ? pythagoreanGroups : undefined,
         part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
       },
-      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
-      requires_work_image: requireWorkImage,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -292,6 +293,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
+        {...setPicker}
       />
 
       {creationMode === 'from-equation' ? (
@@ -450,18 +452,6 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-foreground border-b pb-2">ค่าคลาดเคลื่อนที่ยอมรับ</h2>
         <TolerancePicker value={globalTolerance} onChange={setGlobalTolerance} />
-      </section>
-
-      {/* บังคับแนบรูปวิธีทำ */}
-      <section className="space-y-2">
-        <h2 className="text-base font-semibold text-foreground border-b pb-2">บังคับแนบรูปวิธีทำ</h2>
-        <div className="flex items-start gap-3">
-          <ToggleSwitch checked={requireWorkImage} onChange={setRequireWorkImage} />
-          <div className="text-sm text-muted-foreground">
-            <p>เปิดเพื่อให้นักเรียนต้องถ่ายรูป/แนบรูปวิธีทำก่อนส่งคำตอบข้อนี้</p>
-            <p className="text-xs text-muted-foreground">ถ้ามีข้อย่อยหลายข้อ นักเรียนต้องแนบรูปทีละข้อย่อย (1 รูปต่อคำตอบ)</p>
-          </div>
-        </div>
       </section>
 
       <SolutionSection

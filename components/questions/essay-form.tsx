@@ -52,6 +52,11 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
   const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
   const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
+  // Which แฟ้ม the โจทย์ is filed into on save. Create only: the แฟ้ม holding an
+  // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
+  // back out — a picker here could only ever add.
+  const [setIds, setSetIds] = useState<string[]>([])
+  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
@@ -115,7 +120,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
       essay_rubric: rubric.length > 0
         ? rubric.map(r => ({ criterion: r.criterion, points: r.points }))
         : undefined,
-      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -141,6 +146,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
+        {...setPicker}
       />
 
       <section className="space-y-4">

@@ -40,6 +40,11 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
   const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(question?.shared_org_ids ?? [])
   const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(question?.team_edit_allowed ?? true)
   const [tags, setTags] = useState<string[]>(question?.tags ?? [])
+  // Which แฟ้ม the โจทย์ is filed into on save. Create only: the แฟ้ม holding an
+  // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
+  // back out — a picker here could only ever add.
+  const [setIds, setSetIds] = useState<string[]>([])
+  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [attachmentUrls, setAttachmentUrls] = useState<string[]>(existingConfig?.attachment_urls ?? [])
@@ -81,7 +86,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: [],
       extra_data: { attachment_urls: attachmentUrls } as FileUploadConfig,
-      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: [],
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: [],
       redirect_to: returnTo,
     }
     const result = mode === 'edit' && question
@@ -107,6 +112,7 @@ export function FileUploadForm({ allTags, mode = 'create', question, isOwner = t
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
         tags={tags} onTagsChange={setTags}
+        {...setPicker}
       />
 
       <section className="space-y-4">

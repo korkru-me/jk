@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera } from 'lucide-react'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -65,9 +65,10 @@ export type EditableAssignment = Pick<
   | 'block_clipboard'
   | 'random_question_count'
   | 'exam_watermark_enabled'
+  | 'require_work_image'
 >
 
-export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text'> & {
+export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text' | 'question_type'> & {
   /** What this question is worth before any override — see lib/question-bank.ts. */
   default_points: number
 }
@@ -96,6 +97,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
     a.random_question_count != null ? String(a.random_question_count) : ''
   )
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
+  const [requireWorkImage, setRequireWorkImage] = useState(a.require_work_image ?? false)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
@@ -111,11 +113,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
   // Titles for everything that could end up in the list: the questions the
   // assignment came with, plus the bank the picker adds from.
-  const questionsById = new Map<string, { id: string; title: string; question_text: string }>()
+  const questionsById = new Map<string, { id: string; title: string; question_text: string; question_type?: string }>()
   for (const q of [...questions, ...bank]) questionsById.set(q.id, q)
   const orderedQuestions = questionIds.map(
     id => questionsById.get(id) ?? { id, title: 'โจทย์ที่ไม่พบ', question_text: '' }
   )
+
+  // Only เติมคำตอบตัวเลข has working to photograph, so the ask appears exactly
+  // when this งาน holds one — and follows the list as the teacher edits it.
+  const hasWorkImageQuestions = orderedQuestions.some(q => q.question_type === 'written')
 
   function applyQuestionChange(next: { sections: typeof sections; question_ids: string[] }) {
     setSections(next.sections)
@@ -213,6 +219,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         block_clipboard: blockClipboard,
         random_question_count: randomQuestionCount ? Number(randomQuestionCount) : null,
         exam_watermark_enabled: examWatermarkEnabled,
+        require_work_image: hasWorkImageQuestions && requireWorkImage,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -501,6 +508,28 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               type="checkbox"
               checked={showSections}
               onChange={e => setShowSections(e.target.checked)}
+              className="accent-primary w-4 h-4 shrink-0"
+            />
+          </label>
+        )}
+
+        {hasWorkImageQuestions && (
+          <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <Camera className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">ให้นักเรียนแนบรูปแสดงวิธีทำ</p>
+                <p className="text-xs text-muted-foreground">
+                  งานนี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={requireWorkImage}
+              onChange={e => setRequireWorkImage(e.target.checked)}
               className="accent-primary w-4 h-4 shrink-0"
             />
           </label>

@@ -1,7 +1,10 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { FileUp, FileText, Loader2, X } from 'lucide-react'
+import { downscaleImage } from '@/lib/image-downscale'
+import { uploadErrorMessage } from '@/lib/upload-error'
 import type { SubmittedFile } from '@/lib/types'
 
 // Loaded on demand rather than imported at the top: @supabase/supabase-js is
@@ -16,6 +19,9 @@ interface FileSubmissionUploadProps {
   value: SubmittedFile[]
   onChange: (files: SubmittedFile[]) => void
 }
+
+/** The `submission-files` bucket's own limit, set in its creating migration. */
+const SUBMISSION_FILE_MAX_MB = 10
 
 function isImageType(type: string) {
   return type.startsWith('image/')
@@ -39,19 +45,27 @@ export function FileSubmissionUpload({ value, onChange }: FileSubmissionUploadPr
     if (!user) { setUploading(false); return }
 
     const uploaded: SubmittedFile[] = []
-    for (const file of files) {
+    for (const original of files) {
+      // Same reason as the work-photo slot: a student attaching their answer is
+      // usually attaching a photo of it, from a phone, while a timer runs. PDFs
+      // pass through untouched.
+      const file = await downscaleImage(original)
       const ext = file.name.split('.').pop() ?? 'jpg'
       const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
       const { error } = await supabase.storage
         .from('submission-files')
         .upload(path, file, { upsert: false })
 
-      if (!error) {
-        const { data: { publicUrl } } = supabase.storage
-          .from('submission-files')
-          .getPublicUrl(path)
-        uploaded.push({ url: publicUrl, name: file.name, type: file.type })
+      if (error) {
+        toast.error(uploadErrorMessage(error.message, original.name, SUBMISSION_FILE_MAX_MB))
+        continue
       }
+      const { data: { publicUrl } } = supabase.storage
+        .from('submission-files')
+        .getPublicUrl(path)
+      // The teacher's list shows the name the student recognises, not the one
+      // re-encoding gave it.
+      uploaded.push({ url: publicUrl, name: original.name, type: file.type })
     }
 
     onChange([...value, ...uploaded])

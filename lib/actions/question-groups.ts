@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation'
 import { randomUUID } from 'crypto'
 import { resolveOrgId } from '@/lib/actions/questions'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
+import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
+import { releaseQuestionFiles } from '@/lib/storage-release'
 import type { Variable, Difficulty, Visibility } from '@/lib/types'
 import { RETURN_PARAM } from '@/lib/question-return'
 
@@ -35,6 +37,9 @@ export interface QuestionGroupPayload {
   team_edit_allowed?: boolean
   difficulty: Difficulty
   subQuestions: SubQuestionData[]
+  /** แฟ้ม to file a newly created group into. Ignored when saving an existing
+   *  one — which แฟ้ม hold it is changed from the แฟ้ม itself by then. */
+  set_ids?: string[]
   /** The bank view the editor was opened from, carried through the save redirect. */
   return_query?: string
 }
@@ -174,6 +179,23 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
     await syncGroupShares(supabase, groupId, extraShares)
   }
 
+  // A group is filed by its parent row: `order_in_group = 0` is the row the
+  // คลัง and every แฟ้ม list show, and the sub-questions travel with it.
+  // Filing only on the first save — after that the group already lives
+  // wherever its แฟ้ม put it, and re-adding would fight a teacher who removed
+  // it. As in `createQuestion`, a failed filing does not fail the save: the
+  // โจทย์ exists by then, and an error would read as "not created".
+  if (!payload.parentId && payload.set_ids && payload.set_ids.length > 0) {
+    const filed = await fileQuestionsIntoSets(supabase, user.id, payload.set_ids, [parentId!])
+    if ('error' in filed) {
+      console.error('[saveQuestionGroup] filing into แฟ้ม failed:', filed.error)
+    } else {
+      const failed = filed.outcomes.filter((outcome) => outcome.error)
+      if (failed.length > 0) console.error('[saveQuestionGroup] filing into แฟ้ม failed:', failed)
+    }
+    revalidatePath('/questions/sets')
+  }
+
   revalidatePath('/questions')
   revalidatePath(`/questions/multi/${groupId}`)
   redirect(
@@ -187,8 +209,17 @@ export async function deleteQuestionGroup(groupId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  // Every row in the group, read before the delete — a group's pictures are
+  // spread across the parent and its ข้อย่อย.
+  const { data: doomed } = await supabase
+    .from('questions').select('*').eq('group_id', groupId).eq('created_by', user.id)
+
   const { error } = await supabase
     .from('questions').delete().eq('group_id', groupId).eq('created_by', user.id)
   if (error) return { error: error.message }
+
+  if (doomed && doomed.length > 0) await releaseQuestionFiles(supabase, user.id, doomed)
+
   revalidatePath('/questions')
 }

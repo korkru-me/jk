@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { User, Users, School, Palette, BookOpen, Bell, CreditCard } from 'lucide-react'
+import { User, Users, School, Palette, BookOpen, Bell, CreditCard, HardDrive } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
 
@@ -51,6 +51,12 @@ const NAV_ITEMS = [
     label: 'การแจ้งเตือน',
     icon: Bell,
     description: 'อีเมล, การแจ้งเตือนในระบบ',
+  },
+  {
+    href: '/settings/storage',
+    label: 'พื้นที่จัดเก็บไฟล์',
+    icon: HardDrive,
+    description: 'เก็บกวาดรูปที่ไม่ได้ใช้แล้ว',
   },
   {
     href: '/settings/billing',
