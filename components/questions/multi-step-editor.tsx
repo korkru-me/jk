@@ -11,7 +11,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { VariableEditor } from '@/components/questions/variable-editor'
 import { FormulaEditor } from '@/components/questions/formula-editor'
-import { TeamShareChips } from '@/components/questions/general-info-section'
+import { QuestionSetPicker, TeamShareChips } from '@/components/questions/general-info-section'
 import { SolutionSection } from '@/components/questions/solution-section'
 import { evaluateMultiStep } from '@/lib/math/evaluator'
 import { saveQuestionGroup, deleteQuestionGroup } from '@/lib/actions/question-groups'
@@ -101,6 +101,9 @@ export function MultiStepEditor({
   const [expandedIndex, setExpandedIndex] = useState(0)
   const [previewResults, setPreviewResults] = useState<Array<{ values: Record<string, number>; answer: number | string }> | null>(null)
   const [teamChecked, setTeamChecked] = useState(false)
+  // Which แฟ้ม this group is filed into on save. Create only, like every other
+  // ฟอร์มสร้างโจทย์: an existing group's แฟ้ม are changed from the แฟ้ม itself.
+  const [setIds, setSetIds] = useState<string[]>([])
   const [confirm, confirmDialog] = useConfirm()
 
   // teamOrgId can be left over from a *private* group — where it points at the
@@ -208,6 +211,7 @@ export function MultiStepEditor({
       team_edit_allowed: teamEditAllowed,
       difficulty,
       subQuestions,
+      set_ids: mode === 'create' ? setIds : undefined,
       return_query: searchParams.get(RETURN_PARAM) ?? undefined,
     }
 
@@ -331,6 +335,16 @@ export function MultiStepEditor({
                   ])}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {mode === 'create' && (
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>แฟ้มโจทย์</Label>
+              <p className="text-xs text-muted-foreground">
+                เลือกแฟ้มที่จะเก็บโจทย์กลุ่มนี้ เลือกได้หลายแฟ้ม — โจทย์ข้อเดียวอยู่ได้หลายแฟ้ม · ไม่เลือกก็ได้
+              </p>
+              <QuestionSetPicker selectedIds={setIds} onChange={setSetIds} />
             </div>
           )}
 

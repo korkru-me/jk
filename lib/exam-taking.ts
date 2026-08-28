@@ -50,7 +50,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       id, question_id, random_values, student_answer, work_images, option_order,
       questions(
         title, question_text, question_type, answer_unit, mcq_options,
-        variables, answer_parts, extra_data, image_urls, requires_work_image
+        variables, answer_parts, extra_data, image_urls
       )
     `)
     .eq('submission_id', submissionId)

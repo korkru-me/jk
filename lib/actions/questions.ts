@@ -7,6 +7,7 @@ import { getMyOrgId } from '@/lib/actions/org'
 import { getMyTeamOrgs } from '@/lib/actions/team-org'
 import { dedupeTags } from '@/lib/tag-suggest'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
+import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
 import { safeQuestionsRedirect } from '@/lib/question-return'
 
@@ -34,6 +35,10 @@ export interface QuestionFormData {
   solution_image_urls?: string[]
   tags: string[]
   image_urls: string[]
+  /** Legacy. Whether a photo of the student's working is required is now a
+   *  per-assignment setting (`assignments.require_work_image`), asked once when
+   *  the งาน is created. No form sends this any more; `updateQuestion` keeps
+   *  whatever an older โจทย์ was saved with rather than clearing it. */
   requires_work_image?: boolean
   /** Which team to share to when visibility is 'organization'/'school'. Required
    *  once the user belongs to more than one team; auto-resolved if they have exactly one. */
@@ -42,6 +47,9 @@ export interface QuestionFormData {
   shared_org_ids?: string[]
   /** Whether teammates with access to this question may also edit it (creator can always edit). Default true. */
   team_edit_allowed?: boolean
+  /** แฟ้ม to file a newly created โจทย์ into. Only read by `createQuestion` —
+   *  editing a โจทย์ leaves whatever แฟ้ม hold it alone. */
+  set_ids?: string[]
   /** Where to redirect after a successful save. Defaults to '/questions'. */
   redirect_to?: string
 }
@@ -158,6 +166,25 @@ export async function createQuestion(data: QuestionFormData) {
     await syncQuestionShares(supabase, inserted.id, extraShares)
   }
 
+  // Filing happens here rather than in the form because the form never gets to
+  // run again: this function ends in a redirect, so a client that wanted to
+  // call `addQuestionsToSets` afterwards has already been navigated away.
+  //
+  // A failed filing does not fail the save — the โจทย์ exists by now, and an
+  // error would read as "not created" and invite a second one. The แฟ้ม offered
+  // are the caller's own, so the only way past `fileQuestionsIntoSets` is a
+  // database error, which is logged rather than silently dropped.
+  if (data.set_ids && data.set_ids.length > 0) {
+    const filed = await fileQuestionsIntoSets(supabase, user.id, data.set_ids, [inserted.id])
+    if ('error' in filed) {
+      console.error('[createQuestion] filing into แฟ้ม failed:', filed.error)
+    } else {
+      const failed = filed.outcomes.filter((outcome) => outcome.error)
+      if (failed.length > 0) console.error('[createQuestion] filing into แฟ้ม failed:', failed)
+    }
+    revalidatePath('/questions/sets')
+  }
+
   revalidatePath('/questions')
   redirect('/questions')
 }
@@ -176,7 +203,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   const { data: existing } = await supabase
     .from('questions')
-    .select('created_by, org_id, visibility, team_edit_allowed, is_research_snapshot')
+    .select('created_by, org_id, visibility, team_edit_allowed, is_research_snapshot, requires_work_image')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบโจทย์นี้' }
@@ -219,7 +246,9 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
       solution_image_urls: data.solution_image_urls ?? [],
       tags: data.tags.length > 0 ? data.tags : null,
       image_urls: data.image_urls,
-      requires_work_image: data.question_type === 'written' ? (data.requires_work_image ?? false) : false,
+      requires_work_image: data.question_type === 'written'
+        ? (data.requires_work_image ?? existing.requires_work_image ?? false)
+        : false,
       team_edit_allowed: isOwner ? (data.team_edit_allowed ?? true) : existing.team_edit_allowed,
     }))
     .eq('id', id)
@@ -269,33 +298,13 @@ export async function shareQuestionToOrg(questionId: string, orgId: string) {
   return {}
 }
 
-export async function setRequiresWorkImage(id: string, value: boolean) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-
-  const { error } = await supabase
-    .from('questions')
-    .update({ requires_work_image: value })
-    .eq('id', id)
-    .eq('created_by', user.id)
-    .eq('is_research_snapshot', false)
-
-  if (error) return { error: error.message }
-
-  revalidatePath('/questions')
-  revalidatePath('/questions/sets/[id]/edit', 'page')
-  revalidatePath('/assignments/new')
-}
-
 /**
  * Replaces the whole tag list of one question.
  *
  * The question bank edits tags in place on the card, so this is the one write
  * that touches tags without going through the edit form. Ownership is checked
- * the same way `setRequiresWorkImage` does; `.select()` is what tells an
- * unauthorized write apart from a successful one, because an update that
- * matches no row is not an error.
+ * with `created_by`; `.select()` is what tells an unauthorized write apart from
+ * a successful one, because an update that matches no row is not an error.
  */
 export async function updateQuestionTags(id: string, tags: string[]) {
   const supabase = await createClient()

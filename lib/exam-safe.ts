@@ -102,7 +102,6 @@ export interface SafeExamAnswer {
     answer_parts: SafeAnswerPart[] | null
     extra_data: SafeExamExtraData
     image_urls: string[] | null
-    requires_work_image: boolean
   }
 }
 
@@ -116,7 +115,6 @@ interface RawQuestionForExam {
   answer_parts: unknown[] | null
   extra_data: unknown
   image_urls: string[] | null
-  requires_work_image: boolean
 }
 
 interface RawExamAnswer {
@@ -371,7 +369,6 @@ export function toSafeExamAnswer(row: RawExamAnswer, random: () => number = Math
       answer_parts: answerParts,
       extra_data: sanitizeExtraData(question.question_type, question.extra_data, random),
       image_urls: question.image_urls,
-      requires_work_image: question.requires_work_image,
     },
   }
 }

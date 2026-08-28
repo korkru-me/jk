@@ -111,7 +111,6 @@ export default async function AssignmentPreviewPage({
         answer_parts: q.answer_parts,
         extra_data: q.extra_data,
         image_urls: q.image_urls,
-        requires_work_image: q.requires_work_image,
         answer_tolerance: q.answer_tolerance,
       },
     }
@@ -122,7 +121,7 @@ export default async function AssignmentPreviewPage({
     isFullscreenEnforced: false,
     blockClipboard: false,
     watermarkText: a.exam_watermark_enabled ? 'ตัวอย่างผู้เข้าสอบ • PREVIEW' : null,
-    isWorkImageEnforced: a.require_work_image ?? true,
+    isWorkImageEnforced: a.require_work_image ?? false,
   }
 
   return (

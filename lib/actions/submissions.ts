@@ -335,19 +335,19 @@ async function gradeAndFinalizeSubmission(
 
   const { data: answers } = await admin
     .from('submission_answers')
-    .select('*, questions(answer_tolerance, answer_parts, question_type, extra_data, requires_work_image)')
+    .select('*, questions(answer_tolerance, answer_parts, question_type, extra_data)')
     .eq('submission_id', submissionId)
 
   if (!answers) return { error: 'ไม่พบคำตอบ' }
 
   // Server-side defense-in-depth: the exam UI already blocks submission
   // client-side when a required work-image is missing, but a tampered
-  // client could call this action directly. The assignment-level
-  // require_work_image is the teacher's per-assignment override (asked at
-  // creation time) — false switches the requirement off entirely.
-  const workImageEnforced = opts.enforceWorkImage && ((submission as any).assignments?.require_work_image ?? true)
+  // client could call this action directly. `require_work_image` is the whole
+  // decision — one answer for the งาน, given by the teacher when they created
+  // it — and it applies to every เติมคำตอบตัวเลข question the งาน contains.
+  const workImageEnforced = opts.enforceWorkImage && ((submission as any).assignments?.require_work_image ?? false)
   const missingWorkImage = workImageEnforced && answers.some((a: any) => {
-    if (a.questions?.question_type !== 'written' || !a.questions?.requires_work_image) return false
+    if (a.questions?.question_type !== 'written') return false
     const parts: unknown[] = a.questions?.answer_parts ?? []
     const requiredCount = parts.length > 0 ? parts.length : 1
     const images: (string | null)[] = Array.isArray(a.work_images) ? a.work_images : []

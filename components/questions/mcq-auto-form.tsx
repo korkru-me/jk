@@ -515,6 +515,8 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
   const [sharedOrgIds, setSharedOrgIds] = useState<string[]>([])
   const [teamEditAllowed, setTeamEditAllowed] = useState<boolean>(true)
   const [tags, setTags] = useState<string[]>([])
+  /** Which แฟ้ม the โจทย์ is filed into on save. */
+  const [setIds, setSetIds] = useState<string[]>([])
 
   // Equation / formula
   const [variables, setVariables] = useState<Variable[]>([])
@@ -668,7 +670,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
       answer_parts: [],
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: mcqOptions,
-      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, image_urls: imageUrls,
+      solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
     })
 
     if (result?.error) {
@@ -693,6 +695,7 @@ export function McqAutoForm({ allTags, presets }: McqAutoFormProps) {
         sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         tags={tags} onTagsChange={setTags}
+        setIds={setIds} onSetIdsChange={setSetIds}
       />
 
       {/* สมการและตัวแปร */}

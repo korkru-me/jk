@@ -29,7 +29,6 @@ export interface SetListQuestion {
   question_type: Question['question_type']
   difficulty: Question['difficulty']
   tags?: string[] | null
-  requires_work_image?: boolean
   sub_question_count?: number
 }
 
@@ -192,7 +191,6 @@ export function SetQuestionList({
       question_type: q.question_type,
       difficulty: q.difficulty,
       tags: q.tags ?? null,
-      requires_work_image: q.requires_work_image ?? false,
       group_id: detail?.group_id ?? null,
       order_in_group: detail?.order_in_group ?? null,
       subject: detail?.subject ?? null,

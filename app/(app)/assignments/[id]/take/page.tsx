@@ -50,7 +50,7 @@ export default async function TakeExamPage({
     isFullscreenEnforced: assignment.fullscreen_required,
     blockClipboard: assignment.block_clipboard,
     watermarkText: assignment.watermark_text,
-    isWorkImageEnforced: assignment.require_work_image ?? true,
+    isWorkImageEnforced: assignment.require_work_image ?? false,
   }
 
   return (

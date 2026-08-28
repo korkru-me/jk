@@ -14,7 +14,7 @@ import type { Question } from '@/lib/types'
  */
 type BankQuestionFields = Pick<
   Question,
-  'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'requires_work_image' | 'tags'
+  'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'tags'
 >
 
 export type BankQuestion = BankQuestionFields & {
@@ -27,7 +27,7 @@ export type BankQuestion = BankQuestionFields & {
 /** The row as it comes back, before the jsonb is counted and dropped. */
 type BankRow = BankQuestionFields & CountableQuestion
 
-const BANK_FIELDS = 'id, title, question_text, difficulty, question_type, requires_work_image, tags'
+const BANK_FIELDS = 'id, title, question_text, difficulty, question_type, tags'
 
 /** The jsonb a point value is counted from. `question_type` decides which of
  *  them is read, and BANK_FIELDS already asks for it. */

@@ -31,7 +31,6 @@ function rawAnswer(questionType: string, overrides: Record<string, unknown> = {}
       }],
       extra_data: {},
       image_urls: null,
-      requires_work_image: false,
       ...overrides,
     },
   } as unknown as Parameters<typeof toSafeExamAnswer>[0]

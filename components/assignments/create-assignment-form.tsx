@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
-  Fingerprint, ListFilter,
+  Fingerprint, ListFilter, Camera,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -54,9 +54,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
-  const [showWorkImageConfirm, setShowWorkImageConfirm] = useState(false)
   const [showPublishDialog, setShowPublishDialog] = useState(false)
-  const [pendingRequireWorkImage, setPendingRequireWorkImage] = useState(true)
   const [scheduleMode, setScheduleMode] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
 
@@ -68,6 +66,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   )
   const [mode, setMode] = useState<'online' | 'print'>('online')
   const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exercise')
+  // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
+  // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
+  // able to block students is not a safe default.
+  const [requireWorkImage, setRequireWorkImage] = useState(false)
   // When not starting from an existing set, offer to save the picked
   // questions back into the library as a new reusable set.
   const [saveAsSet, setSaveAsSet] = useState(false)
@@ -189,28 +191,15 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     return true
   }
 
-  // Selected questions where the teacher (in the question/set editor) has
-  // turned on "บังคับแนบรูปวิธีทำ" — only relevant for exams, so the
-  // teacher gets asked whether to keep that enforced for this assignment.
+  // Whether asking about รูปวิธีทำ makes sense at all: only เติมคำตอบตัวเลข
+  // questions have working to photograph, so a งาน made entirely of ปรนัย or
+  // อัตนัย never sees the switch — an option that cannot change anything is
+  // just one more thing to read past.
   const hasWorkImageQuestions = selectedIds.some(
-    id => questions.find(q => q.id === id)?.requires_work_image
+    id => questions.find(q => q.id === id)?.question_type === 'written'
   )
 
-  function handleConfirmClick() {
-    if (assignmentType === 'exam' && hasWorkImageQuestions) {
-      setShowWorkImageConfirm(true)
-      return
-    }
-    openPublishDialog(true)
-  }
-
-  function resolveWorkImageChoice(requireWorkImage: boolean) {
-    setShowWorkImageConfirm(false)
-    openPublishDialog(requireWorkImage)
-  }
-
-  function openPublishDialog(requireWorkImage: boolean) {
-    setPendingRequireWorkImage(requireWorkImage)
+  function openPublishDialog() {
     setScheduleMode(false)
     setScheduleAt(startAt)
     setShowPublishDialog(true)
@@ -218,21 +207,21 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
   function handlePublishNow() {
     setShowPublishDialog(false)
-    finalizeSubmit(pendingRequireWorkImage, 'published', startAt)
+    finalizeSubmit('published', startAt)
   }
 
   function handleScheduleConfirm() {
     if (!scheduleAt) { toast.error('กรุณาเลือกวันและเวลาที่จะเผยแพร่'); return }
     setShowPublishDialog(false)
-    finalizeSubmit(pendingRequireWorkImage, 'published', scheduleAt)
+    finalizeSubmit('published', scheduleAt)
   }
 
   function handleSaveDraft() {
     setShowPublishDialog(false)
-    finalizeSubmit(pendingRequireWorkImage, 'draft', startAt)
+    finalizeSubmit('draft', startAt)
   }
 
-  function finalizeSubmit(requireWorkImage: boolean, status: AssignmentStatus, effectiveStartAt: string) {
+  function finalizeSubmit(status: AssignmentStatus, effectiveStartAt: string) {
     startTransition(async () => {
       let setId = preselectedSet?.id
 
@@ -295,7 +284,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         access_code: accessCode.trim() || null,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
-        require_work_image: requireWorkImage,
+        // A งาน with nothing to photograph is stored as not requiring it,
+        // whatever the switch was left on before the last โจทย์ was removed.
+        require_work_image: hasWorkImageQuestions && requireWorkImage,
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
         block_clipboard: blockClipboard,
@@ -723,6 +714,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 value: shuffleA,
                 set: setShuffleA,
               },
+              ...(hasWorkImageQuestions ? [{
+                label: 'ให้นักเรียนแนบรูปแสดงวิธีทำ',
+                desc: `${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)`,
+                icon: Camera,
+                value: requireWorkImage,
+                set: setRequireWorkImage,
+              }] : []),
             ].map(opt => {
               const Icon = opt.icon
               return (
@@ -988,6 +986,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(mode === 'online' && assignmentType === 'exam' && proctoringEnabled
                   ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
                   : []),
+                ...(hasWorkImageQuestions
+                  ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
+                  : []),
                 { label: 'แสดงผล',    value: showResults === 'immediate' ? 'ทันทีหลังส่ง' : 'หลังพ้นกำหนดส่ง' },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">
@@ -1027,7 +1028,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         ) : (
           <Button
             type="button"
-            onClick={handleConfirmClick}
+            onClick={openPublishDialog}
             disabled={isPending}
             className="gap-2"
           >
@@ -1036,36 +1037,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           </Button>
         )}
       </div>
-
-      {/* Work-image enforcement confirm dialog */}
-      {showWorkImageConfirm && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
-          <Card padding="xl" elevation="xl" className="max-w-sm w-full">
-            <h3 className="font-bold text-lg text-foreground">บังคับแนบรูปวิธีทำหรือไม่?</h3>
-            <p className="text-sm text-muted-foreground mt-2">
-              ชุดข้อสอบนี้มีโจทย์ที่ตั้งค่าไว้ให้นักเรียนต้องแนบรูปวิธีทำ
-              ต้องการให้นักเรียนแนบรูปวิธีทำแบบบังคับก่อนส่งคำตอบสำหรับข้อสอบชุดนี้หรือไม่
-            </p>
-            <div className="flex flex-col gap-2 mt-5">
-              <Button type="button" onClick={() => resolveWorkImageChoice(true)} disabled={isPending} className="w-full">
-                ใช่ บังคับแนบรูป
-              </Button>
-              <Button type="button" variant="outline" onClick={() => resolveWorkImageChoice(false)} disabled={isPending} className="w-full">
-                ไม่ใช่ ไม่ต้องบังคับ
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setShowWorkImageConfirm(false)}
-                disabled={isPending}
-                className="w-full text-muted-foreground"
-              >
-                ยกเลิก
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
 
       {/* Publish timing dialog */}
       {showPublishDialog && (

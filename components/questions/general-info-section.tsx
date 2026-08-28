@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Layers } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SmartTagInput } from '@/components/ui/smart-tag-input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
+import { getMyQuestionSetOptions, type QuestionSetOption } from '@/lib/actions/question-sets'
 import { cn } from '@/lib/utils'
 import type { Difficulty, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
@@ -179,6 +180,115 @@ export function TeamShareChips({ label, teams, selectedIds, onToggle, disabled }
   )
 }
 
+// ─── QuestionSetPicker ─────────────────────────────────────────────────────────
+
+/**
+ * Above this many แฟ้ม the list gets a filter box. Roughly where `max-h-48`
+ * starts scrolling — the exact fit moves with the style preset's `--spacing`,
+ * so this is a handful, not a measurement. A few names are faster to read than
+ * to filter; past that, a name can sit below the fold and typing beats
+ * scrolling. Fifty แฟ้ม is the same capped box either way; what the filter
+ * changes is whether the teacher has to scroll it at all.
+ */
+const SET_FILTER_THRESHOLD = 5
+
+/**
+ * Choosing which แฟ้ม a new โจทย์ is filed into, straight from the form.
+ *
+ * Filing used to happen only after the fact, from คลังแฟ้มโจทย์ — the teacher
+ * saved the โจทย์, went looking for it in a คลัง of hundreds, and ticked it into
+ * a แฟ้ม. But the แฟ้ม a โจทย์ belongs to is known while it is being written
+ * ("this is the third one for ทบทวนกลางภาค"), and asking then costs one tick.
+ *
+ * Several แฟ้ม, because a โจทย์ genuinely lives in more than one — a งาน–พลังงาน
+ * question sits in both the unit แฟ้ม and the revision one — and this is the
+ * moment the teacher knows which.
+ *
+ * Only the teacher's own แฟ้ม are offered: a แฟ้ม a teammate shared is readable
+ * but not writable, so filing into one would be refused on save.
+ */
+export function QuestionSetPicker({ selectedIds, onChange }: {
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const [sets, setSets] = useState<QuestionSetOption[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [filter, setFilter] = useState('')
+
+  useEffect(() => {
+    getMyQuestionSetOptions()
+      .then(setSets)
+      .catch(() => setSets([]))
+      .finally(() => setLoaded(true))
+  }, [])
+
+  const query = filter.trim().toLowerCase()
+  const visible = query ? sets.filter(s => s.title.toLowerCase().includes(query)) : sets
+  // A แฟ้ม ticked before the filter was typed is still ticked, just off-list —
+  // say so, or the count below looks wrong.
+  const hiddenSelected = selectedIds.filter(id => !visible.some(s => s.id === id)).length
+
+  function toggle(id: string) {
+    onChange(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id])
+  }
+
+  if (!loaded) return <p className="text-sm text-muted-foreground">กำลังโหลดแฟ้มโจทย์...</p>
+
+  if (sets.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        ยังไม่มีแฟ้มโจทย์ของคุณ — บันทึกโจทย์นี้ไว้ก่อนได้เลย แล้วค่อยสร้างแฟ้มและจัดโจทย์เข้าแฟ้มที่หน้าคลังแฟ้มโจทย์
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {sets.length > SET_FILTER_THRESHOLD && (
+        <Input
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          placeholder={`ค้นหาจากชื่อแฟ้ม (มีทั้งหมด ${sets.length} แฟ้ม)`}
+          className="text-sm"
+        />
+      )}
+
+      <div className="border border-border rounded-lg max-h-48 overflow-y-auto p-1 space-y-0.5">
+        {visible.length === 0 ? (
+          <p className="px-2 py-3 text-sm text-muted-foreground">ไม่พบแฟ้มที่ชื่อตรงกับที่ค้นหา</p>
+        ) : visible.map(set => {
+          const checked = selectedIds.includes(set.id)
+          return (
+            <label
+              key={set.id}
+              className={cn(
+                'flex items-center gap-2.5 rounded-md px-2 py-1.5 cursor-pointer transition-colors',
+                checked ? 'bg-primary/10' : 'hover:bg-muted',
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggle(set.id)}
+                className="accent-primary"
+              />
+              <Layers className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-sm text-foreground truncate">{set.title}</span>
+            </label>
+          )
+        })}
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        {selectedIds.length === 0
+          ? 'ยังไม่ได้เลือกแฟ้ม — โจทย์จะอยู่ในคลังโจทย์อย่างเดียว'
+          : `เลือกไว้ ${selectedIds.length} แฟ้ม`}
+        {hiddenSelected > 0 && ` (มี ${hiddenSelected} แฟ้มที่เลือกไว้ไม่ตรงกับคำค้น)`}
+      </p>
+    </div>
+  )
+}
+
 // ─── GeneralInfoSection ────────────────────────────────────────────────────────
 
 interface GeneralInfoSectionProps {
@@ -204,6 +314,11 @@ interface GeneralInfoSectionProps {
   canEditSharing?: boolean
   tags: string[]
   onTagsChange: (tags: string[]) => void
+  /** แฟ้ม the โจทย์ will be filed into on save. Both are omitted when editing:
+   *  which แฟ้ม hold an existing โจทย์ is changed from the แฟ้ม itself, and a
+   *  picker here would have to mean "remove from the ones you untick" too. */
+  setIds?: string[]
+  onSetIdsChange?: (ids: string[]) => void
 }
 
 export function GeneralInfoSection({
@@ -217,6 +332,7 @@ export function GeneralInfoSection({
   teamEditAllowed, onTeamEditAllowedChange,
   canEditSharing = true,
   tags, onTagsChange,
+  setIds, onSetIdsChange,
 }: GeneralInfoSectionProps) {
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [teamChecked, setTeamChecked] = useState(false)
@@ -373,6 +489,16 @@ export function GeneralInfoSection({
         <p className="text-xs text-muted-foreground">ใช้ระบุหัวข้อของโจทย์ เช่น แรง, กฎนิวตัน, พลังงาน — ช่วยให้ค้นหาและกรองโจทย์ได้ง่ายขึ้น</p>
         <SmartTagInput allTags={allTags} tags={tags} onTagsChange={onTagsChange} />
       </div>
+
+      {onSetIdsChange && (
+        <div className="space-y-1.5">
+          <Label>แฟ้มโจทย์</Label>
+          <p className="text-xs text-muted-foreground">
+            เลือกแฟ้มที่จะเก็บโจทย์ข้อนี้ เลือกได้หลายแฟ้ม — โจทย์ข้อเดียวอยู่ได้หลายแฟ้ม · ไม่เลือกก็ได้
+          </p>
+          <QuestionSetPicker selectedIds={setIds ?? []} onChange={onSetIdsChange} />
+        </div>
+      )}
     </section>
   )
 }

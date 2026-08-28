@@ -45,7 +45,6 @@ export type QuestionSummary = Pick<
   | 'question_type'
   | 'difficulty'
   | 'tags'
-  | 'requires_work_image'
   | 'group_id'
   | 'order_in_group'
   | 'team_edit_allowed'
@@ -174,7 +173,7 @@ export default async function QuestionsPage({
   const filters = readFilters(sp)
   const teamFilters = readTeamFilters(sp)
 
-  const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, requires_work_image, group_id, order_in_group, team_edit_allowed, content_fingerprint, created_at, updated_at, subject'
+  const summaryFields = 'id, created_by, org_id, title, question_text, question_type, difficulty, tags, group_id, order_in_group, team_edit_allowed, content_fingerprint, created_at, updated_at, subject'
 
   // Filtering and paging happen in the database rather than in the browser:
   // the bank is already past a thousand questions, and shipping all of them on
