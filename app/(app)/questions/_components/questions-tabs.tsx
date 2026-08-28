@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const TABS = [
+  { href: '/questions/sets', label: 'ภาพรวมคลัง' },
   { href: '/questions', label: 'โจทย์รายข้อ' },
-  { href: '/questions/sets', label: 'แฟ้มโจทย์' },
 ]
 
 // Only shown on the two browse pages themselves — not on /questions/new,
