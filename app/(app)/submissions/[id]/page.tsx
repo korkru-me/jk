@@ -40,12 +40,15 @@ function formatAnswer(n: number): string {
   return parseFloat(n.toPrecision(4)).toString()
 }
 
-// Fill-blank is the only question type that can grade to a pending
-// (null) is_correct — a whole-manual blank, or a mix of manual + auto
-// blanks where the auto ones are already scored but the row still
-// awaits a teacher's review of the manual blank(s).
-function isManualFillBlank(a: any): boolean {
-  return String(a.correct_answer ?? '').startsWith('FILL') && a.is_correct === null
+// A row nobody has decided yet. Auto-grading leaves is_correct null exactly
+// when a person still has to read the answer: a whole-manual fill-blank, a
+// mix of manual + auto blanks where the auto ones are already scored, a
+// composite with a manual part, and an essay — which has no answer key at
+// all (see the essay branch in gradeAnswer). A submitted row is graded, so
+// null here means pending review, never "not looked at yet"; an attempt
+// still in progress is redirected away above.
+function isPendingTeacherReview(a: { is_correct: boolean | null }): boolean {
+  return a.is_correct === null
 }
 
 export default async function SubmissionResultPage({
@@ -171,7 +174,7 @@ export default async function SubmissionResultPage({
   const canShowAnswers = isTeacherViewer || canStudentReviewAnswers(assignment.show_results, assignment.end_at)
 
   const answers = (submission as any).submission_answers as any[]
-  const pendingManualCount = answers.filter(isManualFillBlank).length
+  const pendingManualCount = answers.filter(isPendingTeacherReview).length
 
   const attemptsRemaining = assignment.max_attempts == null || submission.attempt_number < assignment.max_attempts
   const canRetry = isOwnSubmission && attemptsRemaining && assignment.status === 'published' &&
@@ -385,7 +388,7 @@ async function SubmissionAnswerDetails({
 
   const sortedAnswers = (answers ?? []) as any[]
   const wrongAnswers = sortedAnswers
-    .filter(a => a.is_correct === false && !isManualFillBlank(a))
+    .filter(a => a.is_correct === false && !isPendingTeacherReview(a))
     .map(a => ({
       title: a.questions?.title ?? '',
       questionText: substituteVars(a.questions?.question_text ?? '', a.random_values ?? {}),
@@ -400,7 +403,7 @@ async function SubmissionAnswerDetails({
         {sortedAnswers.map((a: any, i: number) => {
           const q = a.questions
           const isCorrect = a.is_correct
-          const isPendingManual = isManualFillBlank(a)
+          const isPendingManual = isPendingTeacherReview(a)
 
           return (
             <div
@@ -497,7 +500,7 @@ async function SubmissionAnswerDetails({
         </h2>
         <StudyPathPanel
           wrongQuestions={wrongAnswers}
-          totalQuestions={sortedAnswers.filter(a => !isManualFillBlank(a)).length}
+          totalQuestions={sortedAnswers.filter(a => !isPendingTeacherReview(a)).length}
         />
       </div>
     </>
@@ -657,6 +660,27 @@ function AnswerReview({
             ))}
           </div>
         )}
+      </div>
+    )
+  }
+
+  // ─── Essay: writing a teacher reads ──────────────────────────────────────
+  // There is no answer key to compare against, so no เฉลย row is shown here.
+  // Showing one is exactly what put "undefined" — the value an essay's empty
+  // answer_formula evaluated to — in front of students, back when an essay had
+  // no branch of its own and fell through to the single-answer display at the
+  // bottom. Keyed on question_type, so rows still carrying that frozen string
+  // stop displaying it too.
+  if (questionType === 'essay') {
+    return (
+      <div className="mt-2 space-y-2 text-sm">
+        {isCorrect === null && (
+          <p className="text-xs text-warning font-medium">รอครูผู้สอนตรวจสอบและให้คะแนน</p>
+        )}
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">คำตอบคุณ:</p>
+          <p className="whitespace-pre-wrap break-words font-medium">{studentAnswer?.trim() || '—'}</p>
+        </div>
       </div>
     )
   }
