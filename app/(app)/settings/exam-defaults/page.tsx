@@ -14,9 +14,9 @@ export default async function ExamDefaultsPage() {
   const supabase = await createClient()
   const [profileResult, schemaResult] = await Promise.all([
     supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
-    // The newest SEB preflight table can exist only after the earlier SEB,
-    // Android admission, and proctor-review migrations have been applied in
-    // order. Probing it avoids reporting a partially deployed rollout ready.
+    // This probe confirms the operational schema through the SEB preflight
+    // migration only. ACL/constraint hardening has no PostgREST schema marker,
+    // so operators must separately verify the ledger through 20260830200014.
     supabase.from('exam_seb_checkins').select('assignment_id').limit(1),
   ])
   if (profileResult.data?.role === 'student') redirect('/settings/profile')

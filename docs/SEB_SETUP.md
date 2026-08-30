@@ -1,6 +1,6 @@
-# Safe Exam Browser — คู่มือติดตั้งและใช้งานเฟส 1–6
+# Safe Exam Browser — คู่มือติดตั้งและใช้งานเฟส 1–7
 
-SEB รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเว็บ KorKru เดิม ไม่รองรับ Android และไม่ต้องติดตั้ง SEB Server ระบบตรวจ Config Key (CK) และ Browser Exam Key (BEK) ที่ KorKru โดยตรง แล้วแสดงสถานะในห้องคุมสอบเดิม เฟส 3 เพิ่ม Android monitored mode แยกต่างหากซึ่งความมั่นใจต่ำกว่าและต้องให้ครูตรวจเครื่องต่อหน้า ดู `docs/ANDROID_EXAM_MODE.md` เฟส 4 เพิ่มเสียง/Browser Notification แบบ opt-in และคิวรับทราบเหตุการณ์ร่วมกันระหว่างครู เฟส 5 เพิ่ม roster เช็กอิน SEB ก่อนสอบจาก system check ที่ผ่านจริง และเฟส 6 เพิ่มรายงานสัญญาณย้อนหลังแบบอ่านอย่างเดียวกับ CSV ที่จำกัดขนาดโดยไม่เพิ่ม migration ใหม่
+SEB รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเว็บ KorKru เดิม ไม่รองรับ Android และไม่ต้องติดตั้ง SEB Server ระบบตรวจ Config Key (CK) และ Browser Exam Key (BEK) ที่ KorKru โดยตรง แล้วแสดงสถานะในห้องคุมสอบเดิม เฟส 3 เพิ่ม Android monitored mode แยกต่างหากซึ่งความมั่นใจต่ำกว่าและต้องให้ครูตรวจเครื่องต่อหน้า ดู `docs/ANDROID_EXAM_MODE.md` เฟส 4 เพิ่มเสียง/Browser Notification แบบ opt-in และคิวรับทราบเหตุการณ์ร่วมกันระหว่างครู เฟส 5 เพิ่ม roster เช็กอิน SEB ก่อนสอบจาก system check ที่ผ่านจริง เฟส 6 เพิ่มรายงานสัญญาณย้อนหลังแบบอ่านอย่างเดียวกับ CSV ที่จำกัดขนาด และเฟส 7 เป็นการทำ production readiness: ตรวจ migration, environment, ไฟล์ `.seb`, platform/build ที่อนุญาต และขั้นตอนทดสอบจริงก่อนเปิดใช้
 
 > การ merge โค้ดอย่างเดียวยังไม่ทำให้ SEB พร้อมใช้ ต้อง apply migration, ตั้ง environment, สร้างไฟล์ `.seb` และทดสอบเครื่องจริงก่อนเปิดสวิตช์ให้ข้อสอบ
 
@@ -13,17 +13,17 @@ SEB รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเ
 ค่าขั้นต่ำที่แนะนำ:
 
 - Start URL เป็น URL ของ KorKru production เช่น `https://example.school/assignments`
-- ใช้ modern browser engine / JavaScript API; macOS/iOS ต้องไม่บังคับ classic WebView
+- ใช้ modern browser engine (WKWebView บน macOS/iOS) และ SEB JavaScript API; อย่าถอยไปใช้ classic WebView
 - เปิด JavaScript และ cookies
 - อนุญาต navigation เฉพาะโดเมน KorKru และโดเมน Supabase ของโปรเจกต์ที่ Realtime/Storage ใช้
-- ไม่เปิด URL **content filter** ที่บังคับ classic WebView บน macOS/iOS; ใช้ navigation URL filter แทน
+- หากเปิด URL **content filter** บน macOS/iOS ให้กำหนด SEB 3.5+ ซึ่งรองรับ content filter ใน modern WKWebView แล้ว; custom regular expression ใช้ได้เฉพาะ subset ที่ WKWebView/Safari Content Filters รองรับ จึงต้องทดสอบทุกกฎบน build ที่โรงเรียนอนุญาต สำหรับ build เก่ากว่านั้นให้ปิด content filter และใช้ navigation URL filter แทน ไม่ควรแก้ด้วยการบังคับ classic WebView ดู [macOS release notes ของ SEB 3.5](https://safeexambrowser.org/macosx/mac_release_notes_en.html#new-in-seb-35)
 - ปิด app switching, screen sharing/mirroring, Print Screen, clipboard ภายนอก, developer console และ task manager ตามความสามารถของแต่ละ OS
 - จำกัดหนึ่งจอ ปิด VM/remote session ตามนโยบายโรงเรียน
 - เปิด file upload เฉพาะเมื่อข้อสอบมีรูปวิธีทำหรือข้อส่งไฟล์
 - ตั้ง Quit Password และ Admin Password ที่ผู้คุมสอบถือไว้ ห้ามแจกนักเรียน
 - iOS/iPadOS ต้องตั้ง Quit Password เพื่อเข้า secure mode
 
-KorKru ใช้ SEB JavaScript API (`SafeExamBrowser.security.*`) จึงไม่ต้องเปิดการส่ง CK/BEK ผ่าน HTTP header แต่ต้องใช้ SEB อย่างน้อยรุ่นที่รองรับ API: Windows 3.3.2+, macOS/iOS 3.0+ แนะนำให้กำหนดเฉพาะรุ่นล่าสุดที่โรงเรียนทดสอบแล้ว
+KorKru ใช้ SEB JavaScript API (`SafeExamBrowser.security.*`) จึงไม่ต้องเปิดการส่ง CK/BEK ผ่าน HTTP header สำหรับ production matrix ให้กำหนดขั้นต่ำแบบ conservative เป็น **Windows 3.4+ และ macOS/iOS 3.0+** ตาม [ข้อกำหนด Config Key/JavaScript API หลัก](https://safeexambrowser.org/developer/seb-config-key.html) และอนุญาตเฉพาะรุ่นล่าสุดที่โรงเรียนทดสอบแล้วจริง
 
 ## 2. เก็บ CK และ BEK
 
@@ -33,12 +33,14 @@ KorKru ใช้ SEB JavaScript API (`SafeExamBrowser.security.*`) จึงไ�
 - **Browser Exam Key** เปลี่ยนตาม platform/build ของ SEB ต้องเก็บทุก BEK ที่โรงเรียนยอมรับ
 - ทั้งสองค่าเป็นเลขฐานสิบหก SHA-256 จำนวน 64 ตัว ให้คัดลอกตรงตามที่ Config Tool แสดงรวมถึงตัวพิมพ์เล็ก/ใหญ่ และเป็น secret ฝั่ง server ห้ามใส่ใน source code, หน้าเว็บ หรือ `NEXT_PUBLIC_*`
 
-ทุกครั้งที่แก้ไฟล์ `.seb` ต้องคัดลอก CK/BEK ใหม่และ deploy environment พร้อมกัน ไม่เช่นนั้นนักเรียนทุกคนจะถูกปฏิเสธ
+ทุกครั้งที่แก้ไฟล์ `.seb` ต้องคัดลอก CK/BEK ใหม่และ deploy environment พร้อมกัน ไม่เช่นนั้นนักเรียนทุกคนจะถูกปฏิเสธ ขั้นตอนเก็บ BEK ที่ถูกต้องคือบันทึกไฟล์สุดท้ายหนึ่งครั้ง แล้วเปิดไฟล์เดิม (ห้ามบันทึกซ้ำ) ในทุก platform/build ที่จะอนุญาตเพื่อคัดลอก BEK ของแต่ละรุ่น ตาม [คู่มือ SEB Integration](https://safeexambrowser.org/developer/seb-integration.html)
+
+เมื่อเปลี่ยน CK หรือชุด BEK ให้ **rotate `SEB_SESSION_SECRET` ใน maintenance window เดียวกัน** เพื่อยกเลิก signed SEB session เก่าทันที หรือรอเกินอายุ session 12 ชั่วโมงก่อนถือว่า key เก่าถูกยกเลิกอย่างสมบูรณ์ การ rotate secret จะทำให้ session ที่กำลังใช้อยู่ต้องตรวจ SEB ใหม่ จึงห้ามทำกลางการสอบ
 
 ## 3. ตั้ง environment
 
 ```dotenv
-# URL production ที่ browser เปิดจริง ต้องตรง origin ทุกตัวอักษร
+# URL production ที่ browser เปิดจริง ต้องตรง canonical origin ทุกตัวอักษรและไม่มี / ท้าย
 NEXT_PUBLIC_SITE_URL=https://example.school
 
 # สุ่มอย่างน้อย 32 ตัวอักษร เก็บใน secret manager
@@ -58,6 +60,8 @@ NEXT_PUBLIC_SEB_CONFIG_URL=https://example.school/exam/korkru-production.seb
 
 ไฟล์ `.seb` ที่เผยแพร่ต้องเข้ารหัสและห้ามมีรหัสผ่านเป็น plain text ชื่อ URL ของไฟล์ไม่ถือเป็น secret แต่ CK/BEK และรหัสผู้ดูแลถือเป็น secret
 
+ก่อน deploy ให้รัน `npm run check:seb-readiness` ใน environment ที่จะใช้จริง คำสั่งนี้ตรวจรูปแบบ environment และ permission ของ `.env.local` แบบ read-only โดยไม่แสดงค่าจริงและไม่เรียก network/ฐานข้อมูล ค่า `NEXT_PUBLIC_SEB_CONFIG_URL` ที่เว้นว่างจะแจ้งเตือนเพื่อให้ยืนยันวิธีแจกไฟล์เอง แต่หากตั้งค่าไว้แล้วมีรูปแบบผิดจะเป็น blocker จนกว่าจะแก้หรือลบค่านั้น การผ่านคำสั่งนี้ยังไม่ยืนยันว่า URL ดาวน์โหลดได้หรือไฟล์ `.seb` มี policy ถูกต้อง จึงต้องทดสอบไฟล์จริงต่อ
+
 ## 4. Apply migration และ deploy
 
 Migrations ตามลำดับ:
@@ -66,10 +70,12 @@ Migrations ตามลำดับ:
 2. `20260830072842_add_android_monitored_exam_access.sql`
 3. `20260830082038_add_exam_proctor_event_review.sql`
 4. `20260830085610_add_exam_seb_preflight_checkins.sql`
+5. `20260830195151_harden_android_exam_approval_audit.sql`
+6. `20260830200014_harden_exam_operational_table_privileges.sql`
 
 ลำดับ rollout ที่ปลอดภัย:
 
-1. Apply migrations ทั้งสี่ตามลำดับก่อน deploy code โดย migration เฟส 5 ต้องตามหลังสามไฟล์แรก (ค่าเดิมทุกข้อสอบเป็น `browser` จึงไม่กระทบนักเรียน และ migrations เฟส 4–5 เพิ่มข้อมูลที่ dashboard รุ่นใหม่อ่าน)
+1. Apply migrations ทั้งหกตามลำดับก่อน deploy code โดย migration เช็กอิน SEB ต้องตามหลังสามไฟล์แรก และ migrations hardening สองไฟล์ต้องอยู่ท้ายสุด เพราะแก้สิทธิ์กับ constraints ของตารางที่ migrations ก่อนหน้าสร้างไว้ (ค่าเดิมทุกข้อสอบเป็น `browser` จึงไม่กระทบนักเรียน และ migrations เฟส 4–5 เพิ่มข้อมูลที่ dashboard รุ่นใหม่อ่าน)
 2. Deploy code + environment ทั้งหมด
 3. เปิดไฟล์ `.seb` บน staging และยืนยันว่า login, Realtime, autosave, รูปวิธีทำ/ไฟล์แนบ และ submit ทำงาน
 4. ทดสอบอย่างน้อย Windows, macOS และ iPhone/iPad รุ่นที่โรงเรียนจะอนุญาต
@@ -77,6 +83,24 @@ Migrations ตามลำดับ:
 6. เปิด “บังคับใช้ Safe Exam Browser” เฉพาะข้อสอบนำร่องที่ยังไม่มี submission
 
 ควร apply migration เฟส 4 นอกช่วงสอบ เพราะการสร้างดัชนีคิวรับทราบอาจรอ lock ของตาราง event หากมีข้อมูลจำนวนมากหรือกำลังรับ heartbeat/event อยู่
+
+### สถานะ Phase 7 ณ วันที่ 2026-08-30
+
+สิ่งที่ทำกับ production แล้ว:
+
+- Apply migrations สี่ไฟล์แรกตามลำดับสำเร็จ และตรวจยืนยันว่าประวัติ migration ฝั่ง local/remote ตรงกัน
+- Apply migrations hardening ลำดับที่ 5–6 กับ production สำเร็จเวลาประมาณ 20:00 น. (Asia/Bangkok) โดยใช้ `--skip-vault` จึงไม่แก้ Vault; ลำดับที่ 6 ถอนสิทธิ์ `MAINTAIN` ของ PostgreSQL 17 จาก role เว็บบนตาราง proctor/SEB และคืนเฉพาะ `SELECT` รวมเป็น migrations เฟสนี้ครบทั้งหกไฟล์แล้ว ทั้งนี้ทุก rollout ครั้งถัดไปยังต้องตรวจประวัติด้วย `supabase migration list --linked` ก่อน deploy
+
+สิ่งที่ยังเป็น blocker และต้องจัดเตรียมก่อนเปิดข้อสอบ SEB จริง:
+
+- canonical production URL ที่นักเรียนจะเปิดจริง ต้องมี origin เดียวชัดเจนและตรงกับ `NEXT_PUBLIC_SITE_URL` ทุกตัวอักษร โดยไม่มี credential หรือ `/` ท้าย รวมทั้งมีนโยบาย redirect ของ `www`/โดเมนสำรอง
+- สิทธิ์เข้าถึงระบบ deploy/secret manager เพื่อกำหนด environment ฝั่ง production โดยไม่คัดลอก secret ลง repository
+- CK จากไฟล์ `.seb` รุ่นสุดท้าย และ BEK แยกตามทุก platform/build ที่โรงเรียนจะอนุญาต
+- ไฟล์ `.seb` ที่เข้ารหัสแล้ว พร้อม URL แจกไฟล์หรือขั้นตอนแจกแบบออฟไลน์
+- supported build matrix ที่ระบุ Windows, macOS และ iOS/iPadOS รุ่นที่ทดสอบและอนุญาตอย่างชัดเจน
+- staging ที่แยกจาก production พร้อมบัญชีครู/นักเรียนทดสอบและข้อสอบ fixture สำหรับทดสอบ login, Realtime, autosave, upload, reconnect และ submit โดยไม่สร้างข้อมูลทดสอบใน production
+
+รายการนี้เป็น production-readiness gate ไม่ควรแทนที่ด้วยค่า CK/BEK ปลอมหรือทดสอบสร้าง submission บนฐานข้อมูลจริง เมื่อได้ข้อมูลครบแล้วให้ deploy environment และไฟล์ `.seb` ไป staging ก่อน ทำ automated integration test ที่ไม่แตะ production แล้วจึงทดสอบเครื่องจริงตาม platform/build matrix
 
 หลัง deploy ให้ครูเปิด **การตั้งค่า → ตั้งค่าข้อสอบเริ่มต้น** ระบบจะแสดง readiness checklist โดยส่งไปหน้าเว็บเฉพาะสถานะและจำนวน BEK ที่ไม่ซ้ำ ไม่ส่งค่า secret, CK หรือ BEK ออกจาก server
 
@@ -88,7 +112,7 @@ Migrations ตามลำดับ:
 - `SEB_CONFIG_KEY` ไม่ใช่ 64 hex
 - ไม่มี BEK ที่เป็น 64 hex อย่างน้อยหนึ่งค่า
 
-ลิงก์ `NEXT_PUBLIC_SEB_CONFIG_URL` ไม่ใช่ตัวบล็อก เพราะโรงเรียนอาจแจกไฟล์ `.seb` เอง แต่หน้า readiness จะแจ้งเตือนหากลิงก์มีรูปแบบไม่ถูกต้อง ระบบตรวจเฉพาะความพร้อมของค่า environment ไม่ทดสอบว่า URL ปลายทางดาวน์โหลดไฟล์ได้จริง จึงต้องเปิดไฟล์จากเครื่องทดสอบด้วย
+การ **เว้นว่าง** `NEXT_PUBLIC_SEB_CONFIG_URL` ไม่บล็อก server publish เพราะโรงเรียนอาจแจกไฟล์ `.seb` เอง และ Phase 7 CLI จะแจ้งเพียง warning แต่หากตั้งค่า URL ไว้แล้วรูปแบบผิด server readiness ยังแสดง warning ขณะที่ `npm run check:seb-readiness` จะ exit ไม่สำเร็จเพื่อหยุด deploy จนกว่าจะแก้หรือลบค่านั้น ทั้งสองส่วนตรวจเพียงรูปแบบ ไม่ทดสอบว่า URL ปลายทางดาวน์โหลดได้จริง จึงต้องเปิดไฟล์จากเครื่องทดสอบด้วย
 
 ข้อสอบแบบร่างสามารถเลือก SEB ไว้ก่อนได้ แต่ server จะไม่ยอมเปลี่ยนเป็น `published` จนกว่ารายการตัวบล็อกจะผ่านทั้งหมด หากข้อสอบถูกเผยแพร่อยู่แล้ว การแก้ให้บังคับ SEB จะใช้กฎเดียวกัน
 
@@ -172,4 +196,10 @@ System check ทำสิ่งต่อไปนี้:
 - เว็บปกติไม่มี API ที่เชื่อถือได้สำหรับตรวจว่า OS แคปหน้าจอสำเร็จหรือไม่ การปิด screenshot/app switching ต้องมาจากนโยบายในไฟล์ `.seb` และความสามารถของแต่ละ OS
 - เสียงและ Browser Notification ไม่ใช่ Web Push: ต้องเปิดจากปุ่มของครูต่อการเปิดหน้า และหยุดทำงานเมื่อปิด dashboard หรือ browser
 
-เอกสารเทคนิคทางการ: [SEB Config Key และ JavaScript API](https://safeexambrowser.org/developer/seb-config-key.html)
+## เอกสารทางการที่ใช้อ้างอิง
+
+- [SEB Downloads](https://safeexambrowser.org/download_en.html)
+- [Config Key และ JavaScript API](https://safeexambrowser.org/developer/seb-config-key.html)
+- [การเก็บ Config Key/Browser Exam Key เพื่อเชื่อมกับระบบสอบ](https://safeexambrowser.org/developer/seb-integration.html)
+- [macOS release notes](https://safeexambrowser.org/macosx/mac_release_notes_en.html)
+- [iOS/iPadOS release notes](https://safeexambrowser.org/ios/ios_release_notes_en.html)

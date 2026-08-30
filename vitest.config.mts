@@ -7,10 +7,10 @@ export default defineConfig({
     alias: { '@': import.meta.dirname },
   },
   test: {
-    // Only the pure logic is covered: the evaluator, scoring, and the shared
-    // text/format helpers. Anything that needs Supabase or a browser is left
-    // to manual checking until there is a fixture database to point at.
-    include: ['lib/**/*.test.ts'],
+    // Only pure logic is covered: evaluator/scoring helpers and read-only
+    // deployment checks. Anything that needs Supabase or a browser is left to
+    // manual checking until there is a fixture database to point at.
+    include: ['lib/**/*.test.ts', 'scripts/**/*.test.mjs'],
     environment: 'node',
   },
 })

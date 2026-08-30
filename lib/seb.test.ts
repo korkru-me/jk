@@ -110,6 +110,32 @@ describe('SEB environment and version validation', () => {
       SEB_BROWSER_EXAM_KEYS: BROWSER_KEY,
     })).toMatchObject({ publishReady: false, siteUrlReady: false, configFileStatus: 'manual' })
   })
+
+  it('rejects non-canonical and credential-bearing production URLs', () => {
+    for (const siteUrl of [
+      'https://exam.example/',
+      'https://user:password@exam.example',
+      ' https://exam.example',
+      'https://exam.example ',
+    ]) {
+      expect(inspectSebReadiness({
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_SITE_URL: siteUrl,
+        SEB_SESSION_SECRET: SECRET,
+        SEB_CONFIG_KEY: CONFIG_KEY,
+        SEB_BROWSER_EXAM_KEYS: BROWSER_KEY,
+      })).toMatchObject({ publishReady: false, siteUrlReady: false })
+    }
+
+    expect(inspectSebReadiness({
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_SITE_URL: 'https://exam.example',
+      NEXT_PUBLIC_SEB_CONFIG_URL: 'https://user:password@exam.example/korkru.seb',
+      SEB_SESSION_SECRET: SECRET,
+      SEB_CONFIG_KEY: CONFIG_KEY,
+      SEB_BROWSER_EXAM_KEYS: BROWSER_KEY,
+    })).toMatchObject({ configFileStatus: 'invalid' })
+  })
 })
 
 describe('signed SEB claims', () => {

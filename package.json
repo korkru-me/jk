@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "check:seb-readiness": "node scripts/check-seb-readiness.mjs",
     "lint:tokens": "node scripts/check-design-tokens.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

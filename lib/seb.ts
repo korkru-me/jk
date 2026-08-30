@@ -93,12 +93,17 @@ export function inspectSebReadiness(
       .filter((key): key is string => key !== null),
   ).size
 
-  const siteUrl = parseHttpUrl(environment.NEXT_PUBLIC_SITE_URL)
+  const siteUrlRaw = environment.NEXT_PUBLIC_SITE_URL
+  const siteUrlValue = siteUrlRaw?.trim()
+  const siteUrl = parseHttpUrl(siteUrlValue)
   const siteUrlReady = siteUrl !== null
     && (!production || siteUrl.protocol === 'https:')
+    && siteUrl.username === ''
+    && siteUrl.password === ''
     && siteUrl.pathname === '/'
     && siteUrl.search === ''
     && siteUrl.hash === ''
+    && siteUrlRaw === siteUrl.origin
 
   const configUrlValue = environment.NEXT_PUBLIC_SEB_CONFIG_URL?.trim()
   const configUrl = parseHttpUrl(configUrlValue)
@@ -106,6 +111,8 @@ export function inspectSebReadiness(
     ? 'manual'
     : configUrl
       && (!production || configUrl.protocol === 'https:')
+      && configUrl.username === ''
+      && configUrl.password === ''
       && configUrl.pathname.toLowerCase().endsWith('.seb')
         ? 'ready'
         : 'invalid'

@@ -86,15 +86,15 @@ export function SebReadinessCard({
           status={schemaReady ? 'ready' : 'blocked'}
           title="โครงสร้างฐานข้อมูล"
           description={schemaReady
-            ? 'พบ schema ครบถึงสถานะตรวจเครื่องก่อนสอบและห้องคุมสอบล่าสุดแล้ว'
-            : 'schema ยังไม่ครบทุกเฟส — apply migration ที่ค้างตามลำดับจนถึง 20260830085610_add_exam_seb_preflight_checkins.sql ก่อน deploy โค้ดนี้'}
+            ? 'พบตารางเช็กอิน SEB ซึ่งยืนยัน schema หลักถึง 20260830085610 เท่านั้น — ก่อนเปิด production ผู้ดูแลต้องตรวจ migration ledger ให้ครบถึง 20260830200014 แยกต่างหาก'
+            : 'ยังไม่พบตารางเช็กอิน SEB — apply migrations ตามลำดับ แล้วตรวจ migration ledger ให้ครบถึง 20260830200014 ก่อนเปิด production'}
         />
         <ReadinessRow
           status={readiness.siteUrlReady ? 'ready' : 'blocked'}
           title="Production URL"
           description={readiness.siteUrlReady
             ? 'NEXT_PUBLIC_SITE_URL เป็น origin ที่ถูกต้องและใช้ HTTPS ใน production'
-            : 'ตั้ง NEXT_PUBLIC_SITE_URL เป็น origin ของเว็บจริง เช่น https://exam.school.ac.th โดยไม่มี path'}
+            : 'ตั้ง NEXT_PUBLIC_SITE_URL เป็น canonical origin เช่น https://exam.school.ac.th โดยไม่มี credential, / ท้าย หรือ path'}
         />
         <ReadinessRow
           status={readiness.sessionSecretReady ? 'ready' : 'blocked'}
