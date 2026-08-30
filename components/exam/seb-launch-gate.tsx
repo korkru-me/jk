@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, LockKeyhole } from 'lucide-react'
 import { verifySafeExamBrowser } from '@/lib/actions/seb'
 import { Button } from '@/components/ui/button'
@@ -63,6 +64,7 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
         configKeyHash,
         browserExamKeyHash,
         version: seb.version,
+        purpose: 'take',
       })
       if (cancelled) return
       if ('error' in result) {
@@ -170,6 +172,12 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
         >
           ดาวน์โหลด Safe Exam Browser <ExternalLink className="h-3.5 w-3.5" />
         </a>
+        <Link
+          href={`/assignments/${assignmentId}/system-check`}
+          className="ml-3 inline-flex items-center text-sm text-primary hover:underline"
+        >
+          ตรวจเครื่องโดยไม่เริ่มจับเวลา
+        </Link>
       </Card>
     </div>
   )

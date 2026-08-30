@@ -3,6 +3,7 @@ import {
   createSebChallengeClaims,
   createSebRequestHash,
   createSebSessionClaims,
+  inspectSebReadiness,
   normalizeSebRequestUrl,
   parseSebVersion,
   readSebEnvironment,
@@ -78,16 +79,53 @@ describe('SEB environment and version validation', () => {
   it('does not treat a browser user agent as an SEB version', () => {
     expect(parseSebVersion('Mozilla/5.0 Safari')).toBeNull()
   })
+
+  it('reports deployment readiness without returning secret values', () => {
+    const readiness = inspectSebReadiness({
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_SITE_URL: 'https://exam.example',
+      NEXT_PUBLIC_SEB_CONFIG_URL: 'https://exam.example/korkru.seb',
+      SEB_SESSION_SECRET: SECRET,
+      SEB_CONFIG_KEY: CONFIG_KEY,
+      SEB_BROWSER_EXAM_KEYS: `${BROWSER_KEY},${BROWSER_KEY}`,
+    })
+    expect(readiness).toEqual({
+      publishReady: true,
+      sessionSecretReady: true,
+      configKeyReady: true,
+      browserExamKeyCount: 1,
+      siteUrlReady: true,
+      configFileStatus: 'ready',
+    })
+    expect(JSON.stringify(readiness)).not.toContain(SECRET)
+    expect(JSON.stringify(readiness)).not.toContain(CONFIG_KEY)
+  })
+
+  it('requires HTTPS in production but allows distributing the config file manually', () => {
+    expect(inspectSebReadiness({
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_SITE_URL: 'http://exam.example',
+      SEB_SESSION_SECRET: SECRET,
+      SEB_CONFIG_KEY: CONFIG_KEY,
+      SEB_BROWSER_EXAM_KEYS: BROWSER_KEY,
+    })).toMatchObject({ publishReady: false, siteUrlReady: false, configFileStatus: 'manual' })
+  })
 })
 
 describe('signed SEB claims', () => {
   it('binds a short-lived challenge to one user and assignment', () => {
-    const claims = createSebChallengeClaims(USER_ID, ASSIGNMENT_ID, 1_000)
+    const claims = createSebChallengeClaims(USER_ID, ASSIGNMENT_ID, 'system_check', 1_000)
     const token = signSebClaims(claims, SECRET)
     expect(verifySebClaims(token, SECRET, 2_000)).toMatchObject({
-      kind: 'seb_challenge', userId: USER_ID, assignmentId: ASSIGNMENT_ID,
+      kind: 'seb_challenge', userId: USER_ID, assignmentId: ASSIGNMENT_ID, purpose: 'system_check',
     })
     expect(verifySebClaims(token, SECRET, claims.expiresAt)).toBeNull()
+  })
+
+  it('rejects a challenge without a recognized purpose', () => {
+    const claims = createSebChallengeClaims(USER_ID, ASSIGNMENT_ID, 'take', 1_000)
+    const token = signSebClaims({ ...claims, purpose: 'other' } as never, SECRET)
+    expect(verifySebClaims(token, SECRET, 2_000)).toBeNull()
   })
 
   it('rejects a changed session token', () => {

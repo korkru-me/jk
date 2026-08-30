@@ -44,7 +44,7 @@ const NAV_ITEMS = [
     href: '/settings/exam-defaults',
     label: 'ตั้งค่าข้อสอบเริ่มต้น',
     icon: BookOpen,
-    description: 'ค่าเริ่มต้นของทุกชุดข้อสอบ',
+    description: 'ค่าเริ่มต้นและความพร้อม SEB',
   },
   {
     href: '/settings/notifications',

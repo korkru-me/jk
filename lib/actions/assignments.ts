@@ -7,8 +7,11 @@ import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { AssignmentStatus, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { normalizeSetSections } from '@/lib/question-set-sections'
+import { inspectSebReadiness } from '@/lib/seb'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
+
+const SEB_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ เพราะระบบตั้งค่าไม่ครบ กรุณาตรวจที่ การตั้งค่า > ตั้งค่าข้อสอบเริ่มต้น'
 
 interface CreateAssignmentData {
   classroom_ids: string[]
@@ -85,6 +88,11 @@ export async function createAssignment(data: CreateAssignmentData) {
   const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
     ? 'seb_required'
     : 'browser'
+  if (
+    data.status === 'published'
+    && secureBrowserMode === 'seb_required'
+    && !inspectSebReadiness().publishReady
+  ) return { error: SEB_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled === true || secureBrowserMode === 'seb_required')
   const randomQuestionCount = isOnlineExam
@@ -166,6 +174,18 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
+  if (status === 'published') {
+    const { data: assignment, error: assignmentError } = await supabase
+      .from('assignments')
+      .select('secure_browser_mode')
+      .eq('id', id)
+      .maybeSingle()
+    if (assignmentError) return { error: 'ตรวจสอบความพร้อม Safe Exam Browser ไม่สำเร็จ กรุณาตรวจว่า apply migration แล้ว' }
+    if (assignment?.secure_browser_mode === 'seb_required' && !inspectSebReadiness().publishReady) {
+      return { error: SEB_NOT_READY_ERROR }
+    }
+  }
+
   // No explicit created_by filter — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all, the latter scoped to admin/manage
   // permission) already restricts this update to owner or authorized
@@ -226,7 +246,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, sections, type, mode, random_question_count, secure_browser_mode')
+    .select('question_ids, sections, type, mode, status, random_question_count, secure_browser_mode')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -289,6 +309,11 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
     ? 'seb_required'
     : 'browser'
+  if (
+    existing.status === 'published'
+    && secureBrowserMode === 'seb_required'
+    && !inspectSebReadiness().publishReady
+  ) return { error: SEB_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled || secureBrowserMode === 'seb_required')
   const randomQuestionCount = isOnlineExam

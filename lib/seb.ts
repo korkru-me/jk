@@ -6,6 +6,7 @@ import {
 } from 'node:crypto'
 
 export type SebPlatform = 'windows' | 'macos' | 'ios'
+export type SebChallengePurpose = 'take' | 'system_check'
 
 export interface SebVersionInfo {
   platform: SebPlatform
@@ -16,6 +17,7 @@ export interface SebChallengeClaims {
   kind: 'seb_challenge'
   userId: string
   assignmentId: string
+  purpose: SebChallengePurpose
   nonce: string
   issuedAt: number
   expiresAt: number
@@ -39,6 +41,15 @@ export interface SebEnvironment {
   browserExamKeys: string[]
 }
 
+export interface SebReadiness {
+  publishReady: boolean
+  sessionSecretReady: boolean
+  configKeyReady: boolean
+  browserExamKeyCount: number
+  siteUrlReady: boolean
+  configFileStatus: 'ready' | 'manual' | 'invalid'
+}
+
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/i
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MAX_VERSION_LENGTH = 240
@@ -56,6 +67,60 @@ function validHex(value: string | undefined) {
 
 function normalizedHash(value: string | undefined) {
   return validHex(value)?.toLowerCase() ?? null
+}
+
+function parseHttpUrl(value: string | undefined) {
+  if (!value?.trim()) return null
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url : null
+  } catch {
+    return null
+  }
+}
+
+/** Public-safe deployment status. It intentionally returns no key or secret values. */
+export function inspectSebReadiness(
+  environment: Record<string, string | undefined> = process.env,
+): SebReadiness {
+  const production = environment.NODE_ENV === 'production'
+  const sessionSecretReady = (environment.SEB_SESSION_SECRET?.trim().length ?? 0) >= 32
+  const configKeyReady = validHex(environment.SEB_CONFIG_KEY) !== null
+  const browserExamKeyCount = new Set(
+    (environment.SEB_BROWSER_EXAM_KEYS ?? '')
+      .split(/[\s,;]+/)
+      .map(key => validHex(key))
+      .filter((key): key is string => key !== null),
+  ).size
+
+  const siteUrl = parseHttpUrl(environment.NEXT_PUBLIC_SITE_URL)
+  const siteUrlReady = siteUrl !== null
+    && (!production || siteUrl.protocol === 'https:')
+    && siteUrl.pathname === '/'
+    && siteUrl.search === ''
+    && siteUrl.hash === ''
+
+  const configUrlValue = environment.NEXT_PUBLIC_SEB_CONFIG_URL?.trim()
+  const configUrl = parseHttpUrl(configUrlValue)
+  const configFileStatus: SebReadiness['configFileStatus'] = !configUrlValue
+    ? 'manual'
+    : configUrl
+      && (!production || configUrl.protocol === 'https:')
+      && configUrl.pathname.toLowerCase().endsWith('.seb')
+        ? 'ready'
+        : 'invalid'
+
+  return {
+    publishReady: sessionSecretReady
+      && configKeyReady
+      && browserExamKeyCount > 0
+      && siteUrlReady,
+    sessionSecretReady,
+    configKeyReady,
+    browserExamKeyCount,
+    siteUrlReady,
+    configFileStatus,
+  }
 }
 
 export function readSebEnvironment(
@@ -169,7 +234,11 @@ export function verifySebClaims(token: string, secret: string, now = Date.now())
     ) return null
 
     if (parsed.kind === 'seb_challenge') {
-      if (typeof parsed.nonce !== 'string' || !/^[0-9a-f]{32}$/.test(parsed.nonce)) return null
+      if (
+        (parsed.purpose !== 'take' && parsed.purpose !== 'system_check')
+        || typeof parsed.nonce !== 'string'
+        || !/^[0-9a-f]{32}$/.test(parsed.nonce)
+      ) return null
       return parsed as SebChallengeClaims
     }
 
@@ -187,12 +256,14 @@ export function verifySebClaims(token: string, secret: string, now = Date.now())
 export function createSebChallengeClaims(
   userId: string,
   assignmentId: string,
+  purpose: SebChallengePurpose = 'take',
   now = Date.now(),
 ): SebChallengeClaims {
   return {
     kind: 'seb_challenge',
     userId,
     assignmentId,
+    purpose,
     nonce: randomBytes(16).toString('hex'),
     issuedAt: now,
     expiresAt: now + 5 * 60_000,

@@ -89,10 +89,10 @@ export async function startSubmission(
     ? await getSebSession(user.id, assignmentId)
     : null
   if (secureBrowserRequired && !sebSession) {
-    const reusableChallenge = validateSebChallenge(sebChallenge, user.id, assignmentId)
+    const reusableChallenge = validateSebChallenge(sebChallenge, user.id, assignmentId, 'take')
     const challenge = reusableChallenge
       ? sebChallenge!
-      : createSebChallenge(user.id, assignmentId)
+      : createSebChallenge(user.id, assignmentId, 'take')
     return {
       requiresSecureBrowser: true as const,
       sebConfigured: challenge !== null,
