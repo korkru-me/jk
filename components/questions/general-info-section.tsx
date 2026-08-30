@@ -76,7 +76,7 @@ function saveRecentSubject(subject: string) {
 
 // ─── SubjectAutocomplete ───────────────────────────────────────────────────────
 
-function SubjectAutocomplete({ value, onChange }: {
+export function SubjectAutocomplete({ value, onChange }: {
   value: string
   onChange: (v: string) => void
 }) {
@@ -312,6 +312,13 @@ interface GeneralInfoSectionProps {
   /** False for a teammate editing someone else's shared question — locks the
    *  visibility/sharing controls, which stay owner-only. Defaults to true. */
   canEditSharing?: boolean
+  /** False where the caller cannot act on the answer — the Word import stores
+   *  every โจทย์ as private, so offering the control would be a lie. Defaults
+   *  to true. */
+  showSharing?: boolean
+  /** False where วิชา is asked once for a whole batch instead of per โจทย์ —
+   *  every โจทย์ in one Word file is the same subject. Defaults to true. */
+  showSubject?: boolean
   tags: string[]
   onTagsChange: (tags: string[]) => void
   /** แฟ้ม the โจทย์ will be filed into on save. Both are omitted when editing:
@@ -331,6 +338,8 @@ export function GeneralInfoSection({
   sharedOrgIds, onSharedOrgIdsChange,
   teamEditAllowed, onTeamEditAllowedChange,
   canEditSharing = true,
+  showSharing = true,
+  showSubject = true,
   tags, onTagsChange,
   setIds, onSetIdsChange,
 }: GeneralInfoSectionProps) {
@@ -397,10 +406,12 @@ export function GeneralInfoSection({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label>วิชา *</Label>
-        <SubjectAutocomplete value={subject} onChange={onSubjectChange} />
-      </div>
+      {showSubject && (
+        <div className="space-y-1.5">
+          <Label>วิชา *</Label>
+          <SubjectAutocomplete value={subject} onChange={onSubjectChange} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
@@ -420,6 +431,7 @@ export function GeneralInfoSection({
           </Select>
         </div>
 
+        {showSharing && (
         <div className="space-y-1.5">
           <Label>การมองเห็น</Label>
           <Select
@@ -482,6 +494,7 @@ export function GeneralInfoSection({
             </div>
           )}
         </div>
+        )}
       </div>
 
       <div className="space-y-1.5">
