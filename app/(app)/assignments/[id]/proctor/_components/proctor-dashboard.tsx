@@ -13,6 +13,7 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  FileClock,
   Maximize,
   Minimize,
   MonitorCheck,
@@ -793,6 +794,14 @@ export function ProctorDashboard({
           <p className="mt-1 text-sm text-muted-foreground">{assignment.title} · {assignment.classroomName}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            nativeButton={false}
+            size="sm"
+            variant="outline"
+            render={<Link href={`/assignments/${assignment.id}/proctor/report`} />}
+          >
+            <FileClock aria-hidden="true" /> ดูรายงานย้อนหลัง
+          </Button>
           <Badge
             variant={isRealtimeLive ? 'secondary' : 'outline'}
             className={isRealtimeLive ? 'text-success' : snapshotError ? 'text-destructive' : 'text-warning'}
