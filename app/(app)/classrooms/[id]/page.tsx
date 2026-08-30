@@ -6,7 +6,7 @@ import type { Classroom, User } from '@/lib/types'
 import { ClassroomDetailClient } from './_components/classroom-detail-client'
 import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
 import { HomeroomStudentView } from './_components/homeroom-student-view'
-import { getClassroomPosts } from '@/lib/actions/classroom-posts'
+import { getClassroomPosts, getPostSeenByPost } from '@/lib/actions/classroom-posts'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
@@ -249,10 +249,10 @@ export default async function ClassroomDetailPage({
     isOwner
       ? admin
           .from('classrooms')
-          .select('id, name')
+          .select('id, name, status, deleted_at')
           .eq('teacher_id', authUser.id)
           .neq('id', id)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      : Promise.resolve({ data: [] as { id: string; name: string; status: string; deleted_at: string | null }[] }),
     getClassroomPosts(id),
   ])
 
@@ -305,8 +305,17 @@ export default async function ClassroomDetailPage({
   let classroomExtensions: {
     id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
   }[] = []
+  // How much hand-in is still waiting for a person to score it. Auto-grading
+  // leaves `is_correct` null exactly on the answers a teacher has to read
+  // (essays, manual fill-blanks) — the same rule the submission page uses.
+  // Answer rows, not submissions, so the read is capped: past the cap the
+  // overview says "n+" instead of pretending to know the exact number.
+  const PENDING_REVIEW_ROW_CAP = 1000
+  let pendingReviewCount = 0
+  let pendingReviewCapped = false
   if (c.classroom_type === 'subject' && canManage && linkedAssignmentIds.length > 0) {
-    const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }] = await Promise.all([
+    const rosterIds = new Set(students.map(s => s.id))
+    const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }, { data: pendingAnswerRows }] = await Promise.all([
       admin
         .from('assignments')
         .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score')
@@ -320,7 +329,22 @@ export default async function ClassroomDetailPage({
         .from('assignment_extensions')
         .select('id, assignment_id, student_id, extended_end_at, note')
         .in('assignment_id', linkedAssignmentIds),
+      admin
+        .from('submission_answers')
+        .select('submission_id, submissions!inner(assignment_id, student_id, status)')
+        .in('submissions.assignment_id', linkedAssignmentIds)
+        .neq('submissions.status', 'in_progress')
+        .is('is_correct', null)
+        .limit(PENDING_REVIEW_ROW_CAP),
     ])
+
+    const pendingSubmissionIds = new Set<string>()
+    for (const row of (pendingAnswerRows ?? []) as any[]) {
+      if (!rosterIds.has(row.submissions?.student_id)) continue
+      pendingSubmissionIds.add(row.submission_id as string)
+    }
+    pendingReviewCount = pendingSubmissionIds.size
+    pendingReviewCapped = (pendingAnswerRows?.length ?? 0) >= PENDING_REVIEW_ROW_CAP
     classroomAssignments = (assignmentRows ?? []).map(a => ({
       ...a,
       display_order: displayOrderByAssignment.get(a.id) ?? null,
@@ -392,7 +416,20 @@ export default async function ClassroomDetailPage({
   )
 
   // Other classrooms for "move student" feature (owners only).
-  const otherClassrooms = (otherClassroomRows ?? []) as { id: string; name: string }[]
+  const otherClassroomList = (otherClassroomRows ?? []) as {
+    id: string; name: string; status: string; deleted_at: string | null
+  }[]
+  const otherClassrooms = otherClassroomList.map(({ id: classroomId, name }) => ({ id: classroomId, name }))
+  // Cross-posting an announcement only makes sense into a room students are
+  // still in — an archived or trashed classroom would take the post and show
+  // it to nobody.
+  const crossPostTargets = otherClassroomList
+    .filter(row => row.status === 'active' && !row.deleted_at)
+    .map(({ id: classroomId, name }) => ({ id: classroomId, name }))
+
+  // Who has seen each announcement. Only the teaching side can read these rows
+  // (post_reads_select), and only this side has any use for them.
+  const seenByPost = canManage ? await getPostSeenByPost(posts.map(p => p.id)) : {}
 
   return (
     <ClassroomDetailClient
@@ -413,6 +450,10 @@ export default async function ClassroomDetailPage({
       studentProfiles={studentProfiles}
       ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
       posts={posts}
+      pendingReviewCount={pendingReviewCount}
+      pendingReviewCapped={pendingReviewCapped}
+      seenByPost={seenByPost}
+      crossPostTargets={crossPostTargets}
     />
   )
 }

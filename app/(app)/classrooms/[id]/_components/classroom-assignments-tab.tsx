@@ -6,8 +6,9 @@ import { Plus, Clock, MoreVertical, Copy, BarChart3, Monitor, Printer, Pencil, R
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
-import { SCORE_STRATEGY_LABELS, selectOfficialAttempt } from '@/lib/scoring'
-import { formatPassingThreshold, computePassed } from '@/lib/grading'
+import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
+import { formatPassingThreshold } from '@/lib/grading'
+import { computeAssignmentProgress } from '@/lib/classroom-progress'
 import { Card } from '@/components/ui/card'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -41,37 +42,6 @@ export interface ClassroomAssignmentSubmissionRow {
 }
 
 type TypeFilter = 'all' | 'exercise' | 'exam'
-
-// Per-assignment completion snapshot across the whole classroom roster —
-// `attempted` counts any student with a submission row (even in_progress),
-// `completed`/`passed` only look at each student's official attempt (per
-// score_strategy) once it's actually submitted/graded.
-function computeAssignmentStats(
-  assignment: ClassroomAssignmentRow,
-  submissions: ClassroomAssignmentSubmissionRow[]
-): { attempted: number; completed: number; passed: number } {
-  const byStudent = new Map<string, ClassroomAssignmentSubmissionRow[]>()
-  for (const s of submissions) {
-    if (s.assignment_id !== assignment.id) continue
-    const arr = byStudent.get(s.student_id) ?? []
-    arr.push(s)
-    byStudent.set(s.student_id, arr)
-  }
-
-  let completed = 0
-  let passed = 0
-  for (const attempts of byStudent.values()) {
-    const official = selectOfficialAttempt(attempts, assignment.score_strategy)
-    if (!official) continue
-    const isSubmitted = official.representative.status === 'submitted' || official.representative.status === 'graded'
-    if (!isSubmitted) continue
-    const isPassed = computePassed(official.total_score, official.max_score, assignment.passing_type, assignment.passing_value)
-    if (isPassed !== false) completed++
-    if (isPassed === true) passed++
-  }
-
-  return { attempted: byStudent.size, completed, passed }
-}
 
 const STATUS_CFG: Record<string, { label: string; bg: string; text: string }> = {
   draft:     { label: 'ฉบับร่าง',    bg: 'bg-muted',    text: 'text-muted-foreground' },
@@ -140,7 +110,7 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
               const typeCfg = TYPE_CFG[a.type] ?? TYPE_CFG.exam
               const TypeIcon = typeCfg.icon
               const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
-              const stats = computeAssignmentStats(a, submissions)
+              const stats = computeAssignmentProgress(a, submissions)
               return (
                 <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
                   <Link href={`/assignments/${a.id}`} className="flex-1 min-w-0 flex items-center gap-3">
