@@ -37,6 +37,8 @@ export interface ProctorEventRow {
   event_type: string
   occurred_at_client: string | null
   created_at: string
+  acknowledged_at: string | null
+  acknowledged_by: string | null
 }
 
 export type ProctorSessionChange =

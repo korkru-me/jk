@@ -1,6 +1,6 @@
-# Safe Exam Browser — คู่มือติดตั้งและใช้งานเฟส 1–3
+# Safe Exam Browser — คู่มือติดตั้งและใช้งานเฟส 1–4
 
-SEB รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเว็บ KorKru เดิม ไม่รองรับ Android และไม่ต้องติดตั้ง SEB Server ระบบตรวจ Config Key (CK) และ Browser Exam Key (BEK) ที่ KorKru โดยตรง แล้วแสดงสถานะในห้องคุมสอบเดิม เฟส 3 เพิ่ม Android monitored mode แยกต่างหากซึ่งความมั่นใจต่ำกว่าและต้องให้ครูตรวจเครื่องต่อหน้า ดู `docs/ANDROID_EXAM_MODE.md`
+SEB รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเว็บ KorKru เดิม ไม่รองรับ Android และไม่ต้องติดตั้ง SEB Server ระบบตรวจ Config Key (CK) และ Browser Exam Key (BEK) ที่ KorKru โดยตรง แล้วแสดงสถานะในห้องคุมสอบเดิม เฟส 3 เพิ่ม Android monitored mode แยกต่างหากซึ่งความมั่นใจต่ำกว่าและต้องให้ครูตรวจเครื่องต่อหน้า ดู `docs/ANDROID_EXAM_MODE.md` ส่วนเฟส 4 เพิ่มเสียง/Browser Notification แบบ opt-in และคิวรับทราบเหตุการณ์ร่วมกันระหว่างครู
 
 > การ merge โค้ดอย่างเดียวยังไม่ทำให้ SEB พร้อมใช้ ต้อง apply migration, ตั้ง environment, สร้างไฟล์ `.seb` และทดสอบเครื่องจริงก่อนเปิดสวิตช์ให้ข้อสอบ
 
@@ -60,16 +60,22 @@ NEXT_PUBLIC_SEB_CONFIG_URL=https://example.school/exam/korkru-production.seb
 
 ## 4. Apply migration และ deploy
 
-Migration: `20260830062722_add_seb_secure_exam_mode.sql`
+Migrations ตามลำดับ:
+
+1. `20260830062722_add_seb_secure_exam_mode.sql`
+2. `20260830072842_add_android_monitored_exam_access.sql`
+3. `20260830082038_add_exam_proctor_event_review.sql`
 
 ลำดับ rollout ที่ปลอดภัย:
 
-1. Apply migration ก่อน (ค่าเดิมทุกข้อสอบเป็น `browser` จึงไม่กระทบนักเรียน)
+1. Apply migrations ทั้งสามตามลำดับก่อน deploy code (ค่าเดิมทุกข้อสอบเป็น `browser` จึงไม่กระทบนักเรียน และ migration เฟส 4 เพิ่มคอลัมน์ที่ dashboard รุ่นใหม่อ่าน)
 2. Deploy code + environment ทั้งหมด
 3. เปิดไฟล์ `.seb` บน staging และยืนยันว่า login, Realtime, autosave, รูปวิธีทำ/ไฟล์แนบ และ submit ทำงาน
 4. ทดสอบอย่างน้อย Windows, macOS และ iPhone/iPad รุ่นที่โรงเรียนจะอนุญาต
 5. ทำ mock exam พร้อมกันหลายเครื่องบน Wi-Fi ห้องจริง
 6. เปิด “บังคับใช้ Safe Exam Browser” เฉพาะข้อสอบนำร่องที่ยังไม่มี submission
+
+ควร apply migration เฟส 4 นอกช่วงสอบ เพราะการสร้างดัชนีคิวรับทราบอาจรอ lock ของตาราง event หากมีข้อมูลจำนวนมากหรือกำลังรับ heartbeat/event อยู่
 
 หลัง deploy ให้ครูเปิด **การตั้งค่า → ตั้งค่าข้อสอบเริ่มต้น** ระบบจะแสดง readiness checklist โดยส่งไปหน้าเว็บเฉพาะสถานะและจำนวน BEK ที่ไม่ซ้ำ ไม่ส่งค่า secret, CK หรือ BEK ออกจาก server
 
@@ -124,9 +130,11 @@ System check ทำสิ่งต่อไปนี้:
 1. ให้นักเรียนปิดโปรแกรมอื่นและเปิดไฟล์ `.seb` ที่กำหนด
 2. ให้นักเรียนทำ system check อีกครั้งก่อนแจก access code
 3. ครูเปิดห้องคุมสอบสด ตรวจจำนวนนักเรียนและป้าย OS/SEB ที่ยืนยันแล้ว
-4. จึงแจก access code และให้นักเรียนกดเริ่มสอบ
-5. หากเครื่องหลุด ห้ามสั่งสร้าง attempt ใหม่ทันที ให้เปิด SEB เดิมแล้ว resume; session หมดอายุจะบังคับตรวจใหม่
-6. เหตุฉุกเฉินให้ครูเป็นผู้ใช้ Quit Password และจดเหตุการณ์ประกอบ ไม่ให้นักเรียนรู้รหัส
+4. ครูกด “เปิดเสียงแจ้งเตือน” และ “ทดสอบเสียง”; หากอนุญาต Browser Notification ระบบจะแจ้งนอกแท็บได้เฉพาะตราบใดที่หน้าห้องคุมสอบยังเปิดอยู่
+5. จึงแจก access code และให้นักเรียนกดเริ่มสอบ
+6. เมื่อพบสัญญาณให้ตรวจบริบทในห้องแล้วกด “รับทราบ” เพื่อแยกคิวที่ครูเห็นแล้ว การกดนี้ไม่ใช่คำตัดสินว่าปกติหรือทุจริต
+7. หากเครื่องหลุด ห้ามสั่งสร้าง attempt ใหม่ทันที ให้เปิด SEB เดิมแล้ว resume; session หมดอายุจะบังคับตรวจใหม่
+8. เหตุฉุกเฉินให้ครูเป็นผู้ใช้ Quit Password และจดเหตุการณ์ประกอบ ไม่ให้นักเรียนรู้รหัส
 
 ## 7. การทำงานและ rollback
 
@@ -140,14 +148,15 @@ System check ทำสิ่งต่อไปนี้:
 
 หากต้อง rollback ให้ปิดสวิตช์เป็น `browser` ได้เฉพาะข้อสอบที่ยังไม่มีผู้เริ่มทำ สำหรับข้อสอบที่เริ่มแล้วให้ปิด/ทำสำเนาข้อสอบใหม่แทน ระบบตั้งใจล็อกการเปลี่ยนโหมดกลาง attempt เพื่อไม่ทำให้นักเรียนถูกกันออกจากคำตอบของตน
 
-## ข้อจำกัดเฟส 1–2
+## ข้อจำกัด
 
-- ไม่มี Android
+- ตัว SEB ไม่มี Android; เครื่อง Android ใช้ monitored web mode แยกที่ความมั่นใจต่ำกว่าและต้องตรวจเครื่องต่อหน้า
 - ไม่มี remote quit/control จาก SEB Server
 - ไม่สามารถป้องกันกล้องจากอุปกรณ์อื่นได้ (สถานการณ์ใช้งานจึงต้องมีครูเดินคุม)
 - ความปลอดภัยขึ้นกับไฟล์ `.seb`, รุ่น OS/SEB, นโยบายเครื่อง และการทดสอบจริง ไม่ใช่สวิตช์ใน KorKru เพียงอย่างเดียว
 - การรองรับ accessibility, keyboard ภาษาไทย, PDF, file picker และ assistive technology ต้องทดสอบตามกลุ่มนักเรียนจริงก่อนสอบ
 - System check ไม่สามารถพิสูจน์ว่านักเรียนจะไม่เปลี่ยนเครือข่ายภายหลัง และไม่ได้จำลอง Realtime/upload/submit แบบครบวงจร จึงยังต้องมี mock exam
 - เว็บปกติไม่มี API ที่เชื่อถือได้สำหรับตรวจว่า OS แคปหน้าจอสำเร็จหรือไม่ การปิด screenshot/app switching ต้องมาจากนโยบายในไฟล์ `.seb` และความสามารถของแต่ละ OS
+- เสียงและ Browser Notification ไม่ใช่ Web Push: ต้องเปิดจากปุ่มของครูต่อการเปิดหน้า และหยุดทำงานเมื่อปิด dashboard หรือ browser
 
 เอกสารเทคนิคทางการ: [SEB Config Key และ JavaScript API](https://safeexambrowser.org/developer/seb-config-key.html)

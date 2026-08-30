@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import {
   AlertTriangle,
   ArrowLeft,
+  Bell,
+  BellOff,
   CheckCircle2,
   Clock3,
   Eye,
@@ -25,11 +27,21 @@ import {
   UserCheck,
   UserX,
   Users,
+  Volume2,
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { purgeAssignmentProctorData } from '@/lib/actions/exam-proctor'
+import { acknowledgeProctorEvents, purgeAssignmentProctorData } from '@/lib/actions/exam-proctor'
 import { reviewAndroidExamAccess, type AndroidApprovalView } from '@/lib/actions/android-exam'
+import {
+  isReviewableProctorEvent,
+  isUnacknowledgedProctorEvent,
+  PROCTOR_EVENT_LABELS,
+  PROCTOR_RECENT_EVENT_LIMIT,
+  PROCTOR_REVIEW_EVENT_TYPES,
+  PROCTOR_REVIEW_QUEUE_LIMIT,
+  selectProctorDashboardEvents,
+} from '@/lib/exam-proctor-alerts'
 import {
   EXAM_PROCTOR_RETENTION_DAYS,
   totalPurgedProctorRecords,
@@ -51,6 +63,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useProctorAlerts } from './use-proctor-alerts'
 
 export interface ProctorParticipant {
   studentId: string
@@ -77,12 +90,13 @@ interface Props {
   initialParticipants: ProctorParticipant[]
   initialSessions: ProctorSessionRow[]
   initialEvents: ProctorEventRow[]
+  initialUnacknowledgedCount: number
   initialAndroidApprovals: AndroidApprovalView[]
 }
 
 const ACTIVE_WINDOW_MS = 45_000
 const PROCTOR_SESSION_SELECT = 'submission_id, org_id, assignment_id, student_id, started_monitoring_at, last_seen_at, is_online, is_tab_visible, is_fullscreen, completed_at, tab_switch_count, fullscreen_exit_count, window_blur_count, clipboard_attempt_count, screenshot_key_count, active_connection_count, concurrent_connection_count, secure_browser_verified_at, secure_browser_platform, secure_browser_version, exam_access_mode, android_approved_at, android_approved_by, last_event_type, last_event_at, created_at, updated_at'
-const PROCTOR_EVENT_SELECT = 'id, org_id, assignment_id, submission_id, student_id, event_type, occurred_at_client, created_at'
+const PROCTOR_EVENT_SELECT = 'id, org_id, assignment_id, submission_id, student_id, event_type, occurred_at_client, created_at, acknowledged_at, acknowledged_by'
 const ANDROID_APPROVAL_SELECT = 'id, assignment_id, student_id, status, requested_at, reviewed_at, reviewed_by, expires_at, updated_at'
 
 type AndroidApprovalChange =
@@ -103,39 +117,11 @@ function applyAndroidApprovalChanges(
   )
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  monitoring_started: 'เริ่มเชื่อมต่อห้องคุมสอบ',
-  tab_hidden: 'ออกจากแท็บข้อสอบ',
-  tab_visible: 'กลับเข้าแท็บข้อสอบ',
-  fullscreen_entered: 'กลับเข้าเต็มจอ',
-  fullscreen_exited: 'ออกจากเต็มจอ',
-  window_blur: 'หน้าต่างเสียโฟกัส',
-  window_focus: 'กลับมาที่หน้าต่างข้อสอบ',
-  copy_attempt: 'พยายามคัดลอก',
-  cut_attempt: 'พยายามตัดข้อความ',
-  paste_attempt: 'พยายามวางข้อความ',
-  context_menu_attempt: 'เปิดเมนูคลิกขวา',
-  screenshot_key: 'กดปุ่ม Print Screen',
-  concurrent_connection: 'ตรวจพบหน้าสอบเปิดพร้อมกันหลายจุด',
-}
-
 const SEB_PLATFORM_LABELS = {
   windows: 'Windows',
   macos: 'macOS',
   ios: 'iOS',
 } as const
-
-const REVIEW_EVENT_TYPES = new Set([
-  'tab_hidden',
-  'fullscreen_exited',
-  'window_blur',
-  'copy_attempt',
-  'cut_attempt',
-  'paste_attempt',
-  'context_menu_attempt',
-  'screenshot_key',
-  'concurrent_connection',
-])
 
 function formatTime(value: string | null): string {
   if (!value) return '—'
@@ -161,28 +147,77 @@ export function ProctorDashboard({
   initialParticipants,
   initialSessions,
   initialEvents,
+  initialUnacknowledgedCount,
   initialAndroidApprovals,
 }: Props) {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
   const [sessions, setSessions] = useState(initialSessions)
   const [events, setEvents] = useState(initialEvents)
+  const [unacknowledgedCount, setUnacknowledgedCount] = useState(initialUnacknowledgedCount)
   const [androidApprovals, setAndroidApprovals] = useState(initialAndroidApprovals)
   const [connectionMode, setConnectionMode] = useState<ProctorDashboardConnectionMode>('connecting')
   const [snapshotRefreshing, setSnapshotRefreshing] = useState(false)
+  const [snapshotRefreshRequestVersion, setSnapshotRefreshRequestVersion] = useState(0)
   const [snapshotError, setSnapshotError] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [isPurging, startPurgeTransition] = useTransition()
   const [isReviewing, startReviewTransition] = useTransition()
+  const [isAcknowledging, startAcknowledgeTransition] = useTransition()
   const [reviewingStudentId, setReviewingStudentId] = useState<string | null>(null)
+  const [acknowledgingEventId, setAcknowledgingEventId] = useState<number | null>(null)
+  const [showOnlyUnacknowledged, setShowOnlyUnacknowledged] = useState(false)
   const [confirm, confirmDialog] = useConfirm()
   const snapshotInFlightRef = useRef(false)
+  const snapshotRefreshQueuedRef = useRef(false)
   const pendingSessionChangesRef = useRef<ProctorSessionChange[]>([])
   const pendingEventChangesRef = useRef<ProctorEventChange[]>([])
   const pendingApprovalChangesRef = useRef<AndroidApprovalChange[]>([])
+  const reviewCountRequestRef = useRef(0)
+  const reviewCountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const studentNameById = useMemo(
+    () => new Map(initialParticipants.map(participant => [participant.studentId, participant.name])),
+    [initialParticipants],
+  )
+  const {
+    ingestEvents,
+    alertsEnabled,
+    notificationPermission,
+    toggleAlerts,
+    testAlert,
+    alertStatus,
+  } = useProctorAlerts({ initialEvents, studentNameById })
+
+  const refreshUnacknowledgedCount = useCallback(async () => {
+    if (!assignment.enabled) return
+    const requestId = ++reviewCountRequestRef.current
+    const { count, error } = await supabase
+      .from('exam_proctor_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('assignment_id', assignment.id)
+      .is('acknowledged_at', null)
+      .in('event_type', [...PROCTOR_REVIEW_EVENT_TYPES])
+    if (requestId === reviewCountRequestRef.current && !error) {
+      setUnacknowledgedCount(count ?? 0)
+    }
+  }, [assignment.enabled, assignment.id, supabase])
+
+  const scheduleUnacknowledgedCountRefresh = useCallback(() => {
+    if (reviewCountTimerRef.current) clearTimeout(reviewCountTimerRef.current)
+    reviewCountTimerRef.current = setTimeout(() => {
+      reviewCountTimerRef.current = null
+      void refreshUnacknowledgedCount()
+    }, 500)
+  }, [refreshUnacknowledgedCount])
 
   const refreshSnapshot = useCallback(async () => {
-    if (!assignment.enabled || snapshotInFlightRef.current) return
+    if (!assignment.enabled) return
+    if (snapshotInFlightRef.current) {
+      snapshotRefreshQueuedRef.current = true
+      setSnapshotRefreshRequestVersion(version => version + 1)
+      return
+    }
+    snapshotRefreshQueuedRef.current = false
     snapshotInFlightRef.current = true
     pendingSessionChangesRef.current = []
     pendingEventChangesRef.current = []
@@ -191,7 +226,12 @@ export function ProctorDashboard({
     setSnapshotError(false)
 
     try {
-      const [sessionsResult, eventsResult, approvalsResult] = await Promise.all([
+      const [
+        sessionsResult,
+        eventsResult,
+        unacknowledgedEventsResult,
+        approvalsResult,
+      ] = await Promise.all([
         supabase
           .from('exam_proctor_sessions')
           .select(PROCTOR_SESSION_SELECT)
@@ -202,7 +242,15 @@ export function ProctorDashboard({
           .select(PROCTOR_EVENT_SELECT)
           .eq('assignment_id', assignment.id)
           .order('created_at', { ascending: false })
-          .limit(100),
+          .limit(PROCTOR_RECENT_EVENT_LIMIT),
+        supabase
+          .from('exam_proctor_events')
+          .select(PROCTOR_EVENT_SELECT)
+          .eq('assignment_id', assignment.id)
+          .is('acknowledged_at', null)
+          .in('event_type', [...PROCTOR_REVIEW_EVENT_TYPES])
+          .order('created_at', { ascending: false })
+          .limit(PROCTOR_REVIEW_QUEUE_LIMIT),
         assignment.androidMonitoredAllowed
           ? supabase
               .from('exam_android_approvals')
@@ -212,7 +260,12 @@ export function ProctorDashboard({
           : Promise.resolve({ data: [], error: null }),
       ])
 
-      if (sessionsResult.error || eventsResult.error || approvalsResult.error) {
+      if (
+        sessionsResult.error
+        || eventsResult.error
+        || unacknowledgedEventsResult.error
+        || approvalsResult.error
+      ) {
         setSnapshotError(true)
         return
       }
@@ -227,14 +280,21 @@ export function ProctorDashboard({
         (sessionsResult.data ?? []) as unknown as ProctorSessionRow[],
         sessionChanges,
       ))
-      setEvents(applyProctorEventChanges(
-        (eventsResult.data ?? []) as unknown as ProctorEventRow[],
+      const nextEvents = selectProctorDashboardEvents(applyProctorEventChanges(
+        [
+          ...((eventsResult.data ?? []) as unknown as ProctorEventRow[]),
+          ...((unacknowledgedEventsResult.data ?? []) as unknown as ProctorEventRow[]),
+        ],
         eventChanges,
+        Number.MAX_SAFE_INTEGER,
       ))
+      ingestEvents(nextEvents)
+      setEvents(nextEvents)
       setAndroidApprovals(applyAndroidApprovalChanges(
         (approvalsResult.data ?? []) as unknown as AndroidApprovalView[],
         approvalChanges,
       ))
+      scheduleUnacknowledgedCountRefresh()
     } catch {
       setSnapshotError(true)
     } finally {
@@ -244,11 +304,28 @@ export function ProctorDashboard({
       pendingApprovalChangesRef.current = []
       setSnapshotRefreshing(false)
     }
-  }, [assignment.androidMonitoredAllowed, assignment.enabled, assignment.id, supabase])
+  }, [
+    assignment.androidMonitoredAllowed,
+    assignment.enabled,
+    assignment.id,
+    ingestEvents,
+    scheduleUnacknowledgedCountRefresh,
+    supabase,
+  ])
+
+  useEffect(() => {
+    if (snapshotRefreshing || !snapshotRefreshQueuedRef.current) return
+    snapshotRefreshQueuedRef.current = false
+    void refreshSnapshot()
+  }, [refreshSnapshot, snapshotRefreshing, snapshotRefreshRequestVersion])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 5_000)
     return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => () => {
+    if (reviewCountTimerRef.current) clearTimeout(reviewCountTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -292,11 +369,19 @@ export function ProctorDashboard({
             if (previous?.id) change = { type: 'delete', eventId: previous.id }
           } else {
             const next = payload.new as ProctorEventRow
-            if (next?.id) change = { type: 'upsert', row: next }
+            if (next?.id) {
+              change = { type: 'upsert', row: next }
+              if (payload.eventType === 'INSERT') ingestEvents([next])
+            }
           }
           if (!change) return
           if (snapshotInFlightRef.current) pendingEventChangesRef.current.push(change)
-          setEvents(current => applyProctorEventChanges(current, [change]))
+          setEvents(current => selectProctorDashboardEvents(applyProctorEventChanges(
+            current,
+            [change],
+            current.length + 1,
+          )))
+          scheduleUnacknowledgedCountRefresh()
         },
       )
       .on(
@@ -330,28 +415,52 @@ export function ProctorDashboard({
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [assignment.enabled, assignment.id, refreshSnapshot, supabase])
+  }, [
+    assignment.enabled,
+    assignment.id,
+    ingestEvents,
+    refreshSnapshot,
+    scheduleUnacknowledgedCountRefresh,
+    supabase,
+  ])
 
   useEffect(() => {
     if (!assignment.enabled) return
-    const refreshIfVisible = () => {
-      if (document.visibilityState === 'visible') void refreshSnapshot()
+    const refreshWhenNeeded = () => {
+      if (document.visibilityState === 'visible' || connectionMode !== 'live') {
+        void refreshSnapshot()
+      }
     }
     const timer = setInterval(
-      refreshIfVisible,
+      refreshWhenNeeded,
       connectionMode === 'live' ? PROCTOR_LIVE_RECONCILE_MS : PROCTOR_FALLBACK_POLL_MS,
     )
-    document.addEventListener('visibilitychange', refreshIfVisible)
-    if (connectionMode !== 'live') refreshIfVisible()
+    document.addEventListener('visibilitychange', refreshWhenNeeded)
+    if (connectionMode !== 'live') refreshWhenNeeded()
     return () => {
       clearInterval(timer)
-      document.removeEventListener('visibilitychange', refreshIfVisible)
+      document.removeEventListener('visibilitychange', refreshWhenNeeded)
     }
   }, [assignment.enabled, connectionMode, refreshSnapshot])
 
   const participantByStudent = useMemo(
     () => new Map(initialParticipants.map(participant => [participant.studentId, participant])),
     [initialParticipants],
+  )
+
+  const visibleEvents = useMemo(
+    () => showOnlyUnacknowledged
+      ? events.filter(isUnacknowledgedProctorEvent)
+      : events,
+    [events, showOnlyUnacknowledged],
+  )
+  const visibleUnacknowledgedEventIds = useMemo(
+    () => events.filter(isUnacknowledgedProctorEvent).map(event => event.id),
+    [events],
+  )
+  const acknowledgementBatchEventIds = useMemo(
+    () => visibleUnacknowledgedEventIds.slice(0, PROCTOR_REVIEW_QUEUE_LIMIT),
+    [visibleUnacknowledgedEventIds],
   )
 
   const latestSessionByStudent = useMemo(() => {
@@ -406,7 +515,6 @@ export function ProctorDashboard({
   })
 
   const activeCount = rows.filter(row => row.active).length
-  const flaggedCount = rows.filter(row => row.flagged).length
   const completedCount = rows.filter(row => row.completed).length
   const offlineCount = rows.filter(row => row.session && !row.active && !row.completed).length
   const concurrentCount = rows.filter(row => (row.session?.concurrent_connection_count ?? 0) > 0).length
@@ -419,6 +527,18 @@ export function ProctorDashboard({
       : connectionMode === 'fallback'
         ? 'ใช้การตรวจซ้ำอัตโนมัติ'
         : 'กำลังเชื่อมต่อข้อมูลสด'
+  const alertStatusLabel = alertStatus === 'sound-and-system'
+    ? 'เปิดเสียง · อนุญาตแจ้งเตือนนอกแท็บ'
+    : alertStatus === 'sound-only'
+      ? 'เปิดเสียงแล้ว'
+      : 'ยังไม่เปิดเสียง'
+  const notificationNote = notificationPermission === 'granted'
+    ? 'เบราว์เซอร์อนุญาตแล้ว หากอุปกรณ์รองรับ ระบบจะแจ้งเมื่อครูสลับออกจากแท็บตราบใดที่หน้านี้ยังเปิดอยู่'
+    : notificationPermission === 'denied'
+      ? 'เบราว์เซอร์บล็อกการแจ้งเตือนนอกแท็บ แต่ยังใช้เสียงและข้อความในหน้านี้ได้'
+      : notificationPermission === 'unsupported'
+        ? 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนนอกแท็บ แต่ยังใช้เสียงและข้อความในหน้านี้ได้'
+        : 'ระบบจะขอสิทธิ์แจ้งเตือนของเบราว์เซอร์เมื่อครูกดเปิด'
 
   async function handlePurge() {
     const ok = await confirm({
@@ -442,6 +562,7 @@ export function ProctorDashboard({
 
       setSessions([])
       setEvents([])
+      setUnacknowledgedCount(0)
       const totalDeleted = totalPurgedProctorRecords(result.deleted)
       toast.success(totalDeleted > 0
         ? `ล้างข้อมูลคุมสอบแล้ว ${totalDeleted} รายการ`
@@ -470,6 +591,46 @@ export function ProctorDashboard({
           : approval
       )))
       toast.success(decision === 'approve' ? 'อนุมัติให้เข้าสอบแล้ว' : 'ปฏิเสธคำขอแล้ว')
+      void refreshSnapshot()
+    })
+  }
+
+  async function handleAcknowledgeEvents(eventIds: number[]) {
+    if (eventIds.length === 0) return
+    if (eventIds.length > 1) {
+      const ok = await confirm({
+        title: `รับทราบ ${eventIds.length} เหตุการณ์ที่แสดง?`,
+        description: 'ระบบจะบันทึกว่าครูได้เห็นสัญญาณเหล่านี้แล้ว แต่ไม่ได้หมายความว่าเหตุการณ์เป็นปกติหรือเป็นการทุจริต',
+        confirmLabel: 'รับทราบทั้งหมดที่แสดง',
+      })
+      if (!ok) return
+    }
+    setAcknowledgingEventId(eventIds.length === 1 ? eventIds[0] : -1)
+    startAcknowledgeTransition(async () => {
+      const result = await acknowledgeProctorEvents(assignment.id, eventIds)
+      setAcknowledgingEventId(null)
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+
+      const acknowledgementByEvent = new Map(
+        result.acknowledgements.map(row => [row.eventId, row]),
+      )
+      setEvents(current => current.map(event => {
+        const acknowledgement = acknowledgementByEvent.get(event.id)
+        return acknowledgement
+          ? {
+              ...event,
+              acknowledged_at: acknowledgement.acknowledgedAt,
+              acknowledged_by: acknowledgement.acknowledgedBy,
+            }
+          : event
+      }))
+      toast.success(eventIds.length === 1
+        ? 'บันทึกว่าครูรับทราบเหตุการณ์แล้ว'
+        : `บันทึกรับทราบแล้ว ${result.acknowledgements.length} รายการ`)
+      void refreshUnacknowledgedCount()
       void refreshSnapshot()
     })
   }
@@ -529,6 +690,43 @@ export function ProctorDashboard({
           {assignment.androidMonitoredAllowed && <Badge variant="outline" className="text-warning"><Smartphone aria-hidden="true" /> Android ต้องอนุมัติ</Badge>}
         </div>
       </div>
+
+      <Card padding="md" className="border-primary/25 bg-primary/5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Bell className="size-4" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium text-foreground">การแจ้งเตือนเหตุการณ์ใหม่ของเครื่องนี้</p>
+                <Badge variant={alertsEnabled ? 'secondary' : 'outline'}>{alertStatusLabel}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                ข้อความในหน้านี้ทำงานอัตโนมัติ ส่วนเสียงและการแจ้งเตือนนอกแท็บต้องเปิดทุกครั้งที่เข้าห้องคุมสอบ
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{notificationNote}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {alertsEnabled && (
+              <Button type="button" size="sm" variant="outline" onClick={() => void testAlert()}>
+                <Volume2 aria-hidden="true" /> ทดสอบเสียง
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant={alertsEnabled ? 'outline' : 'default'}
+              aria-pressed={alertsEnabled}
+              onClick={() => void toggleAlerts()}
+            >
+              {alertsEnabled ? <BellOff aria-hidden="true" /> : <Bell aria-hidden="true" />}
+              {alertsEnabled ? 'ปิดเสียงแจ้งเตือน' : 'เปิดเสียงแจ้งเตือน'}
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       <Card padding="md" className="border-warning/30 bg-warning/5">
         <div className="flex gap-3 text-sm">
@@ -626,7 +824,7 @@ export function ProctorDashboard({
         <SummaryCard label="กำลังทำและเชื่อมต่อ" value={activeCount} icon={Wifi} tone="success" />
         <SummaryCard label="Android รออนุมัติ" value={pendingAndroidRows.length} icon={Smartphone} tone="warning" />
         <SummaryCard label="เคยเปิดพร้อมกันหลายจุด" value={concurrentCount} icon={MonitorSmartphone} tone="destructive" />
-        <SummaryCard label="มีสัญญาณให้ตรวจ" value={flaggedCount} icon={ShieldAlert} tone="warning" />
+        <SummaryCard label="สัญญาณรอครูรับทราบ" value={unacknowledgedCount} icon={ShieldAlert} tone="warning" />
         <SummaryCard label="ขาดการเชื่อมต่อ" value={offlineCount} icon={WifiOff} tone="destructive" />
         <SummaryCard label="ส่งแล้ว" value={completedCount} icon={CheckCircle2} />
       </div>
@@ -664,33 +862,97 @@ export function ProctorDashboard({
         </Card>
 
         <Card className="overflow-hidden">
-          <div className="border-b border-border px-5 py-4">
-            <h2 className="font-semibold text-foreground">เหตุการณ์ล่าสุด</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">แสดงล่าสุดไม่เกิน 100 รายการ</p>
+          <div className="space-y-3 border-b border-border px-5 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-foreground">เหตุการณ์ล่าสุด</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  เหตุการณ์ล่าสุด {PROCTOR_RECENT_EVENT_LIMIT} รายการ และคิวรอรับทราบอีกไม่เกิน {PROCTOR_REVIEW_QUEUE_LIMIT} รายการ
+                </p>
+              </div>
+              <Badge variant={unacknowledgedCount > 0 ? 'destructive' : 'outline'} aria-live="polite">
+                รอรับทราบ {unacknowledgedCount}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-pressed={showOnlyUnacknowledged}
+                onClick={() => setShowOnlyUnacknowledged(current => !current)}
+              >
+                {showOnlyUnacknowledged ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />}
+                {showOnlyUnacknowledged ? 'แสดงทุกเหตุการณ์' : 'แสดงเฉพาะที่รอรับทราบ'}
+              </Button>
+              {acknowledgementBatchEventIds.length > 1 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isAcknowledging}
+                  onClick={() => void handleAcknowledgeEvents(acknowledgementBatchEventIds)}
+                >
+                  <CheckCircle2 aria-hidden="true" />
+                  {isAcknowledging && acknowledgingEventId === -1
+                    ? 'กำลังบันทึก…'
+                    : `รับทราบที่แสดง ${acknowledgementBatchEventIds.length} รายการ`}
+                </Button>
+              )}
+            </div>
           </div>
-          {events.length === 0 ? (
+          {visibleEvents.length === 0 ? (
             <div className="px-5 py-14 text-center text-sm text-muted-foreground">
-              ยังไม่มีเหตุการณ์จากหน้าสอบ
+              {showOnlyUnacknowledged ? 'ไม่มีเหตุการณ์ที่รอครูรับทราบ' : 'ยังไม่มีเหตุการณ์จากหน้าสอบ'}
             </div>
           ) : (
             <div className="max-h-[720px] divide-y divide-border overflow-y-auto">
-              {events.map(event => {
+              {visibleEvents.map(event => {
                 const participant = participantByStudent.get(event.student_id)
-                const needsReview = REVIEW_EVENT_TYPES.has(event.event_type)
+                const needsReview = isReviewableProctorEvent(event.event_type)
+                const isUnacknowledged = isUnacknowledgedProctorEvent(event)
+                const busy = isAcknowledging && acknowledgingEventId === event.id
                 return (
                   <div key={event.id} className="flex gap-3 px-5 py-3">
                     <div className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${
-                      needsReview ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'
+                      isUnacknowledged
+                        ? 'bg-warning/10 text-warning'
+                        : needsReview
+                          ? 'bg-success/10 text-success'
+                          : 'bg-muted text-muted-foreground'
                     }`}>
-                      {needsReview ? <ShieldAlert className="size-3.5" aria-hidden="true" /> : <Clock3 className="size-3.5" aria-hidden="true" />}
+                      {isUnacknowledged
+                        ? <ShieldAlert className="size-3.5" aria-hidden="true" />
+                        : needsReview
+                          ? <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                          : <Clock3 className="size-3.5" aria-hidden="true" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground">{participant?.name ?? 'นักเรียน'}</p>
-                      <p className="text-xs text-muted-foreground">{EVENT_LABELS[event.event_type] ?? event.event_type}</p>
+                      <p className="text-xs text-muted-foreground">{PROCTOR_EVENT_LABELS[event.event_type] ?? event.event_type}</p>
+                      {needsReview && !isUnacknowledged && (
+                        <p className="mt-1 text-[11px] text-success">
+                          ครูรับทราบเมื่อ {formatTime(event.acknowledged_at)}
+                        </p>
+                      )}
                     </div>
-                    <time className="shrink-0 text-[11px] text-muted-foreground" dateTime={event.created_at}>
-                      {formatTime(event.created_at)}
-                    </time>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <time className="text-[11px] text-muted-foreground" dateTime={event.created_at}>
+                        {formatTime(event.created_at)}
+                      </time>
+                      {isUnacknowledged && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isAcknowledging}
+                          onClick={() => void handleAcknowledgeEvents([event.id])}
+                        >
+                          <CheckCircle2 aria-hidden="true" />
+                          {busy ? 'กำลังบันทึก…' : 'รับทราบ'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )
               })}

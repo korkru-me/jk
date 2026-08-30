@@ -58,7 +58,7 @@ Invariant สำคัญ:
 - `submission_answers` — answer snapshot และคะแนนรายข้อ
 - `exam_android_approvals` — คำขอ Android หนึ่งแถวต่อ assignment/student เก็บ pending/approved/denied, เวลา, ผู้อนุมัติและวันหมดอายุ; browser เขียนตรงไม่ได้และลบอัตโนมัติเมื่อเกินเพดาน retention
 - `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด พร้อมสำเนา access mode/SEB/Android audit ที่ database trigger อ่านจาก submission เพื่อให้ client ปลอมป้ายยืนยันไม่ได้
-- `exam_proctor_events` — browser-level event แบบ append-only ที่เก็บเฉพาะชนิดเหตุการณ์ เวลา และ foreign keys; ไม่เก็บภาพหน้าจอ เสียง กล้อง เนื้อหาคำตอบ หรือ keystroke
+- `exam_proctor_events` — browser-level event แบบ append-only ที่เก็บเฉพาะชนิดเหตุการณ์ เวลา และ foreign keys พร้อม `acknowledged_at/by` สำหรับการรับทราบครั้งแรกของครู; trigger ห้ามแก้ evidence fields และการรับทราบไม่ใช่คำตัดสินทุจริต ไม่เก็บภาพหน้าจอ เสียง กล้อง เนื้อหาคำตอบ หรือ keystroke
 - `exam_proctor_connections` — heartbeat lease ต่อแท็บด้วย UUID สุ่มและเวลาเห็นล่าสุด ใช้นับการเปิด attempt พร้อมกันหลายจุด; ไม่เก็บ IP, user-agent, device fingerprint หรือเนื้อหาบนจอ
 
 `assignments.classroom_id` ยังมีไว้เป็น home/legacy reference อย่า query เฉพาะ field นี้เมื่อความหมายต้องรองรับหลายห้อง
@@ -71,6 +71,7 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - `assignments.access_code`, `submission_answers.correct_answer`/คะแนน และ answer-bearing fields ใน `questions` เป็น server-only ระหว่าง attempt; RLS แบบรายแถวปกป้องคอลัมน์ลับกับคอลัมน์สาธารณะในแถวเดียวกันไม่ได้ จึงห้ามเปิด full row ให้นักเรียนแล้วพยายาม strip เฉพาะใน UI
 - browser role ไม่มีสิทธิ์ `INSERT/UPDATE/DELETE` ตาราง `submissions` และ `submission_answers`; mutation ต้องผ่าน server action ที่ตรวจเจ้าของ/ครู สถานะ และเวลา ก่อนใช้ service role แบบ exact resource
 - browser role ไม่มีสิทธิ์เขียน `exam_proctor_sessions`/`exam_proctor_events` โดยตรง; `record_exam_proctor_signal` เรียกได้เฉพาะ service role หลัง Server Action ตรวจว่าเป็น attempt ของนักเรียนคนนั้น ยัง `in_progress`, เป็นข้อสอบ online และเปิด proctoring ส่วนครูอ่านผ่าน RLS ตาม assignment ที่จัดการได้
+- การรับทราบ `exam_proctor_events` ใช้ Server Action ตรวจ exact event ผ่าน session RLS ก่อนเรียก `acknowledge_exam_proctor_events`; RPC ตรวจ owner/co-teacher `admin/manage`/super admin ซ้ำ อัปเดตเฉพาะ reviewable event ที่ยังไม่รับทราบ และคืนค่าครู/เวลาคนแรกแบบ idempotent โดยไม่ให้ authenticated role `UPDATE` ตารางตรง
 - browser role ไม่มีสิทธิ์เขียน `exam_proctor_connections` โดยตรงเช่นกัน RPC ใช้ advisory lock ต่อ submission เพื่อคำนวณ transition จากหนึ่งเป็นหลาย lease แบบ atomic; `concurrent_connection` สร้างโดยฐานข้อมูลเท่านั้นและ client ปลอม event ชนิดนี้ไม่ได้
 - `assignments.proctoring_enabled`, `fullscreen_required`, `block_clipboard` และ `exam_watermark_enabled` เป็นการตั้งค่าแรงเสียดทาน/สัญญาณระดับ browser ไม่ใช่ kiosk mode หรือ security boundary; event, connection lease และ session summary ของ attempt ถูกลบเมื่อไม่มี heartbeat เกิน 90 วัน โดยไม่ลบ submission, answer หรือ score และครูผู้จัดการ assignment ล้างก่อนกำหนดได้เมื่อไม่มี session สด
 - `secure_browser_mode = 'seb_required'` เป็นคนละ boundary กับสัญญาณ browser: server ต้องพบ signed SEB session ที่ผูก exact user + assignment ก่อนเริ่ม/resume/read/save/upload/heartbeat/submit และห้ามเปลี่ยนโหมดหลังมี submission แรก

@@ -3,6 +3,12 @@ import { notFound, redirect } from 'next/navigation'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { getAuthUser } from '@/lib/auth/server'
 import type { AndroidApprovalView } from '@/lib/actions/android-exam'
+import {
+  PROCTOR_RECENT_EVENT_LIMIT,
+  PROCTOR_REVIEW_EVENT_TYPES,
+  PROCTOR_REVIEW_QUEUE_LIMIT,
+  selectProctorDashboardEvents,
+} from '@/lib/exam-proctor-alerts'
 import type { ProctorEventRow, ProctorSessionRow } from '@/lib/exam-proctor-realtime'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -51,7 +57,15 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     .eq('assignment_id', id)
   const classroomIds = (links ?? []).map(link => link.classroom_id)
 
-  const [submissionsResult, sessionsResult, eventsResult, rosterResult, approvalsResult] = await Promise.all([
+  const [
+    submissionsResult,
+    sessionsResult,
+    eventsResult,
+    unacknowledgedEventsResult,
+    unacknowledgedCountResult,
+    rosterResult,
+    approvalsResult,
+  ] = await Promise.all([
     supabase
       .from('submissions')
       .select('id, student_id, status, started_at, submitted_at, attempt_number')
@@ -67,7 +81,21 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
       .select('*')
       .eq('assignment_id', id)
       .order('created_at', { ascending: false })
-      .limit(100),
+      .limit(PROCTOR_RECENT_EVENT_LIMIT),
+    supabase
+      .from('exam_proctor_events')
+      .select('*')
+      .eq('assignment_id', id)
+      .is('acknowledged_at', null)
+      .in('event_type', [...PROCTOR_REVIEW_EVENT_TYPES])
+      .order('created_at', { ascending: false })
+      .limit(PROCTOR_REVIEW_QUEUE_LIMIT),
+    supabase
+      .from('exam_proctor_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('assignment_id', id)
+      .is('acknowledged_at', null)
+      .in('event_type', [...PROCTOR_REVIEW_EVENT_TYPES]),
     classroomIds.length > 0
       ? supabase
           .from('classroom_students')
@@ -83,10 +111,15 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
       : Promise.resolve({ data: [], error: null }),
   ])
 
+  const initialProctorEvents = selectProctorDashboardEvents([
+    ...((eventsResult.data ?? []) as ProctorEventRow[]),
+    ...((unacknowledgedEventsResult.data ?? []) as ProctorEventRow[]),
+  ])
+
   const studentIds = new Set<string>()
   for (const row of submissionsResult.data ?? []) studentIds.add(row.student_id)
   for (const row of sessionsResult.data ?? []) studentIds.add(row.student_id)
-  for (const row of eventsResult.data ?? []) studentIds.add(row.student_id)
+  for (const row of initialProctorEvents) studentIds.add(row.student_id)
   for (const row of rosterResult.data ?? []) studentIds.add(row.student_id)
   for (const row of approvalsResult.data ?? []) studentIds.add(row.student_id)
 
@@ -105,6 +138,8 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     ?? submissionsResult.error
     ?? sessionsResult.error
     ?? eventsResult.error
+    ?? unacknowledgedEventsResult.error
+    ?? unacknowledgedCountResult.error
     ?? rosterResult.error
     ?? approvalsResult.error
     ?? namesResult.error
@@ -185,7 +220,8 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
       }}
       initialParticipants={[...participantByStudent.values()]}
       initialSessions={(sessionsResult.data ?? []) as ProctorSessionRow[]}
-      initialEvents={(eventsResult.data ?? []) as ProctorEventRow[]}
+      initialEvents={initialProctorEvents}
+      initialUnacknowledgedCount={unacknowledgedCountResult.count ?? 0}
       initialAndroidApprovals={(approvalsResult.data ?? []) as AndroidApprovalView[]}
     />
   )

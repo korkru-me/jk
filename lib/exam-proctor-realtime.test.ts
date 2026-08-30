@@ -50,6 +50,8 @@ function event(id: number, createdAt: string): ProctorEventRow {
     event_type: 'tab_hidden',
     occurred_at_client: createdAt,
     created_at: createdAt,
+    acknowledged_at: null,
+    acknowledged_by: null,
   }
 }
 

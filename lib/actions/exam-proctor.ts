@@ -18,6 +18,12 @@ interface RecordProctorSignalInput {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+interface ProctorEventAcknowledgementRow {
+  event_id: number | string
+  event_acknowledged_at: string
+  event_acknowledged_by: string | null
+}
+
 export async function recordProctorSignal(input: RecordProctorSignalInput) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -119,4 +125,76 @@ export async function purgeAssignmentProctorData(assignmentId: string) {
 
   revalidatePath(`/assignments/${assignmentId}/proctor`)
   return { success: true as const, deleted }
+}
+
+export async function acknowledgeProctorEvents(assignmentId: string, eventIds: number[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลชุดข้อสอบไม่ถูกต้อง' }
+  if (!Array.isArray(eventIds) || eventIds.length < 1 || eventIds.length > 100) {
+    return { error: 'รายการเหตุการณ์ไม่ถูกต้อง' }
+  }
+  if (eventIds.some(id => !Number.isSafeInteger(id) || id < 1)) {
+    return { error: 'รายการเหตุการณ์ไม่ถูกต้อง' }
+  }
+  const normalizedEventIds = [...new Set(eventIds)]
+
+  // Verify every exact event through the caller's RLS visibility before the
+  // service-role call. This prevents the action from becoming an event-ID
+  // oracle; the RPC below independently repeats mutation authorization.
+  const { data: visibleEvents, error: visibilityError } = await supabase
+    .from('exam_proctor_events')
+    .select('id')
+    .eq('assignment_id', assignmentId)
+    .in('id', normalizedEventIds)
+  if (visibilityError || visibleEvents?.length !== normalizedEventIds.length) {
+    return { error: 'ไม่พบเหตุการณ์หรือไม่มีสิทธิ์จัดการ' }
+  }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin.rpc('acknowledge_exam_proctor_events', {
+    p_assignment_id: assignmentId,
+    p_event_ids: normalizedEventIds,
+    p_actor_id: user.id,
+  })
+  if (error?.code === '42501') return { error: 'คุณไม่มีสิทธิ์รับทราบเหตุการณ์ของชุดข้อสอบนี้' }
+  if (error) return { error: 'บันทึกการรับทราบไม่สำเร็จ กรุณาลองใหม่' }
+  if (!Array.isArray(data)) return { error: 'ระบบตอบกลับข้อมูลการรับทราบไม่ครบ กรุณาลองใหม่' }
+
+  const acknowledgements: Array<{
+    eventId: number
+    acknowledgedAt: string
+    acknowledgedBy: string | null
+  }> = []
+  for (const row of data as ProctorEventAcknowledgementRow[]) {
+    const eventId = typeof row.event_id === 'number' ? row.event_id : Number(row.event_id)
+    const acknowledgedAt = Date.parse(row.event_acknowledged_at)
+    if (
+      !Number.isSafeInteger(eventId)
+      || eventId < 1
+      || !Number.isFinite(acknowledgedAt)
+      || (row.event_acknowledged_by !== null && !UUID_PATTERN.test(row.event_acknowledged_by))
+    ) {
+      return { error: 'ระบบตอบกลับข้อมูลการรับทราบไม่ครบ กรุณาลองใหม่' }
+    }
+    acknowledgements.push({
+      eventId,
+      acknowledgedAt: new Date(acknowledgedAt).toISOString(),
+      acknowledgedBy: row.event_acknowledged_by,
+    })
+  }
+  if (
+    acknowledgements.length !== normalizedEventIds.length
+    || acknowledgements.some(row => (
+      !Number.isSafeInteger(row.eventId)
+      || row.eventId < 1
+      || !normalizedEventIds.includes(row.eventId)
+    ))
+  ) {
+    return { error: 'เหตุการณ์บางรายการไม่รองรับการรับทราบ กรุณาตรวจข้อมูลล่าสุด' }
+  }
+
+  revalidatePath(`/assignments/${assignmentId}/proctor`)
+  return { success: true as const, acknowledgements }
 }
