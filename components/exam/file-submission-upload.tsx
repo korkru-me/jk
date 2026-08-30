@@ -18,6 +18,16 @@ async function browserSupabase() {
 interface FileSubmissionUploadProps {
   value: SubmittedFile[]
   onChange: (files: SubmittedFile[]) => void
+  /**
+   * ครูกำลังลองทำโจทย์ของตัวเอง — เลือกไฟล์ได้จริงและเห็นไฟล์จริง แต่ไม่แตะ
+   * storage เลย เหตุผลเดียวกับ WorkImageUpload: ตัวอย่างไม่มี submission ให้ผูก
+   * ไฟล์ด้วย สิ่งที่อัปขึ้นไปจึงเป็นไฟล์กำพร้าตั้งแต่วินาทีแรก
+   */
+  localOnly?: boolean
+}
+
+function isLocalUrl(url: string) {
+  return url.startsWith('blob:')
 }
 
 /** The `submission-files` bucket's own limit, set in its creating migration. */
@@ -31,13 +41,22 @@ function isImageType(type: string) {
 // mirrors WorkImageUpload's storage-upload pattern but keeps an array (like
 // the teacher-side QuestionImageUpload) instead of a single slot, and
 // accepts PDFs alongside images.
-export function FileSubmissionUpload({ value, onChange }: FileSubmissionUploadProps) {
+export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmissionUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (files.length === 0) return
+
+    if (localOnly) {
+      onChange([
+        ...value,
+        ...files.map(f => ({ url: URL.createObjectURL(f), name: f.name, type: f.type })),
+      ])
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
 
     setUploading(true)
     const supabase = await browserSupabase()
@@ -74,10 +93,14 @@ export function FileSubmissionUpload({ value, onChange }: FileSubmissionUploadPr
   }
 
   async function removeFile(url: string) {
-    const supabase = await browserSupabase()
-    const match = url.match(/\/object\/public\/submission-files\/(.+)/)
-    if (match?.[1]) {
-      await supabase.storage.from('submission-files').remove([decodeURIComponent(match[1])])
+    if (isLocalUrl(url)) {
+      URL.revokeObjectURL(url)
+    } else {
+      const supabase = await browserSupabase()
+      const match = url.match(/\/object\/public\/submission-files\/(.+)/)
+      if (match?.[1]) {
+        await supabase.storage.from('submission-files').remove([decodeURIComponent(match[1])])
+      }
     }
     onChange(value.filter(f => f.url !== url))
   }
@@ -102,7 +125,11 @@ export function FileSubmissionUpload({ value, onChange }: FileSubmissionUploadPr
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
           {uploading ? 'กำลังอัปโหลด...' : 'แนบไฟล์'}
         </button>
-        <span className="text-[10px] text-muted-foreground">รูปภาพหรือ PDF — สูงสุด 10 MB ต่อไฟล์</span>
+        <span className="text-[10px] text-muted-foreground">
+          {localOnly
+            ? 'รูปภาพหรือ PDF · ตัวอย่าง — ไฟล์อยู่ในเครื่องคุณ ไม่ถูกอัปโหลด'
+            : 'รูปภาพหรือ PDF — สูงสุด 10 MB ต่อไฟล์'}
+        </span>
       </div>
 
       {value.length > 0 && (

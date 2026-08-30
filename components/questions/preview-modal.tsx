@@ -137,6 +137,7 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
         questionText={q.question_text}
         variables={(q.variables ?? []) as Variable[]}
         answerParts={q.question_type === 'written' ? (q.answer_parts ?? []) : []}
+        answerTolerance={q.answer_tolerance ?? undefined}
         isRandom={q.is_random}
         questionType={q.question_type}
         mcqOptions={q.question_type === 'mcq' ? ((q.mcq_options ?? []) as MCQOption[]) : []}
