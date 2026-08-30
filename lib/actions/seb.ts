@@ -113,6 +113,26 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     platform: version.platform,
     version: version.version,
   })
+
+  if (input.purpose === 'system_check') {
+    // Persist only the latest successful pre-attempt verification. The
+    // service-role-only RPC independently repeats the published assignment,
+    // SEB mode, and current roster-membership checks before writing. Neither
+    // request hash nor any device/network identifier crosses this boundary.
+    const admin = createAdminClient()
+    const { error } = await admin.rpc('record_exam_seb_checkin', {
+      p_assignment_id: input.assignmentId,
+      p_student_id: user.id,
+      p_platform: claims.platform,
+      p_version: claims.version,
+      p_verified_at: new Date(claims.issuedAt).toISOString(),
+      p_valid_until: new Date(claims.expiresAt).toISOString(),
+    })
+    if (error) {
+      return { error: 'บันทึกผลตรวจความพร้อมไม่สำเร็จ กรุณาลองตรวจใหม่หรือแจ้งครูผู้คุมสอบ' }
+    }
+  }
+
   const maxAge = Math.floor((claims.expiresAt - Date.now()) / 1_000)
   ;(await cookies()).set(sebSessionCookieName(input.assignmentId), signSebClaims(claims, environment.sessionSecret), {
     httpOnly: true,
@@ -123,7 +143,11 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     priority: 'high',
   })
 
-  return { success: true as const, platform: version.platform }
+  return {
+    success: true as const,
+    platform: version.platform,
+    validUntil: new Date(claims.expiresAt).toISOString(),
+  }
 }
 
 /**

@@ -58,6 +58,12 @@ import {
   type ProctorSessionChange,
   type ProctorSessionRow,
 } from '@/lib/exam-proctor-realtime'
+import {
+  getSebPreflightState,
+  normalizeSebPreflightCheckins,
+  summarizeSebPreflight,
+  type SebPreflightCheckinRow,
+} from '@/lib/seb-preflight'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -88,16 +94,21 @@ interface AssignmentSummary {
 interface Props {
   assignment: AssignmentSummary
   initialParticipants: ProctorParticipant[]
+  initialRosterStudentIds: string[]
   initialSessions: ProctorSessionRow[]
   initialEvents: ProctorEventRow[]
   initialUnacknowledgedCount: number
   initialAndroidApprovals: AndroidApprovalView[]
+  initialSebCheckins: SebPreflightCheckinRow[]
+  initialSebCheckinsError: boolean
 }
 
 const ACTIVE_WINDOW_MS = 45_000
+const SEB_PREFLIGHT_POLL_MS = 10_000
 const PROCTOR_SESSION_SELECT = 'submission_id, org_id, assignment_id, student_id, started_monitoring_at, last_seen_at, is_online, is_tab_visible, is_fullscreen, completed_at, tab_switch_count, fullscreen_exit_count, window_blur_count, clipboard_attempt_count, screenshot_key_count, active_connection_count, concurrent_connection_count, secure_browser_verified_at, secure_browser_platform, secure_browser_version, exam_access_mode, android_approved_at, android_approved_by, last_event_type, last_event_at, created_at, updated_at'
 const PROCTOR_EVENT_SELECT = 'id, org_id, assignment_id, submission_id, student_id, event_type, occurred_at_client, created_at, acknowledged_at, acknowledged_by'
 const ANDROID_APPROVAL_SELECT = 'id, assignment_id, student_id, status, requested_at, reviewed_at, reviewed_by, expires_at, updated_at'
+const SEB_PREFLIGHT_CHECKIN_SELECT = 'assignment_id, student_id, verified_at, valid_until, platform, version'
 
 type AndroidApprovalChange =
   | { type: 'upsert'; row: AndroidApprovalView }
@@ -133,6 +144,19 @@ function formatTime(value: string | null): string {
   }).format(new Date(value))
 }
 
+function formatDateTime(value: string): string {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return 'เวลาไม่ถูกต้อง'
+  return new Intl.DateTimeFormat('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Bangkok',
+  }).format(date)
+}
+
 function sessionHasFlags(session: ProctorSessionRow): boolean {
   return session.tab_switch_count > 0
     || session.fullscreen_exit_count > 0
@@ -145,10 +169,13 @@ function sessionHasFlags(session: ProctorSessionRow): boolean {
 export function ProctorDashboard({
   assignment,
   initialParticipants,
+  initialRosterStudentIds,
   initialSessions,
   initialEvents,
   initialUnacknowledgedCount,
   initialAndroidApprovals,
+  initialSebCheckins,
+  initialSebCheckinsError,
 }: Props) {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
@@ -156,6 +183,8 @@ export function ProctorDashboard({
   const [events, setEvents] = useState(initialEvents)
   const [unacknowledgedCount, setUnacknowledgedCount] = useState(initialUnacknowledgedCount)
   const [androidApprovals, setAndroidApprovals] = useState(initialAndroidApprovals)
+  const [sebCheckins, setSebCheckins] = useState(initialSebCheckins)
+  const [sebCheckinsError, setSebCheckinsError] = useState(initialSebCheckinsError)
   const [connectionMode, setConnectionMode] = useState<ProctorDashboardConnectionMode>('connecting')
   const [snapshotRefreshing, setSnapshotRefreshing] = useState(false)
   const [snapshotRefreshRequestVersion, setSnapshotRefreshRequestVersion] = useState(0)
@@ -173,12 +202,22 @@ export function ProctorDashboard({
   const pendingSessionChangesRef = useRef<ProctorSessionChange[]>([])
   const pendingEventChangesRef = useRef<ProctorEventChange[]>([])
   const pendingApprovalChangesRef = useRef<AndroidApprovalChange[]>([])
+  const sebCheckinsRefreshInFlightRef = useRef(false)
   const reviewCountRequestRef = useRef(0)
   const reviewCountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const studentNameById = useMemo(
     () => new Map(initialParticipants.map(participant => [participant.studentId, participant.name])),
     [initialParticipants],
   )
+  const rosterStudentIdSet = useMemo(
+    () => new Set(initialRosterStudentIds),
+    [initialRosterStudentIds],
+  )
+
+  useEffect(() => {
+    setSebCheckins(initialSebCheckins)
+    setSebCheckinsError(initialSebCheckinsError)
+  }, [initialSebCheckins, initialSebCheckinsError])
   const {
     ingestEvents,
     alertsEnabled,
@@ -424,6 +463,60 @@ export function ProctorDashboard({
     supabase,
   ])
 
+  const refreshSebCheckins = useCallback(async () => {
+    if (
+      !assignment.enabled
+      || !assignment.secureBrowserRequired
+      || sebCheckinsRefreshInFlightRef.current
+    ) return
+
+    sebCheckinsRefreshInFlightRef.current = true
+    try {
+      const { data, error } = await supabase
+        .from('exam_seb_checkins')
+        .select(SEB_PREFLIGHT_CHECKIN_SELECT)
+        .eq('assignment_id', assignment.id)
+        .order('verified_at', { ascending: false })
+      if (error) {
+        // Never turn an unavailable readiness source into false “not checked”
+        // rows or leave a stale green status on screen.
+        setSebCheckins([])
+        setSebCheckinsError(true)
+        return
+      }
+
+      setSebCheckins(normalizeSebPreflightCheckins(
+        (data ?? []) as unknown as SebPreflightCheckinRow[],
+      ).filter(checkin => rosterStudentIdSet.has(checkin.student_id)))
+      setSebCheckinsError(false)
+    } catch {
+      setSebCheckins([])
+      setSebCheckinsError(true)
+    } finally {
+      sebCheckinsRefreshInFlightRef.current = false
+    }
+  }, [
+    assignment.enabled,
+    assignment.id,
+    assignment.secureBrowserRequired,
+    rosterStudentIdSet,
+    supabase,
+  ])
+
+  useEffect(() => {
+    if (!assignment.enabled || !assignment.secureBrowserRequired) return
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshSebCheckins()
+    }
+    void refreshSebCheckins()
+    const timer = setInterval(refreshWhenVisible, SEB_PREFLIGHT_POLL_MS)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [assignment.enabled, assignment.secureBrowserRequired, refreshSebCheckins])
+
   useEffect(() => {
     if (!assignment.enabled) return
     const refreshWhenNeeded = () => {
@@ -472,13 +565,28 @@ export function ProctorDashboard({
     }
     return map
   }, [sessions])
+  const sessionBySubmissionId = useMemo(
+    () => new Map(sessions.map(session => [session.submission_id, session])),
+    [sessions],
+  )
 
   const androidApprovalByStudent = useMemo(
     () => new Map(androidApprovals.map(approval => [approval.student_id, approval])),
     [androidApprovals],
   )
+  const sebCheckinByStudent = useMemo(
+    () => new Map(sebCheckins.map(checkin => [checkin.student_id, checkin])),
+    [sebCheckins],
+  )
+  const sebPreflightSummary = useMemo(
+    () => summarizeSebPreflight(initialRosterStudentIds, sebCheckins, now),
+    [initialRosterStudentIds, now, sebCheckins],
+  )
 
   const allStudentIds = useMemo(() => {
+    // A check-in is supporting readiness data, not roster membership. Keeping
+    // it out of this set prevents a delayed row from resurrecting a student
+    // who is no longer an assignment participant.
     const ids = new Set(initialParticipants.map(participant => participant.studentId))
     for (const session of sessions) ids.add(session.student_id)
     for (const approval of androidApprovals) ids.add(approval.student_id)
@@ -487,8 +595,14 @@ export function ProctorDashboard({
 
   const rows = allStudentIds.map(studentId => {
     const participant = participantByStudent.get(studentId)
-    const session = latestSessionByStudent.get(studentId)
+    // Prefer the session for the student's latest submission. A completed
+    // older attempt must not hide a fresh preflight result while the next
+    // allowed attempt has not emitted its first heartbeat yet.
+    const session = participant?.submissionId
+      ? sessionBySubmissionId.get(participant.submissionId)
+      : latestSessionByStudent.get(studentId)
     const androidApproval = androidApprovalByStudent.get(studentId)
+    const sebCheckin = sebCheckinByStudent.get(studentId)
     const active = Boolean(
       session
       && !session.completed_at
@@ -501,6 +615,8 @@ export function ProctorDashboard({
       participant,
       session,
       androidApproval,
+      sebCheckin,
+      isCurrentRosterStudent: rosterStudentIdSet.has(studentId),
       active,
       flagged: session ? sessionHasFlags(session) : false,
       completed: Boolean(session?.completed_at || participant?.submissionStatus === 'submitted' || participant?.submissionStatus === 'graded'),
@@ -545,7 +661,12 @@ export function ProctorDashboard({
       title: 'ล้างข้อมูลคุมสอบของชุดนี้?',
       description: (
         <span>
-          เหตุการณ์ ตัวนับสถานะ และข้อมูลการเชื่อมต่อจะถูกลบถาวร แต่คำตอบ คะแนน และประวัติการส่งข้อสอบยังอยู่ครบ
+          เหตุการณ์ ตัวนับสถานะ ข้อมูลการเชื่อมต่อ
+          {assignment.secureBrowserRequired ? ' และผลตรวจความพร้อม SEB ล่าสุด' : ''}
+          จะถูกลบถาวร แต่คำตอบ คะแนน และประวัติการส่งข้อสอบยังอยู่ครบ
+          {assignment.secureBrowserRequired
+            ? ' สถานะพร้อมใน roster จะว่างจนกว่านักเรียนตรวจใหม่ แต่ session SEB ที่ออกไปแล้วจะไม่ถูกยกเลิกด้วยปุ่มนี้'
+            : ''}
         </span>
       ),
       confirmLabel: 'ล้างข้อมูลคุมสอบ',
@@ -562,6 +683,7 @@ export function ProctorDashboard({
 
       setSessions([])
       setEvents([])
+      setSebCheckins([])
       setUnacknowledgedCount(0)
       const totalDeleted = totalPurgedProctorRecords(result.deleted)
       toast.success(totalDeleted > 0
@@ -742,6 +864,62 @@ export function ProctorDashboard({
         </div>
       </Card>
 
+      {assignment.secureBrowserRequired && (
+        <Card
+          padding="md"
+          className={sebCheckinsError
+            ? 'border-destructive/30 bg-destructive/5'
+            : 'border-primary/25 bg-primary/5'}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <MonitorCheck className="size-4" aria-hidden="true" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-medium text-foreground">ความพร้อม SEB ก่อนเริ่มสอบ</h2>
+                  <Badge
+                    variant={sebCheckinsError
+                      ? 'destructive'
+                      : sebPreflightSummary.total > 0 && sebPreflightSummary.ready === sebPreflightSummary.total
+                        ? 'secondary'
+                        : 'outline'}
+                    className={!sebCheckinsError
+                      && sebPreflightSummary.total > 0
+                      && sebPreflightSummary.ready === sebPreflightSummary.total
+                      ? 'text-success'
+                      : undefined}
+                    aria-live="polite"
+                  >
+                    {sebCheckinsError
+                      ? 'โหลดสถานะไม่สำเร็จ'
+                      : `พร้อม ${sebPreflightSummary.ready}/${sebPreflightSummary.total} คน`}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {sebCheckinsError
+                    ? 'ยังอ่านผลตรวจความพร้อมไม่ได้ ห้องคุมสอบส่วนอื่นยังทำงานต่อ และระบบจะลองตรวจใหม่ทุก 10 วินาที'
+                    : 'นับจากผลตรวจ SEB ล่าสุดที่ยังไม่หมดอายุของนักเรียนในรายชื่อ ตรวจซ้ำทุก 10 วินาที ผลนี้ไม่ใช่การยืนยันตัวบุคคลหรือระบุตัวเครื่อง หากเปลี่ยนเครื่องหรือการตั้งค่าต้องตรวจใหม่'}
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2 text-xs">
+              {!sebCheckinsError && (
+                <>
+                <Badge variant="secondary" className="text-success">พร้อม {sebPreflightSummary.ready}</Badge>
+                <Badge variant="outline" className="text-warning">หมดอายุ {sebPreflightSummary.expired}</Badge>
+                <Badge variant="outline">ยังไม่ตรวจ {sebPreflightSummary.missing}</Badge>
+                </>
+              )}
+              <Button type="button" size="sm" variant="outline" onClick={() => router.refresh()}>
+                <RefreshCw aria-hidden="true" /> รีเฟรชรายชื่อ
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card padding="md">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
@@ -749,7 +927,9 @@ export function ProctorDashboard({
             <div>
               <p className="text-sm font-medium text-foreground">เก็บข้อมูลคุมสอบไม่เกิน {EXAM_PROCTOR_RETENTION_DAYS} วัน</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                ระบบลบอัตโนมัติหลังไม่มี heartbeat ตามระยะที่กำหนด การล้างส่วนนี้ไม่กระทบคำตอบ คะแนน หรือ submission
+                {assignment.secureBrowserRequired
+                  ? `ระบบเก็บสัญญาณสดไม่เกิน ${EXAM_PROCTOR_RETENTION_DAYS} วันนับจาก heartbeat ล่าสุด และเก็บผลตรวจความพร้อม SEB ไม่เกิน ${EXAM_PROCTOR_RETENTION_DAYS} วันนับจากเวลาตรวจ การล้างส่วนนี้ไม่กระทบคำตอบ คะแนน หรือ submission`
+                  : `ระบบเก็บสัญญาณสดไม่เกิน ${EXAM_PROCTOR_RETENTION_DAYS} วันนับจาก heartbeat ล่าสุด การล้างส่วนนี้ไม่กระทบคำตอบ คะแนน หรือ submission`}
               </p>
             </div>
           </div>
@@ -852,8 +1032,13 @@ export function ProctorDashboard({
                   active={row.active}
                   flagged={row.flagged}
                   completed={row.completed}
+                  submissionInProgress={row.participant?.submissionStatus === 'in_progress'}
                   fullscreenRequired={assignment.fullscreenRequired}
                   secureBrowserRequired={assignment.secureBrowserRequired}
+                  isCurrentRosterStudent={row.isCurrentRosterStudent}
+                  sebPreflightCheckin={row.sebCheckin}
+                  sebCheckinsError={sebCheckinsError}
+                  now={now}
                   androidApproval={row.androidApproval}
                 />
               ))}
@@ -996,8 +1181,13 @@ function StudentStatusRow({
   active,
   flagged,
   completed,
+  submissionInProgress,
   fullscreenRequired,
   secureBrowserRequired,
+  isCurrentRosterStudent,
+  sebPreflightCheckin,
+  sebCheckinsError,
+  now,
   androidApproval,
 }: {
   name: string
@@ -1005,10 +1195,18 @@ function StudentStatusRow({
   active: boolean
   flagged: boolean
   completed: boolean
+  submissionInProgress: boolean
   fullscreenRequired: boolean
   secureBrowserRequired: boolean
+  isCurrentRosterStudent: boolean
+  sebPreflightCheckin: SebPreflightCheckinRow | undefined
+  sebCheckinsError: boolean
+  now: number
   androidApproval: AndroidApprovalView | undefined
 }) {
+  const sebPreflightState = getSebPreflightState(sebPreflightCheckin, now)
+  const historicalSession = Boolean(session && !submissionInProgress)
+
   return (
     <div className="space-y-3 px-5 py-4 sm:flex sm:items-center sm:gap-4 sm:space-y-0">
       <div className="min-w-0 flex-1">
@@ -1026,15 +1224,44 @@ function StudentStatusRow({
           {flagged && <Badge variant="destructive"><ShieldAlert aria-hidden="true" /> ควรตรวจสอบ</Badge>}
           {session?.secure_browser_verified_at ? (
             <Badge variant="secondary" className="text-success">
-              <LockKeyhole aria-hidden="true" /> SEB ยืนยันแล้ว · {SEB_PLATFORM_LABELS[session.secure_browser_platform ?? 'windows']}
+              <LockKeyhole aria-hidden="true" />
+              {historicalSession ? 'SEB ของ attempt ล่าสุด' : 'SEB ยืนยันแล้ว'}
+              {' · '}{SEB_PLATFORM_LABELS[session.secure_browser_platform ?? 'windows']}
             </Badge>
           ) : session?.exam_access_mode === 'android_monitored' ? (
             <Badge variant="outline" className="text-warning">
-              <Smartphone aria-hidden="true" /> Android · ครูอนุมัติ
+              <Smartphone aria-hidden="true" />
+              {historicalSession ? 'Android ของ attempt ล่าสุด' : 'Android · ครูอนุมัติ'}
             </Badge>
           ) : secureBrowserRequired && session ? (
             <Badge variant="destructive"><AlertTriangle aria-hidden="true" /> ไม่พบการยืนยัน SEB</Badge>
           ) : null}
+          {secureBrowserRequired
+            && isCurrentRosterStudent
+            && (!session || !submissionInProgress)
+            && (
+            sebCheckinsError ? (
+              <Badge variant="destructive">
+                <AlertTriangle aria-hidden="true" /> โหลดผลตรวจ SEB ไม่สำเร็จ
+              </Badge>
+            ) : sebPreflightState === 'ready' ? (
+              <Badge variant="secondary" className="text-success">
+                <MonitorCheck aria-hidden="true" />
+                {historicalSession ? 'พร้อม SEB รอบถัดไป' : 'ผลตรวจ SEB ยังใช้ได้'}
+                {sebPreflightCheckin ? ` · ${SEB_PLATFORM_LABELS[sebPreflightCheckin.platform]}` : ''}
+              </Badge>
+            ) : sebPreflightState === 'expired' ? (
+              <Badge variant="outline" className="text-warning">
+                <Clock3 aria-hidden="true" />
+                {historicalSession ? 'ผลตรวจ SEB รอบถัดไปหมดอายุ' : 'ผลตรวจ SEB หมดอายุ'}
+              </Badge>
+            ) : (
+              <Badge variant="outline">
+                <MonitorCheck aria-hidden="true" />
+                {historicalSession ? 'ยังไม่ตรวจ SEB รอบถัดไป' : 'ยังไม่ตรวจ SEB'}
+              </Badge>
+            )
+          )}
           {!session && androidApproval?.status === 'approved' && (
             <Badge variant="outline" className="text-warning"><UserCheck aria-hidden="true" /> Android อนุมัติแล้ว</Badge>
           )}
@@ -1046,7 +1273,11 @@ function StudentStatusRow({
           )}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          {session ? `สัญญาณล่าสุด ${formatTime(session.last_seen_at)}` : 'ยังไม่พบการเชื่อมต่อจากหน้าสอบ'}
+          {session
+            ? `สัญญาณล่าสุด ${formatTime(session.last_seen_at)}`
+            : isCurrentRosterStudent && sebPreflightCheckin
+              ? `ตรวจ SEB ล่าสุด ${formatDateTime(sebPreflightCheckin.verified_at)} · ผลใช้ได้ถึง ${formatDateTime(sebPreflightCheckin.valid_until)}`
+              : 'ยังไม่พบการเชื่อมต่อจากหน้าสอบ'}
         </p>
       </div>
 

@@ -10,6 +10,7 @@ import {
   selectProctorDashboardEvents,
 } from '@/lib/exam-proctor-alerts'
 import type { ProctorEventRow, ProctorSessionRow } from '@/lib/exam-proctor-realtime'
+import type { SebPreflightCheckinRow } from '@/lib/seb-preflight'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
@@ -65,6 +66,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     unacknowledgedCountResult,
     rosterResult,
     approvalsResult,
+    sebCheckinsResult,
   ] = await Promise.all([
     supabase
       .from('submissions')
@@ -108,6 +110,13 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
           .select('id, assignment_id, student_id, status, requested_at, reviewed_at, reviewed_by, expires_at, updated_at')
           .eq('assignment_id', id)
           .order('requested_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    assignment.secure_browser_mode === 'seb_required'
+      ? supabase
+          .from('exam_seb_checkins')
+          .select('assignment_id, student_id, verified_at, valid_until, platform, version')
+          .eq('assignment_id', id)
+          .order('verified_at', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
   ])
 
@@ -201,6 +210,10 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
       submittedAt: submission.submitted_at,
     })
   }
+  const initialRosterStudentIds = [
+    ...new Set((rosterResult.data ?? []).map(row => row.student_id)),
+  ]
+  const rosterStudentIdSet = new Set(initialRosterStudentIds)
 
   const classroom = Array.isArray(assignment.classrooms)
     ? assignment.classrooms[0]
@@ -219,10 +232,14 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
         androidMonitoredAllowed: assignment.android_exam_mode === 'monitored',
       }}
       initialParticipants={[...participantByStudent.values()]}
+      initialRosterStudentIds={initialRosterStudentIds}
       initialSessions={(sessionsResult.data ?? []) as ProctorSessionRow[]}
       initialEvents={initialProctorEvents}
       initialUnacknowledgedCount={unacknowledgedCountResult.count ?? 0}
       initialAndroidApprovals={(approvalsResult.data ?? []) as AndroidApprovalView[]}
+      initialSebCheckins={((sebCheckinsResult.data ?? []) as SebPreflightCheckinRow[])
+        .filter(checkin => rosterStudentIdSet.has(checkin.student_id))}
+      initialSebCheckinsError={Boolean(sebCheckinsResult.error)}
     />
   )
 }

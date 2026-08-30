@@ -14,7 +14,10 @@ export default async function ExamDefaultsPage() {
   const supabase = await createClient()
   const [profileResult, schemaResult] = await Promise.all([
     supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
-    supabase.from('assignments').select('secure_browser_mode').limit(1),
+    // The newest SEB preflight table can exist only after the earlier SEB,
+    // Android admission, and proctor-review migrations have been applied in
+    // order. Probing it avoids reporting a partially deployed rollout ready.
+    supabase.from('exam_seb_checkins').select('assignment_id').limit(1),
   ])
   if (profileResult.data?.role === 'student') redirect('/settings/profile')
 

@@ -13,6 +13,21 @@ const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after
 
 const SEB_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ เพราะระบบตั้งค่าไม่ครบ กรุณาตรวจที่ การตั้งค่า > ตั้งค่าข้อสอบเริ่มต้น'
 
+type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
+
+async function isSebPublishingReady(supabase: ServerSupabaseClient) {
+  if (!inspectSebReadiness().publishReady) return false
+
+  // Probe the newest required table. If it exists, the earlier SEB, Android,
+  // and proctor-review migrations must also have been applied in order. RLS
+  // may return zero rows, but a missing/partial schema returns an error.
+  const { error } = await supabase
+    .from('exam_seb_checkins')
+    .select('assignment_id')
+    .limit(1)
+  return !error
+}
+
 interface CreateAssignmentData {
   classroom_ids: string[]
   title: string
@@ -96,7 +111,7 @@ export async function createAssignment(data: CreateAssignmentData) {
   if (
     data.status === 'published'
     && secureBrowserMode === 'seb_required'
-    && !inspectSebReadiness().publishReady
+    && !await isSebPublishingReady(supabase)
   ) return { error: SEB_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled === true || secureBrowserMode === 'seb_required')
@@ -187,7 +202,10 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
       .eq('id', id)
       .maybeSingle()
     if (assignmentError) return { error: 'ตรวจสอบความพร้อม Safe Exam Browser ไม่สำเร็จ กรุณาตรวจว่า apply migration แล้ว' }
-    if (assignment?.secure_browser_mode === 'seb_required' && !inspectSebReadiness().publishReady) {
+    if (
+      assignment?.secure_browser_mode === 'seb_required'
+      && !await isSebPublishingReady(supabase)
+    ) {
       return { error: SEB_NOT_READY_ERROR }
     }
   }
@@ -323,7 +341,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   if (
     existing.status === 'published'
     && secureBrowserMode === 'seb_required'
-    && !inspectSebReadiness().publishReady
+    && !await isSebPublishingReady(supabase)
   ) return { error: SEB_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled || secureBrowserMode === 'seb_required')

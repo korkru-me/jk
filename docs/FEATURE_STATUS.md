@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 29 สิงหาคม 2026
+ตรวจจาก repository: 30 สิงหาคม 2026
 
 ## วิธีอ่านสถานะ
 
@@ -243,14 +243,16 @@
 
 ### งานและข้อสอบ — มีโค้ดรองรับ
 
-- **ระบบสอบปลอดภัยเฟส 1–4 — SEB รองรับ Windows, macOS และ iOS/iPadOS; Android ใช้ monitored mode แยกที่ความมั่นใจต่ำกว่า** — ครูเปิด `secure_browser_mode = seb_required` ได้เฉพาะข้อสอบออนไลน์ ระบบบังคับเปิดห้องคุมสอบสด, นักเรียนได้หน้าแนะนำเปิด `.seb`, และ server ตรวจ CK + BEK ของ exact challenge URL ผ่าน SEB JavaScript API ก่อนออก HttpOnly session ที่ผูกผู้ใช้กับข้อสอบ
+- **ระบบสอบปลอดภัยเฟส 1–5 — SEB รองรับ Windows, macOS และ iOS/iPadOS; Android ใช้ monitored mode แยกที่ความมั่นใจต่ำกว่า** — ครูเปิด `secure_browser_mode = seb_required` ได้เฉพาะข้อสอบออนไลน์ ระบบบังคับเปิดห้องคุมสอบสด, นักเรียนได้หน้าแนะนำเปิด `.seb`, และ server ตรวจ CK + BEK ของ exact challenge URL ผ่าน SEB JavaScript API ก่อนออก HttpOnly session ที่ผูกผู้ใช้กับข้อสอบ
   - ตรวจ session ซ้ำที่ `startSubmission`, `getExamTakingData`, autosave/รูปวิธีทำ/ไฟล์แนบ, proctor heartbeat และ `submitSubmission`; การปลอม UI หรือเรียก Server Action ตรงจึงไม่ข้าม gate ส่วน forced-finalize ของ attempt หมดเวลายังทำงานได้
   - submission และห้องคุมสอบเก็บเฉพาะ verified timestamp/platform/version; ครูเห็นป้าย “SEB ยืนยันแล้ว” แบบ realtime โดยค่าฝั่งห้องคุมสอบถูก trigger คัดจาก submission ไม่รับจาก client
   - ห้ามเปลี่ยน browser ↔ SEB หลังมี submission แรก ป้องกันการล็อกนักเรียนกลางข้อสอบ และ SEB kiosk ไม่ซ้อน DOM fullscreen overlay ซึ่งเคยมีโอกาส false-block บน Apple platform
   - เฟส 2 เพิ่ม teacher readiness checklist ที่ไม่เปิดเผย key, กัน create/publish/แก้ข้อสอบ SEB ที่เผยแพร่อยู่เมื่อ production URL หรือ secret/CK/BEK ไม่พร้อม และเพิ่ม assignment-specific system check ที่ตรวจ roster + purpose-bound challenge โดยไม่โหลดโจทย์ ไม่ถาม access code ไม่สร้าง submission และไม่เริ่ม timer
   - เฟส 3 เพิ่ม `android_exam_mode = monitored`: นักเรียน Android รอโดยยังไม่สร้าง attempt/timer ครูตรวจเครื่องจริงและอนุมัติรายคนจากห้องคุมสอบ จึงได้ signed HttpOnly session; ทุก read/write ตรวจ session ซ้ำและ audit แยก `android_monitored` จาก SEB อย่างชัดเจน ระบบไม่เก็บ user-agent/IP/device fingerprint และไม่กล่าวอ้างว่าป้องกัน screenshot ระดับระบบ
   - เฟส 4 เพิ่มคิวสัญญาณ “รอรับทราบ/ครูรับทราบแล้ว” ที่ใช้ร่วมกันข้ามเครื่องครูแบบ first-ack-wins, ตัวนับ exact ทั้ง assignment, filter/รับทราบทีละรายการหรือไม่เกิน 100 รายการที่แสดง และเสียง/Browser Notification แบบ opt-in ต่อการเปิดหน้า; event เก่ายังเป็น backlog จริง ไม่ backfill ว่าครูเคยเห็น และการรับทราบไม่ใช่คำตัดสินว่าปกติหรือทุจริต
-  - **ยังไม่พร้อมเปิด production จนกว่าจะ** apply migrations `20260830062722`, `20260830072842` และ `20260830082038` ตามลำดับ, ตั้ง 4 env ของ SEB, สร้าง/เข้ารหัส `.seb`, เก็บ BEK ของทุก build ที่อนุญาต และทำ device/Wi-Fi mock exam ทั้ง SEB/Android ตาม `docs/SEB_SETUP.md` กับ `docs/ANDROID_EXAM_MODE.md`
+  - เฟส 5 เก็บเฉพาะ **ผล system check ที่ผ่านล่าสุด** หนึ่งแถวต่อ assignment + นักเรียน (`verified_at`, `valid_until` ไม่เกิน 12 ชั่วโมง, platform และ version) โดยไม่สร้าง submission/attempt หรือเริ่ม timer ห้องคุมสอบแสดง roster ก่อนสอบเป็น “พร้อม/หมดอายุ/ยังไม่ตรวจ” และ refresh ผ่าน RLS ทุก 10 วินาที/เมื่อกลับเข้าแท็บ; ไม่ publish ตารางนี้ผ่าน Postgres Changes เพราะ RLS ไม่ครอบคลุม payload ของ `DELETE` บันทึกนี้ไม่ใช่ device identity, ไม่ใช่หลักฐานว่าทุจริต และยังไม่ใช้เป็น hard gate ตอนเริ่มสอบ
+  - เฟส 5 ไม่เก็บผลตรวจที่ไม่ผ่าน, raw CK/BEK/request hash, IP, user-agent หรือ device fingerprint; browser เขียนตารางตรงไม่ได้ การบันทึกใช้ service-role-only RPC ที่ตรวจซ้ำว่าข้อสอบเผยแพร่และบังคับ SEB พร้อมตรวจ roster ของ student + assignment ส่วน RLS เปิดอ่านเฉพาะครูที่จัดการข้อสอบและ super admin ข้อมูลถูกลบตามเพดาน 90 วันและร่วมอยู่ในปุ่มล้างข้อมูลคุมสอบรายข้อสอบ
+  - **ยังไม่พร้อมเปิด production จนกว่าจะ** apply migrations `20260830062722`, `20260830072842`, `20260830082038` และ `20260830085610` ตามลำดับ, ตั้ง 4 env ของ SEB, สร้าง/เข้ารหัส `.seb`, เก็บ BEK ของทุก build ที่อนุญาต และทำ device/Wi-Fi mock exam ทั้ง SEB/Android ตาม `docs/SEB_SETUP.md` กับ `docs/ANDROID_EXAM_MODE.md`
 
 - มี draft/published/closed, online/print และ exercise/exam
 - เชื่อมหลายห้องผ่าน `assignment_classrooms`

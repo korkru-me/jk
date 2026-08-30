@@ -86,8 +86,8 @@ export function SebReadinessCard({
           status={schemaReady ? 'ready' : 'blocked'}
           title="โครงสร้างฐานข้อมูล"
           description={schemaReady
-            ? 'พบฟิลด์ secure_browser_mode และ schema เฟส SEB แล้ว'
-            : 'ยังไม่พบ schema ที่ต้องใช้ — apply migration 20260830062722_add_seb_secure_exam_mode.sql ก่อน deploy'}
+            ? 'พบ schema ครบถึงสถานะตรวจเครื่องก่อนสอบและห้องคุมสอบล่าสุดแล้ว'
+            : 'schema ยังไม่ครบทุกเฟส — apply migration ที่ค้างตามลำดับจนถึง 20260830085610_add_exam_seb_preflight_checkins.sql ก่อน deploy โค้ดนี้'}
         />
         <ReadinessRow
           status={readiness.siteUrlReady ? 'ready' : 'blocked'}

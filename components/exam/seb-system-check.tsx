@@ -70,6 +70,7 @@ export function SebSystemCheck({
   const [state, setState] = useState<CheckState>('outside')
   const [error, setError] = useState<string | null>(null)
   const [platform, setPlatform] = useState<SebPlatform | null>(null)
+  const [validUntil, setValidUntil] = useState<string | null>(null)
 
   useEffect(() => {
     if (attempted.current || !configured || !challenge) return
@@ -109,6 +110,7 @@ export function SebSystemCheck({
           return
         }
         setPlatform(result.platform)
+        setValidUntil(result.validUntil)
         setState('passed')
       } catch {
         if (cancelled) return
@@ -230,6 +232,18 @@ export function SebSystemCheck({
             <div>
               <p className="font-semibold text-foreground">เครื่องนี้ผ่านการตรวจสอบ</p>
               <p className="mt-1 text-sm text-muted-foreground">ระบบที่ตรวจพบ: {platformLabel(platform)}</p>
+              {validUntil && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  ระบบบันทึกผลให้ครูตรวจในห้องคุมสอบแล้ว · ใช้ได้ถึง{' '}
+                  <time dateTime={validUntil}>
+                    {new Intl.DateTimeFormat('th-TH', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Asia/Bangkok',
+                    }).format(new Date(validUntil))}
+                  </time>
+                </p>
+              )}
             </div>
           </div>
           <p className="text-xs leading-5 text-muted-foreground">

@@ -44,13 +44,25 @@ describe('exam proctor retention boundary', () => {
       eventsDeleted: 12,
       connectionsDeleted: 3,
       sessionsDeleted: 2,
+      checkinsDeleted: 4,
       ignored: 'not exposed',
     })
-    expect(counts).toEqual({ eventsDeleted: 12, connectionsDeleted: 3, sessionsDeleted: 2 })
-    expect(counts && totalPurgedProctorRecords(counts)).toBe(17)
+    expect(counts).toEqual({
+      eventsDeleted: 12,
+      connectionsDeleted: 3,
+      sessionsDeleted: 2,
+      checkinsDeleted: 4,
+    })
+    expect(counts && totalPurgedProctorRecords(counts)).toBe(21)
 
-    expect(normalizeProctorPurgeCounts({ eventsDeleted: '12', connectionsDeleted: 3, sessionsDeleted: 2 })).toBeNull()
-    expect(normalizeProctorPurgeCounts({ eventsDeleted: 12, connectionsDeleted: -1, sessionsDeleted: 2 })).toBeNull()
-    expect(normalizeProctorPurgeCounts({ eventsDeleted: 12, connectionsDeleted: 3 })).toBeNull()
+    expect(normalizeProctorPurgeCounts({
+      eventsDeleted: '12', connectionsDeleted: 3, sessionsDeleted: 2, checkinsDeleted: 4,
+    })).toBeNull()
+    expect(normalizeProctorPurgeCounts({
+      eventsDeleted: 12, connectionsDeleted: -1, sessionsDeleted: 2, checkinsDeleted: 4,
+    })).toBeNull()
+    expect(normalizeProctorPurgeCounts({
+      eventsDeleted: 12, connectionsDeleted: 3, sessionsDeleted: 2,
+    })).toBeNull()
   })
 })

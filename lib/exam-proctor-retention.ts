@@ -4,6 +4,7 @@ export interface ProctorPurgeCounts {
   eventsDeleted: number
   connectionsDeleted: number
   sessionsDeleted: number
+  checkinsDeleted: number
 }
 
 function nonNegativeInteger(value: unknown): number | null {
@@ -18,11 +19,20 @@ export function normalizeProctorPurgeCounts(input: unknown): ProctorPurgeCounts 
   const eventsDeleted = nonNegativeInteger(Reflect.get(input, 'eventsDeleted'))
   const connectionsDeleted = nonNegativeInteger(Reflect.get(input, 'connectionsDeleted'))
   const sessionsDeleted = nonNegativeInteger(Reflect.get(input, 'sessionsDeleted'))
-  if (eventsDeleted === null || connectionsDeleted === null || sessionsDeleted === null) return null
+  const checkinsDeleted = nonNegativeInteger(Reflect.get(input, 'checkinsDeleted'))
+  if (
+    eventsDeleted === null
+    || connectionsDeleted === null
+    || sessionsDeleted === null
+    || checkinsDeleted === null
+  ) return null
 
-  return { eventsDeleted, connectionsDeleted, sessionsDeleted }
+  return { eventsDeleted, connectionsDeleted, sessionsDeleted, checkinsDeleted }
 }
 
 export function totalPurgedProctorRecords(counts: ProctorPurgeCounts): number {
-  return counts.eventsDeleted + counts.connectionsDeleted + counts.sessionsDeleted
+  return counts.eventsDeleted
+    + counts.connectionsDeleted
+    + counts.sessionsDeleted
+    + counts.checkinsDeleted
 }
