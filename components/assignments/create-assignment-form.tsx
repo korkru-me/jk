@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
-  Fingerprint, ListFilter, Camera, LockKeyhole,
+  Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -118,6 +118,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [blockClipboard, setBlockClipboard] = useState(false)
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
   const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>('browser')
+  const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>('blocked')
   const [passingEnabled, setPassingEnabled] = useState(false)
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
@@ -293,6 +294,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         block_clipboard: blockClipboard,
         exam_watermark_enabled: examWatermarkEnabled,
         secure_browser_mode: secureBrowserMode,
+        android_exam_mode: androidExamMode,
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -770,14 +772,41 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   onChange={event => {
                     const enabled = event.target.checked
                     setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
+                    if (!enabled) setAndroidExamMode('blocked')
                     if (enabled) setProctoringEnabled(true)
                   }}
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
               <p className="pl-11 text-xs text-warning">
-                ใช้ได้กับ Windows, macOS, iPhone และ iPad · Android ยังไม่รองรับในเฟสนี้ และนักเรียนต้องติดตั้ง SEB ก่อนสอบ
+                SEB รองรับ Windows, macOS, iPhone และ iPad นักเรียนต้องติดตั้งและตรวจเครื่องก่อนสอบ
               </p>
+              {secureBrowserMode === 'seb_required' && (
+                <div className="ml-11 space-y-2 border-t border-border pt-3">
+                  <label className="flex cursor-pointer items-start justify-between gap-4">
+                    <div className="flex items-start gap-2">
+                      <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูอนุมัติรายคน</p>
+                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                          นักเรียนรอในหน้าเข้าสอบ ครูตรวจว่าเป็นเครื่อง Android จริงแล้วกดอนุมัติจากห้องคุมสอบ
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={androidExamMode === 'monitored'}
+                      onChange={event => setAndroidExamMode(event.target.checked ? 'monitored' : 'blocked')}
+                      className="h-4 w-4 shrink-0 accent-primary"
+                    />
+                  </label>
+                  {androidExamMode === 'monitored' && (
+                    <p className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-warning">
+                      Android monitored ตรวจการสลับแอป/ออกจากหน้าและการเชื่อมต่อ แต่เว็บห้ามหรือตรวจ screenshot ของระบบไม่ได้ จึงมีความมั่นใจต่ำกว่า SEB
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -1024,6 +1053,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   : []),
                 ...(mode === 'online' && assignmentType === 'exam' && secureBrowserMode === 'seb_required'
                   ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
+                  : []),
+                ...(mode === 'online' && assignmentType === 'exam' && androidExamMode === 'monitored'
+                  ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]
                   : []),
                 ...(hasWorkImageQuestions
                   ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]

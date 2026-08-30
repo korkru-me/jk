@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone } from 'lucide-react'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -67,6 +67,7 @@ export type EditableAssignment = Pick<
   | 'exam_watermark_enabled'
   | 'require_work_image'
   | 'secure_browser_mode'
+  | 'android_exam_mode'
 >
 
 export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text' | 'question_type'> & {
@@ -99,6 +100,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   )
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
   const [secureBrowserMode, setSecureBrowserMode] = useState(a.secure_browser_mode ?? 'browser')
+  const [androidExamMode, setAndroidExamMode] = useState(a.android_exam_mode ?? 'blocked')
   const [requireWorkImage, setRequireWorkImage] = useState(a.require_work_image ?? false)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
@@ -222,6 +224,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         random_question_count: randomQuestionCount ? Number(randomQuestionCount) : null,
         exam_watermark_enabled: examWatermarkEnabled,
         secure_browser_mode: secureBrowserMode,
+        android_exam_mode: secureBrowserMode === 'seb_required' ? androidExamMode : 'blocked',
         require_work_image: hasWorkImageQuestions && requireWorkImage,
       })
       if (res?.error) { toast.error(res.error); return }
@@ -265,14 +268,38 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 const enabled = event.target.checked
                 setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
                 if (enabled) setProctoringEnabled(true)
+                else setAndroidExamMode('blocked')
               }}
               className="accent-primary w-4 h-4 shrink-0"
             />
           </label>
           <p className="pl-11 text-xs text-warning">
-            Windows, macOS, iPhone และ iPad เท่านั้น · Android ยังไม่รองรับ
+            SEB รองรับ Windows, macOS, iPhone และ iPad · Android ใช้ monitored mode ด้านล่างได้
             {hasSubmissions ? ' · ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำข้อสอบ' : ''}
           </p>
+          {secureBrowserMode === 'seb_required' && (
+            <label className={`ml-11 flex items-start justify-between gap-4 rounded-lg border border-warning/30 bg-warning/5 p-3 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
+              <div className="flex items-start gap-3">
+                <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูตรวจเครื่อง</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    นักเรียนต้องขออนุมัติหน้าห้องสอบ ระบบแจ้งเมื่อออกจากหน้า แต่เว็บป้องกันการแคปหน้าจอระดับระบบไม่ได้
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={androidExamMode === 'monitored'}
+                disabled={hasSubmissions}
+                onChange={event => {
+                  setAndroidExamMode(event.target.checked ? 'monitored' : 'blocked')
+                  if (event.target.checked) setProctoringEnabled(true)
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+              />
+            </label>
+          )}
         </Card>
       )}
 

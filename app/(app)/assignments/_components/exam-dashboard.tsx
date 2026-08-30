@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   Search, Clock, CheckCircle2, FileText, Play, Timer, RotateCcw,
-  LockKeyhole,
+  LockKeyhole, Smartphone,
 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -104,12 +104,19 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                       {a.end_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />ถึง {new Date(a.end_at).toLocaleDateString('th-TH', { dateStyle: 'short' })}</span>}
                     </div>
                     {a.secure_browser_mode === 'seb_required' && (
-                      <Link
-                        href={`/assignments/${a.id}/system-check`}
-                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10"
-                      >
-                        <LockKeyhole className="h-3.5 w-3.5" /> ตรวจเครื่อง SEB โดยไม่เริ่มจับเวลา
-                      </Link>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/assignments/${a.id}/system-check`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+                        >
+                          <LockKeyhole className="h-3.5 w-3.5" /> ตรวจเครื่อง SEB โดยไม่เริ่มจับเวลา
+                        </Link>
+                        {a.android_exam_mode === 'monitored' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-warning/30 bg-warning/5 px-2.5 py-1 text-xs font-medium text-warning">
+                            <Smartphone className="h-3.5 w-3.5" /> Android ขออนุมัติครูวันสอบ
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                   {isInProgress ? (

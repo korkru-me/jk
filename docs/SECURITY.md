@@ -74,6 +74,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ข้อสอบ `seb_required` ต้องตรวจ **ทั้ง** Config Key และ Browser Exam Key request hash จาก SEB JavaScript API ที่ server; ผูก hash กับ exact URL challenge (ตัดเฉพาะ fragment), ผูก challenge/session กับ user + assignment, ตรวจ origin/path และเก็บ token ใน HttpOnly SameSite=Strict cookie ห้ามใช้ user-agent หรือการมี `window.SafeExamBrowser` อย่างเดียวเป็น security boundary
 - ห้ามส่ง `SEB_SESSION_SECRET`, CK, BEK หรือ Quit/Admin Password ไป client/log/database; submission เก็บได้เฉพาะเวลา platform และ version ที่ผ่านตรวจ ส่วน raw request hash ไม่จำเป็นต่อ audit และห้ามเก็บ
 - SEB session ต้องถูกตรวจซ้ำทุก mutation/read ของ attempt ไม่ใช่แค่หน้าเข้า; การบังคับ SEB กลาง attempt ถูกห้ามเพราะจะล็อกนักเรียนออกจากคำตอบเดิม และ server-initiated forced finalize หลังหมดเวลาต้องทำได้แม้ client session หมดอายุ
+- Android monitored mode ไม่ใช่ SEB/kiosk และห้ามใช้ user-agent เป็น security boundary นักเรียนต้องรอโดยยังไม่สร้าง attempt แล้วให้ครูที่มีสิทธิ์ตรวจเครื่องจริงและอนุมัติ exact student + assignment ก่อนออก signed HttpOnly session; ทุก attempt read/write ต้องตรวจ session นี้ซ้ำเช่นเดียวกับ SEB
+- Android approval เก็บได้เฉพาะ assignment/student/status/request/review/expiry และผู้อนุมัติ ห้ามเก็บ user-agent, IP, device ID/fingerprint หรือ screen content; ป้ายใน audit ต้องเป็น `android_monitored` และห้ามแสดงเป็น “SEB ยืนยันแล้ว”
 
 ## Uploads และ exports
 

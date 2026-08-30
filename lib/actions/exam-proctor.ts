@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeProctorEvents } from '@/lib/exam-proctor'
 import { normalizeProctorPurgeCounts } from '@/lib/exam-proctor-retention'
-import { getSebSession } from '@/lib/seb-session'
+import { getExamAccessSession } from '@/lib/exam-access-session'
 
 interface RecordProctorSignalInput {
   submissionId: string
@@ -38,7 +38,7 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, student_id, status, assignment_id, assignments(proctoring_enabled, mode, secure_browser_mode)')
+    .select('id, student_id, status, assignment_id, assignments(proctoring_enabled, mode, secure_browser_mode, android_exam_mode)')
     .eq('id', input.submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -57,9 +57,13 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
   }
   if (
     assignment.secure_browser_mode === 'seb_required'
-    && !await getSebSession(user.id, submission.assignment_id)
+    && !await getExamAccessSession(
+      user.id,
+      submission.assignment_id,
+      assignment.android_exam_mode === 'monitored',
+    )
   ) {
-    return { error: 'เซสชัน Safe Exam Browser หมดอายุ' }
+    return { error: 'เซสชันเข้าสอบหมดอายุ' }
   }
 
   const { data: activeConnectionCount, error } = await admin.rpc('record_exam_proctor_signal', {

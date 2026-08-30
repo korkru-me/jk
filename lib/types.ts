@@ -502,6 +502,7 @@ export type AssignmentStatus = 'draft' | 'published' | 'closed'
 export type AssignmentMode = 'online' | 'print'
 export type AssignmentType = 'exercise' | 'exam'
 export type SecureBrowserMode = 'browser' | 'seb_required'
+export type AndroidExamMode = 'blocked' | 'monitored'
 
 export type ShowResultsMode = 'immediate' | 'score_only' | 'after_due' | 'never'
 export type ScoreStrategy = 'best' | 'average' | 'latest'
@@ -565,6 +566,10 @@ export interface Assignment {
    * verified with both Config Key and Browser Exam Key is required for every
    * attempt read/write, not merely for the first page load. */
   secure_browser_mode: SecureBrowserMode
+  /** Optional lower-assurance fallback for student-owned Android devices.
+   * `monitored` still requires a teacher to approve the exact student in the
+   * live room; it cannot block or detect OS screenshots. */
+  android_exam_mode: AndroidExamMode
   created_at: string
   updated_at: string
 }
@@ -618,6 +623,9 @@ export interface Submission {
   secure_browser_verified_at: string | null
   secure_browser_platform: 'windows' | 'macos' | 'ios' | null
   secure_browser_version: string | null
+  exam_access_mode: 'browser' | 'seb' | 'android_monitored'
+  android_approved_at: string | null
+  android_approved_by: string | null
   created_at: string
 }
 

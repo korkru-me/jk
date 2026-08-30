@@ -111,7 +111,7 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
           <div>
             <h1 className="text-xl font-semibold text-foreground">ข้อสอบนี้ใช้ Safe Exam Browser</h1>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              รองรับ Windows, macOS, iPhone และ iPad ส่วน Android จะเปิดให้ภายหลัง
+              รองรับ Windows, macOS, iPhone และ iPad · Android ต้องใช้ monitored mode ที่ครูเปิดแยกให้ข้อสอบ
             </p>
           </div>
         </div>

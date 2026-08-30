@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
-import type { AssignmentStatus, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
+import type { AndroidExamMode, AssignmentStatus, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 import { inspectSebReadiness } from '@/lib/seb'
 
@@ -47,6 +47,7 @@ interface CreateAssignmentData {
   block_clipboard?: boolean
   exam_watermark_enabled?: boolean
   secure_browser_mode?: SecureBrowserMode
+  android_exam_mode?: AndroidExamMode
   status?: AssignmentStatus
 }
 
@@ -88,6 +89,10 @@ export async function createAssignment(data: CreateAssignmentData) {
   const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
     ? 'seb_required'
     : 'browser'
+  const androidExamMode: AndroidExamMode = secureBrowserMode === 'seb_required'
+    && data.android_exam_mode === 'monitored'
+      ? 'monitored'
+      : 'blocked'
   if (
     data.status === 'published'
     && secureBrowserMode === 'seb_required'
@@ -152,6 +157,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       block_clipboard: proctoringEnabled && data.block_clipboard === true,
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled === true,
       secure_browser_mode: secureBrowserMode,
+      android_exam_mode: androidExamMode,
       status: data.status ?? 'draft',
     })
     .select('id')
@@ -225,6 +231,7 @@ interface UpdateAssignmentData {
   random_question_count: number | null
   exam_watermark_enabled: boolean
   secure_browser_mode: SecureBrowserMode
+  android_exam_mode: AndroidExamMode
   /** Whether students must attach a photo of their working on every
    *  เติมคำตอบตัวเลข question. Omit to leave the งาน's answer untouched. */
   require_work_image?: boolean
@@ -246,7 +253,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, sections, type, mode, status, random_question_count, secure_browser_mode')
+    .select('question_ids, sections, type, mode, status, random_question_count, secure_browser_mode, android_exam_mode')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -309,6 +316,10 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
     ? 'seb_required'
     : 'browser'
+  const androidExamMode: AndroidExamMode = secureBrowserMode === 'seb_required'
+    && data.android_exam_mode === 'monitored'
+      ? 'monitored'
+      : 'blocked'
   if (
     existing.status === 'published'
     && secureBrowserMode === 'seb_required'
@@ -353,6 +364,19 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     }
   }
 
+  if (androidExamMode !== (existing.android_exam_mode ?? 'blocked')) {
+    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'เปลี่ยนนโยบาย Android ไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
+    }
+  }
+
   const { error } = await supabase
     .from('assignments')
     .update({
@@ -376,6 +400,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       block_clipboard: proctoringEnabled && data.block_clipboard,
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled,
       secure_browser_mode: secureBrowserMode,
+      android_exam_mode: androidExamMode,
       ...(data.require_work_image === undefined ? {} : { require_work_image: data.require_work_image }),
     })
     .eq('id', id)
@@ -472,6 +497,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       block_clipboard: source.block_clipboard ?? false,
       exam_watermark_enabled: source.exam_watermark_enabled ?? false,
       secure_browser_mode: source.secure_browser_mode ?? 'browser',
+      android_exam_mode: source.android_exam_mode ?? 'blocked',
       status: 'draft',
     })
     .select('id')

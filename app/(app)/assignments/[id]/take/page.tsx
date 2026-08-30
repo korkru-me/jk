@@ -4,7 +4,7 @@ import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
 import { parseSections } from '@/lib/question-set-sections'
 import { getExamTakingData } from '@/lib/exam-taking'
-import { SebLaunchGate } from '@/components/exam/seb-launch-gate'
+import { SecureExamLaunchGate } from '@/components/exam/secure-exam-launch-gate'
 import { readSebEnvironment } from '@/lib/seb'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
@@ -36,11 +36,12 @@ export default async function TakeExamPage({
       redirect(`/assignments/${id}/take?sebChallenge=${encodeURIComponent(result.challenge)}`)
     }
     return (
-      <SebLaunchGate
+      <SecureExamLaunchGate
         assignmentId={id}
         challenge={result.challenge ?? ''}
         configUrl={process.env.NEXT_PUBLIC_SEB_CONFIG_URL?.trim() || null}
         configured={result.sebConfigured === true && readSebEnvironment() !== null}
+        androidMonitoredAllowed={result.androidMonitoredAllowed === true}
       />
     )
   }

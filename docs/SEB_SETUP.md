@@ -1,6 +1,6 @@
-# Safe Exam Browser — คู่มือติดตั้งและใช้งานเฟส 1–2
+# Safe Exam Browser — คู่มือติดตั้งและใช้งานเฟส 1–3
 
-เฟสนี้รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเว็บ KorKru เดิม ไม่รองรับ Android และไม่ต้องติดตั้ง SEB Server ระบบตรวจ Config Key (CK) และ Browser Exam Key (BEK) ที่ KorKru โดยตรง แล้วแสดงสถานะในห้องคุมสอบเดิม
+SEB รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเว็บ KorKru เดิม ไม่รองรับ Android และไม่ต้องติดตั้ง SEB Server ระบบตรวจ Config Key (CK) และ Browser Exam Key (BEK) ที่ KorKru โดยตรง แล้วแสดงสถานะในห้องคุมสอบเดิม เฟส 3 เพิ่ม Android monitored mode แยกต่างหากซึ่งความมั่นใจต่ำกว่าและต้องให้ครูตรวจเครื่องต่อหน้า ดู `docs/ANDROID_EXAM_MODE.md`
 
 > การ merge โค้ดอย่างเดียวยังไม่ทำให้ SEB พร้อมใช้ ต้อง apply migration, ตั้ง environment, สร้างไฟล์ `.seb` และทดสอบเครื่องจริงก่อนเปิดสวิตช์ให้ข้อสอบ
 

@@ -19,6 +19,9 @@ export interface ProctorSessionRow {
   secure_browser_verified_at: string | null
   secure_browser_platform: 'windows' | 'macos' | 'ios' | null
   secure_browser_version: string | null
+  exam_access_mode: 'browser' | 'seb' | 'android_monitored'
+  android_approved_at: string | null
+  android_approved_by: string | null
   last_event_type: string | null
   last_event_at: string | null
   created_at: string

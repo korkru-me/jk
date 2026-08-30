@@ -21,6 +21,7 @@ export interface AssignmentRow {
   score_strategy: 'best' | 'average' | 'latest'
   display_max_score: number | null
   secure_browser_mode: 'browser' | 'seb_required'
+  android_exam_mode: 'blocked' | 'monitored'
   classrooms: { name: string } | null
 }
 
@@ -62,7 +63,7 @@ export default async function AssignmentsPage() {
   const { data: published } = cids.length > 0
     ? await admin
         .from('assignments')
-        .select('id, title, question_ids, random_question_count, duration_minutes, end_at, show_results, max_attempts, score_strategy, display_max_score, secure_browser_mode, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .select('id, title, question_ids, random_question_count, duration_minutes, end_at, show_results, max_attempts, score_strategy, display_max_score, secure_browser_mode, android_exam_mode, classrooms(name), assignment_classrooms!inner(classroom_id)')
         .in('assignment_classrooms.classroom_id', cids)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
@@ -80,6 +81,7 @@ export default async function AssignmentsPage() {
     score_strategy: row.score_strategy,
     display_max_score: row.display_max_score,
     secure_browser_mode: row.secure_browser_mode ?? 'browser',
+    android_exam_mode: row.android_exam_mode ?? 'blocked',
     classrooms: Array.isArray(row.classrooms) ? row.classrooms[0] ?? null : row.classrooms,
   }))
   const publishedIds = new Set(pList.map(a => a.id))

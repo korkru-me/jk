@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { isAttemptExpired } from '@/lib/grading'
 import { buildAssignmentAttempt, gradeAnswer } from '@/lib/assignment-attempt'
 import type { Question } from '@/lib/types'
-import { createSebChallenge, getSebSession, validateSebChallenge } from '@/lib/seb-session'
+import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
+import { getExamAccessSession } from '@/lib/exam-access-session'
 
 export async function startSubmission(
   assignmentId: string,
@@ -82,13 +83,15 @@ export async function startSubmission(
   }
 
   // A normal browser must never receive, create, or resume an attempt for a
-  // SEB-required exam. The signed HttpOnly session is bound to this user and
-  // assignment and was issued only after CK + BEK verification.
+  // SEB-required exam. Android monitored mode is a deliberately lower-assurance
+  // path: it still requires a short-lived signed session issued only after a
+  // teacher approves that exact student and assignment in the proctor room.
   const secureBrowserRequired = assignment.secure_browser_mode === 'seb_required'
-  const sebSession = secureBrowserRequired
-    ? await getSebSession(user.id, assignmentId)
+  const androidMonitoredAllowed = assignment.android_exam_mode === 'monitored'
+  const examAccess = secureBrowserRequired
+    ? await getExamAccessSession(user.id, assignmentId, androidMonitoredAllowed)
     : null
-  if (secureBrowserRequired && !sebSession) {
+  if (secureBrowserRequired && !examAccess) {
     const reusableChallenge = validateSebChallenge(sebChallenge, user.id, assignmentId, 'take')
     const challenge = reusableChallenge
       ? sebChallenge!
@@ -96,6 +99,7 @@ export async function startSubmission(
     return {
       requiresSecureBrowser: true as const,
       sebConfigured: challenge !== null,
+      androidMonitoredAllowed,
       challenge,
     }
   }
@@ -107,12 +111,21 @@ export async function startSubmission(
   if (existing) {
     if (existing.status === 'in_progress') {
       if (!isAttemptExpired(existing.started_at, assignment.duration_minutes)) {
-        if (sebSession) {
-          await admin.from('submissions').update({
-            secure_browser_verified_at: new Date(sebSession.issuedAt).toISOString(),
-            secure_browser_platform: sebSession.platform,
-            secure_browser_version: sebSession.version,
-          }).eq('id', existing.id).eq('student_id', user.id)
+        if (examAccess) {
+          await admin.from('submissions').update(examAccess.mode === 'seb'
+            ? {
+                exam_access_mode: 'seb',
+                secure_browser_verified_at: new Date(examAccess.issuedAt).toISOString(),
+                secure_browser_platform: examAccess.platform,
+                secure_browser_version: examAccess.version,
+              }
+            : {
+                exam_access_mode: 'android_monitored',
+                android_approved_at: new Date(examAccess.approvedAt).toISOString(),
+                android_approved_by: examAccess.approvedBy,
+              })
+            .eq('id', existing.id)
+            .eq('student_id', user.id)
         }
         return { submissionId: existing.id }
       }
@@ -177,9 +190,18 @@ export async function startSubmission(
       max_score: totalMaxScore,
       status: 'in_progress',
       attempt_number: attemptNumber,
-      secure_browser_verified_at: sebSession ? new Date(sebSession.issuedAt).toISOString() : null,
-      secure_browser_platform: sebSession?.platform ?? null,
-      secure_browser_version: sebSession?.version ?? null,
+      exam_access_mode: examAccess?.mode ?? 'browser',
+      secure_browser_verified_at: examAccess?.mode === 'seb'
+        ? new Date(examAccess.issuedAt).toISOString()
+        : null,
+      secure_browser_platform: examAccess?.mode === 'seb' ? examAccess.platform : null,
+      secure_browser_version: examAccess?.mode === 'seb' ? examAccess.version : null,
+      android_approved_at: examAccess?.mode === 'android_monitored'
+        ? new Date(examAccess.approvedAt).toISOString()
+        : null,
+      android_approved_by: examAccess?.mode === 'android_monitored'
+        ? examAccess.approvedBy
+        : null,
     })
     .select('id')
     .single()
@@ -205,7 +227,7 @@ async function getWritableStudentAnswer(
       id, submission_id, work_images,
       submissions(
         id, student_id, status, started_at, assignment_id,
-        assignments(id, duration_minutes, end_at, secure_browser_mode)
+        assignments(id, duration_minutes, end_at, secure_browser_mode, android_exam_mode)
       )
     `)
     .eq('id', submissionAnswerId)
@@ -239,9 +261,13 @@ async function getWritableStudentAnswer(
 
   if (
     assignment?.secure_browser_mode === 'seb_required'
-    && !await getSebSession(studentId, submission.assignment_id)
+    && !await getExamAccessSession(
+      studentId,
+      submission.assignment_id,
+      assignment.android_exam_mode === 'monitored',
+    )
   ) {
-    return { error: 'เซสชัน Safe Exam Browser หมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' as const }
+    return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' as const }
   }
 
   return { answer, submission }
@@ -368,7 +394,7 @@ async function gradeAndFinalizeSubmission(
 ): Promise<{ error?: string; success?: true; totalScore?: number }> {
   const { data: submission } = await admin
     .from('submissions')
-    .select('*, assignments(duration_minutes, end_at, require_work_image, secure_browser_mode)')
+    .select('*, assignments(duration_minutes, end_at, require_work_image, secure_browser_mode, android_exam_mode)')
     .eq('id', submissionId)
     .eq('student_id', studentId)
     .maybeSingle()
@@ -382,9 +408,13 @@ async function gradeAndFinalizeSubmission(
   if (
     opts.enforceSecureBrowser
     && assignment?.secure_browser_mode === 'seb_required'
-    && !await getSebSession(studentId, submission.assignment_id)
+    && !await getExamAccessSession(
+      studentId,
+      submission.assignment_id,
+      assignment.android_exam_mode === 'monitored',
+    )
   ) {
-    return { error: 'เซสชัน Safe Exam Browser หมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' }
+    return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' }
   }
 
   const { data: answers } = await admin

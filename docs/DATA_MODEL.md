@@ -49,12 +49,13 @@ Invariant สำคัญ:
 
 ## งานและการส่งคำตอบ
 
-- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ และ `secure_browser_mode` เป็น `browser|seb_required` (ค่าเดิม `browser`)
+- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ, `secure_browser_mode` เป็น `browser|seb_required` และ `android_exam_mode` เป็น `blocked|monitored` สำหรับทางสำรองที่ครูตรวจเครื่อง
 - `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom
 - `assignment_extensions` — ขยายเวลารายคน
-- `submissions` — attempt ต่อผู้เรียน; SEB audit เก็บ `secure_browser_verified_at/platform/version` เท่านั้น ไม่เก็บ CK, BEK, request hash หรือ fingerprint
+- `submissions` — attempt ต่อผู้เรียน; `exam_access_mode` แยก `browser|seb|android_monitored`, SEB audit เก็บ verified time/platform/version และ Android audit เก็บ approval time/teacher เท่านั้น ไม่เก็บ CK, BEK, request hash, user-agent หรือ fingerprint
 - `submission_answers` — answer snapshot และคะแนนรายข้อ
-- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด พร้อมสำเนา SEB audit ที่ database trigger อ่านจาก submission เพื่อให้ client ปลอมป้ายยืนยันไม่ได้
+- `exam_android_approvals` — คำขอ Android หนึ่งแถวต่อ assignment/student เก็บ pending/approved/denied, เวลา, ผู้อนุมัติและวันหมดอายุ; browser เขียนตรงไม่ได้และลบอัตโนมัติเมื่อเกินเพดาน retention
+- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด พร้อมสำเนา access mode/SEB/Android audit ที่ database trigger อ่านจาก submission เพื่อให้ client ปลอมป้ายยืนยันไม่ได้
 - `exam_proctor_events` — browser-level event แบบ append-only ที่เก็บเฉพาะชนิดเหตุการณ์ เวลา และ foreign keys; ไม่เก็บภาพหน้าจอ เสียง กล้อง เนื้อหาคำตอบ หรือ keystroke
 - `exam_proctor_connections` — heartbeat lease ต่อแท็บด้วย UUID สุ่มและเวลาเห็นล่าสุด ใช้นับการเปิด attempt พร้อมกันหลายจุด; ไม่เก็บ IP, user-agent, device fingerprint หรือเนื้อหาบนจอ
 
@@ -71,6 +72,7 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - browser role ไม่มีสิทธิ์เขียน `exam_proctor_connections` โดยตรงเช่นกัน RPC ใช้ advisory lock ต่อ submission เพื่อคำนวณ transition จากหนึ่งเป็นหลาย lease แบบ atomic; `concurrent_connection` สร้างโดยฐานข้อมูลเท่านั้นและ client ปลอม event ชนิดนี้ไม่ได้
 - `assignments.proctoring_enabled`, `fullscreen_required`, `block_clipboard` และ `exam_watermark_enabled` เป็นการตั้งค่าแรงเสียดทาน/สัญญาณระดับ browser ไม่ใช่ kiosk mode หรือ security boundary; event, connection lease และ session summary ของ attempt ถูกลบเมื่อไม่มี heartbeat เกิน 90 วัน โดยไม่ลบ submission, answer หรือ score และครูผู้จัดการ assignment ล้างก่อนกำหนดได้เมื่อไม่มี session สด
 - `secure_browser_mode = 'seb_required'` เป็นคนละ boundary กับสัญญาณ browser: server ต้องพบ signed SEB session ที่ผูก exact user + assignment ก่อนเริ่ม/resume/read/save/upload/heartbeat/submit และห้ามเปลี่ยนโหมดหลังมี submission แรก
+- หาก `android_exam_mode = 'monitored'` server ยอมรับ signed Android session แทน SEB ได้เฉพาะหลังครูที่จัดการ assignment อนุมัติ exact student ที่อยู่ใน roster; user-agent ใช้ routing UI เท่านั้น และ Android audit ห้ามถูกแสดงเป็น SEB
 - `random_question_count` ต้องไม่เกินจำนวน `question_ids`; การแก้จำนวนถูกปิดหลังมี submission แรก และ subset จริงไม่เก็บซ้ำใน assignment แต่ดูจาก `submission_answers` ที่สร้างและตรึงไว้ต่อ attempt
 - นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
 

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
-  AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole,
+  AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
@@ -117,6 +117,11 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
               {a.secure_browser_mode === 'seb_required' && (
                 <span className="flex items-center gap-1 text-xs text-success border border-success/40 bg-success/10 px-2.5 py-1 rounded-full">
                   <LockKeyhole className="w-3 h-3" /> Safe Exam Browser
+                </span>
+              )}
+              {a.android_exam_mode === 'monitored' && (
+                <span className="flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-warning">
+                  <Smartphone className="h-3 w-3" /> Android ครูอนุมัติรายคน
                 </span>
               )}
             </div>

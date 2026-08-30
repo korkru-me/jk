@@ -3,7 +3,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { toSafeExamAnswer, type SafeExamAnswer } from '@/lib/exam-safe'
-import { getSebSession } from '@/lib/seb-session'
+import { getExamAccessSession } from '@/lib/exam-access-session'
 
 export interface ExamTakingData {
   submission: {
@@ -21,6 +21,8 @@ export interface ExamTakingData {
     block_clipboard: boolean
     exam_watermark_enabled: boolean
     secure_browser_mode: 'browser' | 'seb_required'
+    android_exam_mode: 'blocked' | 'monitored'
+    exam_access_mode: 'browser' | 'seb' | 'android_monitored'
     secure_browser_verified: boolean
     watermark_text: string | null
   }
@@ -40,7 +42,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode)')
+    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -51,9 +53,14 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
     ? submission.assignments[0]
     : submission.assignments
   if (!assignment) return null
-  const secureBrowserVerified = assignment.secure_browser_mode !== 'seb_required'
-    || Boolean(await getSebSession(user.id, submission.assignment_id))
-  if (!secureBrowserVerified) return null
+  const examAccess = assignment.secure_browser_mode === 'seb_required'
+    ? await getExamAccessSession(
+        user.id,
+        submission.assignment_id,
+        assignment.android_exam_mode === 'monitored',
+      )
+    : null
+  if (assignment.secure_browser_mode === 'seb_required' && !examAccess) return null
 
   const { data: answerRows } = await admin
     .from('submission_answers')
@@ -91,7 +98,9 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       block_clipboard: assignment.block_clipboard ?? false,
       exam_watermark_enabled: assignment.exam_watermark_enabled ?? false,
       secure_browser_mode: assignment.secure_browser_mode === 'seb_required' ? 'seb_required' : 'browser',
-      secure_browser_verified: assignment.secure_browser_mode === 'seb_required',
+      android_exam_mode: assignment.android_exam_mode === 'monitored' ? 'monitored' : 'blocked',
+      exam_access_mode: examAccess?.mode ?? 'browser',
+      secure_browser_verified: examAccess?.mode === 'seb',
       watermark_text: watermarkText,
     },
     answers,

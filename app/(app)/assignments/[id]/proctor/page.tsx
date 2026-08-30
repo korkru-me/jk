@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { getAuthUser } from '@/lib/auth/server'
+import type { AndroidApprovalView } from '@/lib/actions/android-exam'
 import type { ProctorEventRow, ProctorSessionRow } from '@/lib/exam-proctor-realtime'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -35,7 +36,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   const supabase = await createClient()
   const { data: assignment } = await supabase
     .from('assignments')
-    .select('id, title, mode, type, proctoring_enabled, fullscreen_required, block_clipboard, secure_browser_mode, classrooms(name)')
+    .select('id, title, mode, type, proctoring_enabled, fullscreen_required, block_clipboard, secure_browser_mode, android_exam_mode, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
@@ -50,7 +51,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     .eq('assignment_id', id)
   const classroomIds = (links ?? []).map(link => link.classroom_id)
 
-  const [submissionsResult, sessionsResult, eventsResult, rosterResult] = await Promise.all([
+  const [submissionsResult, sessionsResult, eventsResult, rosterResult, approvalsResult] = await Promise.all([
     supabase
       .from('submissions')
       .select('id, student_id, status, started_at, submitted_at, attempt_number')
@@ -73,6 +74,13 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
           .select('student_id')
           .in('classroom_id', classroomIds)
       : Promise.resolve({ data: [], error: null }),
+    assignment.android_exam_mode === 'monitored'
+      ? supabase
+          .from('exam_android_approvals')
+          .select('id, assignment_id, student_id, status, requested_at, reviewed_at, reviewed_by, expires_at, updated_at')
+          .eq('assignment_id', id)
+          .order('requested_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
   ])
 
   const studentIds = new Set<string>()
@@ -80,6 +88,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   for (const row of sessionsResult.data ?? []) studentIds.add(row.student_id)
   for (const row of eventsResult.data ?? []) studentIds.add(row.student_id)
   for (const row of rosterResult.data ?? []) studentIds.add(row.student_id)
+  for (const row of approvalsResult.data ?? []) studentIds.add(row.student_id)
 
   // The session-bound assignment query above is the authorization boundary.
   // Only after it succeeds do we bypass the restrictive users RLS, and then
@@ -97,6 +106,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     ?? sessionsResult.error
     ?? eventsResult.error
     ?? rosterResult.error
+    ?? approvalsResult.error
     ?? namesResult.error
 
   if (loadError) {
@@ -171,10 +181,12 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
         fullscreenRequired: assignment.fullscreen_required === true,
         blockClipboard: assignment.block_clipboard === true,
         secureBrowserRequired: assignment.secure_browser_mode === 'seb_required',
+        androidMonitoredAllowed: assignment.android_exam_mode === 'monitored',
       }}
       initialParticipants={[...participantByStudent.values()]}
       initialSessions={(sessionsResult.data ?? []) as ProctorSessionRow[]}
       initialEvents={(eventsResult.data ?? []) as ProctorEventRow[]}
+      initialAndroidApprovals={(approvalsResult.data ?? []) as AndroidApprovalView[]}
     />
   )
 }
