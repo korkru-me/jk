@@ -6,8 +6,13 @@ import { revalidatePath } from 'next/cache'
 import { isAttemptExpired } from '@/lib/grading'
 import { buildAssignmentAttempt, gradeAnswer } from '@/lib/assignment-attempt'
 import type { Question } from '@/lib/types'
+import { createSebChallenge, getSebSession, validateSebChallenge } from '@/lib/seb-session'
 
-export async function startSubmission(assignmentId: string, accessCode?: string) {
+export async function startSubmission(
+  assignmentId: string,
+  accessCode?: string,
+  sebChallenge?: string,
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
@@ -76,6 +81,25 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
     return { error: 'หมดเวลาส่งแล้ว' }
   }
 
+  // A normal browser must never receive, create, or resume an attempt for a
+  // SEB-required exam. The signed HttpOnly session is bound to this user and
+  // assignment and was issued only after CK + BEK verification.
+  const secureBrowserRequired = assignment.secure_browser_mode === 'seb_required'
+  const sebSession = secureBrowserRequired
+    ? await getSebSession(user.id, assignmentId)
+    : null
+  if (secureBrowserRequired && !sebSession) {
+    const reusableChallenge = validateSebChallenge(sebChallenge, user.id, assignmentId)
+    const challenge = reusableChallenge
+      ? sebChallenge!
+      : createSebChallenge(user.id, assignmentId)
+    return {
+      requiresSecureBrowser: true as const,
+      sebConfigured: challenge !== null,
+      challenge,
+    }
+  }
+
   // Return existing in-progress submission, or decide on a retry
   const existing = existingRes.data
 
@@ -83,6 +107,13 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
   if (existing) {
     if (existing.status === 'in_progress') {
       if (!isAttemptExpired(existing.started_at, assignment.duration_minutes)) {
+        if (sebSession) {
+          await admin.from('submissions').update({
+            secure_browser_verified_at: new Date(sebSession.issuedAt).toISOString(),
+            secure_browser_platform: sebSession.platform,
+            secure_browser_version: sebSession.version,
+          }).eq('id', existing.id).eq('student_id', user.id)
+        }
         return { submissionId: existing.id }
       }
       // Time ran out while this attempt sat abandoned (e.g. the student
@@ -90,7 +121,10 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
       // with whatever was answered instead of resuming into a countdown
       // that's already at zero, then fall through to the normal
       // retry/attempt-limit logic below as if it had just been submitted.
-      await gradeAndFinalizeSubmission(admin, existing.id, user.id, { enforceWorkImage: false })
+      await gradeAndFinalizeSubmission(admin, existing.id, user.id, {
+        enforceWorkImage: false,
+        enforceSecureBrowser: false,
+      })
     }
     // submitted / graded: retry up to max_attempts. Exercises are unlimited
     // when not set; exams fall back to single-attempt for legacy rows saved
@@ -143,6 +177,9 @@ export async function startSubmission(assignmentId: string, accessCode?: string)
       max_score: totalMaxScore,
       status: 'in_progress',
       attempt_number: attemptNumber,
+      secure_browser_verified_at: sebSession ? new Date(sebSession.issuedAt).toISOString() : null,
+      secure_browser_platform: sebSession?.platform ?? null,
+      secure_browser_version: sebSession?.version ?? null,
     })
     .select('id')
     .single()
@@ -168,7 +205,7 @@ async function getWritableStudentAnswer(
       id, submission_id, work_images,
       submissions(
         id, student_id, status, started_at, assignment_id,
-        assignments(id, duration_minutes, end_at)
+        assignments(id, duration_minutes, end_at, secure_browser_mode)
       )
     `)
     .eq('id', submissionAnswerId)
@@ -198,6 +235,13 @@ async function getWritableStudentAnswer(
     if (!extension?.extended_end_at || new Date(extension.extended_end_at).getTime() < Date.now()) {
       return { error: 'หมดเวลาส่งแล้ว' as const }
     }
+  }
+
+  if (
+    assignment?.secure_browser_mode === 'seb_required'
+    && !await getSebSession(studentId, submission.assignment_id)
+  ) {
+    return { error: 'เซสชัน Safe Exam Browser หมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' as const }
   }
 
   return { answer, submission }
@@ -313,25 +357,35 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
 
 // Shared by submitSubmission (student-initiated) and startSubmission's
 // stale-attempt handling (server-initiated, when a resumed in-progress
-// attempt's time limit already elapsed). `enforceWorkImage` is only turned
-// on for the student-initiated path — a forced finalize of an abandoned,
-// expired attempt shouldn't block on a requirement the student can no
-// longer satisfy.
+// attempt's time limit already elapsed). Student-initiated calls enforce both
+// work-image and SEB rules; a forced finalize of an abandoned expired attempt
+// bypasses both because the student can no longer satisfy either requirement.
 async function gradeAndFinalizeSubmission(
   admin: ReturnType<typeof createAdminClient>,
   submissionId: string,
   studentId: string,
-  opts: { enforceWorkImage: boolean }
+  opts: { enforceWorkImage: boolean; enforceSecureBrowser: boolean }
 ): Promise<{ error?: string; success?: true; totalScore?: number }> {
   const { data: submission } = await admin
     .from('submissions')
-    .select('*, assignments(duration_minutes, end_at, require_work_image)')
+    .select('*, assignments(duration_minutes, end_at, require_work_image, secure_browser_mode)')
     .eq('id', submissionId)
     .eq('student_id', studentId)
     .maybeSingle()
 
   if (!submission) return { error: 'ไม่พบการสอบ' }
   if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว' }
+
+  const assignment = Array.isArray((submission as any).assignments)
+    ? (submission as any).assignments[0]
+    : (submission as any).assignments
+  if (
+    opts.enforceSecureBrowser
+    && assignment?.secure_browser_mode === 'seb_required'
+    && !await getSebSession(studentId, submission.assignment_id)
+  ) {
+    return { error: 'เซสชัน Safe Exam Browser หมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' }
+  }
 
   const { data: answers } = await admin
     .from('submission_answers')
@@ -345,7 +399,7 @@ async function gradeAndFinalizeSubmission(
   // client could call this action directly. `require_work_image` is the whole
   // decision — one answer for the งาน, given by the teacher when they created
   // it — and it applies to every เติมคำตอบตัวเลข question the งาน contains.
-  const workImageEnforced = opts.enforceWorkImage && ((submission as any).assignments?.require_work_image ?? false)
+  const workImageEnforced = opts.enforceWorkImage && (assignment?.require_work_image ?? false)
   const missingWorkImage = workImageEnforced && answers.some((a: any) => {
     if (a.questions?.question_type !== 'written') return false
     const parts: unknown[] = a.questions?.answer_parts ?? []
@@ -417,5 +471,8 @@ export async function submitSubmission(submissionId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
-  return gradeAndFinalizeSubmission(admin, submissionId, user.id, { enforceWorkImage: true })
+  return gradeAndFinalizeSubmission(admin, submissionId, user.id, {
+    enforceWorkImage: true,
+    enforceSecureBrowser: true,
+  })
 }

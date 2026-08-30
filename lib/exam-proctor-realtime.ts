@@ -16,6 +16,9 @@ export interface ProctorSessionRow {
   screenshot_key_count: number
   active_connection_count: number
   concurrent_connection_count: number
+  secure_browser_verified_at: string | null
+  secure_browser_platform: 'windows' | 'macos' | 'ios' | null
+  secure_browser_version: string | null
   last_event_type: string | null
   last_event_at: string | null
   created_at: string

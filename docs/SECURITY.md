@@ -71,6 +71,9 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ข้อมูลคุมสอบระดับ attempt ลบอัตโนมัติหลังไม่มี heartbeat 90 วันด้วย job รายวัน; การล้างก่อนกำหนดต้องตรวจ owner/co-teacher `admin/manage`/super admin ซ้ำใน service-role-only RPC, ปฏิเสธเมื่อยังมี session สด และห้ามลบ submission, คำตอบ หรือคะแนนร่วมไปด้วย
 - เหตุการณ์เปิดหลายหน้าจอต้องคำนวณฝั่งฐานข้อมูลจาก lease ที่ยังสด ไม่เชื่อ counter/event จาก client และเป็นเพียงสัญญาณให้ครูพิจารณา การ reload ปกติต้องนำ id เดิมกลับมาใช้เพื่อลด false positive
 - นักเรียนห้ามเขียนตาราง proctor โดยตรง; Server Action ต้องตรวจ exact submission owner + `in_progress` ก่อนใช้ service role และครูอ่านได้เฉพาะ assignment ที่ตนจัดการ ข้อมูลเหล่านี้เป็นหลักฐานประกอบการพิจารณา ไม่ใช่การตัดสินทุจริตอัตโนมัติ
+- ข้อสอบ `seb_required` ต้องตรวจ **ทั้ง** Config Key และ Browser Exam Key request hash จาก SEB JavaScript API ที่ server; ผูก hash กับ exact URL challenge (ตัดเฉพาะ fragment), ผูก challenge/session กับ user + assignment, ตรวจ origin/path และเก็บ token ใน HttpOnly SameSite=Strict cookie ห้ามใช้ user-agent หรือการมี `window.SafeExamBrowser` อย่างเดียวเป็น security boundary
+- ห้ามส่ง `SEB_SESSION_SECRET`, CK, BEK หรือ Quit/Admin Password ไป client/log/database; submission เก็บได้เฉพาะเวลา platform และ version ที่ผ่านตรวจ ส่วน raw request hash ไม่จำเป็นต่อ audit และห้ามเก็บ
+- SEB session ต้องถูกตรวจซ้ำทุก mutation/read ของ attempt ไม่ใช่แค่หน้าเข้า; การบังคับ SEB กลาง attempt ถูกห้ามเพราะจะล็อกนักเรียนออกจากคำตอบเดิม และ server-initiated forced finalize หลังหมดเวลาต้องทำได้แม้ client session หมดอายุ
 
 ## Uploads และ exports
 

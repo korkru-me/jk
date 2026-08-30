@@ -3,6 +3,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { toSafeExamAnswer, type SafeExamAnswer } from '@/lib/exam-safe'
+import { getSebSession } from '@/lib/seb-session'
 
 export interface ExamTakingData {
   submission: {
@@ -19,6 +20,8 @@ export interface ExamTakingData {
     fullscreen_required: boolean
     block_clipboard: boolean
     exam_watermark_enabled: boolean
+    secure_browser_mode: 'browser' | 'seb_required'
+    secure_browser_verified: boolean
     watermark_text: string | null
   }
   answers: SafeExamAnswer[]
@@ -37,12 +40,20 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled)')
+    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
 
   if (!submission || submission.status !== 'in_progress') return null
+
+  const assignment = Array.isArray(submission.assignments)
+    ? submission.assignments[0]
+    : submission.assignments
+  if (!assignment) return null
+  const secureBrowserVerified = assignment.secure_browser_mode !== 'seb_required'
+    || Boolean(await getSebSession(user.id, submission.assignment_id))
+  if (!secureBrowserVerified) return null
 
   const { data: answerRows } = await admin
     .from('submission_answers')
@@ -55,11 +66,6 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
     `)
     .eq('submission_id', submissionId)
     .order('order_index')
-
-  const assignment = Array.isArray(submission.assignments)
-    ? submission.assignments[0]
-    : submission.assignments
-  if (!assignment) return null
   const student = Array.isArray(submission.users) ? submission.users[0] : submission.users
   const watermarkText = assignment.exam_watermark_enabled
     ? `${student?.full_name?.trim() || 'ผู้เข้าสอบ'} • ครั้งสอบ ${submission.id.slice(0, 8).toUpperCase()}`
@@ -84,6 +90,8 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       fullscreen_required: assignment.fullscreen_required ?? false,
       block_clipboard: assignment.block_clipboard ?? false,
       exam_watermark_enabled: assignment.exam_watermark_enabled ?? false,
+      secure_browser_mode: assignment.secure_browser_mode === 'seb_required' ? 'seb_required' : 'browser',
+      secure_browser_verified: assignment.secure_browser_mode === 'seb_required',
       watermark_text: watermarkText,
     },
     answers,

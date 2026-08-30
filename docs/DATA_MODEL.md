@@ -49,12 +49,12 @@ Invariant สำคัญ:
 
 ## งานและการส่งคำตอบ
 
-- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt และ `exam_watermark_enabled` เปิดลายน้ำระบุตัวผู้เข้าสอบบนหน้าข้อสอบ
+- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ และ `secure_browser_mode` เป็น `browser|seb_required` (ค่าเดิม `browser`)
 - `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom
 - `assignment_extensions` — ขยายเวลารายคน
-- `submissions` — attempt ต่อผู้เรียน
+- `submissions` — attempt ต่อผู้เรียน; SEB audit เก็บ `secure_browser_verified_at/platform/version` เท่านั้น ไม่เก็บ CK, BEK, request hash หรือ fingerprint
 - `submission_answers` — answer snapshot และคะแนนรายข้อ
-- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด
+- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด พร้อมสำเนา SEB audit ที่ database trigger อ่านจาก submission เพื่อให้ client ปลอมป้ายยืนยันไม่ได้
 - `exam_proctor_events` — browser-level event แบบ append-only ที่เก็บเฉพาะชนิดเหตุการณ์ เวลา และ foreign keys; ไม่เก็บภาพหน้าจอ เสียง กล้อง เนื้อหาคำตอบ หรือ keystroke
 - `exam_proctor_connections` — heartbeat lease ต่อแท็บด้วย UUID สุ่มและเวลาเห็นล่าสุด ใช้นับการเปิด attempt พร้อมกันหลายจุด; ไม่เก็บ IP, user-agent, device fingerprint หรือเนื้อหาบนจอ
 
@@ -70,6 +70,7 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - browser role ไม่มีสิทธิ์เขียน `exam_proctor_sessions`/`exam_proctor_events` โดยตรง; `record_exam_proctor_signal` เรียกได้เฉพาะ service role หลัง Server Action ตรวจว่าเป็น attempt ของนักเรียนคนนั้น ยัง `in_progress`, เป็นข้อสอบ online และเปิด proctoring ส่วนครูอ่านผ่าน RLS ตาม assignment ที่จัดการได้
 - browser role ไม่มีสิทธิ์เขียน `exam_proctor_connections` โดยตรงเช่นกัน RPC ใช้ advisory lock ต่อ submission เพื่อคำนวณ transition จากหนึ่งเป็นหลาย lease แบบ atomic; `concurrent_connection` สร้างโดยฐานข้อมูลเท่านั้นและ client ปลอม event ชนิดนี้ไม่ได้
 - `assignments.proctoring_enabled`, `fullscreen_required`, `block_clipboard` และ `exam_watermark_enabled` เป็นการตั้งค่าแรงเสียดทาน/สัญญาณระดับ browser ไม่ใช่ kiosk mode หรือ security boundary; event, connection lease และ session summary ของ attempt ถูกลบเมื่อไม่มี heartbeat เกิน 90 วัน โดยไม่ลบ submission, answer หรือ score และครูผู้จัดการ assignment ล้างก่อนกำหนดได้เมื่อไม่มี session สด
+- `secure_browser_mode = 'seb_required'` เป็นคนละ boundary กับสัญญาณ browser: server ต้องพบ signed SEB session ที่ผูก exact user + assignment ก่อนเริ่ม/resume/read/save/upload/heartbeat/submit และห้ามเปลี่ยนโหมดหลังมี submission แรก
 - `random_question_count` ต้องไม่เกินจำนวน `question_ids`; การแก้จำนวนถูกปิดหลังมี submission แรก และ subset จริงไม่เก็บซ้ำใน assignment แต่ดูจาก `submission_answers` ที่สร้างและตรึงไว้ต่อ attempt
 - นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
 

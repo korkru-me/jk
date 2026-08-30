@@ -190,6 +190,12 @@
 
 ### งานและข้อสอบ — มีโค้ดรองรับ
 
+- **Safe Exam Browser เฟส 1 — โค้ดรองรับ Windows, macOS และ iOS/iPadOS แล้ว; Android ยังไม่รวม** — ครูเปิด `secure_browser_mode = seb_required` ได้เฉพาะข้อสอบออนไลน์ ระบบบังคับเปิดห้องคุมสอบสด, นักเรียนได้หน้าแนะนำเปิด `.seb`, และ server ตรวจ CK + BEK ของ exact challenge URL ผ่าน SEB JavaScript API ก่อนออก HttpOnly session ที่ผูกผู้ใช้กับข้อสอบ
+  - ตรวจ session ซ้ำที่ `startSubmission`, `getExamTakingData`, autosave/รูปวิธีทำ/ไฟล์แนบ, proctor heartbeat และ `submitSubmission`; การปลอม UI หรือเรียก Server Action ตรงจึงไม่ข้าม gate ส่วน forced-finalize ของ attempt หมดเวลายังทำงานได้
+  - submission และห้องคุมสอบเก็บเฉพาะ verified timestamp/platform/version; ครูเห็นป้าย “SEB ยืนยันแล้ว” แบบ realtime โดยค่าฝั่งห้องคุมสอบถูก trigger คัดจาก submission ไม่รับจาก client
+  - ห้ามเปลี่ยน browser ↔ SEB หลังมี submission แรก ป้องกันการล็อกนักเรียนกลางข้อสอบ และ SEB kiosk ไม่ซ้อน DOM fullscreen overlay ซึ่งเคยมีโอกาส false-block บน Apple platform
+  - **ยังไม่พร้อมเปิด production จนกว่าจะ** apply migration `20260830062722`, ตั้ง 4 env ของ SEB, สร้าง/เข้ารหัส `.seb`, เก็บ BEK ของทุก build ที่อนุญาต และทำ device/Wi-Fi mock exam ตาม `docs/SEB_SETUP.md`
+
 - มี draft/published/closed, online/print และ exercise/exam
 - เชื่อมหลายห้องผ่าน `assignment_classrooms`
 - มีเวลาเปิดปิด จำกัดเวลา access code attempts score strategy passing threshold และ score overrides

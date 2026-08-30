@@ -4,18 +4,24 @@ import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
 import { parseSections } from '@/lib/question-set-sections'
 import { getExamTakingData } from '@/lib/exam-taking'
+import { SebLaunchGate } from '@/components/exam/seb-launch-gate'
+import { readSebEnvironment } from '@/lib/seb'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
 
 export default async function TakeExamPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ sebChallenge?: string | string[] }>
 }) {
   const { id } = await params
+  const rawChallenge = (await searchParams).sebChallenge
+  const sebChallenge = typeof rawChallenge === 'string' ? rawChallenge : undefined
 
   // Start or resume submission
-  const result = await startSubmission(id)
+  const result = await startSubmission(id, undefined, sebChallenge)
 
   if ('unauthenticated' in result && result.unauthenticated) {
     redirect('/login')
@@ -23,6 +29,20 @@ export default async function TakeExamPage({
 
   if (result.requiresAccessCode) {
     return <AccessCodeForm assignmentId={id} />
+  }
+
+  if ('requiresSecureBrowser' in result && result.requiresSecureBrowser) {
+    if (result.challenge && result.challenge !== sebChallenge) {
+      redirect(`/assignments/${id}/take?sebChallenge=${encodeURIComponent(result.challenge)}`)
+    }
+    return (
+      <SebLaunchGate
+        assignmentId={id}
+        challenge={result.challenge ?? ''}
+        configUrl={process.env.NEXT_PUBLIC_SEB_CONFIG_URL?.trim() || null}
+        configured={result.sebConfigured === true && readSebEnvironment() !== null}
+      />
+    )
   }
 
   if (result.error) {
@@ -47,7 +67,9 @@ export default async function TakeExamPage({
 
   const examConfig: ExamConfig = {
     proctoringEnabled: assignment.proctoring_enabled,
-    isFullscreenEnforced: assignment.fullscreen_required,
+    // SEB already owns OS-level kiosk/fullscreen behavior. Asking the DOM to
+    // enter fullscreen on top of it causes false overlays on iOS/macOS.
+    isFullscreenEnforced: assignment.fullscreen_required && !assignment.secure_browser_verified,
     blockClipboard: assignment.block_clipboard,
     watermarkText: assignment.watermark_text,
     isWorkImageEnforced: assignment.require_work_image ?? false,

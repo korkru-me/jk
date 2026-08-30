@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
-  Fingerprint, ListFilter, Camera,
+  Fingerprint, ListFilter, Camera, LockKeyhole,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -117,6 +117,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [fullscreenRequired, setFullscreenRequired] = useState(false)
   const [blockClipboard, setBlockClipboard] = useState(false)
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
+  const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>('browser')
   const [passingEnabled, setPassingEnabled] = useState(false)
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
@@ -291,6 +292,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         fullscreen_required: fullscreenRequired,
         block_clipboard: blockClipboard,
         exam_watermark_enabled: examWatermarkEnabled,
+        secure_browser_mode: secureBrowserMode,
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -750,6 +752,37 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           {mode === 'online' && assignmentType === 'exam' && (
             <div className="space-y-3 rounded-xl border border-border p-4">
+              <label className="flex items-center justify-between gap-4 cursor-pointer">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <LockKeyhole className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">บังคับใช้ Safe Exam Browser</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      ล็อกเครื่องและตรวจ Config Key + Browser Exam Key ก่อนเริ่ม อ่าน บันทึก อัปโหลด และส่งข้อสอบ
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={secureBrowserMode === 'seb_required'}
+                  onChange={event => {
+                    const enabled = event.target.checked
+                    setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
+                    if (enabled) setProctoringEnabled(true)
+                  }}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+              <p className="pl-11 text-xs text-warning">
+                ใช้ได้กับ Windows, macOS, iPhone และ iPad · Android ยังไม่รองรับในเฟสนี้ และนักเรียนต้องติดตั้ง SEB ก่อนสอบ
+              </p>
+            </div>
+          )}
+
+          {mode === 'online' && assignmentType === 'exam' && (
+            <div className="space-y-3 rounded-xl border border-border p-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <ListFilter className="w-4 h-4 text-primary" />
@@ -815,7 +848,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 <input
                   type="checkbox"
                   checked={proctoringEnabled}
-                  onChange={event => setProctoringEnabled(event.target.checked)}
+                  onChange={event => setProctoringEnabled(
+                    secureBrowserMode === 'seb_required' ? true : event.target.checked
+                  )}
+                  disabled={secureBrowserMode === 'seb_required'}
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
@@ -985,6 +1021,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
                 ...(mode === 'online' && assignmentType === 'exam' && proctoringEnabled
                   ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
+                  : []),
+                ...(mode === 'online' && assignmentType === 'exam' && secureBrowserMode === 'seb_required'
+                  ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
                   : []),
                 ...(hasWorkImageQuestions
                   ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]

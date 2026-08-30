@@ -27,7 +27,7 @@ export default async function EditAssignmentPage({
   // unauthorized and is handled by notFound() below.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('id, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, passing_type, passing_value, show_results, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, exam_watermark_enabled, require_work_image')
+    .select('id, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, passing_type, passing_value, show_results, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, exam_watermark_enabled, require_work_image, secure_browser_mode')
     .eq('id', id)
     .maybeSingle()
 

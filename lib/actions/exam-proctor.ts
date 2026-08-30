@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeProctorEvents } from '@/lib/exam-proctor'
 import { normalizeProctorPurgeCounts } from '@/lib/exam-proctor-retention'
+import { getSebSession } from '@/lib/seb-session'
 
 interface RecordProctorSignalInput {
   submissionId: string
@@ -37,7 +38,7 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, student_id, status, assignments(proctoring_enabled, mode)')
+    .select('id, student_id, status, assignment_id, assignments(proctoring_enabled, mode, secure_browser_mode)')
     .eq('id', input.submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -53,6 +54,12 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
     || assignment.mode !== 'online'
   ) {
     return { error: 'ไม่สามารถบันทึกสถานะคุมสอบนี้ได้' }
+  }
+  if (
+    assignment.secure_browser_mode === 'seb_required'
+    && !await getSebSession(user.id, submission.assignment_id)
+  ) {
+    return { error: 'เซสชัน Safe Exam Browser หมดอายุ' }
   }
 
   const { data: activeConnectionCount, error } = await admin.rpc('record_exam_proctor_signal', {

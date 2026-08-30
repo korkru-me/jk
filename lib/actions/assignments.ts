@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
-import type { AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { AssignmentStatus, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
@@ -43,6 +43,7 @@ interface CreateAssignmentData {
   fullscreen_required?: boolean
   block_clipboard?: boolean
   exam_watermark_enabled?: boolean
+  secure_browser_mode?: SecureBrowserMode
   status?: AssignmentStatus
 }
 
@@ -81,7 +82,11 @@ export async function createAssignment(data: CreateAssignmentData) {
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
   const isOnlineExam = data.mode === 'online' && data.type === 'exam'
-  const proctoringEnabled = isOnlineExam && data.proctoring_enabled === true
+  const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
+    ? 'seb_required'
+    : 'browser'
+  const proctoringEnabled = isOnlineExam
+    && (data.proctoring_enabled === true || secureBrowserMode === 'seb_required')
   const randomQuestionCount = isOnlineExam
     && Number.isInteger(data.random_question_count)
     && (data.random_question_count as number) > 0
@@ -138,6 +143,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       fullscreen_required: proctoringEnabled && data.fullscreen_required === true,
       block_clipboard: proctoringEnabled && data.block_clipboard === true,
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled === true,
+      secure_browser_mode: secureBrowserMode,
       status: data.status ?? 'draft',
     })
     .select('id')
@@ -198,6 +204,7 @@ interface UpdateAssignmentData {
   block_clipboard: boolean
   random_question_count: number | null
   exam_watermark_enabled: boolean
+  secure_browser_mode: SecureBrowserMode
   /** Whether students must attach a photo of their working on every
    *  เติมคำตอบตัวเลข question. Omit to leave the งาน's answer untouched. */
   require_work_image?: boolean
@@ -219,7 +226,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, sections, type, mode, random_question_count')
+    .select('question_ids, sections, type, mode, random_question_count, secure_browser_mode')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -279,7 +286,11 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     ? data.display_max_score
     : null
   const isOnlineExam = existing.mode === 'online' && existing.type === 'exam'
-  const proctoringEnabled = isOnlineExam && data.proctoring_enabled
+  const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
+    ? 'seb_required'
+    : 'browser'
+  const proctoringEnabled = isOnlineExam
+    && (data.proctoring_enabled || secureBrowserMode === 'seb_required')
   const randomQuestionCount = isOnlineExam
     && Number.isInteger(data.random_question_count)
     && data.random_question_count !== null
@@ -304,6 +315,19 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     if (startedSubmission) return { error: 'เปลี่ยนจำนวนข้อสุ่มไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
   }
 
+  if (secureBrowserMode !== (existing.secure_browser_mode ?? 'browser')) {
+    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'เปลี่ยนโหมด Safe Exam Browser ไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
+    }
+  }
+
   const { error } = await supabase
     .from('assignments')
     .update({
@@ -326,6 +350,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       fullscreen_required: proctoringEnabled && data.fullscreen_required,
       block_clipboard: proctoringEnabled && data.block_clipboard,
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled,
+      secure_browser_mode: secureBrowserMode,
       ...(data.require_work_image === undefined ? {} : { require_work_image: data.require_work_image }),
     })
     .eq('id', id)
@@ -421,6 +446,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       fullscreen_required: source.fullscreen_required ?? false,
       block_clipboard: source.block_clipboard ?? false,
       exam_watermark_enabled: source.exam_watermark_enabled ?? false,
+      secure_browser_mode: source.secure_browser_mode ?? 'browser',
       status: 'draft',
     })
     .select('id')

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
-  AlertCircle, Activity, Copy, Pencil, Eye, Radio,
+  AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
@@ -114,6 +114,11 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
               <span className="text-xs text-surface-inverse-muted border border-surface-inverse-border px-2.5 py-1 rounded-full">
                 {a.mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์'}
               </span>
+              {a.secure_browser_mode === 'seb_required' && (
+                <span className="flex items-center gap-1 text-xs text-success border border-success/40 bg-success/10 px-2.5 py-1 rounded-full">
+                  <LockKeyhole className="w-3 h-3" /> Safe Exam Browser
+                </span>
+              )}
             </div>
             <h1 className="text-2xl font-bold leading-tight">{a.title}</h1>
             {a.classrooms?.name && <p className="text-surface-inverse-muted text-sm mt-1">{a.classrooms.name}</p>}

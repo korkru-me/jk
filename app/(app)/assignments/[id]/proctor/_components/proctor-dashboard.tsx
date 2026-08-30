@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Settings,
   ShieldAlert,
+  LockKeyhole,
   Trash2,
   Users,
   Wifi,
@@ -63,6 +64,7 @@ interface AssignmentSummary {
   enabled: boolean
   fullscreenRequired: boolean
   blockClipboard: boolean
+  secureBrowserRequired: boolean
 }
 
 interface Props {
@@ -73,7 +75,7 @@ interface Props {
 }
 
 const ACTIVE_WINDOW_MS = 45_000
-const PROCTOR_SESSION_SELECT = 'submission_id, org_id, assignment_id, student_id, started_monitoring_at, last_seen_at, is_online, is_tab_visible, is_fullscreen, completed_at, tab_switch_count, fullscreen_exit_count, window_blur_count, clipboard_attempt_count, screenshot_key_count, active_connection_count, concurrent_connection_count, last_event_type, last_event_at, created_at, updated_at'
+const PROCTOR_SESSION_SELECT = 'submission_id, org_id, assignment_id, student_id, started_monitoring_at, last_seen_at, is_online, is_tab_visible, is_fullscreen, completed_at, tab_switch_count, fullscreen_exit_count, window_blur_count, clipboard_attempt_count, screenshot_key_count, active_connection_count, concurrent_connection_count, secure_browser_verified_at, secure_browser_platform, secure_browser_version, last_event_type, last_event_at, created_at, updated_at'
 const PROCTOR_EVENT_SELECT = 'id, org_id, assignment_id, submission_id, student_id, event_type, occurred_at_client, created_at'
 
 const EVENT_LABELS: Record<string, string> = {
@@ -91,6 +93,12 @@ const EVENT_LABELS: Record<string, string> = {
   screenshot_key: 'กดปุ่ม Print Screen',
   concurrent_connection: 'ตรวจพบหน้าสอบเปิดพร้อมกันหลายจุด',
 }
+
+const SEB_PLATFORM_LABELS = {
+  windows: 'Windows',
+  macos: 'macOS',
+  ios: 'iOS',
+} as const
 
 const REVIEW_EVENT_TYPES = new Set([
   'tab_hidden',
@@ -410,6 +418,7 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           )}
           {assignment.fullscreenRequired && <Badge variant="outline"><Maximize aria-hidden="true" /> บังคับเต็มจอ</Badge>}
           {assignment.blockClipboard && <Badge variant="outline"><ShieldAlert aria-hidden="true" /> ปิดคัดลอก/วาง</Badge>}
+          {assignment.secureBrowserRequired && <Badge variant="secondary" className="text-success"><LockKeyhole aria-hidden="true" /> บังคับ SEB</Badge>}
         </div>
       </div>
 
@@ -418,7 +427,9 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
           <p className="text-muted-foreground">
             เหตุการณ์เหล่านี้เป็นสัญญาณให้ครูพิจารณาร่วมกับบริบท ไม่ใช่ข้อสรุปว่านักเรียนทุจริต
-            เบราว์เซอร์ไม่สามารถกันภาพถ่ายหน้าจอหรือควบคุมอุปกรณ์อื่นได้ทั้งหมด
+            {assignment.secureBrowserRequired
+              ? ' สถานะ SEB ยืนยันการตั้งค่าและเวอร์ชันที่อนุญาต แต่ยังไม่ใช่หลักฐานว่าทุจริตหรือไม่ทุจริต'
+              : ' เบราว์เซอร์ไม่สามารถกันภาพถ่ายหน้าจอหรือควบคุมอุปกรณ์อื่นได้ทั้งหมด'}
           </p>
         </div>
       </Card>
@@ -479,6 +490,7 @@ export function ProctorDashboard({ assignment, initialParticipants, initialSessi
                   flagged={row.flagged}
                   completed={row.completed}
                   fullscreenRequired={assignment.fullscreenRequired}
+                  secureBrowserRequired={assignment.secureBrowserRequired}
                 />
               ))}
             </div>
@@ -550,13 +562,14 @@ function SummaryCard({ label, value, icon: Icon, tone = 'default' }: {
   )
 }
 
-function StudentStatusRow({ name, session, active, flagged, completed, fullscreenRequired }: {
+function StudentStatusRow({ name, session, active, flagged, completed, fullscreenRequired, secureBrowserRequired }: {
   name: string
   session: ProctorSessionRow | undefined
   active: boolean
   flagged: boolean
   completed: boolean
   fullscreenRequired: boolean
+  secureBrowserRequired: boolean
 }) {
   return (
     <div className="space-y-3 px-5 py-4 sm:flex sm:items-center sm:gap-4 sm:space-y-0">
@@ -573,6 +586,13 @@ function StudentStatusRow({ name, session, active, flagged, completed, fullscree
             <Badge variant="outline">ยังไม่เริ่ม</Badge>
           )}
           {flagged && <Badge variant="destructive"><ShieldAlert aria-hidden="true" /> ควรตรวจสอบ</Badge>}
+          {session?.secure_browser_verified_at ? (
+            <Badge variant="secondary" className="text-success">
+              <LockKeyhole aria-hidden="true" /> SEB ยืนยันแล้ว · {SEB_PLATFORM_LABELS[session.secure_browser_platform ?? 'windows']}
+            </Badge>
+          ) : secureBrowserRequired && session ? (
+            <Badge variant="destructive"><AlertTriangle aria-hidden="true" /> ไม่พบการยืนยัน SEB</Badge>
+          ) : null}
           {(session?.active_connection_count ?? 0) > 1 && (
             <Badge variant="destructive"><MonitorSmartphone aria-hidden="true" /> เปิดพร้อมกัน {session?.active_connection_count} จุด</Badge>
           )}
@@ -589,8 +609,8 @@ function StudentStatusRow({ name, session, active, flagged, completed, fullscree
             {session.is_tab_visible ? 'อยู่ในแท็บ' : 'ออกจากแท็บ'}
           </span>
           <span className="flex items-center gap-1 text-muted-foreground">
-            {session.is_fullscreen ? <Maximize className="size-3.5" aria-hidden="true" /> : <Minimize className={`size-3.5 ${fullscreenRequired ? 'text-warning' : ''}`} aria-hidden="true" />}
-            {session.is_fullscreen ? 'เต็มจอ' : 'ไม่เต็มจอ'}
+            {secureBrowserRequired && session.secure_browser_verified_at ? <LockKeyhole className="size-3.5 text-success" aria-hidden="true" /> : session.is_fullscreen ? <Maximize className="size-3.5" aria-hidden="true" /> : <Minimize className={`size-3.5 ${fullscreenRequired ? 'text-warning' : ''}`} aria-hidden="true" />}
+            {secureBrowserRequired && session.secure_browser_verified_at ? 'SEB kiosk' : session.is_fullscreen ? 'เต็มจอ' : 'ไม่เต็มจอ'}
           </span>
           <span className="text-muted-foreground">สลับแท็บ <strong className="text-foreground">{session.tab_switch_count}</strong></span>
           <span className="text-muted-foreground">ออกเต็มจอ <strong className="text-foreground">{session.fullscreen_exit_count}</strong></span>

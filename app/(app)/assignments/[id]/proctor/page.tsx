@@ -35,7 +35,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   const supabase = await createClient()
   const { data: assignment } = await supabase
     .from('assignments')
-    .select('id, title, mode, type, proctoring_enabled, fullscreen_required, block_clipboard, classrooms(name)')
+    .select('id, title, mode, type, proctoring_enabled, fullscreen_required, block_clipboard, secure_browser_mode, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
@@ -170,6 +170,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
         enabled: assignment.proctoring_enabled === true,
         fullscreenRequired: assignment.fullscreen_required === true,
         blockClipboard: assignment.block_clipboard === true,
+        secureBrowserRequired: assignment.secure_browser_mode === 'seb_required',
       }}
       initialParticipants={[...participantByStudent.values()]}
       initialSessions={(sessionsResult.data ?? []) as ProctorSessionRow[]}

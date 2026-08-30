@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole } from 'lucide-react'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -66,6 +66,7 @@ export type EditableAssignment = Pick<
   | 'random_question_count'
   | 'exam_watermark_enabled'
   | 'require_work_image'
+  | 'secure_browser_mode'
 >
 
 export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text' | 'question_type'> & {
@@ -97,6 +98,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
     a.random_question_count != null ? String(a.random_question_count) : ''
   )
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
+  const [secureBrowserMode, setSecureBrowserMode] = useState(a.secure_browser_mode ?? 'browser')
   const [requireWorkImage, setRequireWorkImage] = useState(a.require_work_image ?? false)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
@@ -219,6 +221,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         block_clipboard: blockClipboard,
         random_question_count: randomQuestionCount ? Number(randomQuestionCount) : null,
         exam_watermark_enabled: examWatermarkEnabled,
+        secure_browser_mode: secureBrowserMode,
         require_work_image: hasWorkImageQuestions && requireWorkImage,
       })
       if (res?.error) { toast.error(res.error); return }
@@ -239,6 +242,39 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           <Textarea id="edit-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
         </div>
       </Card>
+
+      {a.mode === 'online' && a.type === 'exam' && (
+        <Card padding="xl" className="space-y-3">
+          <label className={`flex items-center justify-between gap-4 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <LockKeyhole className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">บังคับใช้ Safe Exam Browser</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ตรวจ Config Key + Browser Exam Key ที่เซิร์ฟเวอร์ทุกครั้งก่อนเข้าถึง attempt
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={secureBrowserMode === 'seb_required'}
+              disabled={hasSubmissions}
+              onChange={event => {
+                const enabled = event.target.checked
+                setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
+                if (enabled) setProctoringEnabled(true)
+              }}
+              className="accent-primary w-4 h-4 shrink-0"
+            />
+          </label>
+          <p className="pl-11 text-xs text-warning">
+            Windows, macOS, iPhone และ iPad เท่านั้น · Android ยังไม่รองรับ
+            {hasSubmissions ? ' · ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำข้อสอบ' : ''}
+          </p>
+        </Card>
+      )}
 
       {a.mode === 'online' && a.type === 'exam' && (
         <Card padding="xl" className="space-y-3">
@@ -307,7 +343,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <input
               type="checkbox"
               checked={proctoringEnabled}
-              onChange={event => setProctoringEnabled(event.target.checked)}
+              onChange={event => setProctoringEnabled(
+                secureBrowserMode === 'seb_required' ? true : event.target.checked
+              )}
+              disabled={secureBrowserMode === 'seb_required'}
               className="accent-primary w-4 h-4 shrink-0"
             />
           </label>
