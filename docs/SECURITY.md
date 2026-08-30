@@ -80,6 +80,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 ## Uploads และ exports
 
 - ตรวจ MIME type, ขนาด และจำนวนไฟล์ฝั่ง server/storage policy
+- **URL ของไฟล์ที่ client ส่งกลับมาให้บันทึกต้องตรวจถึง “host” ไม่ใช่แค่ path** — `https://evil.example/storage/v1/object/public/classroom-post-files/x.png` มี path ตรงทุกตัวอักษร ถ้าตรวจแค่ path ไฟล์นอกโปรเจกต์จะถูกฝังเป็น `<img src>`/ปุ่มดาวน์โหลดต่อหน้าทั้งห้องได้ · ไฟล์แนบประกาศตรวจด้วย `isPostFileUrl()` เทียบกับ `NEXT_PUBLIC_SUPABASE_URL` (มี unit test ครอบ) และชื่อไฟล์ที่ client ส่งมาถูกตัดอักขระคั่น path และจำกัดความยาวก่อนเก็บ
 - ใช้ชื่อไฟล์และ path ที่ไม่เปิดเผยข้อมูลเกินจำเป็น
 - จำกัดการอ่านไฟล์ตาม owner/classroom/assignment
 - ระวัง orphan files เมื่อแก้หรือลบ resource

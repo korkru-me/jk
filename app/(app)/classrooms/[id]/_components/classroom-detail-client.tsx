@@ -6,19 +6,19 @@ import dynamic from 'next/dynamic'
 import {
   Users, BookOpen, Copy, Check,
   GraduationCap, UserPlus, Grid3x3, Mail, GitBranch, Activity, ChevronLeft,
-  ClipboardList, Megaphone, CalendarDays, Home,
+  ClipboardList, CalendarDays, Home, LayoutDashboard,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
-import { ClassroomStream } from './classroom-stream'
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
 import { parseDescription, coverOf, displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import type { SortKey as StudentSortKey, SortDir as StudentSortDir } from './student-table'
 import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
-import { HomeroomOverview, type StudentNoteRow, type StudentProfileRow } from './homeroom-overview'
+import { ClassroomOverview, type OverviewTarget } from './classroom-overview'
+import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { IconButton } from '@/components/ui/icon-button'
 
@@ -26,9 +26,10 @@ function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
 }
 
-// Stream and homeroom are the two possible initial tabs. Everything else is
-// downloaded only when a teacher opens that tab, keeping the first classroom
-// bundle focused on the content that is actually visible.
+// Overview is always the initial tab, so it and the announcement board inside
+// it are imported directly. Everything else is downloaded only when a teacher
+// opens that tab, keeping the first classroom bundle focused on what is
+// actually visible.
 const StudentTable = dynamic(() => import('./student-table').then(module => module.StudentTable), { loading: TabLoading })
 const InvitePanel = dynamic(() => import('./invite-panel').then(module => module.InvitePanel), { loading: TabLoading })
 const CoTeachers = dynamic(() => import('./co-teachers').then(module => module.CoTeachers), { loading: TabLoading })
@@ -44,11 +45,12 @@ const ParentPortal = dynamic(() => import('./parent-portal').then(module => modu
 const LearningPaths = dynamic(() => import('./learning-paths').then(module => module.LearningPaths), { loading: TabLoading })
 const AuditLog = dynamic(() => import('./audit-log').then(module => module.AuditLog), { loading: TabLoading })
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
+const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
-type Tab = 'stream' | 'students' | 'assignments' | 'scores' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
+type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
 
 const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
-  { key: 'stream',      label: 'ประกาศ',          icon: Megaphone },
+  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
   { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
   { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
   { key: 'students',    label: 'นักเรียน',        icon: Users },
@@ -61,8 +63,8 @@ const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?:
 ]
 
 const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
+  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
   { key: 'homeroom',    label: 'การบ้านนักเรียน', icon: CalendarDays, managerOnly: true },
-  { key: 'stream',      label: 'ประกาศ',          icon: Megaphone },
   { key: 'students',    label: 'นักเรียน',        icon: Users },
   { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
   { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
@@ -98,16 +100,25 @@ interface Props {
   studentProfiles: Record<string, StudentProfileRow>
   ownerName: string
   posts: ClassroomPost[]
+  /** Hand-ins with at least one answer still waiting for a teacher's score. */
+  pendingReviewCount: number
+  /** The lookup above stops at a row cap — true means the count is a floor. */
+  pendingReviewCapped: boolean
+  /** Student ids that have seen each announcement, keyed by post id. */
+  seenByPost: Record<string, string[]>
+  /** Live classrooms the same announcement can be cross-posted to. */
+  crossPostTargets: { id: string; name: string }[]
 }
 
 export function ClassroomDetailClient({
   classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
   classroomAssignments, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
+  pendingReviewCount, pendingReviewCapped, seenByPost, crossPostTargets,
 }: Props) {
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
-  const [activeTab, setActiveTab] = useState<Tab>(isHomeroom && canManage ? 'homeroom' : 'stream')
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [codeCopied, setCodeCopied] = useState(false)
   const savedCover = coverOf(parseDescription(classroom.description))
   // A chosen cover paints the banner as a tinted surface whose text is the same
@@ -233,10 +244,22 @@ export function ClassroomDetailClient({
 
       {/* Tab content */}
       <div>
-        {activeTab === 'stream' && (
-          <div className="max-w-2xl">
-            <ClassroomStream classroomId={classroom.id} canPost={canManage} initialPosts={posts} />
-          </div>
+        {activeTab === 'overview' && canManage && (
+          <ClassroomOverview
+            classroomId={classroom.id}
+            isHomeroom={isHomeroom}
+            students={students}
+            assignments={classroomAssignments}
+            homeroomAssignments={homeroomAssignments}
+            submissions={isHomeroom ? homeroomSubmissions : classroomSubmissions}
+            pendingReviewCount={pendingReviewCount}
+            pendingReviewCapped={pendingReviewCapped}
+            posts={posts}
+            seenByPost={seenByPost}
+            crossPostTargets={crossPostTargets}
+            canManage={canManage}
+            onNavigate={(target: OverviewTarget) => setActiveTab(target)}
+          />
         )}
         {activeTab === 'students' && (
           <StudentTable

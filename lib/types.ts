@@ -681,14 +681,21 @@ export interface Notification {
   created_at: string
 }
 
+export type { PostAttachment } from '@/lib/attachment-display'
+import type { PostAttachment } from '@/lib/attachment-display'
+
 export interface ClassroomPost {
   id: string
   classroom_id: string
   author_id: string
   body: string
+  /** Files in the `classroom-post-files` bucket. Empty for a text-only post. */
+  attachments: PostAttachment[]
   pinned: boolean
   created_at: string
   updated_at: string
+  /** Set only when the text or images were changed — pinning is not an edit. */
+  edited_at: string | null
   users: { full_name: string } | null
   comments: PostComment[]
 }

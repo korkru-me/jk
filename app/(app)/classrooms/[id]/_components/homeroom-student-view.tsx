@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronLeft, GraduationCap, Users, Home, Megaphone } from 'lucide-react'
+import { ChevronLeft, GraduationCap, Users, Home } from 'lucide-react'
 import { ClassroomStream } from './classroom-stream'
 import { AssignmentCalendar, type CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import type { Classroom, ClassroomPost } from '@/lib/types'
@@ -109,12 +109,15 @@ export function HomeroomStudentView({
       </div>
 
       {/* Stream — the advisor's channel: attendance, forms, school-wide notices */}
-      <div>
-        <h2 className="font-semibold mb-3 flex items-center gap-2">
-          <Megaphone className="w-4 h-4 text-muted-foreground" /> ประกาศจากครูที่ปรึกษา
-        </h2>
-        <ClassroomStream classroomId={classroom.id} canPost={false} initialPosts={posts} />
-      </div>
+      <ClassroomStream
+        classroomId={classroom.id}
+        canPost={false}
+        initialPosts={posts}
+        variant="panel"
+        maxHeightClass="max-h-[360px]"
+        title="ประกาศจากครูที่ปรึกษา"
+        trackSeen
+      />
     </div>
   )
 }

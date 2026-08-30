@@ -43,7 +43,9 @@ Invariant สำคัญ:
 - `classroom_students` — roster
 - `classroom_co_teachers` — ครูร่วมและ permission
 - `classroom_invitations` — invitation token สำหรับครูร่วม
-- `classroom_posts` และ `post_comments` — stream การสื่อสาร
+- `classroom_posts` และ `post_comments` — stream การสื่อสาร · `attachments` (jsonb) เก็บไฟล์แนบสูงสุด 6 ไฟล์ต่อประกาศเป็น `{url, name, mime, size}` — เก็บ `name` เพราะ path ใน storage เป็นชื่อสุ่ม ถ้าไม่เก็บ นักเรียนจะได้ไฟล์ชื่อ `1788007637477_gv4hcdo5px4.pdf` · `edited_at` คือเวลาที่ "แก้ไขข้อความ/ไฟล์" จริง — ห้ามอ่าน `updated_at` แทน เพราะ trigger เด้งทุกครั้งที่แตะแถว การปักหมุดจึงเคยขึ้นป้าย “แก้ไขแล้ว” ทั้งที่เนื้อหาไม่เปลี่ยน · ลิงก์ในประกาศไม่มีคอลัมน์ของตัวเอง URL ในข้อความถูกทำเป็นลิงก์ตอน render (`lib/linkify.ts`)
+- `post_reads` — หนึ่งแถวต่อ (ประกาศ, นักเรียน) เขียนครั้งแรกที่ประกาศปรากฏบนจอ ไม่มี `updated_at` เพราะการเห็นซ้ำไม่ใช่เหตุการณ์ใหม่ · UI เขียนว่า “เห็นแล้ว” ไม่ใช่ “อ่านแล้ว” เพราะข้อมูลบอกได้แค่นั้น
+- **การเพิ่ม `post_reads` เคยทำให้ประกาศหายทั้งระบบ** — ตารางนี้มี FK ไปทั้ง `classroom_posts` และ `users` PostgREST จึงเห็นทาง embed `users` จาก `classroom_posts` ได้ 2 ทางและปฏิเสธที่จะเดา (`more than one relationship was found`) query ที่เขียน `users(full_name)` เฉย ๆ เลย error แล้วกลายเป็นรายการว่าง · embed ที่มีตารางเชื่อมแบบนี้ต้องระบุชื่อ FK เช่น `users!classroom_posts_author_id_fkey(full_name)`
 
 ห้อง `homeroom` และ `subject` ใช้ตารางเดียวกัน แต่มี business behavior ต่างกัน
 
@@ -146,12 +148,15 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 | `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์) และ `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้) |
 | `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย |
 | `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน |
+| `classroom-post-files` | 10 MB | รูป (PNG/JPEG/WebP/GIF), PDF, Word, Excel, PowerPoint, txt/csv, zip | `post-attach.tsx` — ไฟล์แนบในประกาศห้องเรียน |
 
-- ทั้งสาม bucket เป็น public-read และเก็บไฟล์ใต้ `{auth.uid()}/...` โดย `work-images`/`submission-files` มี RLS จำกัดให้เขียน/ลบได้เฉพาะโฟลเดอร์ของตัวเอง
+- ทุก bucket เป็น public-read และเก็บไฟล์ใต้ `{auth.uid()}/...` โดย `work-images`/`submission-files`/`classroom-post-files` มี RLS จำกัดให้เขียน/ลบได้เฉพาะโฟลเดอร์ของตัวเอง
+- **ลบ bucket ผ่าน migration ไม่ได้** Postgres ปฏิเสธ `DELETE FROM storage.buckets` ตรง ๆ (`Direct deletion from storage tables is not allowed`) ต้องใช้ Storage API — bucket `classroom-post-images` ที่ถูกแทนด้วย `classroom-post-files` จึงลบด้วยวิธีนั้น ส่วน policy ของมันลบใน migration ได้ตามปกติ
 - **`question-images` เคยไม่มีลิมิตและไม่จำกัดชนิดไฟล์เลย** ทั้งที่ UI เขียนว่า "สูงสุด 5 MB" เพราะเป็น bucket เดียวที่ถูกสร้างจากหน้า dashboard ก่อนโปรเจกต์ใช้ CLI — migration `20260828073436` ตั้งค่าให้ตรงกับอีกสองตัว (ลิมิตเป็น 10 MB ไม่ใช่ 5 เพราะ widget ไฟล์แนบโฆษณา 10 MB ไว้ และ PDF ย่อไม่ได้)
 - **รูปถูกย่อในเบราว์เซอร์ก่อนอัปโหลดเสมอ** (`lib/image-downscale.ts`) ลิมิตของ bucket เป็นแค่ตาข่ายรับ ไม่ใช่ทางเดินปกติ
 - **ไฟล์กำพร้าถูกเก็บกวาดสองทาง** — ลบโจทย์/โจทย์กลุ่มแล้วรูปของมันถูกลบตามทันที (`releaseQuestionFiles`) ส่วนไฟล์ที่ค้างจากการอัปแล้วปิดหน้าไปเฉยๆ ให้ครูกวาดเองที่ ตั้งค่า → พื้นที่จัดเก็บไฟล์
 - ทั้งสองทางถามคำถามเดียวกันผ่าน RPC `storage_paths_still_referenced` ซึ่งเป็น SECURITY DEFINER เพราะการทำสำเนาโจทย์คัดลอก `image_urls` ไปตรงๆ ไฟล์ในโฟลเดอร์เราจึงอาจเป็นรูปเดียวในโจทย์ส่วนตัวของเพื่อนร่วมทีมที่เรามองไม่เห็น · ฟังก์ชันรับ path เข้าไปและตอบเฉพาะ subset ของ path ที่ส่งไป และดึงโฟลเดอร์ที่จะดูจาก `auth.uid()` เอง จึงถามถึงไฟล์ของคนอื่นไม่ได้และ enumerate ไม่ได้
+- **`classroom-post-files` อยู่นอกวงกวาดนี้โดยตั้งใจ** RPC ข้างบนอ่านแค่ `questions` กับ `submission_answers` ถ้าเอา bucket นี้เข้าไปในรายการที่กวาด ไฟล์ในประกาศจะถูกรายงานว่ากำพร้าและถูกเสนอให้ลบทั้งที่ห้องเรียนยังอ่านอยู่ · การลบประกาศลบไฟล์ของตัวเองทันที (`deleteClassroomPost`) **แต่เช็คก่อนว่ามีประกาศอื่นอ้างไฟล์เดียวกันอยู่ไหม** เพราะการโพสต์ข้ามห้องใช้ไฟล์ก้อนเดียวกันหลายประกาศ — เช็คด้วย admin client เพราะสำเนาอีกใบอาจอยู่ในห้องที่คนลบไม่มีสิทธิ์อ่าน · ไฟล์ที่อัปแล้วไม่ได้โพสต์จะค้างในโฟลเดอร์ของครูคนนั้น ถ้าจะให้กวาดได้ต้องเพิ่ม `classroom_posts` เข้าไปใน RPC ก่อน แล้วค่อยเพิ่ม bucket
 - **การจับคู่ใช้ substring กับทั้งแถวที่ cast เป็น text ไม่ใช่ไล่ชื่อคอลัมน์** เพราะรูปอยู่ใน `image_urls`, `solution_image_urls`, `mcq_options[].image_url` และ `extra_data.attachment_urls` และคอลัมน์ที่เพิ่มทีหลังจะหลุดจากรายการที่เขียนไว้วันนี้ · ความไม่แม่นทุกแบบเอียงไปทาง "เก็บไฟล์ไว้" เสมอ ซึ่งเป็นทางเดียวที่ผิดแล้วไม่เสียหาย
 
 ## กฎการเปลี่ยน schema
