@@ -419,3 +419,68 @@ describe('gradeAnswer — composite with an mcq part', () => {
     expect(result).toMatchObject({ is_correct: false, score: 0 })
   })
 })
+// ─── Essay ───────────────────────────────────────────────────────────────────
+
+/** An essay question shaped the way essay-form.tsx saves one: no formula, no
+ *  answer parts, and mcq_options holding the marking rubric. */
+function essayQuestion(): Question {
+  return {
+    id: 'q1',
+    question_type: 'essay',
+    answer_formula: '',
+    answer_parts: [],
+    variables: [],
+    logic_rules: [],
+    extra_data: {},
+    mcq_options: [{ criterion: 'อธิบายหลักการได้ถูกต้อง', points: 3 }],
+  } as unknown as Question
+}
+
+function gradeEssay(correctAnswer: string, student: string | null) {
+  return gradeAnswer(answer({ correct: correctAnswer, student, questionType: 'essay' }))
+}
+
+describe('essay, from attempt to grade', () => {
+  it('records no answer to compare against', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [essayQuestion()])
+    expect(skeleton.correct_answer).toBe('')
+    expect(skeleton.max_score).toBe(1)
+  })
+
+  it('does not freeze an evaluated non-answer into the attempt', () => {
+    // An essay carries an empty answer_formula. Without a branch of its own it
+    // fell through to the numeric path and stored whatever evaluating that
+    // produced: "undefined" for the empty formula every essay saves, or
+    // evaluateFormula's error string if the column held unparseable leftovers.
+    // Both were then shown to the student as the เฉลย.
+    const [skeleton] = buildAssignmentAttempt(assignment, [essayQuestion()])
+    expect(skeleton.correct_answer).not.toBe('undefined')
+    expect(skeleton.correct_answer).not.toBe('สูตรไม่ถูกต้อง')
+  })
+
+  it('leaves the answer pending for a teacher rather than scoring it', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [essayQuestion()])
+    expect(gradeEssay(skeleton.correct_answer, 'พลังงานจลน์เปลี่ยนเป็นพลังงานศักย์')).toEqual({
+      id: 'a1', is_correct: null, score: 0,
+    })
+    expect(gradeEssay(skeleton.correct_answer, '')).toEqual({ id: 'a1', is_correct: null, score: 0 })
+    expect(gradeEssay(skeleton.correct_answer, null)).toEqual({ id: 'a1', is_correct: null, score: 0 })
+  })
+
+  it('leaves an attempt stored before the fix pending too, not wrong', () => {
+    // Rows written by the old numeric fall-through still hold what it
+    // evaluated. Grading keys on question_type, not on what was frozen in, so
+    // they come out pending instead of a silent zero.
+    for (const frozen of ['undefined', 'สูตรไม่ถูกต้อง']) {
+      expect(gradeEssay(frozen, 'คำตอบของนักเรียน')).toEqual({ id: 'a1', is_correct: null, score: 0 })
+    }
+  })
+
+  it('gives nothing away to a student who types the frozen string', () => {
+    // The text comparison at the bottom of gradeAnswer would have called this
+    // a perfect answer.
+    for (const frozen of ['undefined', 'สูตรไม่ถูกต้อง']) {
+      expect(gradeEssay(frozen, frozen)).toEqual({ id: 'a1', is_correct: null, score: 0 })
+    }
+  })
+})

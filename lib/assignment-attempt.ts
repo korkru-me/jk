@@ -194,6 +194,25 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
     return { question_id: q.id, random_values: {}, correct_answer: '', max_score: naturalMaxScore(q.question_type, extraData, null) }
   }
 
+  // Essay: a person reads it. There is no answer to precompute and nothing a
+  // comparison could ever be run against, so none is recorded — grading
+  // branches on question_type, the way file_upload just above does, and the
+  // row stays pending until a teacher scores it.
+  //
+  // Without a branch of its own an essay fell through to the numeric path
+  // below and was stored with whatever evaluating its answer_formula produced.
+  // That column is `not null default ''` and an essay always saves it empty,
+  // which mathjs evaluates to nothing at all — so the frozen correct answer
+  // read "undefined", exactly the mcq bug again. (An essay carrying leftover
+  // unparseable text there froze evaluateFormula's error string
+  // 'สูตรไม่ถูกต้อง' instead; both are answers no writing can match.) Every
+  // student was marked wrong, and wherever results are visible that string was
+  // shown to them as the เฉลย. Keying this on question_type instead of a new
+  // prefix is also what lets an attempt stored back then grade as pending now.
+  if (q.question_type === 'essay') {
+    return { question_id: q.id, random_values: {}, correct_answer: '', max_score: naturalMaxScore(q.question_type, extraData, null) }
+  }
+
   if (parts && parts.length > 1) {
     const answers = evaluatePartsChained(parts, randomValues)
     return { question_id: q.id, random_values: randomValues, correct_answer: JSON.stringify(answers.map(String)), max_score: naturalMaxScore(q.question_type, extraData, parts) }
@@ -276,7 +295,10 @@ export function scaleScore(rawScore: number, structuralMax: number, storedMax: n
   return Math.round((rawScore / structuralMax) * storedMax * 100) / 100
 }
 
-function gradeValue(studentVal: number, correctVal: number, storedTolerance: number): boolean {
+// ค่าคลาดเคลื่อนที่ยอมรับ: ลบ = คิดเป็นเปอร์เซ็นต์ของเฉลย, บวก = ค่าสัมบูรณ์
+// export ออกไปเพราะหน้าตัวอย่างโจทย์ของครูตัดสินถูก/ผิดด้วยกติกาเดียวกันนี้ —
+// เดิมมันมีสูตร 1% ของตัวเอง คำว่า "ถูก" ในตัวอย่างจึงไม่ตรงกับตอนตรวจจริง
+export function gradeValue(studentVal: number, correctVal: number, storedTolerance: number): boolean {
   const tolerance = storedTolerance < 0
     ? Math.abs(correctVal) * (Math.abs(storedTolerance) / 100)
     : storedTolerance
@@ -318,6 +340,18 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
     try { files = studentAns ? JSON.parse(studentAns) : [] } catch { files = [] }
     const submitted = Array.isArray(files) && files.length > 0
     return { id: a.id, is_correct: submitted, score: submitted ? a.max_score : 0 }
+  }
+
+  // Essay grading — only a teacher can score writing, so the row is left
+  // pending (is_correct null, score 0) until they do, the same signal
+  // FILL_MANUAL: and a text-type fill_blank blank use below. Keyed on
+  // question_type rather than a correct_answer prefix, which is what makes an
+  // attempt stored before essays had a branch — one whose frozen answer reads
+  // "undefined" or 'สูตรไม่ถูกต้อง' — come out pending here instead of wrong,
+  // and stops a student who happened to type either string from scoring full
+  // marks off the text comparison at the bottom.
+  if (a.questions?.question_type === 'essay') {
+    return { id: a.id, is_correct: null, score: 0 }
   }
 
   // True/False grading
