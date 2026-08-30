@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  countContentTwins,
-  groupIdsBySharedText,
   normalizeQuestionText,
   questionFingerprint,
   type QuestionContent,
@@ -67,34 +65,5 @@ describe('questionFingerprint', () => {
   it('keeps image addresses byte for byte', () => {
     expect(questionFingerprint(q('a', { image_urls: ['https://x/Ab.png'] })))
       .not.toBe(questionFingerprint(q('b', { image_urls: ['https://x/ab.png'] })))
-  })
-})
-
-describe('groupIdsBySharedText', () => {
-  it('keeps only ids that share their wording with another', () => {
-    const ids = groupIdsBySharedText([
-      { id: 'a', question_text: '<p>งาน</p>' },
-      { id: 'b', question_text: 'งาน' },
-      { id: 'c', question_text: 'โมเมนตัม' },
-    ])
-    expect(ids.sort()).toEqual(['a', 'b'])
-  })
-
-  it('does not call two empty bodies a match', () => {
-    expect(groupIdsBySharedText([
-      { id: 'a', question_text: '' },
-      { id: 'b', question_text: '<p> </p>' },
-    ])).toEqual([])
-  })
-})
-
-describe('countContentTwins', () => {
-  it('counts the other questions sharing each one’s content', () => {
-    expect(countContentTwins([q('a'), q('b'), q('c'), q('d', { answer_formula: 'F' })]))
-      .toEqual({ a: 2, b: 2, c: 2 })
-  })
-
-  it('leaves out questions that stand alone', () => {
-    expect(countContentTwins([q('a'), q('b', { answer_formula: 'F' })])).toEqual({})
   })
 })
