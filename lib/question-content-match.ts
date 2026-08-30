@@ -12,7 +12,7 @@
  * change how the teacher handles the question, not what is being asked.
  */
 
-/** Columns a fingerprint is built from — the select list for the second pass. */
+/** Columns a fingerprint is built from — the select list for reading them back. */
 export const CONTENT_COLUMNS =
   'id, question_text, question_type, image_urls, mcq_options, answer_formula, ' +
   'answer_unit, answer_tolerance, answer_parts, variables, logic_rules, is_random, extra_data'
@@ -100,44 +100,4 @@ export function questionFingerprint(q: FingerprintableContent): string {
     q.is_random ?? false,
     canonical(q.extra_data),
   ])
-}
-
-/**
- * Groups ids by the normalized wording alone — the cheap first pass, run over
- * the whole bank so that the expensive full-content read only has to look at
- * questions that already say the same thing.
- */
-export function groupIdsBySharedText(
-  rows: { id: string; question_text: string | null }[],
-): string[] {
-  const byText = new Map<string, string[]>()
-  for (const row of rows) {
-    const text = normalizeQuestionText(row.question_text ?? '')
-    if (text === '') continue // an empty body is not evidence of anything
-    const bucket = byText.get(text)
-    if (bucket) bucket.push(row.id)
-    else byText.set(text, [row.id])
-  }
-  return [...byText.values()].filter(ids => ids.length > 1).flat()
-}
-
-/**
- * How many *other* questions share each question's content. Ids with no twin
- * are left out, so the result is usually empty or tiny.
- */
-export function countContentTwins(rows: QuestionContent[]): Record<string, number> {
-  const byFingerprint = new Map<string, string[]>()
-  for (const row of rows) {
-    const key = questionFingerprint(row)
-    const bucket = byFingerprint.get(key)
-    if (bucket) bucket.push(row.id)
-    else byFingerprint.set(key, [row.id])
-  }
-
-  const counts: Record<string, number> = {}
-  for (const ids of byFingerprint.values()) {
-    if (ids.length < 2) continue
-    for (const id of ids) counts[id] = ids.length - 1
-  }
-  return counts
 }
