@@ -1,14 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
+import { gradeValue, naturalMaxScore } from '@/lib/assignment-attempt'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { RichText } from '@/components/ui/rich-text'
+import { Button } from '@/components/ui/button'
+import { WorkImageUpload } from '@/components/exam/work-image-upload'
+import { FileSubmissionUpload } from '@/components/exam/file-submission-upload'
+import { TeacherGradingPreview, type GradingRow } from './teacher-grading-preview'
 
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart } from '@/lib/types'
+import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, SubmittedFile } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -42,6 +48,8 @@ export interface QuestionPreviewProps {
   compositeConfig?: CompositeConfig
   partLabelStyle?: PartLabelStyle
   attachmentUrls?: string[]
+  /** ค่าคลาดเคลื่อนระดับโจทย์ ใช้เมื่อข้อย่อยไม่ได้กำหนดของตัวเอง — กติกาเดียวกับ gradeAnswer */
+  answerTolerance?: number
 }
 
 function shuffleIndices(n: number): number[] {
@@ -70,11 +78,6 @@ function isHtml(text: string) {
 function formatAnswer(n: number): string {
   if (Math.abs(n) >= 1e6 || (Math.abs(n) < 0.001 && n !== 0)) return n.toExponential(3)
   return parseFloat(n.toPrecision(4)).toString()
-}
-
-function isClose(a: number, b: number): boolean {
-  if (b === 0) return Math.abs(a) < 1e-6
-  return Math.abs((a - b) / b) <= 0.01
 }
 
 function RenderText({ text }: { text: string }) {
@@ -106,6 +109,7 @@ export function QuestionPreviewContent({
   compositeConfig,
   partLabelStyle,
   attachmentUrls = [],
+  answerTolerance,
 }: QuestionPreviewProps) {
   const labels = partLabels(partLabelStyle)
   const [values, setValues] = useState<Record<string, number>>(() => randomizeVariables(variables))
@@ -154,7 +158,46 @@ export function QuestionPreviewContent({
   const [compositeChecked, setCompositeChecked] = useState(false)
   const [compositeResults, setCompositeResults] = useState<(boolean | null)[]>([])
 
+  // essay / file_upload — ไม่มีการตรวจอัตโนมัติให้เก็บผล แต่ยังต้องรู้ว่าครู
+  // ลองตอบไปหรือยัง ก่อนเปิดหน้าตรวจจำลอง และเอาคำตอบนั้นไปแสดงในหน้านั้น
+  const [essayText, setEssayText] = useState('')
+  const [previewFiles, setPreviewFiles] = useState<SubmittedFile[]>([])
+
+  // รูปวิธีทำที่ครูลองแนบดู ข้อย่อยละหนึ่งช่องเหมือนของนักเรียน — เป็น object URL
+  // ของแท็บนี้ ไม่ได้อัปขึ้น storage (ดู localOnly ใน WorkImageUpload)
+  const [workImages, setWorkImages] = useState<(string | null)[]>([])
+
+  // ปล่อย object URL ทิ้งเมื่อปิดตัวอย่างหรือกดสุ่มโจทย์ใหม่ ไม่งั้นไฟล์ยังถูก
+  // อ้างอยู่ในหน่วยความจำของแท็บจนกว่าจะปิดหน้าไปทั้งหน้า
+  const liveObjectUrls = useRef<string[]>([])
+  liveObjectUrls.current = [
+    ...workImages.filter((u): u is string => !!u),
+    ...previewFiles.map(f => f.url),
+  ].filter(u => u.startsWith('blob:'))
+  useEffect(() => () => { liveObjectUrls.current.forEach(URL.revokeObjectURL) }, [])
+
+  function releaseLocalFiles() {
+    liveObjectUrls.current.forEach(URL.revokeObjectURL)
+    setWorkImages([])
+    setPreviewFiles([])
+  }
+
+  function setWorkImage(index: number, url: string | null) {
+    setWorkImages(prev => {
+      const next = [...prev]
+      while (next.length <= index) next.push(null)
+      next[index] = url
+      return next
+    })
+  }
+
+  // 'teacher' = หน้าตรวจจำลอง แทนที่มุมมองนักเรียนทั้งหน้า
+  const [view, setView] = useState<'student' | 'teacher'>('student')
+
   function generate() {
+    setView('student')
+    setEssayText('')
+    releaseLocalFiles()
     setValues(randomizeVariables(variables))
     setShuffledRight(matchingPairs.length > 0 ? shuffleIndices(matchingPairs.length) : [])
     setWrittenInputs(answerParts.map(() => ''))
@@ -215,13 +258,24 @@ export function QuestionPreviewContent({
     setCompositeChecked(true)
   }
 
+  // ค่าคลาดเคลื่อนที่ยอมรับของข้อย่อยหนึ่ง — ลำดับเดียวกับ gradeAnswer
+  // (ข้อย่อยก่อน แล้วค่อยของทั้งโจทย์ แล้วค่อย 0.1) เพื่อให้คำว่า "ถูก" ใน
+  // ตัวอย่างหมายถึงสิ่งเดียวกับตอนตรวจจริง
+  function toleranceFor(part: AnswerPart): number {
+    return part.tolerance ?? answerTolerance ?? 0.1
+  }
+
   function checkWritten() {
     const results = answerParts.map((part, i) => {
       const correctAnswer = part.formula ? evaluateFormula(part.formula, values) : null
+      // สูตรของครูเองคำนวณไม่ได้ — ตัดสินคำตอบนักเรียนไม่ได้จริง ๆ ปล่อยเป็น null
       if (correctAnswer === null || typeof correctAnswer !== 'number') return null
+      // นักเรียนพิมพ์สิ่งที่ไม่ใช่ตัวเลข (เช่น ตัวอักษร) — ของจริง gradeAnswer
+      // แปลงเป็น NaN แล้วตัดสินว่าผิด ตัวอย่างจึงต้องตอบว่าผิดพร้อมเฉลย ไม่ใช่
+      // เงียบไปเฉย ๆ
       const studentInput = evaluateStudentAnswer(writtenInputs[i])
-      if (studentInput === null) return null
-      return isClose(studentInput, correctAnswer)
+      if (studentInput === null) return false
+      return gradeValue(studentInput, correctAnswer, toleranceFor(part))
     })
     setWrittenResults(results)
     setWrittenChecked(true)
@@ -246,6 +300,268 @@ export function QuestionPreviewContent({
     const correctLabel = shuffledRight.length > 0 ? RIGHT_LABELS[shuffledRight.indexOf(i)] : RIGHT_LABELS[i]
     return s === correctLabel
   }).length
+
+  // ── หน้าตรวจของครู (จำลอง) ───────────────────────────────────────────────
+  // โจทย์ที่ครูกลับมายุ่งด้วยได้หลังนักเรียนส่ง แบ่งเป็นสองแบบ: แบบที่ระบบตรวจ
+  // ไม่ได้เลยจึงค้างเป็น "รอครูตรวจ" (อัตนัย, ช่องพิมพ์เอง, เหตุผลของถูก-ผิด)
+  // กับแบบที่ระบบให้คะแนนไปแล้วแต่ครูยังต้องเปิดดูของที่แนบมาแล้วปรับคะแนนเอง
+  // (เติมคำตอบตัวเลขที่มีรูปวิธีทำ, ส่งไฟล์งาน) — ทั้งสองแบบมีปุ่มนี้
+  const fillBlanks = fillBlankConfig?.blanks ?? []
+  const fillTypes = fillBlanks.map(b => getBlankType(fillBlankConfig, b))
+  const tfItems = trueFalseConfig
+    ? [{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...(trueFalseConfig.statements ?? [])]
+    : []
+  const compositeManual = (part: CompositePart) =>
+    part.type === 'fill_blank' && getBlankType(undefined, part.blanks?.[0]) === 'text'
+  const hasTeacherGrading =
+    questionType === 'written' ||
+    questionType === 'essay' ||
+    questionType === 'file_upload' ||
+    (questionType === 'fill_blank' && fillTypes.some(t => t === 'text')) ||
+    (questionType === 'true_false' && !!trueFalseConfig && trueFalseConfig.explanation_mode !== 'none') ||
+    (questionType === 'composite' && compositeParts.some(compositeManual))
+
+  const filled = (v: string | null | undefined) => {
+    const t = (v ?? '').trim()
+    return t !== '' && t !== '{}' && t !== '[]'
+  }
+
+  // ครูต้องลองตอบก่อน ไม่งั้นหน้าตรวจจะว่างเปล่าและไม่ได้สอนอะไรเลย
+  function hasTriedAnswering(): boolean {
+    if (questionType === 'written') return allWrittenFilled
+    if (questionType === 'essay') return filled(essayText)
+    if (questionType === 'file_upload') return previewFiles.length > 0
+    if (questionType === 'fill_blank') return fillBlanks.length > 0 && fillBlanks.every((_, i) => filled(fillAnswers[i]))
+    if (questionType === 'true_false') {
+      return tfItems.every((_, i) => tfAnswers[i] !== null) && filled(tfExplanation)
+    }
+    if (questionType === 'composite') {
+      // ข้อย่อยที่ครูยังไม่ได้ใส่ตัวเลือก/รายการอะไรเลยก็ยังไม่มีอะไรให้ตอบ
+      // ถ้านับรวมด้วย ปุ่มนี้จะเตือนให้ตอบก่อนไปตลอดโดยที่ไม่มีอะไรให้ตอบ
+      const answerable = compositeParts.filter(compositeAnswerable)
+      if (answerable.length === 0) return true
+      return answerable.every(part => filled(compositeAnswers[compositeParts.indexOf(part)]))
+    }
+    return false
+  }
+
+  /** ข้อย่อยนี้มีตัวรับคำตอบให้กดจริงหรือไม่ — เงื่อนไขเดียวกับที่ใช้เรนเดอร์ด้านล่าง */
+  function compositeAnswerable(part: CompositePart): boolean {
+    // ไม่มี [คำตอบ] ในข้อความก็ยังตอบได้ ช่องกรอกจะไปอยู่บรรทัดถัดไปแทน
+    if (part.type === 'fill_blank') return !!part.blanks?.[0]
+    if (part.type === 'mcq') return (part.options ?? []).length > 0
+    if (part.type === 'ordering') return (part.items ?? []).length > 0
+    return true
+  }
+
+  function compositeDisplay(part: CompositePart, raw: string): { student: string; correct: string | null } {
+    if (part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0) {
+      let ticks: string[] = []
+      try { ticks = JSON.parse(raw || '[]') } catch { ticks = [] }
+      const flip = part.select_target === 'wrong'
+      const picked = part.choices.filter((_, ci) => ticks[ci] === 'true').length
+      const target = part.choices.filter(c => (flip ? !c.correct_answer : c.correct_answer)).length
+      return { student: `เลือก ${picked} ข้อ`, correct: `ต้องเลือก ${target} ข้อที่กำหนด` }
+    }
+    if (part.type === 'true_false') {
+      return {
+        student: raw === 'true' ? 'ถูก' : raw === 'false' ? 'ผิด' : '',
+        correct: (part.correct_answer ?? true) ? 'ถูก' : 'ผิด',
+      }
+    }
+    if (part.type === 'fill_blank') {
+      const blank = part.blanks?.[0]
+      return { student: raw, correct: compositeManual(part) ? null : acceptedAnswers(blank).join(' หรือ ') }
+    }
+    if (part.type === 'mcq') {
+      return { student: raw, correct: part.options?.find(o => o.is_correct)?.text ?? null }
+    }
+    if (part.type === 'ordering') {
+      const items = part.items ?? []
+      let sel: Record<string, string> = {}
+      try { sel = JSON.parse(raw || '{}') } catch { sel = {} }
+      const answered = items.filter(it => sel[it.id]).length
+      return {
+        student: answered > 0 ? `เลือกลำดับแล้ว ${answered}/${items.length} รายการ` : '',
+        correct: 'เรียงตามลำดับที่ครูกำหนดไว้',
+      }
+    }
+    return { student: raw, correct: null }
+  }
+
+  function buildGrading(): { rows: GradingRow[]; autoScore: number; maxScore: number; manualNote: string } | null {
+    if (questionType === 'written') {
+      const rows: GradingRow[] = answerParts.map((part, i) => {
+        const correct = part.formula ? evaluateFormula(part.formula, values) : null
+        const hasKey = typeof correct === 'number'
+        const studentVal = evaluateStudentAnswer(writtenInputs[i] ?? '')
+        return {
+          label: answerParts.length > 1 ? `${labels[i] ?? i + 1})` : undefined,
+          studentAnswer: writtenInputs[i] ?? '',
+          correctAnswer: hasKey ? formatAnswer(correct as number) : null,
+          unit: part.unit || undefined,
+          status: !hasKey
+            ? 'pending'
+            : studentVal !== null && gradeValue(studentVal, correct as number, toleranceFor(part))
+              ? 'correct'
+              : 'wrong',
+          workImageSlot: true,
+          workImage: workImages[i] ?? null,
+        }
+      })
+      return {
+        rows,
+        autoScore: rows.filter(r => r.status === 'correct').length,
+        maxScore: naturalMaxScore('written', undefined, answerParts),
+        manualNote:
+          'ตัวเลขระบบตรวจให้เองครบแล้ว ครูไม่ต้องตรวจซ้ำ และข้อนี้ไม่ค้างเป็น “รอครูตรวจ” · ' +
+          'สิ่งที่ครูมาทำที่หน้านี้คือเปิดดูรูปวิธีทำที่นักเรียนแนบมา (เมื่อเปิดสวิตช์ไว้ตอนสร้างงาน) ' +
+          'แล้วกดที่คะแนนเพื่อพิมพ์คะแนนใหม่ · ใส่ทศนิยมได้ เช่น ตอบเลขถูกแต่แสดงวิธีทำผิด ' +
+          'หักเหลือ 0.5 จาก 1 ได้ หรือวิธีทำถูกหมดแต่คิดเลขพลาดตอนท้าย จะให้ 0.6 ก็ได้ ' +
+          'ระบบไม่ได้ล็อกคะแนนไว้ที่ถูกเต็มหรือผิดศูนย์',
+      }
+    }
+
+    if (questionType === 'essay') {
+      return {
+        rows: [{ studentAnswer: essayText, correctAnswer: null, status: 'pending' }],
+        autoScore: 0,
+        maxScore: naturalMaxScore('essay', undefined, answerParts),
+        manualNote:
+          'อัตนัยไม่มีการตรวจอัตโนมัติเลย ระบบเก็บคำตอบไว้เฉย ๆ คะแนนเป็น 0 และค้างสถานะ “รอครูตรวจ” ' +
+          'จนกว่าครูจะกดที่คะแนนแล้วพิมพ์เอง · เกณฑ์การให้คะแนนที่ตั้งไว้ตอนสร้างโจทย์เป็นแนวทางของครู ' +
+          'ระบบยังไม่ยกมาแสดงในหน้าตรวจ',
+      }
+    }
+
+    if (questionType === 'file_upload') {
+      return {
+        rows: [{
+          studentAnswer: previewFiles.length > 0
+            ? `แนบไฟล์แล้ว ${previewFiles.length} ไฟล์ — ${previewFiles.map(f => f.name).join(', ')}`
+            : 'ไม่ได้แนบไฟล์',
+          correctAnswer: null,
+          status: previewFiles.length > 0 ? 'correct' : 'wrong',
+          files: previewFiles,
+        }],
+        autoScore: previewFiles.length > 0 ? 1 : 0,
+        maxScore: naturalMaxScore('file_upload', undefined, null),
+        manualNote:
+          'ระบบให้คะแนนเต็มอัตโนมัติทันทีที่มีไฟล์แนบมาอย่างน้อย 1 ไฟล์ และไม่ได้ดูเนื้อหาไฟล์เลย ' +
+          'ไม่แนบเลยได้ 0 · หน้าจริงแสดงรูปย่อและลิงก์ของไฟล์ทุกไฟล์ให้กดเปิดดู ครูจึงต้องเข้ามาเปิดดู ' +
+          'แล้วกดที่คะแนนเพื่อให้คะแนนตามงานที่ส่งจริง',
+      }
+    }
+
+    if (questionType === 'fill_blank') {
+      const numbers = extractBlankNumbers(questionText)
+      const rows: GradingRow[] = fillBlanks.map((blank, i) => {
+        const type = fillTypes[i]
+        const student = fillAnswers[i] ?? ''
+        if (type === 'text') {
+          return { label: `ช่อง ${numbers[i] ?? i + 1}`, studentAnswer: student, correctAnswer: null, status: 'pending' }
+        }
+        return {
+          label: `ช่อง ${numbers[i] ?? i + 1}`,
+          studentAnswer: student,
+          correctAnswer: acceptedAnswers(blank).join(' หรือ '),
+          status: isBlankCorrect(student, acceptedAnswers(blank), type, blank.case_sensitive) ? 'correct' : 'wrong',
+        }
+      })
+      return {
+        rows,
+        autoScore: rows.filter(r => r.status === 'correct').length,
+        maxScore: naturalMaxScore('fill_blank', fillBlankConfig, null),
+        manualNote:
+          'ช่องชนิด “พิมพ์เอง” ตรวจอัตโนมัติไม่ได้ ระบบจึงไม่ให้คะแนนช่องนั้น และค้างสถานะทั้งข้อเป็น ' +
+          '“รอครูตรวจ” จนกว่าครูจะให้คะแนน · ช่องที่เป็นคำตอบตายตัวหรือดรอปดาวน์ ระบบตรวจให้แล้ว ' +
+          'และบวกคะแนนไว้ให้ ครูกดที่คะแนนเพื่อรวมคะแนนของช่องพิมพ์เองเข้าไป',
+      }
+    }
+
+    if (questionType === 'true_false' && trueFalseConfig) {
+      const tfLabels = partLabels(trueFalseConfig.part_label_style)
+      const selectMode = trueFalseConfig.answer_mode === 'select_matching'
+      const flip = trueFalseConfig.select_target === 'wrong'
+      const scoreAnswer = trueFalseConfig.score_answer ?? 1
+      let correctCount = 0
+      const rows: GradingRow[] = tfItems.map((item, i) => {
+        const picked = tfAnswers[i]
+        const target = selectMode ? (flip ? !item.correct_answer : item.correct_answer) : item.correct_answer
+        const ok = selectMode ? (picked === 'true') === target : picked === String(item.correct_answer)
+        if (ok) correctCount++
+        return {
+          label: `${tfLabels[i] ?? i + 1})`,
+          studentAnswer: selectMode
+            ? (picked === 'true' ? 'เลือก' : 'ไม่เลือก')
+            : (picked === 'true' ? 'ถูก' : picked === 'false' ? 'ผิด' : ''),
+          correctAnswer: selectMode ? (target ? 'เลือก' : 'ไม่เลือก') : (item.correct_answer ? 'ถูก' : 'ผิด'),
+          status: ok ? 'correct' : 'wrong',
+        }
+      })
+      rows.push({ label: 'เหตุผล', studentAnswer: tfExplanation, correctAnswer: null, status: 'pending' })
+      return {
+        rows,
+        autoScore: correctCount * scoreAnswer,
+        maxScore: naturalMaxScore('true_false', trueFalseConfig, null),
+        manualNote:
+          `ส่วนถูก/ผิดระบบตรวจให้เองข้อละ ${scoreAnswer} คะแนน แต่ “เหตุผล” ที่นักเรียนเขียน ` +
+          `(${trueFalseConfig.score_explanation ?? 1} คะแนน) ไม่มีเฉลยให้เทียบ ระบบจึงเว้นไว้และค้างทั้งข้อเป็น ` +
+          '“รอครูตรวจ” จนกว่าครูจะอ่านเหตุผลแล้วกดที่คะแนนเพื่อรวมคะแนนส่วนนั้นเข้าไป',
+      }
+    }
+
+    if (questionType === 'composite') {
+      let earned = 0
+      const rows: GradingRow[] = compositeParts.map((part, i) => {
+        const raw = compositeAnswers[i] ?? ''
+        const { student, correct } = compositeDisplay(part, raw)
+        const manual = compositeManual(part)
+        const ok = manual ? null : checkCompositePart(part, i)
+        if (ok === true) earned += typeof part.score === 'number' && part.score > 0 ? part.score : 1
+        return {
+          label: `ข้อ ${labels[i] ?? i + 1}`,
+          studentAnswer: student,
+          correctAnswer: correct,
+          status: manual || ok === null ? 'pending' : ok ? 'correct' : 'wrong',
+        }
+      })
+      return {
+        rows,
+        autoScore: earned,
+        maxScore: naturalMaxScore('composite', compositeConfig, null),
+        manualNote:
+          'ข้อย่อยที่ตั้งเป็นช่องให้ครูตรวจเอง ระบบเว้นคะแนนไว้ และค้างสถานะทั้งข้อเป็น “รอครูตรวจ” ' +
+          'จนกว่าครูจะให้คะแนน · ข้อย่อยที่เหลือระบบตรวจให้แล้วและบวกคะแนนไว้ให้ ' +
+          'ครูกดที่คะแนนเพื่อรวมคะแนนของข้อย่อยที่ตรวจเองเข้าไป',
+      }
+    }
+
+    return null
+  }
+
+  const grading = hasTeacherGrading && view === 'teacher' ? buildGrading() : null
+
+  function openTeacherView() {
+    if (!hasTriedAnswering()) {
+      toast.error('ลองตอบคำถามให้ครบก่อน แล้วค่อยกดดูหน้าที่ครูตรวจ')
+      return
+    }
+    setView('teacher')
+  }
+
+  if (grading) {
+    return (
+      <TeacherGradingPreview
+        questionText={renderedText}
+        rows={grading.rows}
+        autoScore={grading.autoScore}
+        maxScore={grading.maxScore}
+        manualNote={grading.manualNote}
+        onBack={() => setView('student')}
+      />
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -516,6 +832,9 @@ export function QuestionPreviewContent({
               }`}
             />
           )
+          // ตอบเป็นตัวอักษร/สูตรที่อ่านไม่ออก — ยังต้องขึ้นเฉลย เพราะของจริง
+          // ก็ตัดสินว่าผิด ไม่ได้ข้ามข้อนี้ไป
+          const notANumber = writtenChecked && evaluateStudentAnswer(writtenInputs[i] ?? '') === null
           const feedback = (
             <>
               {result === true && (
@@ -523,11 +842,15 @@ export function QuestionPreviewContent({
               )}
               {result === false && correctAnswer !== null && typeof correctAnswer === 'number' && (
                 <span className="text-destructive text-sm">
-                  ✗ เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
+                  ✗ {notANumber && 'คำตอบไม่ใช่ตัวเลข · '}
+                  เฉลย: <span className="font-mono font-bold">{formatAnswer(correctAnswer)}</span>
                 </span>
               )}
               {result === false && (correctAnswer === null || typeof correctAnswer !== 'number') && (
                 <span className="text-destructive text-sm">✗ ผิด</span>
+              )}
+              {result === null && writtenChecked && (
+                <span className="text-warning text-sm">⚠ ตรวจไม่ได้ — สูตรของข้อนี้คำนวณไม่ได้</span>
               )}
             </>
           )
@@ -559,6 +882,9 @@ export function QuestionPreviewContent({
                   </span>
                 )
               })}
+              <div className="mt-2">
+                <WorkImageUpload value={workImages[0] ?? null} onChange={url => setWorkImage(0, url)} localOnly />
+              </div>
             </div>
           )}
 
@@ -601,9 +927,31 @@ export function QuestionPreviewContent({
                     </div>
                   </>
                 )}
+                <WorkImageUpload value={workImages[i] ?? null} onChange={url => setWorkImage(i, url)} localOnly />
               </div>
             )
           })}
+
+          {/* อธิบายช่องแนบรูปวิธีทำ — สวิตช์ไม่ได้อยู่ในหน้าสร้างโจทย์ ครูจึงหาไม่เจอถ้าไม่บอก */}
+          <div className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2 leading-relaxed space-y-1">
+            <p className="font-medium text-foreground">ช่องแนบรูปวิธีทำคืออะไร</p>
+            <p>
+              เป็นช่องให้นักเรียน<span className="font-medium text-foreground">ถ่ายรูปกระดาษทดที่แสดงวิธีทำ</span>แนบมาพร้อมคำตอบ
+              (เปิดกล้องหลังของมือถือโดยตรง ย่อรูปให้เองก่อนส่ง — เป็นรูปภาพ ไม่ใช่ไฟล์ PDF)
+              ระบบไม่ตรวจรูป ครูเป็นคนเปิดดูเองตอนตรวจ จึงใช้ดูว่านักเรียนคิดมาอย่างไร ไม่ใช่แค่ตอบเลขถูก
+            </p>
+            <p>
+              สวิตช์อยู่ที่ <span className="font-medium text-foreground">ขั้นตั้งค่าของหน้าสร้างงาน</span> ชื่อ “ให้นักเรียนแนบรูปแสดงวิธีทำ”
+              ไม่ได้อยู่ในหน้าสร้างโจทย์ — เปิดครั้งเดียวมีผลกับข้อเติมคำตอบตัวเลขทุกข้อในงานนั้น
+              ค่าเริ่มต้นคือปิด และเมื่อเปิด นักเรียนต้องแนบให้ครบทุกข้อย่อยก่อนจึงจะกดส่งได้
+            </p>
+            <p>
+              ในหน้าตัวอย่างนี้แนบไฟล์จริงจากเครื่องได้ เพื่อดูว่าหน้าตาเป็นอย่างไรและรูปจะไปโผล่ตรงไหนตอนครูตรวจ
+              — แต่<span className="font-medium text-foreground">ไฟล์ไม่ถูกอัปโหลด</span> อยู่ในเบราว์เซอร์ของคุณเท่านั้น
+              และหายไปเองเมื่อปิดตัวอย่าง จึงไม่มีไฟล์ค้างในระบบให้ต้องตามลบ
+            </p>
+          </div>
+
           {!writtenChecked ? (
             <button
               type="button"
@@ -627,6 +975,8 @@ export function QuestionPreviewContent({
                   ? `✅ ถูก ${writtenResults.filter(r => r === true).length}/${answerParts.length} ข้อ`
                   : '❌ ผิด'
               }
+              {writtenResults.some(r => r === null) &&
+                ` · ตรวจไม่ได้ ${writtenResults.filter(r => r === null).length} ข้อ (สูตรคำนวณไม่ได้)`}
             </div>
           )}
         </div>
@@ -639,6 +989,8 @@ export function QuestionPreviewContent({
           <p className="text-xs text-muted-foreground font-medium">กรอกคำตอบ (บรรยาย):</p>
           <Textarea
             rows={5}
+            value={essayText}
+            onChange={(e) => setEssayText(e.target.value)}
             placeholder="พิมพ์คำตอบที่นี่..." className="w-full resize-none"
           />
           <p className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
@@ -650,10 +1002,10 @@ export function QuestionPreviewContent({
       {/* ── File upload ── */}
       {questionType === 'file_upload' && (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground font-medium">แนบไฟล์คำตอบ (จำลอง):</p>
-          <div className="border-2 border-dashed border-border rounded-lg p-6 text-center text-sm text-muted-foreground">
-            📎 นักเรียนจะแนบไฟล์รูปภาพหรือ PDF ที่นี่
-          </div>
+          <p className="text-xs text-muted-foreground font-medium">แนบไฟล์คำตอบ:</p>
+          {/* ตัวอัปโหลดตัวเดียวกับที่นักเรียนใช้ แต่ localOnly — เลือกไฟล์จริงได้
+              เห็นไฟล์จริง ไม่มีอะไรขึ้น storage ให้ต้องตามลบ */}
+          <FileSubmissionUpload value={previewFiles} onChange={setPreviewFiles} localOnly />
           <p className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
             * ระบบให้คะแนนเต็มอัตโนมัติเมื่อมีการแนบไฟล์อย่างน้อย 1 ไฟล์ — ไม่มีการตรวจเนื้อหาไฟล์
           </p>
@@ -1099,20 +1451,37 @@ export function QuestionPreviewContent({
                     const blank = part.blanks![0]
                     const split = splitAnswerBlankHtml(part.text)
                     const type = getBlankType(undefined, blank)
-                    if (!split) return <RichText text={part.text} className="text-[15px] text-foreground" />
+                    // Same fallback as the real exam page (exam-client.tsx):
+                    // no [คำตอบ] marker in the text still gets an input, on
+                    // its own line, so the preview shows what a student would
+                    // actually be able to answer.
+                    const control = type === 'dropdown' ? (
+                      <NativeSelect value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
+                        onChange={e => setAnswer(e.target.value)}
+                        className={split
+                          ? 'inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center'
+                          : 'border-b-2 border-primary bg-primary/10'}>
+                        <option value="">เลือกคำตอบ</option>
+                        {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
+                      </NativeSelect>
+                    ) : (
+                      <Input type="text" value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
+                        onChange={e => setAnswer(e.target.value)}
+                        placeholder={split ? undefined : 'พิมพ์คำตอบ'}
+                        className={split
+                          ? 'inline-block mx-1 w-28 border-b-2 border-primary bg-primary/10 text-center'
+                          : 'w-full max-w-xs border-b-2 border-primary bg-primary/10'} />
+                    )
+                    if (!split) return (
+                      <>
+                        <RichText text={part.text} className="text-[15px] text-foreground" />
+                        <div className="mt-2">{control}</div>
+                      </>
+                    )
                     return (
                       <p className="leading-loose text-[15px] text-foreground">
                         <RichText text={split[0]} />
-                        {type === 'dropdown' ? (
-                          <NativeSelect value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
-                            onChange={e => setAnswer(e.target.value)} className="inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center">
-                            <option value="">เลือกคำตอบ</option>
-                            {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
-                          </NativeSelect>
-                        ) : (
-                          <Input type="text" value={compositeAnswers[i] ?? ''} disabled={compositeChecked}
-                            onChange={e => setAnswer(e.target.value)} className="inline-block mx-1 w-28 border-b-2 border-primary bg-primary/10 text-center" />
-                        )}
+                        {control}
                         <RichText text={split[1]} />
                       </p>
                     )
@@ -1186,6 +1555,18 @@ export function QuestionPreviewContent({
           </div>
         )
       })()}
+
+      {/* ทางเข้าหน้าตรวจจำลอง — ขึ้นเฉพาะโจทย์ที่ครูกลับมาให้คะแนนเองได้ */}
+      {hasTeacherGrading && (
+        <div className="pt-3 border-t border-border space-y-1.5">
+          <Button type="button" variant="outline" size="sm" onClick={openTeacherView}>
+            🧑‍🏫 ดูหน้าที่ครูตรวจ
+          </Button>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            ข้อแบบนี้ครูเข้าไปให้คะแนนเองได้หลังนักเรียนส่ง — ลองตอบด้านบนให้ครบก่อน แล้วกดดูว่าตอนตรวจครูจะเห็นอะไร
+          </p>
+        </div>
+      )}
     </div>
   )
 }

@@ -21,18 +21,38 @@ interface WorkImageUploadProps {
   value: string | null
   onChange: (url: string | null) => void
   required?: boolean
+  /**
+   * ครูกำลังลองทำโจทย์ของตัวเอง ไม่ใช่นักเรียนกำลังส่งงาน — เลือกไฟล์ได้จริงและ
+   * เห็นรูปจริง แต่ไม่แตะ storage เลย ไฟล์ถูกถือไว้เป็น object URL ของแท็บนั้น
+   *
+   * เหตุผลคือหน้าตัวอย่างไม่มี submission ให้ผูกรูปด้วย รูปที่อัปขึ้นไปจะกลาย
+   * เป็นไฟล์กำพร้าตั้งแต่วินาทีแรก และการ "อัปแล้วค่อยตามลบ" ไม่เคยครบ —
+   * ปิดแท็บ เน็ตหลุด หรือเบราว์เซอร์ถูกฆ่าระหว่างนั้น ไฟล์ก็ค้างอยู่ดี
+   */
+  localOnly?: boolean
+}
+
+function isLocalUrl(url: string) {
+  return url.startsWith('blob:')
 }
 
 // Single image per slot (one per answer part) — reuploading replaces the
 // existing image rather than appending, unlike the teacher-side
 // QuestionImageUpload which keeps an array.
-export function WorkImageUpload({ value, onChange, required }: WorkImageUploadProps) {
+export function WorkImageUpload({ value, onChange, required, localOnly }: WorkImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const original = e.target.files?.[0]
     if (!original) return
+
+    if (localOnly) {
+      if (value && isLocalUrl(value)) URL.revokeObjectURL(value)
+      onChange(URL.createObjectURL(original))
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
 
     setUploading(true)
     const supabase = await browserSupabase()
@@ -76,7 +96,10 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
   }
 
   async function handleRemove() {
-    if (value) await removeStoredImage(value)
+    if (value) {
+      if (isLocalUrl(value)) URL.revokeObjectURL(value)
+      else await removeStoredImage(value)
+    }
     onChange(null)
   }
 
@@ -122,8 +145,11 @@ export function WorkImageUpload({ value, onChange, required }: WorkImageUploadPr
           {uploading ? 'กำลังอัปโหลด...' : 'แนบรูปวิธีทำ'}
         </button>
       )}
-      {required && !value && (
+      {required && !value && !localOnly && (
         <p className="text-[10px] text-warning">ต้องแนบรูปวิธีทำก่อนส่งคำตอบ</p>
+      )}
+      {localOnly && (
+        <p className="text-[10px] text-muted-foreground">ตัวอย่าง — ไฟล์อยู่ในเครื่องคุณ ไม่ถูกอัปโหลด</p>
       )}
     </div>
   )
