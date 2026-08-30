@@ -50,11 +50,17 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         </div>
       </Card>
 
-      {/* Stream */}
-      <div>
-        <h2 className="font-semibold mb-3">ประกาศ</h2>
-        <ClassroomStream classroomId={classroom.id} canPost={false} initialPosts={posts} />
-      </div>
+      {/* Stream — bounded like the teacher's board, so a term of announcements
+          never pushes the งาน a student came here to do off the screen. */}
+      <ClassroomStream
+        classroomId={classroom.id}
+        canPost={false}
+        initialPosts={posts}
+        variant="panel"
+        maxHeightClass="max-h-[360px]"
+        title="ประกาศจากครู"
+        trackSeen
+      />
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3">
