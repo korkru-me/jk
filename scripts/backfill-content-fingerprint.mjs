@@ -23,16 +23,11 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
-import { questionFingerprint } from '../lib/question-content-match.ts'
+import { CONTENT_COLUMNS, questionFingerprint } from '../lib/question-content-match.ts'
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '')
 const DRY_RUN = process.argv.includes('--dry-run')
 const ALL = process.argv.includes('--all')
-
-/** Same select list as CONTENT_COLUMNS in lib/question-content-match.ts. */
-const CONTENT_COLUMNS =
-  'id, question_text, question_type, image_urls, mcq_options, answer_formula, ' +
-  'answer_unit, answer_tolerance, answer_parts, variables, logic_rules, is_random, extra_data'
 
 const PAGE_SIZE = 500
 /** Concurrent UPDATEs. PostgREST cannot set a different value per row in one

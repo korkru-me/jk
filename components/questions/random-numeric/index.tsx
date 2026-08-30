@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 import { countAnswerBlanks, extractAnswerBlankNumbers, nextAnswerBlankNumber, numberedAnswerBlank } from '@/lib/answer-blank'
 import { PART_LABEL_SETS } from '@/lib/part-labels'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
@@ -33,6 +34,9 @@ import { questionsReturnTo } from '@/lib/question-return'
 // ─── Main Form ────────────────────────────────────────────────────────────────
 
 interface RandomNumericFormProps {
+  /** Present when the form is filling in a โจทย์ that is not being saved yet —
+   *  see lib/question-draft-handoff.ts. */
+  draft?: QuestionDraftHandoff
   allTags: string[]
   presets: PresetWithCat[]
   mode?: 'create' | 'edit'
@@ -40,7 +44,7 @@ interface RandomNumericFormProps {
   isOwner?: boolean
 }
 
-export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'create', question, isOwner = true }: RandomNumericFormProps) {
+export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'create', question, isOwner = true, draft }: RandomNumericFormProps) {
   const router = useRouter()
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
@@ -70,7 +74,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
   // back out — a picker here could only ever add.
   const [setIds, setSetIds] = useState<string[]>([])
-  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
+  const setPicker = mode === 'create' && !draft ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
@@ -92,6 +96,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
 
   useEffect(() => {
     if (mode !== 'create' || question) return
+    if (draft) return
     const seed = readDuplicateSeed('written')
     if (!seed) return
     setTitle(seed.title)
@@ -155,7 +160,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
-    if (!subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
+    if (!draft && !subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
     if (!questionText.replace(/<[^>]*>/g, '').trim()) { toast.error('กรอกเนื้อหาโจทย์ด้วย'); return }
 
     if (creationMode === 'from-equation') {
@@ -208,6 +213,12 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
+    // Draft mode: the payload goes back to the caller, which is collecting
+    // several โจทย์ before any of them is written. Nothing is saved here, so
+    // there is no pending state and no redirect either.
+    if (draft) { draft.onSubmit(payload); return }
+
+    setSaving(true)
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
@@ -292,6 +303,8 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
         sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
+        showSharing={!draft}
+        showSubject={!draft}
         tags={tags} onTagsChange={setTags}
         {...setPicker}
       />
@@ -460,19 +473,27 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
       />
 
       <div className="flex items-center gap-3 pt-2 border-t">
+        {/* ค่าคลาดเคลื่อนถูกยัดลงทุกข้อย่อยตอนบันทึก (ดู handleSubmit) ตัวอย่างจึงต้อง
+            เห็นค่าเดียวกัน ไม่งั้นคำว่า "ถูก" ในตัวอย่างกับตอนตรวจจริงคนละความหมาย */}
         <QuestionPreview
           questionText={questionText}
           variables={variables}
-          answerParts={answerParts}
+          answerParts={answerParts.map(p => ({ ...p, tolerance: globalTolerance }))}
+          answerTolerance={globalTolerance}
           isRandom={creationMode !== 'fixed'}
           questionType="written"
           imageUrls={imageUrls}
           partLabelStyle={labelStyle}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
+          {draft ? draft.submitLabel : saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => draft ? draft.onCancel() : router.push(mode === 'edit' ? returnTo : '/questions/new')}
+          disabled={saving}
+        >
           ยกเลิก
         </Button>
       </div>

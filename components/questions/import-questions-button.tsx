@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { checkImportDuplicates, importQuestionsFromFile, type DuplicateHit } from '@/lib/actions/question-export'
-import { EXPORT_FORMAT, EXPORT_VERSION, parseExportFile, type QuestionExportFile } from '@/lib/question-portable'
+import { exportFileBatches, IMPORT_BATCH_SIZE, parseExportFile, type QuestionExportFile } from '@/lib/question-portable'
 import { ImportDuplicateDialog } from './import-duplicate-dialog'
 
 interface Props {
@@ -14,35 +14,14 @@ interface Props {
   variant?: React.ComponentProps<typeof Button>['variant']
   size?: React.ComponentProps<typeof Button>['size']
   onImported: (result: { imported: number; setId?: string }) => void
+  /** Draws the control instead of the default button — for the import chooser,
+   *  where this sits as a card beside the Word one. The file input, the
+   *  duplicate dialog and the batching are the same either way, so the two
+   *  entry points cannot drift apart. */
+  children?: (control: { open: () => void; isPending: boolean }) => React.ReactNode
 }
 
-// A whole question bank is a couple of megabytes, and a Server Action body is
-// capped at 1 MB — so the file goes over in batches rather than in one piece.
-// Batches also keep each request short: the server inserts one batch per round
-// trip, so the work is visible as it goes instead of hanging on one long call.
-const BATCH_SIZE = 50
-
-/** One batch as a self-contained export file the server can parse and validate. */
-function batchFile(
-  file: QuestionExportFile,
-  start: number,
-  isLast: boolean,
-): string {
-  const questions = file.questions.slice(start, start + BATCH_SIZE)
-  // The set descriptor rides on the final batch only, so the set is created
-  // once, after every question it lists exists.
-  const carriesSet = isLast && file.kind === 'question_set' && !!file.set
-  return JSON.stringify({
-    format: EXPORT_FORMAT,
-    version: EXPORT_VERSION,
-    exported_at: file.exported_at,
-    kind: carriesSet ? 'question_set' : 'questions',
-    ...(carriesSet ? { set: file.set } : {}),
-    questions,
-  })
-}
-
-export function ImportQuestionsButton({ label = 'นำเข้าไฟล์', className, variant = 'outline', size, onImported }: Props) {
+export function ImportQuestionsButton({ label = 'นำเข้าไฟล์', className, variant = 'outline', size, onImported, children }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [isPending, startTransition] = useTransition()
   const [pendingFile, setPendingFile] = useState<QuestionExportFile | null>(null)
@@ -57,19 +36,20 @@ export function ImportQuestionsButton({ label = 'นำเข้าไฟล์'
       let setId: string | undefined
       const ids: string[] = []
 
-      for (let start = 0; start < total; start += BATCH_SIZE) {
-        const isLast = start + BATCH_SIZE >= total
+      const batches = exportFileBatches(file)
+      for (let index = 0; index < batches.length; index++) {
+        const start = index * IMPORT_BATCH_SIZE
         // Duplicate indexes are file-wide; the server sees one batch, so they
         // are rebased onto it.
         const localDuplicates = duplicateIndexes
-          .filter(i => i >= start && i < start + BATCH_SIZE)
+          .filter(i => i >= start && i < start + IMPORT_BATCH_SIZE)
           .map(i => i - start)
 
-        if (total > BATCH_SIZE) {
-          toast.loading(`กำลังนำเข้า ${Math.min(start + BATCH_SIZE, total)} / ${total} ข้อ...`, { id: toastId })
+        if (total > IMPORT_BATCH_SIZE) {
+          toast.loading(`กำลังนำเข้า ${Math.min(start + IMPORT_BATCH_SIZE, total)} / ${total} ข้อ...`, { id: toastId })
         }
 
-        const result = await importQuestionsFromFile(batchFile(file, start, isLast), decision, localDuplicates, ids)
+        const result = await importQuestionsFromFile(batches[index], decision, localDuplicates, ids)
 
         if ('error' in result && result.error) {
           toast.dismiss(toastId)
@@ -115,9 +95,11 @@ export function ImportQuestionsButton({ label = 'นำเข้าไฟล์'
 
       startTransition(async () => {
         const found: DuplicateHit[] = []
-        for (let start = 0; start < file.questions.length; start += BATCH_SIZE) {
-          const check = await checkImportDuplicates(batchFile(file, start, false))
+        const batches = exportFileBatches(file)
+        for (let index = 0; index < batches.length; index++) {
+          const check = await checkImportDuplicates(batches[index])
           if ('error' in check) { toast.error(check.error); return }
+          const start = index * IMPORT_BATCH_SIZE
           found.push(...check.duplicates.map(d => ({ ...d, index: d.index + start })))
         }
 
@@ -145,9 +127,13 @@ export function ImportQuestionsButton({ label = 'นำเข้าไฟล์'
   return (
     <>
       <input ref={inputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleFileChange} />
-      <Button variant={variant} size={size} disabled={isPending} onClick={() => inputRef.current?.click()} className={className}>
-        <Upload className="w-3.5 h-3.5" /> {label}
-      </Button>
+      {children
+        ? children({ open: () => inputRef.current?.click(), isPending })
+        : (
+          <Button variant={variant} size={size} disabled={isPending} onClick={() => inputRef.current?.click()} className={className}>
+            <Upload className="w-3.5 h-3.5" /> {label}
+          </Button>
+        )}
       <ImportDuplicateDialog
         duplicates={duplicates}
         isPending={isPending}

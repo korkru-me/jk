@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye,
+  Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye, FileUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +38,7 @@ import type {
 import { questionExcerpt } from '@/lib/question-display'
 import { mergeTagPool } from '@/lib/tag-suggest'
 import { questionEditHref } from '@/lib/question-return'
+import { withBackHref } from '@/lib/back-link'
 import type {
   QuestionSearchGroup,
   QuestionSearchGroupCounts,
@@ -310,8 +311,15 @@ export function QuestionBankClient({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Carries the คลัง view along, so the import's back arrow returns
+                to this search, filter and page rather than a bare list. */}
+            <Link href={withBackHref('/questions/import/word', `${pathname}${searchParams.toString() ? `?${searchParams}` : ''}`)}>
+              <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
+                <FileUp className="w-3.5 h-3.5" /> นำเข้าจาก Word
+              </Button>
+            </Link>
             <ImportQuestionsButton
-              label="นำเข้าไฟล์โจทย์"
+              label="นำเข้าไฟล์ KorKru"
               size="sm"
               className="gap-1.5 hidden sm:flex"
               onImported={() => router.refresh()}

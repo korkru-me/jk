@@ -67,7 +67,7 @@ export function QuestionSetsClient({
         </div>
         <div className="flex items-center gap-2">
           <ImportQuestionsButton
-            label="นำเข้าไฟล์"
+            label="นำเข้าไฟล์ KorKru"
             className="gap-2"
             onImported={() => router.refresh()}
           />

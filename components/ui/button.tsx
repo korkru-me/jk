@@ -1,5 +1,6 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
+import { isValidElement } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -42,15 +43,28 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * Base UI assumes the button ends up as a real `<button>` and warns in development when
+ * it does not. A button that navigates is handed a `<Link>` through `render`, so spot the
+ * `href` that gives it away and let Base UI treat it as a non-native button instead.
+ */
+function rendersAnchor(render: ButtonPrimitive.Props["render"]) {
+  return isValidElement<{ href?: unknown }>(render) && render.props.href != null
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
+  render,
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
       data-slot="button"
+      render={render}
+      nativeButton={nativeButton ?? !rendersAnchor(render)}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

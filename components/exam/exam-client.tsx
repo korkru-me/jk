@@ -497,6 +497,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             <FileUploadAnswerInput
               rawValue={localAnswers[current.id] ?? ''}
               onChange={files => handleFileSubmissionChange(current.id, files)}
+              localOnly={previewMode}
             />
           ) : current.questions.question_type === 'composite' ? (
             <CompositeAnswerInput
@@ -518,6 +519,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               requiresWorkImage={requiredWorkImageCount(current, config) > 0}
               workImages={workImages[current.id] ?? []}
               onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
+              localOnly={previewMode}
             />
           )}
         </Card>
@@ -1127,7 +1129,7 @@ function MCQInput({
 
 function MultiPartAnswerInput({
   answerId, parts, questionText, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
-  requiresWorkImage, workImages, onWorkImageChange,
+  requiresWorkImage, workImages, onWorkImageChange, localOnly,
 }: {
   answerId: string
   parts: SafeAnswerPart[] | AnswerPart[] | null
@@ -1140,6 +1142,8 @@ function MultiPartAnswerInput({
   requiresWorkImage: boolean
   workImages: (string | null)[]
   onWorkImageChange: (partIndex: number, url: string | null) => void
+  /** ครูดูตัวอย่างอยู่ — แนบรูปได้จริงแต่ไม่อัปขึ้น storage (ดู WorkImageUpload) */
+  localOnly?: boolean
 }) {
   const activeParts = parts && parts.length > 0 ? parts : null
 
@@ -1185,6 +1189,7 @@ function MultiPartAnswerInput({
             value={workImages[0] ?? null}
             onChange={url => onWorkImageChange(0, url)}
             required
+            localOnly={localOnly}
           />
         )}
       </div>
@@ -1221,6 +1226,7 @@ function MultiPartAnswerInput({
             value={workImages[0] ?? null}
             onChange={url => onWorkImageChange(0, url)}
             required
+            localOnly={localOnly}
           />
         )}
       </div>
@@ -1247,6 +1253,7 @@ function MultiPartAnswerInput({
               value={workImages[i] ?? null}
               onChange={url => onWorkImageChange(i, url)}
               required
+              localOnly={localOnly}
             />
           )}
         </div>
@@ -1660,18 +1667,37 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
             const blank = part.blanks![0]
             const split = splitAnswerBlankHtml(part.text)
             const type = getBlankType(undefined, blank)
-            if (!split) return <RichText text={part.text} className="text-sm block" />
+            // Inline when the sub-question's text carries the [คำตอบ] marker,
+            // on its own line when it doesn't. The form requires the marker,
+            // but a question imported from a file carries whatever extra_data
+            // it was given, and a part with no input at all is unanswerable
+            // while still counting toward naturalMaxScore — the student loses
+            // the point for a blank the teacher never gave them.
+            const control = type === 'dropdown' ? (
+              <NativeSelect value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
+                className={split
+                  ? 'inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center'
+                  : 'border-b-2 border-primary bg-primary/10'}>
+                <option value="">เลือกคำตอบ</option>
+                {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
+              </NativeSelect>
+            ) : (
+              <Input type="text" value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
+                placeholder={split ? undefined : 'พิมพ์คำตอบ'}
+                className={split
+                  ? 'inline-block mx-1 w-28 border-b-2 border-primary bg-primary/10 text-center'
+                  : 'w-full max-w-xs border-b-2 border-primary bg-primary/10'} />
+            )
+            if (!split) return (
+              <>
+                <RichText text={part.text} className="text-sm block" />
+                <div className="mt-2">{control}</div>
+              </>
+            )
             return (
               <p className="text-sm leading-loose">
                 <RichText text={split[0]} />
-                {type === 'dropdown' ? (
-                  <NativeSelect value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)} className="inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center">
-                    <option value="">เลือกคำตอบ</option>
-                    {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
-                  </NativeSelect>
-                ) : (
-                  <Input type="text" value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)} className="inline-block mx-1 w-28 border-b-2 border-primary bg-primary/10 text-center" />
-                )}
+                {control}
                 <RichText text={split[1]} />
               </p>
             )
@@ -1739,8 +1765,8 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
 
 // ─── File upload ──────────────────────────────────────────────────────────────
 
-function FileUploadAnswerInput({ rawValue, onChange }: {
-  rawValue: string; onChange: (files: SubmittedFile[]) => void
+function FileUploadAnswerInput({ rawValue, onChange, localOnly }: {
+  rawValue: string; onChange: (files: SubmittedFile[]) => void; localOnly?: boolean
 }) {
   let files: SubmittedFile[] = []
   try { files = rawValue ? JSON.parse(rawValue) : [] } catch { files = [] }
@@ -1748,7 +1774,7 @@ function FileUploadAnswerInput({ rawValue, onChange }: {
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">แนบไฟล์คำตอบ (รูปภาพหรือ PDF)</p>
-      <FileSubmissionUpload value={files} onChange={onChange} />
+      <FileSubmissionUpload value={files} onChange={onChange} localOnly={localOnly} />
       {files.length === 0 ? (
         <p className="text-xs text-warning">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
       ) : (
