@@ -9,6 +9,7 @@ import type { Question } from '@/lib/types'
 // One rule for "is this the same wording?", shared with the คลัง's duplicate badge.
 import { normalizeQuestionText } from '@/lib/question-content-match'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
+import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 
 type QuestionRow = Question & { question_categories?: { name: string } | null }
 
@@ -241,12 +242,18 @@ function toQuestionRow(
  *
  * `previousIds` carries the ids from earlier batches so that a question_set
  * file, whose set is created on the final batch, still lists every question.
+ *
+ * `fileIntoSetIds` names แฟ้ม that already exist to add every imported โจทย์ to.
+ * Like the set descriptor it belongs to the final call, because a แฟ้ม should
+ * receive the whole import at once rather than a batch at a time; the caller
+ * passes it only there. Filing is creator-checked inside `fileQuestionsIntoSets`.
  */
 export async function importQuestionsFromFile(
   raw: string,
   duplicateDecision?: 'rename' | 'skip',
   duplicateIndexes: number[] = [],
   previousIds: string[] = [],
+  fileIntoSetIds: string[] = [],
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -325,6 +332,20 @@ export async function importQuestionsFromFile(
     revalidatePath('/questions/sets')
   }
 
+  // Filing runs after the โจทย์ exist and never fails the import: the โจทย์ are
+  // already in the คลัง at this point, so a แฟ้ม that could not be written is
+  // reported alongside a success rather than as one.
+  let filingError: string | undefined
+  if (fileIntoSetIds.length > 0) {
+    const filed = await fileQuestionsIntoSets(supabase, user.id, fileIntoSetIds, allIds)
+    if ('error' in filed) filingError = filed.error
+    else {
+      const failed = filed.outcomes.filter(outcome => outcome.error)
+      if (failed.length > 0) filingError = `เก็บเข้าแฟ้มไม่สำเร็จ: ${failed.map(o => o.title).join(', ')}`
+    }
+    revalidatePath('/questions/sets')
+  }
+
   revalidatePath('/questions')
-  return { imported: newIds.length, ids: newIds, setId }
+  return { imported: newIds.length, ids: newIds, setId, filingError }
 }

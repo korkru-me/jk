@@ -28,6 +28,7 @@ const McqAutoForm = dynamic(() => import('./mcq-auto-form').then(m => m.McqAutoF
   ),
 })
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, MCQOption, FormulaPreset, Question } from '@/lib/types'
 import { questionsReturnTo } from '@/lib/question-return'
@@ -38,6 +39,9 @@ type McqMode = 'manual' | 'auto'
 type PresetWithCat = FormulaPreset & { question_categories: { name: string } | null }
 
 interface McqFormProps {
+  /** Present when the form is filling in a โจทย์ that is not being saved yet —
+   *  see lib/question-draft-handoff.ts. */
+  draft?: QuestionDraftHandoff
   allTags: string[]
   presets?: PresetWithCat[]
   mode?: 'create' | 'edit'
@@ -61,10 +65,10 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
   )
 }
 
-export function McqForm({ allTags, presets = [], mode = 'create', question, isOwner = true }: McqFormProps) {
+export function McqForm({ allTags, presets = [], mode = 'create', question, isOwner = true, draft }: McqFormProps) {
   const [entryMode, setEntryMode] = useState<McqMode>('manual')
 
-  if (mode === 'create' && entryMode === 'auto') {
+  if (mode === 'create' && entryMode === 'auto' && !draft) {
     return (
       <div className="space-y-6">
         <ModeSwitcher mode={entryMode} onChange={setEntryMode} />
@@ -75,8 +79,8 @@ export function McqForm({ allTags, presets = [], mode = 'create', question, isOw
 
   return (
     <div className="space-y-6">
-      {mode === 'create' && <ModeSwitcher mode={entryMode} onChange={setEntryMode} />}
-      <McqManualForm allTags={allTags} mode={mode} question={question} isOwner={isOwner} />
+      {mode === 'create' && !draft && <ModeSwitcher mode={entryMode} onChange={setEntryMode} />}
+      <McqManualForm allTags={allTags} mode={mode} question={question} isOwner={isOwner} draft={draft} />
     </div>
   )
 }
@@ -126,7 +130,7 @@ function ModeSwitcher({ mode, onChange }: { mode: McqMode; onChange: (m: McqMode
   )
 }
 
-function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: { allTags: string[]; mode?: 'create' | 'edit'; question?: Question; isOwner?: boolean }) {
+function McqManualForm({ allTags, mode = 'create', question, isOwner = true, draft }: { allTags: string[]; mode?: 'create' | 'edit'; question?: Question; isOwner?: boolean; draft?: QuestionDraftHandoff }) {
   const router = useRouter()
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
@@ -145,7 +149,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
   // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
   // back out — a picker here could only ever add.
   const [setIds, setSetIds] = useState<string[]>([])
-  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
+  const setPicker = mode === 'create' && !draft ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
@@ -164,6 +168,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
 
   useEffect(() => {
     if (mode !== 'create' || question) return
+    if (draft) return
     const seed = readDuplicateSeed('mcq')
     if (!seed) return
     setTitle(seed.title)
@@ -208,7 +213,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
-    if (!subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
+    if (!draft && !subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
     const plainText = questionText.replace(/<[^>]*>/g, '').trim()
     if (!plainText) { toast.error('กรอกเนื้อหาโจทย์ด้วย'); return }
     if (options.length < 2) { toast.error('ต้องมีตัวเลือกอย่างน้อย 2 ข้อ'); return }
@@ -219,7 +224,6 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
       return
     }
 
-    setSaving(true)
     const payload = {
       title, subject, question_text: questionText, question_type: 'mcq' as const,
       difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
@@ -231,6 +235,12 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
       solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
+    // Draft mode: the payload goes back to the caller, which is collecting
+    // several โจทย์ before any of them is written. Nothing is saved here, so
+    // there is no pending state and no redirect either.
+    if (draft) { draft.onSubmit(payload); return }
+
+    setSaving(true)
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
@@ -253,6 +263,8 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
         sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
+        showSharing={!draft}
+        showSubject={!draft}
         tags={tags} onTagsChange={setTags}
         {...setPicker}
       />
@@ -356,9 +368,14 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true }: {
           imageUrls={imageUrls}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
+          {draft ? draft.submitLabel : saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => draft ? draft.onCancel() : router.push(mode === 'edit' ? returnTo : '/questions/new')}
+          disabled={saving}
+        >
           ยกเลิก
         </Button>
       </div>

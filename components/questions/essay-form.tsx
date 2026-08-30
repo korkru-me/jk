@@ -14,6 +14,7 @@ import { QuestionImageUpload } from './question-image-upload'
 import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, Question } from '@/lib/types'
 import { questionsReturnTo } from '@/lib/question-return'
@@ -25,6 +26,9 @@ interface RubricItem {
 }
 
 interface EssayFormProps {
+  /** Present when the form is filling in a โจทย์ that is not being saved yet —
+   *  see lib/question-draft-handoff.ts. */
+  draft?: QuestionDraftHandoff
   allTags: string[]
   mode?: 'create' | 'edit'
   question?: Question
@@ -37,7 +41,7 @@ function rubricFromQuestion(question?: Question): RubricItem[] | undefined {
   return raw.map(r => ({ id: Math.random().toString(36).slice(2), criterion: r.criterion, points: r.points }))
 }
 
-export function EssayForm({ allTags, mode = 'create', question, isOwner = true }: EssayFormProps) {
+export function EssayForm({ allTags, mode = 'create', question, isOwner = true, draft }: EssayFormProps) {
   const router = useRouter()
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
@@ -56,7 +60,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
   // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
   // back out — a picker here could only ever add.
   const [setIds, setSetIds] = useState<string[]>([])
-  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
+  const setPicker = mode === 'create' && !draft ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
@@ -67,6 +71,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
 
   useEffect(() => {
     if (mode !== 'create' || question) return
+    if (draft) return
     const seed = readDuplicateSeed('essay')
     if (!seed) return
     setTitle(seed.title)
@@ -100,7 +105,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
-    if (!subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
+    if (!draft && !subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
     const plainText = questionText.replace(/<[^>]*>/g, '').trim()
     if (!plainText) { toast.error('กรอกเนื้อหาโจทย์ด้วย'); return }
     if (rubric.some(r => !r.criterion.trim())) {
@@ -108,7 +113,6 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
       return
     }
 
-    setSaving(true)
     const payload = {
       title, subject, question_text: questionText, question_type: 'essay' as const,
       difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
@@ -123,6 +127,12 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
       solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
+    // Draft mode: the payload goes back to the caller, which is collecting
+    // several โจทย์ before any of them is written. Nothing is saved here, so
+    // there is no pending state and no redirect either.
+    if (draft) { draft.onSubmit(payload); return }
+
+    setSaving(true)
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
@@ -145,6 +155,8 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
         sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
+        showSharing={!draft}
+        showSubject={!draft}
         tags={tags} onTagsChange={setTags}
         {...setPicker}
       />
@@ -230,9 +242,14 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true }
           imageUrls={imageUrls}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
+          {draft ? draft.submitLabel : saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => draft ? draft.onCancel() : router.push(mode === 'edit' ? returnTo : '/questions/new')}
+          disabled={saving}
+        >
           ยกเลิก
         </Button>
       </div>

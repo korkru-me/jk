@@ -84,6 +84,42 @@ export function buildExportFile(
   }
 }
 
+/**
+ * How many โจทย์ travel to the server in one request.
+ *
+ * A whole คลัง is a couple of megabytes and a Server Action body is capped at
+ * 1 MB, so a file has to go over in pieces. Batching also keeps each request
+ * short: the server inserts one batch per round trip, which is what makes a
+ * long import visible as it goes rather than a single hanging call.
+ */
+export const IMPORT_BATCH_SIZE = 50
+
+/**
+ * Splits an export file into self-contained files the server can each parse
+ * and validate on its own.
+ *
+ * A set descriptor rides on the final batch only, so the แฟ้ม is created once,
+ * after every โจทย์ it lists already exists.
+ */
+export function exportFileBatches(file: QuestionExportFile): string[] {
+  const batches: string[] = []
+
+  for (let start = 0; start < file.questions.length; start += IMPORT_BATCH_SIZE) {
+    const isLast = start + IMPORT_BATCH_SIZE >= file.questions.length
+    const carriesSet = isLast && file.kind === 'question_set' && !!file.set
+    batches.push(JSON.stringify({
+      format: EXPORT_FORMAT,
+      version: EXPORT_VERSION,
+      exported_at: file.exported_at,
+      kind: carriesSet ? 'question_set' : 'questions',
+      ...(carriesSet ? { set: file.set } : {}),
+      questions: file.questions.slice(start, start + IMPORT_BATCH_SIZE),
+    }))
+  }
+
+  return batches
+}
+
 export function parseExportFile(raw: string): { data: QuestionExportFile } | { error: string } {
   let parsed: unknown
   try {

@@ -15,6 +15,7 @@ interface NavItem {
 const teacherNav: NavItem[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
+  { href: '/questions/import', label: 'นำเข้าโจทย์', icon: '📥' },
   { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
   { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
   { href: '/research', label: 'วิจัยการศึกษา', icon: '🧪' },
@@ -31,7 +32,13 @@ const studentNav: NavItem[] = [
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard'
   if (href === '/settings/profile') return pathname.startsWith('/settings')
-  if (href === '/questions/sets') return pathname === '/questions' || (pathname.startsWith('/questions/') && !pathname.startsWith('/questions/new'))
+  if (href === '/questions/sets') {
+    return pathname === '/questions' || (
+      pathname.startsWith('/questions/')
+      && !pathname.startsWith('/questions/new')
+      && !pathname.startsWith('/questions/import')
+    )
+  }
   return pathname === href || pathname.startsWith(href + '/')
 }
 
