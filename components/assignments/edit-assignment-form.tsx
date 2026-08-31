@@ -766,7 +766,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <RotateCcw className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">ลองใหม่เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม</p>
+                  <p className="text-sm font-medium text-foreground">แก้ไขเฉพาะข้อที่ไม่ถูกต้อง</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     ครั้งถัดไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม
                     ข้ออัตนัยที่ยังไม่ได้ตรวจจะยกมาตามเดิมและแก้ไม่ได้ · มีผลกับการทำครั้งใหม่เท่านั้น

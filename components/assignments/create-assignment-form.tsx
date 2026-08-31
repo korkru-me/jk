@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
-  BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
+  Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X,
 } from 'lucide-react'
 import {
@@ -27,6 +27,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionSetImport } from '@/components/assignments/question-set-import'
+import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
 
@@ -113,7 +114,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [maxAttempts, setMaxAttempts] = useState('')
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
-  const [retryScope, setRetryScope] = useState<RetryScope>('all')
+  // On by default: a แบบฝึกหัด a student can retake is nearly always meant as
+  // a second chance at what they got wrong, not as the whole set again. A
+  // teacher who wants the full set back only has to untick it — and ข้อสอบ,
+  // which is one attempt, resets this to 'all' below where it means nothing.
+  const [retryScope, setRetryScope] = useState<RetryScope>('wrong_only')
   const [questionsPerPage, setQuestionsPerPage] = useState('1')
   const [accessCode, setAccessCode] = useState('')
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
@@ -403,32 +408,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   <a href="/classrooms" className="underline font-medium">สร้างห้องเรียน</a> ก่อน
                 </div>
               ) : (
-                <div className="grid gap-2">
-                  {classrooms.map(c => {
-                    const isSelected = classroomIds.includes(c.id)
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => toggleClassroom(c.id)}
-                        className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                          isSelected ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                        }`}
-                      >
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                        }`}>
-                          <BookOpen className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground">{c.name}</p>
-                          {c.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.description}</p>}
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-primary shrink-0" />}
-                      </button>
-                    )
-                  })}
-                </div>
+                <ClassroomPicker
+                  classrooms={classrooms}
+                  selectedIds={classroomIds}
+                  onToggle={toggleClassroom}
+                />
               )}
             </div>
 
@@ -464,7 +448,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     setAssignmentType(t)
                     if (attemptsAuto) {
                       setMaxAttempts(t === 'exam' ? '1' : '')
-                      if (t === 'exam') setRetryScope('all')
+                      setRetryScope(t === 'exam' ? 'all' : 'wrong_only')
                     }
                   }}
                   className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
@@ -776,30 +760,54 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 icon: Camera,
                 value: requireWorkImage,
                 set: setRequireWorkImage,
+                footer: null as React.ReactNode,
+              }] : []),
+              // Reads as an on/off choice like the ones above it, so it is one
+              // of them rather than a differently-shaped card further down the
+              // step. Only offered where it can do anything: one attempt has no
+              // "next time", and a printed ใบงาน has no attempts at all.
+              ...(mode === 'online' && maxAttempts !== '1' ? [{
+                label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง',
+                desc: 'รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ',
+                icon: RotateCcw,
+                value: retryScope === 'wrong_only',
+                set: (on: boolean) => setRetryScope(on ? 'wrong_only' : 'all'),
+                footer: (
+                  <>
+                    {retryScope === 'wrong_only' && showResults === 'immediate' && (
+                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                        ตอนนี้ตั้งให้เฉลยทันทีหลังส่ง นักเรียนจึงเห็นเฉลยก่อนกลับมาแก้ข้อที่ผิด
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground px-1">
+                      ข้ออัตนัยที่ครูยังไม่ได้ตรวจจะยกมาตามเดิม ไม่ถูกนับว่าผิดและนักเรียนแก้ไม่ได้
+                    </p>
+                  </>
+                ) as React.ReactNode,
               }] : []),
             ].map(opt => {
               const Icon = opt.icon
               return (
-                <label
-                  key={opt.label}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-muted-foreground" />
+                <div key={opt.label} className="space-y-1.5">
+                  <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={opt.value}
-                    onChange={e => opt.set(e.target.checked)}
-                    className="accent-primary w-4 h-4 shrink-0"
-                  />
-                </label>
+                    <input
+                      type="checkbox"
+                      checked={opt.value}
+                      onChange={e => opt.set(e.target.checked)}
+                      className="accent-primary w-4 h-4 shrink-0"
+                    />
+                  </label>
+                  {opt.footer}
+                </div>
               )
             })}
           </div>
@@ -1041,38 +1049,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </div>
           )}
 
-          {mode === 'online' && maxAttempts !== '1' && (
-            <div className="space-y-3 rounded-xl border border-border p-4">
-              <label className="flex items-center justify-between gap-4 cursor-pointer">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <RotateCcw className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">ลองใหม่เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      ครั้งถัดไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกครั้ง
-                    </p>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={retryScope === 'wrong_only'}
-                  onChange={e => setRetryScope(e.target.checked ? 'wrong_only' : 'all')}
-                  className="accent-primary w-4 h-4 shrink-0"
-                />
-              </label>
-              {retryScope === 'wrong_only' && showResults === 'immediate' && (
-                <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                  ตอนนี้ตั้งให้เฉลยทันทีหลังส่ง นักเรียนจึงเห็นเฉลยก่อนกลับมาแก้ข้อที่ผิด
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                ข้ออัตนัยที่ครูยังไม่ได้ตรวจจะยกมาตามเดิม ไม่ถูกนับว่าผิดและนักเรียนแก้ไม่ได้
-              </p>
-            </div>
-          )}
-
           <div className="space-y-1.5">
             <Label htmlFor="code" className="flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-muted-foreground" /> รหัสผ่านเข้าทำ (ถ้ามี)
@@ -1133,7 +1109,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
                 ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
                 ...(mode === 'online' && maxAttempts !== '1' && retryScope === 'wrong_only'
-                  ? [{ label: 'การลองใหม่', value: 'เฉพาะข้อที่ยังไม่เต็ม' }]
+                  ? [{ label: 'การทำรอบต่อไป', value: 'แก้เฉพาะข้อที่ไม่ถูกต้อง' }]
                   : []),
                 ...(mode === 'online' && perPageValue > 1
                   ? [{ label: 'ข้อต่อหน้า', value: `${perPageValue} ข้อ` }]
