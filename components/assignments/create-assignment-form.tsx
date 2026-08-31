@@ -340,12 +340,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="title">ชื่อชุดข้อสอบ <span className="text-destructive">*</span></Label>
+              <Label htmlFor="title">ชื่องานที่มอบหมาย <span className="text-destructive">*</span></Label>
               <Input
                 id="title"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="เช่น แบบทดสอบกลางภาค บทที่ 1–3"
+                placeholder="เช่น แบบฝึกหัดบทที่ 3 หรือ สอบกลางภาค"
                 autoFocus
               />
             </div>

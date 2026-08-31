@@ -260,7 +260,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
-  if (!data.title.trim()) return { error: 'กรุณากรอกชื่อชุดข้อสอบ' }
+  if (!data.title.trim()) return { error: 'กรุณากรอกชื่องานที่มอบหมาย' }
   if (data.start_at && data.end_at && data.start_at > data.end_at) {
     return { error: 'วันเปิดรับต้องอยู่ก่อนวันปิดรับ' }
   }

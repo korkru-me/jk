@@ -183,7 +183,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim()) { toast.error('กรุณากรอกชื่อชุดข้อสอบ'); return }
+    if (!title.trim()) { toast.error('กรุณากรอกชื่องานที่มอบหมาย'); return }
 
     if (questionIds.length === 0) { toast.error('ชุดข้อสอบต้องมีโจทย์อย่างน้อย 1 ข้อ'); return }
 
@@ -237,7 +237,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
     <form onSubmit={handleSubmit} className="space-y-4">
       <Card padding="xl" className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="edit-title">ชื่อชุดข้อสอบ</Label>
+          <Label htmlFor="edit-title">ชื่องานที่มอบหมาย</Label>
           <Input id="edit-title" value={title} onChange={e => setTitle(e.target.value)} />
         </div>
         <div className="space-y-1.5">
