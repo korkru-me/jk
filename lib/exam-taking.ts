@@ -25,6 +25,7 @@ export interface ExamTakingData {
     exam_access_mode: 'browser' | 'seb' | 'android_monitored'
     secure_browser_verified: boolean
     watermark_text: string | null
+    questions_per_page: number
   }
   answers: SafeExamAnswer[]
 }
@@ -42,7 +43,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode)')
+    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -107,6 +108,8 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       exam_access_mode: examAccess?.mode ?? 'browser',
       secure_browser_verified: examAccess?.mode === 'seb',
       watermark_text: watermarkText,
+      // A row saved before the setting existed reads as the original layout.
+      questions_per_page: Math.max(1, Number(assignment.questions_per_page ?? 1)),
     },
     answers,
   }

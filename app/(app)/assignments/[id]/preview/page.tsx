@@ -133,6 +133,7 @@ export default async function AssignmentPreviewPage({
         startedAt={new Date().toISOString()}
         config={examConfig}
         sections={a.show_sections === false ? [] : parseSections(a.sections)}
+        questionsPerPage={Math.max(1, Number(a.questions_per_page ?? 1))}
         previewMode
         previewReturnHref={`/assignments/${id}`}
       />

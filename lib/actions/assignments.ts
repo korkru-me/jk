@@ -11,6 +11,18 @@ import { inspectSebReadiness } from '@/lib/seb'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
+// How many questions the online exam page shows at once. Anything outside
+// 1–50 (the column's own CHECK) falls back to the original one-per-screen
+// layout rather than being rejected — a printed sheet has its own layout
+// settings and never reads this.
+const MAX_QUESTIONS_PER_PAGE = 50
+function normalizeQuestionsPerPage(mode: string, value: number | null | undefined): number {
+  if (mode !== 'online') return 1
+  if (!Number.isInteger(value)) return 1
+  const n = value as number
+  return n >= 1 && n <= MAX_QUESTIONS_PER_PAGE ? n : 1
+}
+
 const SEB_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ เพราะระบบตั้งค่าไม่ครบ กรุณาตรวจที่ การตั้งค่า > ตั้งค่าข้อสอบเริ่มต้น'
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -54,6 +66,7 @@ interface CreateAssignmentData {
   max_attempts?: number | null
   score_strategy?: ScoreStrategy
   retry_scope?: RetryScope
+  questions_per_page?: number | null
   access_code?: string | null
   passing_type?: 'score' | 'percent' | null
   passing_value?: number | null
@@ -173,6 +186,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       max_attempts: data.max_attempts || null,
       score_strategy: data.score_strategy ?? 'best',
       retry_scope: retryScope,
+      questions_per_page: normalizeQuestionsPerPage(data.mode, data.questions_per_page),
       access_code: data.access_code?.trim() || null,
       passing_type: data.passing_type ?? null,
       passing_value: data.passing_value ?? null,
@@ -244,6 +258,7 @@ interface UpdateAssignmentData {
   max_attempts: number | null
   score_strategy: ScoreStrategy
   retry_scope?: RetryScope
+  questions_per_page?: number | null
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   /** The question set and its order. Omit to leave both untouched. */
@@ -426,6 +441,9 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       max_attempts: data.max_attempts || null,
       score_strategy: data.score_strategy,
       ...(data.retry_scope === undefined ? {} : { retry_scope: updatedRetryScope }),
+      ...(data.questions_per_page === undefined
+        ? {}
+        : { questions_per_page: normalizeQuestionsPerPage(existing.mode, data.questions_per_page) }),
       passing_type: data.passing_type,
       passing_value: data.passing_value,
       question_points: questionPoints,
@@ -526,6 +544,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       max_attempts: source.max_attempts,
       score_strategy: source.score_strategy,
       retry_scope: source.retry_scope ?? 'all',
+      questions_per_page: source.questions_per_page ?? 1,
       access_code: null,
       passing_type: source.passing_type,
       passing_value: source.passing_value,

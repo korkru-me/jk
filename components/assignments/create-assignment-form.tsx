@@ -113,6 +113,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
   const [retryScope, setRetryScope] = useState<RetryScope>('all')
+  const [questionsPerPage, setQuestionsPerPage] = useState('1')
   const [accessCode, setAccessCode] = useState('')
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
   const [fullscreenRequired, setFullscreenRequired] = useState(false)
@@ -172,6 +173,17 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
   // What survives of the แฟ้มย่อย after the teacher's own picking.
   const assignedSections = filterSectionsToQuestions(sections, selectedIds)
+
+  // How the ข้อต่อหน้า setting will actually break up this งาน. Counted
+  // against the สุ่ม draw when one is set, since that is how many questions a
+  // student really receives.
+  const perPageValue = Math.min(50, Math.max(1, Number(questionsPerPage) || 1))
+  const questionsPerAttempt = Number(randomQuestionCount) > 0
+    ? Math.min(Number(randomQuestionCount), selectedIds.length)
+    : selectedIds.length
+  const perPageHint = questionsPerAttempt > 0
+    ? `${questionsPerAttempt} ข้อ → ${Math.ceil(questionsPerAttempt / perPageValue)} หน้า · 1 = ทีละข้อเหมือนเดิม`
+    : '1 = แสดงทีละข้อเหมือนเดิม'
 
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
@@ -285,6 +297,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
         retry_scope: retryScope,
+        questions_per_page: Number(questionsPerPage) || 1,
         access_code: accessCode.trim() || null,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
@@ -698,6 +711,24 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             />
           </div>
 
+          {mode === 'online' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="per-page" className="flex items-center gap-1.5">
+                <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
+              </Label>
+              <Input
+                id="per-page"
+                type="number"
+                min={1}
+                max={50}
+                value={questionsPerPage}
+                onChange={e => setQuestionsPerPage(e.target.value)}
+                className="max-w-[200px]"
+              />
+              <p className="text-xs text-muted-foreground">{perPageHint}</p>
+            </div>
+          )}
+
           <div className="space-y-2">
             {[
               ...(assignedSections.length > 0 ? [{
@@ -1087,6 +1118,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
                 ...(mode === 'online' && maxAttempts !== '1' && retryScope === 'wrong_only'
                   ? [{ label: 'การลองใหม่', value: 'เฉพาะข้อที่ยังไม่เต็ม' }]
+                  : []),
+                ...(mode === 'online' && perPageValue > 1
+                  ? [{ label: 'ข้อต่อหน้า', value: `${perPageValue} ข้อ` }]
                   : []),
                 ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
                 ...(mode === 'online' && assignmentType === 'exam' && proctoringEnabled

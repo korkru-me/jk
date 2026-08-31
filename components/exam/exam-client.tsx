@@ -96,6 +96,10 @@ interface Props {
   /** แฟ้มย่อย snapshotted onto the assignment, already filtered by the server to
    *  what this assignment contains. Empty/omitted = plain numbered list. */
   sections?: QuestionSetSection[]
+  /** How many questions share one screen. 1 (the default, and every
+   *  assignment saved before the setting existed) is the original
+   *  one-question-per-screen layout. */
+  questionsPerPage?: number
   // Teacher-facing "see it as a student would" mode: renders the exact same
   // UI/interactions but never calls the save/submit server actions (there is
   // no real submission row behind `submissionId` to write to), and exits via
@@ -128,7 +132,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], previewMode = false, previewReturnHref }: Props) {
+export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef,
@@ -356,25 +360,34 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     return `${m}:${ss}`
   }
 
-  const current      = answers[currentIndex]
   const answeredCount = answers.filter(a => hasAnswered(a.id)).length
   const flaggedCount  = flagged.size
   const unanswered    = answers.length - answeredCount
   const progress      = Math.round((answeredCount / answers.length) * 100)
-  const isFlagged     = flagged.has(current.id)
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
 
-  // "written" questions may embed one or more numbered answer inputs directly
-  // in the main question text via [คำตอบ N], instead of the generic
-  // standalone "คำตอบ" box(es).
-  const currentQuestionText = interpolateValues(
-    current.questions.question_text,
-    current.random_values,
-    current.questions.variables,
-  )
-  const mainInlineBlank = current.questions.question_type === 'written'
-    && countAnswerBlanks(currentQuestionText) > 0
+  // The teacher chooses how many questions share a screen. `currentIndex`
+  // stays a question index rather than becoming a page number: the นำทาง grid
+  // and the "jump to the ข้อ still missing a รูปวิธีทำ" path both address one
+  // question, and deriving the page from it lands either on whichever page
+  // holds that question — with no third piece of state to keep in step.
+  const perPage = Math.max(1, questionsPerPage)
+  const pageStart = Math.floor(currentIndex / perPage) * perPage
+  const pageAnswers = answers.slice(pageStart, pageStart + perPage)
+  const isLastPage = pageStart + perPage >= answers.length
+
+  // With several questions on a screen, moving the focus is not visible on its
+  // own — tapping ข้อ 4 in the นำทาง grid while it is already on the page would
+  // look like nothing happened. Bring the focused question into view instead.
+  // A single-question page has nowhere to scroll to, so it is left alone.
+  useEffect(() => {
+    if (perPage === 1) return
+    document.getElementById(`exam-q-${currentIndex}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }, [currentIndex, perPage])
 
   // ── Exam body (shared between normal + focus mode) ────────────────────────────
 
@@ -384,157 +397,178 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       {/* LEFT: Question */}
       <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-y-auto">
 
-        {/* Question card */}
-        <Card padding="lg" className="space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="font-mono text-xs">ข้อ {currentIndex + 1} / {answers.length}</Badge>
-            {sectionOwner.get(current.question_id)?.title && (
-              <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
-            )}
-            {current.questions.question_type === 'mcq' && (
-              <Badge variant="outline" className="text-xs">ปรนัย</Badge>
-            )}
-            {isFlagged && (
-              <Badge className="text-xs bg-flag/15 text-flag dark:text-flag border-flag/30">
-                🚩 ปักธงไว้
-              </Badge>
-            )}
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                onClick={() => toggleFlag(current.id)}
-                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
-                  isFlagged
-                    ? 'bg-flag/15 border-flag/30 text-flag dark:text-flag'
-                    : 'border-border text-muted-foreground hover:border-flag hover:text-flag'
-                }`}
-              >
-                <Flag size={11} className={isFlagged ? 'fill-flag' : ''} />
-                {isFlagged ? 'ยกเลิกธง' : 'ปักธง'}
-              </button>
-            </div>
-          </div>
+        {pageAnswers.map((current, pageOffset) => {
+          const questionIndex = pageStart + pageOffset
+          const isFlagged = flagged.has(current.id)
+          // "written" questions may embed one or more numbered answer inputs
+          // directly in the main question text via [คำตอบ N], instead of the
+          // generic standalone "คำตอบ" box(es).
+          const currentQuestionText = interpolateValues(
+            current.questions.question_text,
+            current.random_values,
+            current.questions.variables,
+          )
+          const mainInlineBlank = current.questions.question_type === 'written'
+            && countAnswerBlanks(currentQuestionText) > 0
 
-          {current.questions.question_type !== 'fill_blank' && !mainInlineBlank && (
-            <QuestionText text={currentQuestionText} />
-          )}
-
-          {(current.questions.image_urls ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {(current.questions.image_urls ?? []).map(url => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={url} src={url} alt="รูปประกอบ" className="max-h-52 rounded-xl border object-contain" />
-              ))}
-            </div>
-          )}
-
-          {current.questions.question_type === 'file_upload' && (
-            ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {((current.questions.extra_data as FileUploadConfig).attachment_urls ?? []).map(url => (
-                  /\.pdf(\?|$)/i.test(url) ? (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border bg-muted/40 hover:bg-muted transition-colors">
-                      📄 <span className="truncate max-w-[140px]">{decodeURIComponent(url.split('/').pop() ?? 'PDF')}</span>
-                    </a>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-52 rounded-xl border object-contain" />
-                  )
-                ))}
+          return (
+            <div key={current.id} id={`exam-q-${questionIndex}`} className="flex flex-col gap-3 scroll-mt-2">
+            {/* Question card */}
+            <Card padding="lg" className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="font-mono text-xs">ข้อ {questionIndex + 1} / {answers.length}</Badge>
+                {sectionOwner.get(current.question_id)?.title && (
+                  <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
+                )}
+                {current.questions.question_type === 'mcq' && (
+                  <Badge variant="outline" className="text-xs">ปรนัย</Badge>
+                )}
+                {isFlagged && (
+                  <Badge className="text-xs bg-flag/15 text-flag dark:text-flag border-flag/30">
+                    🚩 ปักธงไว้
+                  </Badge>
+                )}
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={() => toggleFlag(current.id)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
+                      isFlagged
+                        ? 'bg-flag/15 border-flag/30 text-flag dark:text-flag'
+                        : 'border-border text-muted-foreground hover:border-flag hover:text-flag'
+                    }`}
+                  >
+                    <Flag size={11} className={isFlagged ? 'fill-flag' : ''} />
+                    {isFlagged ? 'ยกเลิกธง' : 'ปักธง'}
+                  </button>
+                </div>
               </div>
-            )
-          )}
 
-          {/* No "ค่าที่กำหนด" readout while sitting the exam. Every {name} in the
-              question text is already replaced with the value this student drew,
-              so the panel restated the same numbers underneath the question.
-              Note this leaves a variable that the question text never mentions
-              with nowhere to appear — write such a value into the text itself.
-              The submission review still lists them, where a teacher marking an
-              attempt has to see what that student was given. */}
-        </Card>
+              {current.questions.question_type !== 'fill_blank' && !mainInlineBlank && (
+                <QuestionText text={currentQuestionText} />
+              )}
 
-        {/* Answer inputs */}
-        <Card padding="lg">
-          {current.questions.question_type === 'matching' && current.questions.mcq_options ? (
-            <MatchingAnswerInput
-              prompts={current.questions.mcq_options}
-              options={current.questions.matching_options ?? []}
-              rawValue={localAnswers[current.id] ?? ''}
-              onChange={val => handleAnswerChange(current.id, val)}
-            />
-          ) : current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
-            <MCQInput
-              answerId={current.id}
-              options={current.questions.mcq_options as Array<{ text: string; image_url?: string; index: number }>}
-              selected={localAnswers[current.id] ?? ''}
-              eliminatedSet={eliminated[current.id] ?? new Set()}
-              onSelect={val => handleAnswerChange(current.id, val)}
-              onToggleEliminate={i => toggleEliminate(current.id, i)}
-            />
-          ) : current.questions.question_type === 'true_false' ? (
-            <TrueFalseAnswerInput
-              answerId={current.id}
-              config={current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig}
-              rawValue={localAnswers[current.id] ?? ''}
-              onChange={val => handleAnswerChange(current.id, val)}
-            />
-          ) : current.questions.question_type === 'fill_blank' ? (
-            <FillBlankAnswerInput
-              questionText={current.questions.question_text}
-              config={current.questions.extra_data as FillBlankConfig | SafeFillBlankConfig}
-              rawValue={localAnswers[current.id] ?? ''}
-              onChange={val => handleAnswerChange(current.id, val)}
-            />
-          ) : current.questions.question_type === 'ordering' ? (
-            <OrderingAnswerInput
-              answerId={current.id}
-              config={current.questions.extra_data as OrderingConfig | SafeOrderingConfig}
-              rawValue={localAnswers[current.id] ?? ''}
-              onChange={val => handleAnswerChange(current.id, val)}
-            />
-          ) : current.questions.question_type === 'file_upload' ? (
-            <FileUploadAnswerInput
-              rawValue={localAnswers[current.id] ?? ''}
-              onChange={files => handleFileSubmissionChange(current.id, files)}
-              localOnly={previewMode}
-            />
-          ) : current.questions.question_type === 'composite' ? (
-            <CompositeAnswerInput
-              config={current.questions.extra_data as CompositeConfig | SafeCompositeConfig}
-              rawValue={localAnswers[current.id] ?? ''}
-              onChange={val => handleAnswerChange(current.id, val)}
-            />
-          ) : (
-            <MultiPartAnswerInput
-              answerId={current.id}
-              parts={current.questions.answer_parts}
-              questionText={currentQuestionText}
-              labels={partLabels((current.questions.extra_data as RandomQuestionConfig | SafeRandomQuestionConfig | null)?.part_label_style)}
-              fallbackUnit={current.questions.answer_unit}
-              rawValue={localAnswers[current.id] ?? ''}
-              onSingleChange={val => handleAnswerChange(current.id, val)}
-              onPartChange={(pi, val, total) =>
-                handlePartAnswerChange(current.id, pi, val, total, localAnswers[current.id] ?? '')}
-              requiresWorkImage={requiredWorkImageCount(current, config) > 0}
-              workImages={workImages[current.id] ?? []}
-              onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
-              localOnly={previewMode}
-            />
-          )}
-        </Card>
+              {(current.questions.image_urls ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {(current.questions.image_urls ?? []).map(url => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={url} src={url} alt="รูปประกอบ" className="max-h-52 rounded-xl border object-contain" />
+                  ))}
+                </div>
+              )}
 
-        {/* Prev / Next */}
+              {current.questions.question_type === 'file_upload' && (
+                ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {((current.questions.extra_data as FileUploadConfig).attachment_urls ?? []).map(url => (
+                      /\.pdf(\?|$)/i.test(url) ? (
+                        <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border bg-muted/40 hover:bg-muted transition-colors">
+                          📄 <span className="truncate max-w-[140px]">{decodeURIComponent(url.split('/').pop() ?? 'PDF')}</span>
+                        </a>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-52 rounded-xl border object-contain" />
+                      )
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* No "ค่าที่กำหนด" readout while sitting the exam. Every {name} in the
+                  question text is already replaced with the value this student drew,
+                  so the panel restated the same numbers underneath the question.
+                  Note this leaves a variable that the question text never mentions
+                  with nowhere to appear — write such a value into the text itself.
+                  The submission review still lists them, where a teacher marking an
+                  attempt has to see what that student was given. */}
+            </Card>
+
+            {/* Answer inputs */}
+            <Card padding="lg">
+              {current.questions.question_type === 'matching' && current.questions.mcq_options ? (
+                <MatchingAnswerInput
+                  prompts={current.questions.mcq_options}
+                  options={current.questions.matching_options ?? []}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
+              ) : current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
+                <MCQInput
+                  answerId={current.id}
+                  options={current.questions.mcq_options as Array<{ text: string; image_url?: string; index: number }>}
+                  selected={localAnswers[current.id] ?? ''}
+                  eliminatedSet={eliminated[current.id] ?? new Set()}
+                  onSelect={val => handleAnswerChange(current.id, val)}
+                  onToggleEliminate={i => toggleEliminate(current.id, i)}
+                />
+              ) : current.questions.question_type === 'true_false' ? (
+                <TrueFalseAnswerInput
+                  answerId={current.id}
+                  config={current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
+              ) : current.questions.question_type === 'fill_blank' ? (
+                <FillBlankAnswerInput
+                  questionText={current.questions.question_text}
+                  config={current.questions.extra_data as FillBlankConfig | SafeFillBlankConfig}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
+              ) : current.questions.question_type === 'ordering' ? (
+                <OrderingAnswerInput
+                  answerId={current.id}
+                  config={current.questions.extra_data as OrderingConfig | SafeOrderingConfig}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
+              ) : current.questions.question_type === 'file_upload' ? (
+                <FileUploadAnswerInput
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={files => handleFileSubmissionChange(current.id, files)}
+                  localOnly={previewMode}
+                />
+              ) : current.questions.question_type === 'composite' ? (
+                <CompositeAnswerInput
+                  config={current.questions.extra_data as CompositeConfig | SafeCompositeConfig}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
+              ) : (
+                <MultiPartAnswerInput
+                  answerId={current.id}
+                  parts={current.questions.answer_parts}
+                  questionText={currentQuestionText}
+                  labels={partLabels((current.questions.extra_data as RandomQuestionConfig | SafeRandomQuestionConfig | null)?.part_label_style)}
+                  fallbackUnit={current.questions.answer_unit}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onSingleChange={val => handleAnswerChange(current.id, val)}
+                  onPartChange={(pi, val, total) =>
+                    handlePartAnswerChange(current.id, pi, val, total, localAnswers[current.id] ?? '')}
+                  requiresWorkImage={requiredWorkImageCount(current, config) > 0}
+                  workImages={workImages[current.id] ?? []}
+                  onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
+                  localOnly={previewMode}
+                />
+              )}
+            </Card>
+
+            </div>
+          )
+        })}
+
+        {/* Prev / Next — a page at a time, which is one question at a time
+            on the default setting */}
         <div className="flex items-center gap-3 pb-2">
           <Button
             variant="outline" className="flex-1"
-            onClick={() => setCurrentIndex(i => Math.max(0, i - 1))}
-            disabled={currentIndex === 0}
+            onClick={() => setCurrentIndex(Math.max(0, pageStart - perPage))}
+            disabled={pageStart === 0}
           >
             ← ก่อนหน้า
           </Button>
-          {currentIndex < answers.length - 1 ? (
-            <Button className="flex-1" onClick={() => setCurrentIndex(i => i + 1)}>
+          {!isLastPage ? (
+            <Button className="flex-1" onClick={() => setCurrentIndex(pageStart + perPage)}>
               ถัดไป →
             </Button>
           ) : (
@@ -619,7 +653,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                     {run.question_ids.map((_, offset) => {
                       const i = startIndex + offset
                       const a = answers[i]
-                      const isCur = i === currentIndex
+                      const isCur = i >= pageStart && i < pageStart + perPage
                       const isAns = hasAnswered(a.id)
                       const isFlg = flagged.has(a.id)
                       let cls = 'bg-muted text-muted-foreground'
@@ -786,7 +820,11 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                   โหมดโฟกัส
                 </span>
                 <span className="h-3 w-px bg-border shrink-0" />
-                <p className="text-sm font-medium truncate">{current.questions.title || 'ชุดข้อสอบ'}</p>
+                <p className="text-sm font-medium truncate">
+                  {perPage === 1
+                    ? (pageAnswers[0]?.questions.title || 'ชุดข้อสอบ')
+                    : `ข้อ ${pageStart + 1}–${pageStart + pageAnswers.length} จาก ${answers.length}`}
+                </p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">

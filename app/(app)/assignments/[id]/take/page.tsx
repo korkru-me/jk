@@ -85,6 +85,7 @@ export default async function TakeExamPage({
         startedAt={submission.started_at}
         config={examConfig}
         sections={assignment.show_sections === false ? [] : parseSections(assignment.sections)}
+        questionsPerPage={assignment.questions_per_page}
       />
     </div>
   )

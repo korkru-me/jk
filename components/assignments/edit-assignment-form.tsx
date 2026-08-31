@@ -56,6 +56,7 @@ export type EditableAssignment = Pick<
   | 'type'
   | 'score_strategy'
   | 'retry_scope'
+  | 'questions_per_page'
   | 'passing_type'
   | 'passing_value'
   | 'show_results'
@@ -92,6 +93,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   )
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(a.score_strategy)
   const [retryScope, setRetryScope] = useState<RetryScope>(a.retry_scope ?? 'all')
+  const [questionsPerPage, setQuestionsPerPage] = useState(String(a.questions_per_page ?? 1))
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
   const [showSections, setShowSections] = useState(a.show_sections !== false)
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
@@ -211,6 +213,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
         retry_scope: retryScope,
+        questions_per_page: Number(questionsPerPage) || 1,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
         // Sent only when the teacher could actually change it, so a frozen
@@ -664,6 +667,26 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             className="max-w-[200px]"
           />
         </div>
+
+        {a.mode === 'online' && (
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-per-page" className="flex items-center gap-1.5">
+              <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
+            </Label>
+            <Input
+              id="edit-per-page"
+              type="number"
+              min={1}
+              max={50}
+              value={questionsPerPage}
+              onChange={e => setQuestionsPerPage(e.target.value)}
+              className="max-w-[200px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              1 = แสดงทีละข้อเหมือนเดิม · เป็นการจัดหน้าจออย่างเดียว ไม่กระทบคะแนน และมีผลทันทีแม้กับคนที่กำลังทำอยู่
+            </p>
+          </div>
+        )}
       </Card>
 
       <Card padding="xl" className="space-y-4">

@@ -557,6 +557,9 @@ export interface Assignment {
    *  the new attempt's max_score — and every score comparison built on it —
    *  matches a full attempt's. */
   retry_scope: RetryScope
+  /** How many questions the online exam page puts on one screen. 1 is the
+   *  original one-question-per-screen layout and the default. */
+  questions_per_page: number
   access_code: string | null
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
