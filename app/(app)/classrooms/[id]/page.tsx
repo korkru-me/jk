@@ -117,7 +117,7 @@ export default async function ClassroomDetailPage({
     const { data: assignmentRows } = assignmentIds.length > 0
       ? await admin
           .from('assignments')
-          .select('id, title, question_ids, random_question_count, end_at, duration_minutes, type, max_attempts, score_strategy, passing_type, passing_value, display_max_score, show_results')
+          .select('id, title, question_ids, random_question_count, end_at, duration_minutes, type, max_attempts, score_strategy, retry_scope, passing_type, passing_value, display_max_score, show_results')
           .in('id', assignmentIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false })
@@ -174,6 +174,7 @@ export default async function ClassroomDetailPage({
       duration_minutes: a.duration_minutes,
       type: a.type,
       max_attempts: a.max_attempts,
+      retry_scope: a.retry_scope ?? 'all',
       passing_type: a.passing_type,
       passing_value: a.passing_value,
       show_results: a.show_results,

@@ -125,6 +125,8 @@ Invariant สำคัญ:
 - `assignments.question_points` override น้ำหนักรายข้อ
 - `assignments.display_max_score` เปลี่ยนสเกลตอนแสดง ไม่ใช่ raw stored score
 - `assignments.score_strategy` เลือก best/average/latest สำหรับหลาย attempt
+- `assignments.retry_scope` = `all` | `wrong_only` ตัดสินว่าการทำครั้งใหม่ถามซ้ำทั้งชุดหรือเฉพาะข้อที่ `score < max_score`
+- `submission_answers.carried_over` คือแถวที่คัดลอกมาจาก attempt ก่อนหน้า ไม่ได้ตอบใน attempt นี้ — นับใน `max_score`/`total_score` แต่ไม่ถูก auto-grade ซ้ำ และไม่ถูกส่งเข้าหน้าทำข้อสอบ
 
 ก่อนแก้ scoring ต้องตรวจ `lib/scoring.ts`, `lib/grading.ts`, `lib/actions/submissions.ts` และหน้าที่อ่านคะแนนทั้งหมด
 

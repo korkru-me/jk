@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw } from 'lucide-react'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
-import type { Assignment, Question, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { Assignment, Question, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import {
@@ -55,6 +55,7 @@ export type EditableAssignment = Pick<
   | 'mode'
   | 'type'
   | 'score_strategy'
+  | 'retry_scope'
   | 'passing_type'
   | 'passing_value'
   | 'show_results'
@@ -90,6 +91,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
     a.max_attempts ? String(a.max_attempts) : a.type === 'exam' ? '1' : ''
   )
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(a.score_strategy)
+  const [retryScope, setRetryScope] = useState<RetryScope>(a.retry_scope ?? 'all')
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
   const [showSections, setShowSections] = useState(a.show_sections !== false)
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
@@ -208,6 +210,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
+        retry_scope: retryScope,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
         // Sent only when the teacher could actually change it, so a frozen
@@ -701,7 +704,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             type="number"
             min={1}
             value={maxAttempts}
-            onChange={e => setMaxAttempts(e.target.value)}
+            onChange={e => {
+              setMaxAttempts(e.target.value)
+              if (e.target.value === '1') setRetryScope('all')
+            }}
             placeholder="ไม่จำกัด (เว้นว่าง)"
             className="max-w-[200px]"
           />
@@ -726,6 +732,36 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {a.mode === 'online' && maxAttempts !== '1' && (
+          <div className="space-y-3 rounded-xl border border-border p-4">
+            <label className="flex items-center justify-between gap-4 cursor-pointer">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <RotateCcw className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">ลองใหม่เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    ครั้งถัดไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม
+                    ข้ออัตนัยที่ยังไม่ได้ตรวจจะยกมาตามเดิมและแก้ไม่ได้ · มีผลกับการทำครั้งใหม่เท่านั้น
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={retryScope === 'wrong_only'}
+                onChange={e => setRetryScope(e.target.checked ? 'wrong_only' : 'all')}
+                className="accent-primary w-4 h-4 shrink-0"
+              />
+            </label>
+            {retryScope === 'wrong_only' && showResults === 'immediate' && (
+              <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                ตอนนี้ตั้งให้เฉลยทันทีหลังส่ง นักเรียนจึงเห็นเฉลยก่อนกลับมาแก้ข้อที่ผิด
+              </p>
+            )}
           </div>
         )}
       </Card>

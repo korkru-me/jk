@@ -142,7 +142,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                         className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 bg-warning hover:bg-warning/90 text-white border-0')}
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        ลองใหม่{a.max_attempts != null && ` (เหลือ ${a.max_attempts - used} ครั้ง)`}
+                        {a.retry_scope === 'wrong_only' ? 'แก้ข้อที่ยังไม่เต็ม' : 'ลองใหม่'}{a.max_attempts != null && ` (เหลือ ${a.max_attempts - used} ครั้ง)`}
                       </Link>
                     </div>
                   ) : isDone ? (

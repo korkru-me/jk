@@ -9,6 +9,7 @@ export interface StudentAssignmentRow {
   duration_minutes: number | null
   type: string
   max_attempts: number | null
+  retry_scope: 'all' | 'wrong_only'
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   show_results: 'immediate' | 'score_only' | 'after_due' | 'never'

@@ -226,7 +226,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
             className={cn(buttonVariants({ size: 'sm' }), 'w-full justify-center gap-1 text-xs bg-warning hover:bg-warning/90 text-white border-0')}
           >
             <RotateCcw size={12} />
-            ลองใหม่{a.max_attempts != null && ` (เหลือ ${a.max_attempts - a.attempts_used} ครั้ง)`}
+            {a.retry_scope === 'wrong_only' ? 'แก้ข้อที่ยังไม่เต็ม' : 'ลองใหม่'}{a.max_attempts != null && ` (เหลือ ${a.max_attempts - a.attempts_used} ครั้ง)`}
           </Link>
         </div>
       ) : isDone ? (

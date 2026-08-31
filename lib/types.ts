@@ -506,6 +506,7 @@ export type AndroidExamMode = 'blocked' | 'monitored'
 
 export type ShowResultsMode = 'immediate' | 'score_only' | 'after_due' | 'never'
 export type ScoreStrategy = 'best' | 'average' | 'latest'
+export type RetryScope = 'all' | 'wrong_only'
 
 export type { QuestionSetSection } from '@/lib/question-set-sections'
 import type { QuestionSetSection } from '@/lib/question-set-sections'
@@ -550,6 +551,12 @@ export interface Assignment {
   show_results: ShowResultsMode
   max_attempts: number | null
   score_strategy: ScoreStrategy
+  /** What a retry re-asks. `all` rebuilds the whole attempt (the behavior
+   *  that existed before this setting). `wrong_only` rebuilds only the
+   *  questions the previous attempt missed and copies the rest forward, so
+   *  the new attempt's max_score — and every score comparison built on it —
+   *  matches a full attempt's. */
+  retry_scope: RetryScope
   access_code: string | null
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
@@ -725,6 +732,11 @@ export interface SubmissionAnswer {
   work_images: (string | null)[] | null
   score_edited_by: string | null
   score_edited_at: string | null
+  /** True when this row was copied from the student's previous attempt
+   *  instead of being answered in this one (retry_scope = 'wrong_only').
+   *  Carried rows are hidden from the exam-taking view and skipped by
+   *  auto-grading, which keeps a teacher-graded score from being recomputed. */
+  carried_over: boolean
   created_at: string
 }
 

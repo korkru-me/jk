@@ -4,7 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isAttemptExpired } from '@/lib/grading'
-import { buildAssignmentAttempt, gradeAnswer } from '@/lib/assignment-attempt'
+import {
+  buildAssignmentAttempt,
+  buildRetryAttempt,
+  gradeAnswer,
+  type AssignmentAttemptSkeleton,
+  type CarriedAttemptAnswer,
+  type PreviousAttemptAnswer,
+} from '@/lib/assignment-attempt'
 import type { Question } from '@/lib/types'
 import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
@@ -108,6 +115,9 @@ export async function startSubmission(
   const existing = existingRes.data
 
   let attemptNumber = 1
+  // Set to the attempt a wrong-only retry rebuilds from. Null on a first
+  // attempt and whenever the งาน re-asks everything, which is the default.
+  let retryFromSubmissionId: string | null = null
   if (existing) {
     if (existing.status === 'in_progress') {
       if (!isAttemptExpired(existing.started_at, assignment.duration_minutes)) {
@@ -147,6 +157,7 @@ export async function startSubmission(
       return { submissionId: existing.id, alreadySubmitted: true }
     }
     attemptNumber = existing.attempt_number + 1
+    if (assignment.retry_scope === 'wrong_only') retryFromSubmissionId = existing.id
   }
 
   // Access code is only checked when creating a genuinely new attempt —
@@ -168,11 +179,48 @@ export async function startSubmission(
 
   if (!questions || questions.length === 0) return { error: 'ไม่พบโจทย์' }
 
-  const skeletons = buildAssignmentAttempt(assignment, questions as Question[])
-  if (assignment.random_question_count && skeletons.length < assignment.random_question_count) {
-    return { error: 'ข้อสอบในคลังเหลือไม่ครบตามจำนวนที่ตั้งไว้ กรุณาแจ้งครูผู้สอน' }
+  let skeletons: AssignmentAttemptSkeleton[]
+  // Rows copied from the previous attempt, kept out of this attempt's exam
+  // view and out of auto-grading, but counted in its totals.
+  let carried: CarriedAttemptAnswer[] = []
+
+  if (retryFromSubmissionId) {
+    const { data: previous } = await admin
+      .from('submission_answers')
+      .select(`
+        question_id, random_values, correct_answer, student_answer, is_correct,
+        score, max_score, teacher_feedback, order_index, option_order,
+        work_images, score_edited_by, score_edited_at
+      `)
+      .eq('submission_id', retryFromSubmissionId)
+      .order('order_index')
+
+    if (!previous || previous.length === 0) return { error: 'ไม่พบคำตอบของครั้งก่อน' }
+
+    const split = buildRetryAttempt(
+      assignment,
+      questions as Question[],
+      previous as unknown as PreviousAttemptAnswer[],
+    )
+    // Nothing to come back for: either every question already earned full
+    // marks, or the only shortfalls are still waiting on the teacher. Send the
+    // student to their results instead of opening an attempt with no questions.
+    if (split.retried.length === 0) {
+      return { submissionId: retryFromSubmissionId, alreadySubmitted: true }
+    }
+    skeletons = split.retried
+    carried = split.carried
+  } else {
+    skeletons = buildAssignmentAttempt(assignment, questions as Question[])
+    if (assignment.random_question_count && skeletons.length < assignment.random_question_count) {
+      return { error: 'ข้อสอบในคลังเหลือไม่ครบตามจำนวนที่ตั้งไว้ กรุณาแจ้งครูผู้สอน' }
+    }
   }
-  const totalMaxScore = skeletons.reduce((sum, s) => sum + s.max_score, 0)
+
+  // Carried rows are part of the total on purpose — that is what makes a
+  // wrong-only retry add up to the same max_score as a full attempt.
+  const totalMaxScore = [...skeletons, ...carried]
+    .reduce((sum, s) => sum + Number(s.max_score), 0)
 
   // A submission belongs to the same immutable tenant as its assignment.
   // Do not derive this from the student's "primary" organization: students
@@ -208,9 +256,10 @@ export async function startSubmission(
 
   if (subError) return { error: subError.message }
 
-  const { error: answersError } = await admin.from('submission_answers').insert(
-    skeletons.map(s => ({ ...s, org_id: orgId, submission_id: submission.id }))
-  )
+  const { error: answersError } = await admin.from('submission_answers').insert([
+    ...skeletons.map(s => ({ ...s, org_id: orgId, submission_id: submission.id, carried_over: false })),
+    ...carried.map(c => ({ ...c, org_id: orgId, submission_id: submission.id })),
+  ])
   if (answersError) return { error: answersError.message }
 
   return { submissionId: submission.id }
@@ -424,13 +473,22 @@ async function gradeAndFinalizeSubmission(
 
   if (!answers) return { error: 'ไม่พบคำตอบ' }
 
+  // Rows carried over from an earlier attempt keep that attempt's answer and
+  // score. Re-grading them would be wrong twice over: the student never saw
+  // them this time, and any score a teacher gave or adjusted by hand would be
+  // recomputed — an essay would drop back to pending and score 0.
+  const gradable = answers.filter((a: any) => !a.carried_over)
+  const carriedScore = answers
+    .filter((a: any) => a.carried_over)
+    .reduce((sum: number, a: any) => sum + Number(a.score ?? 0), 0)
+
   // Server-side defense-in-depth: the exam UI already blocks submission
   // client-side when a required work-image is missing, but a tampered
   // client could call this action directly. `require_work_image` is the whole
   // decision — one answer for the งาน, given by the teacher when they created
   // it — and it applies to every เติมคำตอบตัวเลข question the งาน contains.
   const workImageEnforced = opts.enforceWorkImage && (assignment?.require_work_image ?? false)
-  const missingWorkImage = workImageEnforced && answers.some((a: any) => {
+  const missingWorkImage = workImageEnforced && gradable.some((a: any) => {
     if (a.questions?.question_type !== 'written') return false
     const parts: unknown[] = a.questions?.answer_parts ?? []
     const requiredCount = parts.length > 0 ? parts.length : 1
@@ -443,7 +501,7 @@ async function gradeAndFinalizeSubmission(
   if (missingWorkImage) return { error: 'กรุณาแนบรูปวิธีทำให้ครบทุกข้อก่อนส่งคำตอบ' }
 
   // Auto-grade: compare student_answer vs correct_answer with tolerance
-  const updates = answers.map((a: any) => gradeAnswer(a))
+  const updates = gradable.map((a: any) => gradeAnswer(a))
 
   // Each answer row is independent. Grade writes can run in small concurrent
   // batches instead of one-by-one, while avoiding a request spike for a long
@@ -458,7 +516,7 @@ async function gradeAndFinalizeSubmission(
     ))
   }
 
-  const totalScore = updates.reduce((sum: number, u: any) => sum + u.score, 0)
+  const totalScore = updates.reduce((sum: number, u: any) => sum + u.score, 0) + carriedScore
 
   const { error } = await admin
     .from('submissions')

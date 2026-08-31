@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
-import type { AndroidExamMode, AssignmentStatus, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
+import type { AndroidExamMode, AssignmentStatus, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 import { inspectSebReadiness } from '@/lib/seb'
 
@@ -53,6 +53,7 @@ interface CreateAssignmentData {
   show_results?: ShowResultsMode
   max_attempts?: number | null
   score_strategy?: ScoreStrategy
+  retry_scope?: RetryScope
   access_code?: string | null
   passing_type?: 'score' | 'percent' | null
   passing_value?: number | null
@@ -115,6 +116,14 @@ export async function createAssignment(data: CreateAssignmentData) {
   ) return { error: SEB_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled === true || secureBrowserMode === 'seb_required')
+  // Re-asking only the missed questions needs an online attempt to re-open
+  // and more than one attempt to re-open it in. A printed sheet or a
+  // single-attempt งาน can only mean the default, whatever a client sends.
+  const retryScope: RetryScope = data.mode === 'online'
+    && data.max_attempts !== 1
+    && data.retry_scope === 'wrong_only'
+      ? 'wrong_only'
+      : 'all'
   const randomQuestionCount = isOnlineExam
     && Number.isInteger(data.random_question_count)
     && (data.random_question_count as number) > 0
@@ -163,6 +172,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       show_results: showResults,
       max_attempts: data.max_attempts || null,
       score_strategy: data.score_strategy ?? 'best',
+      retry_scope: retryScope,
       access_code: data.access_code?.trim() || null,
       passing_type: data.passing_type ?? null,
       passing_value: data.passing_value ?? null,
@@ -233,6 +243,7 @@ interface UpdateAssignmentData {
   duration_minutes: number | null
   max_attempts: number | null
   score_strategy: ScoreStrategy
+  retry_scope?: RetryScope
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   /** The question set and its order. Omit to leave both untouched. */
@@ -345,6 +356,13 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   ) return { error: SEB_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled || secureBrowserMode === 'seb_required')
+  // Same rule as createAssignment: only an online งาน that can be reopened
+  // more than once can re-ask just the missed questions.
+  const updatedRetryScope: RetryScope = existing.mode === 'online'
+    && data.max_attempts !== 1
+    && data.retry_scope === 'wrong_only'
+      ? 'wrong_only'
+      : 'all'
   const randomQuestionCount = isOnlineExam
     && Number.isInteger(data.random_question_count)
     && data.random_question_count !== null
@@ -407,6 +425,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       duration_minutes: data.duration_minutes || null,
       max_attempts: data.max_attempts || null,
       score_strategy: data.score_strategy,
+      ...(data.retry_scope === undefined ? {} : { retry_scope: updatedRetryScope }),
       passing_type: data.passing_type,
       passing_value: data.passing_value,
       question_points: questionPoints,
@@ -506,6 +525,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       show_results: source.show_results,
       max_attempts: source.max_attempts,
       score_strategy: source.score_strategy,
+      retry_scope: source.retry_scope ?? 'all',
       access_code: null,
       passing_type: source.passing_type,
       passing_value: source.passing_value,

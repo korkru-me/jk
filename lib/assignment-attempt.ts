@@ -286,6 +286,87 @@ export function buildAssignmentAttempt(
     })
 }
 
+// One answer row of the attempt a wrong-only retry is built from. Only the
+// columns the decision and the carried copy need — the caller reads these
+// straight out of submission_answers.
+export type PreviousAttemptAnswer = {
+  question_id: string
+  random_values: Record<string, number>
+  correct_answer: string
+  student_answer: string | null
+  is_correct: boolean | null
+  score: number
+  max_score: number
+  teacher_feedback: string | null
+  order_index: number
+  option_order: number[] | null
+  work_images: (string | null)[] | null
+  score_edited_by: string | null
+  score_edited_at: string | null
+}
+
+export type CarriedAttemptAnswer = PreviousAttemptAnswer & { carried_over: true }
+
+// A question is re-asked only when the previous attempt was actually graded
+// and came up short of full marks. Partial credit counts as short — 2 of 4
+// blanks is not mastered. `is_correct === null` is the pending-teacher signal
+// gradeAnswer leaves on an essay (and on a manual fill_blank), and a row
+// nobody has scored yet must not be handed back as if it were wrong.
+function needsRetry(prev: PreviousAttemptAnswer): boolean {
+  return prev.is_correct !== null && Number(prev.score) < Number(prev.max_score)
+}
+
+/**
+ * Splits the previous attempt into the questions a wrong-only retry re-asks
+ * and the rows it copies forward untouched.
+ *
+ * The retried questions are rebuilt from scratch — fresh random values, a
+ * freshly evaluated correct answer, a freshly shuffled option order — so a
+ * student who saw the เฉลย cannot replay the same instance. Their `max_score`
+ * is deliberately pinned to the previous attempt's rather than recomputed:
+ * together with the carried rows it makes the new attempt add up to exactly
+ * the same total as a full attempt, which is what keeps `score_strategy`
+ * (best/average/latest), the class analytics and every "out of" the student
+ * reads comparable across attempts.
+ *
+ * A question that has since been deleted from the bank cannot be rebuilt, so
+ * its row is carried instead of dropped — losing it would shrink the total.
+ */
+export function buildRetryAttempt(
+  assignment: Pick<Assignment, 'shuffle_options'>,
+  questions: Question[],
+  previous: PreviousAttemptAnswer[],
+): { retried: AssignmentAttemptSkeleton[]; carried: CarriedAttemptAnswer[] } {
+  const questionsById = new Map(questions.map((q) => [q.id, q]))
+  const retried: AssignmentAttemptSkeleton[] = []
+  const carried: CarriedAttemptAnswer[] = []
+
+  for (const prev of previous) {
+    const q = questionsById.get(prev.question_id)
+    if (!q || !needsRetry(prev)) {
+      carried.push({ ...prev, carried_over: true })
+      continue
+    }
+
+    // Same rule as buildAssignmentAttempt: matching always scrambles its
+    // right-hand column, MCQ only when the teacher asked for it.
+    const shufflesOptions = q.question_type === 'matching'
+      || (assignment.shuffle_options && q.question_type === 'mcq')
+    const optionOrder = shufflesOptions && q.mcq_options
+      ? shuffleArray((q.mcq_options as unknown[]).map((_, i) => i))
+      : null
+
+    retried.push({
+      ...buildSkeletonBase(q),
+      max_score: prev.max_score,
+      order_index: prev.order_index,
+      option_order: optionOrder,
+    })
+  }
+
+  return { retried, carried }
+}
+
 // Rescales a raw auto-graded score to a custom point override. `storedMax`
 // equals `structuralMax` exactly when no override was set (see
 // naturalMaxScore above), so this is a no-op for every pre-existing

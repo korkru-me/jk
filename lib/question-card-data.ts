@@ -123,6 +123,10 @@ export async function fetchQuestionStats(
         .from('submission_answers')
         .select(STATS_SELECT)
         .in('submissions.status', ['submitted', 'graded'])
+        // A row a wrong-only retry carried forward is a copy of an answer an
+        // earlier attempt already contributed here. Counting it again would
+        // weight one student's answer twice in this question's difficulty.
+        .eq('carried_over', false)
       if (batch !== 'all') query = query.in('question_id', batch)
       return query.order('id', { ascending: true }).range(from, to) as unknown as
         PromiseLike<{ data: StatsRow[] | null; error: unknown }>

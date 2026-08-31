@@ -14,13 +14,13 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
-  Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone,
+  Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
-import type { Classroom, QuestionSet, AssignmentStatus, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { Classroom, QuestionSet, AssignmentStatus, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import type { BankQuestion } from '@/lib/question-bank'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
@@ -112,6 +112,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [maxAttempts, setMaxAttempts] = useState('')
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
+  const [retryScope, setRetryScope] = useState<RetryScope>('all')
   const [accessCode, setAccessCode] = useState('')
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
   const [fullscreenRequired, setFullscreenRequired] = useState(false)
@@ -283,6 +284,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         show_results: showResults,
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
+        retry_scope: retryScope,
         access_code: accessCode.trim() || null,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
@@ -428,7 +430,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   type="button"
                   onClick={() => {
                     setAssignmentType(t)
-                    if (attemptsAuto) setMaxAttempts(t === 'exam' ? '1' : '')
+                    if (attemptsAuto) {
+                      setMaxAttempts(t === 'exam' ? '1' : '')
+                      if (t === 'exam') setRetryScope('all')
+                    }
                   }}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
                     assignmentType === t ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
@@ -960,6 +965,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               onChange={e => {
                 setMaxAttempts(e.target.value)
                 setAttemptsAuto(false)
+                if (e.target.value === '1') setRetryScope('all')
               }}
               placeholder="ไม่จำกัด (เว้นว่าง)"
               className="max-w-[200px]"
@@ -985,6 +991,38 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {mode === 'online' && maxAttempts !== '1' && (
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <label className="flex items-center justify-between gap-4 cursor-pointer">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <RotateCcw className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">ลองใหม่เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      ครั้งถัดไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกครั้ง
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={retryScope === 'wrong_only'}
+                  onChange={e => setRetryScope(e.target.checked ? 'wrong_only' : 'all')}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+              {retryScope === 'wrong_only' && showResults === 'immediate' && (
+                <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                  ตอนนี้ตั้งให้เฉลยทันทีหลังส่ง นักเรียนจึงเห็นเฉลยก่อนกลับมาแก้ข้อที่ผิด
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                ข้ออัตนัยที่ครูยังไม่ได้ตรวจจะยกมาตามเดิม ไม่ถูกนับว่าผิดและนักเรียนแก้ไม่ได้
+              </p>
             </div>
           )}
 
@@ -1047,6 +1085,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(passingEnabled && passingValue ? [{ label: 'เกณฑ์ผ่าน', value: passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน` }] : []),
                 ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
                 ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
+                ...(mode === 'online' && maxAttempts !== '1' && retryScope === 'wrong_only'
+                  ? [{ label: 'การลองใหม่', value: 'เฉพาะข้อที่ยังไม่เต็ม' }]
+                  : []),
                 ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
                 ...(mode === 'online' && assignmentType === 'exam' && proctoringEnabled
                   ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]

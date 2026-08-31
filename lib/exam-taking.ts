@@ -72,6 +72,11 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       )
     `)
     .eq('submission_id', submissionId)
+    // A wrong-only retry copies the questions the student already got right
+    // into this attempt so its total still adds up. They are not asked again,
+    // so they must not reach the exam view — the student sees only what they
+    // came back to fix.
+    .eq('carried_over', false)
     .order('order_index')
   const student = Array.isArray(submission.users) ? submission.users[0] : submission.users
   const watermarkText = assignment.exam_watermark_enabled

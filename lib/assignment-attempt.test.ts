@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { buildAssignmentAttempt, gradeAnswer, naturalMaxScore, scaleScore, type GradableAnswer } from './assignment-attempt'
+import {
+  buildAssignmentAttempt, buildRetryAttempt, gradeAnswer, naturalMaxScore, scaleScore,
+  type GradableAnswer, type PreviousAttemptAnswer,
+} from './assignment-attempt'
 import type { AnswerPart, Assignment, Question } from '@/lib/types'
 
 /** A gradable answer with everything defaulted, so each test states only what it is about. */
@@ -393,6 +396,104 @@ describe('buildAssignmentAttempt — random question pool', () => {
 
     expect(result).toHaveLength(4)
     expect(result.some((row) => row.question_id === 'deleted-question')).toBe(false)
+  })
+})
+
+describe('buildRetryAttempt — what a wrong-only retry re-asks', () => {
+  const pool = ['q1', 'q2', 'q3', 'q4'].map((id) => ({
+    ...mcqQuestion([
+      { text: 'ผิด', is_correct: false },
+      { text: 'ถูก', is_correct: true },
+    ]),
+    id,
+  }))
+
+  /** A graded answer row from the previous attempt, defaulted to full marks. */
+  function previous(over: Partial<PreviousAttemptAnswer> & { question_id: string }): PreviousAttemptAnswer {
+    return {
+      random_values: {},
+      correct_answer: '1',
+      student_answer: '1',
+      is_correct: true,
+      score: 2,
+      max_score: 2,
+      teacher_feedback: null,
+      order_index: 0,
+      option_order: null,
+      work_images: null,
+      score_edited_by: null,
+      score_edited_at: null,
+      ...over,
+    }
+  }
+
+  it('re-asks only the questions that fell short of full marks', () => {
+    const { retried, carried } = buildRetryAttempt(assignment, pool, [
+      previous({ question_id: 'q1', order_index: 0 }),
+      previous({ question_id: 'q2', order_index: 1, is_correct: false, score: 0 }),
+      previous({ question_id: 'q3', order_index: 2 }),
+      previous({ question_id: 'q4', order_index: 3, is_correct: false, score: 0 }),
+    ])
+
+    expect(retried.map((row) => row.question_id)).toEqual(['q2', 'q4'])
+    expect(carried.map((row) => row.question_id)).toEqual(['q1', 'q3'])
+    expect(carried.every((row) => row.carried_over)).toBe(true)
+  })
+
+  it('counts partial credit as short of full marks', () => {
+    const { retried } = buildRetryAttempt(assignment, pool, [
+      previous({ question_id: 'q1', is_correct: true, score: 1, max_score: 2 }),
+    ])
+
+    expect(retried.map((row) => row.question_id)).toEqual(['q1'])
+  })
+
+  it('carries a question still waiting on the teacher instead of calling it wrong', () => {
+    const { retried, carried } = buildRetryAttempt(assignment, pool, [
+      previous({ question_id: 'q1', is_correct: null, score: 0, student_answer: 'เขียนไว้แล้ว' }),
+    ])
+
+    expect(retried).toHaveLength(0)
+    expect(carried[0].student_answer).toBe('เขียนไว้แล้ว')
+    expect(carried[0].score).toBe(0)
+  })
+
+  it('keeps the attempt worth the same total as a full attempt', () => {
+    const rows = [
+      previous({ question_id: 'q1', order_index: 0, max_score: 3, score: 3 }),
+      previous({ question_id: 'q2', order_index: 1, max_score: 5, score: 1, is_correct: false }),
+    ]
+    const { retried, carried } = buildRetryAttempt(assignment, pool, rows)
+    const total = [...retried, ...carried].reduce((sum, row) => sum + row.max_score, 0)
+
+    expect(total).toBe(rows.reduce((sum, row) => sum + row.max_score, 0))
+  })
+
+  it('preserves the previous attempt\'s question numbering', () => {
+    const { retried } = buildRetryAttempt(assignment, pool, [
+      previous({ question_id: 'q1', order_index: 0 }),
+      previous({ question_id: 'q2', order_index: 1, is_correct: false, score: 0 }),
+      previous({ question_id: 'q3', order_index: 2, is_correct: false, score: 0 }),
+    ])
+
+    expect(retried.map((row) => row.order_index)).toEqual([1, 2])
+  })
+
+  it('re-asks a question with a fresh answer key rather than the frozen one', () => {
+    const { retried } = buildRetryAttempt(assignment, pool, [
+      previous({ question_id: 'q1', correct_answer: 'ค่าเก่าที่นักเรียนเห็นไปแล้ว', is_correct: false, score: 0 }),
+    ])
+
+    expect(retried[0].correct_answer).toBe('MCQ:1')
+  })
+
+  it('carries a question that no longer exists instead of dropping its points', () => {
+    const { retried, carried } = buildRetryAttempt(assignment, pool, [
+      previous({ question_id: 'deleted-question', is_correct: false, score: 0, max_score: 4 }),
+    ])
+
+    expect(retried).toHaveLength(0)
+    expect(carried[0].max_score).toBe(4)
   })
 })
 

@@ -71,7 +71,7 @@ export default async function SubmissionResultPage({
     .select(`
       id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
       users(full_name),
-      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, display_max_score)
+      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score)
     `)
     .eq('id', id)
     .eq('student_id', user.id)
@@ -96,7 +96,7 @@ export default async function SubmissionResultPage({
       .select(`
         id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
         users(full_name),
-        assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, classroom_id, display_max_score),
+        assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score),
         submission_answers(id, correct_answer, is_correct)
       `)
       .eq('id', id)
@@ -177,8 +177,27 @@ export default async function SubmissionResultPage({
   const pendingManualCount = answers.filter(isPendingTeacherReview).length
 
   const attemptsRemaining = assignment.max_attempts == null || submission.attempt_number < assignment.max_attempts
+
+  // A wrong-only retry only has something to reopen while a question is still
+  // short of full marks. Questions waiting on the teacher are not counted:
+  // they are carried into the next attempt rather than re-asked, so offering
+  // the button for them would open an attempt with nothing in it. Counted in
+  // JS because PostgREST cannot compare two columns in a filter.
+  const isWrongOnlyRetry = assignment.retry_scope === 'wrong_only'
+  let retryableCount: number | null = null
+  if (isWrongOnlyRetry && isOwnSubmission && attemptsRemaining) {
+    const { data: scoreRows } = await admin
+      .from('submission_answers')
+      .select('is_correct, score, max_score')
+      .eq('submission_id', id)
+    retryableCount = (scoreRows ?? []).filter(
+      (r: any) => r.is_correct !== null && Number(r.score) < Number(r.max_score)
+    ).length
+  }
+
   const canRetry = isOwnSubmission && attemptsRemaining && assignment.status === 'published' &&
-    (!assignment.end_at || new Date(assignment.end_at) > new Date())
+    (!assignment.end_at || new Date(assignment.end_at) > new Date()) &&
+    (!isWrongOnlyRetry || (retryableCount ?? 0) > 0)
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -321,7 +340,9 @@ export default async function SubmissionResultPage({
                   className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-4 py-2 transition-colors"
                 >
                   <RotateCcw size={15} />
-                  {assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}
+                  {isWrongOnlyRetry
+                    ? `แก้เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม (${retryableCount} ข้อ)`
+                    : assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}
                 </Link>
               )}
               {assignment.classroom_id && (
@@ -380,7 +401,7 @@ async function SubmissionAnswerDetails({
     .from('submission_answers')
     .select(`
       id, correct_answer, is_correct, max_score, option_order, order_index,
-      random_values, score, student_answer, work_images,
+      random_values, score, student_answer, work_images, carried_over,
       questions(title, question_text, answer_parts, answer_unit, question_type, extra_data, mcq_options)
     `)
     .eq('submission_id', submissionId)
@@ -439,6 +460,9 @@ async function SubmissionAnswerDetails({
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm">ข้อ {i + 1}</p>
                       {q.title && <p className="text-xs text-muted-foreground truncate">{q.title}</p>}
+                      {a.carried_over && (
+                        <Badge variant="outline" className="text-xs">ยกมาจากครั้งก่อน</Badge>
+                      )}
                       <div className="ml-auto shrink-0">
                         {isTeacherViewer ? (
                           <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
