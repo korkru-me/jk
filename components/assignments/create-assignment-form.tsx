@@ -767,7 +767,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               // step. Only offered where it can do anything: one attempt has no
               // "next time", and a printed ใบงาน has no attempts at all.
               ...(mode === 'online' && maxAttempts !== '1' ? [{
-                label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง',
+                label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
                 desc: 'รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ',
                 icon: RotateCcw,
                 value: retryScope === 'wrong_only',
