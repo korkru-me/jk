@@ -41,9 +41,11 @@ npm run dev       # development server
 npx tsc --noEmit  # ตรวจ TypeScript
 npm run build     # production build
 npm run start     # รัน production build
+npm test             # vitest — ครอบเฉพาะโมดูล pure logic ใน lib/
+npm run lint:tokens  # กันไม่ให้ไฟล์ UI ถอยกลับไปใช้สี Tailwind ดิบ
 ```
 
-ปัจจุบันยังไม่มีคำสั่ง `lint` และยังไม่มี automated test suite
+ยังไม่มีคำสั่ง `lint` ทั่วไป และ `npm test` ยังไม่แตะ Supabase, server action หรือ browser
 
 ## เอกสารสำหรับคนและ AI
 
