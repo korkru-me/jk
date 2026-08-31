@@ -54,7 +54,7 @@ export default async function AssignmentDetailPage({
       .in('id', a.question_ids),
     supabase
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users(full_name)')
+      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', id)
       .order('submitted_at', { ascending: false }),
     admin

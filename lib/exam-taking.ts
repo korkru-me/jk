@@ -41,9 +41,14 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   if (!user) return null
 
   const admin = createAdminClient()
+  // The users embed is pinned to the student FK by name. `submissions` gained a
+  // second relationship to `users` with Android monitored mode
+  // (`android_approved_by`, the approving teacher), and an unqualified
+  // `users(...)` is ambiguous from that point on: PostgREST refuses the whole
+  // query, which reads here as an attempt that cannot be opened at all.
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, users(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page)')
+    .select('id, started_at, assignment_id, student_id, status, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()

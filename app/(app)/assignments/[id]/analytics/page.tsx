@@ -65,7 +65,7 @@ export default async function AnalyticsPage({
       .in('id', a.question_ids),
     supabase
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users(full_name, avatar_url)')
+      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name, avatar_url)')
       .eq('assignment_id', id)
       .in('status', ['submitted', 'graded'])
       .order('total_score', { ascending: false }),

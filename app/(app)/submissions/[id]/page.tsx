@@ -70,7 +70,7 @@ export default async function SubmissionResultPage({
     .from('submissions')
     .select(`
       id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
-      users(full_name),
+      users!submissions_student_id_fkey(full_name),
       assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score)
     `)
     .eq('id', id)
@@ -95,7 +95,7 @@ export default async function SubmissionResultPage({
       .from('submissions')
       .select(`
         id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
-        users(full_name),
+        users!submissions_student_id_fkey(full_name),
         assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score),
         submission_answers(id, correct_answer, is_correct)
       `)
@@ -128,7 +128,7 @@ export default async function SubmissionResultPage({
 
     const { data: siblingSubs } = await supabase
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, attempt_number, users(full_name)')
+      .select('id, student_id, status, total_score, max_score, attempt_number, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', submission.assignment_id)
 
     const normalized = (siblingSubs ?? []).map((s: any) => ({ ...s, attempt_number: s.attempt_number ?? 1 }))

@@ -35,7 +35,7 @@ export default async function ResultsPage({
   const [{ data: submissions }, { data: questionRows }] = await Promise.all([
     supabase
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, submitted_at, attempt_number, users(full_name, email)')
+      .select('id, student_id, status, total_score, max_score, submitted_at, attempt_number, users!submissions_student_id_fkey(full_name, email)')
       .eq('assignment_id', id),
     supabase
       .from('questions')
