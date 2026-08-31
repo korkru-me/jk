@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 30 สิงหาคม 2026
+ตรวจจาก repository: 31 สิงหาคม 2026
 
 ## วิธีอ่านสถานะ
 
