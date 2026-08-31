@@ -137,7 +137,11 @@ export async function createAssignment(data: CreateAssignmentData) {
     && data.retry_scope === 'wrong_only'
       ? 'wrong_only'
       : 'all'
-  const randomQuestionCount = isOnlineExam
+  // Drawing a smaller paper per student is not an exam-integrity control the
+  // way SEB or the watermark are — a แบบฝึกหัด wants it just as much, so this
+  // is gated on online alone. A printed ใบงาน is one paper for the whole room
+  // and cannot draw at all.
+  const randomQuestionCount = data.mode === 'online'
     && Number.isInteger(data.random_question_count)
     && (data.random_question_count as number) > 0
     && (data.random_question_count as number) < questionIds.length
@@ -378,7 +382,8 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     && data.retry_scope === 'wrong_only'
       ? 'wrong_only'
       : 'all'
-  const randomQuestionCount = isOnlineExam
+  // Online alone, matching createAssignment: a แบบฝึกหัด can draw too.
+  const randomQuestionCount = existing.mode === 'online'
     && Number.isInteger(data.random_question_count)
     && data.random_question_count !== null
     && data.random_question_count > 0

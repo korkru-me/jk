@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices } from 'lucide-react'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -309,16 +309,16 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </Card>
       )}
 
-      {a.mode === 'online' && a.type === 'exam' && (
+      {a.mode === 'online' && a.question_ids.length >= 2 && (
         <Card padding="xl" className="space-y-3">
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <ListFilter className="w-4 h-4 text-primary" />
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Dices className="w-4 h-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">สุ่มชุดข้อสอบรายคน</p>
+              <p className="text-sm font-medium text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                เลือกจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอด attempt รวมถึงหลัง reload
+                สุ่มจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอดรอบนั้น รวมถึงหลังปิดหน้าจอแล้วกลับมาทำต่อ
               </p>
             </div>
           </div>
@@ -331,7 +331,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               value={randomQuestionCount}
               onChange={event => setRandomQuestionCount(event.target.value)}
               placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
-              disabled={a.question_ids.length < 2}
+              disabled={hasSubmissions}
               className="max-w-[150px]"
             />
             <Label htmlFor="edit-random-question-count" className="text-sm text-muted-foreground">
@@ -339,9 +339,16 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             </Label>
           </div>
           <p className="text-xs text-muted-foreground pl-11">
-            เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว
+            {hasSubmissions
+              ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
+              : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
           </p>
-          <label className="flex items-center justify-between gap-4 border-t border-border pt-3 cursor-pointer">
+        </Card>
+      )}
+
+      {a.mode === 'online' && a.type === 'exam' && (
+        <Card padding="xl" className="space-y-3">
+          <label className="flex items-center justify-between gap-4 cursor-pointer">
             <div className="flex items-start gap-3">
               <Fingerprint className="w-4 h-4 text-muted-foreground mt-0.5" />
               <div>

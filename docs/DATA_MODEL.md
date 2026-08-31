@@ -79,7 +79,7 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - browser เขียน `exam_seb_checkins` ตรงไม่ได้ การบันทึกหลัง `system_check` ผ่านใช้ service-role-only `record_exam_seb_checkin` ซึ่งตรวจซ้ำว่าข้อสอบเป็น `published` + `seb_required` และนักเรียนยังอยู่ใน roster; teacher-select RLS ให้ owner, co-teacher `admin/manage` และ super admin อ่านได้ แต่ไม่เปิดให้นักเรียนหรือผู้ไม่เกี่ยวข้อง แถวเก่ากว่าถูกแทนที่เฉพาะด้วยผลตรวจที่ใหม่กว่าหรือเวลาเท่ากัน
 - check-in ที่ยังไม่หมดอายุหมายถึง “ผ่านการตรวจล่าสุด” เท่านั้น ไม่ใช่ตัวระบุเครื่อง ไม่พิสูจน์ว่าใช้เครื่องเดิมต่อ และไม่ใช่หลักฐานว่าปกติหรือทุจริต จึงไม่ใช้เป็น hard gate ของ `startSubmission`; รายการนี้ลบอัตโนมัติเมื่อเกิน 90 วันและถูกล้างร่วมกับข้อมูลคุมสอบราย assignment ได้
 - หาก `android_exam_mode = 'monitored'` server ยอมรับ signed Android session แทน SEB ได้เฉพาะหลังครูที่จัดการ assignment อนุมัติ exact student ที่อยู่ใน roster; user-agent ใช้ routing UI เท่านั้น และ Android audit ห้ามถูกแสดงเป็น SEB
-- `random_question_count` ต้องไม่เกินจำนวน `question_ids`; การแก้จำนวนถูกปิดหลังมี submission แรก และ subset จริงไม่เก็บซ้ำใน assignment แต่ดูจาก `submission_answers` ที่สร้างและตรึงไว้ต่อ attempt
+- `random_question_count` ต้องไม่เกินจำนวน `question_ids` และ server รับเฉพาะงาน `mode = online` (ทั้ง `exam` และ `exercise` — ไม่ใช่ข้อสอบอย่างเดียวเหมือนก่อน 31 ส.ค. 2026); การแก้จำนวนถูกปิดหลังมี submission แรก และ subset จริงไม่เก็บซ้ำใน assignment แต่ดูจาก `submission_answers` ที่สร้างและตรึงไว้ต่อ attempt
 - นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
 
 ## วิจัยการศึกษา
