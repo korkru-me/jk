@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   BookOpen, Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
-  Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw,
+  Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -26,6 +26,7 @@ import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
+import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
 
@@ -129,6 +130,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
 
+  // Every โจทย์ this teacher can actually assign. Kept as a set because both
+  // the แฟ้ม shortcut and importSet ask "is this id real?" once per ข้อ in a
+  // แฟ้ม, against a คลัง that can hold thousands.
+  const bankIds = useMemo(() => new Set(questions.map(q => q.id)), [questions])
+
   function toggleQ(id: string) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
@@ -146,9 +152,22 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setSelectedIds(prev => moveQuestionOrderToIndex(prev, id, position - 1))
   }
 
+  // Same effect as unticking the ข้อ back in เลือกโจทย์, so a duplicate spotted
+  // here doesn't cost a trip backwards. `sections` is left alone for the same
+  // reason as in moveQuestion: it keeps this question's แฟ้มย่อย, so re-ticking
+  // it later puts it back under the same one. The last remaining ข้อ can't go —
+  // the server refuses a งาน with no โจทย์, and one built from a แฟ้ม would
+  // quietly get the whole แฟ้ม back instead.
+  function removeQuestion(id: string) {
+    setSelectedIds(prev => prev.filter(i => i !== id))
+  }
+
   function importSet(set: AssignmentQuestionSetOption) {
-    const validIds = set.question_ids.filter(id => questions.some(q => q.id === id))
+    const validIds = set.question_ids.filter(id => bankIds.has(id))
     const missingCount = set.question_ids.length - validIds.length
+    // What the click actually changed. Re-importing a แฟ้ม the teacher already
+    // pulled in used to claim it added all 22 ข้อ again.
+    const addedCount = validIds.filter(id => !selectedIds.includes(id)).length
     setSelectedIds(prev => Array.from(new Set([...prev, ...validIds])))
     // Sections follow their questions in. Ids already claimed by an earlier
     // แฟ้ม stay where they are, so two แฟ้ม can be merged without a question
@@ -161,9 +180,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       return [...prev, ...incoming]
     })
     if (missingCount > 0) {
-      toast.success(`เพิ่ม ${validIds.length} ข้อจากแฟ้ม "${set.title}" (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
+      toast.success(`เพิ่ม ${addedCount} ข้อจากแฟ้ม "${set.title}" (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
     } else {
-      toast.success(`เพิ่ม ${validIds.length} ข้อจากแฟ้ม "${set.title}"`)
+      toast.success(`เพิ่ม ${addedCount} ข้อจากแฟ้ม "${set.title}"`)
     }
   }
 
@@ -436,7 +455,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           <Card padding="xl" className="space-y-3">
             <h2 className="font-semibold text-foreground">ประเภทงาน</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(['exercise', 'exam'] as const).map(t => (
                 <button
                   key={t}
@@ -448,15 +467,17 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                       if (t === 'exam') setRetryScope('all')
                     }
                   }}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
                     assignmentType === t ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
                 >
-                  <div className="text-2xl mb-2">{t === 'exam' ? '📝' : '🔁'}</div>
-                  <p className="font-medium text-sm text-foreground">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {t === 'exam' ? 'ทำได้ครั้งเดียว' : 'ทำได้หลายครั้ง'}
-                  </p>
+                  <div className="text-xl leading-none shrink-0">{t === 'exam' ? '📝' : '🔁'}</div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm text-foreground">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t === 'exam' ? 'ทำได้ครั้งเดียว' : 'ทำได้หลายครั้ง'}
+                    </p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -464,21 +485,23 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           <Card padding="xl" className="space-y-3">
             <h2 className="font-semibold text-foreground">โหมดการสอบ</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(['online', 'print'] as const).map(m => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
                     mode === m ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
                 >
-                  <div className="text-2xl mb-2">{m === 'online' ? '💻' : '🖨️'}</div>
-                  <p className="font-medium text-sm text-foreground">{m === 'online' ? 'ออนไลน์' : 'พิมพ์ใบงาน'}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {m === 'online' ? 'นักเรียนทำบนเว็บ + จับเวลา' : 'สร้าง PDF พร้อม QR Code'}
-                  </p>
+                  <div className="text-xl leading-none shrink-0">{m === 'online' ? '💻' : '🖨️'}</div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm text-foreground">{m === 'online' ? 'ออนไลน์' : 'พิมพ์ใบงาน'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {m === 'online' ? 'นักเรียนทำบนเว็บ + จับเวลา' : 'สร้าง PDF พร้อม QR Code'}
+                    </p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -489,33 +512,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {/* ── Step 2: เลือกโจทย์ ────────────────────────────────────────── */}
       {step === 1 && (
         <div className="space-y-4">
-          {questionSets.length > 0 && (
-            <Card padding="md" className="space-y-2.5">
-              <div className="flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">เพิ่มจากแฟ้มโจทย์ที่มีอยู่</h3>
-              </div>
-              <p className="text-xs text-muted-foreground">เลือกแฟ้มเพื่อเพิ่มโจทย์ทั้งหมดเข้ามา — ปรับเพิ่ม/ลดทีละข้อได้ด้านล่าง</p>
-              <div className="flex flex-wrap gap-2">
-                {questionSets.map(s => {
-                  const validCount = s.question_ids.filter(id => questions.some(q => q.id === id)).length
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => importSet(s)}
-                      className="flex items-center gap-1.5 text-xs font-medium border border-border hover:border-primary/20 hover:bg-primary/10 text-muted-foreground px-3 py-1.5 rounded-lg transition-all"
-                    >
-                      <Layers className="w-3 h-3 text-muted-foreground" />
-                      {s.title}
-                      <span className="text-muted-foreground">({validCount})</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </Card>
-          )}
-
           <QuestionPicker
             questions={questions}
             selectedIds={selectedIds}
@@ -524,6 +520,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             onSearchChange={setSearch}
             diffFilter={diffFilter}
             onDiffFilterChange={setDiffFilter}
+            toolbar={
+              <QuestionSetImport
+                sets={questionSets}
+                bankIds={bankIds}
+                selectedIds={selectedIds}
+                onImport={importSet}
+              />
+            }
           />
         </div>
       )}
@@ -532,15 +536,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
       {step === 2 && (
         <div className="space-y-4">
           <Card padding="xl" className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <h2 className="font-semibold text-foreground">คะแนนแต่ละข้อ</h2>
-              <span className="text-sm font-semibold text-primary">รวม {pointsSum} คะแนน</span>
+              <span className="text-sm font-semibold text-primary shrink-0">
+                {previewQuestions.length} ข้อ · รวม {pointsSum} คะแนน
+              </span>
             </div>
             <p className="text-xs text-muted-foreground">
               ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
               แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
               สลับลำดับข้อได้ที่นี่ — ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
-              และกดรูปตาเพื่อดูตัวอย่างข้อนั้นแบบที่นักเรียนเห็น
+              กดรูปตาเพื่อดูตัวอย่างข้อนั้นแบบที่นักเรียนเห็น
+              และถ้าเจอข้อซ้ำหรือข้อที่ไม่เอาแล้ว กดกากบาทท้ายแถวเอาออกได้เลย ไม่ต้องย้อนกลับไปหน้าเลือกโจทย์
             </p>
 
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
@@ -595,6 +602,15 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     className="w-20 text-center shrink-0"
                   />
                   <span className="text-xs text-muted-foreground shrink-0">คะแนน</span>
+                  <IconButton
+                    label="เอาข้อนี้ออก"
+                    size="2xs"
+                    className="shrink-0 hover:text-destructive"
+                    disabled={previewQuestions.length <= 1}
+                    onClick={() => removeQuestion(q.id)}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </IconButton>
                 </div>
               ))}
             </div>

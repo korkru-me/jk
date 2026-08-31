@@ -17,6 +17,11 @@ interface Props {
   diffFilter: string
   onDiffFilterChange: (v: string) => void
   title?: string
+  /** Rendered between the heading and the search box, where an entry point
+   *  into the list belongs — the assignment wizard puts เพิ่มจากแฟ้มโจทย์
+   *  there. Above the search on purpose: below it, it scrolls away exactly
+   *  when a teacher deep in the bank goes looking for it. */
+  toolbar?: React.ReactNode
   /** Rendered above the list — the set editor uses it to show which แฟ้มย่อย
    *  newly ticked questions will land in. */
   banner?: React.ReactNode
@@ -40,7 +45,7 @@ interface Props {
 
 export function QuestionPicker({
   questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
-  title = 'เลือกโจทย์', banner, showSelectedFooter = true, showHeader = true, surface = 'card',
+  title = 'เลือกโจทย์', toolbar, banner, showSelectedFooter = true, showHeader = true, surface = 'card',
   baselineIds, collectionNoun = 'แฟ้ม',
 }: Props) {
   const allTags = Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort()
@@ -99,6 +104,8 @@ export function QuestionPicker({
           </span>
         </div>
       )}
+
+      {toolbar}
 
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-48">
