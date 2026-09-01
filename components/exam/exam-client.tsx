@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
+  Pencil,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -59,6 +60,11 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
   // submission_answers rows carry this column too, but the real exam-taking
   // route never needs it client-side since grading happens server-side.
   max_score?: number
+  // Preview-only: whether this teacher may open this โจทย์ in the คลัง. A
+  // question a teammate shared without เปิดให้แก้ร่วมกัน is readable here but
+  // not editable, and the edit route would answer 404 — so the button is not
+  // drawn rather than drawn and broken. Never set on the student route.
+  canEditQuestion?: boolean
   questions: {
     title: string
     question_text: string
@@ -126,6 +132,10 @@ interface Props {
   // `previewReturnHref` instead of the real post-submit redirect.
   previewMode?: boolean
   previewReturnHref?: string
+  /** Preview-only: shown under the banner when editing a โจทย์ from here can
+   *  no longer reach everyone — i.e. someone has already started this งาน and
+   *  is holding a frozen copy of it. */
+  previewEditWarning?: string
 }
 
 // ─── ExamClient ───────────────────────────────────────────────────────────────
@@ -152,7 +162,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref }: Props) {
+export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef,
@@ -558,6 +568,22 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                   </Badge>
                 )}
                 <div className="ml-auto flex items-center gap-2">
+                  {/* Teacher-only, and the reason the preview is worth opening
+                      at all: a typo in a โจทย์ is easiest to see in the layout
+                      the student gets. Opens in a new tab so the preview — and
+                      whatever has been typed into it — is still there to come
+                      back to. */}
+                  {previewMode && current.canEditQuestion && (
+                    <a
+                      href={`/questions/${current.question_id}/edit`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground transition-all hover:border-primary hover:text-primary"
+                    >
+                      <Pencil size={11} />
+                      แก้ไขโจทย์
+                    </a>
+                  )}
                   <button
                     onClick={() => toggleFlag(current.id)}
                     className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
@@ -871,11 +897,16 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
       {/* ── Preview mode banner ────────────────────────────────────────────── */}
       {previewMode && (
-        <div className="fixed top-0 inset-x-0 z-[110] bg-warning text-amber-950 text-xs font-semibold px-4 py-1.5 flex items-center justify-center gap-3">
-          <span>🔍 โหมดตัวอย่าง — มุมมองนักเรียน (คำตอบจะไม่ถูกบันทึกจริง)</span>
-          <a href={previewReturnHref ?? '/assignments'} className="underline hover:no-underline">
-            ออกจากตัวอย่าง
-          </a>
+        <div className="fixed top-0 inset-x-0 z-[110] bg-warning text-amber-950 px-4 py-1.5 flex flex-col items-center gap-0.5">
+          <div className="flex items-center justify-center gap-3 text-xs font-semibold">
+            <span>🔍 โหมดตัวอย่าง — มุมมองนักเรียน (คำตอบจะไม่ถูกบันทึกจริง)</span>
+            <a href={previewReturnHref ?? '/assignments'} className="underline hover:no-underline">
+              ออกจากตัวอย่าง
+            </a>
+          </div>
+          {previewEditWarning && (
+            <p className="text-[11px] font-medium text-center leading-4">{previewEditWarning}</p>
+          )}
         </div>
       )}
 

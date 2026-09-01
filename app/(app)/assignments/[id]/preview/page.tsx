@@ -42,10 +42,20 @@ export default async function AssignmentPreviewPage({
     )
   }
 
-  const { data: questions } = await supabase
-    .from('questions')
-    .select('*')
-    .in('id', a.question_ids)
+  // The โจทย์ themselves, and whether anyone has started this งาน — the second
+  // decides only what the banner says, so it must never block the preview.
+  const [{ data: questions }, { data: startedSubmission }] = await Promise.all([
+    supabase
+      .from('questions')
+      .select('*')
+      .in('id', a.question_ids),
+    supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle(),
+  ])
 
   if (!questions || questions.length === 0) notFound()
 
@@ -94,6 +104,11 @@ export default async function AssignmentPreviewPage({
       // submit (see ExamClient's previewMode) — the real exam-taking route
       // never sends this since grading there happens server-side.
       max_score: s.max_score,
+      // Same rule the edit route enforces (`questions/[id]/edit`): the owner,
+      // or anyone when the โจทย์ is opened for team editing. Decided here so a
+      // teammate's locked โจทย์ shows no button at all rather than a button
+      // that lands on 404.
+      canEditQuestion: q.created_by === user.id || q.team_edit_allowed === true,
       questions: {
         title: q.title,
         question_text: q.question_text,
@@ -133,8 +148,11 @@ export default async function AssignmentPreviewPage({
     instantCheckAnswerKey: a.instant_check_answer_key !== false,
   }
 
+  // The banner is fixed, so the page reserves its height by hand. A second
+  // line only appears when someone has already started, and without the extra
+  // room it would sit on top of ข้อ 1.
   return (
-    <div className="h-full flex flex-col pt-9">
+    <div className={`h-full flex flex-col ${startedSubmission ? 'pt-16' : 'pt-9'}`}>
       <ExamClient
         submissionId={`preview-${id}`}
         answers={previewAnswers as any}
@@ -145,6 +163,9 @@ export default async function AssignmentPreviewPage({
         questionsPerPage={Math.max(1, Number(a.questions_per_page ?? 1))}
         previewMode
         previewReturnHref={`/assignments/${id}`}
+        previewEditWarning={startedSubmission
+          ? 'มีนักเรียนเริ่มทำงานนี้แล้ว — การแก้โจทย์มีผลกับครั้งที่เริ่มใหม่เท่านั้น ครั้งที่ทำค้างอยู่ยังใช้โจทย์และเฉลยเดิมที่ตรึงไว้ตอนเริ่ม'
+          : undefined}
       />
     </div>
   )
