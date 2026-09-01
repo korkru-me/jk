@@ -560,6 +560,16 @@ export interface Assignment {
   /** How many questions the online exam page puts on one screen. 1 is the
    *  original one-question-per-screen layout and the default. */
   questions_per_page: number
+  /** แบบฝึกหัด only: lets the student check one ข้อ mid-attempt instead of
+   *  waiting for the single ส่งคำตอบ at the end — the behavioral difference
+   *  between a แบบฝึกหัด and a ข้อสอบ. Never on for an exam or a printed
+   *  ใบงาน. Scores are still decided by the final submit, so a ข้อ checked
+   *  and then fixed is banked as the fixed answer. */
+  instant_check: boolean
+  /** Whether that check reveals the เฉลย (and the teacher's วิธีทำ), or only
+   *  says ถูก/ผิด and leaves the student to think again. Meaningless while
+   *  `instant_check` is false. */
+  instant_check_answer_key: boolean
   access_code: string | null
   passing_type: 'score' | 'percent' | null
   passing_value: number | null

@@ -81,6 +81,7 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - หาก `android_exam_mode = 'monitored'` server ยอมรับ signed Android session แทน SEB ได้เฉพาะหลังครูที่จัดการ assignment อนุมัติ exact student ที่อยู่ใน roster; user-agent ใช้ routing UI เท่านั้น และ Android audit ห้ามถูกแสดงเป็น SEB
 - `random_question_count` ต้องไม่เกินจำนวน `question_ids` และ server รับเฉพาะงาน `mode = online` (ทั้ง `exam` และ `exercise` — ไม่ใช่ข้อสอบอย่างเดียวเหมือนก่อน 31 ส.ค. 2026); การแก้จำนวนถูกปิดหลังมี submission แรก และ subset จริงไม่เก็บซ้ำใน assignment แต่ดูจาก `submission_answers` ที่สร้างและตรึงไว้ต่อ attempt
 - นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
+- ข้อยกเว้นเดียวของบรรทัดบนคือ `checkAnswer` ของแบบฝึกหัดที่เปิด `instant_check` ซึ่งส่งผลรายข้อ (และเฉลย ถ้า `instant_check_answer_key` เปิด) ระหว่าง attempt ยัง `in_progress` · RLS ไม่ได้ถูกผ่อน — browser ยังอ่าน `submission_answers` ระหว่างทำไม่ได้เลย ทางเดียวคือ Server Action ที่ตรวจเจ้าของ/สถานะ/เวลา/กำหนดส่ง/SEB session ซ้ำ แล้วประกอบ payload ที่เปิดเฉพาะสิ่งที่ครูอนุญาต ไม่ส่ง `correct_answer` ดิบลงไป
 
 ## วิจัยการศึกษา
 
@@ -127,6 +128,8 @@ Invariant สำคัญ:
 - `assignments.score_strategy` เลือก best/average/latest สำหรับหลาย attempt
 - `assignments.retry_scope` = `all` | `wrong_only` ตัดสินว่าการทำครั้งใหม่ถามซ้ำทั้งชุดหรือเฉพาะข้อที่ `score < max_score`
 - `submission_answers.carried_over` คือแถวที่คัดลอกมาจาก attempt ก่อนหน้า ไม่ได้ตอบใน attempt นี้ — นับใน `max_score`/`total_score` แต่ไม่ถูก auto-grade ซ้ำ และไม่ถูกส่งเข้าหน้าทำข้อสอบ
+- `assignments.instant_check` เปิดให้แบบฝึกหัดออนไลน์กดตรวจทีละข้อระหว่างทำ และ `instant_check_answer_key` ตัดสินว่าการตรวจนั้นเปิดเฉลยด้วยหรือบอกแค่ถูก/ผิด — ทั้งคู่ไม่มีผลกับคะแนน `submitSubmission` ยังตรวจใหม่ทั้งชุดจาก `student_answer` เหมือนเดิม คะแนนแบบฝึกหัดจึงมาจากคำตอบสุดท้ายเสมอ
+- `submission_answers.check_count` นับจำนวนครั้งที่นักเรียนกดตรวจข้อนั้นระหว่างทำ ไม่ใช้คิดคะแนนและไม่ใช้กั้นการกดตรวจ เป็นสัญญาณเดียวที่แยก "ถูกตั้งแต่แรก" ออกจาก "ตรวจแล้วแก้จนถูก" เมื่อคะแนนสองคนเท่ากัน
 
 ก่อนแก้ scoring ต้องตรวจ `lib/scoring.ts`, `lib/grading.ts`, `lib/actions/submissions.ts` และหน้าที่อ่านคะแนนทั้งหมด
 

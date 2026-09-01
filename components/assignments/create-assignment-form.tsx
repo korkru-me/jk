@@ -15,6 +15,7 @@ import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
+  CircleCheck,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -134,6 +135,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   // which is one attempt, resets this to 'all' below where it means nothing.
   const [retryScope, setRetryScope] = useState<RetryScope>('wrong_only')
   const [questionsPerPage, setQuestionsPerPage] = useState('1')
+  // On by default, and the reason a แบบฝึกหัด is not just a ข้อสอบ with more
+  // attempts: the student finishes a ข้อ, presses ตรวจ, and finds out there and
+  // then. A teacher who wants the whole set answered blind before any feedback
+  // unticks it; the เฉลย itself is a separate decision below, because "บอกว่า
+  // ผิด" and "บอกว่าคำตอบคืออะไร" are not the same amount of help.
+  const [instantCheck, setInstantCheck] = useState(true)
+  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(true)
   const [accessCode, setAccessCode] = useState('')
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
   const [fullscreenRequired, setFullscreenRequired] = useState(false)
@@ -371,6 +379,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         // switch was left on before they turned the draw on.
         retry_scope: selectedRandomCount ? 'all' : retryScope,
         questions_per_page: Number(questionsPerPage) || 1,
+        instant_check: instantCheck,
+        instant_check_answer_key: instantCheckAnswerKey,
         access_code: accessCode.trim() || null,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
@@ -861,6 +871,42 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
           <div className="space-y-2">
             {[
+              // The แบบฝึกหัด/ข้อสอบ difference itself, so it sits above the
+              // rest rather than among the shuffles. Never offered to a ข้อสอบ
+              // (one ส่งคำตอบ at the end is what a ข้อสอบ is) or to a printed
+              // ใบงาน (nothing to press).
+              ...(mode === 'online' && assignmentType === 'exercise' ? [{
+                label: 'ให้นักเรียนกดตรวจทีละข้อ',
+                desc: 'ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย — คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน',
+                icon: CircleCheck,
+                value: instantCheck,
+                set: setInstantCheck,
+                footer: (instantCheck ? (
+                  <div className="space-y-1.5 pl-11">
+                    <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                        <p className="text-xs text-muted-foreground">
+                          {instantCheckAnswerKey
+                            ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำที่ครูใส่ไว้ทันที เหมาะกับการฝึกให้เข้าใจ'
+                            : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={instantCheckAnswerKey}
+                        onChange={e => setInstantCheckAnswerKey(e.target.checked)}
+                        className="accent-primary w-4 h-4 shrink-0"
+                      />
+                    </label>
+                    {instantCheckAnswerKey && (
+                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                        นักเรียนเห็นเฉลยระหว่างทำ แล้วแก้คำตอบให้ถูกได้ คะแนนแบบฝึกหัดจึงสะท้อน &ldquo;ทำจนเข้าใจ&rdquo; ไม่ใช่ &ldquo;ถูกตั้งแต่แรก&rdquo; — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดูในหน้าผลรายคน
+                      </p>
+                    )}
+                  </div>
+                ) : null) as React.ReactNode,
+              }] : []),
               ...(assignedSections.length > 0 ? [{
                 label: 'แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น',
                 desc: shuffleQ

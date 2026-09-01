@@ -401,7 +401,7 @@ async function SubmissionAnswerDetails({
     .from('submission_answers')
     .select(`
       id, correct_answer, is_correct, max_score, option_order, order_index,
-      random_values, score, student_answer, work_images, carried_over,
+      random_values, score, student_answer, work_images, carried_over, check_count,
       questions(title, question_text, answer_parts, answer_unit, question_type, extra_data, mcq_options)
     `)
     .eq('submission_id', submissionId)
@@ -462,6 +462,14 @@ async function SubmissionAnswerDetails({
                       {q.title && <p className="text-xs text-muted-foreground truncate">{q.title}</p>}
                       {a.carried_over && (
                         <Badge variant="outline" className="text-xs">ยกมาจากครั้งก่อน</Badge>
+                      )}
+                      {/* แบบฝึกหัด ที่เปิดให้ตรวจทีละข้อ: คะแนนคิดจากคำตอบสุดท้าย
+                          เสมอ ตัวเลขนี้จึงเป็นสิ่งเดียวที่แยก "ถูกตั้งแต่แรก"
+                          ออกจาก "ตรวจแล้วแก้อีกหลายรอบ" */}
+                      {a.check_count > 1 && (
+                        <Badge variant="outline" className="text-xs">
+                          ตรวจก่อนส่ง {a.check_count} ครั้ง
+                        </Badge>
                       )}
                       <div className="ml-auto shrink-0">
                         {isTeacherViewer ? (

@@ -47,3 +47,17 @@ export function isAttemptExpired(startedAt: string, durationMinutes: number | nu
   if (durationMinutes == null) return false
   return Date.now() > new Date(startedAt).getTime() + durationMinutes * 60_000
 }
+
+// Whether a ข้อ can be checked on its own during a แบบฝึกหัด.
+//
+// ข้อเขียน has no answer key — only a teacher can score it — so pressing ตรวจ
+// could never answer more than "รอครูตรวจ", and revealing the model answer
+// while the student is still writing would hand them the essay. It is the one
+// type the button is withheld from entirely; everything else, including a
+// ช่องกรอกที่ครูตรวจเอง inside a เติมคำ, has something honest to say.
+//
+// Lives here rather than next to buildAnswerFeedback so the exam page can ask
+// the question without importing the evaluator that grades the answer.
+export function isInstantCheckable(questionType: string): boolean {
+  return questionType !== 'essay'
+}

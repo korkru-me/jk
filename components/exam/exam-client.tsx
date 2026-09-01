@@ -2,12 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
+import { checkAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
 // previewMode grading ever runs. Importing it statically shipped that whole
 // evaluator to every student's phone and pushed the exam page past what a
 // mobile browser would allocate, so it is loaded on demand in handleSubmit.
 import type { GradedAnswer } from '@/lib/assignment-attempt'
+// Type-only for the same reason: buildAnswerFeedback reaches the evaluator too,
+// and only a teacher's previewMode ever runs it in the browser.
+import type { AnswerFeedback } from '@/lib/answer-feedback'
+import { isInstantCheckable } from '@/lib/grading'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
@@ -21,7 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone,
+  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -73,6 +77,11 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
     image_urls: string[] | null
     // Preview-only, see AnswerRow.max_score above.
     answer_tolerance?: number
+    // Preview-only as well: a real attempt's ตรวจคำตอบ gets the teacher's
+    // วิธีทำ from the server, which is the only side that may decide whether
+    // the student is allowed to see it yet.
+    solution_text?: string | null
+    solution_image_urls?: string[] | null
   }
 }
 
@@ -85,6 +94,17 @@ export interface ExamConfig {
   // decision for the whole assignment, made by the teacher when they create it
   // — every เติมคำตอบตัวเลข question in it either needs a photo or none does.
   isWorkImageEnforced: boolean
+  // แบบฝึกหัด only: each ข้อ carries its own ตรวจคำตอบ button, so a student
+  // finds out whether they got it right — and reads the เฉลย, when the teacher
+  // left that on — without waiting for the single ส่งคำตอบ at the end. This is
+  // the difference between a แบบฝึกหัด and a ข้อสอบ; the server re-checks the
+  // งาน's type and setting on every check, this only draws the button.
+  instantCheck?: boolean
+  // Whether that check shows the เฉลย, or only says ถูก/ผิด and leaves the
+  // student to think again. On a real attempt this is advisory — the server
+  // decides what it puts in the response — and only previewMode, which grades
+  // its own copy, reads it to make the same decision.
+  instantCheckAnswerKey?: boolean
 }
 
 interface Props {
@@ -157,6 +177,15 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   // after a teacher clicks submit in previewMode, in place of the real
   // /submissions/[id] results page.
   const [previewResult, setPreviewResult] = useState<{ graded: GradedAnswer[]; totalScore: number; totalMax: number } | null>(null)
+  // ── ตรวจทีละข้อ (แบบฝึกหัด) ───────────────────────────────────────────────
+  // The result of the last ตรวจคำตอบ on each ข้อ, keyed by submission_answer id.
+  // Deliberately not persisted anywhere client-side: it is cleared the moment
+  // the answer under it changes (see handleAnswerChange), so a panel on screen
+  // always describes the answer currently in the box. Nothing here decides a
+  // score — the final ส่งคำตอบ re-grades every ข้อ from what was last saved.
+  const [checked, setChecked] = useState<Record<string, AnswerFeedback & { checkCount: number }>>({})
+  const [checkingId, setCheckingId] = useState<string | null>(null)
+  const instantCheckOn = config.instantCheck === true
 
   // ── UX state ────────────────────────────────────────────────────────────────
   const [flagged, setFlagged] = useState<Set<string>>(new Set())
@@ -192,14 +221,16 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const secondsLeft = useExamTimer(durationMinutes, startedAt, () => handleSubmit())
 
   // ── Teacher preview: warm the grading module ────────────────────────────────
-  // previewMode grades in the browser through gradeAnswer, which carries
-  // mathjs. Students never reach that path, so it is no longer imported at the
-  // top of this file. Fetching it here — on the preview route only, while the
-  // teacher is still reading the first question — keeps the submit click as
-  // instant and as offline-tolerant as it was when the import was static.
+  // previewMode grades in the browser through gradeAnswer and lays the ตรวจ
+  // panel out through buildAnswerFeedback; both reach mathjs. Students never
+  // run either — the real routes grade on the server — so neither is imported
+  // at the top of this file. Fetching them here, on the preview route only and
+  // while the teacher is still reading the first question, keeps the ตรวจ and
+  // submit clicks as instant and offline-tolerant as a static import would.
   useEffect(() => {
     if (!previewMode) return
     void import('@/lib/assignment-attempt')
+    void import('@/lib/answer-feedback')
   }, [previewMode])
 
   // ── 5. Submit countdown ─────────────────────────────────────────────────────
@@ -211,7 +242,105 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleAnswerChange = setAnswer
+  // Editing an answer invalidates whatever ตรวจ said about it — the panel would
+  // otherwise sit under a box that no longer holds the answer it described,
+  // which is worse than no panel. This is also what makes ทำใหม่ work without
+  // locking the inputs: change anything and the ข้อ is simply open again.
+  const handleAnswerChange = useCallback((answerId: string, value: string) => {
+    setChecked(prev => {
+      if (!(answerId in prev)) return prev
+      const next = { ...prev }
+      delete next[answerId]
+      return next
+    })
+    setAnswer(answerId, value)
+  }, [setAnswer])
+
+  const clearCheck = useCallback((answerId: string) => {
+    setChecked(prev => {
+      if (!(answerId in prev)) return prev
+      const next = { ...prev }
+      delete next[answerId]
+      return next
+    })
+  }, [])
+
+  /**
+   * ตรวจคำตอบข้อนี้ — the one thing a แบบฝึกหัด does that a ข้อสอบ does not.
+   *
+   * Flushes first for the same reason handleSubmit does: the answer is graded
+   * from the row in the database, so checking inside the autosave debounce
+   * would mark the previous keystroke's answer. On a real attempt the verdict
+   * and the เฉลย are decided entirely server-side (see checkAnswer) — the
+   * browser never held the answer key to begin with. previewMode has no
+   * submission row to check against, so it grades its own frozen copy in the
+   * browser using the very same two functions, loaded on demand so students
+   * never pay for the evaluator behind them.
+   */
+  const handleCheck = useCallback(async (answerId: string) => {
+    if (checkingId) return
+    setCheckingId(answerId)
+    try {
+      if (previewMode) {
+        const answer = answers.find(a => a.id === answerId)
+        if (!answer) return
+        const [{ gradeAnswer }, { buildAnswerFeedback }] = await Promise.all([
+          import('@/lib/assignment-attempt'),
+          import('@/lib/answer-feedback'),
+        ])
+        const gradable = {
+          id: answer.id,
+          correct_answer: answer.correct_answer ?? '',
+          student_answer: localAnswersRef.current[answer.id] ?? null,
+          max_score: answer.max_score ?? 0,
+          questions: {
+            question_type: answer.questions.question_type,
+            answer_tolerance: answer.questions.answer_tolerance ?? 0.1,
+            answer_parts: answer.questions.answer_parts as AnswerPart[] | null,
+            extra_data: answer.questions.extra_data,
+          },
+        }
+        const graded = gradeAnswer(gradable)
+        const feedback = buildAnswerFeedback({
+          correct_answer: gradable.correct_answer,
+          student_answer: gradable.student_answer,
+          question: {
+            question_type: answer.questions.question_type,
+            answer_unit: answer.questions.answer_unit,
+            answer_parts: answer.questions.answer_parts as AnswerPart[] | null,
+            answer_tolerance: answer.questions.answer_tolerance ?? 0.1,
+            extra_data: answer.questions.extra_data,
+            mcq_options: answer.questions.mcq_options,
+            solution_text: answer.questions.solution_text ?? null,
+            solution_image_urls: answer.questions.solution_image_urls ?? null,
+          },
+          isCorrect: graded.is_correct,
+          score: graded.score,
+          maxScore: gradable.max_score,
+          revealAnswerKey: config.instantCheckAnswerKey !== false,
+        })
+        setChecked(prev => ({
+          ...prev,
+          [answerId]: { ...feedback, checkCount: (prev[answerId]?.checkCount ?? 0) + 1 },
+        }))
+        return
+      }
+
+      const allAnswersSynced = await flushQueuedAnswers()
+      if (!allAnswersSynced) {
+        toast.error('ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองตรวจอีกครั้ง')
+        return
+      }
+      const result = await checkAnswer(answerId)
+      if (!result || 'error' in result) {
+        toast.error(result?.error ?? 'ตรวจคำตอบไม่สำเร็จ กรุณาลองใหม่')
+        return
+      }
+      setChecked(prev => ({ ...prev, [answerId]: { ...result.feedback, checkCount: result.checkCount } }))
+    } finally {
+      setCheckingId(null)
+    }
+  }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, previewMode])
 
   const handlePartAnswerChange = useCallback((
     answerId: string, partIndex: number, value: string, totalParts: number, currentRaw: string,
@@ -553,6 +682,18 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               )}
             </Card>
 
+            {/* ตรวจคำตอบข้อนี้ — แบบฝึกหัดเท่านั้น */}
+            {instantCheckOn && isInstantCheckable(current.questions.question_type) && (
+              <InstantCheckPanel
+                feedback={checked[current.id] ?? null}
+                busy={checkingId === current.id}
+                disabled={checkingId !== null && checkingId !== current.id}
+                answered={hasAnswered(current.id)}
+                onCheck={() => handleCheck(current.id)}
+                onRetry={() => clearCheck(current.id)}
+              />
+            )}
+
             </div>
           )
         })}
@@ -656,9 +797,15 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                       const isCur = i >= pageStart && i < pageStart + perPage
                       const isAns = hasAnswered(a.id)
                       const isFlg = flagged.has(a.id)
+                      // On a แบบฝึกหัด a ข้อ that has been checked says so here
+                      // too — the point of checking one ข้อ at a time is being
+                      // able to see, at a glance, what is left to fix.
+                      const verdict = checked[a.id]?.verdict
                       let cls = 'bg-muted text-muted-foreground'
                       if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
                       else if (isFlg) cls = 'bg-flag text-white'
+                      else if (verdict === 'correct') cls = 'bg-success text-success-foreground'
+                      else if (verdict === 'wrong' || verdict === 'partial') cls = 'bg-destructive/15 text-destructive border border-destructive/30'
                       else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
                       return (
                         <button
@@ -679,6 +826,10 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             {[
               { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
               { cls: 'bg-success/10 border border-success/20 dark:bg-success/15', label: 'ตอบแล้ว' },
+              ...(instantCheckOn ? [
+                { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
+                { cls: 'bg-destructive/15 border border-destructive/30', label: 'ตรวจแล้ว ยังไม่ถูก' },
+              ] : []),
               { cls: 'bg-flag', label: 'ปักธง' },
               { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
             ].map(l => (
@@ -919,6 +1070,178 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         </div>
       )}
     </>
+  )
+}
+
+// ─── ตรวจทีละข้อ (แบบฝึกหัด) ───────────────────────────────────────────────────
+
+/**
+ * The ปุ่มตรวจ under one ข้อ, and the verdict once it has been pressed.
+ *
+ * Everything it shows is decided elsewhere: `feedback` arrives finished from
+ * the server (or, in a teacher's preview, from the same builder run locally),
+ * so this only picks colours and lays the rows out. In particular it cannot
+ * tell whether the เฉลย was withheld — a row simply has no `correct` to draw.
+ *
+ * The ข้อ is never locked after checking. ทำใหม่ clears the panel, and so does
+ * touching the answer itself, which keeps what is on screen honest without
+ * threading a `disabled` prop through nine different answer inputs.
+ */
+function InstantCheckPanel({
+  feedback, busy, disabled, answered, onCheck, onRetry,
+}: {
+  feedback: (AnswerFeedback & { checkCount: number }) | null
+  busy: boolean
+  disabled: boolean
+  answered: boolean
+  onCheck: () => void
+  onRetry: () => void
+}) {
+  if (!feedback) {
+    return (
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button
+          onClick={onCheck}
+          disabled={busy || disabled || !answered}
+          className="bg-success hover:bg-success/90 text-success-foreground border-0"
+        >
+          <CircleCheck size={16} />
+          {busy ? 'กำลังตรวจ...' : 'ตรวจคำตอบข้อนี้'}
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {answered
+            ? 'รู้ผลทันที แก้แล้วตรวจใหม่ได้ไม่จำกัด คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน'
+            : 'ตอบข้อนี้ก่อนจึงจะตรวจได้'}
+        </p>
+      </div>
+    )
+  }
+
+  const tone = feedback.verdict === 'correct'
+    ? { border: 'border-success/30', bg: 'bg-success/10', text: 'text-success', label: 'ถูกต้อง' }
+    : feedback.verdict === 'partial'
+      ? { border: 'border-warning/30', bg: 'bg-warning/10', text: 'text-warning', label: 'ถูกบางส่วน' }
+      : feedback.verdict === 'pending'
+        ? { border: 'border-warning/30', bg: 'bg-warning/10', text: 'text-warning', label: 'รอครูตรวจ' }
+        : { border: 'border-destructive/30', bg: 'bg-destructive/10', text: 'text-destructive', label: 'ยังไม่ถูก' }
+
+  return (
+    <Card padding="lg" className={`space-y-3 border ${tone.border} ${tone.bg}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`flex items-center gap-1.5 font-bold text-sm ${tone.text}`}>
+          {feedback.verdict === 'correct'
+            ? <CheckCircle2 size={18} />
+            : feedback.verdict === 'pending'
+              ? <Clock size={18} />
+              : <XCircle size={18} />}
+          {tone.label}
+        </span>
+        {feedback.verdict !== 'pending' && (
+          <Badge variant="outline" className="text-xs">
+            {feedback.score}/{feedback.maxScore} คะแนน
+          </Badge>
+        )}
+        {feedback.checkCount > 1 && (
+          <span className="text-[11px] text-muted-foreground">ตรวจไปแล้ว {feedback.checkCount} ครั้ง</span>
+        )}
+        <Button variant="outline" size="sm" onClick={onRetry} className="ml-auto">
+          <RotateCcw size={14} />
+          ทำใหม่
+        </Button>
+      </div>
+
+      {feedback.note && (
+        <p className="text-xs text-warning">{feedback.note}</p>
+      )}
+
+      {feedback.choices && (
+        <div className="space-y-1.5">
+          {feedback.choices.map(choice => (
+            <div
+              key={choice.label}
+              className={`flex items-center gap-3 px-3 py-2 rounded-xl border-2 ${
+                choice.correct
+                  ? 'border-success bg-success/10'
+                  : choice.picked
+                    ? 'border-destructive bg-destructive/10'
+                    : 'border-border bg-background'
+              }`}
+            >
+              <span className={`text-sm font-bold shrink-0 w-5 ${
+                choice.correct ? 'text-success' : choice.picked ? 'text-destructive' : 'text-muted-foreground'
+              }`}>
+                {choice.label}
+              </span>
+              {choice.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={choice.imageUrl} alt="" loading="lazy" decoding="async" className="max-h-20 w-auto object-contain rounded border shrink-0" />
+              )}
+              <span className="text-sm flex-1 min-w-0">{choice.text}</span>
+              {choice.correct && (
+                <span className="text-xs font-semibold text-success shrink-0 flex items-center gap-1">
+                  <CheckCircle2 size={13} /> เฉลย
+                </span>
+              )}
+              {choice.picked && !choice.correct && (
+                <span className="text-xs font-semibold text-destructive shrink-0">คำตอบคุณ</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!feedback.choices && feedback.rows.length > 0 && (
+        <div className="space-y-2 text-sm">
+          {feedback.rows.map((row, i) => (
+            <div key={i} className="pl-3 border-l-2 border-border space-y-0.5">
+              {row.label && <p className="text-xs font-semibold text-muted-foreground">{row.label}</p>}
+              <div className="flex gap-2">
+                <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
+                <span className={`font-medium ${
+                  row.status === 'pending' ? 'text-warning'
+                    : row.status === 'correct' ? 'text-success' : 'text-destructive'
+                }`}>
+                  {row.student} {row.unit && <UnitDisplay html={row.unit} />}
+                </span>
+              </div>
+              {row.correct !== undefined && (
+                <div className="flex gap-2">
+                  <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
+                  <span className="font-medium">
+                    {row.correct} {row.unit && <UnitDisplay html={row.unit} />}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(feedback.solutionText || (feedback.solutionImageUrls ?? []).length > 0) && (
+        <Card radius="md" padding="sm" className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+            <Lightbulb size={13} /> วิธีทำ
+          </p>
+          {feedback.solutionText && (
+            <RichText text={feedback.solutionText} className="text-sm leading-relaxed block" />
+          )}
+          {(feedback.solutionImageUrls ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {(feedback.solutionImageUrls ?? []).map(url => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={url} src={url} alt="เฉลยวิธีทำ" loading="lazy" decoding="async" className="max-h-44 rounded-lg border object-contain" />
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {!feedback.revealed && feedback.verdict !== 'correct' && (
+        <p className="text-xs text-muted-foreground">
+          งานนี้ครูตั้งให้ไม่แสดงเฉลย ลองคิดใหม่แล้วกดตรวจอีกครั้งได้
+        </p>
+      )}
+    </Card>
   )
 }
 

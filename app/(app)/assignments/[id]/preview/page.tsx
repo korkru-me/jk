@@ -112,6 +112,11 @@ export default async function AssignmentPreviewPage({
         extra_data: q.extra_data,
         image_urls: q.image_urls,
         answer_tolerance: q.answer_tolerance,
+        // Preview grades itself in the browser, so its ตรวจคำตอบ needs the
+        // เฉลย the server would otherwise hand a student one ข้อ at a time.
+        // Teacher-only route — the same reason correct_answer above is here.
+        solution_text: q.solution_text,
+        solution_image_urls: q.solution_image_urls,
       },
     }
   })
@@ -122,6 +127,10 @@ export default async function AssignmentPreviewPage({
     blockClipboard: false,
     watermarkText: a.exam_watermark_enabled ? 'ตัวอย่างผู้เข้าสอบ • PREVIEW' : null,
     isWorkImageEnforced: a.require_work_image ?? false,
+    // Show the teacher exactly the แบบฝึกหัด their students will get, ปุ่มตรวจ
+    // and all — including whether it opens the เฉลย.
+    instantCheck: a.type === 'exercise' && a.mode === 'online' && a.instant_check === true,
+    instantCheckAnswerKey: a.instant_check_answer_key !== false,
   }
 
   return (

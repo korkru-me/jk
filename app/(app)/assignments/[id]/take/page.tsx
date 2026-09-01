@@ -74,6 +74,9 @@ export default async function TakeExamPage({
     blockClipboard: assignment.block_clipboard,
     watermarkText: assignment.watermark_text,
     isWorkImageEnforced: assignment.require_work_image ?? false,
+    // แบบฝึกหัด: ตรวจทีละข้อระหว่างทำได้ ไม่ต้องรอกดส่งตอนจบเหมือนข้อสอบ
+    instantCheck: assignment.instant_check,
+    instantCheckAnswerKey: assignment.instant_check_answer_key,
   }
 
   return (

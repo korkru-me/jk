@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck } from 'lucide-react'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -57,6 +57,8 @@ export type EditableAssignment = Pick<
   | 'score_strategy'
   | 'retry_scope'
   | 'questions_per_page'
+  | 'instant_check'
+  | 'instant_check_answer_key'
   | 'passing_type'
   | 'passing_value'
   | 'show_results'
@@ -94,6 +96,12 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(a.score_strategy)
   const [retryScope, setRetryScope] = useState<RetryScope>(a.retry_scope ?? 'all')
   const [questionsPerPage, setQuestionsPerPage] = useState(String(a.questions_per_page ?? 1))
+  // A แบบฝึกหัด created before this setting existed reads as off, matching the
+  // migration's default — its students have been finishing the whole set
+  // before seeing anything, and turning that on under a running งาน is the
+  // teacher's call, not a side effect of opening the edit page.
+  const [instantCheck, setInstantCheck] = useState(a.instant_check === true)
+  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(a.instant_check_answer_key !== false)
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
   const [showSections, setShowSections] = useState(a.show_sections !== false)
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
@@ -214,6 +222,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         score_strategy: scoreStrategy,
         retry_scope: retryScope,
         questions_per_page: Number(questionsPerPage) || 1,
+        instant_check: instantCheck,
+        instant_check_answer_key: instantCheckAnswerKey,
         passing_type: passingEnabled && passingValue ? passingType : null,
         passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
         // Sent only when the teacher could actually change it, so a frozen
@@ -762,6 +772,49 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {a.mode === 'online' && a.type === 'exercise' && (
+          <div className="space-y-3 rounded-xl border border-border p-4">
+            <label className="flex items-center justify-between gap-4 cursor-pointer">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <CircleCheck className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">ให้นักเรียนกดตรวจทีละข้อ</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย
+                    คะแนนยังคิดจากคำตอบสุดท้ายตอนกดส่งงาน · มีผลกับการทำครั้งใหม่และครั้งที่กำลังทำอยู่
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={instantCheck}
+                onChange={e => setInstantCheck(e.target.checked)}
+                className="accent-primary w-4 h-4 shrink-0"
+              />
+            </label>
+            {instantCheck && (
+              <label className="ml-11 flex items-center justify-between gap-4 rounded-xl border border-border p-3 cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {instantCheckAnswerKey
+                      ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำที่ครูใส่ไว้ทันที แล้วแก้ให้ถูกได้ — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดู'
+                      : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={instantCheckAnswerKey}
+                  onChange={e => setInstantCheckAnswerKey(e.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+            )}
           </div>
         )}
 

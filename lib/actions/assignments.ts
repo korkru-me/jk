@@ -67,6 +67,8 @@ interface CreateAssignmentData {
   score_strategy?: ScoreStrategy
   retry_scope?: RetryScope
   questions_per_page?: number | null
+  instant_check?: boolean
+  instant_check_answer_key?: boolean
   access_code?: string | null
   passing_type?: 'score' | 'percent' | null
   passing_value?: number | null
@@ -115,6 +117,12 @@ export async function createAssignment(data: CreateAssignmentData) {
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
   const isOnlineExam = data.mode === 'online' && data.type === 'exam'
+  // Checking one ข้อ at a time is what makes a แบบฝึกหัด a แบบฝึกหัด, so it is
+  // on unless the teacher turns it off — and it is never on for a ข้อสอบ or a
+  // printed ใบงาน, whatever a client sends. The default is applied here rather
+  // than in the column so that งาน already handed out keep the behavior their
+  // students have been getting; see the migration's backfill.
+  const isOnlineExercise = data.mode === 'online' && data.type === 'exercise'
   const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
     ? 'seb_required'
     : 'browser'
@@ -191,6 +199,8 @@ export async function createAssignment(data: CreateAssignmentData) {
       score_strategy: data.score_strategy ?? 'best',
       retry_scope: retryScope,
       questions_per_page: normalizeQuestionsPerPage(data.mode, data.questions_per_page),
+      instant_check: isOnlineExercise && data.instant_check !== false,
+      instant_check_answer_key: data.instant_check_answer_key !== false,
       access_code: data.access_code?.trim() || null,
       passing_type: data.passing_type ?? null,
       passing_value: data.passing_value ?? null,
@@ -263,6 +273,9 @@ interface UpdateAssignmentData {
   score_strategy: ScoreStrategy
   retry_scope?: RetryScope
   questions_per_page?: number | null
+  /** Omit either to leave the งาน's answer untouched. */
+  instant_check?: boolean
+  instant_check_answer_key?: boolean
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   /** The question set and its order. Omit to leave both untouched. */
@@ -361,6 +374,9 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     ? data.display_max_score
     : null
   const isOnlineExam = existing.mode === 'online' && existing.type === 'exam'
+  // Same rule as createAssignment, read off the stored งาน — neither type nor
+  // mode is editable after creation, so this cannot drift from what was saved.
+  const isOnlineExercise = existing.mode === 'online' && existing.type === 'exercise'
   const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
     ? 'seb_required'
     : 'browser'
@@ -449,6 +465,12 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       ...(data.questions_per_page === undefined
         ? {}
         : { questions_per_page: normalizeQuestionsPerPage(existing.mode, data.questions_per_page) }),
+      ...(data.instant_check === undefined
+        ? {}
+        : { instant_check: isOnlineExercise && data.instant_check }),
+      ...(data.instant_check_answer_key === undefined
+        ? {}
+        : { instant_check_answer_key: data.instant_check_answer_key }),
       passing_type: data.passing_type,
       passing_value: data.passing_value,
       question_points: questionPoints,

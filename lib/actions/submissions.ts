@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-import { isAttemptExpired } from '@/lib/grading'
+import { isAttemptExpired, isInstantCheckable } from '@/lib/grading'
 import {
   buildAssignmentAttempt,
   buildRetryAttempt,
@@ -12,6 +12,7 @@ import {
   type CarriedAttemptAnswer,
   type PreviousAttemptAnswer,
 } from '@/lib/assignment-attempt'
+import { buildAnswerFeedback, type FeedbackQuestion } from '@/lib/answer-feedback'
 import type { Question } from '@/lib/types'
 import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
@@ -273,10 +274,10 @@ async function getWritableStudentAnswer(
   const { data: answer } = await admin
     .from('submission_answers')
     .select(`
-      id, submission_id, work_images,
+      id, submission_id, work_images, carried_over, check_count,
       submissions(
         id, student_id, status, started_at, assignment_id,
-        assignments(id, duration_minutes, end_at, secure_browser_mode, android_exam_mode)
+        assignments(id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode, instant_check, instant_check_answer_key)
       )
     `)
     .eq('id', submissionAnswerId)
@@ -319,7 +320,7 @@ async function getWritableStudentAnswer(
     return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' as const }
   }
 
-  return { answer, submission }
+  return { answer, submission, assignment }
 }
 
 export async function saveAnswer(submissionAnswerId: string, studentAnswer: string) {
@@ -369,6 +370,143 @@ export async function saveWorkImage(submissionAnswerId: string, partIndex: numbe
 
   if (error) return { error: error.message }
   return { success: true }
+}
+
+/**
+ * แบบฝึกหัด only: grade one ข้อ on the spot, without ending the attempt.
+ *
+ * This is the difference between a ข้อสอบ and a แบบฝึกหัด. An exam is graded
+ * once, when the student presses ส่งคำตอบ at the end. An exercise lets them
+ * finish one ข้อ, see whether it is right, read the เฉลย, and fix it there and
+ * then — so the answer key has to cross the wire mid-attempt, which nothing
+ * else in the exam path is allowed to do.
+ *
+ * Every guard that protects that key is therefore re-checked here, server-side,
+ * rather than assumed from the fact that the button rendered:
+ *
+ *  - owner, still `in_progress`, within the timer and the deadline, and holding
+ *    a live SEB/Android session where one is required (getWritableStudentAnswer)
+ *  - the งาน is actually an online แบบฝึกหัด with `instant_check` on
+ *  - `instant_check_answer_key` decides whether the เฉลย is in the response at
+ *    all — a withheld one is never serialized, not merely hidden client-side
+ *  - a row carried over from a previous attempt is not being asked again, so
+ *    there is nothing to check and its earlier score must not be re-shown
+ *
+ * Nothing here writes a score. The final ส่งคำตอบ re-grades every non-carried
+ * row from `student_answer`, so an exercise always scores the answer the
+ * student left behind — checking a ข้อ ten times and fixing it changes what is
+ * banked exactly as much as quietly editing it would. `check_count` records how
+ * many times they looked, which is the only thing that distinguishes "ถูกตั้งแต่
+ * แรก" from "แก้จนถูก" once the scores are equal.
+ */
+export async function checkAnswer(submissionAnswerId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const admin = createAdminClient()
+
+  const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
+  if ('error' in writable) return { error: writable.error }
+
+  const assignment = writable.assignment as {
+    type?: string
+    mode?: string
+    instant_check?: boolean
+    instant_check_answer_key?: boolean
+  } | null
+
+  if (
+    assignment?.type !== 'exercise'
+    || assignment?.mode !== 'online'
+    || assignment?.instant_check !== true
+  ) {
+    return { error: 'งานนี้ไม่ได้เปิดให้ตรวจทีละข้อ' }
+  }
+  if ((writable.answer as { carried_over?: boolean }).carried_over) {
+    return { error: 'ข้อนี้ยกคะแนนมาจากครั้งก่อน ไม่ต้องทำใหม่' }
+  }
+
+  const { data: row } = await admin
+    .from('submission_answers')
+    .select(`
+      id, correct_answer, student_answer, max_score, option_order,
+      questions(
+        question_type, answer_unit, answer_parts, answer_tolerance, extra_data,
+        mcq_options, solution_text, solution_image_urls
+      )
+    `)
+    .eq('id', submissionAnswerId)
+    .eq('submission_id', writable.submission.id)
+    .maybeSingle()
+
+  if (!row) return { error: 'ไม่พบคำตอบ' }
+  const question = (Array.isArray(row.questions) ? row.questions[0] : row.questions) as
+    (Omit<FeedbackQuestion, 'mcq_options'> & { mcq_options: any[] | null }) | null
+  if (!question) return { error: 'ไม่พบโจทย์' }
+  if (!isInstantCheckable(question.question_type)) {
+    return { error: 'ข้อเขียนต้องให้ครูตรวจ จึงยังตรวจเองตอนนี้ไม่ได้' }
+  }
+
+  // The same function the real grading path runs, on the same frozen row —
+  // so a ข้อ that reads ถูก here cannot come out ผิด at ส่งคำตอบ. Built
+  // explicitly rather than passed through, because the embed is typed as a
+  // possible array and gradeAnswer reads `questions.question_type` directly:
+  // an array there would silently miss every type-keyed branch it has.
+  const maxScore = Number(row.max_score ?? 0)
+  const graded = gradeAnswer({
+    id: row.id,
+    correct_answer: row.correct_answer ?? '',
+    student_answer: row.student_answer,
+    max_score: maxScore,
+    questions: {
+      question_type: question.question_type,
+      answer_tolerance: question.answer_tolerance ?? 0.1,
+      answer_parts: question.answer_parts,
+      extra_data: question.extra_data,
+    },
+  })
+
+  // Put the ปรนัย options back in the order this student read them, tagging
+  // each with its position in the question's own list — the same reorder
+  // toSafeExamAnswer does for the exam view, so ก/ข/ค/ง in the panel are the
+  // letters that were on screen. จับคู่ shuffles only its right-hand column,
+  // so its pairs stay in authored order.
+  const rawOptions = (question.mcq_options ?? []) as Array<Record<string, unknown>>
+  const optionOrder = (row.option_order as number[] | null) ?? rawOptions.map((_, i) => i)
+  const displayOptions = question.question_type === 'mcq'
+    ? optionOrder
+        .filter(i => rawOptions[i])
+        .map(i => ({
+          text: String(rawOptions[i].text ?? ''),
+          ...(typeof rawOptions[i].image_url === 'string'
+            ? { image_url: rawOptions[i].image_url as string }
+            : {}),
+          index: i,
+        }))
+    : rawOptions.map(option => ({
+        left_text: typeof option.left_text === 'string' ? option.left_text : undefined,
+      }))
+
+  const checkCount = Number((writable.answer as { check_count?: number }).check_count ?? 0) + 1
+  await admin
+    .from('submission_answers')
+    .update({ check_count: checkCount })
+    .eq('id', submissionAnswerId)
+    .eq('submission_id', writable.submission.id)
+
+  return {
+    success: true as const,
+    checkCount,
+    feedback: buildAnswerFeedback({
+      correct_answer: row.correct_answer ?? '',
+      student_answer: row.student_answer,
+      question: { ...question, mcq_options: displayOptions },
+      isCorrect: graded.is_correct,
+      score: graded.score,
+      maxScore,
+      revealAnswerKey: assignment.instant_check_answer_key !== false,
+    }),
+  }
 }
 
 // Manual score override for a teacher grading (or re-grading) one student's
