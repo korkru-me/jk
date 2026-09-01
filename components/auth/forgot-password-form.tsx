@@ -53,7 +53,7 @@ export function ForgotPasswordForm() {
         </div>
         <div className="space-y-1">
           <p className="font-semibold text-foreground">
-            ระบบได้ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลของคุณเรียบร้อยแล้ว
+            หากอีเมลนี้มีบัญชี ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้
           </p>
           <p className="text-sm text-muted-foreground">
             ตรวจสอบกล่องจดหมายที่{' '}

@@ -57,7 +57,7 @@ export function LoginForm() {
       if (result?.error) {
         toast.error(result.error)
       } else {
-        toast.success(`ส่ง Magic Link ไปที่ ${email} แล้ว กรุณาตรวจสอบอีเมล`)
+        toast.success('หากอีเมลนี้มีบัญชี ระบบจะส่งลิงก์เข้าสู่ระบบให้')
       }
     } catch {
       toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่')
@@ -168,7 +168,7 @@ export function LoginForm() {
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
           </svg>
         )}
-        Continue with Google
+        เข้าสู่ระบบด้วย Google
       </Button>
 
       {/* Magic Link */}
@@ -184,7 +184,7 @@ export function LoginForm() {
         ) : (
           <Mail className="h-4 w-4" />
         )}
-        ส่งลิงก์เข้าสู่ระบบทางอีเมล (Magic Link)
+        ส่งลิงก์เข้าสู่ระบบทางอีเมล
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">

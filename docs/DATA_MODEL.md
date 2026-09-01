@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 30 สิงหาคม 2026
+อัปเดตล่าสุด: 1 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -18,6 +18,8 @@ Invariant สำคัญ:
 - resource หลักต้องมี `org_id`
 - ห้ามย้าย resource ข้าม organization ด้วยการ update `org_id`
 - ผู้ใช้หนึ่งคนอาจมีหลาย organization แต่ helper บางส่วนยังเลือก organization เดียว จึงต้องตรวจ context ก่อนเพิ่ม multi-org workflow
+- auth user ทุกคนต้องมี `public.users` หนึ่งแถวและ membership แบบ `owner` ใน personal organization อย่างน้อยหนึ่งแห่ง; `handle_new_user()` กับ `ensure_personal_organization()` รักษา invariant นี้ และ migration `20260901091339` backfill บัญชีที่เคยตกหล่น
+- `users.subject_group` และ `subject_group_other` เป็นข้อมูล legacy/optional ไม่ใช่เงื่อนไขสมัครอีกต่อไป ห้ามตีความค่า `NULL` ว่าผู้ใช้ไม่ใช่ครู
 
 ## คลังโจทย์
 

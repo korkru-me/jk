@@ -4,21 +4,41 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { isAuthRetryableFetchError } from '@supabase/supabase-js'
-import { buildFullName } from '@/lib/utils'
-import { isSubjectGroup } from '@/lib/subject-groups'
+import {
+  completeProfileSchema,
+  emailSchema,
+  loginSchema,
+  resetPasswordSchema,
+  signupSchema,
+  type AccountRole,
+} from '@/lib/auth/validation'
+
+function validationMessage(issues: { message: string }[]) {
+  return issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่'
+}
+
+function authConnectionError(error: unknown) {
+  return isAuthRetryableFetchError(error)
+    ? 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'
+    : null
+}
 
 export async function login(_prevState: unknown, formData: FormData) {
   const supabase = await createClient()
 
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
+  const parsed = loginSchema.safeParse({
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+  if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
+
+  const { email, password } = parsed.data
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    if (isAuthRetryableFetchError(error)) {
-      return { error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่' }
-    }
+    const connectionError = authConnectionError(error)
+    if (connectionError) return { error: connectionError }
     return {
       error: error.message === 'Invalid login credentials'
         ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
@@ -37,15 +57,27 @@ export async function login(_prevState: unknown, formData: FormData) {
 
     if (!profile) {
       const meta = data.user.user_metadata
-      await admin.from('users').insert({
+      const role: AccountRole = meta?.role === 'teacher' ? 'teacher' : 'student'
+      const fullName = meta?.full_name ?? meta?.name ?? email.split('@')[0]
+      const { error: profileError } = await admin.from('users').insert({
         id: data.user.id,
         email: data.user.email!,
-        full_name: meta?.full_name ?? email.split('@')[0],
+        full_name: fullName,
         prefix: meta?.prefix ?? null,
         first_name: meta?.first_name ?? null,
         last_name: meta?.last_name ?? null,
-        role: (meta?.role as 'teacher' | 'student') ?? 'student',
+        role,
+        survey_role: meta?.survey_role === 'teacher' || meta?.survey_role === 'student'
+          ? meta.survey_role
+          : null,
+        instructor_type: role === 'teacher' ? 'teacher' : null,
       })
+      if (!profileError) {
+        await admin.rpc('ensure_personal_organization', {
+          p_user_id: data.user.id,
+          p_display_name: fullName,
+        })
+      }
     }
   }
 
@@ -55,37 +87,16 @@ export async function login(_prevState: unknown, formData: FormData) {
 export async function register(formData: FormData) {
   const supabase = await createClient()
 
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const prefix = formData.get('prefix') as string
-  const first_name = formData.get('first_name') as string
-  const last_name = formData.get('last_name') as string
-  const survey_role = formData.get('survey_role') as string
-  const role_custom = formData.get('role_custom') as string | null
-  const subject_group_raw = formData.get('subject_group') as string | null
-  const subject_group_other = formData.get('subject_group_other') as string | null
+  const parsed = signupSchema.safeParse({
+    role: formData.get('role'),
+    full_name: formData.get('full_name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+  if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
 
-  if (!prefix?.trim() || !first_name?.trim() || !last_name?.trim()) {
-    return { error: 'กรุณากรอกคำนำหน้าชื่อ ชื่อ และสกุล' }
-  }
-
-  const full_name = buildFullName(prefix, first_name, last_name)
-
-  // Map survey role → system role + instructor_type
-  const role = survey_role === 'student' || survey_role === 'parent' || survey_role === 'other'
-    ? 'student'
-    : 'teacher'
-  const instructor_type = survey_role === 'teacher' || survey_role === 'tutor'
-    ? survey_role
-    : null
-
-  // กลุ่มสาระการเรียนรู้ถามเฉพาะครูผู้สอน — บทบาทอื่นไม่เก็บค่า
-  const subject_group =
-    survey_role === 'teacher' && subject_group_raw && isSubjectGroup(subject_group_raw)
-      ? subject_group_raw
-      : null
-  const subject_group_other_value =
-    subject_group === 'other' ? subject_group_other?.trim() || null : null
+  const { email, password, full_name, role } = parsed.data
+  const instructor_type = role === 'teacher' ? 'teacher' : null
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -93,62 +104,33 @@ export async function register(formData: FormData) {
     options: {
       data: {
         full_name,
-        prefix,
-        first_name,
-        last_name,
         role,
         instructor_type,
-        survey_role,
-        role_custom,
-        subject_group,
-        subject_group_other: subject_group_other_value,
+        survey_role: role,
       },
     },
   })
 
   if (error) {
+    const connectionError = authConnectionError(error)
+    if (connectionError) return { error: connectionError }
     return { error: error.message }
   }
 
-  if (data.user) {
-    const admin = createAdminClient()
-    const { error: profileError } = await admin
-      .from('users')
-      .upsert(
-        {
-          id: data.user.id,
-          email: data.user.email!,
-          full_name,
-          prefix,
-          first_name,
-          last_name,
-          role: role as 'teacher' | 'student',
-          instructor_type: instructor_type || null,
-          survey_role: survey_role || null,
-          role_custom: survey_role === 'other' ? (role_custom || null) : null,
-          subject_group,
-          subject_group_other: subject_group_other_value,
-        },
-        { onConflict: 'id' }
-      )
-
-    if (profileError) {
-      return { error: profileError.message }
-    }
-  }
-
-  return { success: true }
+  return { success: true, signedIn: Boolean(data.session) }
 }
 
-export async function loginWithGoogle() {
+export async function loginWithGoogle(role?: AccountRole) {
   const supabase = await createClient()
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const callbackUrl = new URL('/auth/callback', siteUrl)
+  if (role === 'teacher' || role === 'student') callbackUrl.searchParams.set('role', role)
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${siteUrl}/auth/callback`,
-      queryParams: { access_type: 'offline', prompt: 'consent' },
+      redirectTo: callbackUrl.toString(),
+      queryParams: { access_type: 'offline', prompt: 'select_account' },
     },
   })
 
@@ -162,20 +144,110 @@ export async function loginWithGoogle() {
 export async function sendMagicLink(email: string) {
   const supabase = await createClient()
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const parsed = emailSchema.safeParse(email)
+  if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
+
   const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: `${siteUrl}/auth/callback` },
+    email: parsed.data,
+    options: {
+      emailRedirectTo: `${siteUrl}/auth/callback`,
+      shouldCreateUser: false,
+    },
   })
-  if (error) return { error: error.message }
+  if (error) {
+    const connectionError = authConnectionError(error)
+    if (connectionError) return { error: connectionError }
+    // Keep the response identical for registered and unregistered addresses.
+    return { success: true }
+  }
   return { success: true }
 }
 
 export async function forgotPassword(email: string) {
   const supabase = await createClient()
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/reset-password`,
+  const parsed = emailSchema.safeParse(email)
+  if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const callbackUrl = new URL('/auth/callback', siteUrl)
+  callbackUrl.searchParams.set('next', '/reset-password')
+
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+    redirectTo: callbackUrl.toString(),
   })
-  if (error) return { error: error.message }
+  if (error) {
+    const connectionError = authConnectionError(error)
+    if (connectionError) return { error: connectionError }
+    return { error: 'ยังส่งอีเมลไม่ได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่' }
+  }
+  return { success: true }
+}
+
+export async function completeProfile(formData: FormData) {
+  const parsed = completeProfileSchema.safeParse({
+    role: formData.get('role'),
+    full_name: formData.get('full_name'),
+  })
+  if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ลิงก์เข้าสู่ระบบหมดอายุ กรุณาเข้าสู่ระบบใหม่' }
+
+  const admin = createAdminClient()
+  const { data: profile, error: profileError } = await admin
+    .from('users')
+    .select('id, role, survey_role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profileError) return { error: 'ไม่สามารถอ่านข้อมูลบัญชีได้ กรุณาลองใหม่' }
+  if (!profile) return { error: 'ไม่พบข้อมูลบัญชี กรุณาเข้าสู่ระบบใหม่' }
+  if (profile.role === 'admin' || profile.survey_role) return { success: true }
+
+  const { role, full_name } = parsed.data
+  const { data: updated, error } = await admin
+    .from('users')
+    .update({
+      full_name,
+      role,
+      survey_role: role,
+      instructor_type: role === 'teacher' ? 'teacher' : null,
+    })
+    .eq('id', user.id)
+    .is('survey_role', null)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { error: 'ไม่สามารถบันทึกข้อมูลบัญชีได้ กรุณาลองใหม่' }
+  if (!updated) return { success: true }
+
+  await supabase.auth.updateUser({
+    data: { full_name, role, survey_role: role },
+  })
+  return { success: true }
+}
+
+export async function resetPassword(formData: FormData) {
+  const parsed = resetPasswordSchema.safeParse({
+    password: formData.get('password'),
+    confirm_password: formData.get('confirm_password'),
+  })
+  if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ลิงก์ตั้งรหัสผ่านหมดอายุ กรุณาขอลิงก์ใหม่' }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
+  if (error) {
+    const connectionError = authConnectionError(error)
+    if (connectionError) return { error: connectionError }
+    return { error: 'ไม่สามารถตั้งรหัสผ่านใหม่ได้ กรุณาขอลิงก์ใหม่แล้วลองอีกครั้ง' }
+  }
+
+  // Invalidate refresh tokens on other devices after a credential reset.
+  await supabase.auth.signOut({ scope: 'global' })
   return { success: true }
 }
 

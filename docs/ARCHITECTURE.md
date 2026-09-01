@@ -44,6 +44,10 @@
 ## Authentication และ authorization
 
 - Supabase Auth ดูแล session
+- บัญชีครูและนักเรียนใช้ email/password เป็นตัวตนหลักเดียวกันทั่วระบบ; classroom code ใช้สร้าง membership ไม่ใช่ login identifier
+- email/password signup ส่ง `role` และ `survey_role` ที่ผ่าน server validation เข้า auth metadata แล้ว database trigger สร้าง `public.users` กับ personal organization ใน transaction เดียว
+- OAuth account ที่ยังไม่มี `survey_role` ต้องผ่าน `/complete-profile`; Server Action ตรวจ exact authenticated user และยอมกำหนด `teacher|student` ได้เฉพาะครั้งแรก ส่วน protected layout ปฏิเสธ profile ที่ยังไม่สมบูรณ์
+- Magic link ตั้ง `shouldCreateUser: false`; password recovery กลับผ่าน `/auth/callback?next=/reset-password` เพื่อแลก PKCE code เป็น server session ก่อนเปลี่ยน credential
 - `users.role` ใช้ `teacher`, `student`, `admin`
 - `organization_members.org_role` ใช้ `owner`, `admin`, `teacher`, `student`
 - ครูประจำชั้นมาจากการเป็นครูของ classroom ชนิด `homeroom`

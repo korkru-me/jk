@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 31 สิงหาคม 2026
+ตรวจจาก repository: 1 กันยายน 2026
 
 ## วิธีอ่านสถานะ
 
@@ -11,17 +11,20 @@
 
 > โจทย์ประเภท "ส่งไฟล์งาน" (`file_upload`) เคยใช้งานบน production ไม่ได้จนถึง 23 สิงหาคม 2026 เพราะ `20260726120000_file_upload_question_type.sql` ไม่เคยถูก apply — ทั้งที่โค้ดฝั่งแอปรองรับครบมาตั้งแต่กรกฎาคม ตอนนี้รันแล้ว: enum `question_type` มีค่า `'file_upload'` และ bucket `submission-files` มีอยู่จริง (public, จำกัด 10 MB, รับ png/jpeg/webp/pdf) ยังไม่ได้ทดสอบเส้นทางอัปโหลดจริงจากฝั่งนักเรียน
 
-มี automated test (`npm test`) ครอบคลุมเฉพาะโมดูลที่เป็น pure logic — evaluator, การให้คะแนน และตัวช่วยข้อความ ยังไม่มีอะไรทดสอบ Supabase, server action หรือ browser และการตรวจครั้งนี้ไม่ได้ยืนยันฐานข้อมูลที่ deploy จริง ทุกสถานะต้องผ่าน end-to-end และ authorization testing ก่อนเปลี่ยนเป็น “พร้อมใช้จริง”
+มี automated test (`npm test`) ครอบคลุมเฉพาะโมดูลที่เป็น pure logic — evaluator, การให้คะแนน และตัวช่วยข้อความ ยังไม่มีอะไรทดสอบ Supabase, server action หรือ browser การยืนยันฐานข้อมูลที่ deploy จริงจะระบุแยกไว้เฉพาะฟีเจอร์ที่ตรวจแล้ว และทุกสถานะยังต้องผ่าน end-to-end กับ authorization testing ก่อนเปลี่ยนเป็น “พร้อมใช้จริง”
 
 ## MVP core
 
 ### Authentication — บางส่วน
 
-- มี email/password signup/login, Google OAuth, magic link และ forgot-password action
-- แบบสอบถามตอนสมัครเหลือ 2 บทบาท: `teacher` และ `student` (ตัด tutor/admin/other ออกจาก UI แล้ว — ค่า `role_custom` จึงไม่มีทางถูกกรอกจากหน้าสมัครอีก)
-- ครูผู้สอนต้องเลือกกลุ่มสาระการเรียนรู้ (`users.subject_group`, ตัวเลือกใน `lib/subject-groups.ts`) และกรอกข้อความเองได้เมื่อเลือก `other` (`users.subject_group_other`) — ต้องใช้ migration `20260823081036_teacher_subject_group`
+- มี email/password signup/login สำหรับ `teacher` และ `student`; หน้าสมัครถามเฉพาะประเภทบัญชี ชื่อที่ใช้แสดง อีเมล และรหัสผ่าน ไม่ถามโรงเรียนหรือกลุ่มสาระ กลุ่มสาระเดิมใน `users.subject_group`/`subject_group_other` ยังคงไว้กับข้อมูลเก่าแต่ไม่เก็บเพิ่มตอนสมัคร เพราะอนุมานความสนใจจริงจากวิชาหรือโจทย์ที่ครูสร้างได้ภายหลัง
+- Google OAuth รายใหม่ต้องผ่าน `/complete-profile` เพื่อยืนยันชื่อและประเภทบัญชีครั้งเดียว จึงไม่ถูกกำหนดเป็นครูหรือนักเรียนจากค่า default ของ trigger; protected layout กันบัญชีที่ยังไม่จบขั้นตอนนี้ออกจากหน้าหลัก ส่วน admin เดิมไม่ถูกบังคับเปลี่ยน role
+- Magic link ใช้ได้เฉพาะบัญชีที่มีอยู่ (`shouldCreateUser: false`) และตอบข้อความแบบเดียวกันไม่ว่าอีเมลมีบัญชีหรือไม่ เพื่อไม่ให้หน้า login กลายเป็นทางสมัครที่ข้ามการเลือกบทบาทหรือเปิดเผยรายชื่อบัญชี
+- เส้นทางลืมรหัสผ่านครบแล้ว: ส่ง recovery link ผ่าน `/auth/callback`, แลก code เป็น session, เปิด `/reset-password`, ตรวจความแข็งแรง/การยืนยันซ้ำฝั่ง client และ server แล้ว global sign-out หลังเปลี่ยนสำเร็จ
+- migration `20260901091339_restore_auth_user_provisioning.sql` คืน invariant ที่บัญชีใหม่ทุกคนต้องมี personal organization หลัง `20260823081036` เคยเขียนทับ `handle_new_user()` จนส่วนสร้าง organization หาย และ backfill เฉพาะบัญชีที่ตกหล่นแบบ idempotent
+- apply migration นี้กับฐาน Production แล้วเมื่อ 1 กันยายน 2026; migration ledger ฝั่ง local/remote ตรงกันและ `supabase db lint --linked --level error` ไม่พบ error
 - มี session refresh และ protected layouts
-- ยังไม่พบหน้า `/reset-password` แม้ action จะ redirect ไปเส้นทางนั้น
+- ยังไม่ได้ยืนยันการส่งอีเมลจริงกับ production SMTP หรือทดสอบ Google/recovery end-to-end ใน browser ด้วยบัญชีทดสอบ
 - authority ระหว่าง system admin, organization admin และ super admin ยังต้องสรุป
 
 ### คลังโจทย์ — มีโค้ดรองรับ

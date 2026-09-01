@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 30 สิงหาคม 2026
+อัปเดตล่าสุด: 1 กันยายน 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -22,6 +22,14 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - `org_id`, classroom membership, ownership และ co-teacher permission ต้องตรวจตาม action
 - การดูข้อมูลนักเรียนต้องจำกัดตามวัตถุประสงค์ ไม่ใช่เพียงอยู่ organization เดียวกัน
 - แยก system admin, organization admin, classroom admin และ super admin ให้ชัด
+
+## Authentication และ account recovery
+
+- ตรวจ email, password, display name และ `teacher|student` ซ้ำฝั่ง server ทุกครั้ง ห้ามเชื่อ role จากปุ่มหรือ TypeScript type ใน browser
+- Google OAuth ที่ยังไม่มี `survey_role` ต้องจบ profile completion ก่อนเข้า protected app; การกำหนด role ครั้งแรกต้องตรวจ exact session และ update เฉพาะ profile เดียวที่ `survey_role IS NULL`
+- Magic link จากหน้า login ต้องตั้ง `shouldCreateUser: false` และตอบแบบไม่เปิดเผยว่าอีเมลใดมีบัญชี
+- password recovery ต้องแลก code เป็น session ที่ callback ก่อนเรียก `updateUser`; หลังเปลี่ยน credential ให้ global sign-out เพื่อตัด refresh token เดิม
+- การสร้าง auth user ต้องสร้าง profile และ personal organization ใน transaction เดียว ฟังก์ชันซ่อม provisioning ต้องล็อกต่อ user และ idempotent เพื่อไม่สร้าง workspace ซ้ำเมื่อ callback ชนกัน
 
 ## Supabase admin client
 
