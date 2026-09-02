@@ -528,6 +528,32 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     })
   }, [currentIndex, perPage])
 
+  // ── Preview banner (shared between normal + focus mode) ───────────────────────
+
+  /**
+   * In the page's flow rather than fixed to the top of the window: pinned, it
+   * sat on top of the app's own header — over the logo and the button that
+   * hides the sidebar — and neither could be tapped. It also meant the page
+   * below had to reserve the banner's height by hand, in two variants, since
+   * the second line only appears once someone has started.
+   *
+   * `rounded` is off inside โหมดโฟกัส, which is an overlay flush with the
+   * window edges and has nothing to round against.
+   */
+  const previewBanner = (rounded: boolean) => previewMode && (
+    <div className={`shrink-0 bg-warning text-amber-950 px-4 py-1.5 flex flex-col items-center gap-0.5 ${rounded ? 'rounded-xl' : ''}`}>
+      <div className="flex items-center justify-center gap-3 text-xs font-semibold text-center">
+        <span>🔍 โหมดตัวอย่าง — มุมมองนักเรียน (คำตอบจะไม่ถูกบันทึกจริง)</span>
+        <a href={previewReturnHref ?? '/assignments'} className="underline hover:no-underline shrink-0">
+          ออกจากตัวอย่าง
+        </a>
+      </div>
+      {previewEditWarning && (
+        <p className="text-[11px] font-medium text-center leading-4">{previewEditWarning}</p>
+      )}
+    </div>
+  )
+
   // ── Exam body (shared between normal + focus mode) ────────────────────────────
 
   const examBody = (
@@ -895,21 +921,6 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     <>
       {config.watermarkText && <ExamWatermark text={config.watermarkText} />}
 
-      {/* ── Preview mode banner ────────────────────────────────────────────── */}
-      {previewMode && (
-        <div className="fixed top-0 inset-x-0 z-[110] bg-warning text-amber-950 px-4 py-1.5 flex flex-col items-center gap-0.5">
-          <div className="flex items-center justify-center gap-3 text-xs font-semibold">
-            <span>🔍 โหมดตัวอย่าง — มุมมองนักเรียน (คำตอบจะไม่ถูกบันทึกจริง)</span>
-            <a href={previewReturnHref ?? '/assignments'} className="underline hover:no-underline">
-              ออกจากตัวอย่าง
-            </a>
-          </div>
-          {previewEditWarning && (
-            <p className="text-[11px] font-medium text-center leading-4">{previewEditWarning}</p>
-          )}
-        </div>
-      )}
-
       {/* ── Fullscreen warning overlay ─────────────────────────────────────── */}
       {config.isFullscreenEnforced && showFullscreenWarning && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
@@ -969,6 +980,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       {/* ── Normal mode ────────────────────────────────────────────────────── */}
       {!focusMode && !previewResult && (
         <div className="flex flex-col gap-3">
+          {previewBanner(true)}
           {/* Toolbar */}
           <ExamToolbar
             saving={saving}
@@ -994,6 +1006,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       {/* ── Focus mode: full-screen overlay ────────────────────────────────── */}
       {focusMode && !previewResult && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden">
+          {previewBanner(false)}
           {/* Focus header */}
           <div className="shrink-0 border-b bg-card">
             <div className="flex items-center gap-4 px-6 py-3">

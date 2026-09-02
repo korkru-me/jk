@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
+import { useAppViewport } from '@/hooks/use-app-viewport'
 import type { User } from '@/lib/types'
 
 const SIDEBAR_COLLAPSE_KEY = 'korkru:sidebar-collapsed'
@@ -21,6 +22,11 @@ export function ShellClient({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
+  // Nothing inside the shell scrolls the page itself, so its height has to
+  // track the visible area rather than 100vh — see the hook for why iOS turns
+  // the difference into a white half-screen.
+  useAppViewport()
+
   useEffect(() => {
     setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1')
   }, [])
@@ -34,7 +40,7 @@ export function ShellClient({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-[var(--app-height,100dvh)] overflow-hidden bg-background">
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-overlay md:hidden"
@@ -56,7 +62,7 @@ export function ShellClient({
           sidebarCollapsed={sidebarCollapsed}
           onSidebarCollapseToggle={toggleSidebarCollapsed}
         />
-        <main className="flex-1 overflow-y-auto bg-muted/30 p-6">
+        <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6">
           {children}
         </main>
       </div>

@@ -148,11 +148,11 @@ export default async function AssignmentPreviewPage({
     instantCheckAnswerKey: a.instant_check_answer_key !== false,
   }
 
-  // The banner is fixed, so the page reserves its height by hand. A second
-  // line only appears when someone has already started, and without the extra
-  // room it would sit on top of ข้อ 1.
+  // The โหมดตัวอย่าง banner rides in ExamClient's own column, so there is no
+  // height to reserve here — it takes whichever of its one or two lines it
+  // needs out of the same space the exam gets.
   return (
-    <div className={`h-full flex flex-col ${startedSubmission ? 'pt-16' : 'pt-9'}`}>
+    <div className="h-full flex flex-col">
       <ExamClient
         submissionId={`preview-${id}`}
         answers={previewAnswers as any}

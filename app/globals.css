@@ -342,6 +342,27 @@
   }
 }
 
+/*
+ * Touch keyboards: never let a field's text drop below 16px.
+ *
+ * Safari on iOS/iPadOS zooms the whole page in when a focused field's text is
+ * smaller than 16px, and it never zooms back out on its own. `md:text-sm` on
+ * the field primitives is 14px, and an iPad matches `md:` — so every answer
+ * box on the exam page pulled the page sideways the moment a student tapped
+ * it, leaving the shell scrolled off its own origin.
+ *
+ * Deliberately outside @layer so it beats the utility that sets 14px; phones
+ * are already at 16px below `md:`, so in practice this only changes tablets.
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  textarea,
+  select,
+  [contenteditable='true'] {
+    font-size: 1rem;
+  }
+}
+
 /* Rich text content display (preview) */
 .rich-text-content p {
   @apply my-0.5;
