@@ -160,6 +160,7 @@ export default async function AssignmentPreviewPage({
         submissionId={`preview-${id}`}
         storageOwnerId={user.id}
         answers={previewAnswers as any}
+        initialWorkArtifacts={[]}
         durationMinutes={a.duration_minutes}
         startedAt={new Date().toISOString()}
         config={examConfig}

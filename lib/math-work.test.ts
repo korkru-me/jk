@@ -3,12 +3,14 @@ import {
   buildStudentWorkUploadPaths,
   buildTeachingBoardUploadPaths,
   CURRENT_WORK_FORMAT_VERSION,
+  hasCompleteWorkEvidence,
   hasWebpSignature,
   isWorkArtifactSource,
   isWorkPartKey,
   MAX_WORK_PREVIEW_BYTES,
   readSceneElementCount,
   validateStoredWorkFile,
+  workArtifactPartKey,
 } from '@/lib/math-work'
 
 const STUDENT_ID = '11111111-1111-4111-8111-111111111111'
@@ -19,6 +21,29 @@ const ASSIGNMENT_ID = '55555555-5555-4555-8555-555555555555'
 const QUESTION_ID = '66666666-6666-4666-8666-666666666666'
 
 describe('math work artifact helpers', () => {
+  it('maps whole and multi-part answers to stable artifact slots', () => {
+    expect(workArtifactPartKey(0, 1)).toBe('answer')
+    expect(workArtifactPartKey(0, 3)).toBe('part:0')
+    expect(workArtifactPartKey(2, 3)).toBe('part:2')
+    expect(() => workArtifactPartKey(1, 1)).toThrow()
+    expect(() => workArtifactPartKey(3, 3)).toThrow()
+  })
+
+  it('accepts a complete mix of legacy photos and attached artifact slots', () => {
+    expect(hasCompleteWorkEvidence({
+      submissionAnswerId: ANSWER_ID,
+      partCount: 3,
+      workImages: ['legacy-photo', null, null],
+      artifactSlots: new Set([`${ANSWER_ID}:part:1`, `${ANSWER_ID}:part:2`]),
+    })).toBe(true)
+    expect(hasCompleteWorkEvidence({
+      submissionAnswerId: ANSWER_ID,
+      partCount: 3,
+      workImages: ['legacy-photo', null, null],
+      artifactSlots: new Set([`${ANSWER_ID}:part:1`]),
+    })).toBe(false)
+  })
+
   it('builds answer-bound student paths with an optional scene', () => {
     expect(buildStudentWorkUploadPaths({
       studentId: STUDENT_ID,

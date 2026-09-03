@@ -1,6 +1,6 @@
 'use client'
 
-import { lazy, Suspense, useState, useEffect, useCallback, useMemo } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 import { checkAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
-  Pencil, Calculator as CalculatorIcon, NotebookPen,
+  Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -51,6 +51,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { ExamWatermark } from './exam-watermark'
 import { MathAnswerField } from './math-answer-field'
 import { mathInputPartKey, readMathInputMode, type MathInputModes } from '@/lib/math/input-mode'
+import { hasCompleteWorkEvidence, workArtifactPartKey, type StudentWorkArtifactView } from '@/lib/math-work'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,7 +101,7 @@ export interface ExamConfig {
   isFullscreenEnforced: boolean
   blockClipboard: boolean
   watermarkText: string | null
-  // Whether this งาน asks students to attach a photo of their working. One
+  // Whether this งาน asks students to attach evidence of their working. One
   // decision for the whole assignment, made by the teacher when they create it
   // — every เติมคำตอบตัวเลข question in it either needs a photo or none does.
   isWorkImageEnforced: boolean
@@ -127,11 +128,19 @@ interface CalculatorTarget {
   label: string
 }
 
+interface ScratchpadTarget {
+  answerId: string
+  localPartKey: string
+  artifactPartKey: string
+  label: string
+}
+
 interface Props {
   submissionId: string
   /** Authenticated user id used only to namespace local IndexedDB data. */
   storageOwnerId: string
   answers: AnswerRow[]
+  initialWorkArtifacts?: StudentWorkArtifactView[]
   durationMinutes: number | null
   startedAt: string
   config: ExamConfig
@@ -168,11 +177,33 @@ function initMathInputModes(answers: AnswerRow[]): Record<string, MathInputModes
   return Object.fromEntries(answers.map(a => [a.id, a.math_input_modes ?? {}]))
 }
 
+function workArtifactMap(artifacts: StudentWorkArtifactView[]): Record<string, StudentWorkArtifactView> {
+  return Object.fromEntries(artifacts.map(artifact => [
+    `${artifact.submissionAnswerId}:${artifact.partKey}`,
+    artifact,
+  ]))
+}
+
+function workPartKeys(answer: AnswerRow, partIndex: number): { localPartKey: string; artifactPartKey: string } {
+  const parts = (answer.questions.answer_parts ?? []) as Array<{ id?: string }>
+  if (parts.length <= 1) {
+    return {
+      localPartKey: mathInputPartKey(parts[0]?.id, 0, 1),
+      artifactPartKey: workArtifactPartKey(0, 1),
+    }
+  }
+  const safeIndex = Math.max(0, Math.min(partIndex, parts.length - 1))
+  return {
+    localPartKey: mathInputPartKey(parts[safeIndex]?.id, safeIndex, parts.length),
+    artifactPartKey: workArtifactPartKey(safeIndex, parts.length),
+  }
+}
+
 /**
- * How many photos of working this question needs before it can be submitted.
+ * How many pieces of working evidence this question needs before submission.
  *
  * Nothing about the โจทย์ decides this any more — only the งาน does. A
- * เติมคำตอบตัวเลข question asks for one photo per ข้อย่อย (one if it has none);
+ * เติมคำตอบตัวเลข question asks for one item per ข้อย่อย (one if it has none);
  * every other type asks for none, because there is no numeric working to show.
  */
 function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
@@ -182,7 +213,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, storageOwnerId, answers, durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
+export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
@@ -196,6 +227,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
   })
   const [workImages, setWorkImages] = useState<Record<string, (string | null)[]>>(
     () => initWorkImages(answers)
+  )
+  const [workArtifacts, setWorkArtifacts] = useState<Record<string, StudentWorkArtifactView>>(
+    () => workArtifactMap(initialWorkArtifacts)
   )
   const [submitting, setSubmitting] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -231,11 +265,15 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
   const [standaloneCalculatorMode, setStandaloneCalculatorMode] = useState<MathInputMode>('deg')
   const [scratchpadLoaded, setScratchpadLoaded] = useState(false)
   const [showScratchpad, setShowScratchpad] = useState(false)
+  const [scratchpadTarget, setScratchpadTarget] = useState<ScratchpadTarget | null>(null)
+  const [loadAttachedNonce, setLoadAttachedNonce] = useState(0)
 
   const navigateTo = useCallback((index: number) => {
     setCurrentIndex(index)
     setActiveMathField(null)
     setCalculatorTarget(null)
+    setScratchpadTarget(null)
+    setLoadAttachedNonce(0)
   }, [])
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
@@ -448,10 +486,110 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
 
   const toggleScratchpad = useCallback(() => {
     setScratchpadLoaded(true)
-    setShowScratchpad(open => !open)
+    setShowScratchpad(open => {
+      if (!open) {
+        setLoadAttachedNonce(0)
+        const answer = calculatorTarget
+          ? answers.find(item => item.id === calculatorTarget.answerId)
+          : answers[currentIndex]
+        if (answer) {
+          const parts = (answer.questions.answer_parts ?? []) as Array<{ id?: string }>
+          const partIndex = calculatorTarget
+            ? Math.max(0, parts.findIndex((part, index) => (
+                mathInputPartKey(part.id, index, parts.length) === calculatorTarget.partKey
+              )))
+            : 0
+          const keys = workPartKeys(answer, partIndex)
+          setScratchpadTarget({
+            answerId: answer.id,
+            ...keys,
+            label: calculatorTarget?.label ?? `ข้อ ${answers.findIndex(item => item.id === answer.id) + 1}`,
+          })
+        }
+      }
+      return !open
+    })
     setShowCalculator(false)
     setActiveMathField(null)
+  }, [answers, calculatorTarget, currentIndex])
+
+  const openScratchpadForPart = useCallback((
+    answerId: string,
+    partIndex: number,
+    label: string,
+    loadAttached = false,
+  ) => {
+    const answer = answers.find(item => item.id === answerId)
+    if (!answer) return
+    setScratchpadTarget({ answerId, ...workPartKeys(answer, partIndex), label })
+    if (loadAttached) setLoadAttachedNonce(nonce => nonce + 1)
+    else setLoadAttachedNonce(0)
+    setScratchpadLoaded(true)
+    setShowScratchpad(true)
+    setShowCalculator(false)
+    setActiveMathField(null)
+  }, [answers])
+
+  const refreshWorkArtifacts = useCallback(async (answerId: string) => {
+    if (previewMode) return
+    try {
+      const { getStudentWorkArtifacts } = await import('@/lib/actions/math-work')
+      const result = await getStudentWorkArtifacts(answerId)
+      if (!result || 'error' in result) {
+        toast.error(result?.error ?? 'เปิดวิธีทำไม่สำเร็จ กรุณาลองใหม่')
+        return
+      }
+      setWorkArtifacts(previous => {
+        const next = Object.fromEntries(Object.entries(previous).filter(([, artifact]) => (
+          artifact.submissionAnswerId !== answerId
+        )))
+        for (const artifact of result.artifacts) {
+          next[`${answerId}:${artifact.partKey}`] = {
+            ...artifact,
+            submissionAnswerId: answerId,
+            sourceType: artifact.sourceType === 'photo' ? 'photo' : 'scratchpad',
+          }
+        }
+        return next
+      })
+    } catch {
+      toast.error('เปิดวิธีทำไม่สำเร็จ กรุณาลองใหม่')
+    }
+  }, [previewMode])
+
+  const handleArtifactSaved = useCallback((artifact: StudentWorkArtifactView) => {
+    setWorkArtifacts(previous => {
+      const key = `${artifact.submissionAnswerId}:${artifact.partKey}`
+      const oldUrl = previous[key]?.previewUrl
+      if (oldUrl?.startsWith('blob:') && oldUrl !== artifact.previewUrl) URL.revokeObjectURL(oldUrl)
+      return { ...previous, [key]: artifact }
+    })
   }, [])
+
+  const handleArtifactDelete = useCallback(async (artifact: StudentWorkArtifactView) => {
+    try {
+      if (previewMode) {
+        if (artifact.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(artifact.previewUrl)
+      } else {
+        const { deleteStudentWorkArtifact } = await import('@/lib/actions/math-work')
+        const result = await deleteStudentWorkArtifact(artifact.id)
+        if (!result || 'error' in result) {
+          toast.error(result?.error ?? 'ลบวิธีทำไม่สำเร็จ กรุณาลองใหม่')
+          return false
+        }
+      }
+      setWorkArtifacts(previous => {
+        const next = { ...previous }
+        delete next[`${artifact.submissionAnswerId}:${artifact.partKey}`]
+        return next
+      })
+      toast.success('นำวิธีทำที่แนบออกแล้ว')
+      return true
+    } catch {
+      toast.error('ลบวิธีทำไม่สำเร็จ กรุณาลองใหม่')
+      return false
+    }
+  }, [previewMode])
 
   const insertCalculatorResult = useCallback((result: string) => {
     if (!calculatorTarget) return
@@ -574,13 +712,18 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
   }
 
   function findMissingWorkImage(): number | null {
+    const artifactSlots = new Set(Object.keys(workArtifacts))
     for (let i = 0; i < answers.length; i++) {
       const required = requiredWorkImageCount(answers[i], config)
       if (required === 0) continue
-      const imgs = workImages[answers[i].id] ?? []
-      for (let p = 0; p < required; p++) {
-        if (!imgs[p]) return i
-      }
+      const answer = answers[i]
+      const imgs = workImages[answer.id] ?? []
+      if (!hasCompleteWorkEvidence({
+        submissionAnswerId: answer.id,
+        partCount: required,
+        workImages: imgs,
+        artifactSlots,
+      })) return i
     }
     return null
   }
@@ -588,7 +731,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
   function openSubmitDialog() {
     const missingIndex = findMissingWorkImage()
     if (missingIndex !== null) {
-      toast.error(`กรุณาแนบรูปวิธีทำให้ครบก่อนส่งคำตอบ (ข้อ ${missingIndex + 1})`)
+      toast.error(`กรุณาแนบวิธีทำให้ครบก่อนส่งคำตอบ (ข้อ ${missingIndex + 1})`)
       navigateTo(missingIndex)
       return
     }
@@ -640,18 +783,22 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
   const pageStart = Math.floor(currentIndex / perPage) * perPage
   const pageAnswers = answers.slice(pageStart, pageStart + perPage)
   const isLastPage = pageStart + perPage >= answers.length
-  const scratchpadAnswer = calculatorTarget
-    ? answers.find(answer => answer.id === calculatorTarget.answerId)
+  const scratchpadAnswer = scratchpadTarget
+    ? answers.find(answer => answer.id === scratchpadTarget.answerId)
     : answers[currentIndex]
-  const scratchpadPartKey = calculatorTarget?.partKey ?? 'main'
+  const scratchpadPartKey = scratchpadTarget?.localPartKey ?? 'main'
   const scratchpadScope = useMemo(() => scratchpadAnswer ? ({
     ownerId: storageOwnerId,
     submissionId,
     answerId: scratchpadAnswer.id,
     partKey: scratchpadPartKey,
   }) : null, [scratchpadAnswer, scratchpadPartKey, storageOwnerId, submissionId])
-  const scratchpadTargetLabel = calculatorTarget?.label
+  const scratchpadTargetLabel = scratchpadTarget?.label
     ?? (scratchpadAnswer ? `ข้อ ${answers.findIndex(answer => answer.id === scratchpadAnswer.id) + 1}` : 'ข้อปัจจุบัน')
+  const scratchpadArtifactPartKey = scratchpadTarget?.artifactPartKey ?? 'answer'
+  const scratchpadArtifact = scratchpadAnswer
+    ? workArtifacts[`${scratchpadAnswer.id}:${scratchpadArtifactPartKey}`] ?? null
+    : null
 
   // With several questions on a screen, moving the focus is not visible on its
   // own — tapping ข้อ 4 in the นำทาง grid while it is already on the page would
@@ -872,6 +1019,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
                   requiresWorkImage={requiredWorkImageCount(current, config) > 0}
                   workImages={workImages[current.id] ?? []}
                   onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
+                  scratchpadEnabled={config.scratchpadEnabled}
+                  workArtifacts={workArtifacts}
+                  onOpenScratchpad={openScratchpadForPart}
+                  onArtifactDelete={handleArtifactDelete}
+                  onArtifactRefresh={refreshWorkArtifacts}
                   localOnly={previewMode}
                 />
               )}
@@ -1241,6 +1393,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, durationMinu
             scope={scratchpadScope}
             targetLabel={scratchpadTargetLabel}
             persistenceEnabled={!previewMode}
+            artifactPartKey={scratchpadArtifactPartKey}
+            artifact={scratchpadArtifact}
+            loadAttachedNonce={loadAttachedNonce}
+            previewMode={previewMode}
+            onAttachmentSaved={handleArtifactSaved}
             onClose={() => setShowScratchpad(false)}
           />
         </Suspense>
@@ -1760,10 +1917,146 @@ function MCQInput({
 
 // ─── Multi-part numeric ───────────────────────────────────────────────────────
 
+function WorkProofSlot({
+  answerId,
+  partIndex,
+  partCount,
+  label,
+  required,
+  scratchpadEnabled,
+  workImage,
+  artifact,
+  localOnly,
+  onPhotoChange,
+  onOpenScratchpad,
+  onArtifactDelete,
+  onArtifactRefresh,
+}: {
+  answerId: string
+  partIndex: number
+  partCount: number
+  label: string
+  required: boolean
+  scratchpadEnabled: boolean
+  workImage: string | null
+  artifact: StudentWorkArtifactView | null
+  localOnly?: boolean
+  onPhotoChange: (url: string | null) => void
+  onOpenScratchpad: (answerId: string, partIndex: number, label: string, loadAttached?: boolean) => void
+  onArtifactDelete: (artifact: StudentWorkArtifactView) => Promise<boolean | void>
+  onArtifactRefresh: (answerId: string) => Promise<void>
+}) {
+  const [deleting, setDeleting] = useState(false)
+  const refreshedUrlRef = useRef<string | null>(null)
+  const scratchpadLabel = partCount > 1 ? `ข้อย่อย ${label}` : 'คำตอบ'
+
+  useEffect(() => {
+    refreshedUrlRef.current = null
+  }, [artifact?.previewUrl])
+
+  if (!required && !scratchpadEnabled && !artifact && !workImage) return null
+
+  const removeArtifact = async () => {
+    if (!artifact || deleting) return
+    if (!window.confirm('นำวิธีทำที่แนบออกจากข้อนี้ใช่ไหม?')) return
+    setDeleting(true)
+    try {
+      await onArtifactDelete(artifact)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const refreshPreview = () => {
+    if (refreshedUrlRef.current === artifact?.previewUrl) return
+    refreshedUrlRef.current = artifact?.previewUrl ?? '__missing__'
+    void onArtifactRefresh(answerId)
+  }
+
+  return (
+    <div className="mt-2 rounded-xl border border-dashed border-border bg-muted/20 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Paperclip className="size-3.5 text-primary" aria-hidden="true" />
+        <p className="text-xs font-semibold">วิธีทำ{partCount > 1 ? ` · ${label}` : ''}</p>
+        {required && (
+          <Badge variant="outline" className="ml-auto text-[10px] text-warning">ต้องแนบ</Badge>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-start gap-3">
+        {artifact && (
+          <div className="space-y-1.5">
+            {artifact.previewUrl ? (
+              <a href={artifact.previewUrl} target="_blank" rel="noopener noreferrer" className="block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={artifact.previewUrl}
+                  alt={`วิธีทำจากกระดาษทด ${label}`}
+                  className="h-28 w-28 rounded-lg border bg-card object-cover transition-opacity hover:opacity-90"
+                  onError={refreshPreview}
+                />
+              </a>
+            ) : (
+              <Button type="button" variant="outline" size="sm" className="h-28 w-28" onClick={refreshPreview}>
+                โหลดภาพวิธีทำ
+              </Button>
+            )}
+            <p className="text-[10px] text-muted-foreground">จากกระดาษทด · แก้ไขได้ก่อนส่ง</p>
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => onOpenScratchpad(answerId, partIndex, scratchpadLabel, true)}
+              >
+                <Pencil /> แก้ไข
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => void removeArtifact()}
+                disabled={deleting}
+                aria-label="นำวิธีทำที่แนบออก"
+              >
+                {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          {scratchpadEnabled && !artifact && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenScratchpad(answerId, partIndex, scratchpadLabel)}
+            >
+              <NotebookPen /> เขียนบนกระดาษทด
+            </Button>
+          )}
+          <WorkImageUpload
+            value={workImage}
+            onChange={onPhotoChange}
+            required={required && !artifact}
+            localOnly={localOnly}
+          />
+        </div>
+      </div>
+
+      {required && !artifact && !workImage && localOnly && (
+        <p className="mt-2 text-[10px] text-warning">ต้องแนบวิธีทำก่อนจำลองการส่ง</p>
+      )}
+    </div>
+  )
+}
+
 function MultiPartAnswerInput({
   answerId, parts, questionText, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
   mathInputModes, activeMathField, onActivateMathField, onDeactivateMathField, onMathInputModeChange,
-  requiresWorkImage, workImages, onWorkImageChange, localOnly,
+  requiresWorkImage, workImages, onWorkImageChange, scratchpadEnabled, workArtifacts,
+  onOpenScratchpad, onArtifactDelete, onArtifactRefresh, localOnly,
 }: {
   answerId: string
   parts: SafeAnswerPart[] | AnswerPart[] | null
@@ -1781,6 +2074,11 @@ function MultiPartAnswerInput({
   requiresWorkImage: boolean
   workImages: (string | null)[]
   onWorkImageChange: (partIndex: number, url: string | null) => void
+  scratchpadEnabled: boolean
+  workArtifacts: Record<string, StudentWorkArtifactView>
+  onOpenScratchpad: (answerId: string, partIndex: number, label: string, loadAttached?: boolean) => void
+  onArtifactDelete: (artifact: StudentWorkArtifactView) => Promise<boolean | void>
+  onArtifactRefresh: (answerId: string) => Promise<void>
   /** ครูดูตัวอย่างอยู่ — แนบรูปได้จริงแต่ไม่อัปขึ้น storage (ดู WorkImageUpload) */
   localOnly?: boolean
 }) {
@@ -1868,14 +2166,29 @@ function MultiPartAnswerInput({
             )
           })}
         </div>
-        {requiresWorkImage && (
-          <WorkImageUpload
-            value={workImages[0] ?? null}
-            onChange={url => onWorkImageChange(0, url)}
-            required
-            localOnly={localOnly}
-          />
-        )}
+        {(requiresWorkImage || scratchpadEnabled || activeParts.some((_, index) => (
+          !!workArtifacts[`${answerId}:${workArtifactPartKey(index, activeParts.length)}`]
+        ))) && activeParts.map((_, index) => {
+          const artifactPartKey = workArtifactPartKey(index, activeParts.length)
+          return (
+            <WorkProofSlot
+              key={artifactPartKey}
+              answerId={answerId}
+              partIndex={index}
+              partCount={activeParts.length}
+              label={labels[index] ?? String(index + 1)}
+              required={requiresWorkImage}
+              scratchpadEnabled={scratchpadEnabled}
+              workImage={workImages[index] ?? null}
+              artifact={workArtifacts[`${answerId}:${artifactPartKey}`] ?? null}
+              localOnly={localOnly}
+              onPhotoChange={url => onWorkImageChange(index, url)}
+              onOpenScratchpad={onOpenScratchpad}
+              onArtifactDelete={onArtifactDelete}
+              onArtifactRefresh={onArtifactRefresh}
+            />
+          )
+        })}
       </div>
     )
   }
@@ -1910,12 +2223,21 @@ function MultiPartAnswerInput({
             </div>
           </>
         )}
-        {requiresWorkImage && (
-          <WorkImageUpload
-            value={workImages[0] ?? null}
-            onChange={url => onWorkImageChange(0, url)}
-            required
+        {(requiresWorkImage || scratchpadEnabled || workArtifacts[`${answerId}:answer`]) && (
+          <WorkProofSlot
+            answerId={answerId}
+            partIndex={0}
+            partCount={1}
+            label="คำตอบ"
+            required={requiresWorkImage}
+            scratchpadEnabled={scratchpadEnabled}
+            workImage={workImages[0] ?? null}
+            artifact={workArtifacts[`${answerId}:answer`] ?? null}
             localOnly={localOnly}
+            onPhotoChange={url => onWorkImageChange(0, url)}
+            onOpenScratchpad={onOpenScratchpad}
+            onArtifactDelete={onArtifactDelete}
+            onArtifactRefresh={onArtifactRefresh}
           />
         )}
       </div>
@@ -1944,12 +2266,21 @@ function MultiPartAnswerInput({
             })}
             {part.unit && <UnitDisplay html={part.unit} />}
           </div>
-          {requiresWorkImage && (
-            <WorkImageUpload
-              value={workImages[i] ?? null}
-              onChange={url => onWorkImageChange(i, url)}
-              required
+          {(requiresWorkImage || scratchpadEnabled || workArtifacts[`${answerId}:${workArtifactPartKey(i, activeParts.length)}`]) && (
+            <WorkProofSlot
+              answerId={answerId}
+              partIndex={i}
+              partCount={activeParts.length}
+              label={labels[i] ?? String(i + 1)}
+              required={requiresWorkImage}
+              scratchpadEnabled={scratchpadEnabled}
+              workImage={workImages[i] ?? null}
+              artifact={workArtifacts[`${answerId}:${workArtifactPartKey(i, activeParts.length)}`] ?? null}
               localOnly={localOnly}
+              onPhotoChange={url => onWorkImageChange(i, url)}
+              onOpenScratchpad={onOpenScratchpad}
+              onArtifactDelete={onArtifactDelete}
+              onArtifactRefresh={onArtifactRefresh}
             />
           )}
         </div>

@@ -125,7 +125,8 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            aria-label="นำรูปวิธีทำออก"
           >
             <X className="w-3 h-3" />
           </button>
@@ -140,6 +141,7 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
               ? 'border-warning text-warning bg-warning/8'
               : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
           }`}
+          aria-label="แนบรูปวิธีทำจากกล้องหรือเครื่อง"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
           {uploading ? 'กำลังอัปโหลด...' : 'แนบรูปวิธีทำ'}

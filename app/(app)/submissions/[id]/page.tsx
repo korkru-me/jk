@@ -17,6 +17,7 @@ import { ScoreEditor } from '@/components/assignments/score-editor'
 import { Card } from '@/components/ui/card'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
+import { MATH_WORK_BUCKET } from '@/lib/math-work'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -402,12 +403,24 @@ async function SubmissionAnswerDetails({
     .select(`
       id, correct_answer, is_correct, max_score, option_order, order_index,
       random_values, score, student_answer, work_images, carried_over, check_count,
-      questions(title, question_text, answer_parts, answer_unit, question_type, extra_data, mcq_options)
+      questions(title, question_text, answer_parts, answer_unit, question_type, extra_data, mcq_options),
+      student_work_artifacts(id, part_key, source_type, preview_path, updated_at)
     `)
     .eq('submission_id', submissionId)
     .order('order_index')
 
   const sortedAnswers = (answers ?? []) as any[]
+  const artifactPreviewPaths = sortedAnswers.flatMap(answer => (
+    (answer.student_work_artifacts ?? []).map((artifact: any) => artifact.preview_path as string)
+  ))
+  const { data: signedArtifactRows } = artifactPreviewPaths.length > 0
+    ? await createAdminClient().storage
+        .from(MATH_WORK_BUCKET)
+        .createSignedUrls(Array.from(new Set(artifactPreviewPaths)), 5 * 60)
+    : { data: [] }
+  const signedArtifactUrls = new Map((signedArtifactRows ?? []).flatMap(row => (
+    row.signedUrl ? [[row.path, row.signedUrl] as const] : []
+  )))
   const wrongAnswers = sortedAnswers
     .filter(a => a.is_correct === false && !isPendingTeacherReview(a))
     .map(a => ({
@@ -519,6 +532,14 @@ async function SubmissionAnswerDetails({
                     }
                     workImages={a.work_images ?? null}
                   />
+                  <SubmittedWorkArtifacts
+                    artifacts={(a.student_work_artifacts ?? []).map((artifact: any) => ({
+                      id: artifact.id as string,
+                      partKey: artifact.part_key as string,
+                      sourceType: artifact.source_type as string,
+                      previewUrl: signedArtifactUrls.get(artifact.preview_path as string) ?? null,
+                    }))}
+                  />
                 </div>
               </div>
             </div>
@@ -536,6 +557,50 @@ async function SubmissionAnswerDetails({
         />
       </div>
     </>
+  )
+}
+
+function SubmittedWorkArtifacts({
+  artifacts,
+}: {
+  artifacts: Array<{ id: string; partKey: string; sourceType: string; previewUrl: string | null }>
+}) {
+  if (artifacts.length === 0) return null
+  return (
+    <div className="mt-3 rounded-xl border border-dashed border-border bg-muted/20 p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold">
+        <span aria-hidden="true">✍️</span> วิธีทำที่แนบ
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {artifacts.map(artifact => {
+          const partIndex = /^part:(\d+)$/.exec(artifact.partKey)?.[1]
+          const label = partIndex === undefined ? 'คำตอบ' : `ข้อย่อย ${PART_LABELS[Number(partIndex)] ?? Number(partIndex) + 1}`
+          return (
+            <div key={artifact.id} className="space-y-1">
+              {artifact.previewUrl ? (
+                <a href={artifact.previewUrl} target="_blank" rel="noopener noreferrer" className="block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={artifact.previewUrl}
+                    alt={`วิธีทำ ${label}`}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-28 w-28 rounded-lg border bg-card object-cover transition-opacity hover:opacity-90"
+                  />
+                </a>
+              ) : (
+                <div className="flex h-28 w-28 items-center justify-center rounded-lg border bg-muted px-2 text-center text-[10px] text-muted-foreground">
+                  เปิดภาพไม่สำเร็จ
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                {label} · {artifact.sourceType === 'scratchpad' ? 'กระดาษทด' : 'รูปภาพ'}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

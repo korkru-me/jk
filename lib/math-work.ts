@@ -8,6 +8,18 @@ export const CURRENT_WORK_FORMAT_VERSION = 1
 
 export type WorkArtifactSource = 'scratchpad' | 'photo'
 
+/** Signed, client-safe view. Storage paths never cross the server boundary. */
+export interface StudentWorkArtifactView {
+  id: string
+  submissionAnswerId: string
+  partKey: string
+  sourceType: WorkArtifactSource
+  formatVersion: number
+  previewUrl: string | null
+  sceneUrl: string | null
+  updatedAt: string
+}
+
 export interface WorkUploadPaths {
   previewPath: string
   scenePath: string | null
@@ -22,6 +34,38 @@ export function isUuid(value: string): boolean {
 
 export function isWorkPartKey(value: string): boolean {
   return PART_KEY_PATTERN.test(value)
+}
+
+/** Stable persisted slot: one whole answer, or one positional sub-answer. */
+export function workArtifactPartKey(partIndex: number, partCount: number): string {
+  if (
+    !Number.isInteger(partIndex)
+    || !Number.isInteger(partCount)
+    || partCount < 1
+    || partIndex < 0
+    || partIndex >= partCount
+  ) {
+    throw new Error('Invalid work artifact part position')
+  }
+  if (partCount === 1) return 'answer'
+  return `part:${partIndex}`
+}
+
+/** Shared submit rule: every logical slot needs either a legacy photo or an artifact. */
+export function hasCompleteWorkEvidence(input: {
+  submissionAnswerId: string
+  partCount: number
+  workImages: Array<string | null | undefined>
+  artifactSlots: ReadonlySet<string>
+}): boolean {
+  if (!Number.isInteger(input.partCount) || input.partCount < 1) return false
+  for (let partIndex = 0; partIndex < input.partCount; partIndex++) {
+    const partKey = workArtifactPartKey(partIndex, input.partCount)
+    if (!input.workImages[partIndex] && !input.artifactSlots.has(`${input.submissionAnswerId}:${partKey}`)) {
+      return false
+    }
+  }
+  return true
 }
 
 export function isWorkArtifactSource(value: string): value is WorkArtifactSource {

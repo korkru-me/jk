@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 3 กันยายน 2026
 
-สถานะ: **เฟส 4 — กระดาษทด local-only แบบ lazy-loaded พัฒนาแล้ว**
+สถานะ: **เฟส 5 — แนบ แก้ไข ส่ง และตรวจวิธีทำจากกระดาษทดได้แล้ว**
 
-เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู เฟส 1 เพิ่ม schema, RLS, private Storage, Server Actions และสวิตช์ในหน้าสร้าง/แก้ไขงาน เฟส 2 เปิดแป้นคณิตศาสตร์และ DEG/RAD ในช่องคำตอบตัวเลข เฟส 3 เปิดเครื่องคิดเลข และเฟส 4 เปิดกระดาษทด local-only ตามค่าที่ครูตั้งแล้ว การแนบวิธีทำจากกระดาษทดเริ่มในเฟส 5
+เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู เฟส 1 เพิ่ม schema, RLS, private Storage, Server Actions และสวิตช์ในหน้าสร้าง/แก้ไขงาน เฟส 2 เปิดแป้นคณิตศาสตร์และ DEG/RAD ในช่องคำตอบตัวเลข เฟส 3 เปิดเครื่องคิดเลข เฟส 4 เปิดกระดาษทด local-only และเฟส 5 เปิดการแนบ/แก้/ส่ง artifact กับหน้าตรวจผลแล้ว
 
 ## เป้าหมาย
 
@@ -109,6 +109,16 @@
 - ไม่มี Server Action, Storage upload หรือ telemetry ต่อ stroke ในเฟสนี้ การกดแนบ/สร้าง WebP preview/กลับมาแก้ artifact ที่แนบแล้วเป็นงานของเฟส 5
 - production bundle ของหน้า take หลังเฟส 4 มี 17 initial client chunks รวม 777,953 bytes raw / 237,410 bytes gzip (0.742/0.226 MiB) เพิ่มจากเฟส 3 เพียง 2,863/1,534 bytes; scan ยืนยันว่า Excalidraw และ mathjs ไม่อยู่ใน initial chunk union
 
+ของที่ส่งมอบในเฟส 5:
+
+- ช่องคำตอบตัวเลขแต่ละข้อ/ข้อย่อยมีส่วน “วิธีทำ” ที่เลือกเขียนบนกระดาษทดหรือแนบรูปจากอุปกรณ์ได้ ครู preview ขั้นตอนนี้ใน memory เท่านั้นและไม่สร้างไฟล์บน server
+- เมื่อกดแนบ ระบบ render เฉพาะตอนนั้นเป็น WebP preview คู่กับ versioned scene แล้วอัปโหลดผ่าน token ที่ผูกกับ answer/path; Server Action ตรวจสิทธิ์ attempt, เวลา, SEB/Android gate, MIME, ขนาด, WebP signature, scene version และจำนวน element ก่อนสร้างหรือแทนที่ reference
+- Artifact หนึ่ง logical slot มีฉบับปัจจุบันหนึ่งรายการ นักเรียนเห็น thumbnail, นำออก, เปิด scene ที่แนบกลับมาแก้และอัปเดตได้ตราบใดที่ submission ยัง `in_progress`; การแทนที่ลบไฟล์ฉบับเดิมแบบ best effort หลัง reference ใหม่สำเร็จ
+- กติกา “บังคับแนบวิธีทำ” ยอมรับทั้ง artifact จากกระดาษทดและ `work_images` เดิมต่อข้อย่อย โดยตรวจทั้งใน UI และฝั่ง server ก่อน finalize จึงข้ามด้วยการเรียก action ตรง ๆ ไม่ได้
+- หน้าผลลัพธ์แสดงภาพวิธีทำแบบ read-only ผ่าน signed URL อายุสั้นแก่ผู้ที่ผ่านสิทธิ์ดูรายละเอียดคำตอบ และไม่ส่ง scene ต้นฉบับไปยังหน้านี้
+- authenticated browser QA ผ่าน flow กระดาษว่าง, เขียน–แนบ, thumbnail, เปิดแก้ไข และ layout มือถือโดยไม่ล้นแนวนอน
+- production bundle ของหน้า take หลังเฟส 5 ยังมี 17 initial client chunks รวม 786,060 bytes raw / 239,716 bytes gzip (0.750/0.229 MiB) เพิ่มจากเฟส 4 เพียง 8,107/2,306 bytes; scan ยืนยันว่า Excalidraw, mathjs และ Supabase browser client ไม่อยู่ใน initial chunk union
+
 ## ประสบการณ์ครู
 
 หน้าสร้างและแก้ไขงานต้องแสดงสวิตช์เครื่องคิดเลขกับกระดาษทดเฉพาะงานออนไลน์ และสรุปค่าทั้งสองก่อนบันทึก การ duplicate งานคัดลอกค่าตามต้นฉบับ หน้าตัวอย่างนักเรียนต้องแสดงเครื่องมือเหมือนค่าที่ตั้งจริงโดยไม่สร้าง submission
@@ -168,7 +178,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 7. Scheduled cleanup, retention และ security hardening
 8. Authenticated browser QA, accessibility, performance และ rollout
 
-สถานะปัจจุบัน: เฟส 0–4 เสร็จในโค้ด แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข และกระดาษทด local-only ตามสิทธิ์ของงานแสดงแล้ว เฟส 5–8 ยังไม่เริ่ม จึงยังแนบกระดาษทดเป็น artifact ไม่ได้และยังไม่มีโหมดสอนใน production UI
+สถานะปัจจุบัน: เฟส 0–5 เสร็จในโค้ด แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข, กระดาษทด local-only และ artifact ที่แนบ/แก้/ส่ง/อ่านในหน้าผลลัพธ์ทำงานแล้ว เฟส 6–8 ยังไม่เริ่ม จึงยังไม่มีโหมดสอนหรือ scheduled orphan cleanup ใน production UI
 
 แต่ละเฟสต้องเป็นหน่วย commit ที่ตรวจรับได้ Migration ต้องอยู่ใน commit เดียวกับโค้ดที่พึ่งพา และห้ามเปิด UI production ก่อน authorization/persistence ของเฟสนั้นพร้อม
 

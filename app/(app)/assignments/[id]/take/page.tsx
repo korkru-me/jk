@@ -64,7 +64,7 @@ export default async function TakeExamPage({
 
   const exam = await getExamTakingData(result.submissionId!)
   if (!exam) redirect('/assignments')
-  const { assignment, submission, answers } = exam
+  const { assignment, submission, answers, artifacts } = exam
 
   const examConfig: ExamConfig = {
     proctoringEnabled: assignment.proctoring_enabled,
@@ -87,6 +87,7 @@ export default async function TakeExamPage({
         submissionId={result.submissionId!}
         storageOwnerId={submission.student_id}
         answers={answers}
+        initialWorkArtifacts={artifacts}
         durationMinutes={assignment.duration_minutes}
         startedAt={submission.started_at}
         config={examConfig}

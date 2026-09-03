@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { toSafeExamAnswer, type SafeExamAnswer } from '@/lib/exam-safe'
 import { getExamAccessSession } from '@/lib/exam-access-session'
+import { MATH_WORK_BUCKET, type StudentWorkArtifactView } from '@/lib/math-work'
 
 export interface ExamTakingData {
   submission: {
@@ -33,6 +34,7 @@ export interface ExamTakingData {
     scratchpad_enabled: boolean
   }
   answers: SafeExamAnswer[]
+  artifacts: StudentWorkArtifactView[]
 }
 
 /**
@@ -98,6 +100,38 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
     .map(row => toSafeExamAnswer(row as unknown as Parameters<typeof toSafeExamAnswer>[0]))
     .filter((answer): answer is SafeExamAnswer => answer !== null)
 
+  // Existing attached work is small metadata plus short-lived private URLs.
+  // Query only the exact safe answer ids from this authenticated attempt; a
+  // failed artifact read must never make the exam itself unavailable.
+  let artifacts: StudentWorkArtifactView[] = []
+  const answerIds = answers.map(answer => answer.id)
+  if (answerIds.length > 0) {
+    const { data: artifactRows } = await admin
+      .from('student_work_artifacts')
+      .select('id, submission_answer_id, part_key, source_type, preview_path, scene_path, format_version, updated_at')
+      .in('submission_answer_id', answerIds)
+      .order('part_key')
+    const paths = (artifactRows ?? []).flatMap(row => (
+      [row.preview_path, row.scene_path].filter((path): path is string => !!path)
+    ))
+    const { data: signedRows } = paths.length > 0
+      ? await admin.storage.from(MATH_WORK_BUCKET).createSignedUrls(Array.from(new Set(paths)), 5 * 60)
+      : { data: [] }
+    const signed = new Map((signedRows ?? []).flatMap(row => (
+      row.signedUrl ? [[row.path, row.signedUrl] as const] : []
+    )))
+    artifacts = (artifactRows ?? []).map(row => ({
+      id: row.id,
+      submissionAnswerId: row.submission_answer_id,
+      partKey: row.part_key,
+      sourceType: row.source_type === 'photo' ? 'photo' : 'scratchpad',
+      formatVersion: row.format_version,
+      previewUrl: signed.get(row.preview_path) ?? null,
+      sceneUrl: row.scene_path ? (signed.get(row.scene_path) ?? null) : null,
+      updatedAt: row.updated_at,
+    }))
+  }
+
   return {
     submission: {
       id: submission.id,
@@ -133,5 +167,6 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       scratchpad_enabled: assignment.scratchpad_enabled === true,
     },
     answers,
+    artifacts,
   }
 }

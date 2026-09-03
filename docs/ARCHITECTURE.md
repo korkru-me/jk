@@ -110,7 +110,7 @@
 
 ## เครื่องมือคณิตศาสตร์และพื้นที่เขียน
 
-สเปกที่อนุมัติอยู่ใน `docs/STUDENT_MATH_TOOLS.md` เฟส 1 มี schema/private Storage/RLS/Server Actions และ assignment settings เฟส 2 เปิดแป้นคณิตศาสตร์กับ DEG/RAD เฟส 3 เปิดเครื่องคิดเลขวิทยาศาสตร์ และเฟส 4 เปิดกระดาษทด local-only ตาม assignment flag โดยแบ่ง runtime boundary ไว้ดังนี้:
+สเปกที่อนุมัติอยู่ใน `docs/STUDENT_MATH_TOOLS.md` เฟส 1 มี schema/private Storage/RLS/Server Actions และ assignment settings เฟส 2 เปิดแป้นคณิตศาสตร์กับ DEG/RAD เฟส 3 เปิดเครื่องคิดเลขวิทยาศาสตร์ เฟส 4 เปิดกระดาษทด local-only และเฟส 5 เปิด artifact ที่แนบ/แก้/ส่ง/ตรวจได้ โดยแบ่ง runtime boundary ไว้ดังนี้:
 
 1. แป้นคณิตศาสตร์เป็น client UI ขนาดเล็กและแก้ข้อความตาม cursor/selection; normalization กับการตัดสินคะแนนใช้ bounded recursive-descent parser แบบ allowlist ซึ่งไม่ใช้ `eval`/`Function` กับ input นักเรียน โหมด DEG/RAD ถูกเก็บแบบ atomic กับคำตอบของแต่ละช่องเพื่อให้ preview, instant check และ final grading อ่านความหมายเดียวกัน ส่วน mathjs เดิมเหลือไว้เฉพาะสูตรที่ครูเป็นผู้สร้างและไม่เข้า initial client path
 2. เครื่องคิดเลขเป็น dynamic client chunk ที่เริ่ม fetch หลัง user gesture ใช้ evaluator ที่ปลอดภัยตัวเดียวกับคำตอบ และเก็บ expression/history สูงสุด 20 รายการเฉพาะ memory ของหน้า attempt ไม่มี database/localStorage path สำหรับประวัติ
@@ -120,7 +120,7 @@
 6. โหมดสอนมี persistence แยกจาก teacher preview ปัจจุบัน กระดานผูก assignment/question/creator/slot และไม่ broadcast แบบ realtime ในรุ่นแรก
 7. Scheduled orphan cleanup อ่าน reference จากทั้ง student artifacts และ teaching boards เว้นไฟล์ใหม่ตาม grace period และยกเลิกการลบหาก scan ไม่ครบ
 
-Excalidraw, mathjs และ Supabase browser client ห้ามเข้า initial dependency path ของหน้าทำโจทย์ เครื่องคิดเลขและพื้นที่เขียนต้องโหลดหลัง user gesture และทุกเฟสวัด client-reference chunk union ของ route `/assignments/[id]/take` — หลังเฟส 4 route มี 17 initial chunks รวม 777,953 bytes raw / 237,410 bytes gzip และ scan ไม่พบ Excalidraw/mathjs ใน union นี้
+Excalidraw, mathjs และ Supabase browser client ห้ามเข้า initial dependency path ของหน้าทำโจทย์ เครื่องคิดเลขและพื้นที่เขียนต้องโหลดหลัง user gesture และทุกเฟสวัด client-reference chunk union ของ route `/assignments/[id]/take` — หลังเฟส 5 route มี 17 initial chunks รวม 786,060 bytes raw / 239,716 bytes gzip และ scan ไม่พบ Excalidraw/mathjs/Supabase browser client ใน union นี้
 
 ## Compatibility hotspots
 

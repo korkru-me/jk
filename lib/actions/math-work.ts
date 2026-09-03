@@ -427,6 +427,7 @@ export async function getStudentWorkArtifacts(submissionAnswerId: string) {
     expiresInSeconds: SIGNED_READ_SECONDS,
     artifacts: (rows ?? []).map(row => ({
       id: row.id,
+      submissionAnswerId,
       partKey: row.part_key,
       sourceType: row.source_type,
       formatVersion: row.format_version,

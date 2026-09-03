@@ -17,6 +17,7 @@ import type { Question } from '@/lib/types'
 import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
 import { parseMathInputModes } from '@/lib/math/input-mode'
+import { hasCompleteWorkEvidence } from '@/lib/math-work'
 
 export async function startSubmission(
   assignmentId: string,
@@ -634,22 +635,34 @@ async function gradeAndFinalizeSubmission(
     .reduce((sum: number, a: any) => sum + Number(a.score ?? 0), 0)
 
   // Server-side defense-in-depth: the exam UI already blocks submission
-  // client-side when a required work-image is missing, but a tampered
+  // client-side when required working is missing, but a tampered
   // client could call this action directly. `require_work_image` is the whole
   // decision — one answer for the งาน, given by the teacher when they created
   // it — and it applies to every เติมคำตอบตัวเลข question the งาน contains.
   const workImageEnforced = opts.enforceWorkImage && (assignment?.require_work_image ?? false)
+  const { data: workArtifactRows, error: workArtifactError } = workImageEnforced && gradable.length > 0
+    ? await admin
+        .from('student_work_artifacts')
+        .select('submission_answer_id, part_key')
+        .in('submission_answer_id', gradable.map((answer: any) => answer.id))
+    : { data: [], error: null }
+  if (workArtifactError) return { error: 'ตรวจสอบวิธีทำที่แนบไม่สำเร็จ กรุณาลองใหม่' }
+  const attachedArtifactSlots = new Set((workArtifactRows ?? []).map(row => (
+    `${row.submission_answer_id}:${row.part_key}`
+  )))
   const missingWorkImage = workImageEnforced && gradable.some((a: any) => {
     if (a.questions?.question_type !== 'written') return false
     const parts: unknown[] = a.questions?.answer_parts ?? []
     const requiredCount = parts.length > 0 ? parts.length : 1
     const images: (string | null)[] = Array.isArray(a.work_images) ? a.work_images : []
-    for (let i = 0; i < requiredCount; i++) {
-      if (!images[i]) return true
-    }
-    return false
+    return !hasCompleteWorkEvidence({
+      submissionAnswerId: a.id,
+      partCount: requiredCount,
+      workImages: images,
+      artifactSlots: attachedArtifactSlots,
+    })
   })
-  if (missingWorkImage) return { error: 'กรุณาแนบรูปวิธีทำให้ครบทุกข้อก่อนส่งคำตอบ' }
+  if (missingWorkImage) return { error: 'กรุณาแนบวิธีทำให้ครบทุกข้อก่อนส่งคำตอบ' }
 
   // Auto-grade: compare student_answer vs correct_answer with tolerance
   const updates = gradable.map((a: any) => gradeAnswer(a))
