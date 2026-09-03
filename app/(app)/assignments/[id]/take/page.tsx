@@ -77,6 +77,7 @@ export default async function TakeExamPage({
     // แบบฝึกหัด: ตรวจทีละข้อระหว่างทำได้ ไม่ต้องรอกดส่งตอนจบเหมือนข้อสอบ
     instantCheck: assignment.instant_check,
     instantCheckAnswerKey: assignment.instant_check_answer_key,
+    calculatorEnabled: assignment.calculator_enabled,
   }
 
   return (

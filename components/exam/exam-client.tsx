@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { checkAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
-  Pencil,
+  Pencil, Calculator as CalculatorIcon,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -55,6 +55,7 @@ import { mathInputPartKey, readMathInputMode, type MathInputModes } from '@/lib/
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
+const ScientificCalculator = lazy(() => import('./scientific-calculator'))
 
 interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
   correct_answer?: string
@@ -113,6 +114,14 @@ export interface ExamConfig {
   // decides what it puts in the response — and only previewMode, which grades
   // its own copy, reads it to make the same decision.
   instantCheckAnswerKey?: boolean
+  /** Server-derived assignment rule; the calculator chunk is fetched only after a click. */
+  calculatorEnabled: boolean
+}
+
+interface CalculatorTarget {
+  answerId: string
+  partKey: string
+  label: string
 }
 
 interface Props {
@@ -211,6 +220,16 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitCountdown, setSubmitCountdown] = useState(0)
   const [activeMathField, setActiveMathField] = useState<string | null>(null)
+  const [calculatorTarget, setCalculatorTarget] = useState<CalculatorTarget | null>(null)
+  const [calculatorLoaded, setCalculatorLoaded] = useState(false)
+  const [showCalculator, setShowCalculator] = useState(false)
+  const [standaloneCalculatorMode, setStandaloneCalculatorMode] = useState<MathInputMode>('deg')
+
+  const navigateTo = useCallback((index: number) => {
+    setCurrentIndex(index)
+    setActiveMathField(null)
+    setCalculatorTarget(null)
+  }, [])
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
@@ -386,6 +405,62 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     setMathInputMode(answerId, partKey, mode)
   }, [clearCheck, setMathInputMode])
 
+  const handleMathFieldActivate = useCallback((
+    fieldId: string,
+    answerId: string,
+    partKey: string,
+    label: string,
+  ) => {
+    const questionNumber = answers.findIndex(answer => answer.id === answerId) + 1
+    setActiveMathField(fieldId)
+    setCalculatorTarget({
+      answerId,
+      partKey,
+      label: questionNumber > 0 ? `ข้อ ${questionNumber} · ${label}` : label,
+    })
+  }, [answers])
+
+  const calculatorMode = calculatorTarget
+    ? readMathInputMode(localMathInputModes[calculatorTarget.answerId], calculatorTarget.partKey)
+    : standaloneCalculatorMode
+
+  const handleCalculatorModeChange = useCallback((mode: MathInputMode) => {
+    if (calculatorTarget) {
+      handleMathInputModeChange(calculatorTarget.answerId, calculatorTarget.partKey, mode)
+    } else {
+      setStandaloneCalculatorMode(mode)
+    }
+  }, [calculatorTarget, handleMathInputModeChange])
+
+  const toggleCalculator = useCallback(() => {
+    setCalculatorLoaded(true)
+    setShowCalculator(open => !open)
+    setActiveMathField(null)
+  }, [])
+
+  const insertCalculatorResult = useCallback((result: string) => {
+    if (!calculatorTarget) return
+    const answer = answers.find(item => item.id === calculatorTarget.answerId)
+    if (!answer) return
+    const parts = (answer.questions.answer_parts ?? []) as Array<{ id?: string }>
+    if (calculatorTarget.partKey === 'main' || parts.length <= 1) {
+      handleAnswerChange(answer.id, result)
+    } else {
+      const partIndex = parts.findIndex((part, index) => (
+        mathInputPartKey(part.id, index, parts.length) === calculatorTarget.partKey
+      ))
+      if (partIndex < 0) return
+      handlePartAnswerChange(
+        answer.id,
+        partIndex,
+        result,
+        parts.length,
+        localAnswersRef.current[answer.id] ?? '',
+      )
+    }
+    toast.success('ใส่ผลลัพธ์ในคำตอบแล้ว')
+  }, [answers, calculatorTarget, handleAnswerChange, handlePartAnswerChange, localAnswersRef])
+
   const handleWorkImageChange = useCallback(async (answerId: string, partIndex: number, url: string | null) => {
     setWorkImages(prev => {
       const arr = [...(prev[answerId] ?? [])]
@@ -491,7 +566,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     const missingIndex = findMissingWorkImage()
     if (missingIndex !== null) {
       toast.error(`กรุณาแนบรูปวิธีทำให้ครบก่อนส่งคำตอบ (ข้อ ${missingIndex + 1})`)
-      setCurrentIndex(missingIndex)
+      navigateTo(missingIndex)
       return
     }
     setShowSubmitConfirm(true)
@@ -753,7 +828,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                     handlePartAnswerChange(current.id, pi, val, total, localAnswers[current.id] ?? '')}
                   mathInputModes={localMathInputModes[current.id] ?? {}}
                   activeMathField={activeMathField}
-                  onActivateMathField={setActiveMathField}
+                  onActivateMathField={handleMathFieldActivate}
                   onDeactivateMathField={() => setActiveMathField(null)}
                   onMathInputModeChange={(partKey, mode) =>
                     handleMathInputModeChange(current.id, partKey, mode)}
@@ -786,13 +861,13 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         <div className="flex items-center gap-3 pb-2">
           <Button
             variant="outline" className="flex-1"
-            onClick={() => setCurrentIndex(Math.max(0, pageStart - perPage))}
+            onClick={() => navigateTo(Math.max(0, pageStart - perPage))}
             disabled={pageStart === 0}
           >
             ← ก่อนหน้า
           </Button>
           {!isLastPage ? (
-            <Button className="flex-1" onClick={() => setCurrentIndex(pageStart + perPage)}>
+            <Button className="flex-1" onClick={() => navigateTo(pageStart + perPage)}>
               ถัดไป →
             </Button>
           ) : (
@@ -893,7 +968,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                       return (
                         <button
                           key={i}
-                          onClick={() => setCurrentIndex(i)}
+                          onClick={() => navigateTo(i)}
                           className={`w-8 h-8 rounded-lg text-[11px] font-bold transition-all hover:scale-105 ${cls}`}
                         >
                           {i + 1}
@@ -1021,6 +1096,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             config={config}
             proctorStatus={proctorStatus}
             proctorActiveConnectionCount={proctorActiveConnectionCount}
+            calculatorOpen={showCalculator}
+            onToggleCalculator={toggleCalculator}
             onFocusMode={() => setFocusMode(true)}
           />
           {/* Progress bar */}
@@ -1054,12 +1131,20 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setFocusMode(false)}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                >
-                  <Minimize2 size={12} /> ออก
-                </button>
+                {config.calculatorEnabled && (
+                  <Button
+                    type="button"
+                    variant={showCalculator ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={toggleCalculator}
+                    aria-pressed={showCalculator}
+                  >
+                    <CalculatorIcon /> เครื่องคิดเลข
+                  </Button>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={() => setFocusMode(false)}>
+                  <Minimize2 /> ออก
+                </Button>
               </div>
             </div>
             {/* Progress bar */}
@@ -1075,6 +1160,23 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             {examBody}
           </div>
         </div>
+      )}
+
+      {calculatorLoaded && !previewResult && (
+        <Suspense fallback={showCalculator ? (
+          <Card elevation="xl" className="fixed bottom-3 right-3 z-[80] px-4 py-3 text-sm text-muted-foreground">
+            กำลังเปิดเครื่องคิดเลข...
+          </Card>
+        ) : null}>
+          <ScientificCalculator
+            open={showCalculator}
+            mode={calculatorMode}
+            targetLabel={calculatorTarget?.label ?? null}
+            onModeChange={handleCalculatorModeChange}
+            onInsertResult={insertCalculatorResult}
+            onClose={() => setShowCalculator(false)}
+          />
+        </Suspense>
       )}
 
       {/* ── Submit confirmation dialog ──────────────────────────────────────── */}
@@ -1411,7 +1513,7 @@ function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
   proctorStatus,
   proctorActiveConnectionCount,
-  config, onFocusMode,
+  config, calculatorOpen, onToggleCalculator, onFocusMode,
 }: {
   saving: boolean
   isOnline: boolean
@@ -1420,6 +1522,8 @@ function ExamToolbar({
   proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
   proctorActiveConnectionCount: number
   config: ExamConfig
+  calculatorOpen: boolean
+  onToggleCalculator: () => void
   onFocusMode: () => void
 }) {
   return (
@@ -1465,14 +1569,24 @@ function ExamToolbar({
         )}
       </div>
 
-      {/* Right: Focus mode */}
-      <button
-        onClick={onFocusMode}
-        className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-      >
-        <Maximize2 size={13} />
-        <span className="hidden sm:inline">โฟกัส</span>
-      </button>
+      <div className="ml-auto flex items-center gap-1.5">
+        {config.calculatorEnabled && (
+          <Button
+            type="button"
+            variant={calculatorOpen ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={onToggleCalculator}
+            aria-pressed={calculatorOpen}
+          >
+            <CalculatorIcon />
+            <span className="hidden sm:inline">เครื่องคิดเลข</span>
+          </Button>
+        )}
+        <Button type="button" variant="outline" size="sm" onClick={onFocusMode}>
+          <Maximize2 />
+          <span className="hidden sm:inline">โฟกัส</span>
+        </Button>
+      </div>
     </Card>
   )
 }
@@ -1578,7 +1692,7 @@ function MultiPartAnswerInput({
   onPartChange: (pi: number, val: string, total: number) => void
   mathInputModes: MathInputModes
   activeMathField: string | null
-  onActivateMathField: (fieldId: string) => void
+  onActivateMathField: (fieldId: string, answerId: string, partKey: string, label: string) => void
   onDeactivateMathField: () => void
   onMathInputModeChange: (partKey: string, mode: MathInputMode) => void
   requiresWorkImage: boolean
@@ -1615,7 +1729,7 @@ function MultiPartAnswerInput({
         value={value}
         mode={readMathInputMode(mathInputModes, partKey)}
         active={activeMathField === fieldId}
-        onActivate={() => onActivateMathField(fieldId)}
+        onActivate={() => onActivateMathField(fieldId, answerId, partKey, ariaLabel)}
         onDeactivate={onDeactivateMathField}
         onChange={onChange}
         onModeChange={mode => onMathInputModeChange(partKey, mode)}

@@ -110,10 +110,10 @@
 
 ## เครื่องมือคณิตศาสตร์และพื้นที่เขียน
 
-สเปกที่อนุมัติอยู่ใน `docs/STUDENT_MATH_TOOLS.md` เฟส 1 มี schema/private Storage/RLS/Server Actions และ assignment settings แล้ว เฟส 2 เปิดแป้นคณิตศาสตร์กับ DEG/RAD ใน numeric input และแบ่ง runtime boundary ไว้ดังนี้:
+สเปกที่อนุมัติอยู่ใน `docs/STUDENT_MATH_TOOLS.md` เฟส 1 มี schema/private Storage/RLS/Server Actions และ assignment settings เฟส 2 เปิดแป้นคณิตศาสตร์กับ DEG/RAD และเฟส 3 เปิดเครื่องคิดเลขวิทยาศาสตร์ตาม assignment flag โดยแบ่ง runtime boundary ไว้ดังนี้:
 
 1. แป้นคณิตศาสตร์เป็น client UI ขนาดเล็กและแก้ข้อความตาม cursor/selection; normalization กับการตัดสินคะแนนใช้ bounded recursive-descent parser แบบ allowlist ซึ่งไม่ใช้ `eval`/`Function` กับ input นักเรียน โหมด DEG/RAD ถูกเก็บแบบ atomic กับคำตอบของแต่ละช่องเพื่อให้ preview, instant check และ final grading อ่านความหมายเดียวกัน ส่วน mathjs เดิมเหลือไว้เฉพาะสูตรที่ครูเป็นผู้สร้างและไม่เข้า initial client path
-2. เครื่องคิดเลขเป็น dynamic client chunk ใช้ evaluator ที่ปลอดภัย มี history เฉพาะ attempt และไม่บันทึกประวัติบน server
+2. เครื่องคิดเลขเป็น dynamic client chunk ที่เริ่ม fetch หลัง user gesture ใช้ evaluator ที่ปลอดภัยตัวเดียวกับคำตอบ และเก็บ expression/history สูงสุด 20 รายการเฉพาะ memory ของหน้า attempt ไม่มี database/localStorage path สำหรับประวัติ
 3. กระดาษทดที่ยังไม่แนบอยู่ใน IndexedDB แยกตาม user/submission/answer/part ไม่มี Server Action ต่อ stroke และล้างตาม attempt lifecycle/TTL
 4. เมื่อผู้ใช้สั่งแนบ browser จึง render WebP preview + versioned scene แล้วขอ signed upload token ที่ผูกกับ user/submission/answer/upload id จาก Server Action; action ตรวจไฟล์จริงซ้ำก่อนบันทึก metadata การอัปโหลดไฟล์อย่างเดียวไม่ถือว่าแนบจน database reference สำเร็จ
 5. หน้าตรวจขอ signed URL หลังตรวจ assignment authority แล้ว ข้อมูลเก่าใน `submission_answers.work_images` ยังอ่านด้วยเส้นทางเดิมจนกว่าจะมี migration plan แยก
