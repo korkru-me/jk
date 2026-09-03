@@ -1,0 +1,372 @@
+'use client'
+
+import '@excalidraw/excalidraw/index.css'
+import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw'
+import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
+import type {
+  AppState,
+  BinaryFileData,
+  BinaryFiles,
+  ExcalidrawImperativeAPI,
+} from '@excalidraw/excalidraw/types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Eraser, Highlighter, Loader2, PenLine, RotateCcw, Save } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import {
+  createDrawingPreview,
+  DRAWING_BACKGROUNDS,
+  drawingBackgroundStyle,
+  stableDrawingAppState,
+  TRANSPARENT_CANVAS,
+} from '@/components/exam/drawing-board-utils'
+import {
+  CURRENT_WORK_FORMAT_VERSION,
+  MATH_WORK_BUCKET,
+  type TeachingBoardView,
+} from '@/lib/math-work'
+import {
+  emptyScratchpadScene,
+  isScratchpadSceneWithinLimits,
+  sanitizeScratchpadScene,
+  type ScratchpadBackground,
+  type ScratchpadScene,
+} from '@/lib/scratchpad'
+
+interface Props {
+  assignmentId: string
+  questionId: string
+  slot: number
+  board: TeachingBoardView | null
+  canManage: boolean
+  loadNonce: number
+  resetNonce: number
+  onSaved: (slot: number) => Promise<void>
+  onDirtyChange: (dirty: boolean) => void
+}
+
+function contentSignature(elements: readonly OrderedExcalidrawElement[]): string {
+  return elements.map(element => `${element.id}:${element.version}:${element.isDeleted ? 1 : 0}`).join('|')
+}
+
+export default function TeachingBoardEditor({
+  assignmentId,
+  questionId,
+  slot,
+  board,
+  canManage,
+  loadNonce,
+  resetNonce,
+  onSaved,
+  onDirtyChange,
+}: Props) {
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
+  const sceneRef = useRef<ScratchpadScene>(emptyScratchpadScene())
+  const contentSignatureRef = useRef('')
+  const ignoreChangesRef = useRef(true)
+  const handledLoadRef = useRef(0)
+  const handledResetRef = useRef(0)
+  const [background, setBackground] = useState<ScratchpadBackground>('lined')
+  const [dirty, setDirty] = useState(false)
+  const [apiReady, setApiReady] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [confirm, confirmDialog] = useConfirm()
+
+  const editable = canManage && (!board || board.editable)
+
+  const markDirty = useCallback((next: boolean) => {
+    setDirty(next)
+    onDirtyChange(next)
+  }, [onDirtyChange])
+
+  const releaseChangeGuard = () => {
+    requestAnimationFrame(() => { ignoreChangesRef.current = false })
+  }
+
+  const resetCanvas = useCallback((dirtyAfterReset = false) => {
+    const api = apiRef.current
+    if (!api) return
+    ignoreChangesRef.current = true
+    api.resetScene()
+    api.updateScene({
+      appState: { viewBackgroundColor: TRANSPARENT_CANVAS },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    })
+    api.setActiveTool({ type: 'freedraw' })
+    api.history.clear()
+    const scene = emptyScratchpadScene()
+    sceneRef.current = scene
+    contentSignatureRef.current = ''
+    setBackground(scene.background)
+    markDirty(dirtyAfterReset)
+    releaseChangeGuard()
+  }, [markDirty])
+
+  const loadBoardScene = useCallback(async () => {
+    if (!board || !apiRef.current) return
+    setLoading(true)
+    try {
+      let sceneUrl = board.sceneUrl
+      let response = sceneUrl ? await fetch(sceneUrl, { cache: 'no-store' }) : null
+      if (!response?.ok) {
+        const { getTeachingBoards } = await import('@/lib/actions/math-work')
+        const refreshed = await getTeachingBoards(assignmentId, questionId)
+        if (!refreshed || 'error' in refreshed) throw new Error(refreshed?.error ?? 'เปิดกระดานสอนไม่สำเร็จ')
+        sceneUrl = refreshed.boards.find(item => item.id === board.id)?.sceneUrl ?? null
+        response = sceneUrl ? await fetch(sceneUrl, { cache: 'no-store' }) : null
+      }
+      if (!response?.ok) throw new Error('เปิดไฟล์ต้นฉบับของกระดานไม่สำเร็จ')
+      const scene = sanitizeScratchpadScene(await response.json())
+      if (!scene || !isScratchpadSceneWithinLimits(scene)) throw new Error('รูปแบบกระดานสอนไม่รองรับ')
+
+      const api = apiRef.current
+      ignoreChangesRef.current = true
+      contentSignatureRef.current = contentSignature(scene.elements as readonly OrderedExcalidrawElement[])
+      api.resetScene()
+      api.updateScene({
+        elements: scene.elements as readonly OrderedExcalidrawElement[],
+        appState: { ...scene.appState, viewBackgroundColor: TRANSPARENT_CANVAS } as AppState,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      })
+      api.addFiles(Object.values(scene.files) as BinaryFileData[])
+      api.history.clear()
+      if (board.editable) api.setActiveTool({ type: 'freedraw' })
+      sceneRef.current = scene
+      setBackground(scene.background)
+      markDirty(false)
+      releaseChangeGuard()
+      toast.success(board.editable ? `เปิดกระดานช่อง ${board.slot} แล้ว` : `เปิดกระดานของ ${board.creatorName} แล้ว`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'เปิดกระดานสอนไม่สำเร็จ')
+    } finally {
+      setLoading(false)
+    }
+  }, [assignmentId, board, markDirty, questionId])
+
+  useEffect(() => {
+    if (!apiReady || loadNonce <= 0 || handledLoadRef.current === loadNonce) return
+    handledLoadRef.current = loadNonce
+    void loadBoardScene()
+  }, [apiReady, loadBoardScene, loadNonce])
+
+  useEffect(() => {
+    if (!apiReady || resetNonce <= 0 || handledResetRef.current === resetNonce) return
+    handledResetRef.current = resetNonce
+    resetCanvas(false)
+  }, [apiReady, resetCanvas, resetNonce])
+
+  useEffect(() => {
+    if (!apiReady) return
+    const frame = requestAnimationFrame(() => {
+      apiRef.current?.setActiveTool({ type: editable ? 'freedraw' : 'hand' })
+      releaseChangeGuard()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [apiReady, editable])
+
+  const handleChange = useCallback((
+    elements: readonly OrderedExcalidrawElement[],
+    appState: AppState,
+    files: BinaryFiles,
+  ) => {
+    const nextSignature = contentSignature(elements)
+    const contentChanged = nextSignature !== contentSignatureRef.current
+    contentSignatureRef.current = nextSignature
+    sceneRef.current = {
+      formatVersion: CURRENT_WORK_FORMAT_VERSION,
+      elements,
+      appState: stableDrawingAppState(appState),
+      files,
+      background,
+    }
+    if (contentChanged && !ignoreChangesRef.current && editable) markDirty(true)
+  }, [background, editable, markDirty])
+
+  const chooseBackground = (next: ScratchpadBackground) => {
+    if (!editable) return
+    setBackground(next)
+    sceneRef.current = { ...sceneRef.current, background: next }
+    markDirty(true)
+  }
+
+  const chooseInkPreset = (kind: 'pen' | 'highlighter' | 'eraser') => {
+    const api = apiRef.current
+    if (!api || !editable) return
+    if (kind === 'eraser') {
+      api.setActiveTool({ type: 'eraser' })
+      return
+    }
+    api.updateScene({
+      appState: kind === 'pen'
+        ? { currentItemStrokeColor: '#172554', currentItemStrokeWidth: 2, currentItemOpacity: 100 }
+        : { currentItemStrokeColor: '#facc15', currentItemStrokeWidth: 4, currentItemOpacity: 35 },
+    })
+    api.setActiveTool({ type: 'freedraw' })
+  }
+
+  const saveBoard = async () => {
+    const api = apiRef.current
+    if (!api || !editable || saving) return
+    if (board) {
+      const ok = await confirm({
+        title: `บันทึกทับกระดานช่อง ${slot}?`,
+        description: 'ภาพและไฟล์ต้นฉบับเดิมในช่องนี้จะถูกแทนที่ด้วยกระดานที่กำลังเปิดอยู่',
+        confirmLabel: 'บันทึกทับ',
+      })
+      if (!ok) return
+    }
+
+    setSaving(true)
+    try {
+      const scene: ScratchpadScene = {
+        formatVersion: CURRENT_WORK_FORMAT_VERSION,
+        elements: api.getSceneElementsIncludingDeleted(),
+        appState: stableDrawingAppState(api.getAppState()),
+        files: api.getFiles(),
+        background,
+      }
+      if (!isScratchpadSceneWithinLimits(scene)) throw new Error('กระดานมีขนาดใหญ่เกิน 2 MB หรือมีเส้นมากเกินไป')
+      const preview = await createDrawingPreview(api, background, 'เขียนบนกระดานก่อนกดบันทึก')
+      const sceneBlob = new Blob([JSON.stringify(scene)], { type: 'application/json' })
+      const { prepareTeachingBoardUpload, saveTeachingBoard } = await import('@/lib/actions/math-work')
+      const prepared = await prepareTeachingBoardUpload({
+        assignmentId,
+        questionId,
+        slot,
+        formatVersion: CURRENT_WORK_FORMAT_VERSION,
+      })
+      if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่บันทึกไม่สำเร็จ')
+      if (!prepared.scene) throw new Error('เตรียมไฟล์ต้นฉบับไม่สำเร็จ')
+
+      const { createClient } = await import('@/lib/supabase/client')
+      const bucket = createClient().storage.from(MATH_WORK_BUCKET)
+      await Promise.allSettled([
+        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview, {
+          contentType: 'image/webp',
+          cacheControl: '300',
+        }),
+        bucket.uploadToSignedUrl(prepared.scene.path, prepared.scene.token, sceneBlob, {
+          contentType: 'application/json',
+          cacheControl: '300',
+        }),
+      ])
+      const saved = await saveTeachingBoard({
+        assignmentId,
+        questionId,
+        slot,
+        uploadId: prepared.uploadId,
+        formatVersion: CURRENT_WORK_FORMAT_VERSION,
+        replaceExisting: Boolean(board),
+      })
+      if (!saved || 'error' in saved) throw new Error(saved?.error ?? 'บันทึกกระดานสอนไม่สำเร็จ')
+      markDirty(false)
+      await onSaved(slot)
+      toast.success(board ? `บันทึกทับช่อง ${slot} แล้ว` : `บันทึกกระดานลงช่อง ${slot} แล้ว`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'บันทึกกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <Card role="region" aria-label="กระดานสอน" className="flex h-[70dvh] min-h-[560px] min-w-0 max-w-full flex-col overflow-hidden lg:h-full">
+        <div className="shrink-0 border-b border-border bg-card px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <PenLine className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">กระดานสอน · ช่อง {slot}</p>
+              <p className="text-[10px] text-muted-foreground" aria-live="polite">
+                {!editable ? 'ดูอย่างเดียว' : saving ? 'กำลังบันทึก...' : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
+              </p>
+            </div>
+            <div className="ml-auto flex items-center gap-1">
+              {editable && (
+                <Button type="button" variant="outline" size="xs" onClick={() => resetCanvas(Boolean(board))} disabled={saving || loading}>
+                  <RotateCcw /> กระดานใหม่
+                </Button>
+              )}
+              {editable && (
+                <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || (Boolean(board) && !dirty)}>
+                  {saving ? <Loader2 className="animate-spin" /> : <Save />}
+                  {saving ? 'กำลังบันทึก...' : board ? 'บันทึกทับ' : 'บันทึก'}
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('pen')} disabled={!editable}>
+              <PenLine /> ปากกา
+            </Button>
+            <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('highlighter')} disabled={!editable}>
+              <Highlighter /> ไฮไลต์
+            </Button>
+            <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('eraser')} disabled={!editable}>
+              <Eraser /> ยางลบ
+            </Button>
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            {DRAWING_BACKGROUNDS.map(item => (
+              <Button
+                key={item.value}
+                type="button"
+                variant={background === item.value ? 'secondary' : 'ghost'}
+                size="xs"
+                className="shrink-0"
+                onClick={() => chooseBackground(item.value)}
+                disabled={!editable}
+                aria-pressed={background === item.value}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden [&_.excalidraw]:!min-w-0" style={drawingBackgroundStyle(background)}>
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-overlay/20 backdrop-blur-[1px]">
+              <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-sm shadow-md">
+                <Loader2 className="size-4 animate-spin" /> กำลังเปิดกระดาน...
+              </div>
+            </div>
+          )}
+          <Excalidraw
+            initialData={{
+              elements: [],
+              appState: { viewBackgroundColor: TRANSPARENT_CANVAS },
+              files: {},
+              scrollToContent: false,
+            }}
+            excalidrawAPI={api => {
+              apiRef.current = api
+              setApiReady(true)
+            }}
+            onChange={handleChange}
+            langCode="th-TH"
+            viewModeEnabled={!editable}
+            handleKeyboardGlobally={false}
+            autoFocus={editable}
+            aiEnabled={false}
+            validateEmbeddable={false}
+            UIOptions={{
+              canvasActions: {
+                changeViewBackgroundColor: false,
+                export: false,
+                loadScene: false,
+                saveToActiveFile: false,
+                saveAsImage: false,
+                toggleTheme: false,
+              },
+              tools: { image: false },
+            }}
+          />
+        </div>
+      </Card>
+      {confirmDialog}
+    </>
+  )
+}

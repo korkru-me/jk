@@ -1,7 +1,7 @@
 'use client'
 
 import '@excalidraw/excalidraw/index.css'
-import { CaptureUpdateAction, Excalidraw, exportToCanvas } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
@@ -9,7 +9,7 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from '@excalidraw/excalidraw/types'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Database, Highlighter, Loader2, Paperclip, PenLine, RefreshCw, X } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -32,9 +32,15 @@ import {
 import {
   CURRENT_WORK_FORMAT_VERSION,
   MATH_WORK_BUCKET,
-  MAX_WORK_PREVIEW_BYTES,
   type StudentWorkArtifactView,
 } from '@/lib/math-work'
+import {
+  createDrawingPreview,
+  DRAWING_BACKGROUNDS,
+  drawingBackgroundStyle,
+  stableDrawingAppState,
+  TRANSPARENT_CANVAS,
+} from './drawing-board-utils'
 
 export interface ScratchpadProps {
   open: boolean
@@ -50,148 +56,6 @@ export interface ScratchpadProps {
 }
 
 type SaveStatus = 'loading' | 'idle' | 'saving' | 'saved' | 'error' | 'too-large'
-
-const BACKGROUNDS: Array<{ value: ScratchpadBackground; label: string }> = [
-  { value: 'blank', label: 'เปล่า' },
-  { value: 'lined', label: 'เส้นบรรทัด' },
-  { value: 'grid', label: 'ตาราง' },
-  { value: 'dots', label: 'จุด' },
-]
-
-const TRANSPARENT_CANVAS = 'transparent'
-
-function paintPreviewBackground(
-  context: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  background: ScratchpadBackground,
-) {
-  context.fillStyle = '#fffefb'
-  context.fillRect(0, 0, width, height)
-  if (background === 'blank') return
-
-  context.lineWidth = 1
-  if (background === 'lined' || background === 'grid') {
-    context.strokeStyle = 'rgba(59, 130, 246, 0.18)'
-    for (let y = 32; y < height; y += 32) {
-      context.beginPath()
-      context.moveTo(0, y + 0.5)
-      context.lineTo(width, y + 0.5)
-      context.stroke()
-    }
-  }
-  if (background === 'grid') {
-    for (let x = 24; x < width; x += 24) {
-      context.beginPath()
-      context.moveTo(x + 0.5, 0)
-      context.lineTo(x + 0.5, height)
-      context.stroke()
-    }
-  }
-  if (background === 'dots') {
-    context.fillStyle = 'rgba(71, 85, 105, 0.32)'
-    for (let y = 11; y < height; y += 22) {
-      for (let x = 11; x < width; x += 22) {
-        context.beginPath()
-        context.arc(x, y, 1.2, 0, Math.PI * 2)
-        context.fill()
-      }
-    }
-  }
-}
-
-function encodeWebp(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => {
-      if (!blob || blob.type !== 'image/webp') {
-        reject(new Error('เบราว์เซอร์นี้ไม่รองรับการสร้างภาพ WebP'))
-        return
-      }
-      resolve(blob)
-    }, 'image/webp', 0.86)
-  })
-}
-
-async function createScratchpadPreview(
-  api: ExcalidrawImperativeAPI,
-  background: ScratchpadBackground,
-): Promise<Blob> {
-  const elements = api.getSceneElements()
-  if (elements.length === 0) throw new Error('เขียนวิธีทำก่อนกดแนบ')
-  const drawing = await exportToCanvas({
-    elements,
-    appState: {
-      ...api.getAppState(),
-      exportBackground: false,
-      viewBackgroundColor: TRANSPARENT_CANVAS,
-    },
-    files: api.getFiles(),
-    maxWidthOrHeight: 1600,
-    exportPadding: 36,
-  })
-  const canvas = document.createElement('canvas')
-  canvas.width = drawing.width
-  canvas.height = drawing.height
-  const context = canvas.getContext('2d')
-  if (!context) throw new Error('สร้างภาพวิธีทำไม่สำเร็จ')
-  paintPreviewBackground(context, canvas.width, canvas.height, background)
-  context.drawImage(drawing, 0, 0)
-  const blob = await encodeWebp(canvas)
-  if (blob.size > MAX_WORK_PREVIEW_BYTES) throw new Error('ภาพวิธีทำมีขนาดใหญ่เกิน 5 MB')
-  return blob
-}
-
-function backgroundStyle(background: ScratchpadBackground): CSSProperties {
-  if (background === 'lined') {
-    return {
-      backgroundColor: '#fffefb',
-      backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(59, 130, 246, 0.18) 32px)',
-      backgroundSize: '100% 32px',
-    }
-  }
-  if (background === 'grid') {
-    return {
-      backgroundColor: '#fffefb',
-      backgroundImage: [
-        'linear-gradient(rgba(59, 130, 246, 0.13) 1px, transparent 1px)',
-        'linear-gradient(90deg, rgba(59, 130, 246, 0.13) 1px, transparent 1px)',
-      ].join(','),
-      backgroundSize: '24px 24px',
-    }
-  }
-  if (background === 'dots') {
-    return {
-      backgroundColor: '#fffefb',
-      backgroundImage: 'radial-gradient(circle, rgba(71, 85, 105, 0.28) 1.2px, transparent 1.3px)',
-      backgroundSize: '22px 22px',
-    }
-  }
-  return { backgroundColor: '#fffefb' }
-}
-
-/** Persist only stable drawing preferences; transient selections/dialog state is deliberately excluded. */
-function stableAppState(appState: AppState): Record<string, unknown> {
-  return {
-    scrollX: appState.scrollX,
-    scrollY: appState.scrollY,
-    zoom: appState.zoom,
-    currentItemStrokeColor: appState.currentItemStrokeColor,
-    currentItemBackgroundColor: appState.currentItemBackgroundColor,
-    currentItemFillStyle: appState.currentItemFillStyle,
-    currentItemStrokeWidth: appState.currentItemStrokeWidth,
-    currentItemStrokeStyle: appState.currentItemStrokeStyle,
-    currentItemRoughness: appState.currentItemRoughness,
-    currentItemOpacity: appState.currentItemOpacity,
-    currentItemFontFamily: appState.currentItemFontFamily,
-    currentItemFontSize: appState.currentItemFontSize,
-    currentItemTextAlign: appState.currentItemTextAlign,
-    currentItemStartArrowhead: appState.currentItemStartArrowhead,
-    currentItemEndArrowhead: appState.currentItemEndArrowhead,
-    currentItemRoundness: appState.currentItemRoundness,
-    currentItemArrowType: appState.currentItemArrowType,
-    penMode: appState.penMode,
-  }
-}
 
 function statusText(status: SaveStatus, persistenceEnabled: boolean): string {
   if (!persistenceEnabled) return 'ตัวอย่างชั่วคราว · ไม่บันทึก'
@@ -328,7 +192,7 @@ export default function Scratchpad({
     sceneRef.current = {
       ...sceneRef.current,
       elements,
-      appState: stableAppState(appState),
+      appState: stableDrawingAppState(appState),
       files,
     }
     scheduleSave()
@@ -405,12 +269,12 @@ export default function Scratchpad({
       const scene: ScratchpadScene = {
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         elements: api.getSceneElementsIncludingDeleted(),
-        appState: stableAppState(api.getAppState()),
+        appState: stableDrawingAppState(api.getAppState()),
         files: api.getFiles(),
         background,
       }
       if (!isScratchpadSceneWithinLimits(scene)) throw new Error('กระดาษทดมีขนาดใหญ่เกิน 2 MB หรือมีเส้นมากเกินไป')
-      const preview = await createScratchpadPreview(api, background)
+      const preview = await createDrawingPreview(api, background, 'เขียนวิธีทำก่อนกดแนบ')
 
       if (previewMode) {
         const previewUrl = URL.createObjectURL(preview)
@@ -554,7 +418,7 @@ export default function Scratchpad({
             <Highlighter /> ไฮไลต์
           </Button>
           <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-          {BACKGROUNDS.map(item => (
+          {DRAWING_BACKGROUNDS.map(item => (
             <Button
               key={item.value}
               type="button"
@@ -570,7 +434,7 @@ export default function Scratchpad({
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1" style={backgroundStyle(background)}>
+      <div className="relative min-h-0 flex-1" style={drawingBackgroundStyle(background)}>
         <Excalidraw
           initialData={initialData}
           excalidrawAPI={api => { apiRef.current = api; setApiReady(true) }}

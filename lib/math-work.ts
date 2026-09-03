@@ -20,6 +20,20 @@ export interface StudentWorkArtifactView {
   updatedAt: string
 }
 
+/** Client-safe teaching board metadata with short-lived private URLs. */
+export interface TeachingBoardView {
+  id: string
+  slot: number
+  createdBy: string
+  creatorName: string
+  editable: boolean
+  formatVersion: number
+  previewUrl: string | null
+  sceneUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface WorkUploadPaths {
   previewPath: string
   scenePath: string | null

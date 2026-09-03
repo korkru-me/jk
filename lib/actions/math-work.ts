@@ -596,9 +596,16 @@ export async function getTeachingBoards(assignmentId: string, questionId: string
   ])
   if (error) return { error: 'เปิดกระดานสอนไม่สำเร็จ กรุณาลองใหม่' }
 
-  const paths = (rows ?? []).flatMap(row => [row.preview_path, row.scene_path])
-  const signed = await signStoredPaths(createAdminClient(), paths)
+  const admin = createAdminClient()
+  const creatorIds = Array.from(new Set((rows ?? []).map(row => row.created_by)))
+  const [{ data: creators }, signed] = await Promise.all([
+    creatorIds.length > 0
+      ? admin.from('users').select('id, full_name').in('id', creatorIds)
+      : Promise.resolve({ data: [] }),
+    signStoredPaths(admin, (rows ?? []).flatMap(row => [row.preview_path, row.scene_path])),
+  ])
   if (!signed) return { error: 'สร้างลิงก์เปิดกระดานสอนไม่สำเร็จ กรุณาลองใหม่' }
+  const creatorNames = new Map((creators ?? []).map(row => [row.id, row.full_name || 'ครูผู้สอน']))
 
   return {
     success: true as const,
@@ -607,6 +614,7 @@ export async function getTeachingBoards(assignmentId: string, questionId: string
       id: row.id,
       slot: row.slot,
       createdBy: row.created_by,
+      creatorName: creatorNames.get(row.created_by) ?? 'ครูผู้สอน',
       editable: canManage === true && row.created_by === user.id,
       formatVersion: row.format_version,
       previewUrl: signed.get(row.preview_path) ?? null,
