@@ -23,6 +23,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
 import type { TeachingBoardView } from '@/lib/math-work'
+import { TYPE_LABEL } from '@/lib/question-display'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
   ssr: false,
@@ -41,6 +42,7 @@ export type TeachingQuestionView = Question & {
 interface Props {
   assignmentId: string
   assignmentTitle: string
+  backHref: string
   currentUserId: string
   canManage: boolean
   questions: TeachingQuestionView[]
@@ -110,7 +112,7 @@ function TeachingQuestion({ question, index, total, showSolution }: {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">ข้อ {index + 1} / {total}</Badge>
-        <Badge variant="outline">{question.question_type}</Badge>
+        <Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge>
         {Object.keys(question.randomValues).length > 0 && <Badge variant="secondary">สุ่มค่าตัวอย่างแล้ว</Badge>}
       </div>
       {question.title && <h2 className="text-lg font-semibold">{question.title}</h2>}
@@ -215,6 +217,7 @@ function TeachingQuestion({ question, index, total, showSolution }: {
 export function TeachingModeClient({
   assignmentId,
   assignmentTitle,
+  backHref,
   currentUserId,
   canManage,
   questions,
@@ -361,7 +364,7 @@ export function TeachingModeClient({
 
   const leaveTeachingMode = async () => {
     if (!await allowDiscard()) return
-    router.push(`/assignments/${assignmentId}`)
+    router.push(backHref)
   }
 
   return (
@@ -433,9 +436,13 @@ export function TeachingModeClient({
                         </Button>
                       )}
                       <div className="flex items-center gap-1">
-                        <Button type="button" variant={selected ? 'secondary' : 'ghost'} size="xs" className="flex-1" onClick={() => void openOwnSlot(slot)}>
-                          ช่อง {slot}
-                        </Button>
+                        {saved ? (
+                          <Button type="button" variant={selected ? 'secondary' : 'ghost'} size="xs" className="flex-1" onClick={() => void openOwnSlot(slot)}>
+                            ช่อง {slot}
+                          </Button>
+                        ) : (
+                          <p className="flex-1 py-1 text-center text-xs font-medium">ช่อง {slot}</p>
+                        )}
                         {saved && (
                           <Button type="button" variant="ghost" size="icon-xs" onClick={() => void deleteBoard(saved)} aria-label={`ลบกระดานช่อง ${slot}`}>
                             <Trash2 />

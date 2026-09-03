@@ -1,19 +1,24 @@
 import { notFound, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildAssignmentAttempt } from '@/lib/assignment-attempt'
 import { getTeachingBoards } from '@/lib/actions/math-work'
 import { TeachingModeClient, type TeachingQuestionView } from '@/components/assignments/teaching-mode-client'
 import type { Assignment, Question } from '@/lib/types'
+import { backHrefFromSearchParams } from '@/lib/back-link'
 
 export const metadata = { title: 'โหมดสอน — KorKru' }
 
 export default async function AssignmentTeachingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { id } = await params
+  const [{ id }, sp] = await Promise.all([params, searchParams])
+  const backHref = backHrefFromSearchParams(sp, `/assignments/${id}`)
   const user = await getAuthUser()
   if (!user) redirect('/login')
 
@@ -29,7 +34,7 @@ export default async function AssignmentTeachingPage({
     return (
       <div className="mx-auto mt-16 max-w-md text-center">
         <p className="text-lg font-semibold">งานนี้ยังไม่มีโจทย์สำหรับเปิดโหมดสอน</p>
-        <a href={`/assignments/${id}`} className="mt-4 inline-block text-sm text-primary hover:underline">← กลับไปที่งาน</a>
+        <Link href={backHref} className="mt-4 inline-block text-sm text-primary hover:underline">← กลับไปที่งาน</Link>
       </div>
     )
   }
@@ -71,6 +76,7 @@ export default async function AssignmentTeachingPage({
     <TeachingModeClient
       assignmentId={id}
       assignmentTitle={a.title}
+      backHref={backHref}
       currentUserId={user.id}
       canManage={canManage === true}
       questions={teachingQuestions}

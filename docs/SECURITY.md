@@ -119,6 +119,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - การ finalize งานที่บังคับแนบวิธีทำตรวจ exact answer/part ฝั่ง server และยอมรับเฉพาะ artifact reference หรือ `work_images` รุ่นเก่าที่มีอยู่จริงใน answer; หน้าผลลัพธ์ sign เฉพาะ preview path ที่ได้จากคำตอบซึ่งผ่าน result-visibility/RLS แล้วและไม่เปิด scene
 - การแทนที่หรือลบต้องเปลี่ยน database reference ก่อนแล้วจึงลบไฟล์แบบ best effort; scheduled orphan cleanup เว้น grace period 7 วัน ลบเฉพาะ path ที่ตรงกับ builder ใต้ `students/`/`teachers/` หลังตรวจ exact path จากทั้งสอง reference tables ซ้ำ และหยุดก่อนเริ่มลบเมื่อ listing/reference scan ไม่ครบหรือเกินเพดาน
 - Cleanup route ใช้ Bearer `CRON_SECRET` อย่างน้อย 32 ตัวอักษรและเปรียบเทียบแบบ constant-time ก่อนสร้าง admin client; response/log มีเฉพาะ aggregate/error code ไม่ส่ง path, URL หรือข้อมูลนักเรียน และ deployment ที่ไม่มี secret จะ fail closed ด้วย 503
+- rollout audit เฟส 8 ตรวจแบบอ่านอย่างเดียวแล้วว่า bucket `math-work-artifacts` เป็น private จำกัด 5 MiB รับเฉพาะ WebP/JSON, migration local/remote ตรงกัน และ dry-run cleanup ไม่ลบข้อมูล; environment ที่ตรวจยังไม่มี Vercel project link/CLI และ `CRON_SECRET` จึงห้ามถือว่า scheduled cleanup ทำงาน production แล้วจนกว่าจะ deploy และตั้ง secret
 - ห้าม log scene, คำตอบเต็ม, signed URL หรือ path ที่เปิดเผยข้อมูลนักเรียน รายละเอียด threat model และ lifecycle อยู่ใน `docs/STUDENT_MATH_TOOLS.md`
 
 ## Logging และ errors

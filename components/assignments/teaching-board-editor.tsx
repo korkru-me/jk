@@ -349,7 +349,7 @@ export default function TeachingBoardEditor({
             langCode="th-TH"
             viewModeEnabled={!editable}
             handleKeyboardGlobally={false}
-            autoFocus={editable}
+            autoFocus={false}
             aiEnabled={false}
             validateEmbeddable={false}
             UIOptions={{

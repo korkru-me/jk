@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 3 กันยายน 2026
 
-สถานะ: **เฟส 7 — scheduled cleanup และ security hardening พร้อม deploy แล้ว**
+สถานะ: **เฟส 8 — QA, accessibility, performance และ rollout audit เสร็จแล้ว**
 
-เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู เฟส 1 เพิ่ม schema, RLS, private Storage, Server Actions และสวิตช์ในหน้าสร้าง/แก้ไขงาน เฟส 2 เปิดแป้นคณิตศาสตร์และ DEG/RAD ในช่องคำตอบตัวเลข เฟส 3 เปิดเครื่องคิดเลข เฟส 4 เปิดกระดาษทด local-only เฟส 5 เปิดการแนบ/แก้/ส่ง artifact กับหน้าตรวจผล เฟส 6 เปิดโหมดสอนที่บันทึกกระดานกลับมาแก้ได้ และเฟส 7 เพิ่ม scheduled orphan cleanup แบบ fail-closed แล้ว
+เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู เฟส 1 เพิ่ม schema, RLS, private Storage, Server Actions และสวิตช์ในหน้าสร้าง/แก้ไขงาน เฟส 2 เปิดแป้นคณิตศาสตร์และ DEG/RAD ในช่องคำตอบตัวเลข เฟส 3 เปิดเครื่องคิดเลข เฟส 4 เปิดกระดาษทด local-only เฟส 5 เปิดการแนบ/แก้/ส่ง artifact กับหน้าตรวจผล เฟส 6 เปิดโหมดสอนที่บันทึกกระดานกลับมาแก้ได้ เฟส 7 เพิ่ม scheduled orphan cleanup แบบ fail-closed และเฟส 8 ปิดงาน QA/accessibility/performance พร้อมตรวจเงื่อนไข rollout แล้ว
 
 ## เป้าหมาย
 
@@ -138,6 +138,16 @@
 - เฟสนี้ไม่มี schema change; `supabase migration list` ยืนยัน local/remote ตรงกัน และ linked database lint ผ่านโดยเหลือเพียง warnings เดิมที่ไม่เกี่ยวกับเครื่องมือชุดนี้ การ schedule จริงเริ่มหลัง deploy config นี้พร้อมตั้ง `CRON_SECRET`
 - production bundle หลังเฟส 7 ยังมี 17 initial client chunks รวม 786,060 bytes raw / 239,718 bytes gzip (0.750/0.229 MiB) เท่าเฟส 6 และ scan ไม่พบ cleanup server code ใน initial chunk union ของหน้า take
 
+ของที่ส่งมอบในเฟส 8:
+
+- authenticated browser QA ยืนยันหน้า preview และโหมดสอนด้วยบัญชีครูจริง รวมเส้นทางกลับที่รักษาหน้าต้นทาง ป้ายชนิดโจทย์ภาษาไทย และการไม่แย่ง keyboard focus เมื่อ editor โหลด; flow บันทึก–เปิดแก้–แทนที่–ลบและ navigation guard ผ่านตั้งแต่เฟส 6 โดยลบข้อมูล QA ออกจาก Storage แล้ว
+- โหมดสอนลด focus ซ้ำของ slot ว่างให้เหลือ action เดียวต่อช่อง ปุ่มของแอปมี accessible name และพื้นที่ editor เป็น region ที่มีชื่อ/status แบบ `aria-live`; ปุ่มเมนูมือถือที่ไม่มีชื่อหนึ่งจุดเป็นของ Excalidraw upstream ไม่ใช่ปุ่มที่ KorKru สร้าง
+- ตรวจ layout จริงที่ desktop, mobile 390×844 และ tablet 820×1180 แล้วไม่เกิด document overflow แนวนอน และ reset viewport หลังตรวจ
+- rollout audit แบบอ่านอย่างเดียวยืนยันว่า bucket `math-work-artifacts` เป็น private จำกัด 5 MiB และรับเฉพาะ WebP/JSON, ตาราง artifact/teaching board ไม่มีข้อมูล QA ค้าง, migration local/remote ตรงกัน และ production cleanup dry-run จบโดยไม่ลบข้อมูล
+- ชุดตรวจสุดท้ายผ่าน 58 test files / 694 tests, TypeScript, design-token lint และ production build; bundle หน้า take ยังเท่าเฟส 7 ที่ 17 chunks, 786,060 bytes raw / 239,718 bytes gzip และไม่พบ Excalidraw, mathjs, Supabase browser client หรือ cleanup server code ใน initial union
+- deployment นี้ยังไม่มี Vercel project link/CLI และยังไม่ได้ตั้ง `CRON_SECRET` ใน environment ที่ตรวจ จึงเป็น **พร้อม deploy แต่ cron ยังไม่ทำงานจริง** จนกว่าจะผูก deployment และตั้ง secret อย่างน้อย 32 ตัวอักษร
+- รอบนี้ไม่มี credential นักเรียนและไม่มี fixture หลายองค์กรสำหรับ live authorization test; หน้า preview ของงานที่ใช้ตรวจปิด calculator/scratchpad และไม่มีงานออนไลน์ในฐานที่เปิด flag เหล่านี้ จึงอ้างเฉพาะ authenticated teacher QA รอบสุดท้าย ส่วน enabled-tool browser flows ใช้ผล QA จากเฟส 2–6 และยังต้องเพิ่ม automated multi-role RLS test ก่อนประกาศพร้อมใช้จริงทั้งระบบ
+
 ## ประสบการณ์ครู
 
 หน้าสร้างและแก้ไขงานต้องแสดงสวิตช์เครื่องคิดเลขกับกระดาษทดเฉพาะงานออนไลน์ และสรุปค่าทั้งสองก่อนบันทึก การ duplicate งานคัดลอกค่าตามต้นฉบับ หน้าตัวอย่างนักเรียนต้องแสดงเครื่องมือเหมือนค่าที่ตั้งจริงโดยไม่สร้าง submission
@@ -197,7 +207,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 7. Scheduled cleanup, retention และ security hardening
 8. Authenticated browser QA, accessibility, performance และ rollout
 
-สถานะปัจจุบัน: เฟส 0–7 เสร็จในโค้ด แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข, กระดาษทด local-only, artifact ที่แนบ/แก้/ส่ง/อ่านในหน้าผลลัพธ์, โหมดสอนพร้อมกระดาน 5 slots และ scheduled orphan cleanup แบบ fail-closed ทำงานแล้ว เฟส 8 ยังไม่เริ่ม จึงยังเหลือ authenticated QA/accessibility/performance และ production rollout audit รอบสุดท้าย; cron จะเริ่มทำงานจริงหลัง deploy และตั้ง `CRON_SECRET`
+สถานะปัจจุบัน: เฟส 0–8 เสร็จในโค้ดและผ่าน rollout audit ตามขอบเขต credential/environment ที่มี แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข, กระดาษทด local-only, artifact ที่แนบ/แก้/ส่ง/อ่านในหน้าผลลัพธ์, โหมดสอนพร้อมกระดาน 5 slots และ scheduled orphan cleanup แบบ fail-closed พร้อม deploy แล้ว งานปฏิบัติการที่เหลือคือผูก deployment และตั้ง `CRON_SECRET`; automated multi-role RLS test กับ live student flow ยังเป็น production-readiness requirement ของระบบโดยรวม ไม่ใช่สิ่งที่เฟสนี้อ้างว่าผ่านแล้ว
 
 แต่ละเฟสต้องเป็นหน่วย commit ที่ตรวจรับได้ Migration ต้องอยู่ใน commit เดียวกับโค้ดที่พึ่งพา และห้ามเปิด UI production ก่อน authorization/persistence ของเฟสนั้นพร้อม
 

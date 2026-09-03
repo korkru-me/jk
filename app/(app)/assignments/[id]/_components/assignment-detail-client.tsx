@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/card'
 import { questionExcerpt } from '@/lib/question-display'
 import { sectionByQuestionId, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { withBackHref } from '@/lib/back-link'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
@@ -207,7 +208,7 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             </Link>
           )}
           {a.question_ids.length > 0 && (
-            <Link href={`/assignments/${a.id}/teach`} target="_blank">
+            <Link href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)} target="_blank">
               <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
                 <Presentation className="w-3.5 h-3.5" /> โหมดสอน
               </Button>
