@@ -218,9 +218,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     onOnline: async () => {
       if (pendingCount === 0) return
       toast.info(`กำลังซิงก์คำตอบ ${pendingCount} ข้อ...`)
-      const allSynced = await retryPending()
-      if (allSynced) toast.success('ซิงก์คำตอบสำเร็จ ✓')
-      else toast.warning('ยังมีบางคำตอบที่รอซิงก์ ระบบจะลองอีกครั้งเมื่อเชื่อมต่อใหม่')
+      const synced = await retryPending()
+      if (synced.ok) toast.success('ซิงก์คำตอบสำเร็จ ✓')
+      else toast.warning(synced.error ?? 'ยังมีบางคำตอบที่รอซิงก์ ระบบจะลองอีกครั้งเมื่อเชื่อมต่อใหม่')
     },
     onOffline: () => {
       toast.warning('อินเทอร์เน็ตหลุด — บันทึกในเครื่องแล้ว จะซิงก์อัตโนมัติเมื่อเน็ตกลับมา')
@@ -336,9 +336,12 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         return
       }
 
-      const allAnswersSynced = await flushQueuedAnswers()
-      if (!allAnswersSynced) {
-        toast.error('ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองตรวจอีกครั้ง')
+      // A refusal has a reason the student can act on; a thrown request does
+      // not. Do not retry checkAnswer here: it increments check_count, and a
+      // request can commit while only its response is lost.
+      const synced = await flushQueuedAnswers()
+      if (!synced.ok) {
+        toast.error(synced.error ?? 'ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองตรวจอีกครั้ง')
         return
       }
       const result = await checkAnswer(answerId)
@@ -347,6 +350,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         return
       }
       setChecked(prev => ({ ...prev, [answerId]: { ...result.feedback, checkCount: result.checkCount } }))
+    } catch {
+      toast.error('ตรวจคำตอบไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       setCheckingId(null)
     }
@@ -403,9 +408,9 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     setSubmitting(true)
     // Do not grade against stale DB values when the student confirms within
     // the debounce window or while an earlier save is still in flight.
-    const allAnswersSynced = await flushQueuedAnswers()
-    if (!previewMode && !allAnswersSynced) {
-      toast.error('ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองส่งอีกครั้ง')
+    const synced = await flushQueuedAnswers()
+    if (!previewMode && !synced.ok) {
+      toast.error(synced.error ?? 'ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองส่งอีกครั้ง')
       setSubmitting(false)
       return
     }

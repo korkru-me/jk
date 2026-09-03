@@ -2,9 +2,31 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { saveAnswer } from '@/lib/actions/submissions'
+import { callIdempotentAction } from '@/lib/retry-action'
 
 const LS_KEY = (submissionId: string) => `korkru_exam_${submissionId}`
 const DEBOUNCE_MS = 500
+
+/**
+ * Whether a set of writes made it, and — when the server answered and refused
+ * — what it said.
+ *
+ * The distinction is the whole point: a refusal has a reason worth showing the
+ * student (ส่งงานแล้ว, หมดเวลาทำข้อสอบแล้ว), while a request that never landed
+ * has none, and telling someone with a perfectly good connection to go check
+ * their internet is how a dropped POST used to look from the exam page.
+ */
+export interface SaveOutcome {
+  ok: boolean
+  error?: string
+}
+
+const SAVED: SaveOutcome = { ok: true }
+
+function combineOutcomes(outcomes: SaveOutcome[]): SaveOutcome {
+  if (outcomes.every(outcome => outcome.ok)) return SAVED
+  return { ok: false, error: outcomes.find(outcome => !outcome.ok && outcome.error)?.error }
+}
 
 interface Options {
   submissionId: string
@@ -21,11 +43,14 @@ interface Options {
  * Owns the student's in-progress answers and everything involved in getting
  * them persisted.
  *
- * Three guarantees this is here to provide:
+ * Four guarantees this is here to provide:
  *  - typing stays instant — edits are coalesced per answer before they hit the
  *    server, instead of firing a server action per keystroke;
  *  - saves for one answer are chained, so a slow earlier response can never
  *    land after a newer one and overwrite it;
+ *  - a dropped request is retried before it counts as a failure, because iOS
+ *    drops enough of them that one was regularly all it took to stop a student
+ *    mid-แบบฝึกหัด (see callIdempotentAction);
  *  - nothing is lost offline — values go to localStorage on every change and
  *    the failed ones are queued for `retryPending()` when the network returns.
  */
@@ -37,7 +62,7 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
   const localAnswersRef = useRef(localAnswers)
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const pendingValuesRef = useRef<Map<string, string>>(new Map())
-  const inFlightRef = useRef<Map<string, Promise<boolean>>>(new Map())
+  const inFlightRef = useRef<Map<string, Promise<SaveOutcome>>>(new Map())
   // Only dirty values belong in localStorage. Keeping every server-confirmed
   // value there would let an old backup overwrite a newer answer from another
   // device the next time this attempt opens.
@@ -64,44 +89,56 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
     )
   }, [])
 
-  const flushAnswer = useCallback((answerId: string): Promise<boolean> => {
+  const flushAnswer = useCallback((answerId: string): Promise<SaveOutcome> => {
     const timer = saveTimersRef.current.get(answerId)
     if (timer) clearTimeout(timer)
     saveTimersRef.current.delete(answerId)
 
     const value = pendingValuesRef.current.get(answerId)
     const existing = inFlightRef.current.get(answerId)
-    if (value === undefined) return existing ?? Promise.resolve(true)
+    if (value === undefined) return existing ?? Promise.resolve(SAVED)
     pendingValuesRef.current.delete(answerId)
 
-    const task = (existing ?? Promise.resolve(true))
-      .catch(() => false)
-      .then(async () => {
-        const result: { error?: string } = previewMode ? {} : await saveAnswer(answerId, value)
-        if (result.error) throw new Error(result.error)
-        if (pendingValuesRef.current.get(answerId) === value) {
-          pendingValuesRef.current.delete(answerId)
-        }
-        setPendingSync(prev => {
-          if (!prev.has(answerId)) return prev
-          const next = new Set(prev)
-          next.delete(answerId)
-          return next
-        })
-        if (backupValuesRef.current.get(answerId) === value && !pendingValuesRef.current.has(answerId)) {
-          backupValuesRef.current.delete(answerId)
-          persistPendingBackup()
-        }
-        return true
+    const markSaved = (): SaveOutcome => {
+      if (pendingValuesRef.current.get(answerId) === value) {
+        pendingValuesRef.current.delete(answerId)
+      }
+      setPendingSync(prev => {
+        if (!prev.has(answerId)) return prev
+        const next = new Set(prev)
+        next.delete(answerId)
+        return next
       })
-      .catch(() => {
-        const latest = localAnswersRef.current[answerId] ?? value
-        if (!pendingValuesRef.current.has(answerId)) pendingValuesRef.current.set(answerId, latest)
-        backupValuesRef.current.set(answerId, latest)
+      if (backupValuesRef.current.get(answerId) === value && !pendingValuesRef.current.has(answerId)) {
+        backupValuesRef.current.delete(answerId)
         persistPendingBackup()
-        setPendingSync(prev => new Set(prev).add(answerId))
-        return false
+      }
+      return SAVED
+    }
+
+    /** Keep the value queued and backed up so the next flush picks it up again. */
+    const markUnsaved = (error?: string): SaveOutcome => {
+      const latest = localAnswersRef.current[answerId] ?? value
+      if (!pendingValuesRef.current.has(answerId)) pendingValuesRef.current.set(answerId, latest)
+      backupValuesRef.current.set(answerId, latest)
+      persistPendingBackup()
+      setPendingSync(prev => new Set(prev).add(answerId))
+      return { ok: false, error }
+    }
+
+    const task = (existing ?? Promise.resolve(SAVED))
+      .catch(() => SAVED)
+      .then(async () => {
+        if (previewMode) return markSaved()
+        // Setting the same answer value twice is idempotent. A browser error
+        // can mean either the request or only its response was lost, so this
+        // is the kind of mutation that is safe to retry.
+        const call = await callIdempotentAction(() => saveAnswer(answerId, value))
+        if (!call.ok) return markUnsaved()
+        if (call.data.error) return markUnsaved(call.data.error)
+        return markSaved()
       })
+      .catch(() => markUnsaved())
       .finally(() => {
         if (inFlightRef.current.get(answerId) === task) {
           inFlightRef.current.delete(answerId)
@@ -115,11 +152,11 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
   }, [persistPendingBackup, refreshSavingState, previewMode])
 
   /** Force every queued edit out and report whether every write reached the server. */
-  const flushQueuedAnswers = useCallback(async (): Promise<boolean> => {
+  const flushQueuedAnswers = useCallback(async (): Promise<SaveOutcome> => {
     const queuedIds = [...pendingValuesRef.current.keys()]
     const queuedResults = await Promise.all(queuedIds.map(id => flushAnswer(id)))
     const inFlightResults = await Promise.all([...inFlightRef.current.values()])
-    return [...queuedResults, ...inFlightResults].every(Boolean)
+    return combineOutcomes([...queuedResults, ...inFlightResults])
   }, [flushAnswer])
 
   /** Record an edit and schedule it to be persisted. */
@@ -152,16 +189,15 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
    * Re-send everything that failed while offline. Resolves to whether all of
    * it made it this time.
    */
-  const retryPending = useCallback(async (): Promise<boolean> => {
+  const retryPending = useCallback(async (): Promise<SaveOutcome> => {
     const ids = [...pendingSync]
-    if (ids.length === 0) return true
+    if (ids.length === 0) return SAVED
     setPendingSync(new Set())
     for (const id of ids) {
       const value = localAnswersRef.current[id]
       if (value !== undefined) pendingValuesRef.current.set(id, value)
     }
-    const results = await Promise.all(ids.map(id => flushAnswer(id)))
-    return results.every(Boolean)
+    return combineOutcomes(await Promise.all(ids.map(id => flushAnswer(id))))
   }, [pendingSync, flushAnswer])
 
   /** Drop the local backup once the attempt is committed. */
