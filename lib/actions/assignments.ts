@@ -8,6 +8,7 @@ import { filterSectionsToQuestions, parseSections, type QuestionSetSection } fro
 import type { AndroidExamMode, AssignmentStatus, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 import { inspectSebReadiness } from '@/lib/seb'
+import { resolveNewAssignmentMathTools } from '@/lib/assignment-math-tools'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -73,6 +74,8 @@ interface CreateAssignmentData {
   passing_type?: 'score' | 'percent' | null
   passing_value?: number | null
   require_work_image?: boolean
+  calculator_enabled?: boolean
+  scratchpad_enabled?: boolean
   proctoring_enabled?: boolean
   fullscreen_required?: boolean
   block_clipboard?: boolean
@@ -116,13 +119,20 @@ export async function createAssignment(data: CreateAssignmentData) {
 
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
-  const isOnlineExam = data.mode === 'online' && data.type === 'exam'
+  const assignmentType = data.type ?? 'exercise'
+  const isOnlineExam = data.mode === 'online' && assignmentType === 'exam'
   // Checking one ข้อ at a time is what makes a แบบฝึกหัด a แบบฝึกหัด, so it is
   // on unless the teacher turns it off — and it is never on for a ข้อสอบ or a
   // printed ใบงาน, whatever a client sends. The default is applied here rather
   // than in the column so that งาน already handed out keep the behavior their
   // students have been getting; see the migration's backfill.
-  const isOnlineExercise = data.mode === 'online' && data.type === 'exercise'
+  const isOnlineExercise = data.mode === 'online' && assignmentType === 'exercise'
+  const { calculatorEnabled, scratchpadEnabled } = resolveNewAssignmentMathTools({
+    mode: data.mode,
+    type: assignmentType,
+    calculatorEnabled: data.calculator_enabled,
+    scratchpadEnabled: data.scratchpad_enabled,
+  })
   const secureBrowserMode: SecureBrowserMode = isOnlineExam && data.secure_browser_mode === 'seb_required'
     ? 'seb_required'
     : 'browser'
@@ -190,7 +200,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
       mode: data.mode,
-      ...(data.type ? { type: data.type } : {}),
+      type: assignmentType,
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? false,
       random_question_count: randomQuestionCount,
@@ -205,6 +215,8 @@ export async function createAssignment(data: CreateAssignmentData) {
       passing_type: data.passing_type ?? null,
       passing_value: data.passing_value ?? null,
       require_work_image: data.require_work_image ?? false,
+      calculator_enabled: calculatorEnabled,
+      scratchpad_enabled: scratchpadEnabled,
       proctoring_enabled: proctoringEnabled,
       fullscreen_required: proctoringEnabled && data.fullscreen_required === true,
       block_clipboard: proctoringEnabled && data.block_clipboard === true,
@@ -296,6 +308,9 @@ interface UpdateAssignmentData {
   /** Whether students must attach a photo of their working on every
    *  เติมคำตอบตัวเลข question. Omit to leave the งาน's answer untouched. */
   require_work_image?: boolean
+  /** Online-only student tools. Omit either value to leave it unchanged. */
+  calculator_enabled?: boolean
+  scratchpad_enabled?: boolean
 }
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
@@ -314,7 +329,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, sections, type, mode, status, random_question_count, secure_browser_mode, android_exam_mode')
+    .select('question_ids, sections, type, mode, status, random_question_count, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -449,6 +464,28 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     }
   }
 
+  const nextCalculatorEnabled = data.calculator_enabled === undefined
+    ? existing.calculator_enabled
+    : existing.mode === 'online' && data.calculator_enabled
+  const nextScratchpadEnabled = data.scratchpad_enabled === undefined
+    ? existing.scratchpad_enabled
+    : existing.mode === 'online' && data.scratchpad_enabled
+  if (
+    nextCalculatorEnabled !== existing.calculator_enabled
+    || nextScratchpadEnabled !== existing.scratchpad_enabled
+  ) {
+    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'เปลี่ยนเครื่องคิดเลขหรือกระดาษทดไม่ได้หลังมีนักเรียนเริ่มทำแล้ว' }
+    }
+  }
+
   const { error } = await supabase
     .from('assignments')
     .update({
@@ -484,6 +521,12 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       secure_browser_mode: secureBrowserMode,
       android_exam_mode: androidExamMode,
       ...(data.require_work_image === undefined ? {} : { require_work_image: data.require_work_image }),
+      ...(data.calculator_enabled === undefined
+        ? {}
+        : { calculator_enabled: nextCalculatorEnabled }),
+      ...(data.scratchpad_enabled === undefined
+        ? {}
+        : { scratchpad_enabled: nextScratchpadEnabled }),
     })
     .eq('id', id)
 
@@ -576,6 +619,8 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       passing_type: source.passing_type,
       passing_value: source.passing_value,
       require_work_image: source.require_work_image,
+      calculator_enabled: source.mode === 'online' && (source.calculator_enabled ?? false),
+      scratchpad_enabled: source.mode === 'online' && (source.scratchpad_enabled ?? false),
       proctoring_enabled: source.proctoring_enabled ?? false,
       fullscreen_required: source.fullscreen_required ?? false,
       block_clipboard: source.block_clipboard ?? false,

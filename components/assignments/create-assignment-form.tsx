@@ -15,7 +15,7 @@ import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
-  CircleCheck,
+  CircleCheck, Calculator, NotebookPen,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -142,6 +142,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   // ผิด" and "บอกว่าคำตอบคืออะไร" are not the same amount of help.
   const [instantCheck, setInstantCheck] = useState(true)
   const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(true)
+  // Approved defaults for a new online งาน: practice tools start on for an
+  // exercise and off for an exam. Existing assignments are never backfilled.
+  const [calculatorEnabled, setCalculatorEnabled] = useState(true)
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(true)
   const [accessCode, setAccessCode] = useState('')
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
   const [fullscreenRequired, setFullscreenRequired] = useState(false)
@@ -252,6 +256,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   useEffect(() => {
     if (mode === 'print') setRandomQuestionCount('')
   }, [mode])
+
+  useEffect(() => {
+    const defaultEnabled = mode === 'online' && assignmentType === 'exercise'
+    setCalculatorEnabled(defaultEnabled)
+    setScratchpadEnabled(defaultEnabled)
+  }, [assignmentType, mode])
 
 
   const previewQuestions = selectedIds
@@ -387,6 +397,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         // A งาน with nothing to photograph is stored as not requiring it,
         // whatever the switch was left on before the last โจทย์ was removed.
         require_work_image: hasWorkImageQuestions && requireWorkImage,
+        calculator_enabled: mode === 'online' && calculatorEnabled,
+        scratchpad_enabled: mode === 'online' && scratchpadEnabled,
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
         block_clipboard: blockClipboard,
@@ -907,6 +919,21 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   </div>
                 ) : null) as React.ReactNode,
               }] : []),
+              ...(mode === 'online' ? [{
+                label: 'ให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์',
+                desc: 'เปิดปุ่มเครื่องคิดเลขในหน้าทำโจทย์ นักเรียนเลือก DEG/RAD ตามช่องคำตอบที่กำลังใช้ได้',
+                icon: Calculator,
+                value: calculatorEnabled,
+                set: setCalculatorEnabled,
+                footer: null as React.ReactNode,
+              }, {
+                label: 'เปิดกระดาษทด',
+                desc: 'ให้นักเรียนเขียนทดบนอุปกรณ์ได้ สิ่งที่ยังไม่แนบจะอยู่เฉพาะเครื่องและไม่กินพื้นที่เก็บไฟล์ของระบบ',
+                icon: NotebookPen,
+                value: scratchpadEnabled,
+                set: setScratchpadEnabled,
+                footer: null as React.ReactNode,
+              }] : []),
               ...(assignedSections.length > 0 ? [{
                 label: 'แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น',
                 desc: shuffleQ
@@ -1294,6 +1321,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(hasWorkImageQuestions
                   ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
                   : []),
+                ...(mode === 'online' ? [
+                  { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
+                  { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
+                ] : []),
                 { label: 'แสดงผล',    value: SHOW_RESULTS_SUMMARY[showResults] },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">

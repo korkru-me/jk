@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen } from 'lucide-react'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -70,6 +70,8 @@ export type EditableAssignment = Pick<
   | 'random_question_count'
   | 'exam_watermark_enabled'
   | 'require_work_image'
+  | 'calculator_enabled'
+  | 'scratchpad_enabled'
   | 'secure_browser_mode'
   | 'android_exam_mode'
 >
@@ -114,6 +116,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [secureBrowserMode, setSecureBrowserMode] = useState(a.secure_browser_mode ?? 'browser')
   const [androidExamMode, setAndroidExamMode] = useState(a.android_exam_mode ?? 'blocked')
   const [requireWorkImage, setRequireWorkImage] = useState(a.require_work_image ?? false)
+  const [calculatorEnabled, setCalculatorEnabled] = useState(a.calculator_enabled ?? false)
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(a.scratchpad_enabled ?? false)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
@@ -242,6 +246,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         secure_browser_mode: secureBrowserMode,
         android_exam_mode: secureBrowserMode === 'seb_required' ? androidExamMode : 'blocked',
         require_work_image: hasWorkImageQuestions && requireWorkImage,
+        calculator_enabled: a.mode === 'online' && calculatorEnabled,
+        scratchpad_enabled: a.mode === 'online' && scratchpadEnabled,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -600,6 +606,52 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               className="accent-primary w-4 h-4 shrink-0"
             />
           </label>
+        )}
+
+        {a.mode === 'online' && (
+          <>
+            <label className={`flex items-center justify-between p-3 rounded-xl border border-border transition-all ${hasSubmissions ? 'opacity-70' : 'hover:border-ring cursor-pointer'}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  <Calculator className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">ให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์</p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : 'เปิดปุ่มเครื่องคิดเลขในหน้าทำโจทย์ และใช้ DEG/RAD ตามช่องคำตอบที่กำลังเลือก'}
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={calculatorEnabled}
+                onChange={e => setCalculatorEnabled(e.target.checked)}
+                disabled={hasSubmissions}
+                className="accent-primary w-4 h-4 shrink-0"
+              />
+            </label>
+
+            <label className={`flex items-center justify-between p-3 rounded-xl border border-border transition-all ${hasSubmissions ? 'opacity-70' : 'hover:border-ring cursor-pointer'}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  <NotebookPen className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">เปิดกระดาษทด</p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : 'สิ่งที่นักเรียนยังไม่แนบจะอยู่เฉพาะอุปกรณ์ ไม่ถูกอัปโหลดขึ้นพื้นที่เก็บไฟล์'}
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={scratchpadEnabled}
+                onChange={e => setScratchpadEnabled(e.target.checked)}
+                disabled={hasSubmissions}
+                className="accent-primary w-4 h-4 shrink-0"
+              />
+            </label>
+          </>
         )}
 
         {hasWorkImageQuestions && (

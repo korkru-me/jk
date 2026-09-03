@@ -121,14 +121,14 @@ Invariant สำคัญ:
 
 ห้ามคำนวณ random values ใหม่เมื่อ refresh หรือ grade เพราะจะทำให้คำถามและเฉลยเปลี่ยนหลังนักเรียนตอบ
 
-## เครื่องมือคณิตศาสตร์และ artifact — โมเดลที่อนุมัติ ยังไม่ใช่ schema ปัจจุบัน
+## เครื่องมือคณิตศาสตร์และ artifact
 
-เฟส 1 ตาม `docs/STUDENT_MATH_TOOLS.md` ต้องเพิ่มข้อมูลโดยไม่เปลี่ยน shape เดิมของ `student_answer` และ `work_images`:
+เฟส 1 ตาม `docs/STUDENT_MATH_TOOLS.md` เพิ่มข้อมูลโดยไม่เปลี่ยน shape เดิมของ `student_answer` และ `work_images`:
 
 - Assignment flags แยกการอนุญาตเครื่องคิดเลขกับกระดาษทด งานเก่าอ่านเป็นปิด แบบฝึกหัดออนไลน์ใหม่เริ่มเปิด และข้อสอบออนไลน์ใหม่เริ่มปิดจาก create action
-- Metadata มุม `DEG`/`RAD` ผูกกับ logical numeric input หรือข้อย่อย ค่าไม่มี metadata อ่านเป็น `DEG`
-- Student work artifact อ้าง exact `submission_answer`, part/blank identity, `org_id`, student owner, preview path, scene path, format version และ timestamps; logical slot หนึ่งตำแหน่งมี artifact ปัจจุบันได้หนึ่งรายการ
-- Teaching board อ้าง assignment, question, creator, slot 1–5, `org_id`, preview path, scene path, format version และ timestamps; unique constraint และ check constraint เป็นผู้บังคับเพดานจริง
+- Metadata มุม `DEG`/`RAD` อยู่ใน `submission_answers.math_input_modes` ผูกกับ logical numeric input หรือข้อย่อย ค่า object ว่าง/ไม่มี key อ่านเป็น `DEG`
+- `student_work_artifacts` อ้าง exact `submission_answer`, part identity, `org_id`, student owner, source type, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(submission_answer_id, part_key)` ทำให้ logical slot หนึ่งตำแหน่งมี artifact ปัจจุบันได้หนึ่งรายการ
+- `teaching_boards` อ้าง assignment, question, creator, slot 1–5, `org_id`, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(assignment_id, question_id, created_by, slot)` กับ check `slot BETWEEN 1 AND 5` เป็นผู้บังคับเพดานจริง
 - Path ใหม่อยู่ใน private Storage และ database เก็บ path ไม่เก็บ signed URL ซึ่งมีอายุสั้น
 
 Local-only scratch scene ไม่ใช่ row ในฐานข้อมูล อยู่ใน IndexedDB และห้ามถูกนับเป็น submission attachment การอัปโหลด preview/scene ยังไม่สร้าง reference จน Server Action ที่ตรวจสิทธิ์บันทึก metadata สำเร็จ

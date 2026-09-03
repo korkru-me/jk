@@ -106,14 +106,14 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - Retention 90 วันและปุ่มล้างข้อมูลคุมสอบมีผลเฉพาะข้อมูลใน KorKru ไม่สามารถตามลบไฟล์ที่ดาวน์โหลดแล้ว หน้ารายงานต้องเตือนว่าไฟล์มีชื่อและพฤติกรรมของนักเรียน ผู้ดาวน์โหลดต้องจำกัดผู้เข้าถึง ส่งต่อเท่าที่จำเป็น และลบสำเนาเมื่อหมดวัตถุประสงค์
 - ผลวิจัยระดับบุคคลและแท็บข้อมูลที่ใช้ต้องตรวจสิทธิ์จัดการโครงการก่อน query; pagination/filtering ทำฝั่ง server และไม่ส่ง roster ทั้งโครงการเข้า Client Component เมื่อผู้ใช้ดูเพียงหน้าปัจจุบัน
 
-### พื้นที่เขียนและวิธีทำที่แนบ — แบบที่อนุมัติ ยังไม่ใช่ระบบปัจจุบัน
+### พื้นที่เขียนและวิธีทำที่แนบ
 
 - กระดาษทดที่ยังไม่แนบต้องอยู่ใน IndexedDB ของอุปกรณ์เท่านั้น ไม่ส่ง scene ต่อ stroke และไม่ถือเป็น education record บน server
 - Local key ต้องแยก user/submission/answer/part และถูกล้างเมื่อส่งสำเร็จ attempt ใช้ต่อไม่ได้ หรือเกิน TTL; local data เป็น recovery convenience ไม่ใช่ trusted submission state
-- Preview และ scene ที่แนบใหม่ต้องอยู่ private Storage และเปิดด้วย signed URL หลังตรวจ exact submission/assignment authority ห้ามใช้ public URL สำหรับข้อมูลชุดใหม่
+- Preview และ scene ที่แนบใหม่อยู่ใน private bucket `math-work-artifacts`; browser ขอ path-bound signed upload token และ signed read URL อายุ 5 นาทีผ่าน Server Action หลังตรวจ exact submission/assignment authority ไม่มี client policy สำหรับ list/read/write/delete ทั้ง bucket
 - Browser ส่ง Storage path, MIME, size, format version และ element count มาได้แต่เชื่อไม่ได้ Server Action ต้องตรวจ owner, tenant, exact in-progress answer, เวลา และ SEB/Android access gate ซ้ำก่อนบันทึก reference
 - หลังส่งต้องปฏิเสธการแก้ scene, preview และ metadata แม้ client ยังถือ URL หรือ local copy อยู่
-- กระดานสอนอ่านได้เฉพาะครูที่มีสิทธิ์ใน assignment และแก้/ลบได้เฉพาะผู้สร้าง เพดาน 5 slots ต้องบังคับในฐานข้อมูลเพื่อกัน concurrent request
+- `student_work_artifacts` แก้/ลบได้เฉพาะเจ้าของที่ submission ยัง `in_progress`; `teaching_boards` อ่านได้เฉพาะครูที่มีสิทธิ์ใน assignment และแก้/ลบได้เฉพาะผู้สร้าง เพดาน 5 slots บังคับด้วย constraint เพื่อกัน concurrent request
 - การแทนที่หรือลบต้องเปลี่ยน database reference ก่อนแล้วจึงลบไฟล์แบบ best effort; scheduled orphan cleanup เว้น grace period อย่างน้อย 7 วัน ตรวจ reference ซ้ำ และหยุดทั้งรอบเมื่อ scan ไม่ครบ
 - ห้าม log scene, คำตอบเต็ม, signed URL หรือ path ที่เปิดเผยข้อมูลนักเรียน รายละเอียด threat model และ lifecycle อยู่ใน `docs/STUDENT_MATH_TOOLS.md`
 

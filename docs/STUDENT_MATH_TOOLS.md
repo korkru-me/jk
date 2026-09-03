@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 3 กันยายน 2026
 
-สถานะ: **เจ้าของผลิตภัณฑ์อนุมัติ UX และทิศทางสถาปัตยกรรมแล้ว · เฟส 0 เท่านั้น**
+สถานะ: **เฟส 1 — data/security foundation และการตั้งค่าครูพัฒนาแล้ว · ยังไม่มีเครื่องมือในหน้าทำโจทย์**
 
-เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู ยังไม่มี schema, RLS หรือ UI ใหม่จากสเปกนี้จนกว่าแต่ละเฟสจะถูกพัฒนาและตรวจรับ ห้ามอ่านข้อความในเอกสารนี้เป็นพฤติกรรม production ปัจจุบัน
+เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู เฟส 1 เพิ่ม schema, RLS, private Storage, Server Actions และสวิตช์ในหน้าสร้าง/แก้ไขงานแล้ว แต่ยังไม่แสดงแป้น เครื่องคิดเลข หรือกระดาษทดในหน้าทำโจทย์จนกว่าเฟสของเครื่องมือนั้นจะเสร็จ
 
 ## เป้าหมาย
 
@@ -91,15 +91,15 @@
 
 “โหมดสอน” แยกจาก preview ปัจจุบัน เพราะ preview จงใจไม่เขียน Storage โหมดสอนต้องมี authorization และ persistence ของตัวเอง ครูเปลี่ยนข้อ แสดง/ซ่อนเฉลย เขียน และจัดการ 5 slots ได้โดยไม่เปลี่ยน requirement การแนบวิธีทำของนักเรียน
 
-## แผนข้อมูล — ยังไม่ใช่ schema ปัจจุบัน
+## โครงสร้างข้อมูลจากเฟส 1
 
-ชื่อสุดท้ายต้องยืนยันกับ migration ในเฟส 1 แต่โมเดลต้องแยกหน้าที่ดังนี้:
+Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้าที่ดังนี้:
 
-- Assignment flags สำหรับ `scratchpad_enabled` และ `calculator_enabled`
-- Metadata DEG/RAD ต่อช่องคำตอบที่ยังรักษา `student_answer` รูปแบบเก่าได้
-- Student work artifact ผูก exact `submission_answer` และ part/blank identity พร้อม owner, tenant, preview path, scene path, format version และ timestamps
-- Teaching board ผูก assignment, question, creator และ slot 1–5 พร้อม preview path, scene path, format version และ timestamps
-- Private Storage bucket ที่อ่านผ่าน signed URL หลัง server ตรวจ exact resource
+- Assignment flags `scratchpad_enabled` และ `calculator_enabled`; แถวเก่าเป็นปิด ส่วน create action กำหนดค่าเริ่มต้นของงานใหม่ตามชนิด
+- `submission_answers.math_input_modes` เป็น object แยกจาก `student_answer`; object ว่างหมายถึง `DEG`
+- `student_work_artifacts` ผูก exact submission answer + part key พร้อม owner, tenant, source, private paths, ขนาด, element count และ format version
+- `teaching_boards` ผูก assignment + question + creator + slot 1–5 โดย unique/check constraint บังคับเพดานจริง
+- Private bucket `math-work-artifacts` รับเฉพาะ WebP/JSON และไม่มี `storage.objects` policy สำหรับ client; Server Action ออก path-bound signed upload token และ signed read URL อายุสั้นหลังตรวจสิทธิ์
 
 `submission_answers.work_images` และ public URLs เก่าต้องอ่านได้ต่อ ห้าม migration บังคับย้ายข้อมูลเก่าก่อนเส้นทางใหม่พร้อม กติกา “แนบวิธีทำครบ” ต้องยอมรับรูปเก่าหรือ artifact ใหม่โดยไม่เปลี่ยนคะแนนและ answer snapshot เดิม
 
@@ -143,6 +143,8 @@
 6. โหมดสอนกับกระดาน 5 slots
 7. Scheduled cleanup, retention และ security hardening
 8. Authenticated browser QA, accessibility, performance และ rollout
+
+สถานะปัจจุบัน: เฟส 0 และ 1 เสร็จในโค้ด เฟส 2–8 ยังไม่เริ่ม เครื่องมือฝั่งนักเรียนและโหมดสอนจึงยังไม่แสดงใน production UI
 
 แต่ละเฟสต้องเป็นหน่วย commit ที่ตรวจรับได้ Migration ต้องอยู่ใน commit เดียวกับโค้ดที่พึ่งพา และห้ามเปิด UI production ก่อน authorization/persistence ของเฟสนั้นพร้อม
 

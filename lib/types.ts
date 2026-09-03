@@ -507,6 +507,7 @@ export type AndroidExamMode = 'blocked' | 'monitored'
 export type ShowResultsMode = 'immediate' | 'score_only' | 'after_due' | 'never'
 export type ScoreStrategy = 'best' | 'average' | 'latest'
 export type RetryScope = 'all' | 'wrong_only'
+export type MathInputMode = 'deg' | 'rad'
 
 export type { QuestionSetSection } from '@/lib/question-set-sections'
 import type { QuestionSetSection } from '@/lib/question-set-sections'
@@ -574,6 +575,11 @@ export interface Assignment {
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   require_work_image: boolean
+  /** Whether the student page may lazy-load the scientific calculator. */
+  calculator_enabled: boolean
+  /** Whether the student may open a local-only scratch scene and optionally
+   * attach it as working. Unattached scenes never become server rows. */
+  scratchpad_enabled: boolean
   /** Browser-level presence/integrity signals. This is not kiosk-mode or an
    * operating-system security boundary. */
   proctoring_enabled: boolean
@@ -743,6 +749,8 @@ export interface SubmissionAnswer {
   order_index: number
   option_order: number[] | null
   work_images: (string | null)[] | null
+  /** DEG/RAD per logical numeric input. Missing keys retain legacy DEG. */
+  math_input_modes: Record<string, MathInputMode>
   score_edited_by: string | null
   score_edited_at: string | null
   /** True when this row was copied from the student's previous attempt
@@ -751,6 +759,42 @@ export interface SubmissionAnswer {
    *  auto-grading, which keeps a teacher-graded score from being recomputed. */
   carried_over: boolean
   created_at: string
+}
+
+export type WorkArtifactSource = 'scratchpad' | 'photo'
+
+export interface StudentWorkArtifact {
+  id: string
+  org_id: string
+  submission_answer_id: string
+  student_id: string
+  part_key: string
+  source_type: WorkArtifactSource
+  preview_path: string
+  scene_path: string | null
+  format_version: number
+  preview_size_bytes: number
+  scene_size_bytes: number | null
+  element_count: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TeachingBoard {
+  id: string
+  org_id: string
+  assignment_id: string
+  question_id: string
+  created_by: string
+  slot: number
+  preview_path: string
+  scene_path: string
+  format_version: number
+  preview_size_bytes: number
+  scene_size_bytes: number
+  element_count: number
+  created_at: string
+  updated_at: string
 }
 
 export interface FormulaPreset {
