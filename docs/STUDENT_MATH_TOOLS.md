@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 3 กันยายน 2026
 
-สถานะ: **เฟส 6 — โหมดสอนและกระดาน 5 ช่องต่อผู้สร้างพร้อมใช้งานแล้ว**
+สถานะ: **เฟส 7 — scheduled cleanup และ security hardening พร้อม deploy แล้ว**
 
-เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู เฟส 1 เพิ่ม schema, RLS, private Storage, Server Actions และสวิตช์ในหน้าสร้าง/แก้ไขงาน เฟส 2 เปิดแป้นคณิตศาสตร์และ DEG/RAD ในช่องคำตอบตัวเลข เฟส 3 เปิดเครื่องคิดเลข เฟส 4 เปิดกระดาษทด local-only เฟส 5 เปิดการแนบ/แก้/ส่ง artifact กับหน้าตรวจผล และเฟส 6 เปิดโหมดสอนที่บันทึกกระดานกลับมาแก้ได้แล้ว
+เอกสารนี้กำหนดขอบเขตของแป้นคณิตศาสตร์ เครื่องคิดเลขวิทยาศาสตร์ กระดาษทดของนักเรียน การแนบวิธีทำ และกระดานสอนของครู เฟส 1 เพิ่ม schema, RLS, private Storage, Server Actions และสวิตช์ในหน้าสร้าง/แก้ไขงาน เฟส 2 เปิดแป้นคณิตศาสตร์และ DEG/RAD ในช่องคำตอบตัวเลข เฟส 3 เปิดเครื่องคิดเลข เฟส 4 เปิดกระดาษทด local-only เฟส 5 เปิดการแนบ/แก้/ส่ง artifact กับหน้าตรวจผล เฟส 6 เปิดโหมดสอนที่บันทึกกระดานกลับมาแก้ได้ และเฟส 7 เพิ่ม scheduled orphan cleanup แบบ fail-closed แล้ว
 
 ## เป้าหมาย
 
@@ -128,6 +128,16 @@
 - authenticated browser QA ผ่านการบันทึก เปิดแก้ บันทึกทับ ลบ เตือนก่อนทิ้งงาน และ layout desktop/mobile โดยหลัง QA ไม่มีไฟล์ทดสอบค้าง
 - production bundle ของหน้า take หลังเฟส 6 ยังเท่าเดิมที่ 17 initial client chunks รวม 786,060 bytes raw / 239,718 bytes gzip (0.750/0.229 MiB); Excalidraw, mathjs, Supabase browser client และ signed-upload path ของโหมดสอนไม่อยู่ใน initial chunk union
 
+ของที่ส่งมอบในเฟส 7:
+
+- Vercel Cron เรียก `GET /api/internal/math-work-cleanup` วันละครั้งเวลา 02:45 Asia/Bangkok; route ทำงานเมื่อมี `CRON_SECRET` สุ่มอย่างน้อย 32 ตัวอักษรและ Bearer token ตรงกันเท่านั้น ถ้ายังไม่ตั้งค่า route ตอบ 503 และไม่แตะ Storage
+- งานล้างใช้ service role เฉพาะหลังผ่าน cron authorization, enumerate เฉพาะ namespace `students/` และ `teachers/` ใน private bucket, จำกัด 100,000 objects/100,000 folders ต่อรอบ และลบได้เฉพาะ path ที่ตรงกับ upload builder รวม slot ครู 1–5 เท่านั้น path แปลกหรือ timestamp อ่านไม่ได้ถูกเก็บไว้
+- ไฟล์ไม่มี reference ต้องเก่าครบ 7 วันก่อนเป็น candidate และทุก candidate ถูกตรวจ exact path กับทั้ง `student_work_artifacts.preview_path/scene_path` และ `teaching_boards.preview_path/scene_path` จากฐานข้อมูลซ้ำทันทีเป็น batch ก่อนลบ ความล้มเหลวของ Storage listing หรือ reference query ยกเลิกรอบก่อนเริ่มลบ
+- route ไม่ตอบหรือ log path, signed URL, scene หรือข้อมูลนักเรียน มีเฉพาะ aggregate count/bytes และรองรับ `?dryRun=1` สำหรับตรวจ production โดยไม่ลบ
+- unit/integration-style tests ครอบคลุม path allowlist, grace boundary, timestamp ที่พิสูจน์ไม่ได้, referenced object, reference-scan failure, dry-run และ cron authorization; production server dry-run กับ Supabase ที่ผูกจริงสแกนสำเร็จ 0 objects/0 deletes
+- เฟสนี้ไม่มี schema change; `supabase migration list` ยืนยัน local/remote ตรงกัน และ linked database lint ผ่านโดยเหลือเพียง warnings เดิมที่ไม่เกี่ยวกับเครื่องมือชุดนี้ การ schedule จริงเริ่มหลัง deploy config นี้พร้อมตั้ง `CRON_SECRET`
+- production bundle หลังเฟส 7 ยังมี 17 initial client chunks รวม 786,060 bytes raw / 239,718 bytes gzip (0.750/0.229 MiB) เท่าเฟส 6 และ scan ไม่พบ cleanup server code ใน initial chunk union ของหน้า take
+
 ## ประสบการณ์ครู
 
 หน้าสร้างและแก้ไขงานต้องแสดงสวิตช์เครื่องคิดเลขกับกระดาษทดเฉพาะงานออนไลน์ และสรุปค่าทั้งสองก่อนบันทึก การ duplicate งานคัดลอกค่าตามต้นฉบับ หน้าตัวอย่างนักเรียนต้องแสดงเครื่องมือเหมือนค่าที่ตั้งจริงโดยไม่สร้าง submission
@@ -151,7 +161,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 - กระดาษไม่แนบ: local-only; ลบทันทีหลังส่งสำเร็จ/attempt ใช้ต่อไม่ได้ และล้างรายการเกิน TTL เมื่อเปิดหน้า
 - Artifact นักเรียน: อยู่ตาม lifecycle ของ submission; ถอดหรือแทนที่ก่อนส่งแล้ว enqueue ไฟล์เดิมให้ลบ
 - กระดานสอน: อยู่จนผู้สร้างลบหรือ assignment ถูกลบ
-- Upload ที่ไม่มี reference: เว้น grace period อย่างน้อย 7 วัน แล้ว scheduled cleanup ตรวจ reference ซ้ำก่อนลบ
+- Upload ที่ไม่มี reference: เว้น grace period 7 วัน แล้ว scheduled cleanup ที่มี cron secret ตรวจ exact reference จากทั้งสองตารางซ้ำก่อนลบ; หาก scan เกินเพดานหรือไม่ครบจะไม่เริ่มลบ
 - การลบไฟล์เป็น best effort หลัง database mutation สำเร็จ; cleanup เป็น safety net ไม่ใช่เหตุผลให้ client อัปโหลดทุก stroke
 
 นโยบาย retention ระยะยาวของ submission ยังต้องอยู่ภายใต้นโยบายข้อมูลนักเรียนทั้งระบบ เอกสารนี้ไม่กำหนดอายุใหม่แทน policy กลางที่ยังต้องสรุป
@@ -187,7 +197,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 7. Scheduled cleanup, retention และ security hardening
 8. Authenticated browser QA, accessibility, performance และ rollout
 
-สถานะปัจจุบัน: เฟส 0–6 เสร็จในโค้ด แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข, กระดาษทด local-only, artifact ที่แนบ/แก้/ส่ง/อ่านในหน้าผลลัพธ์ และโหมดสอนพร้อมกระดาน 5 slots ทำงานแล้ว เฟส 7–8 ยังไม่เริ่ม จึงยังไม่มี scheduled orphan cleanup และ production rollout audit รอบสุดท้าย
+สถานะปัจจุบัน: เฟส 0–7 เสร็จในโค้ด แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข, กระดาษทด local-only, artifact ที่แนบ/แก้/ส่ง/อ่านในหน้าผลลัพธ์, โหมดสอนพร้อมกระดาน 5 slots และ scheduled orphan cleanup แบบ fail-closed ทำงานแล้ว เฟส 8 ยังไม่เริ่ม จึงยังเหลือ authenticated QA/accessibility/performance และ production rollout audit รอบสุดท้าย; cron จะเริ่มทำงานจริงหลัง deploy และตั้ง `CRON_SECRET`
 
 แต่ละเฟสต้องเป็นหน่วย commit ที่ตรวจรับได้ Migration ต้องอยู่ใน commit เดียวกับโค้ดที่พึ่งพา และห้ามเปิด UI production ก่อน authorization/persistence ของเฟสนั้นพร้อม
 

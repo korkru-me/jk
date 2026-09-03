@@ -118,9 +118,9 @@
 4. เมื่อผู้ใช้สั่งแนบ browser จึง render WebP preview + versioned scene แล้วขอ signed upload token ที่ผูกกับ user/submission/answer/upload id จาก Server Action; action ตรวจไฟล์จริงซ้ำก่อนบันทึก metadata การอัปโหลดไฟล์อย่างเดียวไม่ถือว่าแนบจน database reference สำเร็จ
 5. หน้าตรวจขอ signed URL หลังตรวจ assignment authority แล้ว ข้อมูลเก่าใน `submission_answers.work_images` ยังอ่านด้วยเส้นทางเดิมจนกว่าจะมี migration plan แยก
 6. โหมดสอนเป็น route ฝั่งครูแยกจาก teacher preview, ไม่สร้าง submission และโหลด Excalidraw ด้วย dynamic import; กระดานผูก assignment/question/creator/slot ผู้สร้างมี 5 slots เปิด scene เดิมกลับมาแก้ได้ ครูร่วมอ่านของผู้อื่นแบบ read-only และไม่มี realtime broadcast
-7. Scheduled orphan cleanup อ่าน reference จากทั้ง student artifacts และ teaching boards เว้นไฟล์ใหม่ตาม grace period และยกเลิกการลบหาก scan ไม่ครบ
+7. Scheduled orphan cleanup เป็น Node.js Route Handler ที่ Vercel Cron เรียกด้วย Bearer `CRON_SECRET`; service role enumerate เฉพาะ `students/`/`teachers/` ใน private bucket เว้นไฟล์ใหม่ 7 วัน ตรวจ exact candidate path จากทั้ง student artifacts และ teaching boards ซ้ำเป็น batch ก่อนลบ และ fail closed เมื่อ listing/reference scan ไม่ครบหรือเกินเพดาน 100,000 objects/folders
 
-Excalidraw, mathjs และ Supabase browser client ห้ามเข้า initial dependency path ของหน้าทำโจทย์ เครื่องคิดเลขและพื้นที่เขียนต้องโหลดหลัง user gesture และทุกเฟสวัด client-reference chunk union ของ route `/assignments/[id]/take` — หลังเฟส 6 route ยังมี 17 initial chunks รวม 786,060 bytes raw / 239,718 bytes gzip และ scan ไม่พบ Excalidraw/mathjs/Supabase browser client ใน union นี้
+Excalidraw, mathjs และ Supabase browser client ห้ามเข้า initial dependency path ของหน้าทำโจทย์ เครื่องคิดเลขและพื้นที่เขียนต้องโหลดหลัง user gesture และทุกเฟสวัด client-reference chunk union ของ route `/assignments/[id]/take` — หลังเฟส 7 route ยังมี 17 initial chunks รวม 786,060 bytes raw / 239,718 bytes gzip และ scan ไม่พบ Excalidraw/mathjs/Supabase browser client/cleanup server code ใน union นี้
 
 ## Compatibility hotspots
 

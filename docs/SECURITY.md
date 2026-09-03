@@ -117,7 +117,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - หลังส่งต้องปฏิเสธการแก้ scene, preview และ metadata แม้ client ยังถือ URL หรือ local copy อยู่
 - `student_work_artifacts` แก้/ลบได้เฉพาะเจ้าของที่ submission ยัง `in_progress`; `teaching_boards` อ่านได้เฉพาะครูที่มีสิทธิ์ใน assignment และแก้/ลบได้เฉพาะผู้สร้าง เพดาน 5 slots บังคับด้วย constraint เพื่อกัน concurrent request
 - การ finalize งานที่บังคับแนบวิธีทำตรวจ exact answer/part ฝั่ง server และยอมรับเฉพาะ artifact reference หรือ `work_images` รุ่นเก่าที่มีอยู่จริงใน answer; หน้าผลลัพธ์ sign เฉพาะ preview path ที่ได้จากคำตอบซึ่งผ่าน result-visibility/RLS แล้วและไม่เปิด scene
-- การแทนที่หรือลบต้องเปลี่ยน database reference ก่อนแล้วจึงลบไฟล์แบบ best effort; scheduled orphan cleanup เว้น grace period อย่างน้อย 7 วัน ตรวจ reference ซ้ำ และหยุดทั้งรอบเมื่อ scan ไม่ครบ
+- การแทนที่หรือลบต้องเปลี่ยน database reference ก่อนแล้วจึงลบไฟล์แบบ best effort; scheduled orphan cleanup เว้น grace period 7 วัน ลบเฉพาะ path ที่ตรงกับ builder ใต้ `students/`/`teachers/` หลังตรวจ exact path จากทั้งสอง reference tables ซ้ำ และหยุดก่อนเริ่มลบเมื่อ listing/reference scan ไม่ครบหรือเกินเพดาน
+- Cleanup route ใช้ Bearer `CRON_SECRET` อย่างน้อย 32 ตัวอักษรและเปรียบเทียบแบบ constant-time ก่อนสร้าง admin client; response/log มีเฉพาะ aggregate/error code ไม่ส่ง path, URL หรือข้อมูลนักเรียน และ deployment ที่ไม่มี secret จะ fail closed ด้วย 503
 - ห้าม log scene, คำตอบเต็ม, signed URL หรือ path ที่เปิดเผยข้อมูลนักเรียน รายละเอียด threat model และ lifecycle อยู่ใน `docs/STUDENT_MATH_TOOLS.md`
 
 ## Logging และ errors
