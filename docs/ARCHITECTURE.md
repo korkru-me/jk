@@ -1,6 +1,6 @@
 # Architecture
 
-อัปเดตล่าสุด: 30 สิงหาคม 2026
+อัปเดตล่าสุด: 3 กันยายน 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
 
@@ -107,6 +107,20 @@
 9. `/research/[id]/results` ตรวจ manage permission แล้วคำนวณผล request-time ด้วย pure module `lib/education-research-statistics.ts`; ไม่มี persisted result ที่อาจเก่ากว่า score source of truth และแท็บข้อมูลรายคนทำ filtering/pagination ฝั่ง server ก่อนส่งเฉพาะหน้าปัจจุบันไป browser
 9. แม่แบบ Excel สร้างผ่าน route handler แบบ `POST` หลังตรวจ session/สิทธิ์ และผูกแถวกับ template row token ที่ตรวจกลับในฐานข้อมูล การอัปโหลดอ่านไฟล์ในหน่วยความจำเท่านั้น แล้วเก็บเฉพาะ normalized preview/audit rows ไม่เก็บ binary ต้นฉบับ
 10. การยืนยัน import ล็อก batch, ตรวจค่าคะแนนปัจจุบันเทียบกับ preview ทุกแถว แล้วเขียนทั้งชุดใน transaction เดียว; batch ที่ยืนยันแล้ว retry ได้โดยไม่เขียนซ้ำ
+
+## เครื่องมือคณิตศาสตร์และพื้นที่เขียน — แบบที่อนุมัติ ยังไม่ใช่ runtime ปัจจุบัน
+
+สเปกที่อนุมัติอยู่ใน `docs/STUDENT_MATH_TOOLS.md` และแบ่ง runtime boundary ไว้ดังนี้:
+
+1. แป้นคณิตศาสตร์เป็น client UI ขนาดเล็ก แต่ normalization และการตัดสินคะแนนใช้ allowlist evaluator ฝั่ง server โหมด DEG/RAD ถูกเก็บกับช่องคำตอบเพื่อให้ instant check กับ final grading อ่านความหมายเดียวกัน
+2. เครื่องคิดเลขเป็น dynamic client chunk ใช้ evaluator ที่ปลอดภัย มี history เฉพาะ attempt และไม่บันทึกประวัติบน server
+3. กระดาษทดที่ยังไม่แนบอยู่ใน IndexedDB แยกตาม user/submission/answer/part ไม่มี Server Action ต่อ stroke และล้างตาม attempt lifecycle/TTL
+4. เมื่อผู้ใช้สั่งแนบ browser จึง render WebP preview + versioned scene แล้วอัปโหลดเข้า private Storage; Server Action ตรวจ exact in-progress answer และบันทึก metadata การอัปโหลดไฟล์อย่างเดียวไม่ถือว่าแนบจน database reference สำเร็จ
+5. หน้าตรวจขอ signed URL หลังตรวจ assignment authority แล้ว ข้อมูลเก่าใน `submission_answers.work_images` ยังอ่านด้วยเส้นทางเดิมจนกว่าจะมี migration plan แยก
+6. โหมดสอนมี persistence แยกจาก teacher preview ปัจจุบัน กระดานผูก assignment/question/creator/slot และไม่ broadcast แบบ realtime ในรุ่นแรก
+7. Scheduled orphan cleanup อ่าน reference จากทั้ง student artifacts และ teaching boards เว้นไฟล์ใหม่ตาม grace period และยกเลิกการลบหาก scan ไม่ครบ
+
+Excalidraw, mathjs และ Supabase browser client ห้ามเข้า initial dependency path ของหน้าทำโจทย์ เครื่องคิดเลขและพื้นที่เขียนต้องโหลดหลัง user gesture และทุกเฟสวัด client-reference chunk union ของ route `/assignments/[id]/take`
 
 ## Compatibility hotspots
 

@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 1 กันยายน 2026
+อัปเดตล่าสุด: 3 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -120,6 +120,20 @@ Invariant สำคัญ:
 - max score ตาม assignment ณ เวลาสร้าง attempt
 
 ห้ามคำนวณ random values ใหม่เมื่อ refresh หรือ grade เพราะจะทำให้คำถามและเฉลยเปลี่ยนหลังนักเรียนตอบ
+
+## เครื่องมือคณิตศาสตร์และ artifact — โมเดลที่อนุมัติ ยังไม่ใช่ schema ปัจจุบัน
+
+เฟส 1 ตาม `docs/STUDENT_MATH_TOOLS.md` ต้องเพิ่มข้อมูลโดยไม่เปลี่ยน shape เดิมของ `student_answer` และ `work_images`:
+
+- Assignment flags แยกการอนุญาตเครื่องคิดเลขกับกระดาษทด งานเก่าอ่านเป็นปิด แบบฝึกหัดออนไลน์ใหม่เริ่มเปิด และข้อสอบออนไลน์ใหม่เริ่มปิดจาก create action
+- Metadata มุม `DEG`/`RAD` ผูกกับ logical numeric input หรือข้อย่อย ค่าไม่มี metadata อ่านเป็น `DEG`
+- Student work artifact อ้าง exact `submission_answer`, part/blank identity, `org_id`, student owner, preview path, scene path, format version และ timestamps; logical slot หนึ่งตำแหน่งมี artifact ปัจจุบันได้หนึ่งรายการ
+- Teaching board อ้าง assignment, question, creator, slot 1–5, `org_id`, preview path, scene path, format version และ timestamps; unique constraint และ check constraint เป็นผู้บังคับเพดานจริง
+- Path ใหม่อยู่ใน private Storage และ database เก็บ path ไม่เก็บ signed URL ซึ่งมีอายุสั้น
+
+Local-only scratch scene ไม่ใช่ row ในฐานข้อมูล อยู่ใน IndexedDB และห้ามถูกนับเป็น submission attachment การอัปโหลด preview/scene ยังไม่สร้าง reference จน Server Action ที่ตรวจสิทธิ์บันทึก metadata สำเร็จ
+
+หลัง submit ห้ามแก้ artifact ของนักเรียน Attempt ใหม่ไม่แก้หรือย้ายหลักฐานจาก attempt เก่า ส่วน `submission_answers.work_images` รุ่นเก่ายังคงเป็น source ที่อ่านได้เพื่อ backward compatibility
 
 ## คะแนน
 
