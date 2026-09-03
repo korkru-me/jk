@@ -1,5 +1,6 @@
-import { evaluate, parse, type MathNode } from 'mathjs'
-import type { Variable, LogicRule, PythagoreanGroup } from '@/lib/types'
+import { evaluate, parse } from 'mathjs'
+import type { MathInputMode, Variable, LogicRule, PythagoreanGroup } from '@/lib/types'
+import { evaluateStudentExpression } from './student-expression'
 
 // ─── Pythagorean triple data ──────────────────────────────────────────────────
 // Moved to ./pythagorean-families so a caller that only wants the tables does
@@ -302,78 +303,11 @@ export function evaluateFormula(
 }
 
 // ─── evaluateStudentAnswer ──────────────────────────────────────────────────────
-// Lets students answer numeric questions like they would on a calculator —
-// a plain number, arithmetic ("9+1"), or scientific-calculator functions
-// ("sin(30)", "sqrt(100)") — instead of typing the computed value itself.
-//
-// `evaluate`/parsed-Node.evaluate() have no sandboxing of their own (mathjs's
-// expression language can reach well past arithmetic — member access,
-// assignments, its whole built-in function library), which is fine for
-// evaluateFormula above since that only ever runs a teacher-authored
-// formula. Student input is a different trust level, so instead of trying to
-// blocklist dangerous syntax we parse to an AST and allowlist it structurally:
-// only constants, the standard operators, parentheses, and a fixed calculator
-// function/constant list survive — everything else (bare variables, member
-// access, assignment, array/object literals, arbitrary function names) is
-// rejected before evaluation ever runs.
-
-const ALLOWED_FUNCTIONS = new Set([
-  'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
-  'sinh', 'cosh', 'tanh',
-  'sqrt', 'cbrt', 'log', 'log10', 'log2', 'exp',
-  'abs', 'pow', 'ceil', 'floor', 'round', 'sign',
-])
-const ALLOWED_CONSTANTS = new Set(['pi', 'e', 'tau'])
-const ALLOWED_NODE_TYPES = new Set(['OperatorNode', 'ParenthesisNode', 'ConstantNode', 'FunctionNode', 'SymbolNode'])
-
-// Scientific calculators (and how trig is taught through Thai secondary
-// school) default to degrees, not the radians mathjs's sin/cos/tan assume —
-// so "sin(30)" should read as sin(30°) = 0.5, not sin(30 rad) ≈ -0.99.
-// Overriding them in the evaluation scope only changes how *this* evaluator
-// interprets a bare numeric argument; it doesn't touch evaluateFormula.
-const DEGREE_TRIG_SCOPE = {
-  sin: (x: number) => Math.sin(x * Math.PI / 180),
-  cos: (x: number) => Math.cos(x * Math.PI / 180),
-  tan: (x: number) => Math.tan(x * Math.PI / 180),
-  asin: (x: number) => Math.asin(x) * 180 / Math.PI,
-  acos: (x: number) => Math.acos(x) * 180 / Math.PI,
-  atan: (x: number) => Math.atan(x) * 180 / Math.PI,
-}
-
-// √100 / √(9+16) -> sqrt(100) / sqrt(9+16), so the unicode symbol works too
-// (e.g. pasted from the question text, which offers it as a special
-// character) without students needing to know the "sqrt(...)" spelling.
-function normalizeSqrtSymbol(text: string): string {
-  return text
-    .replace(/√\s*\(/g, 'sqrt(')
-    .replace(/√\s*(\d+(?:\.\d+)?)/g, 'sqrt($1)')
-}
-
-function isAllowedExpressionNode(root: MathNode): boolean {
-  let safe = true
-  root.traverse((node: MathNode, _path: string | null, parent: MathNode | null) => {
-    if (!ALLOWED_NODE_TYPES.has(node.type)) { safe = false; return }
-    if (node.type === 'SymbolNode') {
-      const name = (node as unknown as { name: string }).name
-      const isFunctionName = parent?.type === 'FunctionNode'
-        && (parent as unknown as { fn: MathNode }).fn === node
-      if (isFunctionName ? !ALLOWED_FUNCTIONS.has(name) : !ALLOWED_CONSTANTS.has(name)) safe = false
-    }
-  })
-  return safe
-}
-
-export function evaluateStudentAnswer(text: string): number | null {
-  const normalized = normalizeSqrtSymbol(text.trim())
-  if (!normalized) return null
-  try {
-    const node = parse(normalized)
-    if (!isAllowedExpressionNode(node)) return null
-    const result = node.evaluate(DEGREE_TRIG_SCOPE)
-    return typeof result === 'number' && isFinite(result) ? result : null
-  } catch {
-    return null
-  }
+// Student input has a different trust boundary from teacher-authored formulas.
+// Keep it on the small, purpose-built parser so neither a general expression
+// runtime nor mathjs's large client bundle is needed by the answer keypad.
+export function evaluateStudentAnswer(text: string, mode: MathInputMode = 'deg'): number | null {
+  return evaluateStudentExpression(text, mode)
 }
 
 // ─── evaluatePartsChained ─────────────────────────────────────────────────────

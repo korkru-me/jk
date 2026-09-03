@@ -1,4 +1,5 @@
 import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
+import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
 import { getBlankType, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import type { Assignment, AnswerPart, Question, Variable, LogicRule } from '@/lib/types'
 
@@ -301,6 +302,7 @@ export type PreviousAttemptAnswer = {
   order_index: number
   option_order: number[] | null
   work_images: (string | null)[] | null
+  math_input_modes?: Record<string, import('@/lib/types').MathInputMode>
   score_edited_by: string | null
   score_edited_at: string | null
 }
@@ -391,6 +393,7 @@ export type GradableAnswer = {
   correct_answer: string
   student_answer: string | null
   max_score: number
+  math_input_modes?: Record<string, import('@/lib/types').MathInputMode> | null
   questions: {
     question_type: string
     answer_tolerance: number
@@ -594,12 +597,16 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
     let studentAnswers: string[] = []
     try { studentAnswers = JSON.parse(studentAns || '[]') } catch { studentAnswers = [] }
 
-    const parts: Array<{ tolerance: number }> = a.questions?.answer_parts ?? []
+    const parts: Array<{ id?: string; tolerance: number }> = a.questions?.answer_parts ?? []
     let correctCount = 0
     for (let i = 0; i < correctAnswers.length; i++) {
       // Students may answer with a plain number or a simple arithmetic
       // expression (e.g. "9+1") — see evaluateStudentAnswer.
-      const sv = evaluateStudentAnswer(studentAnswers[i] ?? '') ?? NaN
+      const modeKey = mathInputPartKey(parts[i]?.id, i, correctAnswers.length)
+      const sv = evaluateStudentAnswer(
+        studentAnswers[i] ?? '',
+        readMathInputMode(a.math_input_modes, modeKey),
+      ) ?? NaN
       const cv = parseFloat(correctAnswers[i] ?? '')
       const tol = parts[i]?.tolerance ?? a.questions?.answer_tolerance ?? 0.1
       if (!isNaN(sv) && !isNaN(cv) && gradeValue(sv, cv, tol)) correctCount++
@@ -610,7 +617,10 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
 
   // Single-part (backwards compat) — students may answer with a plain
   // number or a simple arithmetic expression (e.g. "9+1").
-  const studentVal = evaluateStudentAnswer(studentAns) ?? NaN
+  const studentVal = evaluateStudentAnswer(
+    studentAns,
+    readMathInputMode(a.math_input_modes, 'main'),
+  ) ?? NaN
   const correctVal = parseFloat(correctAns)
   let isCorrect = false
   let score = 0

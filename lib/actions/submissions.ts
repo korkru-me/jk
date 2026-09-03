@@ -16,6 +16,7 @@ import { buildAnswerFeedback, type FeedbackQuestion } from '@/lib/answer-feedbac
 import type { Question } from '@/lib/types'
 import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
+import { parseMathInputModes } from '@/lib/math/input-mode'
 
 export async function startSubmission(
   assignmentId: string,
@@ -191,7 +192,7 @@ export async function startSubmission(
       .select(`
         question_id, random_values, correct_answer, student_answer, is_correct,
         score, max_score, teacher_feedback, order_index, option_order,
-        work_images, score_edited_by, score_edited_at
+        work_images, math_input_modes, score_edited_by, score_edited_at
       `)
       .eq('submission_id', retryFromSubmissionId)
       .order('order_index')
@@ -323,11 +324,18 @@ async function getWritableStudentAnswer(
   return { answer, submission, assignment }
 }
 
-export async function saveAnswer(submissionAnswerId: string, studentAnswer: string) {
+export async function saveAnswer(
+  submissionAnswerId: string,
+  studentAnswer: string,
+  mathInputModes?: unknown,
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (typeof studentAnswer !== 'string') return { error: 'รูปแบบคำตอบไม่ถูกต้อง' }
   if (studentAnswer.length > 500_000) return { error: 'คำตอบมีขนาดใหญ่เกินไป' }
+  const parsedModes = mathInputModes === undefined ? undefined : parseMathInputModes(mathInputModes)
+  if (mathInputModes !== undefined && !parsedModes) return { error: 'โหมดมุมไม่ถูกต้อง' }
   const admin = createAdminClient()
 
   const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
@@ -335,7 +343,10 @@ export async function saveAnswer(submissionAnswerId: string, studentAnswer: stri
 
   const { error } = await admin
     .from('submission_answers')
-    .update({ student_answer: studentAnswer })
+    .update({
+      student_answer: studentAnswer,
+      ...(parsedModes ? { math_input_modes: parsedModes } : {}),
+    })
     .eq('id', submissionAnswerId)
     .eq('submission_id', writable.submission.id)
 
@@ -429,7 +440,7 @@ export async function checkAnswer(submissionAnswerId: string) {
   const { data: row } = await admin
     .from('submission_answers')
     .select(`
-      id, correct_answer, student_answer, max_score, option_order,
+      id, correct_answer, student_answer, math_input_modes, max_score, option_order,
       questions(
         question_type, answer_unit, answer_parts, answer_tolerance, extra_data,
         mcq_options, solution_text, solution_image_urls
@@ -457,6 +468,7 @@ export async function checkAnswer(submissionAnswerId: string) {
     id: row.id,
     correct_answer: row.correct_answer ?? '',
     student_answer: row.student_answer,
+    math_input_modes: row.math_input_modes,
     max_score: maxScore,
     questions: {
       question_type: question.question_type,
@@ -500,6 +512,7 @@ export async function checkAnswer(submissionAnswerId: string) {
     feedback: buildAnswerFeedback({
       correct_answer: row.correct_answer ?? '',
       student_answer: row.student_answer,
+      math_input_modes: row.math_input_modes,
       question: { ...question, mcq_options: displayOptions },
       isCorrect: graded.is_correct,
       score: graded.score,

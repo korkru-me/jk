@@ -156,6 +156,7 @@ describe('evaluateStudentAnswer', () => {
 
   it('reads trig in degrees, the way a school calculator does', () => {
     expect(evaluateStudentAnswer('sin(30)')).toBeCloseTo(0.5, 10)
+    expect(evaluateStudentAnswer('sin(pi/6)', 'rad')).toBeCloseTo(0.5, 10)
   })
 
   it('accepts the √ symbol the question text offers', () => {

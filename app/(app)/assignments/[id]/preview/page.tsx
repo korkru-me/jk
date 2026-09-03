@@ -100,6 +100,7 @@ export default async function AssignmentPreviewPage({
       correct_answer: s.correct_answer,
       student_answer: null,
       work_images: [],
+      math_input_modes: {},
       // Only needed so the preview can grade itself client-side after
       // submit (see ExamClient's previewMode) — the real exam-taking route
       // never sends this since grading there happens server-side.

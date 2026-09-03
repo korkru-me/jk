@@ -21,6 +21,7 @@ function check(over: {
   answerUnit?: string | null
   solutionText?: string | null
   reveal?: boolean
+  mathInputModes?: Record<string, 'deg' | 'rad'>
 }) {
   const maxScore = over.maxScore ?? 1
   const question: FeedbackQuestion = {
@@ -37,6 +38,7 @@ function check(over: {
     id: 'a1',
     correct_answer: over.correct,
     student_answer: over.student,
+    math_input_modes: over.mathInputModes,
     max_score: maxScore,
     questions: {
       question_type: question.question_type,
@@ -48,6 +50,7 @@ function check(over: {
   const input: FeedbackInput = {
     correct_answer: over.correct,
     student_answer: over.student,
+    math_input_modes: over.mathInputModes,
     question,
     isCorrect: graded.is_correct,
     score: graded.score,
@@ -62,6 +65,16 @@ describe('buildAnswerFeedback — verdict', () => {
     const f = check({ correct: '10', student: '10' })
     expect(f.verdict).toBe('correct')
     expect(f.score).toBe(1)
+  })
+
+  it('uses the saved angle mode for the row status as well as the score', () => {
+    const rad = check({
+      correct: '0.5',
+      student: 'sin(pi/6)',
+      mathInputModes: { main: 'rad' },
+    })
+    expect(rad.verdict).toBe('correct')
+    expect(rad.rows[0].status).toBe('correct')
   })
 
   it('calls a ข้อ with some marks partial rather than a flat ผิด', () => {

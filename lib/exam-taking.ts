@@ -73,7 +73,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   const { data: answerRows } = await admin
     .from('submission_answers')
     .select(`
-      id, question_id, random_values, student_answer, work_images, option_order,
+      id, question_id, random_values, student_answer, work_images, math_input_modes, option_order,
       questions(
         title, question_text, question_type, answer_unit, mcq_options,
         variables, answer_parts, extra_data, image_urls

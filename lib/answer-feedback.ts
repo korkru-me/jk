@@ -1,5 +1,6 @@
 import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
 import { evaluateStudentAnswer } from '@/lib/math/evaluator'
+import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
 import { gradeValue } from '@/lib/assignment-attempt'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import type { AnswerPart, FillBlankItem } from '@/lib/types'
@@ -89,6 +90,7 @@ export interface FeedbackQuestion {
 export interface FeedbackInput {
   correct_answer: string
   student_answer: string | null
+  math_input_modes?: Record<string, import('@/lib/types').MathInputMode> | null
   question: FeedbackQuestion
   /** gradeAnswer's verdict for this same row — never recomputed here, so the
    *  panel can never disagree with the score that gets banked. */
@@ -431,7 +433,11 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
       ...base,
       rows: correctList.map((correct, i) => {
         const student = studentList[i] ?? ''
-        const studentValue = evaluateStudentAnswer(student) ?? NaN
+        const modeKey = mathInputPartKey(parts[i]?.id, i, correctList.length)
+        const studentValue = evaluateStudentAnswer(
+          student,
+          readMathInputMode(input.math_input_modes, modeKey),
+        ) ?? NaN
         const correctValue = parseFloat(correct)
         const tolerance = parts[i]?.tolerance ?? question.answer_tolerance ?? 0.1
         const ok = !isNaN(studentValue)
@@ -449,7 +455,10 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
   }
 
   // ─── คำตอบเดียว (ตัวเลขหรือข้อความ) ───────────────────────────────────────
-  const studentValue = evaluateStudentAnswer(studentAns) ?? NaN
+  const studentValue = evaluateStudentAnswer(
+    studentAns,
+    readMathInputMode(input.math_input_modes, 'main'),
+  ) ?? NaN
   const correctValue = parseFloat(correctAns)
   const numeric = !isNaN(studentValue) && !isNaN(correctValue)
   const ok = numeric

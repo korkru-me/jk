@@ -14,11 +14,13 @@ function answer(over: {
   extraData?: unknown
   answerParts?: AnswerPart[] | null
   tolerance?: number
+  mathInputModes?: Record<string, 'deg' | 'rad'>
 }): GradableAnswer {
   return {
     id: 'a1',
     correct_answer: over.correct,
     student_answer: over.student,
+    math_input_modes: over.mathInputModes,
     max_score: over.maxScore ?? 1,
     questions: {
       question_type: over.questionType ?? 'written',
@@ -89,6 +91,24 @@ describe('gradeAnswer — numeric written questions', () => {
     expect(gradeAnswer(answer({ correct: '100', student: '111', tolerance: -10 })).is_correct).toBe(false)
   })
 
+  it('grades the same trig text from its saved DEG or RAD mode', () => {
+    expect(gradeAnswer(answer({
+      correct: '0.5',
+      student: 'sin(30)',
+      mathInputModes: { main: 'deg' },
+    })).is_correct).toBe(true)
+    expect(gradeAnswer(answer({
+      correct: '0.5',
+      student: 'sin(pi/6)',
+      mathInputModes: { main: 'rad' },
+    })).is_correct).toBe(true)
+    expect(gradeAnswer(answer({
+      correct: '0.5',
+      student: 'sin(30)',
+      mathInputModes: { main: 'rad' },
+    })).is_correct).toBe(false)
+  })
+
   it('accepts arithmetic the student typed instead of the computed number', () => {
     expect(gradeAnswer(answer({ correct: '10', student: '9+1' })).is_correct).toBe(true)
   })
@@ -108,6 +128,21 @@ describe('gradeAnswer — numeric written questions', () => {
     }))
     expect(result.score).toBe(1)
     expect(result.is_correct).toBe(false)
+  })
+
+  it('uses the saved mode of each numeric part independently', () => {
+    const parts = [
+      { id: 'degrees', tolerance: 0.0001 },
+      { id: 'radians', tolerance: 0.0001 },
+    ] as AnswerPart[]
+    const result = gradeAnswer(answer({
+      correct: JSON.stringify(['0.5', '0.5']),
+      student: JSON.stringify(['sin(30)', 'sin(pi/6)']),
+      maxScore: 2,
+      answerParts: parts,
+      mathInputModes: { 'part:degrees': 'deg', 'part:radians': 'rad' },
+    }))
+    expect(result).toMatchObject({ is_correct: true, score: 2 })
   })
 })
 

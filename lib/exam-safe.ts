@@ -1,6 +1,7 @@
 import type {
   CompositePartType,
   FileUploadConfig,
+  MathInputMode,
   OrderingItem,
   PythagoreanGroup,
   TrueFalseAnswerMode,
@@ -8,6 +9,7 @@ import type {
   TrueFalseSelectTarget,
 } from '@/lib/types'
 import type { PartLabelStyle } from '@/lib/part-labels'
+import { sanitizeMathInputModes } from '@/lib/math/input-mode'
 
 export interface SafeTrueFalseStatement {
   id: string
@@ -85,6 +87,7 @@ export interface SafeExamAnswer {
   random_values: Record<string, number>
   student_answer: string | null
   work_images: (string | null)[] | null
+  math_input_modes: Record<string, MathInputMode>
   questions: {
     title: string
     question_text: string
@@ -123,6 +126,7 @@ interface RawExamAnswer {
   random_values: Record<string, number> | null
   student_answer: string | null
   work_images: (string | null)[] | null
+  math_input_modes?: unknown
   option_order: number[] | null
   questions: RawQuestionForExam | RawQuestionForExam[] | null
 }
@@ -358,6 +362,7 @@ export function toSafeExamAnswer(row: RawExamAnswer, random: () => number = Math
     random_values: row.random_values ?? {},
     student_answer: row.student_answer,
     work_images: row.work_images,
+    math_input_modes: sanitizeMathInputModes(row.math_input_modes),
     questions: {
       title: question.title,
       question_text: question.question_text,

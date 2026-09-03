@@ -123,10 +123,10 @@ Invariant สำคัญ:
 
 ## เครื่องมือคณิตศาสตร์และ artifact
 
-เฟส 1 ตาม `docs/STUDENT_MATH_TOOLS.md` เพิ่มข้อมูลโดยไม่เปลี่ยน shape เดิมของ `student_answer` และ `work_images`:
+เฟส 1–2 ตาม `docs/STUDENT_MATH_TOOLS.md` เพิ่มข้อมูลโดยไม่เปลี่ยน shape เดิมของ `student_answer` และ `work_images`:
 
 - Assignment flags แยกการอนุญาตเครื่องคิดเลขกับกระดาษทด งานเก่าอ่านเป็นปิด แบบฝึกหัดออนไลน์ใหม่เริ่มเปิด และข้อสอบออนไลน์ใหม่เริ่มปิดจาก create action
-- Metadata มุม `DEG`/`RAD` อยู่ใน `submission_answers.math_input_modes` ผูกกับ logical numeric input หรือข้อย่อย ค่า object ว่าง/ไม่มี key อ่านเป็น `DEG`
+- Metadata มุม `DEG`/`RAD` อยู่ใน `submission_answers.math_input_modes` ผูกกับ logical numeric input หรือข้อย่อย ค่า object ว่าง/ไม่มี key อ่านเป็น `DEG`; autosave เขียน object นี้พร้อม `student_answer` ใน update เดียวเพื่อไม่ให้สมการกับหน่วยมุมเหลื่อมกัน
 - `student_work_artifacts` อ้าง exact `submission_answer`, part identity, `org_id`, student owner, source type, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(submission_answer_id, part_key)` ทำให้ logical slot หนึ่งตำแหน่งมี artifact ปัจจุบันได้หนึ่งรายการ
 - `teaching_boards` อ้าง assignment, question, creator, slot 1–5, `org_id`, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(assignment_id, question_id, created_by, slot)` กับ check `slot BETWEEN 1 AND 5` เป็นผู้บังคับเพดานจริง
 - Path ใหม่อยู่ใน private Storage และ database เก็บ path ไม่เก็บ signed URL ซึ่งมีอายุสั้น

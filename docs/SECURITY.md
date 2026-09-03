@@ -108,6 +108,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 ### พื้นที่เขียนและวิธีทำที่แนบ
 
+- ข้อความคณิตศาสตร์จากนักเรียนต้องผ่าน bounded allowlist parser เท่านั้น: จำกัดความยาว/token/depth/operation, ปฏิเสธ identifier และ syntax ที่ไม่รู้จัก, ไม่ใช้ `eval` หรือ `Function`, และไม่ส่ง mathjs เข้า initial client path โหมด DEG/RAD ที่ใช้ตรวจต้องมาจาก metadata ที่ validate แล้วและบันทึกพร้อมคำตอบ
 - กระดาษทดที่ยังไม่แนบต้องอยู่ใน IndexedDB ของอุปกรณ์เท่านั้น ไม่ส่ง scene ต่อ stroke และไม่ถือเป็น education record บน server
 - Local key ต้องแยก user/submission/answer/part และถูกล้างเมื่อส่งสำเร็จ attempt ใช้ต่อไม่ได้ หรือเกิน TTL; local data เป็น recovery convenience ไม่ใช่ trusted submission state
 - Preview และ scene ที่แนบใหม่อยู่ใน private bucket `math-work-artifacts`; browser ขอ path-bound signed upload token และ signed read URL อายุ 5 นาทีผ่าน Server Action หลังตรวจ exact submission/assignment authority ไม่มี client policy สำหรับ list/read/write/delete ทั้ง bucket

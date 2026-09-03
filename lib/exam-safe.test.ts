@@ -66,6 +66,15 @@ describe('toSafeExamAnswer', () => {
     expect(json).not.toContain('max_score')
   })
 
+  it('passes only valid DEG/RAD metadata to the in-progress client', () => {
+    const row = rawAnswer('written') as any
+    row.math_input_modes = { main: 'rad', 'part:part-1': 'deg' }
+    expect(toSafeExamAnswer(row)?.math_input_modes).toEqual({ main: 'rad', 'part:part-1': 'deg' })
+
+    row.math_input_modes = { main: 'not-a-mode' }
+    expect(toSafeExamAnswer(row)?.math_input_modes).toEqual({})
+  })
+
   it('strips correct flags from MCQ and splits matching pairs into separate columns', () => {
     const mcq = serializedSafe('mcq', {
       mcq_options: [

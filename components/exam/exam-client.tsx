@@ -34,7 +34,7 @@ import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
+import type { AnswerPart, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
 import type {
   SafeAnswerPart,
   SafeCompositeConfig,
@@ -49,6 +49,8 @@ import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
 import { ExamWatermark } from './exam-watermark'
+import { MathAnswerField } from './math-answer-field'
+import { mathInputPartKey, readMathInputMode, type MathInputModes } from '@/lib/math/input-mode'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +150,10 @@ function initWorkImages(answers: AnswerRow[]): Record<string, (string | null)[]>
   return Object.fromEntries(answers.map(a => [a.id, a.work_images ?? []]))
 }
 
+function initMathInputModes(answers: AnswerRow[]): Record<string, MathInputModes> {
+  return Object.fromEntries(answers.map(a => [a.id, a.math_input_modes ?? {}]))
+}
+
 /**
  * How many photos of working this question needs before it can be submitted.
  *
@@ -165,12 +171,13 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
 export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
-    localAnswers, localAnswersRef,
-    setAnswer, flushQueuedAnswers, retryPending, clearSavedAnswers,
+    localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
+    setAnswer, setMathInputMode, flushQueuedAnswers, retryPending, clearSavedAnswers,
     saving, pendingCount,
   } = useAnswerAutosave({
     submissionId,
     initialAnswers: () => initLocalAnswers(answers),
+    initialMathInputModes: () => initMathInputModes(answers),
     previewMode,
   })
   const [workImages, setWorkImages] = useState<Record<string, (string | null)[]>>(
@@ -203,6 +210,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [focusMode, setFocusMode] = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitCountdown, setSubmitCountdown] = useState(0)
+  const [activeMathField, setActiveMathField] = useState<string | null>(null)
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
@@ -302,6 +310,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
           id: answer.id,
           correct_answer: answer.correct_answer ?? '',
           student_answer: localAnswersRef.current[answer.id] ?? null,
+          math_input_modes: localMathInputModesRef.current[answer.id] ?? {},
           max_score: answer.max_score ?? 0,
           questions: {
             question_type: answer.questions.question_type,
@@ -314,6 +323,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         const feedback = buildAnswerFeedback({
           correct_answer: gradable.correct_answer,
           student_answer: gradable.student_answer,
+          math_input_modes: gradable.math_input_modes,
           question: {
             question_type: answer.questions.question_type,
             answer_unit: answer.questions.answer_unit,
@@ -355,7 +365,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     } finally {
       setCheckingId(null)
     }
-  }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, previewMode])
+  }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, localMathInputModesRef, previewMode])
 
   const handlePartAnswerChange = useCallback((
     answerId: string, partIndex: number, value: string, totalParts: number, currentRaw: string,
@@ -366,6 +376,15 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
     arr[partIndex] = value
     handleAnswerChange(answerId, JSON.stringify(arr))
   }, [handleAnswerChange])
+
+  const handleMathInputModeChange = useCallback((
+    answerId: string,
+    partKey: string,
+    mode: MathInputMode,
+  ) => {
+    clearCheck(answerId)
+    setMathInputMode(answerId, partKey, mode)
+  }, [clearCheck, setMathInputMode])
 
   const handleWorkImageChange = useCallback(async (answerId: string, partIndex: number, url: string | null) => {
     setWorkImages(prev => {
@@ -423,6 +442,7 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
         id: a.id,
         correct_answer: a.correct_answer ?? '',
         student_answer: localAnswersRef.current[a.id] ?? null,
+        math_input_modes: localMathInputModesRef.current[a.id] ?? {},
         max_score: a.max_score ?? 0,
         questions: {
           question_type: a.questions.question_type,
@@ -731,6 +751,12 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
                   onSingleChange={val => handleAnswerChange(current.id, val)}
                   onPartChange={(pi, val, total) =>
                     handlePartAnswerChange(current.id, pi, val, total, localAnswers[current.id] ?? '')}
+                  mathInputModes={localMathInputModes[current.id] ?? {}}
+                  activeMathField={activeMathField}
+                  onActivateMathField={setActiveMathField}
+                  onDeactivateMathField={() => setActiveMathField(null)}
+                  onMathInputModeChange={(partKey, mode) =>
+                    handleMathInputModeChange(current.id, partKey, mode)}
                   requiresWorkImage={requiredWorkImageCount(current, config) > 0}
                   workImages={workImages[current.id] ?? []}
                   onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
@@ -1539,6 +1565,7 @@ function MCQInput({
 
 function MultiPartAnswerInput({
   answerId, parts, questionText, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
+  mathInputModes, activeMathField, onActivateMathField, onDeactivateMathField, onMathInputModeChange,
   requiresWorkImage, workImages, onWorkImageChange, localOnly,
 }: {
   answerId: string
@@ -1549,6 +1576,11 @@ function MultiPartAnswerInput({
   rawValue: string
   onSingleChange: (val: string) => void
   onPartChange: (pi: number, val: string, total: number) => void
+  mathInputModes: MathInputModes
+  activeMathField: string | null
+  onActivateMathField: (fieldId: string) => void
+  onDeactivateMathField: () => void
+  onMathInputModeChange: (partKey: string, mode: MathInputMode) => void
   requiresWorkImage: boolean
   workImages: (string | null)[]
   onWorkImageChange: (partIndex: number, url: string | null) => void
@@ -1556,6 +1588,43 @@ function MultiPartAnswerInput({
   localOnly?: boolean
 }) {
   const activeParts = parts && parts.length > 0 ? parts : null
+
+  const mathField = ({
+    value,
+    onChange,
+    partId,
+    partIndex,
+    totalParts,
+    ariaLabel,
+    className,
+    inputClassName,
+  }: {
+    value: string
+    onChange: (value: string) => void
+    partId?: string
+    partIndex: number
+    totalParts: number
+    ariaLabel: string
+    className?: string
+    inputClassName?: string
+  }) => {
+    const partKey = mathInputPartKey(partId, partIndex, totalParts)
+    const fieldId = `${answerId}:${partKey}`
+    return (
+      <MathAnswerField
+        value={value}
+        mode={readMathInputMode(mathInputModes, partKey)}
+        active={activeMathField === fieldId}
+        onActivate={() => onActivateMathField(fieldId)}
+        onDeactivate={onDeactivateMathField}
+        onChange={onChange}
+        onModeChange={mode => onMathInputModeChange(partKey, mode)}
+        ariaLabel={ariaLabel}
+        className={className}
+        inputClassName={inputClassName}
+      />
+    )
+  }
 
   // One or more numbered [คำตอบ N] blanks embedded directly in the question
   // stem — render the stem here (interleaved with inputs) instead of the
@@ -1586,8 +1655,16 @@ function MultiPartAnswerInput({
                 {frag && <RichText text={frag} className="[&_p]:inline" />}
                 <span className="inline-flex items-center gap-1.5 mx-1 align-middle">
                   <span className="text-xs font-semibold text-muted-foreground shrink-0">{num})</span>
-                  <Input type="text" inputMode="text" placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)" value={getValue(i)}
-                    onChange={e => setValue(i, e.target.value)} className="max-w-[140px] inline-block h-8" />
+                  {mathField({
+                    value: getValue(i),
+                    onChange: value => setValue(i, value),
+                    partId: part.id,
+                    partIndex: i,
+                    totalParts: activeParts.length,
+                    ariaLabel: `คำตอบข้อย่อย ${num}`,
+                    className: 'max-w-[13rem]',
+                    inputClassName: 'h-8 max-w-[9rem]',
+                  })}
                   {part.unit && <UnitDisplay html={part.unit} />}
                 </span>
               </span>
@@ -1609,10 +1686,15 @@ function MultiPartAnswerInput({
   if (!activeParts || activeParts.length === 1) {
     const unit = activeParts?.[0]?.unit ?? fallbackUnit ?? ''
     const blankSplit = questionText ? splitAnswerBlankHtml(questionText) : null
-    const inputEl = (
-      <Input type="text" inputMode="text" placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)" value={rawValue}
-        onChange={e => onSingleChange(e.target.value)} className="max-w-[200px]" />
-    )
+    const inputEl = mathField({
+      value: rawValue,
+      onChange: onSingleChange,
+      partId: activeParts?.[0]?.id,
+      partIndex: 0,
+      totalParts: 1,
+      ariaLabel: 'คำตอบตัวเลข',
+      className: 'w-full max-w-xs',
+    })
     return (
       <div className="space-y-1">
         {blankSplit ? (
@@ -1654,8 +1736,15 @@ function MultiPartAnswerInput({
             {part.sub_text && <RichText text={part.sub_text} className="font-normal text-muted-foreground ml-1" />}
           </label>
           <div className="flex items-center gap-2">
-            <Input type="text" inputMode="text" placeholder="เช่น 10, 9+1, sqrt(100) หรือ sin(30)" value={partValues[i] ?? ''}
-              onChange={e => onPartChange(i, e.target.value, activeParts.length)} className="max-w-[200px]" />
+            {mathField({
+              value: partValues[i] ?? '',
+              onChange: value => onPartChange(i, value, activeParts.length),
+              partId: part.id,
+              partIndex: i,
+              totalParts: activeParts.length,
+              ariaLabel: `คำตอบข้อย่อย ${labels[i] ?? i + 1}`,
+              className: 'w-full max-w-xs',
+            })}
             {part.unit && <UnitDisplay html={part.unit} />}
           </div>
           {requiresWorkImage && (
@@ -1880,6 +1969,25 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
 
 // ─── Ordering ─────────────────────────────────────────────────────────────────
 
+// `Math.random()` during render made the server and browser paint a different
+// order and forced React to throw the whole preview tree away at hydration.
+// The real student payload is already shuffled server-side; this second,
+// deterministic pass only keeps the legacy/component-preview behaviour stable.
+function stableItemShuffle(items: OrderingItem[], salt: string): OrderingItem[] {
+  const hash = (value: string) => {
+    let result = 2166136261
+    for (let i = 0; i < value.length; i++) {
+      result ^= value.charCodeAt(i)
+      result = Math.imul(result, 16777619)
+    }
+    return result >>> 0
+  }
+  return items
+    .map((item, index) => ({ item, order: hash(`${salt}:${index}:${item.id}`) }))
+    .sort((left, right) => left.order - right.order)
+    .map(entry => entry.item)
+}
+
 // ─── Matching ────────────────────────────────────────────────────────────────
 // One dropdown per left-hand prompt, listing the whole (already shuffled)
 // right-hand column. The answer is stored as the chosen right_text per prompt,
@@ -1940,7 +2048,7 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
 }) {
   const items: OrderingItem[] = config?.items ?? []
   const n = items.length
-  const [shuffled] = useState<OrderingItem[]>(() => [...items].sort(() => Math.random() - 0.5))
+  const shuffled = stableItemShuffle(items, 'ordering')
   let sel: Record<string, string> = {}
   if (rawValue.startsWith('{')) { try { sel = JSON.parse(rawValue) } catch { sel = {} } }
   else if (rawValue.startsWith('[')) {
@@ -2013,8 +2121,8 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
   try { answers = JSON.parse(rawValue || '[]') } catch { answers = [] }
   while (answers.length < parts.length) answers.push('')
 
-  const [shuffledByPart] = useState<OrderingItem[][]>(
-    () => parts.map(p => p.items?.length ? [...p.items].sort(() => Math.random() - 0.5) : [])
+  const shuffledByPart = parts.map((part, index) =>
+    part.items?.length ? stableItemShuffle(part.items, `composite:${index}:${part.id}`) : [],
   )
 
   function updatePart(i: number, val: string) {

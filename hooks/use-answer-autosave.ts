@@ -3,19 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { saveAnswer } from '@/lib/actions/submissions'
 import { callIdempotentAction } from '@/lib/retry-action'
+import type { MathInputModes } from '@/lib/math/input-mode'
+import {
+  copyMathInputModes,
+  parseAnswerBackup,
+  sameAnswerPayload,
+  serializeAnswerBackup,
+  type PendingAnswerPayload,
+} from '@/lib/math/answer-backup'
+import type { MathInputMode } from '@/lib/types'
 
 const LS_KEY = (submissionId: string) => `korkru_exam_${submissionId}`
 const DEBOUNCE_MS = 500
 
-/**
- * Whether a set of writes made it, and — when the server answered and refused
- * — what it said.
- *
- * The distinction is the whole point: a refusal has a reason worth showing the
- * student (ส่งงานแล้ว, หมดเวลาทำข้อสอบแล้ว), while a request that never landed
- * has none, and telling someone with a perfectly good connection to go check
- * their internet is how a dropped POST used to look from the exam page.
- */
 export interface SaveOutcome {
   ok: boolean
   error?: string
@@ -30,62 +30,59 @@ function combineOutcomes(outcomes: SaveOutcome[]): SaveOutcome {
 
 interface Options {
   submissionId: string
-  /** Lazy initial values, keyed by answer id — usually derived from the DB rows. */
+  /** Lazy initial values, keyed by answer id — usually derived from DB rows. */
   initialAnswers: () => Record<string, string>
-  /**
-   * Teacher preview: keep every behaviour except the writes, since there is no
-   * real submission row behind `submissionId`.
-   */
+  /** DEG/RAD per logical numeric input, grouped by answer id. */
+  initialMathInputModes?: () => Record<string, MathInputModes>
+  /** Teacher preview keeps local behaviour but never writes a submission row. */
   previewMode?: boolean
 }
 
 /**
- * Owns the student's in-progress answers and everything involved in getting
- * them persisted.
- *
- * Four guarantees this is here to provide:
- *  - typing stays instant — edits are coalesced per answer before they hit the
- *    server, instead of firing a server action per keystroke;
- *  - saves for one answer are chained, so a slow earlier response can never
- *    land after a newer one and overwrite it;
- *  - a dropped request is retried before it counts as a failure, because iOS
- *    drops enough of them that one was regularly all it took to stop a student
- *    mid-แบบฝึกหัด (see callIdempotentAction);
- *  - nothing is lost offline — values go to localStorage on every change and
- *    the failed ones are queued for `retryPending()` when the network returns.
+ * Owns in-progress answer text and its angle-mode metadata as one atomic save.
+ * Both are backed up locally, coalesced, chained per answer, and retried after
+ * a dropped request so a RAD answer cannot later be graded as legacy DEG.
  */
-export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = false }: Options) {
+export function useAnswerAutosave({
+  submissionId,
+  initialAnswers,
+  initialMathInputModes,
+  previewMode = false,
+}: Options) {
   const [localAnswers, setLocalAnswers] = useState<Record<string, string>>(initialAnswers)
+  const [localMathInputModes, setLocalMathInputModes] = useState<Record<string, MathInputModes>>(
+    () => initialMathInputModes?.() ?? {},
+  )
   const [pendingSync, setPendingSync] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
 
   const localAnswersRef = useRef(localAnswers)
+  const localMathInputModesRef = useRef(localMathInputModes)
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
-  const pendingValuesRef = useRef<Map<string, string>>(new Map())
+  const pendingRef = useRef<Map<string, PendingAnswerPayload>>(new Map())
   const inFlightRef = useRef<Map<string, Promise<SaveOutcome>>>(new Map())
-  // Only dirty values belong in localStorage. Keeping every server-confirmed
-  // value there would let an old backup overwrite a newer answer from another
-  // device the next time this attempt opens.
-  const backupValuesRef = useRef<Map<string, string>>(new Map())
+  const backupRef = useRef<Map<string, PendingAnswerPayload>>(new Map())
+
+  const currentPayload = useCallback((answerId: string): PendingAnswerPayload => ({
+    value: localAnswersRef.current[answerId] ?? '',
+    mathInputModes: copyMathInputModes(localMathInputModesRef.current[answerId]),
+  }), [])
 
   const persistPendingBackup = useCallback(() => {
     try {
-      if (backupValuesRef.current.size === 0) {
+      if (backupRef.current.size === 0) {
         localStorage.removeItem(LS_KEY(submissionId))
         return
       }
-      localStorage.setItem(
-        LS_KEY(submissionId),
-        JSON.stringify(Object.fromEntries(backupValuesRef.current)),
-      )
+      localStorage.setItem(LS_KEY(submissionId), serializeAnswerBackup(backupRef.current))
     } catch { /* ignore quota errors */ }
   }, [submissionId])
 
   const refreshSavingState = useCallback(() => {
     setSaving(
       saveTimersRef.current.size > 0
-      || pendingValuesRef.current.size > 0
-      || inFlightRef.current.size > 0
+      || pendingRef.current.size > 0
+      || inFlightRef.current.size > 0,
     )
   }, [])
 
@@ -94,35 +91,33 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
     if (timer) clearTimeout(timer)
     saveTimersRef.current.delete(answerId)
 
-    const value = pendingValuesRef.current.get(answerId)
+    const payload = pendingRef.current.get(answerId)
     const existing = inFlightRef.current.get(answerId)
-    if (value === undefined) return existing ?? Promise.resolve(SAVED)
-    pendingValuesRef.current.delete(answerId)
+    if (!payload) return existing ?? Promise.resolve(SAVED)
+    pendingRef.current.delete(answerId)
 
     const markSaved = (): SaveOutcome => {
-      if (pendingValuesRef.current.get(answerId) === value) {
-        pendingValuesRef.current.delete(answerId)
-      }
-      setPendingSync(prev => {
-        if (!prev.has(answerId)) return prev
-        const next = new Set(prev)
+      const queued = pendingRef.current.get(answerId)
+      if (sameAnswerPayload(queued, payload)) pendingRef.current.delete(answerId)
+      setPendingSync(previous => {
+        if (!previous.has(answerId) || pendingRef.current.has(answerId)) return previous
+        const next = new Set(previous)
         next.delete(answerId)
         return next
       })
-      if (backupValuesRef.current.get(answerId) === value && !pendingValuesRef.current.has(answerId)) {
-        backupValuesRef.current.delete(answerId)
+      if (sameAnswerPayload(backupRef.current.get(answerId), payload) && !pendingRef.current.has(answerId)) {
+        backupRef.current.delete(answerId)
         persistPendingBackup()
       }
       return SAVED
     }
 
-    /** Keep the value queued and backed up so the next flush picks it up again. */
     const markUnsaved = (error?: string): SaveOutcome => {
-      const latest = localAnswersRef.current[answerId] ?? value
-      if (!pendingValuesRef.current.has(answerId)) pendingValuesRef.current.set(answerId, latest)
-      backupValuesRef.current.set(answerId, latest)
+      const latest = currentPayload(answerId)
+      if (!pendingRef.current.has(answerId)) pendingRef.current.set(answerId, latest)
+      backupRef.current.set(answerId, latest)
       persistPendingBackup()
-      setPendingSync(prev => new Set(prev).add(answerId))
+      setPendingSync(previous => new Set(previous).add(answerId))
       return { ok: false, error }
     }
 
@@ -130,48 +125,36 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
       .catch(() => SAVED)
       .then(async () => {
         if (previewMode) return markSaved()
-        // Setting the same answer value twice is idempotent. A browser error
-        // can mean either the request or only its response was lost, so this
-        // is the kind of mutation that is safe to retry.
-        const call = await callIdempotentAction(() => saveAnswer(answerId, value))
+        const call = await callIdempotentAction(() => saveAnswer(
+          answerId,
+          payload.value,
+          payload.mathInputModes,
+        ))
         if (!call.ok) return markUnsaved()
         if (call.data.error) return markUnsaved(call.data.error)
         return markSaved()
       })
       .catch(() => markUnsaved())
       .finally(() => {
-        if (inFlightRef.current.get(answerId) === task) {
-          inFlightRef.current.delete(answerId)
-        }
+        if (inFlightRef.current.get(answerId) === task) inFlightRef.current.delete(answerId)
         refreshSavingState()
       })
 
     inFlightRef.current.set(answerId, task)
     setSaving(true)
     return task
-  }, [persistPendingBackup, refreshSavingState, previewMode])
+  }, [currentPayload, persistPendingBackup, previewMode, refreshSavingState])
 
-  /** Force every queued edit out and report whether every write reached the server. */
-  const flushQueuedAnswers = useCallback(async (): Promise<SaveOutcome> => {
-    const queuedIds = [...pendingValuesRef.current.keys()]
-    const queuedResults = await Promise.all(queuedIds.map(id => flushAnswer(id)))
-    const inFlightResults = await Promise.all([...inFlightRef.current.values()])
-    return combineOutcomes([...queuedResults, ...inFlightResults])
-  }, [flushAnswer])
-
-  /** Record an edit and schedule it to be persisted. */
-  const setAnswer = useCallback((answerId: string, value: string) => {
-    localAnswersRef.current = { ...localAnswersRef.current, [answerId]: value }
-    setLocalAnswers(prev => ({ ...prev, [answerId]: value }))
-    pendingValuesRef.current.set(answerId, value)
-    backupValuesRef.current.set(answerId, value)
+  const scheduleSave = useCallback((answerId: string, payload: PendingAnswerPayload) => {
+    pendingRef.current.set(answerId, payload)
+    backupRef.current.set(answerId, payload)
     persistPendingBackup()
 
     const existingTimer = saveTimersRef.current.get(answerId)
     if (existingTimer) clearTimeout(existingTimer)
 
     if (!navigator.onLine) {
-      setPendingSync(prev => new Set([...prev, answerId]))
+      setPendingSync(previous => new Set(previous).add(answerId))
       saveTimersRef.current.delete(answerId)
       refreshSavingState()
       return
@@ -185,70 +168,88 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
     saveTimersRef.current.set(answerId, timer)
   }, [flushAnswer, persistPendingBackup, refreshSavingState])
 
-  /**
-   * Re-send everything that failed while offline. Resolves to whether all of
-   * it made it this time.
-   */
+  const flushQueuedAnswers = useCallback(async (): Promise<SaveOutcome> => {
+    const queuedIds = [...pendingRef.current.keys()]
+    const queuedResults = await Promise.all(queuedIds.map(id => flushAnswer(id)))
+    const inFlightResults = await Promise.all([...inFlightRef.current.values()])
+    return combineOutcomes([...queuedResults, ...inFlightResults])
+  }, [flushAnswer])
+
+  const setAnswer = useCallback((answerId: string, value: string) => {
+    localAnswersRef.current = { ...localAnswersRef.current, [answerId]: value }
+    setLocalAnswers(previous => ({ ...previous, [answerId]: value }))
+    scheduleSave(answerId, currentPayload(answerId))
+  }, [currentPayload, scheduleSave])
+
+  const setMathInputMode = useCallback((answerId: string, partKey: string, mode: MathInputMode) => {
+    const answerModes = {
+      ...(localMathInputModesRef.current[answerId] ?? {}),
+      [partKey]: mode,
+    }
+    localMathInputModesRef.current = {
+      ...localMathInputModesRef.current,
+      [answerId]: answerModes,
+    }
+    setLocalMathInputModes(previous => ({ ...previous, [answerId]: answerModes }))
+    scheduleSave(answerId, currentPayload(answerId))
+  }, [currentPayload, scheduleSave])
+
   const retryPending = useCallback(async (): Promise<SaveOutcome> => {
     const ids = [...pendingSync]
     if (ids.length === 0) return SAVED
     setPendingSync(new Set())
-    for (const id of ids) {
-      const value = localAnswersRef.current[id]
-      if (value !== undefined) pendingValuesRef.current.set(id, value)
-    }
+    for (const id of ids) pendingRef.current.set(id, currentPayload(id))
     return combineOutcomes(await Promise.all(ids.map(id => flushAnswer(id))))
-  }, [pendingSync, flushAnswer])
+  }, [currentPayload, flushAnswer, pendingSync])
 
-  /** Drop the local backup once the attempt is committed. */
   const clearSavedAnswers = useCallback(() => {
-    backupValuesRef.current.clear()
+    backupRef.current.clear()
     try {
       localStorage.removeItem(LS_KEY(submissionId))
     } catch { /* ignore */ }
   }, [submissionId])
 
-  // Restore anything the last session left behind. A differing local value is
-  // treated as a write that may have missed the server (for example the tab
-  // closed inside the debounce window), so it wins on this device and is
-  // immediately queued for server sync instead of remaining a display-only
-  // recovery that disappears on the next device/reload.
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY(submissionId))
       if (!saved) return
-      const savedAnswers: Record<string, string> = JSON.parse(saved)
-      const current = localAnswersRef.current
-      const merged = { ...current, ...savedAnswers }
-      const restoredIds = Object.keys(savedAnswers).filter(id => savedAnswers[id] !== current[id])
+      const entries = parseAnswerBackup(saved)
+      const restoredIds = Object.keys(entries).filter((answerId) => {
+        const serverPayload: PendingAnswerPayload = {
+          value: localAnswersRef.current[answerId] ?? '',
+          mathInputModes: localMathInputModesRef.current[answerId] ?? {},
+        }
+        return !sameAnswerPayload(serverPayload, entries[answerId])
+      })
       if (restoredIds.length === 0) {
-        // The server already has the same values, so this backup is no longer dirty.
-        backupValuesRef.current.clear()
+        backupRef.current.clear()
         persistPendingBackup()
         return
       }
-      for (const id of restoredIds) backupValuesRef.current.set(id, savedAnswers[id])
+
+      const nextAnswers = { ...localAnswersRef.current }
+      const nextModes = { ...localMathInputModesRef.current }
+      for (const answerId of restoredIds) {
+        const payload = entries[answerId]
+        nextAnswers[answerId] = payload.value
+        nextModes[answerId] = copyMathInputModes(payload.mathInputModes)
+        backupRef.current.set(answerId, payload)
+        pendingRef.current.set(answerId, payload)
+      }
+      localAnswersRef.current = nextAnswers
+      localMathInputModesRef.current = nextModes
+      setLocalAnswers(nextAnswers)
+      setLocalMathInputModes(nextModes)
       persistPendingBackup()
 
-      localAnswersRef.current = merged
-      setLocalAnswers(merged)
-      for (const id of restoredIds) pendingValuesRef.current.set(id, merged[id])
-
-      if (navigator.onLine) {
-        void Promise.all(restoredIds.map(id => flushAnswer(id)))
-      } else {
-        setPendingSync(prev => new Set([...prev, ...restoredIds]))
+      if (navigator.onLine) void Promise.all(restoredIds.map(id => flushAnswer(id)))
+      else {
+        setPendingSync(previous => new Set([...previous, ...restoredIds]))
         refreshSavingState()
       }
     } catch { /* ignore corrupt data */ }
-  }, [submissionId, flushAnswer, persistPendingBackup, refreshSavingState])
+  }, [flushAnswer, persistPendingBackup, refreshSavingState, submissionId])
 
-  useEffect(() => {
-    localAnswersRef.current = localAnswers
-  }, [localAnswers])
-
-  // A debounce timer must not outlive this attempt view. Whatever it was about
-  // to write is still in localStorage as a recovery fallback.
   useEffect(() => () => {
     for (const timer of saveTimersRef.current.values()) clearTimeout(timer)
     saveTimersRef.current.clear()
@@ -257,7 +258,10 @@ export function useAnswerAutosave({ submissionId, initialAnswers, previewMode = 
   return {
     localAnswers,
     localAnswersRef,
+    localMathInputModes,
+    localMathInputModesRef,
     setAnswer,
+    setMathInputMode,
     flushAnswer,
     flushQueuedAnswers,
     retryPending,
