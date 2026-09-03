@@ -123,7 +123,7 @@ Invariant สำคัญ:
 
 ## เครื่องมือคณิตศาสตร์และ artifact
 
-เฟส 1–2 ตาม `docs/STUDENT_MATH_TOOLS.md` เพิ่มข้อมูลโดยไม่เปลี่ยน shape เดิมของ `student_answer` และ `work_images`:
+เฟส 1–4 ตาม `docs/STUDENT_MATH_TOOLS.md` เพิ่มข้อมูลโดยไม่เปลี่ยน shape เดิมของ `student_answer` และ `work_images`:
 
 - Assignment flags แยกการอนุญาตเครื่องคิดเลขกับกระดาษทด งานเก่าอ่านเป็นปิด แบบฝึกหัดออนไลน์ใหม่เริ่มเปิด และข้อสอบออนไลน์ใหม่เริ่มปิดจาก create action
 - Metadata มุม `DEG`/`RAD` อยู่ใน `submission_answers.math_input_modes` ผูกกับ logical numeric input หรือข้อย่อย ค่า object ว่าง/ไม่มี key อ่านเป็น `DEG`; autosave เขียน object นี้พร้อม `student_answer` ใน update เดียวเพื่อไม่ให้สมการกับหน่วยมุมเหลื่อมกัน
@@ -131,7 +131,7 @@ Invariant สำคัญ:
 - `teaching_boards` อ้าง assignment, question, creator, slot 1–5, `org_id`, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(assignment_id, question_id, created_by, slot)` กับ check `slot BETWEEN 1 AND 5` เป็นผู้บังคับเพดานจริง
 - Path ใหม่อยู่ใน private Storage และ database เก็บ path ไม่เก็บ signed URL ซึ่งมีอายุสั้น
 
-Local-only scratch scene ไม่ใช่ row ในฐานข้อมูล อยู่ใน IndexedDB และห้ามถูกนับเป็น submission attachment การอัปโหลด preview/scene ยังไม่สร้าง reference จน Server Action ที่ตรวจสิทธิ์บันทึก metadata สำเร็จ
+Local-only scratch scene ไม่ใช่ row ในฐานข้อมูล อยู่ใน IndexedDB keyed by user/submission/answer/part, จำกัด 2 MiB/10,000 elements และห้ามถูกนับเป็น submission attachment การอัปโหลด preview/scene ยังไม่สร้าง reference จน Server Action ที่ตรวจสิทธิ์บันทึก metadata สำเร็จ
 
 หลัง submit ห้ามแก้ artifact ของนักเรียน Attempt ใหม่ไม่แก้หรือย้ายหลักฐานจาก attempt เก่า ส่วน `submission_answers.work_images` รุ่นเก่ายังคงเป็น source ที่อ่านได้เพื่อ backward compatibility
 

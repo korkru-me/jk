@@ -10,6 +10,7 @@ export interface ExamTakingData {
     id: string
     started_at: string
     assignment_id: string
+    student_id: string
   }
   assignment: {
     duration_minutes: number | null
@@ -29,6 +30,7 @@ export interface ExamTakingData {
     instant_check: boolean
     instant_check_answer_key: boolean
     calculator_enabled: boolean
+    scratchpad_enabled: boolean
   }
   answers: SafeExamAnswer[]
 }
@@ -51,7 +53,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   // query, which reads here as an attempt that cannot be opened at all.
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled)')
+    .select('id, started_at, assignment_id, student_id, status, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled, scratchpad_enabled)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -101,6 +103,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       id: submission.id,
       started_at: submission.started_at,
       assignment_id: submission.assignment_id,
+      student_id: submission.student_id,
     },
     assignment: {
       duration_minutes: assignment.duration_minutes,
@@ -127,6 +130,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
         && assignment.instant_check === true,
       instant_check_answer_key: assignment.instant_check_answer_key !== false,
       calculator_enabled: assignment.calculator_enabled === true,
+      scratchpad_enabled: assignment.scratchpad_enabled === true,
     },
     answers,
   }

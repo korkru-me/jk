@@ -1,6 +1,6 @@
 'use client'
 
-import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { checkAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
-  Pencil, Calculator as CalculatorIcon,
+  Pencil, Calculator as CalculatorIcon, NotebookPen,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -56,6 +56,7 @@ import { mathInputPartKey, readMathInputMode, type MathInputModes } from '@/lib/
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 const ScientificCalculator = lazy(() => import('./scientific-calculator'))
+const Scratchpad = lazy(() => import('./scratchpad'))
 
 interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
   correct_answer?: string
@@ -116,6 +117,8 @@ export interface ExamConfig {
   instantCheckAnswerKey?: boolean
   /** Server-derived assignment rule; the calculator chunk is fetched only after a click. */
   calculatorEnabled: boolean
+  /** Server-derived assignment rule; the drawing editor chunk is fetched only after a click. */
+  scratchpadEnabled: boolean
 }
 
 interface CalculatorTarget {
@@ -126,6 +129,8 @@ interface CalculatorTarget {
 
 interface Props {
   submissionId: string
+  /** Authenticated user id used only to namespace local IndexedDB data. */
+  storageOwnerId: string
   answers: AnswerRow[]
   durationMinutes: number | null
   startedAt: string
@@ -177,7 +182,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, answers, durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
+export function ExamClient({ submissionId, storageOwnerId, answers, durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
@@ -224,6 +229,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const [calculatorLoaded, setCalculatorLoaded] = useState(false)
   const [showCalculator, setShowCalculator] = useState(false)
   const [standaloneCalculatorMode, setStandaloneCalculatorMode] = useState<MathInputMode>('deg')
+  const [scratchpadLoaded, setScratchpadLoaded] = useState(false)
+  const [showScratchpad, setShowScratchpad] = useState(false)
 
   const navigateTo = useCallback((index: number) => {
     setCurrentIndex(index)
@@ -435,6 +442,14 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const toggleCalculator = useCallback(() => {
     setCalculatorLoaded(true)
     setShowCalculator(open => !open)
+    setShowScratchpad(false)
+    setActiveMathField(null)
+  }, [])
+
+  const toggleScratchpad = useCallback(() => {
+    setScratchpadLoaded(true)
+    setShowScratchpad(open => !open)
+    setShowCalculator(false)
     setActiveMathField(null)
   }, [])
 
@@ -541,6 +556,14 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       return
     }
     clearSavedAnswers()
+    // Working paper is intentionally local-only. Once the attempt is safely
+    // submitted, discard every local scene for it instead of retaining stale
+    // drawings that the student can no longer use.
+    await import('@/lib/scratchpad-storage')
+      .then(({ deleteScratchpadsForSubmission }) => (
+        deleteScratchpadsForSubmission(storageOwnerId, submissionId)
+      ))
+      .catch(() => undefined)
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
     // The result route redirects in-progress submissions back to the exam.
     // A client-side transition can reuse a stale prefetched result and briefly
@@ -569,6 +592,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
       navigateTo(missingIndex)
       return
     }
+    setShowCalculator(false)
+    setShowScratchpad(false)
     setShowSubmitConfirm(true)
     setSubmitCountdown(3)
   }
@@ -615,6 +640,18 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
   const pageStart = Math.floor(currentIndex / perPage) * perPage
   const pageAnswers = answers.slice(pageStart, pageStart + perPage)
   const isLastPage = pageStart + perPage >= answers.length
+  const scratchpadAnswer = calculatorTarget
+    ? answers.find(answer => answer.id === calculatorTarget.answerId)
+    : answers[currentIndex]
+  const scratchpadPartKey = calculatorTarget?.partKey ?? 'main'
+  const scratchpadScope = useMemo(() => scratchpadAnswer ? ({
+    ownerId: storageOwnerId,
+    submissionId,
+    answerId: scratchpadAnswer.id,
+    partKey: scratchpadPartKey,
+  }) : null, [scratchpadAnswer, scratchpadPartKey, storageOwnerId, submissionId])
+  const scratchpadTargetLabel = calculatorTarget?.label
+    ?? (scratchpadAnswer ? `ข้อ ${answers.findIndex(answer => answer.id === scratchpadAnswer.id) + 1}` : 'ข้อปัจจุบัน')
 
   // With several questions on a screen, moving the focus is not visible on its
   // own — tapping ข้อ 4 in the นำทาง grid while it is already on the page would
@@ -1098,6 +1135,8 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             proctorActiveConnectionCount={proctorActiveConnectionCount}
             calculatorOpen={showCalculator}
             onToggleCalculator={toggleCalculator}
+            scratchpadOpen={showScratchpad}
+            onToggleScratchpad={toggleScratchpad}
             onFocusMode={() => setFocusMode(true)}
           />
           {/* Progress bar */}
@@ -1131,6 +1170,17 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {config.scratchpadEnabled && (
+                  <Button
+                    type="button"
+                    variant={showScratchpad ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={toggleScratchpad}
+                    aria-pressed={showScratchpad}
+                  >
+                    <NotebookPen /> กระดาษทด
+                  </Button>
+                )}
                 {config.calculatorEnabled && (
                   <Button
                     type="button"
@@ -1175,6 +1225,23 @@ export function ExamClient({ submissionId, answers, durationMinutes, startedAt, 
             onModeChange={handleCalculatorModeChange}
             onInsertResult={insertCalculatorResult}
             onClose={() => setShowCalculator(false)}
+          />
+        </Suspense>
+      )}
+
+      {scratchpadLoaded && scratchpadScope && !previewResult && (
+        <Suspense fallback={showScratchpad ? (
+          <Card elevation="xl" className="fixed inset-x-2 bottom-2 z-[75] px-4 py-3 text-sm text-muted-foreground md:inset-x-auto md:right-4">
+            กำลังเปิดกระดาษทด...
+          </Card>
+        ) : null}>
+          <Scratchpad
+            key={JSON.stringify(scratchpadScope)}
+            open={showScratchpad}
+            scope={scratchpadScope}
+            targetLabel={scratchpadTargetLabel}
+            persistenceEnabled={!previewMode}
+            onClose={() => setShowScratchpad(false)}
           />
         </Suspense>
       )}
@@ -1513,7 +1580,7 @@ function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
   proctorStatus,
   proctorActiveConnectionCount,
-  config, calculatorOpen, onToggleCalculator, onFocusMode,
+  config, calculatorOpen, onToggleCalculator, scratchpadOpen, onToggleScratchpad, onFocusMode,
 }: {
   saving: boolean
   isOnline: boolean
@@ -1524,6 +1591,8 @@ function ExamToolbar({
   config: ExamConfig
   calculatorOpen: boolean
   onToggleCalculator: () => void
+  scratchpadOpen: boolean
+  onToggleScratchpad: () => void
   onFocusMode: () => void
 }) {
   return (
@@ -1570,19 +1639,33 @@ function ExamToolbar({
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        {config.scratchpadEnabled && (
+          <Button
+            type="button"
+            variant={scratchpadOpen ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={onToggleScratchpad}
+            aria-label="กระดาษทด"
+            aria-pressed={scratchpadOpen}
+          >
+            <NotebookPen />
+            <span className="hidden sm:inline">กระดาษทด</span>
+          </Button>
+        )}
         {config.calculatorEnabled && (
           <Button
             type="button"
             variant={calculatorOpen ? 'secondary' : 'outline'}
             size="sm"
             onClick={onToggleCalculator}
+            aria-label="เครื่องคิดเลข"
             aria-pressed={calculatorOpen}
           >
             <CalculatorIcon />
             <span className="hidden sm:inline">เครื่องคิดเลข</span>
           </Button>
         )}
-        <Button type="button" variant="outline" size="sm" onClick={onFocusMode}>
+        <Button type="button" variant="outline" size="sm" onClick={onFocusMode} aria-label="โฟกัส">
           <Maximize2 />
           <span className="hidden sm:inline">โฟกัส</span>
         </Button>

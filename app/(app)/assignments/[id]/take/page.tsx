@@ -78,12 +78,14 @@ export default async function TakeExamPage({
     instantCheck: assignment.instant_check,
     instantCheckAnswerKey: assignment.instant_check_answer_key,
     calculatorEnabled: assignment.calculator_enabled,
+    scratchpadEnabled: assignment.scratchpad_enabled,
   }
 
   return (
     <div className="h-full flex flex-col">
       <ExamClient
         submissionId={result.submissionId!}
+        storageOwnerId={submission.student_id}
         answers={answers}
         durationMinutes={assignment.duration_minutes}
         startedAt={submission.started_at}

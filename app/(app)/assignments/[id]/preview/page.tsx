@@ -148,6 +148,7 @@ export default async function AssignmentPreviewPage({
     instantCheck: a.type === 'exercise' && a.mode === 'online' && a.instant_check === true,
     instantCheckAnswerKey: a.instant_check_answer_key !== false,
     calculatorEnabled: a.calculator_enabled === true,
+    scratchpadEnabled: a.scratchpad_enabled === true,
   }
 
   // The โหมดตัวอย่าง banner rides in ExamClient's own column, so there is no
@@ -157,6 +158,7 @@ export default async function AssignmentPreviewPage({
     <div className="h-full flex flex-col">
       <ExamClient
         submissionId={`preview-${id}`}
+        storageOwnerId={user.id}
         answers={previewAnswers as any}
         durationMinutes={a.duration_minutes}
         startedAt={new Date().toISOString()}

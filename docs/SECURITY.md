@@ -110,8 +110,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 - ข้อความคณิตศาสตร์จากนักเรียนต้องผ่าน bounded allowlist parser เท่านั้น: จำกัดความยาว/token/depth/operation, ปฏิเสธ identifier และ syntax ที่ไม่รู้จัก, ไม่ใช้ `eval` หรือ `Function`, และไม่ส่ง mathjs เข้า initial client path โหมด DEG/RAD ที่ใช้ตรวจต้องมาจาก metadata ที่ validate แล้วและบันทึกพร้อมคำตอบ
 - เครื่องคิดเลขแสดงจาก assignment flag ที่ server อ่านให้ แต่ไม่ถือเป็น security boundary ต่อเครื่องคิดเลขภายนอก; implementation โหลดหลัง user gesture และ history อยู่ใน memory ของหน้าเท่านั้น ห้ามเพิ่ม API, database row หรือ telemetry ที่ส่งนิพจน์/ประวัติการคำนวณขึ้น server
-- กระดาษทดที่ยังไม่แนบต้องอยู่ใน IndexedDB ของอุปกรณ์เท่านั้น ไม่ส่ง scene ต่อ stroke และไม่ถือเป็น education record บน server
-- Local key ต้องแยก user/submission/answer/part และถูกล้างเมื่อส่งสำเร็จ attempt ใช้ต่อไม่ได้ หรือเกิน TTL; local data เป็น recovery convenience ไม่ใช่ trusted submission state
+- กระดาษทดที่ยังไม่แนบอยู่ใน IndexedDB ของอุปกรณ์เท่านั้นแล้ว ไม่ส่ง scene ต่อ stroke และไม่ถือเป็น education record บน server; teacher preview ไม่เขียน IndexedDB
+- Local key แยก authenticated user/submission/answer/part, scene ใช้ allowlisted format version และจำกัด 2 MiB/10,000 elements; ล้างเมื่อส่งสำเร็จแบบ best effort และ purge รายการหมดอายุ 7 วันเมื่อเปิด editor ครั้งถัดไป local data เป็น recovery convenience ไม่ใช่ trusted submission state
 - Preview และ scene ที่แนบใหม่อยู่ใน private bucket `math-work-artifacts`; browser ขอ path-bound signed upload token และ signed read URL อายุ 5 นาทีผ่าน Server Action หลังตรวจ exact submission/assignment authority ไม่มี client policy สำหรับ list/read/write/delete ทั้ง bucket
 - Browser ส่ง Storage path, MIME, size, format version และ element count มาได้แต่เชื่อไม่ได้ Server Action ต้องตรวจ owner, tenant, exact in-progress answer, เวลา และ SEB/Android access gate ซ้ำก่อนบันทึก reference
 - หลังส่งต้องปฏิเสธการแก้ scene, preview และ metadata แม้ client ยังถือ URL หรือ local copy อยู่
