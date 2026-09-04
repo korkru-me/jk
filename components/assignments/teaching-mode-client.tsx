@@ -11,6 +11,7 @@ import {
   EyeOff,
   FileText,
   Loader2,
+  PanelLeftClose,
   Plus,
   Presentation,
   Trash2,
@@ -123,13 +124,15 @@ function TrueFalseChoice({ value, onSelect }: { value: string; onSelect: (next: 
   )
 }
 
-function TeachingQuestion({ question, index, total, showSolution, answer }: {
+function TeachingQuestion({ question, index, total, showSolution, answer, actions }: {
   question: TeachingQuestionView
   index: number
   total: number
   showSolution: boolean
   /** The teacher's own answer so far, held by the card around this. */
   answer: { values: string[]; set: (index: number, value: string) => void }
+  /** This ข้อ's own controls, sat on its badge row instead of the top bar. */
+  actions?: React.ReactNode
 }) {
   const renderedQuestion = interpolateValues(question.question_text, question.randomValues)
   const renderedSolution = interpolateValues(question.solution_text ?? '', question.randomValues)
@@ -144,6 +147,7 @@ function TeachingQuestion({ question, index, total, showSolution, answer }: {
         <Badge variant="outline">ข้อ {index + 1} / {total}</Badge>
         <Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge>
         {Object.keys(question.randomValues).length > 0 && <Badge variant="secondary">สุ่มค่าตัวอย่างแล้ว</Badge>}
+        {actions && <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">{actions}</span>}
       </div>
       {question.title && <h2 className="text-lg font-semibold">{question.title}</h2>}
       <div className="text-base leading-relaxed">
@@ -279,12 +283,12 @@ function TeachingQuestion({ question, index, total, showSolution, answer }: {
  * pressed inside the question, or a box under it. Both feed the one array
  * `TeachingAnswerCheck` grades.
  */
-function TeachingQuestionCard({ question, index, total, showSolution, boardAction, outlined }: {
+function TeachingQuestionCard({ question, index, total, showSolution, actions, outlined }: {
   question: TeachingQuestionView
   index: number
   total: number
   showSolution: boolean
-  boardAction?: React.ReactNode
+  actions?: React.ReactNode
   outlined: boolean
 }) {
   const fields = useMemo(() => tryFields(question), [question])
@@ -301,13 +305,13 @@ function TeachingQuestionCard({ question, index, total, showSolution, boardActio
 
   return (
     <Card padding="lg" className={`space-y-4 ${outlined ? 'border-primary' : ''}`}>
-      {boardAction && <div className="flex justify-end">{boardAction}</div>}
       <TeachingQuestion
         question={question}
         index={index}
         total={total}
         showSolution={showSolution}
         answer={{ values, set: setValue }}
+        actions={actions}
       />
       {fields && (
         <TeachingAnswerCheck
@@ -363,6 +367,8 @@ export function TeachingModeClient({
   const pageQuestions = questions.slice(pageStart, pageStart + perPage)
   const pageNumber = Math.floor(pageStart / perPage) + 1
   const pageCount = Math.ceil(questions.length / perPage)
+  // Whatever is put away leaves its own button on the left rail.
+  const railed = !showQuestion || !showBoards
   const perPageOptions = useMemo(() => {
     const values = new Set([1, 2, 3, 4, 5, Math.max(1, Math.round(questionsPerPage) || 1)])
     return [...values].filter(value => value <= questions.length).sort((a, b) => a - b)
@@ -508,15 +514,6 @@ export function TeachingModeClient({
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 sm:justify-end">
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
-            {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
-          </Button>
-          <Button type="button" variant={showQuestion ? 'outline' : 'secondary'} size="sm" onClick={() => setShowQuestion(value => !value)} aria-pressed={!showQuestion}>
-            <FileText />{showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
-          </Button>
-          <Button type="button" variant={showBoards ? 'secondary' : 'outline'} size="sm" onClick={() => setShowBoards(value => !value)} aria-pressed={showBoards}>
-            <Presentation />{showBoards ? 'ซ่อนช่องกระดาน' : 'ช่องกระดาน'}
-          </Button>
           <NativeSelect
             aria-label="ไปที่ข้อ"
             className="h-8 w-auto max-w-56 text-xs sm:ml-2"
@@ -557,10 +554,44 @@ export function TeachingModeClient({
       </Card>
 
       {/* With the ข้อ and the slots put away the column disappears entirely,
-          which is what gives the board the whole width to write on. */}
-      <div className={`grid min-h-0 min-w-0 flex-1 gap-4 ${
-        showQuestion || showBoards ? 'lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]' : ''
+          which is what gives the board the whole width to write on. What is
+          put away leaves a button on the rail down the left edge. */}
+      <div className={`grid min-h-0 min-w-0 flex-1 gap-3 ${
+        showQuestion || showBoards
+          ? (railed ? 'lg:grid-cols-[auto_minmax(17rem,0.72fr)_minmax(30rem,1.28fr)]' : 'lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]')
+          : (railed ? 'lg:grid-cols-[auto_1fr]' : '')
       }`}>
+        {railed && (
+          <div className="flex shrink-0 flex-row flex-wrap gap-1.5 lg:flex-col">
+            {!showQuestion && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-lg"
+                className="rounded-xl"
+                title="แสดงโจทย์"
+                aria-label="แสดงโจทย์"
+                onClick={() => setShowQuestion(true)}
+              >
+                <FileText />
+              </Button>
+            )}
+            {!showBoards && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-lg"
+                className="rounded-xl"
+                title="กระดานที่บันทึกไว้"
+                aria-label="กระดานที่บันทึกไว้"
+                onClick={() => setShowBoards(true)}
+              >
+                <Presentation />
+              </Button>
+            )}
+          </div>
+        )}
+
         {(showQuestion || showBoards) && (
         <div className="min-w-0 space-y-4 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:pr-1">
           {showQuestion && pageQuestions.map((pageQuestion, offset) => {
@@ -574,15 +605,32 @@ export function TeachingModeClient({
                 total={questions.length}
                 showSolution={showSolution}
                 outlined={perPage > 1 && isBoardQuestion}
-                /* With several ข้อ on the page, one of them owns the board —
-                   say which, and let the teacher move it without leaving. */
-                boardAction={perPage > 1 ? (isBoardQuestion ? (
-                  <Badge variant="secondary"><Presentation /> กระดานของข้อนี้</Badge>
-                ) : (
-                  <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
-                    <Presentation /> เขียนกระดานข้อนี้
-                  </Button>
-                )) : undefined}
+                actions={
+                  <>
+                    {/* With several ข้อ on the page, one of them owns the board —
+                        say which, and let the teacher move it without leaving. */}
+                    {perPage > 1 && (isBoardQuestion ? (
+                      <Badge variant="secondary"><Presentation /> กระดานของข้อนี้</Badge>
+                    ) : (
+                      <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
+                        <Presentation /> เขียนกระดานข้อนี้
+                      </Button>
+                    ))}
+                    {/* The เฉลย and the hide control belong to the column, so
+                        they sit on the first ข้อ of the page rather than on
+                        every card or in the top bar. */}
+                    {offset === 0 && (
+                      <>
+                        <Button type="button" variant="outline" size="xs" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
+                          {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
+                        </Button>
+                        <Button type="button" variant="ghost" size="xs" onClick={() => setShowQuestion(false)}>
+                          <PanelLeftClose /> ซ่อนโจทย์
+                        </Button>
+                      </>
+                    )}
+                  </>
+                }
               />
             )
           })}
@@ -592,7 +640,10 @@ export function TeachingModeClient({
             <div className="flex items-center gap-2">
               <Presentation className="size-4 text-primary" />
               <h2 className="text-sm font-semibold">กระดานที่บันทึกไว้</h2>
-              {loadingBoards && <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />}
+              {loadingBoards && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+              <Button type="button" variant="ghost" size="xs" className="ml-auto" onClick={() => setShowBoards(false)}>
+                <PanelLeftClose /> ซ่อน
+              </Button>
             </div>
 
             {canManage ? (
