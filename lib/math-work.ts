@@ -1,6 +1,21 @@
 export const MATH_WORK_BUCKET = 'math-work-artifacts'
-export const MATH_WORK_PREVIEW_MIME = 'image/webp'
 export const MATH_WORK_SCENE_MIME = 'application/json'
+
+/**
+ * How a board preview is stored. WebP is the default; PNG exists because no
+ * version of Safari can encode WebP from a canvas, so iPad, iPhone and any
+ * Mac on Safari would otherwise have no way to save a drawing at all.
+ */
+export type WorkPreviewFormat = 'webp' | 'png'
+
+export const WORK_PREVIEW_MIMES: Record<WorkPreviewFormat, string> = {
+  webp: 'image/webp',
+  png: 'image/png',
+}
+
+export function isWorkPreviewFormat(value: unknown): value is WorkPreviewFormat {
+  return value === 'webp' || value === 'png'
+}
 export const MAX_WORK_PREVIEW_BYTES = 5 * 1024 * 1024
 export const MAX_WORK_SCENE_BYTES = 2 * 1024 * 1024
 export const MAX_WORK_ELEMENTS = 10_000
@@ -98,6 +113,7 @@ export function buildStudentWorkUploadPaths(input: {
   studentId: string
   submissionId: string
   submissionAnswerId: string
+  previewFormat: WorkPreviewFormat
   uploadId: string
   includeScene: boolean
 }): WorkUploadPaths {
@@ -115,7 +131,7 @@ export function buildStudentWorkUploadPaths(input: {
   ].join('/')
 
   return {
-    previewPath: `${prefix}/preview.webp`,
+    previewPath: `${prefix}/preview.${input.previewFormat}`,
     scenePath: input.includeScene ? `${prefix}/scene.json` : null,
   }
 }
@@ -126,6 +142,7 @@ export function buildTeachingBoardUploadPaths(input: {
   questionId: string
   slot: number
   uploadId: string
+  previewFormat: WorkPreviewFormat
 }): WorkUploadPaths {
   assertUuid('teacherId', input.teacherId)
   assertUuid('assignmentId', input.assignmentId)
@@ -145,7 +162,7 @@ export function buildTeachingBoardUploadPaths(input: {
   ].join('/')
 
   return {
-    previewPath: `${prefix}/preview.webp`,
+    previewPath: `${prefix}/preview.${input.previewFormat}`,
     scenePath: `${prefix}/scene.json`,
   }
 }
@@ -164,16 +181,30 @@ export function hasWebpSignature(bytes: Uint8Array): boolean {
     && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
 }
 
-export function validateStoredWorkFile(input: {
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+
+export function hasPngSignature(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < PNG_MAGIC.length) return false
+  return PNG_MAGIC.every((byte, index) => bytes[index] === byte)
+}
+
+/** The bytes must match the format the caller claims, not just any image. */
+export function hasPreviewSignature(bytes: Uint8Array, format: WorkPreviewFormat): boolean {
+  return format === 'webp' ? hasWebpSignature(bytes) : hasPngSignature(bytes)
+}
+
+export function validateStoredWorkFile(input: (
+  | { kind: 'preview'; previewFormat: WorkPreviewFormat }
+  | { kind: 'scene' }
+) & {
   size: number | undefined
   contentType: string | undefined
-  kind: 'preview' | 'scene'
 }): { ok: true; size: number } | { ok: false; error: string } {
-  const expectedType = input.kind === 'preview' ? MATH_WORK_PREVIEW_MIME : MATH_WORK_SCENE_MIME
+  const expectedType = input.kind === 'preview' ? WORK_PREVIEW_MIMES[input.previewFormat] : MATH_WORK_SCENE_MIME
   const maxSize = input.kind === 'preview' ? MAX_WORK_PREVIEW_BYTES : MAX_WORK_SCENE_BYTES
 
   if (input.contentType !== expectedType) {
-    return { ok: false, error: input.kind === 'preview' ? 'ไฟล์ตัวอย่างต้องเป็น WebP' : 'ไฟล์ต้นฉบับต้องเป็น JSON' }
+    return { ok: false, error: input.kind === 'preview' ? 'ไฟล์ตัวอย่างต้องเป็น WebP หรือ PNG' : 'ไฟล์ต้นฉบับต้องเป็น JSON' }
   }
   if (!Number.isInteger(input.size) || !input.size || input.size < 1 || input.size > maxSize) {
     return { ok: false, error: input.kind === 'preview' ? 'ไฟล์ตัวอย่างมีขนาดไม่ถูกต้อง' : 'ไฟล์ต้นฉบับมีขนาดไม่ถูกต้อง' }

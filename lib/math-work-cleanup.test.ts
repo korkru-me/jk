@@ -27,6 +27,9 @@ describe('math-work orphan cleanup plan', () => {
     expect(isManagedMathWorkPath(teacherScene.replace('/5/', '/6/'))).toBe(false)
     expect(isManagedMathWorkPath(studentPreview.replace('preview.webp', '../preview.webp'))).toBe(false)
     expect(isManagedMathWorkPath(`other/${UPLOAD_ID}/preview.webp`)).toBe(false)
+    // Safari cannot encode WebP, so its boards are stored as PNG.
+    expect(isManagedMathWorkPath(studentPreview.replace('preview.webp', 'preview.png'))).toBe(true)
+    expect(isManagedMathWorkPath(studentPreview.replace('preview.webp', 'preview.gif'))).toBe(false)
   })
 
   it('deletes only old, unreferenced objects from managed paths', () => {

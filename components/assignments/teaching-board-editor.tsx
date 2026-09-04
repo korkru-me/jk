@@ -16,9 +16,15 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
+  clampStrokeWidth,
   createDrawingPreview,
   DRAWING_BACKGROUNDS,
+  DRAWING_DEFAULT_ITEM_STATE,
   drawingBackgroundStyle,
+  HIGHLIGHTER_INK,
+  MAX_STROKE_WIDTH,
+  MIN_STROKE_WIDTH,
+  PEN_INK,
   stableDrawingAppState,
   TRANSPARENT_CANVAS,
 } from '@/components/exam/drawing-board-utils'
@@ -69,6 +75,7 @@ export default function TeachingBoardEditor({
   const handledLoadRef = useRef(0)
   const handledResetRef = useRef(0)
   const [background, setBackground] = useState<ScratchpadBackground>('lined')
+  const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
   const [dirty, setDirty] = useState(false)
   const [apiReady, setApiReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -92,10 +99,11 @@ export default function TeachingBoardEditor({
     ignoreChangesRef.current = true
     api.resetScene()
     api.updateScene({
-      appState: { viewBackgroundColor: TRANSPARENT_CANVAS },
+      appState: { ...DRAWING_DEFAULT_ITEM_STATE, viewBackgroundColor: TRANSPARENT_CANVAS },
       captureUpdate: CaptureUpdateAction.NEVER,
     })
-    api.setActiveTool({ type: 'freedraw' })
+    setStrokeWidth(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
+    api.setActiveTool({ type: 'freedraw', locked: true })
     api.history.clear()
     const scene = emptyScratchpadScene()
     sceneRef.current = scene
@@ -128,12 +136,16 @@ export default function TeachingBoardEditor({
       api.resetScene()
       api.updateScene({
         elements: scene.elements as readonly OrderedExcalidrawElement[],
-        appState: { ...scene.appState, viewBackgroundColor: TRANSPARENT_CANVAS } as AppState,
+        appState: {
+          ...DRAWING_DEFAULT_ITEM_STATE,
+          ...scene.appState,
+          viewBackgroundColor: TRANSPARENT_CANVAS,
+        } as AppState,
         captureUpdate: CaptureUpdateAction.NEVER,
       })
       api.addFiles(Object.values(scene.files) as BinaryFileData[])
       api.history.clear()
-      if (board.editable) api.setActiveTool({ type: 'freedraw' })
+      if (board.editable) api.setActiveTool({ type: 'freedraw', locked: true })
       sceneRef.current = scene
       setBackground(scene.background)
       markDirty(false)
@@ -161,7 +173,7 @@ export default function TeachingBoardEditor({
   useEffect(() => {
     if (!apiReady) return
     const frame = requestAnimationFrame(() => {
-      apiRef.current?.setActiveTool({ type: editable ? 'freedraw' : 'hand' })
+      apiRef.current?.setActiveTool({ type: editable ? 'freedraw' : 'hand', locked: true })
       releaseChangeGuard()
     })
     return () => cancelAnimationFrame(frame)
@@ -182,6 +194,8 @@ export default function TeachingBoardEditor({
       files,
       background,
     }
+    // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
+    setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
     if (contentChanged && !ignoreChangesRef.current && editable) markDirty(true)
   }, [background, editable, markDirty])
 
@@ -196,15 +210,27 @@ export default function TeachingBoardEditor({
     const api = apiRef.current
     if (!api || !editable) return
     if (kind === 'eraser') {
-      api.setActiveTool({ type: 'eraser' })
+      api.setActiveTool({ type: 'eraser', locked: true })
       return
     }
+    const ink = kind === 'pen' ? PEN_INK : HIGHLIGHTER_INK
     api.updateScene({
-      appState: kind === 'pen'
-        ? { currentItemStrokeColor: '#172554', currentItemStrokeWidth: 2, currentItemOpacity: 100 }
-        : { currentItemStrokeColor: '#facc15', currentItemStrokeWidth: 4, currentItemOpacity: 35 },
+      appState: {
+        currentItemStrokeColor: ink.color,
+        currentItemStrokeWidth: ink.width,
+        currentItemOpacity: ink.opacity,
+      },
     })
-    api.setActiveTool({ type: 'freedraw' })
+    setStrokeWidth(ink.width)
+    api.setActiveTool({ type: 'freedraw', locked: true })
+  }
+
+  const chooseStrokeWidth = (value: number) => {
+    const api = apiRef.current
+    if (!api || !editable) return
+    const next = clampStrokeWidth(value)
+    setStrokeWidth(next)
+    api.updateScene({ appState: { currentItemStrokeWidth: next } })
   }
 
   const saveBoard = async () => {
@@ -237,6 +263,7 @@ export default function TeachingBoardEditor({
         questionId,
         slot,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
+        previewFormat: preview.format,
       })
       if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่บันทึกไม่สำเร็จ')
       if (!prepared.scene) throw new Error('เตรียมไฟล์ต้นฉบับไม่สำเร็จ')
@@ -244,8 +271,8 @@ export default function TeachingBoardEditor({
       const { createClient } = await import('@/lib/supabase/client')
       const bucket = createClient().storage.from(MATH_WORK_BUCKET)
       await Promise.allSettled([
-        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview, {
-          contentType: 'image/webp',
+        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
+          contentType: preview.blob.type,
           cacheControl: '300',
         }),
         bucket.uploadToSignedUrl(prepared.scene.path, prepared.scene.token, sceneBlob, {
@@ -260,6 +287,7 @@ export default function TeachingBoardEditor({
         uploadId: prepared.uploadId,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         replaceExisting: Boolean(board),
+        previewFormat: preview.format,
       })
       if (!saved || 'error' in saved) throw new Error(saved?.error ?? 'บันทึกกระดานสอนไม่สำเร็จ')
       markDirty(false)
@@ -309,6 +337,22 @@ export default function TeachingBoardEditor({
               <Eraser /> ยางลบ
             </Button>
             <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            <label className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+              ขนาดเส้น
+              <input
+                type="range"
+                min={MIN_STROKE_WIDTH}
+                max={MAX_STROKE_WIDTH}
+                step={1}
+                value={strokeWidth}
+                onChange={event => chooseStrokeWidth(Number(event.target.value))}
+                disabled={!editable}
+                aria-label="ขนาดเส้น"
+                className="h-1 w-24 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <span className="w-3 text-right font-mono text-[10px] text-foreground" aria-hidden="true">{strokeWidth}</span>
+            </label>
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
             {DRAWING_BACKGROUNDS.map(item => (
               <Button
                 key={item.value}
@@ -337,7 +381,7 @@ export default function TeachingBoardEditor({
           <Excalidraw
             initialData={{
               elements: [],
-              appState: { viewBackgroundColor: TRANSPARENT_CANVAS },
+              appState: { ...DRAWING_DEFAULT_ITEM_STATE, viewBackgroundColor: TRANSPARENT_CANVAS },
               files: {},
               scrollToContent: false,
             }}

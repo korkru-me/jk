@@ -3,8 +3,9 @@ import { isOlderThan, ORPHAN_GRACE_MS, totalBytes, type StoredFile } from '@/lib
 export const MATH_WORK_ORPHAN_GRACE_MS = ORPHAN_GRACE_MS
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-const STUDENT_OBJECT = new RegExp(`^students/${UUID}/${UUID}/${UUID}/${UUID}/(?:preview\\.webp|scene\\.json)$`, 'i')
-const TEACHER_OBJECT = new RegExp(`^teachers/${UUID}/${UUID}/${UUID}/[1-5]/${UUID}/(?:preview\\.webp|scene\\.json)$`, 'i')
+const PREVIEW = 'preview\\.(?:webp|png)'
+const STUDENT_OBJECT = new RegExp(`^students/${UUID}/${UUID}/${UUID}/${UUID}/(?:${PREVIEW}|scene\\.json)$`, 'i')
+const TEACHER_OBJECT = new RegExp(`^teachers/${UUID}/${UUID}/${UUID}/[1-5]/${UUID}/(?:${PREVIEW}|scene\\.json)$`, 'i')
 
 /** Only paths produced by the signed-upload builders are eligible for deletion. */
 export function isManagedMathWorkPath(path: string): boolean {

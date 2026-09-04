@@ -51,7 +51,7 @@
 - กระดาษที่ยังไม่แนบ autosave เฉพาะใน IndexedDB ของอุปกรณ์เพื่อกู้จาก reload/browser crash และไม่อัปโหลดทุกเส้นขึ้น server
 - local scene แยกอย่างน้อยด้วย user, submission, submission answer และ part/blank identity เพื่อไม่ไหลข้ามบัญชีหรือ attempt
 - local scene ถูกลบเมื่อส่งสำเร็จ attempt ใช้งานต่อไม่ได้ หรือเกิน TTL ที่กำหนด
-- การกด “แนบจากกระดาษทด” เท่านั้นที่สร้างภาพ WebP preview และ scene ต้นฉบับใน private Storage
+- การกด “แนบจากกระดาษทด” เท่านั้นที่สร้างภาพ preview (WebP หรือ PNG เมื่อเบราว์เซอร์เข้ารหัส WebP ไม่ได้) และ scene ต้นฉบับใน private Storage
 - วิธีทำที่สร้างในระบบแก้ได้จน submission ถูกส่ง หลังส่งแล้วเป็น read-only เพื่อรักษาหลักฐานของ attempt
 - รูปถ่ายเดิมแก้เส้นภายในภาพไม่ได้ แต่เปิดเป็นพื้นหลังแล้วเขียนทับเพิ่มเติมก่อนส่งได้
 - Attempt ใหม่เริ่มกระดาษใหม่ วิธีทำของ attempt เก่ายังคงอยู่กับผลครั้งเดิม
@@ -112,7 +112,7 @@
 ของที่ส่งมอบในเฟส 5:
 
 - ช่องคำตอบตัวเลขแต่ละข้อ/ข้อย่อยมีส่วน “วิธีทำ” ที่เลือกเขียนบนกระดาษทดหรือแนบรูปจากอุปกรณ์ได้ ครู preview ขั้นตอนนี้ใน memory เท่านั้นและไม่สร้างไฟล์บน server
-- เมื่อกดแนบ ระบบ render เฉพาะตอนนั้นเป็น WebP preview คู่กับ versioned scene แล้วอัปโหลดผ่าน token ที่ผูกกับ answer/path; Server Action ตรวจสิทธิ์ attempt, เวลา, SEB/Android gate, MIME, ขนาด, WebP signature, scene version และจำนวน element ก่อนสร้างหรือแทนที่ reference
+- เมื่อกดแนบ ระบบ render เฉพาะตอนนั้นเป็น preview คู่กับ versioned scene แล้วอัปโหลดผ่าน token ที่ผูกกับ answer/path; client แจ้งชนิดภาพที่ encode ได้จริง (`webp` หรือ `png`) และ Server Action ตรวจสิทธิ์ attempt, เวลา, SEB/Android gate, MIME, ขนาด, signature ที่ต้องตรงกับชนิดที่แจ้ง, scene version และจำนวน element ก่อนสร้างหรือแทนที่ reference
 - Artifact หนึ่ง logical slot มีฉบับปัจจุบันหนึ่งรายการ นักเรียนเห็น thumbnail, นำออก, เปิด scene ที่แนบกลับมาแก้และอัปเดตได้ตราบใดที่ submission ยัง `in_progress`; การแทนที่ลบไฟล์ฉบับเดิมแบบ best effort หลัง reference ใหม่สำเร็จ
 - กติกา “บังคับแนบวิธีทำ” ยอมรับทั้ง artifact จากกระดาษทดและ `work_images` เดิมต่อข้อย่อย โดยตรวจทั้งใน UI และฝั่ง server ก่อน finalize จึงข้ามด้วยการเรียก action ตรง ๆ ไม่ได้
 - หน้าผลลัพธ์แสดงภาพวิธีทำแบบ read-only ผ่าน signed URL อายุสั้นแก่ผู้ที่ผ่านสิทธิ์ดูรายละเอียดคำตอบ และไม่ส่ง scene ต้นฉบับไปยังหน้านี้
@@ -123,6 +123,7 @@
 
 - หน้ารายละเอียดงานมีปุ่ม “โหมดสอน” แยกจาก preview นักเรียน ครูเปิดโจทย์ตามลำดับจริง แสดง/ซ่อนเฉลย และเขียนข้างโจทย์ได้โดยไม่สร้าง submission หรือแก้โจทย์ต้นฉบับ
 - กระดานสอนใช้เครื่องมือวาดและพื้นกระดาษชุดเดียวกับกระดาษทด บันทึกเฉพาะเมื่อครูกด โดยสร้าง WebP preview คู่กับ versioned scene ใน private Storage และเปิด scene เดิมกลับมาแก้ได้
+- แป้นเครื่องมือของทั้งสองกระดานล็อกเครื่องมือที่เลือกไว้หลังวาดเสร็จ (`activeTool.locked`) มีสไลเดอร์ขนาดเส้น 1–12 ที่ sync สองทางกับปุ่มขนาดของ Excalidraw และกระดานใหม่เริ่มที่ปากกา `#172554` เส้นหนา 2 เส้นทึบ พื้นรูปโปร่งใส sloppiness architect; ฉากที่บันทึกไว้แล้วยังคืนค่าเดิมของตัวเอง
 - ผู้สร้างแต่ละคนมี 5 slots ต่อ assignment + question; การบันทึกทับต้องยืนยัน ผู้สร้างเท่านั้นที่แก้หรือลบ ส่วนครูร่วมที่มีสิทธิ์อ่านเปิดดูสำเนาของผู้อื่นแบบ read-only พร้อมชื่อผู้สร้างได้
 - การเปลี่ยนข้อ เปิด slot อื่น หรือออกจากโหมดสอนขณะมีเส้นที่ยังไม่บันทึกต้องยืนยันก่อน; กระดานเปล่าไม่อัปโหลด และการลบเอาทั้ง reference, preview และ scene ออกแบบ best effort
 - authenticated browser QA ผ่านการบันทึก เปิดแก้ บันทึกทับ ลบ เตือนก่อนทิ้งงาน และ layout desktop/mobile โดยหลัง QA ไม่มีไฟล์ทดสอบค้าง
@@ -143,7 +144,7 @@
 - authenticated browser QA ยืนยันหน้า preview และโหมดสอนด้วยบัญชีครูจริง รวมเส้นทางกลับที่รักษาหน้าต้นทาง ป้ายชนิดโจทย์ภาษาไทย และการไม่แย่ง keyboard focus เมื่อ editor โหลด; flow บันทึก–เปิดแก้–แทนที่–ลบและ navigation guard ผ่านตั้งแต่เฟส 6 โดยลบข้อมูล QA ออกจาก Storage แล้ว
 - โหมดสอนลด focus ซ้ำของ slot ว่างให้เหลือ action เดียวต่อช่อง ปุ่มของแอปมี accessible name และพื้นที่ editor เป็น region ที่มีชื่อ/status แบบ `aria-live`; ปุ่มเมนูมือถือที่ไม่มีชื่อหนึ่งจุดเป็นของ Excalidraw upstream ไม่ใช่ปุ่มที่ KorKru สร้าง
 - ตรวจ layout จริงที่ desktop, mobile 390×844 และ tablet 820×1180 แล้วไม่เกิด document overflow แนวนอน และ reset viewport หลังตรวจ
-- rollout audit แบบอ่านอย่างเดียวยืนยันว่า bucket `math-work-artifacts` เป็น private จำกัด 5 MiB และรับเฉพาะ WebP/JSON, ตาราง artifact/teaching board ไม่มีข้อมูล QA ค้าง, migration local/remote ตรงกัน และ production cleanup dry-run จบโดยไม่ลบข้อมูล
+- rollout audit แบบอ่านอย่างเดียวยืนยันว่า bucket `math-work-artifacts` เป็น private จำกัด 5 MiB และรับเฉพาะ WebP/JSON (เพิ่ม `image/png` ภายหลังด้วย migration `20260904023417`), ตาราง artifact/teaching board ไม่มีข้อมูล QA ค้าง, migration local/remote ตรงกัน และ production cleanup dry-run จบโดยไม่ลบข้อมูล
 - ชุดตรวจสุดท้ายผ่าน 58 test files / 694 tests, TypeScript, design-token lint และ production build; bundle หน้า take ยังเท่าเฟส 7 ที่ 17 chunks, 786,060 bytes raw / 239,718 bytes gzip และไม่พบ Excalidraw, mathjs, Supabase browser client หรือ cleanup server code ใน initial union
 - deployment นี้ยังไม่มี Vercel project link/CLI และยังไม่ได้ตั้ง `CRON_SECRET` ใน environment ที่ตรวจ จึงเป็น **พร้อม deploy แต่ cron ยังไม่ทำงานจริง** จนกว่าจะผูก deployment และตั้ง secret อย่างน้อย 32 ตัวอักษร
 - รอบนี้ไม่มี credential นักเรียนและไม่มี fixture หลายองค์กรสำหรับ live authorization test; หน้า preview ของงานที่ใช้ตรวจปิด calculator/scratchpad และไม่มีงานออนไลน์ในฐานที่เปิด flag เหล่านี้ จึงอ้างเฉพาะ authenticated teacher QA รอบสุดท้าย ส่วน enabled-tool browser flows ใช้ผล QA จากเฟส 2–6 และยังต้องเพิ่ม automated multi-role RLS test ก่อนประกาศพร้อมใช้จริงทั้งระบบ
@@ -162,7 +163,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 - `submission_answers.math_input_modes` เป็น object แยกจาก `student_answer`; object ว่างหมายถึง `DEG`
 - `student_work_artifacts` ผูก exact submission answer + part key พร้อม owner, tenant, source, private paths, ขนาด, element count และ format version
 - `teaching_boards` ผูก assignment + question + creator + slot 1–5 โดย unique/check constraint บังคับเพดานจริง
-- Private bucket `math-work-artifacts` รับเฉพาะ WebP/JSON และไม่มี `storage.objects` policy สำหรับ client; Server Action ออก path-bound signed upload token และ signed read URL อายุสั้นหลังตรวจสิทธิ์
+- Private bucket `math-work-artifacts` รับเฉพาะ WebP/PNG/JSON และไม่มี `storage.objects` policy สำหรับ client; Server Action ออก path-bound signed upload token และ signed read URL อายุสั้นหลังตรวจสิทธิ์
 
 `submission_answers.work_images` และ public URLs เก่าต้องอ่านได้ต่อ ห้าม migration บังคับย้ายข้อมูลเก่าก่อนเส้นทางใหม่พร้อม กติกา “แนบวิธีทำครบ” ต้องยอมรับรูปเก่าหรือ artifact ใหม่โดยไม่เปลี่ยนคะแนนและ answer snapshot เดิม
 

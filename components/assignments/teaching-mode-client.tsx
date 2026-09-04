@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  FileText,
   Loader2,
   Plus,
   Presentation,
@@ -24,6 +25,7 @@ import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
 import type { TeachingBoardView } from '@/lib/math-work'
 import { TYPE_LABEL } from '@/lib/question-display'
+import { TeachingTryAnswer } from './teaching-try-answer'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
   ssr: false,
@@ -233,6 +235,10 @@ export function TeachingModeClient({
   const [selectedSlot, setSelectedSlot] = useState(initialSlot)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(initialBoard?.id ?? null)
   const [showSolution, setShowSolution] = useState(false)
+  const [showQuestion, setShowQuestion] = useState(true)
+  // The slots start put away: a teacher opens them to switch or save a board
+  // and then wants the width back for writing.
+  const [showBoards, setShowBoards] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [loadingBoards, setLoadingBoards] = useState(false)
   const [loadNonce, setLoadNonce] = useState(initialBoard ? 1 : 0)
@@ -380,11 +386,17 @@ export function TeachingModeClient({
             <p className="line-clamp-2 text-xs text-muted-foreground">กระดานแยกตามโจทย์ · ผู้สร้างแก้ไขได้สูงสุด 5 ช่อง</p>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2 sm:justify-end">
+        <div className="mt-3 flex flex-wrap items-center gap-2 sm:justify-end">
           <Button type="button" variant="outline" size="sm" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
             {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
           </Button>
-          <div className="flex items-center gap-1">
+          <Button type="button" variant={showQuestion ? 'outline' : 'secondary'} size="sm" onClick={() => setShowQuestion(value => !value)} aria-pressed={!showQuestion}>
+            <FileText />{showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
+          </Button>
+          <Button type="button" variant={showBoards ? 'secondary' : 'outline'} size="sm" onClick={() => setShowBoards(value => !value)} aria-pressed={showBoards}>
+            <Presentation />{showBoards ? 'ซ่อนช่องกระดาน' : 'ช่องกระดาน'}
+          </Button>
+          <div className="flex items-center gap-1 sm:ml-2">
             <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(questionIndex - 1)} disabled={questionIndex === 0} aria-label="ข้อก่อนหน้า">
               <ChevronLeft />
             </Button>
@@ -396,12 +408,21 @@ export function TeachingModeClient({
         </div>
       </Card>
 
-      <div className="grid min-h-0 min-w-0 flex-1 gap-4 lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]">
+      {/* With the ข้อ and the slots put away the column disappears entirely,
+          which is what gives the board the whole width to write on. */}
+      <div className={`grid min-h-0 min-w-0 flex-1 gap-4 ${
+        showQuestion || showBoards ? 'lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]' : ''
+      }`}>
+        {(showQuestion || showBoards) && (
         <div className="min-w-0 space-y-4 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:pr-1">
-          <Card padding="lg">
+          {showQuestion && (
+          <Card padding="lg" className="space-y-4">
             <TeachingQuestion question={question} index={questionIndex} total={questions.length} showSolution={showSolution} />
+            <TeachingTryAnswer question={question} revealAnswerKey={showSolution} />
           </Card>
+          )}
 
+          {showBoards && (
           <Card padding="md" className="space-y-3">
             <div className="flex items-center gap-2">
               <Presentation className="size-4 text-primary" />
@@ -415,40 +436,45 @@ export function TeachingModeClient({
                   const saved = ownBoards.find(board => board.slot === slot) ?? null
                   const selected = selectedSlot === slot && (!selectedBoard || selectedBoard.createdBy === currentUserId)
                   return (
-                    <div key={slot} className={`rounded-xl border p-2 ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}>
-                      {saved?.previewUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={saved.previewUrl}
-                          alt={`กระดานช่อง ${slot}`}
-                          className="mb-2 aspect-square w-full rounded-lg border bg-card object-cover"
-                          onError={() => void fetchBoards(question.id)}
-                        />
-                      ) : (
+                    <div key={slot} className="relative min-w-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => void openOwnSlot(slot)}
+                        aria-pressed={selected}
+                        aria-label={saved ? `เปิดกระดานช่อง ${slot}` : `เริ่มกระดานช่อง ${slot}`}
+                        className={`h-auto w-full flex-col items-stretch gap-2 whitespace-normal rounded-xl border p-2 ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
+                      >
+                        {saved?.previewUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={saved.previewUrl}
+                            alt=""
+                            className="aspect-square w-full rounded-lg border bg-card object-cover"
+                            onError={() => void fetchBoards(question.id)}
+                          />
+                        ) : (
+                          <span className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground">
+                            <Plus className="size-5" />
+                          </span>
+                        )}
+                        <span className="text-center text-xs font-medium">ช่อง {slot}</span>
+                      </Button>
+                      {/* A slot is only a fifth of the sidebar wide: beside the
+                          label this button overflowed under the next slot, which
+                          then swallowed every click on it. */}
+                      {saved && (
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => void openOwnSlot(slot)}
-                          className="mb-2 aspect-square h-auto w-full border-dashed p-0 text-muted-foreground hover:border-primary hover:text-primary"
-                          aria-label={`เริ่มกระดานช่อง ${slot}`}
+                          size="icon-sm"
+                          className="absolute right-1 top-1 bg-card/90 shadow-sm"
+                          onClick={() => void deleteBoard(saved)}
+                          aria-label={`ลบกระดานช่อง ${slot}`}
                         >
-                          <Plus className="size-5" />
+                          <Trash2 />
                         </Button>
                       )}
-                      <div className="flex items-center gap-1">
-                        {saved ? (
-                          <Button type="button" variant={selected ? 'secondary' : 'ghost'} size="xs" className="flex-1" onClick={() => void openOwnSlot(slot)}>
-                            ช่อง {slot}
-                          </Button>
-                        ) : (
-                          <p className="flex-1 py-1 text-center text-xs font-medium">ช่อง {slot}</p>
-                        )}
-                        {saved && (
-                          <Button type="button" variant="ghost" size="icon-xs" onClick={() => void deleteBoard(saved)} aria-label={`ลบกระดานช่อง ${slot}`}>
-                            <Trash2 />
-                          </Button>
-                        )}
-                      </div>
                     </div>
                   )
                 })}
@@ -483,7 +509,9 @@ export function TeachingModeClient({
               </div>
             )}
           </Card>
+          )}
         </div>
+        )}
 
         <div className="min-h-[560px] min-w-0 lg:min-h-0">
           <TeachingBoardEditor

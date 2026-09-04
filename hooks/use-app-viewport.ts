@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { appShellHeight } from '@/lib/app-viewport'
 
 /**
  * Keeps the app shell exactly as tall as the part of the window the user can
@@ -26,8 +27,10 @@ import { useEffect } from 'react'
  * Sizing the shell to `visualViewport.height` gives <main> exactly the
  * keyboard's worth of room back, so WebKit has no reason to scroll the
  * document at all, and resetting the scroll undoes any offset it took anyway.
- * A pinch-zoomed page is left alone: panning a zoomed page is a deliberate
- * gesture, not a bug to correct.
+ * A pinch-zoomed page is left alone entirely — neither resized nor scrolled:
+ * its visual viewport is a fraction of the layout viewport on purpose, and
+ * sizing the shell to that is what left a white band across the bottom of a
+ * zoomed-in board. `appShellHeight` owns that decision.
  *
  * Browsers without `visualViewport` keep the `100dvh` fallback in the shell's
  * own class, so nothing here has to run for the layout to be correct.
@@ -43,8 +46,12 @@ export function useAppViewport() {
     const sync = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        root.style.setProperty('--app-height', `${Math.round(viewport.height)}px`)
-        if (viewport.scale > 1.01) return
+        const height = appShellHeight(viewport)
+        if (height === null) {
+          root.style.removeProperty('--app-height')
+          return
+        }
+        root.style.setProperty('--app-height', `${height}px`)
         if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0)
       })
     }
