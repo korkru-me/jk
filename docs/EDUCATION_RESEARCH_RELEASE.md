@@ -6,7 +6,7 @@
 
 ระยะ 4 นำความสามารถวิจัยพัฒนาผู้เรียนแบบกลุ่มเดียววัดก่อน–หลังที่เสร็จในระยะ 2.1–2.5 และผ่าน technical/read-only UAT ระยะ 3.1 เข้า `master` เพื่อ deploy ผ่าน GitHub integration ของ Vercel
 
-source release คือ branch `feat/education-research-uat` ที่ commit `7669d60` ซึ่งต่อยอดจาก export commit `732d98a` และ `master` เดิม `520bb7a` โดยไม่มีการแก้ schema เพิ่มในระยะ 4
+source release คือ branch `feat/education-research-uat` ที่ commit `bec127b` ซึ่งรวม UAT hardening commit `7669d60`, export commit `732d98a` และเอกสารระยะ 4 แล้วนำเข้า `master` ด้วย merge commit `f7448f9` โดยไม่มีการแก้ schema เพิ่มในระยะ 4
 
 ## การตัดสินใจของระยะ 4
 
@@ -24,6 +24,15 @@ source release คือ branch `feat/education-research-uat` ที่ commit `
 - local/remote migration history ตรงกัน และไม่มี migration ค้าง
 - คู่มือครูอยู่ใน `docs/EDUCATION_RESEARCH_USER_GUIDE.md`
 
+ผลตรวจจาก source ก่อน merge:
+
+- Preview deployment ของ `7669d60`: สำเร็จ
+- `npm test`: 65 test files, 729 tests ผ่าน
+- `npx tsc --noEmit`: ผ่าน
+- `npm run lint:tokens`: ผ่าน ไม่มีไฟล์ถดถอย
+- `npm run build`: ผ่าน และมี route งานวิจัย/ส่งออกครบ
+- `supabase migration list`: local/remote ตรงกันถึง `20260904133949`; ไม่มี `supabase db push` ในระยะนี้
+
 ## เกณฑ์หลัง deploy
 
 - Vercel production deployment ของ `master` สำเร็จ
@@ -34,7 +43,19 @@ source release คือ branch `feat/education-research-uat` ที่ commit `
 
 ## บันทึก deployment
 
-สถานะ: รอ merge และ production smoke test
+สถานะ: **deploy production สำเร็จ และ public/auth-guard smoke test ผ่าน**
+
+- Merge commit: `f7448f95bd3c68c2f6c83a238553fb0576d58aea`
+- Production deployment ID: `6266510692`
+- Vercel deployment URL: `https://jk-200z4dw1k-korkru-mes-projects.vercel.app`
+- Production alias ที่ตรวจ: `https://jk-three-beta.vercel.app`
+- Vercel รายงานสำเร็จ: 4 กันยายน 2569 เวลา 21:31:55 น. (Asia/Bangkok)
+- หน้า `/` ตอบสนองและแสดงหน้า KorKru โดยไม่มี console error/warning
+- ผู้ไม่ล็อกอินเข้า `/research` ถูกส่งไป `/login` ถูกต้อง และหน้าเข้าสู่ระบบแสดงครบโดยไม่มี console error/warning
+- ตรวจ auth guard ซ้ำทั้ง in-app browser และ Chrome ได้ผลตรงกัน
+- ไม่ได้สร้าง แก้ หรือลบโครงการ นักเรียน คะแนน หรือ fixture ใดระหว่าง smoke test
+
+ข้อจำกัดของ smoke test: browser ทั้งสองไม่มี production session ที่ล็อกอินอยู่ จึงยังไม่ได้ตรวจ `/research` หลังล็อกอินบน production ในรอบนี้ การตรวจ authenticated read-only เคยผ่านบน local ที่ต่อฐานข้อมูลจริงในระยะ 3.1 แล้ว แต่ไม่ถือเป็นหลักฐานแทน production session รายการนี้จึงรวมอยู่กับ UAT โครงการจริงระยะ 3.2
 
 ## งานที่ยังเหลือหลังปล่อย
 
