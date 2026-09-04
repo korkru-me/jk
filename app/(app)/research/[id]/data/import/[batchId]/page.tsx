@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type {
   EducationResearchImportBatch,
   EducationResearchImportBatchRow,
@@ -30,18 +31,45 @@ export default async function ResearchExcelPreviewPage({ params }: { params: Pro
 
   const [batchResult, rowsResult, measurementsResult, participantsResult, scoresResult] = await Promise.all([
     supabase.from('education_research_import_batches').select('*').eq('id', batchId).eq('project_id', project.id).maybeSingle(),
-    supabase.from('education_research_import_batch_rows').select('*').eq('batch_id', batchId).eq('project_id', project.id).order('row_number'),
+    fetchAllRows<EducationResearchImportBatchRow>((from, to) => supabase
+      .from('education_research_import_batch_rows')
+      .select('*')
+      .eq('batch_id', batchId)
+      .eq('project_id', project.id)
+      .order('row_number', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to), { maxRows: 2000 }),
     supabase.from('education_research_measurements').select('*').eq('project_id', project.id),
-    supabase.from('education_research_participants').select('id').eq('project_id', project.id),
-    supabase.from('education_research_scores').select('*').eq('project_id', project.id),
+    fetchAllRows<{ id: string }>((from, to) => supabase
+      .from('education_research_participants')
+      .select('id')
+      .eq('project_id', project.id)
+      .order('id', { ascending: true })
+      .range(from, to), { maxRows: 2000 }),
+    fetchAllRows<EducationResearchScore>((from, to) => supabase
+      .from('education_research_scores')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('participant_id', { ascending: true })
+      .order('measurement_id', { ascending: true })
+      .range(from, to)),
   ])
-  if (!batchResult.data || rowsResult.error) notFound()
+  if (
+    batchResult.error
+    || rowsResult.error
+    || measurementsResult.error
+    || participantsResult.error
+    || scoresResult.error
+  ) {
+    throw new Error('Failed to load education research import preview')
+  }
+  if (!batchResult.data) notFound()
 
   const measurements = (measurementsResult.data ?? []) as EducationResearchMeasurement[]
   const pretest = measurements.find(item => item.measurement_type === 'pretest') ?? null
   const posttest = measurements.find(item => item.measurement_type === 'posttest') ?? null
-  const participants = participantsResult.data ?? []
-  const scores = (scoresResult.data ?? []) as EducationResearchScore[]
+  const participants = participantsResult.rows
+  const scores = scoresResult.rows
   const scoreByKey = new Set(scores.map(score => `${score.participant_id}:${score.measurement_id}`))
   const pairedCount = participants.filter(participant => pretest && posttest && scoreByKey.has(`${participant.id}:${pretest.id}`) && scoreByKey.has(`${participant.id}:${posttest.id}`)).length
 
@@ -52,7 +80,7 @@ export default async function ResearchExcelPreviewPage({ params }: { params: Pro
       <ResearchExcelPreviewClient
         projectId={project.id}
         batch={batchResult.data as EducationResearchImportBatch}
-        rows={(rowsResult.data ?? []) as EducationResearchImportBatchRow[]}
+        rows={rowsResult.rows}
         pretestMax={pretest?.max_score === null || pretest?.max_score === undefined ? null : Number(pretest.max_score)}
         posttestMax={posttest?.max_score === null || posttest?.max_score === undefined ? null : Number(posttest.max_score)}
         pairedCount={pairedCount}

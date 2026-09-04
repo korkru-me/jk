@@ -16,6 +16,7 @@ import {
   selectResearchAnalysisData,
 } from '@/lib/education-research-statistics'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type {
   EducationResearchMeasurement,
   EducationResearchProject,
@@ -35,6 +36,7 @@ import {
   type ResearchDataHistoryItem,
   type ResearchDataUsedRow,
 } from './_components/research-data-used-panel'
+import { ResearchDataExportDialog } from './_components/research-data-export-dialog'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ผลวิเคราะห์งานวิจัย — KorKru' }
@@ -49,6 +51,7 @@ type ParticipantQueryRow = {
 }
 
 const PAGE_SIZE = 20
+const PROFILE_LOOKUP_CHUNK_SIZE = 200
 
 export default async function ResearchResultsPage({
   params,
@@ -92,15 +95,20 @@ export default async function ResearchResultsPage({
       .from('education_research_measurements')
       .select('id, org_id, project_id, measurement_type, source_type, assignment_id, max_score, selection_mode, source_set_id, source_sections, source_question_ids, snapshot_question_ids, duration_minutes, created_at, updated_at')
       .eq('project_id', project.id),
-    supabase
+    fetchAllRows<ParticipantQueryRow>((from, to) => supabase
       .from('education_research_participants')
       .select('id, student_id, roster_order, users(id, full_name)')
       .eq('project_id', project.id)
-      .order('roster_order', { ascending: true, nullsFirst: false }),
-    supabase
+      .order('roster_order', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true })
+      .range(from, to) as unknown as PromiseLike<{ data: ParticipantQueryRow[] | null; error: unknown }>),
+    fetchAllRows<EducationResearchScore>((from, to) => supabase
       .from('education_research_scores')
       .select('*')
-      .eq('project_id', project.id),
+      .eq('project_id', project.id)
+      .order('participant_id', { ascending: true })
+      .order('measurement_id', { ascending: true })
+      .range(from, to)),
   ])
 
   if (measurementsResult.error || participantsResult.error || scoresResult.error) {
@@ -114,8 +122,8 @@ export default async function ResearchResultsPage({
   }
 
   const measurements = (measurementsResult.data ?? []) as EducationResearchMeasurement[]
-  const participants = (participantsResult.data ?? []) as unknown as ParticipantQueryRow[]
-  const scores = (scoresResult.data ?? []) as EducationResearchScore[]
+  const participants = participantsResult.rows
+  const scores = scoresResult.rows
   const pretest = measurements.find(measurement => measurement.measurement_type === 'pretest') ?? null
   const posttest = measurements.find(measurement => measurement.measurement_type === 'posttest') ?? null
   const pretestMaxScore = positiveNumber(pretest?.max_score)
@@ -217,15 +225,25 @@ async function renderDataUsedPanel({
 }) {
   const supabase = await createClient()
   const studentIds = participants.map(participant => participant.student_id)
-  const profilesResult = studentIds.length > 0
-    ? await supabase.from('student_profiles').select('student_id, student_code, class_number').in('student_id', studentIds)
-    : { data: [], error: null }
+  const profileRows: Array<Pick<StudentProfile, 'student_id' | 'student_code' | 'class_number'>> = []
+  let profileError: unknown = null
+  for (let offset = 0; offset < studentIds.length; offset += PROFILE_LOOKUP_CHUNK_SIZE) {
+    const { data, error } = await supabase
+      .from('student_profiles')
+      .select('student_id, student_code, class_number')
+      .in('student_id', studentIds.slice(offset, offset + PROFILE_LOOKUP_CHUNK_SIZE))
+    if (error) {
+      profileError = error
+      break
+    }
+    profileRows.push(...((data ?? []) as Array<Pick<StudentProfile, 'student_id' | 'student_code' | 'class_number'>>))
+  }
 
-  if (profilesResult.error) {
+  if (profileError) {
     return <DataQueryError />
   }
 
-  const profiles = new Map((profilesResult.data ?? []).map(profile => [
+  const profiles = new Map(profileRows.map(profile => [
     profile.student_id,
     profile as Pick<StudentProfile, 'student_id' | 'student_code' | 'class_number'>,
   ]))
@@ -340,16 +358,21 @@ async function renderDataUsedPanel({
 
 function ResultsHeader({ project, participantCount, maxScore }: { project: ProjectRow; participantCount: number | null; maxScore: number | null }) {
   return (
-    <div>
-      <p className="text-sm text-muted-foreground"><Link href="/research" className="hover:underline">วิจัยการศึกษา</Link> / ผลวิเคราะห์</p>
-      <h1 className="mt-1 text-2xl font-bold text-foreground">ผลวิเคราะห์: {project.title}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">{project.topic}</p>
-      <div className="mt-3 flex flex-wrap gap-2 text-sm">
-        <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><BookOpenCheck className="size-4 text-primary" aria-hidden="true" />{project.classrooms?.name ?? 'ไม่พบห้องเรียน'}</span>
-        {participantCount !== null && <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><Users className="size-4 text-primary" aria-hidden="true" />{participantCount} นักเรียน</span>}
-        {maxScore !== null && <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><BookOpenCheck className="size-4 text-primary" aria-hidden="true" />คะแนนเต็ม {formatCompact(maxScore)}</span>}
-        <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><Target className="size-4 text-primary" aria-hidden="true" />เกณฑ์ {formatCompact(Number(project.passing_threshold_percent))}%</span>
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
+        <p className="text-sm text-muted-foreground"><Link href="/research" className="hover:underline">วิจัยการศึกษา</Link> / ผลวิเคราะห์</p>
+        <h1 className="mt-1 text-2xl font-bold text-foreground">ผลวิเคราะห์: {project.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{project.topic}</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><BookOpenCheck className="size-4 text-primary" aria-hidden="true" />{project.classrooms?.name ?? 'ไม่พบห้องเรียน'}</span>
+          {participantCount !== null && <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><Users className="size-4 text-primary" aria-hidden="true" />{participantCount} นักเรียน</span>}
+          {maxScore !== null && <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><BookOpenCheck className="size-4 text-primary" aria-hidden="true" />คะแนนเต็ม {formatCompact(maxScore)}</span>}
+          <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><Target className="size-4 text-primary" aria-hidden="true" />เกณฑ์ {formatCompact(Number(project.passing_threshold_percent))}%</span>
+        </div>
       </div>
+      {participantCount !== null && participantCount > 0 && (
+        <ResearchDataExportDialog projectId={project.id} participantCount={participantCount} />
+      )}
     </div>
   )
 }

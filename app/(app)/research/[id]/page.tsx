@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type {
   AssignmentStatus,
   EducationResearchMeasurement,
@@ -63,15 +64,27 @@ export default async function ResearchProjectPage({
       .from('education_research_participants')
       .select('id', { count: 'exact', head: true })
       .eq('project_id', project.id),
-    supabase
+    fetchAllRows<{ measurement_id: string; participant_id: string }>((from, to) => supabase
       .from('education_research_scores')
       .select('measurement_id, participant_id')
-      .eq('project_id', project.id),
+      .eq('project_id', project.id)
+      .order('participant_id', { ascending: true })
+      .order('measurement_id', { ascending: true })
+      .range(from, to)),
   ])
+
+  if (
+    canManageResult.error
+    || measurementsResult.error
+    || participantsResult.error
+    || scoresResult.error
+  ) {
+    throw new Error('Failed to load education research project overview')
+  }
 
   const scoreCountByMeasurement = new Map<string, number>()
   const participantIdsByMeasurement = new Map<string, Set<string>>()
-  for (const score of scoresResult.data ?? []) {
+  for (const score of scoresResult.rows) {
     scoreCountByMeasurement.set(
       score.measurement_id,
       (scoreCountByMeasurement.get(score.measurement_id) ?? 0) + 1,

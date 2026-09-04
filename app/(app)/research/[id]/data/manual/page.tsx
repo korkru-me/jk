@@ -2,10 +2,12 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows, fetchRowsInChunks } from '@/lib/supabase/fetch-all-rows'
 import type {
   EducationResearchMeasurement,
   EducationResearchScore,
   EducationResearchScoreDraft,
+  StudentProfile,
 } from '@/lib/types'
 import { ResearchProjectNav } from '../../_components/research-project-nav'
 import { ManualScoreEntryClient, type ManualScoreEntryRow } from './_components/manual-score-entry-client'
@@ -14,6 +16,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'กรอกคะแนนงานวิจัย — KorKru' }
 
 type ParticipantRow = { id: string; student_id: string; roster_order: number | null; users: { full_name: string } | null }
+type ProfileRow = Pick<StudentProfile, 'student_id' | 'student_code' | 'class_number'>
 
 export default async function ManualResearchScoresPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -32,24 +35,54 @@ export default async function ManualResearchScoresPage({ params }: { params: Pro
 
   const [measurementsResult, participantsResult, scoresResult, draftsResult] = await Promise.all([
     supabase.from('education_research_measurements').select('*').eq('project_id', project.id),
-    supabase.from('education_research_participants').select('id, student_id, roster_order, users(full_name)').eq('project_id', project.id).order('roster_order', { ascending: true, nullsFirst: false }),
-    supabase.from('education_research_scores').select('*').eq('project_id', project.id),
-    supabase.from('education_research_score_drafts').select('*').eq('project_id', project.id).eq('saved_by', authUser.id),
+    fetchAllRows<ParticipantRow>((from, to) => supabase
+      .from('education_research_participants')
+      .select('id, student_id, roster_order, users(full_name)')
+      .eq('project_id', project.id)
+      .order('roster_order', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true })
+      .range(from, to) as unknown as PromiseLike<{ data: ParticipantRow[] | null; error: unknown }>),
+    fetchAllRows<EducationResearchScore>((from, to) => supabase
+      .from('education_research_scores')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('participant_id', { ascending: true })
+      .order('measurement_id', { ascending: true })
+      .range(from, to)),
+    fetchAllRows<EducationResearchScoreDraft>((from, to) => supabase
+      .from('education_research_score_drafts')
+      .select('*')
+      .eq('project_id', project.id)
+      .eq('saved_by', authUser.id)
+      .order('participant_id', { ascending: true })
+      .order('measurement_id', { ascending: true })
+      .range(from, to)),
   ])
+
+  if (
+    measurementsResult.error
+    || participantsResult.error
+    || scoresResult.error
+    || draftsResult.error
+  ) {
+    throw new Error('Failed to load manual education research scores')
+  }
 
   const measurements = (measurementsResult.data ?? []) as EducationResearchMeasurement[]
   const pretest = measurements.find(item => item.measurement_type === 'pretest') ?? null
   const posttest = measurements.find(item => item.measurement_type === 'posttest') ?? null
   if (pretest?.source_type !== 'manual' && posttest?.source_type !== 'manual') redirect(`/research/${project.id}/data`)
 
-  const participants = (participantsResult.data ?? []) as unknown as ParticipantRow[]
+  const participants = participantsResult.rows
   const studentIds = participants.map(participant => participant.student_id)
-  const { data: profiles } = studentIds.length > 0
-    ? await supabase.from('student_profiles').select('student_id, student_code, class_number').in('student_id', studentIds)
-    : { data: [] }
-  const profileByStudent = new Map((profiles ?? []).map(profile => [profile.student_id, profile]))
-  const scores = (scoresResult.data ?? []) as EducationResearchScore[]
-  const drafts = (draftsResult.data ?? []) as EducationResearchScoreDraft[]
+  const profilesResult = await fetchRowsInChunks<ProfileRow, string>(studentIds, chunk => supabase
+    .from('student_profiles')
+    .select('student_id, student_code, class_number')
+    .in('student_id', chunk))
+  if (profilesResult.error) throw new Error('Failed to load education research student profiles')
+  const profileByStudent = new Map(profilesResult.rows.map(profile => [profile.student_id, profile]))
+  const scores = scoresResult.rows
+  const drafts = draftsResult.rows
   const scoreByKey = new Map(scores.map(score => [`${score.participant_id}:${score.measurement_id}`, score]))
   const draftByKey = new Map(drafts.map(draft => [`${draft.participant_id}:${draft.measurement_id}`, draft]))
 
