@@ -400,11 +400,13 @@
 
 ## Supporting features
 
-### วิจัยการศึกษา — มีโค้ดรองรับ, ระยะ 3.1 ผ่าน
+### วิจัยการศึกษา — ระยะ 4 กำลังปล่อยแบบรุ่นทดลองควบคุม
 
 - รุ่นแรกแบบกลุ่มเดียววัดก่อน–หลังเสร็จครบระยะ 2.1–2.5 แล้ว: สร้างโครงการ/ข้อสอบ, คะแนนจริงสามช่องทาง, paired t-test, one-sample criterion t-test, 95% CI, effect size, กราฟ, CSV สรุป และ Excel รายบุคคลแบบไม่ระบุตัวตนหรือมีชื่อ/รหัส พร้อม RLS และ append-only export audit
 - Technical/read-only UAT ผ่านแล้ว: wizard จากข้อมูลจริงโดยไม่กดสร้าง, paired t-test เทียบ NIST, Excel ที่ขอบเขต 2,000 คน, anonymous export ข้าม 1,000 คน, upload/download permission guard, migration parity และ remote schema lint
 - แก้เส้นทางที่เคยเสี่ยงถูก PostgREST ตัดหลัง 1,000 แถวแล้ว รายละเอียดและ checklist ระยะ 3.2 สำหรับโครงการ/คะแนนห้องจริงอยู่ใน `docs/EDUCATION_RESEARCH_UAT.md`
+- เจ้าของผลิตภัณฑ์อนุมัติให้ merge/deploy ก่อนมีโครงการจริง จึงไม่อ้างว่าระยะ 3.2 ผ่าน ไม่สร้าง fixture ใน production และคง checklist หลายบทบาทเป็นงานหลังปล่อย รายละเอียดการตัดสินใจและ smoke test อยู่ใน `docs/EDUCATION_RESEARCH_RELEASE.md`
+- คู่มือครูตั้งแต่เตรียม roster, เลือกแหล่งคะแนน, อ่านผล ไปจนถึงส่งออกอย่างปลอดภัยอยู่ใน `docs/EDUCATION_RESEARCH_USER_GUIDE.md`
 
 ### Dashboard — มีโค้ดรองรับ (ฝั่งครู)
 

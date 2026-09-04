@@ -1,11 +1,12 @@
 # วิจัยการศึกษา
 
-สถานะ: ระยะที่ 2 เสร็จแล้ว (2.1–2.5) และระยะ 3.1 technical/read-only UAT ผ่านแล้ว — ระยะ 3.2 รอตรวจโครงการและคะแนนของห้องจริงโดยไม่สร้าง fixture ใน production
+สถานะ: ระยะที่ 2 เสร็จแล้ว (2.1–2.5), ระยะ 3.1 technical/read-only UAT ผ่านแล้ว และกำลังปล่อยระยะ 4 แบบรุ่นทดลองควบคุม — ระยะ 3.2 ยังรอตรวจโครงการและคะแนนของห้องจริงโดยไม่สร้าง fixture ใน production
 
 อัปเดตล่าสุด: 4 กันยายน 2569
 
 ## สถานะหลังกลับมาพัฒนา
 
+- คู่มือใช้งานสำหรับครูอยู่ใน `docs/EDUCATION_RESEARCH_USER_GUIDE.md` และเหตุผล/หลักฐานการปล่อยระยะ 4 อยู่ใน `docs/EDUCATION_RESEARCH_RELEASE.md`
 - รายละเอียดผล UAT, regression fix และ release gate ของข้อมูลจริงอยู่ใน `docs/EDUCATION_RESEARCH_UAT.md`
 - ระยะ 3.1 ตรวจ wizard ด้วยบัญชีจริงโดยหยุดก่อนสร้างโครงการ ตรวจสถิติเทียบ NIST, Excel 2,000 แถว, export ข้าม 1,000 แถว, route permissions, migration parity และ remote schema lint แล้ว
 - UAT พบและแก้การอ่านข้อมูลที่อาจถูก PostgREST ตัดหลัง 1,000 แถวในภาพรวม ข้อมูลคะแนน กรอกคะแนน preview import และแม่แบบ Excel พร้อมแบ่ง profile lookup เป็นชุดและเลิก query email ที่ไม่ได้ใช้
