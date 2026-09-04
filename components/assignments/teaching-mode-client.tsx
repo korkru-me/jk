@@ -27,6 +27,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
 import type { TeachingBoardView } from '@/lib/math-work'
+import type { ScratchpadScene } from '@/lib/scratchpad'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
 
@@ -479,7 +480,10 @@ export function TeachingModeClient({
   // and then wants the width back for writing.
   const [showBoards, setShowBoards] = useState(false)
   const [showBoard, setShowBoard] = useState(true)
-  const [dirty, setDirty] = useState(false)
+  // One board per ข้อ: what is on it stays with it, so leaving and coming
+  // back finds the same strokes, and a new ข้อ opens on a clean sheet.
+  const scenesRef = useRef(new Map<string, ScratchpadScene>())
+  const [dirtyQuestionIds, setDirtyQuestionIds] = useState<string[]>([])
   const [loadingQuestionIds, setLoadingQuestionIds] = useState<string[]>([])
   const [loadNonce, setLoadNonce] = useState(initialBoard ? 1 : 0)
   const [resetNonce, setResetNonce] = useState(initialBoard ? 0 : 1)
@@ -497,6 +501,7 @@ export function TeachingModeClient({
     const values = new Set([1, 2, 3, 4, 5, Math.max(1, Math.round(questionsPerPage) || 1)])
     return [...values].filter(value => value <= questions.length).sort((a, b) => a - b)
   }, [questions.length, questionsPerPage])
+  const dirty = dirtyQuestionIds.includes(question.id)
   const boards = useMemo(() => boardsByQuestion[question.id] ?? [], [boardsByQuestion, question.id])
   const selectedBoard = boards.find(board => board.id === selectedBoardId) ?? null
   const ownBoards = useMemo(
@@ -508,12 +513,21 @@ export function TeachingModeClient({
     if (initialBoardsError) toast.error(initialBoardsError)
   }, [initialBoardsError])
 
+  // Any ข้อ with unsaved strokes is worth warning about, not just the open one.
   useEffect(() => {
-    if (!dirty) return
+    if (dirtyQuestionIds.length === 0) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [dirty])
+  }, [dirtyQuestionIds])
+
+  const setDirty = useCallback((next: boolean) => {
+    setDirtyQuestionIds(current => {
+      const has = current.includes(question.id)
+      if (next === has) return current
+      return next ? [...current, question.id] : current.filter(id => id !== question.id)
+    })
+  }, [question.id])
 
   const fetchBoards = useCallback(async (questionId: string): Promise<TeachingBoardView[] | null> => {
     setLoadingQuestionIds(current => current.includes(questionId) ? current : [...current, questionId])
@@ -550,8 +564,9 @@ export function TeachingModeClient({
     }
   }, [fetchBoards, pageQuestionIds, showBoards])
 
-  const allowDiscard = async () => {
-    if (!dirty) return true
+  /** Asked only where strokes would actually be lost — never on a plain move. */
+  const allowDiscard = async (questionId = question.id) => {
+    if (!dirtyQuestionIds.includes(questionId)) return true
     return confirm({
       title: 'ทิ้งสิ่งที่ยังไม่ได้บันทึก?',
       description: 'เส้นที่เขียนหลังการบันทึกล่าสุดจะหายไป แต่กระดานที่บันทึกไว้แล้วไม่ถูกลบ',
@@ -560,18 +575,28 @@ export function TeachingModeClient({
     })
   }
 
+  /**
+   * Moves to another ข้อ, which parks this board and opens that ข้อ's own.
+   *
+   * Nothing is thrown away, so this asks nothing — unless a saved slot is
+   * being opened over strokes the target ข้อ still holds.
+   */
   const changeQuestion = async (nextIndex: number, preferredSlot?: number) => {
-    if (nextIndex < 0 || nextIndex >= questions.length || !await allowDiscard()) return
+    if (nextIndex < 0 || nextIndex >= questions.length) return
     const nextQuestion = questions[nextIndex]
+    const parked = scenesRef.current.get(nextQuestion.id)
+    if (preferredSlot !== undefined && !await allowDiscard(nextQuestion.id)) return
     setQuestionIndex(nextIndex)
     setShowSolution(false)
-    setDirty(false)
     setSelectedBoardId(null)
     const nextBoards = await fetchBoards(nextQuestion.id) ?? boardsByQuestion[nextQuestion.id] ?? []
     const slot = preferredSlot ?? firstAvailableSlot(nextBoards, currentUserId)
     const existing = nextBoards.find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
     setSelectedSlot(slot)
     setSelectedBoardId(existing?.id ?? null)
+    // A parked board comes back as it was; only an untouched ข้อ opens its
+    // saved slot or a clean sheet.
+    if (parked && preferredSlot === undefined) return
     if (existing) setLoadNonce(value => value + 1)
     else setResetNonce(value => value + 1)
   }
@@ -645,11 +670,8 @@ export function TeachingModeClient({
     }
   }
 
-  const hideBoard = async () => {
-    if (!await allowDiscard()) return
-    setDirty(false)
-    setShowBoard(false)
-  }
+  // The scene is parked, so putting the board away costs nothing.
+  const hideBoard = () => setShowBoard(false)
 
   const leaveTeachingMode = async () => {
     if (!await allowDiscard()) return
@@ -658,21 +680,18 @@ export function TeachingModeClient({
 
   return (
     <div className="flex min-h-[calc(100dvh-7rem)] flex-col gap-4">
-      <Card padding="md" className="shrink-0">
-        <div className="flex items-start gap-2">
-          <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => void leaveTeachingMode()}>
+      {/* One line: the bar sits above every ข้อ and every board, so a second
+          row of it is width taken from the teaching itself. */}
+      <Card padding="sm" className="shrink-0">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <Button type="button" variant="ghost" size="xs" className="shrink-0" onClick={() => void leaveTeachingMode()}>
             <ChevronLeft /> กลับ
           </Button>
-          <Presentation className="mt-1.5 size-5 shrink-0 text-primary" aria-hidden="true" />
-          <div className="min-w-0 flex-1 pt-0.5">
-            <h1 className="truncate text-sm font-semibold sm:text-base">โหมดสอน · {assignmentTitle}</h1>
-            <p className="line-clamp-2 text-xs text-muted-foreground">กระดานแยกตามโจทย์ · ผู้สร้างแก้ไขได้สูงสุด 5 ช่อง</p>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 sm:justify-end">
+          <Presentation className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">โหมดสอน · {assignmentTitle}</h1>
           <NativeSelect
             aria-label="ไปที่ข้อ"
-            className="h-8 w-auto max-w-56 text-xs sm:ml-2"
+            className="h-8 w-auto max-w-44 shrink text-xs"
             value={questionIndex}
             onChange={event => void changeQuestion(Number(event.target.value))}
           >
@@ -683,8 +702,8 @@ export function TeachingModeClient({
             ))}
           </NativeSelect>
 
-          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            ข้อต่อหน้า
+          <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+            ต่อหน้า
             <NativeSelect
               aria-label="จำนวนข้อต่อหน้า"
               className="h-8 w-16 text-xs"
@@ -695,7 +714,7 @@ export function TeachingModeClient({
             </NativeSelect>
           </label>
 
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(pageStart - perPage)} disabled={pageStart === 0} aria-label="หน้าก่อนหน้า">
               <ChevronLeft />
             </Button>
@@ -834,9 +853,13 @@ export function TeachingModeClient({
             canManage={canManage}
             loadNonce={loadNonce}
             resetNonce={resetNonce}
+            questionLabel={`ข้อ ${questionIndex + 1}/${questions.length}`}
+            initialScene={scenesRef.current.get(question.id) ?? null}
+            initialDirty={dirty}
             onSaved={handleSaved}
             onDirtyChange={setDirty}
-            onHide={() => void hideBoard()}
+            onSceneChange={scene => scenesRef.current.set(question.id, scene)}
+            onHide={hideBoard}
           />
         </div>
         )}
