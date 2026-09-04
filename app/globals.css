@@ -397,3 +397,11 @@
 .tiptap u {
   @apply underline;
 }
+/* Excalidraw — the teaching board hides the library's own tool panels when the
+   teacher wants a bare sheet. Its own CSS wins on specificity, hence the
+   !important; our toolbar above the canvas covers pen, highlighter and eraser,
+   and the bottom bar keeps undo/redo reachable. */
+.board-tools-hidden .App-toolbar-container,
+.board-tools-hidden .App-menu__left {
+  display: none !important;
+}

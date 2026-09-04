@@ -404,7 +404,7 @@ function TeachingBoardSlots({
  * pressed inside the question, or a box under it. Both feed the one array
  * `TeachingAnswerCheck` grades.
  */
-function TeachingQuestionCard({ question, index, total, showSolution, actions, slots, outlined }: {
+function TeachingQuestionCard({ question, index, total, showSolution, actions, slots, outlined, onActivate }: {
   question: TeachingQuestionView
   index: number
   total: number
@@ -413,6 +413,8 @@ function TeachingQuestionCard({ question, index, total, showSolution, actions, s
   /** This ข้อ's own saved boards, grouped with it. */
   slots?: React.ReactNode
   outlined: boolean
+  /** Given when this ข้อ is not the one being taught; a click moves to it. */
+  onActivate?: () => void
 }) {
   const fields = useMemo(() => tryFields(question), [question])
   const [values, setValues] = useState<string[]>(() => (fields ?? []).map(() => ''))
@@ -427,7 +429,17 @@ function TeachingQuestionCard({ question, index, total, showSolution, actions, s
   }, [])
 
   return (
-    <Card padding="lg" className={`space-y-4 ${outlined ? 'border-primary' : ''}`}>
+    <Card
+      padding="lg"
+      className={`space-y-4 ${outlined ? 'border-primary' : ''} ${onActivate ? 'cursor-pointer' : ''}`}
+      /* Clicking anywhere quiet in another ข้อ brings the board to it, so the
+         teacher does not have to go up to the bar to change ข้อ. Controls and
+         fields inside keep their own click. */
+      onClick={onActivate ? event => {
+        if (event.target instanceof HTMLElement && event.target.closest('button, a, input, select, textarea, label')) return
+        onActivate()
+      } : undefined}
+    >
       <TeachingQuestion
         question={question}
         index={index}
@@ -795,6 +807,7 @@ export function TeachingModeClient({
                     total={questions.length}
                     showSolution={showSolution}
                     outlined={perPage > 1 && isBoardQuestion}
+                    onActivate={isBoardQuestion ? undefined : () => void changeQuestion(index)}
                     actions={
                       /* The เฉลย and the hide control belong to the whole
                          column, so they sit on the first ข้อ of the page. */
@@ -855,8 +868,9 @@ export function TeachingModeClient({
                       <Card
                         role="region"
                         aria-label={`กระดานของข้อ ${index + 1}`}
-                        className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 p-6 text-center"
+                        className="flex h-full min-h-[220px] cursor-pointer flex-col items-center justify-center gap-2 p-6 text-center"
                         style={drawingBackgroundStyle('lined')}
+                        onClick={() => void changeQuestion(index)}
                       >
                         <PenLine className="size-5 text-primary" aria-hidden="true" />
                         <p className="text-sm font-semibold">กระดานของข้อ {index + 1}</p>

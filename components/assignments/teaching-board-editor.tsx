@@ -10,7 +10,7 @@ import type {
   ExcalidrawImperativeAPI,
 } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Eraser, Highlighter, Loader2, PanelRightClose, PenLine, RotateCcw, Save } from 'lucide-react'
+import { Eraser, Highlighter, Loader2, Maximize2, PanelRightClose, PenLine, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -62,6 +62,17 @@ interface Props {
   onHide?: () => void
 }
 
+/**
+ * The sheet the board writes on, in scene units.
+ *
+ * Excalidraw's canvas is endless, which on a blank board reads as "nothing is
+ * happening" while panning and makes it easy to end up lost in white space.
+ * A sheet of a fixed size is something to aim at: it moves and scales with the
+ * scene, and the scroll wheel hands the page back once its edge is reached.
+ */
+const PAGE_WIDTH = 1600
+const PAGE_HEIGHT = 1100
+
 function contentSignature(elements: readonly OrderedExcalidrawElement[]): string {
   return elements.map(element => `${element.id}:${element.version}:${element.isDeleted ? 1 : 0}`).join('|')
 }
@@ -83,6 +94,8 @@ export default function TeachingBoardEditor({
   onHide,
 }: Props) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
+  const surfaceRef = useRef<HTMLDivElement | null>(null)
+  const paperRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<ScratchpadScene>(initialScene ?? emptyScratchpadScene())
   const contentSignatureRef = useRef(
     initialScene ? contentSignature(initialScene.elements as readonly OrderedExcalidrawElement[]) : '',
@@ -92,6 +105,7 @@ export default function TeachingBoardEditor({
   const handledResetRef = useRef(0)
   const [background, setBackground] = useState<ScratchpadBackground>(initialScene?.background ?? 'lined')
   const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
+  const [toolsHidden, setToolsHidden] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [apiReady, setApiReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -219,6 +233,14 @@ export default function TeachingBoardEditor({
       files,
       background,
     }
+    // The sheet is a plain DOM element under a transparent canvas, so it is
+    // moved by hand on every change — written straight to the node, because a
+    // re-render per pointer move while panning is not affordable.
+    const paper = paperRef.current
+    if (paper) {
+      const zoom = appState.zoom.value
+      paper.style.transform = `translate(${appState.scrollX * zoom}px, ${appState.scrollY * zoom}px) scale(${zoom})`
+    }
     onSceneChange?.(sceneRef.current)
     // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
     setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
@@ -249,6 +271,38 @@ export default function TeachingBoardEditor({
     })
     setStrokeWidth(ink.width)
     api.setActiveTool({ type: 'freedraw', locked: true })
+  }
+
+  /** Puts the whole sheet on screen — the way back when the view wanders. */
+  const fitPaper = () => {
+    const api = apiRef.current
+    const box = surfaceRef.current?.getBoundingClientRect()
+    if (!api || !box || box.width === 0) return
+    const zoom = Math.min(box.width / (PAGE_WIDTH + 80), box.height / (PAGE_HEIGHT + 80))
+    api.updateScene({
+      appState: {
+        scrollX: box.width / (2 * zoom) - PAGE_WIDTH / 2,
+        scrollY: box.height / (2 * zoom) - PAGE_HEIGHT / 2,
+        zoom: { value: zoom as AppState['zoom']['value'] },
+      },
+    })
+  }
+
+  /**
+   * Scrolling past the top or bottom edge of the sheet belongs to the page,
+   * not to the board: that is how a teacher reaches the next ข้อ with the same
+   * gesture instead of panning further into empty space. Stopping the event
+   * here in the capture phase keeps Excalidraw from seeing it at all, and the
+   * browser scrolls as it would over any other part of the page.
+   */
+  const passWheelToPage = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || event.metaKey) return
+    const paper = paperRef.current?.getBoundingClientRect()
+    const box = surfaceRef.current?.getBoundingClientRect()
+    if (!paper || !box) return
+    const pastBottom = event.deltaY > 0 && paper.bottom <= box.bottom + 1
+    const pastTop = event.deltaY < 0 && paper.top >= box.top - 1
+    if (pastBottom || pastTop) event.stopPropagation()
   }
 
   const chooseStrokeWidth = (value: number) => {
@@ -384,6 +438,20 @@ export default function TeachingBoardEditor({
               <span className="w-3 text-right font-mono text-[10px] text-foreground" aria-hidden="true">{strokeWidth}</span>
             </label>
             <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            <Button type="button" variant="outline" size="xs" onClick={fitPaper} title="จัดกระดาษให้พอดีจอ">
+              <Maximize2 /> พอดีจอ
+            </Button>
+            <Button
+              type="button"
+              variant={toolsHidden ? 'secondary' : 'outline'}
+              size="xs"
+              aria-pressed={toolsHidden}
+              onClick={() => setToolsHidden(value => !value)}
+              title="ซ่อน/แสดงแถบเครื่องมือของกระดาน"
+            >
+              <SlidersHorizontal /> {toolsHidden ? 'แสดงแถบเครื่องมือ' : 'ซ่อนแถบเครื่องมือ'}
+            </Button>
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
             {DRAWING_BACKGROUNDS.map(item => (
               <Button
                 key={item.value}
@@ -404,9 +472,19 @@ export default function TeachingBoardEditor({
         {/* `main-menu-trigger` is Excalidraw's ☰ button. An empty MainMenu
             leaves nothing behind it, and this takes the button away too. */}
         <div
-          className="relative min-h-0 min-w-0 flex-1 overflow-hidden [&_.excalidraw]:!min-w-0 [&_.main-menu-trigger]:!hidden"
-          style={drawingBackgroundStyle(background)}
+          ref={surfaceRef}
+          onWheelCapture={passWheelToPage}
+          className={`relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/40 [&_.excalidraw]:!min-w-0 [&_.excalidraw]:!bg-transparent [&_.main-menu-trigger]:!hidden ${toolsHidden ? 'board-tools-hidden' : ''}`}
         >
+          {/* The sheet: sits under a transparent canvas and is moved by
+              handleChange, so panning and zooming are visible even on a board
+              with nothing written on it yet. */}
+          <div
+            ref={paperRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 top-0 origin-top-left rounded-md shadow-sm ring-1 ring-border"
+            style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT, ...drawingBackgroundStyle(background) }}
+          />
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-overlay/20 backdrop-blur-[1px]">
               <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-sm shadow-md">
