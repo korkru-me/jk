@@ -1,16 +1,18 @@
 'use client'
 
 import '@excalidraw/excalidraw/index.css'
-import { CaptureUpdateAction, Excalidraw, MainMenu } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, convertToExcalidrawElements, Excalidraw, MainMenu } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
   BinaryFileData,
   BinaryFiles,
+  DataURL,
   ExcalidrawImperativeAPI,
 } from '@excalidraw/excalidraw/types'
+import type { FileId } from '@excalidraw/excalidraw/element/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Eraser, Highlighter, Loader2, PanelRightClose, PenLine, RotateCcw, Save } from 'lucide-react'
+import { Eraser, Highlighter, Loader2, Maximize2, PanelRightClose, PenLine, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -33,6 +35,7 @@ import {
   MATH_WORK_BUCKET,
   type TeachingBoardView,
 } from '@/lib/math-work'
+import { downscaleImage } from '@/lib/image-downscale'
 import {
   emptyScratchpadScene,
   isScratchpadSceneWithinLimits,
@@ -58,9 +61,22 @@ interface Props {
   onDirtyChange: (dirty: boolean) => void
   /** Reports the live scene so the ข้อ can be returned to as it was left. */
   onSceneChange?: (scene: ScratchpadScene) => void
+  /** A รูปประกอบโจทย์ the teacher asked to drop onto this board. */
+  insertImage?: { url: string; nonce: number } | null
   /** Given when the board can be put away. */
   onHide?: () => void
 }
+
+/**
+ * The sheet the board writes on, in scene units.
+ *
+ * Excalidraw's canvas is endless, which on a blank board reads as "nothing is
+ * happening" while panning and makes it easy to end up lost in white space.
+ * A sheet of a fixed size is something to aim at: it moves and scales with the
+ * scene, and the scroll wheel hands the page back once its edge is reached.
+ */
+const PAGE_WIDTH = 1600
+const PAGE_HEIGHT = 1100
 
 function contentSignature(elements: readonly OrderedExcalidrawElement[]): string {
   return elements.map(element => `${element.id}:${element.version}:${element.isDeleted ? 1 : 0}`).join('|')
@@ -80,9 +96,12 @@ export default function TeachingBoardEditor({
   onSaved,
   onDirtyChange,
   onSceneChange,
+  insertImage,
   onHide,
 }: Props) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
+  const surfaceRef = useRef<HTMLDivElement | null>(null)
+  const paperRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<ScratchpadScene>(initialScene ?? emptyScratchpadScene())
   const contentSignatureRef = useRef(
     initialScene ? contentSignature(initialScene.elements as readonly OrderedExcalidrawElement[]) : '',
@@ -92,6 +111,8 @@ export default function TeachingBoardEditor({
   const handledResetRef = useRef(0)
   const [background, setBackground] = useState<ScratchpadBackground>(initialScene?.background ?? 'lined')
   const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
+  const [toolsHidden, setToolsHidden] = useState(false)
+  const [insertingImage, setInsertingImage] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [apiReady, setApiReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -219,6 +240,14 @@ export default function TeachingBoardEditor({
       files,
       background,
     }
+    // The sheet is a plain DOM element under a transparent canvas, so it is
+    // moved by hand on every change — written straight to the node, because a
+    // re-render per pointer move while panning is not affordable.
+    const paper = paperRef.current
+    if (paper) {
+      const zoom = appState.zoom.value
+      paper.style.transform = `translate(${appState.scrollX * zoom}px, ${appState.scrollY * zoom}px) scale(${zoom})`
+    }
     onSceneChange?.(sceneRef.current)
     // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
     setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
@@ -249,6 +278,125 @@ export default function TeachingBoardEditor({
     })
     setStrokeWidth(ink.width)
     api.setActiveTool({ type: 'freedraw', locked: true })
+  }
+
+  /**
+   * Drops a รูปประกอบโจทย์ onto the sheet, centred on what the teacher is
+   * looking at and scaled to sit inside it.
+   *
+   * The picture is embedded rather than linked: the board is saved as one
+   * scene file, and a link would break the day the question's image moves.
+   * That file is capped at 2 MiB, so it goes through the same downscaler the
+   * upload paths use before it becomes part of the scene.
+   */
+  const dropQuestionImage = useCallback(async (url: string) => {
+    const api = apiRef.current
+    if (!api) return
+    setInsertingImage(true)
+    try {
+      const response = await fetch(url, { cache: 'no-store' })
+      if (!response.ok) throw new Error('โหลดรูปจากโจทย์ไม่สำเร็จ')
+      const blob = await response.blob()
+      const shrunk = await downscaleImage(
+        new File([blob], 'question-image', { type: blob.type || 'image/png' }),
+        { maxEdge: 1200 },
+      )
+      const dataURL = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(new Error('อ่านไฟล์รูปไม่สำเร็จ'))
+        reader.readAsDataURL(shrunk)
+      })
+      // Measured through an <img>, not createImageBitmap: that cannot decode
+      // an SVG, which Excalidraw itself is perfectly happy to draw.
+      const size = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const image = new Image()
+        image.onload = () => resolve({ width: image.naturalWidth || 800, height: image.naturalHeight || 600 })
+        image.onerror = () => reject(new Error('รูปประกอบโจทย์นี้เปิดไม่ได้'))
+        image.src = dataURL
+      })
+
+      const state = api.getAppState()
+      const box = surfaceRef.current?.getBoundingClientRect()
+      const zoom = state.zoom.value
+      const viewWidth = (box?.width ?? PAGE_WIDTH) / zoom
+      const viewHeight = (box?.height ?? PAGE_HEIGHT) / zoom
+      const fit = Math.min(
+        1,
+        (viewWidth * 0.7) / size.width,
+        (viewHeight * 0.7) / size.height,
+        (PAGE_WIDTH * 0.8) / size.width,
+      )
+      const width = Math.round(size.width * fit)
+      const height = Math.round(size.height * fit)
+
+      const fileId = crypto.randomUUID() as FileId
+      api.addFiles([{
+        id: fileId,
+        dataURL: dataURL as DataURL,
+        mimeType: (shrunk.type || 'image/png') as BinaryFileData['mimeType'],
+        created: Date.now(),
+      }])
+      api.updateScene({
+        elements: [
+          ...api.getSceneElements(),
+          ...convertToExcalidrawElements([{
+            type: 'image',
+            fileId,
+            x: -state.scrollX + viewWidth / 2 - width / 2,
+            y: -state.scrollY + viewHeight / 2 - height / 2,
+            width,
+            height,
+          }]),
+        ],
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      })
+      markDirty(true)
+      toast.success('ใส่รูปจากโจทย์ลงกระดานแล้ว')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'ใส่รูปจากโจทย์ไม่สำเร็จ')
+    } finally {
+      setInsertingImage(false)
+    }
+  }, [markDirty])
+
+  const handledInsertRef = useRef(0)
+  useEffect(() => {
+    if (!apiReady || !editable || !insertImage || insertImage.nonce === handledInsertRef.current) return
+    handledInsertRef.current = insertImage.nonce
+    void dropQuestionImage(insertImage.url)
+  }, [apiReady, dropQuestionImage, editable, insertImage])
+
+  /** Puts the whole sheet on screen — the way back when the view wanders. */
+  const fitPaper = () => {
+    const api = apiRef.current
+    const box = surfaceRef.current?.getBoundingClientRect()
+    if (!api || !box || box.width === 0) return
+    const zoom = Math.min(box.width / (PAGE_WIDTH + 80), box.height / (PAGE_HEIGHT + 80))
+    api.updateScene({
+      appState: {
+        scrollX: box.width / (2 * zoom) - PAGE_WIDTH / 2,
+        scrollY: box.height / (2 * zoom) - PAGE_HEIGHT / 2,
+        zoom: { value: zoom as AppState['zoom']['value'] },
+      },
+    })
+  }
+
+  /**
+   * Scrolling past the top or bottom edge of the sheet belongs to the page,
+   * not to the board: that is how a teacher reaches the next ข้อ with the same
+   * gesture instead of panning further into empty space. Stopping the event
+   * here in the capture phase keeps Excalidraw from seeing it at all, and the
+   * browser scrolls as it would over any other part of the page.
+   */
+  const passWheelToPage = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || event.metaKey) return
+    const paper = paperRef.current?.getBoundingClientRect()
+    const box = surfaceRef.current?.getBoundingClientRect()
+    if (!paper || !box) return
+    const pastBottom = event.deltaY > 0 && paper.bottom <= box.bottom + 1
+    const pastTop = event.deltaY < 0 && paper.top >= box.top - 1
+    if (pastBottom || pastTop) event.stopPropagation()
   }
 
   const chooseStrokeWidth = (value: number) => {
@@ -335,7 +483,11 @@ export default function TeachingBoardEditor({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{questionLabel} · ช่อง {slot}</p>
               <p className="text-[10px] text-muted-foreground" aria-live="polite">
-                {!editable ? 'ดูอย่างเดียว' : saving ? 'กำลังบันทึก...' : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
+                {!editable ? 'ดูอย่างเดียว'
+                  : insertingImage ? 'กำลังใส่รูปจากโจทย์...'
+                    : saving ? 'กำลังบันทึก...'
+                      : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก'
+                        : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
               </p>
             </div>
             <div className="ml-auto flex items-center gap-1">
@@ -384,6 +536,20 @@ export default function TeachingBoardEditor({
               <span className="w-3 text-right font-mono text-[10px] text-foreground" aria-hidden="true">{strokeWidth}</span>
             </label>
             <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            <Button type="button" variant="outline" size="xs" onClick={fitPaper} title="จัดกระดาษให้พอดีจอ">
+              <Maximize2 /> พอดีจอ
+            </Button>
+            <Button
+              type="button"
+              variant={toolsHidden ? 'secondary' : 'outline'}
+              size="xs"
+              aria-pressed={toolsHidden}
+              onClick={() => setToolsHidden(value => !value)}
+              title="ซ่อน/แสดงแถบเครื่องมือของกระดาน"
+            >
+              <SlidersHorizontal /> {toolsHidden ? 'แสดงแถบเครื่องมือ' : 'ซ่อนแถบเครื่องมือ'}
+            </Button>
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
             {DRAWING_BACKGROUNDS.map(item => (
               <Button
                 key={item.value}
@@ -404,9 +570,19 @@ export default function TeachingBoardEditor({
         {/* `main-menu-trigger` is Excalidraw's ☰ button. An empty MainMenu
             leaves nothing behind it, and this takes the button away too. */}
         <div
-          className="relative min-h-0 min-w-0 flex-1 overflow-hidden [&_.excalidraw]:!min-w-0 [&_.main-menu-trigger]:!hidden"
-          style={drawingBackgroundStyle(background)}
+          ref={surfaceRef}
+          onWheelCapture={passWheelToPage}
+          className={`relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/40 [&_.excalidraw]:!min-w-0 [&_.excalidraw]:!bg-transparent [&_.main-menu-trigger]:!hidden ${toolsHidden ? 'board-tools-hidden' : ''}`}
         >
+          {/* The sheet: sits under a transparent canvas and is moved by
+              handleChange, so panning and zooming are visible even on a board
+              with nothing written on it yet. */}
+          <div
+            ref={paperRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 top-0 origin-top-left rounded-md shadow-sm ring-1 ring-border"
+            style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT, ...drawingBackgroundStyle(background) }}
+          />
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-overlay/20 backdrop-blur-[1px]">
               <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-sm shadow-md">

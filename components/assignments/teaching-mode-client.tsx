@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   FileText,
+  ImagePlus,
   Loader2,
   PanelLeftClose,
   PenLine,
@@ -127,7 +128,7 @@ function TrueFalseChoice({ value, onSelect }: { value: string; onSelect: (next: 
   )
 }
 
-function TeachingQuestion({ question, index, total, showSolution, answer, actions }: {
+function TeachingQuestion({ question, index, total, showSolution, answer, actions, onInsertImage }: {
   question: TeachingQuestionView
   index: number
   total: number
@@ -136,6 +137,8 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
   answer: { values: string[]; set: (index: number, value: string) => void }
   /** This ข้อ's own controls, sat on its badge row instead of the top bar. */
   actions?: React.ReactNode
+  /** Puts one of this ข้อ's pictures onto its board, to write over. */
+  onInsertImage?: (url: string) => void
 }) {
   const renderedQuestion = interpolateValues(question.question_text, question.randomValues)
   const renderedSolution = interpolateValues(question.solution_text ?? '', question.randomValues)
@@ -160,8 +163,21 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
       {(question.image_urls ?? []).length > 0 && (
         <div className="flex flex-wrap gap-2">
           {(question.image_urls ?? []).map(url => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={url} src={url} alt="รูปประกอบโจทย์" className="max-h-52 rounded-xl border object-contain" />
+            <span key={url} className="relative inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="รูปประกอบโจทย์" className="max-h-52 rounded-xl border object-contain" />
+              {onInsertImage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  className="absolute bottom-1 right-1 bg-card/90 shadow-sm"
+                  onClick={() => onInsertImage(url)}
+                >
+                  <ImagePlus /> ใส่ในกระดาน
+                </Button>
+              )}
+            </span>
           ))}
         </div>
       )}
@@ -404,7 +420,7 @@ function TeachingBoardSlots({
  * pressed inside the question, or a box under it. Both feed the one array
  * `TeachingAnswerCheck` grades.
  */
-function TeachingQuestionCard({ question, index, total, showSolution, actions, slots, outlined }: {
+function TeachingQuestionCard({ question, index, total, showSolution, actions, slots, outlined, onActivate, onInsertImage }: {
   question: TeachingQuestionView
   index: number
   total: number
@@ -413,6 +429,9 @@ function TeachingQuestionCard({ question, index, total, showSolution, actions, s
   /** This ข้อ's own saved boards, grouped with it. */
   slots?: React.ReactNode
   outlined: boolean
+  /** Given when this ข้อ is not the one being taught; a click moves to it. */
+  onActivate?: () => void
+  onInsertImage?: (url: string) => void
 }) {
   const fields = useMemo(() => tryFields(question), [question])
   const [values, setValues] = useState<string[]>(() => (fields ?? []).map(() => ''))
@@ -427,7 +446,17 @@ function TeachingQuestionCard({ question, index, total, showSolution, actions, s
   }, [])
 
   return (
-    <Card padding="lg" className={`space-y-4 ${outlined ? 'border-primary' : ''}`}>
+    <Card
+      padding="lg"
+      className={`space-y-4 ${outlined ? 'border-primary' : ''} ${onActivate ? 'cursor-pointer' : ''}`}
+      /* Clicking anywhere quiet in another ข้อ brings the board to it, so the
+         teacher does not have to go up to the bar to change ข้อ. Controls and
+         fields inside keep their own click. */
+      onClick={onActivate ? event => {
+        if (event.target instanceof HTMLElement && event.target.closest('button, a, input, select, textarea, label')) return
+        onActivate()
+      } : undefined}
+    >
       <TeachingQuestion
         question={question}
         index={index}
@@ -435,6 +464,7 @@ function TeachingQuestionCard({ question, index, total, showSolution, actions, s
         showSolution={showSolution}
         answer={{ values, set: setValue }}
         actions={actions}
+        onInsertImage={onInsertImage}
       />
       {fields && (
         <TeachingAnswerCheck
@@ -481,6 +511,7 @@ export function TeachingModeClient({
   // and then wants the width back for writing.
   const [showBoards, setShowBoards] = useState(false)
   const [showBoard, setShowBoard] = useState(true)
+  const [imageRequest, setImageRequest] = useState<{ questionId: string; url: string; nonce: number } | null>(null)
   // One board per ข้อ: what is on it stays with it, so leaving and coming
   // back finds the same strokes, and a new ข้อ opens on a clean sheet.
   const scenesRef = useRef(new Map<string, ScratchpadScene>())
@@ -674,6 +705,21 @@ export function TeachingModeClient({
   // The scene is parked, so putting the board away costs nothing.
   const hideBoard = () => setShowBoard(false)
 
+  /**
+   * Sends one of a ข้อ's pictures to its board — bringing the board out and
+   * moving it to that ข้อ first, so the picture always lands where the
+   * teacher asked for it.
+   */
+  const insertQuestionImage = async (index: number, url: string) => {
+    setShowBoard(true)
+    if (index !== questionIndex) await changeQuestion(index)
+    setImageRequest(current => ({
+      questionId: questions[index].id,
+      url,
+      nonce: (current?.nonce ?? 0) + 1,
+    }))
+  }
+
   const leaveTeachingMode = async () => {
     if (!await allowDiscard()) return
     router.push(backHref)
@@ -795,6 +841,8 @@ export function TeachingModeClient({
                     total={questions.length}
                     showSolution={showSolution}
                     outlined={perPage > 1 && isBoardQuestion}
+                    onActivate={isBoardQuestion ? undefined : () => void changeQuestion(index)}
+                    onInsertImage={url => void insertQuestionImage(index, url)}
                     actions={
                       /* The เฉลย and the hide control belong to the whole
                          column, so they sit on the first ข้อ of the page. */
@@ -846,6 +894,7 @@ export function TeachingModeClient({
                         onSaved={handleSaved}
                         onDirtyChange={setDirty}
                         onSceneChange={scene => scenesRef.current.set(pageQuestion.id, scene)}
+                        insertImage={imageRequest?.questionId === pageQuestion.id ? imageRequest : null}
                         onHide={hideBoard}
                       />
                     ) : (
@@ -855,8 +904,9 @@ export function TeachingModeClient({
                       <Card
                         role="region"
                         aria-label={`กระดานของข้อ ${index + 1}`}
-                        className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 p-6 text-center"
+                        className="flex h-full min-h-[220px] cursor-pointer flex-col items-center justify-center gap-2 p-6 text-center"
                         style={drawingBackgroundStyle('lined')}
+                        onClick={() => void changeQuestion(index)}
                       >
                         <PenLine className="size-5 text-primary" aria-hidden="true" />
                         <p className="text-sm font-semibold">กระดานของข้อ {index + 1}</p>
