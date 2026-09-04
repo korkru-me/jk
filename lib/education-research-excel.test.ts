@@ -75,4 +75,27 @@ describe('education research Excel workbook', () => {
 
     await expect(parseEducationResearchScoreWorkbook(buffer)).rejects.toBeInstanceOf(EducationResearchWorkbookError)
   })
+
+  it('round-trips the supported 2,000-participant boundary without dropping the last row', async () => {
+    const rows = Array.from({ length: 2_000 }, (_, index) => ({
+      row_token: `row-token-${index + 1}`,
+      roster_order: index + 1,
+      student_code: `STU-${index + 1}`,
+      full_name: `นักเรียน ${index + 1}`,
+      current_pretest: index % 20,
+      current_posttest: (index % 20) + 1,
+    }))
+
+    const buffer = await buildEducationResearchScoreWorkbook({ ...input, rows })
+    const parsed = await parseEducationResearchScoreWorkbook(buffer)
+
+    expect(parsed.rows).toHaveLength(2_000)
+    expect(parsed.rows[1_999]).toMatchObject({
+      student_code: 'STU-2000',
+      full_name: 'นักเรียน 2000',
+      pretest: 19,
+      posttest: 20,
+      parse_errors: [],
+    })
+  }, 15_000)
 })

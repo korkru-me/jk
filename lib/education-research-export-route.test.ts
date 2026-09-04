@@ -82,14 +82,24 @@ function measurements() {
   ]
 }
 
-function scores() {
-  return [
-    { participant_id: PARTICIPANT_ID, measurement_id: PRETEST_ID, raw_score: 10, updated_at: '2026-09-04T06:00:00.000Z' },
-    { participant_id: PARTICIPANT_ID, measurement_id: POSTTEST_ID, raw_score: 18, updated_at: '2026-09-04T07:00:00.000Z' },
-  ]
-}
-
-function sessionClient(options: { canManage?: boolean; selectedColumns: string[]; requestedTables: string[] }) {
+function sessionClient(options: {
+  canManage?: boolean
+  participantCount?: number
+  selectedColumns: string[]
+  requestedTables: string[]
+}) {
+  const participantCount = options.participantCount ?? 1
+  const participants = Array.from({ length: participantCount }, (_, index) => ({
+    id: index === 0 ? PARTICIPANT_ID : `participant-${index}`,
+    student_id: index === 0 ? STUDENT_ID : `student-${index}`,
+    roster_order: index + 1,
+    created_at: '2026-09-01T00:00:00.000Z',
+    users: { id: index === 0 ? STUDENT_ID : `student-${index}`, full_name: `นักเรียนจริง ${index + 1}` },
+  }))
+  const allScores = participants.flatMap(participant => [
+    { participant_id: participant.id, measurement_id: PRETEST_ID, raw_score: 10, updated_at: '2026-09-04T06:00:00.000Z' },
+    { participant_id: participant.id, measurement_id: POSTTEST_ID, raw_score: 18, updated_at: '2026-09-04T07:00:00.000Z' },
+  ])
   return {
     rpc: vi.fn(async (name: string) => {
       if (name !== 'can_manage_education_research_project') throw new Error(`Unexpected RPC: ${name}`)
@@ -105,18 +115,12 @@ function sessionClient(options: { canManage?: boolean; selectedColumns: string[]
             if (table === 'education_research_measurements') return { data: measurements(), error: null }
             if (table === 'education_research_participants') {
               return {
-                data: [{
-                  id: PARTICIPANT_ID,
-                  student_id: STUDENT_ID,
-                  roster_order: 1,
-                  created_at: '2026-09-01T00:00:00.000Z',
-                  users: { id: STUDENT_ID, full_name: 'นักเรียนจริง' },
-                }].slice(state.from, state.to + 1),
+                data: participants.slice(state.from, state.to + 1),
                 error: null,
               }
             }
             if (table === 'education_research_scores') {
-              return { data: scores().slice(state.from, state.to + 1), error: null }
+              return { data: allScores.slice(state.from, state.to + 1), error: null }
             }
             if (table === 'student_profiles') {
               return { data: [{ student_id: STUDENT_ID, student_code: 'STU-001', class_number: 1 }], error: null }
@@ -195,6 +199,25 @@ describe('education research data-export route', () => {
     expect(text).toContain('STU-001')
     expect(text).not.toContain(STUDENT_ID)
   })
+
+  it('exports every participant after crossing the 1,000-row response cap', async () => {
+    const audit = vi.fn().mockResolvedValue({ data: 21, error: null })
+    mocks.createClient.mockResolvedValue(sessionClient({
+      participantCount: 1_001,
+      selectedColumns: [],
+      requestedTables: [],
+    }))
+    mocks.createAdminClient.mockReturnValue({ rpc: audit })
+
+    const response = await POST(request('anonymous'), { params: Promise.resolve({ id: PROJECT_ID }) })
+
+    expect(response.status).toBe(200)
+    const text = await workbookText(response)
+    expect(text).toContain('P1001')
+    expect(audit).toHaveBeenCalledWith('record_education_research_export_event', expect.objectContaining({
+      p_row_count: 1_001,
+    }))
+  }, 15_000)
 
   it('does not query or audit individual data without manage permission', async () => {
     const selectedColumns: string[] = []

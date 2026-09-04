@@ -63,6 +63,30 @@ describe('education research statistics', () => {
     }
   })
 
+  it('matches the published NIST Dataplot paired t-test example', () => {
+    // NIST Dataplot T TEST, Program 3 (Bowker and Lieberman paired sample):
+    // https://www.itl.nist.gov/div898/software/dataplot/refman1/auxillar/t_test.htm
+    const posttest = [73, 43, 47, 53, 58, 47, 52, 38, 61, 56, 56, 34, 55, 65, 75]
+    const pretest = [51, 41, 43, 41, 47, 32, 24, 43, 53, 52, 57, 44, 57, 40, 68]
+    const analysis = calculatePairedAnalysis(posttest.map((score, index) => ({
+      pretest: pretest[index],
+      posttest: score,
+    })))
+
+    expect(analysis.pretest.mean).toBeCloseTo(46.2, 5)
+    expect(analysis.posttest.mean).toBeCloseTo(54.2, 5)
+    expect(analysis.test.status).toBe('calculated')
+    if (analysis.test.status === 'calculated') {
+      expect(analysis.test.n).toBe(15)
+      expect(analysis.test.df).toBe(14)
+      expect(analysis.test.meanDifference).toBeCloseTo(8, 5)
+      expect(analysis.test.differenceSd).toBeCloseTo(11.02594, 5)
+      expect(analysis.test.standardError).toBeCloseTo(2.84688, 4)
+      expect(analysis.test.t).toBeCloseTo(2.81008, 4)
+      expect(analysis.test.p).toBeCloseTo(0.01390, 5)
+    }
+  })
+
   it('calculates a two-sided one-sample t-test against the unrounded criterion', () => {
     const analysis = calculateCriterionAnalysis([18, 20, 19, 22, 21], 17.5)
 

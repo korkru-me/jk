@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 3 กันยายน 2026
+ตรวจจาก repository: 4 กันยายน 2026
 
 ## วิธีอ่านสถานะ
 
@@ -11,7 +11,7 @@
 
 > โจทย์ประเภท "ส่งไฟล์งาน" (`file_upload`) เคยใช้งานบน production ไม่ได้จนถึง 23 สิงหาคม 2026 เพราะ `20260726120000_file_upload_question_type.sql` ไม่เคยถูก apply — ทั้งที่โค้ดฝั่งแอปรองรับครบมาตั้งแต่กรกฎาคม ตอนนี้รันแล้ว: enum `question_type` มีค่า `'file_upload'` และ bucket `submission-files` มีอยู่จริง (public, จำกัด 10 MB, รับ png/jpeg/webp/pdf) ยังไม่ได้ทดสอบเส้นทางอัปโหลดจริงจากฝั่งนักเรียน
 
-มี automated test (`npm test`) ครอบคลุมเฉพาะโมดูลที่เป็น pure logic — evaluator, การให้คะแนน และตัวช่วยข้อความ ยังไม่มีอะไรทดสอบ Supabase, server action หรือ browser การยืนยันฐานข้อมูลที่ deploy จริงจะระบุแยกไว้เฉพาะฟีเจอร์ที่ตรวจแล้ว และทุกสถานะยังต้องผ่าน end-to-end กับ authorization testing ก่อนเปลี่ยนเป็น “พร้อมใช้จริง”
+มี automated test (`npm test`) ครอบคลุม pure logic หลักและ route สำคัญบางส่วน รวมถึง upload/download ของงานวิจัยด้วย mock Supabase แต่ยังไม่แทนการทดสอบ Supabase, server action และ browser กับหลายบัญชีจริง การยืนยันฐานข้อมูลที่ deploy จริงจะระบุแยกไว้เฉพาะฟีเจอร์ที่ตรวจแล้ว และทุกสถานะยังต้องผ่าน end-to-end กับ authorization testing ก่อนเปลี่ยนเป็น “พร้อมใช้จริง”
 
 ## MVP core
 
@@ -399,6 +399,12 @@
 - ต้องทดสอบว่า health/family/guardian/address/notes ไม่รั่วถึงครูหรือสมาชิกที่ไม่เกี่ยวข้อง
 
 ## Supporting features
+
+### วิจัยการศึกษา — มีโค้ดรองรับ, ระยะ 3.1 ผ่าน
+
+- รุ่นแรกแบบกลุ่มเดียววัดก่อน–หลังเสร็จครบระยะ 2.1–2.5 แล้ว: สร้างโครงการ/ข้อสอบ, คะแนนจริงสามช่องทาง, paired t-test, one-sample criterion t-test, 95% CI, effect size, กราฟ, CSV สรุป และ Excel รายบุคคลแบบไม่ระบุตัวตนหรือมีชื่อ/รหัส พร้อม RLS และ append-only export audit
+- Technical/read-only UAT ผ่านแล้ว: wizard จากข้อมูลจริงโดยไม่กดสร้าง, paired t-test เทียบ NIST, Excel ที่ขอบเขต 2,000 คน, anonymous export ข้าม 1,000 คน, upload/download permission guard, migration parity และ remote schema lint
+- แก้เส้นทางที่เคยเสี่ยงถูก PostgREST ตัดหลัง 1,000 แถวแล้ว รายละเอียดและ checklist ระยะ 3.2 สำหรับโครงการ/คะแนนห้องจริงอยู่ใน `docs/EDUCATION_RESEARCH_UAT.md`
 
 ### Dashboard — มีโค้ดรองรับ (ฝั่งครู)
 
