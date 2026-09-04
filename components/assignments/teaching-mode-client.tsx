@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  FileText,
   Loader2,
   Plus,
   Presentation,
@@ -234,6 +235,10 @@ export function TeachingModeClient({
   const [selectedSlot, setSelectedSlot] = useState(initialSlot)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(initialBoard?.id ?? null)
   const [showSolution, setShowSolution] = useState(false)
+  const [showQuestion, setShowQuestion] = useState(true)
+  // The slots start put away: a teacher opens them to switch or save a board
+  // and then wants the width back for writing.
+  const [showBoards, setShowBoards] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [loadingBoards, setLoadingBoards] = useState(false)
   const [loadNonce, setLoadNonce] = useState(initialBoard ? 1 : 0)
@@ -381,11 +386,17 @@ export function TeachingModeClient({
             <p className="line-clamp-2 text-xs text-muted-foreground">กระดานแยกตามโจทย์ · ผู้สร้างแก้ไขได้สูงสุด 5 ช่อง</p>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2 sm:justify-end">
+        <div className="mt-3 flex flex-wrap items-center gap-2 sm:justify-end">
           <Button type="button" variant="outline" size="sm" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
             {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
           </Button>
-          <div className="flex items-center gap-1">
+          <Button type="button" variant={showQuestion ? 'outline' : 'secondary'} size="sm" onClick={() => setShowQuestion(value => !value)} aria-pressed={!showQuestion}>
+            <FileText />{showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
+          </Button>
+          <Button type="button" variant={showBoards ? 'secondary' : 'outline'} size="sm" onClick={() => setShowBoards(value => !value)} aria-pressed={showBoards}>
+            <Presentation />{showBoards ? 'ซ่อนช่องกระดาน' : 'ช่องกระดาน'}
+          </Button>
+          <div className="flex items-center gap-1 sm:ml-2">
             <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(questionIndex - 1)} disabled={questionIndex === 0} aria-label="ข้อก่อนหน้า">
               <ChevronLeft />
             </Button>
@@ -397,13 +408,21 @@ export function TeachingModeClient({
         </div>
       </Card>
 
-      <div className="grid min-h-0 min-w-0 flex-1 gap-4 lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]">
+      {/* With the ข้อ and the slots put away the column disappears entirely,
+          which is what gives the board the whole width to write on. */}
+      <div className={`grid min-h-0 min-w-0 flex-1 gap-4 ${
+        showQuestion || showBoards ? 'lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]' : ''
+      }`}>
+        {(showQuestion || showBoards) && (
         <div className="min-w-0 space-y-4 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:pr-1">
+          {showQuestion && (
           <Card padding="lg" className="space-y-4">
             <TeachingQuestion question={question} index={questionIndex} total={questions.length} showSolution={showSolution} />
             <TeachingTryAnswer question={question} revealAnswerKey={showSolution} />
           </Card>
+          )}
 
+          {showBoards && (
           <Card padding="md" className="space-y-3">
             <div className="flex items-center gap-2">
               <Presentation className="size-4 text-primary" />
@@ -490,7 +509,9 @@ export function TeachingModeClient({
               </div>
             )}
           </Card>
+          )}
         </div>
+        )}
 
         <div className="min-h-[560px] min-w-0 lg:min-h-0">
           <TeachingBoardEditor
