@@ -15,6 +15,38 @@ export const DRAWING_BACKGROUNDS: Array<{ value: ScratchpadBackground; label: st
 
 export const TRANSPARENT_CANVAS = 'transparent'
 
+/** Ink presets behind the ปากกา / ไฮไลต์ buttons. */
+export const PEN_INK = { color: '#172554', width: 2, opacity: 100 } as const
+export const HIGHLIGHTER_INK = { color: '#facc15', width: 4, opacity: 35 } as const
+
+/**
+ * Stroke widths the slider offers. Excalidraw's own panel has three steps
+ * (1 / 2 / 4); teachers write at a range of sizes on a projector, so the
+ * board exposes every whole width in between and above.
+ */
+export const MIN_STROKE_WIDTH = 1
+export const MAX_STROKE_WIDTH = 12
+
+export function clampStrokeWidth(value: number): number {
+  if (!Number.isFinite(value)) return PEN_INK.width
+  return Math.min(MAX_STROKE_WIDTH, Math.max(MIN_STROKE_WIDTH, Math.round(value)))
+}
+
+/**
+ * What a fresh board opens with: the navy pen, no shape fill, plain solid
+ * strokes drawn straight rather than sketchy. A board that was saved with
+ * other settings restores its own — these only fill the gaps.
+ */
+export const DRAWING_DEFAULT_ITEM_STATE = {
+  currentItemStrokeColor: PEN_INK.color,
+  currentItemBackgroundColor: 'transparent',
+  currentItemStrokeWidth: PEN_INK.width,
+  currentItemStrokeStyle: 'solid',
+  // Excalidraw's "architect" roughness: no hand-drawn wobble.
+  currentItemRoughness: 0,
+  currentItemOpacity: PEN_INK.opacity,
+} as const satisfies Partial<AppState>
+
 function paintPreviewBackground(
   context: CanvasRenderingContext2D,
   width: number,

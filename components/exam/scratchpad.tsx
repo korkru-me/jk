@@ -35,9 +35,15 @@ import {
   type StudentWorkArtifactView,
 } from '@/lib/math-work'
 import {
+  clampStrokeWidth,
   createDrawingPreview,
   DRAWING_BACKGROUNDS,
+  DRAWING_DEFAULT_ITEM_STATE,
   drawingBackgroundStyle,
+  HIGHLIGHTER_INK,
+  MAX_STROKE_WIDTH,
+  MIN_STROKE_WIDTH,
+  PEN_INK,
   stableDrawingAppState,
   TRANSPARENT_CANVAS,
 } from './drawing-board-utils'
@@ -92,6 +98,7 @@ export default function Scratchpad({
   const mountedRef = useRef(true)
   const loadedArtifactNonceRef = useRef(0)
   const [background, setBackground] = useState<ScratchpadBackground>('lined')
+  const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
   const [status, setStatus] = useState<SaveStatus>(persistenceEnabled ? 'loading' : 'idle')
   const [apiReady, setApiReady] = useState(false)
   const [attaching, setAttaching] = useState(false)
@@ -113,6 +120,7 @@ export default function Scratchpad({
     return {
       elements: scene.elements as readonly OrderedExcalidrawElement[],
       appState: {
+        ...DRAWING_DEFAULT_ITEM_STATE,
         ...scene.appState,
         viewBackgroundColor: TRANSPARENT_CANVAS,
       } as Partial<AppState>,
@@ -195,6 +203,8 @@ export default function Scratchpad({
       appState: stableDrawingAppState(appState),
       files,
     }
+    // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
+    setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
     scheduleSave()
   }, [scheduleSave])
 
@@ -207,12 +217,24 @@ export default function Scratchpad({
   const chooseInkPreset = (kind: 'pen' | 'highlighter') => {
     const api = apiRef.current
     if (!api) return
+    const ink = kind === 'pen' ? PEN_INK : HIGHLIGHTER_INK
     api.updateScene({
-      appState: kind === 'pen'
-        ? { currentItemStrokeColor: '#172554', currentItemStrokeWidth: 2, currentItemOpacity: 100 }
-        : { currentItemStrokeColor: '#facc15', currentItemStrokeWidth: 4, currentItemOpacity: 35 },
+      appState: {
+        currentItemStrokeColor: ink.color,
+        currentItemStrokeWidth: ink.width,
+        currentItemOpacity: ink.opacity,
+      },
     })
-    api.setActiveTool({ type: 'freedraw' })
+    setStrokeWidth(ink.width)
+    api.setActiveTool({ type: 'freedraw', locked: true })
+  }
+
+  const chooseStrokeWidth = (value: number) => {
+    const api = apiRef.current
+    if (!api) return
+    const next = clampStrokeWidth(value)
+    setStrokeWidth(next)
+    api.updateScene({ appState: { currentItemStrokeWidth: next } })
   }
 
   const loadAttachedScene = useCallback(async () => {
@@ -253,6 +275,13 @@ export default function Scratchpad({
       setLoadingAttached(false)
     }
   }, [artifact, artifactPartKey, persist, previewMode, scope.answerId])
+
+  // Keep the chosen tool after each stroke: a line or an arrow is rarely
+  // drawn only once, and reverting to selection breaks the flow.
+  useEffect(() => {
+    if (!apiReady) return
+    apiRef.current?.setActiveTool({ type: 'freedraw', locked: true })
+  }, [apiReady])
 
   useEffect(() => {
     if (!apiReady || !open || loadAttachedNonce <= 0) return
@@ -419,6 +448,21 @@ export default function Scratchpad({
           <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('highlighter')}>
             <Highlighter /> ไฮไลต์
           </Button>
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+          <label className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+            ขนาดเส้น
+            <input
+              type="range"
+              min={MIN_STROKE_WIDTH}
+              max={MAX_STROKE_WIDTH}
+              step={1}
+              value={strokeWidth}
+              onChange={event => chooseStrokeWidth(Number(event.target.value))}
+              aria-label="ขนาดเส้น"
+              className="h-1 w-24 cursor-pointer accent-primary"
+            />
+            <span className="w-3 text-right font-mono text-[10px] text-foreground" aria-hidden="true">{strokeWidth}</span>
+          </label>
           <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
           {DRAWING_BACKGROUNDS.map(item => (
             <Button
