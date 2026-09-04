@@ -1,14 +1,16 @@
 'use client'
 
 import '@excalidraw/excalidraw/index.css'
-import { CaptureUpdateAction, Excalidraw, MainMenu } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, convertToExcalidrawElements, Excalidraw, MainMenu } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
   BinaryFileData,
   BinaryFiles,
+  DataURL,
   ExcalidrawImperativeAPI,
 } from '@excalidraw/excalidraw/types'
+import type { FileId } from '@excalidraw/excalidraw/element/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Eraser, Highlighter, Loader2, Maximize2, PanelRightClose, PenLine, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
@@ -33,6 +35,7 @@ import {
   MATH_WORK_BUCKET,
   type TeachingBoardView,
 } from '@/lib/math-work'
+import { downscaleImage } from '@/lib/image-downscale'
 import {
   emptyScratchpadScene,
   isScratchpadSceneWithinLimits,
@@ -58,6 +61,8 @@ interface Props {
   onDirtyChange: (dirty: boolean) => void
   /** Reports the live scene so the ข้อ can be returned to as it was left. */
   onSceneChange?: (scene: ScratchpadScene) => void
+  /** A รูปประกอบโจทย์ the teacher asked to drop onto this board. */
+  insertImage?: { url: string; nonce: number } | null
   /** Given when the board can be put away. */
   onHide?: () => void
 }
@@ -91,6 +96,7 @@ export default function TeachingBoardEditor({
   onSaved,
   onDirtyChange,
   onSceneChange,
+  insertImage,
   onHide,
 }: Props) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
@@ -106,6 +112,7 @@ export default function TeachingBoardEditor({
   const [background, setBackground] = useState<ScratchpadBackground>(initialScene?.background ?? 'lined')
   const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
   const [toolsHidden, setToolsHidden] = useState(false)
+  const [insertingImage, setInsertingImage] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [apiReady, setApiReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -273,6 +280,93 @@ export default function TeachingBoardEditor({
     api.setActiveTool({ type: 'freedraw', locked: true })
   }
 
+  /**
+   * Drops a รูปประกอบโจทย์ onto the sheet, centred on what the teacher is
+   * looking at and scaled to sit inside it.
+   *
+   * The picture is embedded rather than linked: the board is saved as one
+   * scene file, and a link would break the day the question's image moves.
+   * That file is capped at 2 MiB, so it goes through the same downscaler the
+   * upload paths use before it becomes part of the scene.
+   */
+  const dropQuestionImage = useCallback(async (url: string) => {
+    const api = apiRef.current
+    if (!api) return
+    setInsertingImage(true)
+    try {
+      const response = await fetch(url, { cache: 'no-store' })
+      if (!response.ok) throw new Error('โหลดรูปจากโจทย์ไม่สำเร็จ')
+      const blob = await response.blob()
+      const shrunk = await downscaleImage(
+        new File([blob], 'question-image', { type: blob.type || 'image/png' }),
+        { maxEdge: 1200 },
+      )
+      const dataURL = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(new Error('อ่านไฟล์รูปไม่สำเร็จ'))
+        reader.readAsDataURL(shrunk)
+      })
+      // Measured through an <img>, not createImageBitmap: that cannot decode
+      // an SVG, which Excalidraw itself is perfectly happy to draw.
+      const size = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const image = new Image()
+        image.onload = () => resolve({ width: image.naturalWidth || 800, height: image.naturalHeight || 600 })
+        image.onerror = () => reject(new Error('รูปประกอบโจทย์นี้เปิดไม่ได้'))
+        image.src = dataURL
+      })
+
+      const state = api.getAppState()
+      const box = surfaceRef.current?.getBoundingClientRect()
+      const zoom = state.zoom.value
+      const viewWidth = (box?.width ?? PAGE_WIDTH) / zoom
+      const viewHeight = (box?.height ?? PAGE_HEIGHT) / zoom
+      const fit = Math.min(
+        1,
+        (viewWidth * 0.7) / size.width,
+        (viewHeight * 0.7) / size.height,
+        (PAGE_WIDTH * 0.8) / size.width,
+      )
+      const width = Math.round(size.width * fit)
+      const height = Math.round(size.height * fit)
+
+      const fileId = crypto.randomUUID() as FileId
+      api.addFiles([{
+        id: fileId,
+        dataURL: dataURL as DataURL,
+        mimeType: (shrunk.type || 'image/png') as BinaryFileData['mimeType'],
+        created: Date.now(),
+      }])
+      api.updateScene({
+        elements: [
+          ...api.getSceneElements(),
+          ...convertToExcalidrawElements([{
+            type: 'image',
+            fileId,
+            x: -state.scrollX + viewWidth / 2 - width / 2,
+            y: -state.scrollY + viewHeight / 2 - height / 2,
+            width,
+            height,
+          }]),
+        ],
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      })
+      markDirty(true)
+      toast.success('ใส่รูปจากโจทย์ลงกระดานแล้ว')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'ใส่รูปจากโจทย์ไม่สำเร็จ')
+    } finally {
+      setInsertingImage(false)
+    }
+  }, [markDirty])
+
+  const handledInsertRef = useRef(0)
+  useEffect(() => {
+    if (!apiReady || !editable || !insertImage || insertImage.nonce === handledInsertRef.current) return
+    handledInsertRef.current = insertImage.nonce
+    void dropQuestionImage(insertImage.url)
+  }, [apiReady, dropQuestionImage, editable, insertImage])
+
   /** Puts the whole sheet on screen — the way back when the view wanders. */
   const fitPaper = () => {
     const api = apiRef.current
@@ -389,7 +483,11 @@ export default function TeachingBoardEditor({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{questionLabel} · ช่อง {slot}</p>
               <p className="text-[10px] text-muted-foreground" aria-live="polite">
-                {!editable ? 'ดูอย่างเดียว' : saving ? 'กำลังบันทึก...' : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
+                {!editable ? 'ดูอย่างเดียว'
+                  : insertingImage ? 'กำลังใส่รูปจากโจทย์...'
+                    : saving ? 'กำลังบันทึก...'
+                      : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก'
+                        : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
               </p>
             </div>
             <div className="ml-auto flex items-center gap-1">
