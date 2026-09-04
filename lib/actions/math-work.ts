@@ -7,15 +7,17 @@ import { getExamAccessSession } from '@/lib/exam-access-session'
 import {
   buildStudentWorkUploadPaths,
   buildTeachingBoardUploadPaths,
-  hasWebpSignature,
+  hasPreviewSignature,
   isSupportedWorkFormatVersion,
   isUuid,
   isWorkArtifactSource,
   isWorkPartKey,
+  isWorkPreviewFormat,
   MATH_WORK_BUCKET,
   readSceneElementCount,
   validateStoredWorkFile,
   type WorkArtifactSource,
+  type WorkPreviewFormat,
   type WorkUploadPaths,
 } from '@/lib/math-work'
 
@@ -199,6 +201,7 @@ async function createSignedUploadTargets(
 async function inspectStoredWork(
   admin: AdminClient,
   paths: WorkUploadPaths,
+  previewFormat: WorkPreviewFormat,
 ): Promise<{ inspection: StoredWorkInspection } | { error: string }> {
   const bucket = admin.storage.from(MATH_WORK_BUCKET)
   const [previewInfo, sceneInfo] = await Promise.all([
@@ -213,6 +216,7 @@ async function inspectStoredWork(
   const previewMeta = fileMetadata(previewInfo.data)
   const previewCheck = validateStoredWorkFile({
     kind: 'preview',
+    previewFormat,
     size: previewMeta.size,
     contentType: previewMeta.contentType,
   })
@@ -239,7 +243,9 @@ async function inspectStoredWork(
   }
 
   const previewHeader = new Uint8Array((await previewDownload.data.arrayBuffer()).slice(0, 12))
-  if (!hasWebpSignature(previewHeader)) return { error: 'ไฟล์ตัวอย่างไม่ใช่ WebP ที่ถูกต้อง' }
+  if (!hasPreviewSignature(previewHeader, previewFormat)) {
+    return { error: 'ไฟล์ตัวอย่างไม่ตรงกับชนิดภาพที่แจ้งไว้' }
+  }
 
   let elementCount: number | null = null
   if (sceneDownload) {
@@ -281,6 +287,7 @@ export async function prepareStudentWorkArtifactUpload(input: {
   sourceType: string
   includeScene: boolean
   formatVersion: number
+  previewFormat: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -289,6 +296,7 @@ export async function prepareStudentWorkArtifactUpload(input: {
   if (!isWorkPartKey(input.partKey)) return { error: 'ตำแหน่งวิธีทำไม่ถูกต้อง' }
   if (!isWorkArtifactSource(input.sourceType)) return { error: 'ประเภทวิธีทำไม่ถูกต้อง' }
   if (!isSupportedWorkFormatVersion(input.formatVersion)) return { error: 'เวอร์ชันพื้นที่เขียนไม่รองรับ' }
+  if (!isWorkPreviewFormat(input.previewFormat)) return { error: 'ชนิดภาพตัวอย่างไม่รองรับ' }
   if (input.sourceType === 'scratchpad' && !input.includeScene) {
     return { error: 'กระดาษทดต้องมีไฟล์ต้นฉบับเพื่อกลับมาแก้ไข' }
   }
@@ -312,6 +320,7 @@ export async function prepareStudentWorkArtifactUpload(input: {
     submissionAnswerId: writable.context.answerId,
     uploadId,
     includeScene: input.includeScene,
+    previewFormat: input.previewFormat,
   })
   const targets = await createSignedUploadTargets(admin, paths)
   if ('error' in targets) return targets
@@ -331,6 +340,7 @@ export async function saveStudentWorkArtifact(input: {
   uploadId: string
   includeScene: boolean
   formatVersion: number
+  previewFormat: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -339,6 +349,7 @@ export async function saveStudentWorkArtifact(input: {
   if (!isWorkPartKey(input.partKey)) return { error: 'ตำแหน่งวิธีทำไม่ถูกต้อง' }
   if (!isWorkArtifactSource(input.sourceType)) return { error: 'ประเภทวิธีทำไม่ถูกต้อง' }
   if (!isSupportedWorkFormatVersion(input.formatVersion)) return { error: 'เวอร์ชันพื้นที่เขียนไม่รองรับ' }
+  if (!isWorkPreviewFormat(input.previewFormat)) return { error: 'ชนิดภาพตัวอย่างไม่รองรับ' }
   if (input.sourceType === 'scratchpad' && !input.includeScene) {
     return { error: 'กระดาษทดต้องมีไฟล์ต้นฉบับเพื่อกลับมาแก้ไข' }
   }
@@ -361,8 +372,9 @@ export async function saveStudentWorkArtifact(input: {
     submissionAnswerId: writable.context.answerId,
     uploadId: input.uploadId,
     includeScene: input.includeScene,
+    previewFormat: input.previewFormat,
   })
-  const inspected = await inspectStoredWork(admin, paths)
+  const inspected = await inspectStoredWork(admin, paths, input.previewFormat)
   if ('error' in inspected) {
     await removeStoredWork(admin, [paths.previewPath, paths.scenePath])
     return inspected
@@ -471,6 +483,7 @@ export async function prepareTeachingBoardUpload(input: {
   questionId: string
   slot: number
   formatVersion: number
+  previewFormat: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -478,6 +491,7 @@ export async function prepareTeachingBoardUpload(input: {
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
   if (!Number.isInteger(input.slot) || input.slot < 1 || input.slot > 5) return { error: 'ช่องบันทึกต้องอยู่ระหว่าง 1–5' }
   if (!isSupportedWorkFormatVersion(input.formatVersion)) return { error: 'เวอร์ชันพื้นที่เขียนไม่รองรับ' }
+  if (!isWorkPreviewFormat(input.previewFormat)) return { error: 'ชนิดภาพตัวอย่างไม่รองรับ' }
 
   const managed = await loadManagedTeachingBoardContext(supabase, input.assignmentId, input.questionId)
   if ('error' in managed) return managed
@@ -489,6 +503,7 @@ export async function prepareTeachingBoardUpload(input: {
     questionId: input.questionId,
     slot: input.slot,
     uploadId,
+    previewFormat: input.previewFormat,
   })
   const targets = await createSignedUploadTargets(createAdminClient(), paths)
   if ('error' in targets) return targets
@@ -507,6 +522,7 @@ export async function saveTeachingBoard(input: {
   uploadId: string
   formatVersion: number
   replaceExisting: boolean
+  previewFormat: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -516,6 +532,7 @@ export async function saveTeachingBoard(input: {
   }
   if (!Number.isInteger(input.slot) || input.slot < 1 || input.slot > 5) return { error: 'ช่องบันทึกต้องอยู่ระหว่าง 1–5' }
   if (!isSupportedWorkFormatVersion(input.formatVersion)) return { error: 'เวอร์ชันพื้นที่เขียนไม่รองรับ' }
+  if (!isWorkPreviewFormat(input.previewFormat)) return { error: 'ชนิดภาพตัวอย่างไม่รองรับ' }
 
   const managed = await loadManagedTeachingBoardContext(supabase, input.assignmentId, input.questionId)
   if ('error' in managed) return managed
@@ -526,9 +543,10 @@ export async function saveTeachingBoard(input: {
     questionId: input.questionId,
     slot: input.slot,
     uploadId: input.uploadId,
+    previewFormat: input.previewFormat,
   })
   const admin = createAdminClient()
-  const inspected = await inspectStoredWork(admin, paths)
+  const inspected = await inspectStoredWork(admin, paths, input.previewFormat)
   if ('error' in inspected || inspected.inspection.sceneSize === null || inspected.inspection.elementCount === null) {
     await removeStoredWork(admin, [paths.previewPath, paths.scenePath])
     return 'error' in inspected ? inspected : { error: 'กระดานสอนต้องมีไฟล์ต้นฉบับ' }

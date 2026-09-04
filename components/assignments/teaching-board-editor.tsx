@@ -237,6 +237,7 @@ export default function TeachingBoardEditor({
         questionId,
         slot,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
+        previewFormat: preview.format,
       })
       if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่บันทึกไม่สำเร็จ')
       if (!prepared.scene) throw new Error('เตรียมไฟล์ต้นฉบับไม่สำเร็จ')
@@ -244,8 +245,8 @@ export default function TeachingBoardEditor({
       const { createClient } = await import('@/lib/supabase/client')
       const bucket = createClient().storage.from(MATH_WORK_BUCKET)
       await Promise.allSettled([
-        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview, {
-          contentType: 'image/webp',
+        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
+          contentType: preview.blob.type,
           cacheControl: '300',
         }),
         bucket.uploadToSignedUrl(prepared.scene.path, prepared.scene.token, sceneBlob, {
@@ -260,6 +261,7 @@ export default function TeachingBoardEditor({
         uploadId: prepared.uploadId,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         replaceExisting: Boolean(board),
+        previewFormat: preview.format,
       })
       if (!saved || 'error' in saved) throw new Error(saved?.error ?? 'บันทึกกระดานสอนไม่สำเร็จ')
       markDirty(false)

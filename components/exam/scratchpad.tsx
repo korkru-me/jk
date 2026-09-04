@@ -277,7 +277,7 @@ export default function Scratchpad({
       const preview = await createDrawingPreview(api, background, 'เขียนวิธีทำก่อนกดแนบ')
 
       if (previewMode) {
-        const previewUrl = URL.createObjectURL(preview)
+        const previewUrl = URL.createObjectURL(preview.blob)
         onAttachmentSaved({
           id: `preview-${scope.answerId}-${artifactPartKey}`,
           submissionAnswerId: scope.answerId,
@@ -304,6 +304,7 @@ export default function Scratchpad({
         sourceType: 'scratchpad',
         includeScene: true,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
+        previewFormat: preview.format,
       })
       if (!prepared || 'error' in prepared) {
         throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
@@ -316,8 +317,8 @@ export default function Scratchpad({
       // This also recovers cleanly when an upload response is lost even though
       // the object reached storage; a genuinely partial pair is removed there.
       await Promise.allSettled([
-        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview, {
-          contentType: 'image/webp',
+        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
+          contentType: preview.blob.type,
           cacheControl: '300',
         }),
         bucket.uploadToSignedUrl(prepared.scene.path, prepared.scene.token, sceneBlob, {
@@ -332,6 +333,7 @@ export default function Scratchpad({
         uploadId: prepared.uploadId,
         includeScene: true,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
+        previewFormat: preview.format,
       })
       if (!saved || 'error' in saved) throw new Error(saved?.error ?? 'บันทึกวิธีทำไม่สำเร็จ')
       const refreshed = await getStudentWorkArtifacts(scope.answerId)

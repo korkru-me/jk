@@ -4,6 +4,8 @@ import {
   buildTeachingBoardUploadPaths,
   CURRENT_WORK_FORMAT_VERSION,
   hasCompleteWorkEvidence,
+  hasPngSignature,
+  hasPreviewSignature,
   hasWebpSignature,
   isWorkArtifactSource,
   isWorkPartKey,
@@ -51,10 +53,30 @@ describe('math work artifact helpers', () => {
       submissionAnswerId: ANSWER_ID,
       uploadId: UPLOAD_ID,
       includeScene: true,
+      previewFormat: 'webp',
     })).toEqual({
       previewPath: `students/${STUDENT_ID}/${SUBMISSION_ID}/${ANSWER_ID}/${UPLOAD_ID}/preview.webp`,
       scenePath: `students/${STUDENT_ID}/${SUBMISSION_ID}/${ANSWER_ID}/${UPLOAD_ID}/scene.json`,
     })
+  })
+
+  it('names the preview after the format the browser could actually encode', () => {
+    expect(buildStudentWorkUploadPaths({
+      studentId: STUDENT_ID,
+      submissionId: SUBMISSION_ID,
+      submissionAnswerId: ANSWER_ID,
+      uploadId: UPLOAD_ID,
+      includeScene: true,
+      previewFormat: 'png',
+    }).previewPath).toBe(`students/${STUDENT_ID}/${SUBMISSION_ID}/${ANSWER_ID}/${UPLOAD_ID}/preview.png`)
+    expect(buildTeachingBoardUploadPaths({
+      teacherId: STUDENT_ID,
+      assignmentId: ASSIGNMENT_ID,
+      questionId: QUESTION_ID,
+      slot: 1,
+      uploadId: UPLOAD_ID,
+      previewFormat: 'png',
+    }).previewPath).toBe(`teachers/${STUDENT_ID}/${ASSIGNMENT_ID}/${QUESTION_ID}/1/${UPLOAD_ID}/preview.png`)
   })
 
   it('does not allocate a scene path for an unannotated photo', () => {
@@ -64,6 +86,7 @@ describe('math work artifact helpers', () => {
       submissionAnswerId: ANSWER_ID,
       uploadId: UPLOAD_ID,
       includeScene: false,
+      previewFormat: 'webp',
     }).scenePath).toBeNull()
   })
 
@@ -74,6 +97,7 @@ describe('math work artifact helpers', () => {
       questionId: QUESTION_ID,
       slot: 5,
       uploadId: UPLOAD_ID,
+      previewFormat: 'webp',
     })).toEqual({
       previewPath: `teachers/${STUDENT_ID}/${ASSIGNMENT_ID}/${QUESTION_ID}/5/${UPLOAD_ID}/preview.webp`,
       scenePath: `teachers/${STUDENT_ID}/${ASSIGNMENT_ID}/${QUESTION_ID}/5/${UPLOAD_ID}/scene.json`,
@@ -87,6 +111,7 @@ describe('math work artifact helpers', () => {
       questionId: QUESTION_ID,
       slot: 6,
       uploadId: UPLOAD_ID,
+      previewFormat: 'webp',
     })).toThrow('slot must be an integer from 1 to 5')
   })
 
@@ -109,24 +134,43 @@ describe('math work artifact helpers', () => {
   it('checks the actual stored MIME and byte size', () => {
     expect(validateStoredWorkFile({
       kind: 'preview',
+      previewFormat: 'webp',
       contentType: 'image/webp',
       size: MAX_WORK_PREVIEW_BYTES,
     })).toEqual({ ok: true, size: MAX_WORK_PREVIEW_BYTES })
     expect(validateStoredWorkFile({
       kind: 'preview',
+      previewFormat: 'png',
+      contentType: 'image/png',
+      size: 100,
+    })).toEqual({ ok: true, size: 100 })
+    // The stored type has to match the format the upload was prepared for.
+    expect(validateStoredWorkFile({
+      kind: 'preview',
+      previewFormat: 'webp',
       contentType: 'image/png',
       size: 100,
     }).ok).toBe(false)
     expect(validateStoredWorkFile({
       kind: 'preview',
+      previewFormat: 'webp',
       contentType: 'image/webp',
       size: MAX_WORK_PREVIEW_BYTES + 1,
     }).ok).toBe(false)
   })
 
-  it('checks WebP file bytes instead of trusting the MIME label alone', () => {
-    expect(hasWebpSignature(new TextEncoder().encode('RIFF0000WEBPdata'))).toBe(true)
+  it('checks preview file bytes instead of trusting the MIME label alone', () => {
+    const webp = new TextEncoder().encode('RIFF0000WEBPdata')
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
+    expect(hasWebpSignature(webp)).toBe(true)
     expect(hasWebpSignature(new TextEncoder().encode('RIFF0000PNG data'))).toBe(false)
     expect(hasWebpSignature(new Uint8Array(3))).toBe(false)
+    expect(hasPngSignature(png)).toBe(true)
+    expect(hasPngSignature(webp)).toBe(false)
+    expect(hasPngSignature(new Uint8Array(3))).toBe(false)
+    // A PNG uploaded against a WebP-prepared path is still rejected.
+    expect(hasPreviewSignature(png, 'png')).toBe(true)
+    expect(hasPreviewSignature(png, 'webp')).toBe(false)
+    expect(hasPreviewSignature(webp, 'webp')).toBe(true)
   })
 })
