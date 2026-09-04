@@ -44,14 +44,21 @@ import {
 interface Props {
   assignmentId: string
   questionId: string
+  /** "ข้อ 15/22" — every save says which ข้อ it lands on. */
+  questionLabel: string
   slot: number
   board: TeachingBoardView | null
   canManage: boolean
   loadNonce: number
   resetNonce: number
+  /** What was on this ข้อ's board when the teacher last left it. */
+  initialScene?: ScratchpadScene | null
+  initialDirty?: boolean
   onSaved: (slot: number) => Promise<void>
   onDirtyChange: (dirty: boolean) => void
-  /** Given when the board can be put away; it asks about unsaved work first. */
+  /** Reports the live scene so the ข้อ can be returned to as it was left. */
+  onSceneChange?: (scene: ScratchpadScene) => void
+  /** Given when the board can be put away. */
   onHide?: () => void
 }
 
@@ -62,22 +69,28 @@ function contentSignature(elements: readonly OrderedExcalidrawElement[]): string
 export default function TeachingBoardEditor({
   assignmentId,
   questionId,
+  questionLabel,
   slot,
   board,
   canManage,
   loadNonce,
   resetNonce,
+  initialScene,
+  initialDirty = false,
   onSaved,
   onDirtyChange,
+  onSceneChange,
   onHide,
 }: Props) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
-  const sceneRef = useRef<ScratchpadScene>(emptyScratchpadScene())
-  const contentSignatureRef = useRef('')
+  const sceneRef = useRef<ScratchpadScene>(initialScene ?? emptyScratchpadScene())
+  const contentSignatureRef = useRef(
+    initialScene ? contentSignature(initialScene.elements as readonly OrderedExcalidrawElement[]) : '',
+  )
   const ignoreChangesRef = useRef(true)
   const handledLoadRef = useRef(0)
   const handledResetRef = useRef(0)
-  const [background, setBackground] = useState<ScratchpadBackground>('lined')
+  const [background, setBackground] = useState<ScratchpadBackground>(initialScene?.background ?? 'lined')
   const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
   const [dirty, setDirty] = useState(false)
   const [apiReady, setApiReady] = useState(false)
@@ -182,6 +195,15 @@ export default function TeachingBoardEditor({
     return () => cancelAnimationFrame(frame)
   }, [apiReady, editable])
 
+  // The strokes come back through initialData; this only restores the
+  // "not saved yet" state that came with them.
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (!apiReady || restoredRef.current || !initialScene) return
+    restoredRef.current = true
+    markDirty(initialDirty)
+  }, [apiReady, initialDirty, initialScene, markDirty])
+
   const handleChange = useCallback((
     elements: readonly OrderedExcalidrawElement[],
     appState: AppState,
@@ -197,10 +219,11 @@ export default function TeachingBoardEditor({
       files,
       background,
     }
+    onSceneChange?.(sceneRef.current)
     // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
     setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
     if (contentChanged && !ignoreChangesRef.current && editable) markDirty(true)
-  }, [background, editable, markDirty])
+  }, [background, editable, markDirty, onSceneChange])
 
   const chooseBackground = (next: ScratchpadBackground) => {
     if (!editable) return
@@ -241,7 +264,7 @@ export default function TeachingBoardEditor({
     if (!api || !editable || saving) return
     if (board) {
       const ok = await confirm({
-        title: `บันทึกทับกระดานช่อง ${slot}?`,
+        title: `บันทึกทับกระดาน ${questionLabel} ช่อง ${slot}?`,
         description: 'ภาพและไฟล์ต้นฉบับเดิมในช่องนี้จะถูกแทนที่ด้วยกระดานที่กำลังเปิดอยู่',
         confirmLabel: 'บันทึกทับ',
       })
@@ -295,7 +318,7 @@ export default function TeachingBoardEditor({
       if (!saved || 'error' in saved) throw new Error(saved?.error ?? 'บันทึกกระดานสอนไม่สำเร็จ')
       markDirty(false)
       await onSaved(slot)
-      toast.success(board ? `บันทึกทับช่อง ${slot} แล้ว` : `บันทึกกระดานลงช่อง ${slot} แล้ว`)
+      toast.success(board ? `บันทึกทับ ${questionLabel} ช่อง ${slot} แล้ว` : `บันทึกกระดานลง ${questionLabel} ช่อง ${slot} แล้ว`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'บันทึกกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
     } finally {
@@ -310,7 +333,7 @@ export default function TeachingBoardEditor({
           <div className="flex flex-wrap items-center gap-2">
             <PenLine className="size-4 shrink-0 text-primary" aria-hidden="true" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">กระดานสอน · ช่อง {slot}</p>
+              <p className="truncate text-sm font-semibold">{questionLabel} · ช่อง {slot}</p>
               <p className="text-[10px] text-muted-foreground" aria-live="polite">
                 {!editable ? 'ดูอย่างเดียว' : saving ? 'กำลังบันทึก...' : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
               </p>
@@ -387,10 +410,17 @@ export default function TeachingBoardEditor({
             </div>
           )}
           <Excalidraw
+            /* Coming back to a ข้อ opens its board exactly as it was left,
+               unsaved strokes included, because the parked scene is what
+               Excalidraw mounts with. */
             initialData={{
-              elements: [],
-              appState: { ...DRAWING_DEFAULT_ITEM_STATE, viewBackgroundColor: TRANSPARENT_CANVAS },
-              files: {},
+              elements: (initialScene?.elements ?? []) as readonly OrderedExcalidrawElement[],
+              appState: {
+                ...DRAWING_DEFAULT_ITEM_STATE,
+                ...(initialScene?.appState ?? {}),
+                viewBackgroundColor: TRANSPARENT_CANVAS,
+              },
+              files: (initialScene?.files ?? {}) as BinaryFiles,
               scrollToContent: false,
             }}
             excalidrawAPI={api => {
