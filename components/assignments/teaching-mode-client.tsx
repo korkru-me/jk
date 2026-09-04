@@ -26,7 +26,7 @@ import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
 import type { TeachingBoardView } from '@/lib/math-work'
 import { TYPE_LABEL } from '@/lib/question-display'
-import { TeachingTryAnswer } from './teaching-try-answer'
+import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
   ssr: false,
@@ -100,11 +100,36 @@ function answerSummary(question: TeachingQuestionView): string {
   return question.correctAnswer || 'ยังไม่ได้กำหนดคำตอบ'
 }
 
-function TeachingQuestion({ question, index, total, showSolution }: {
+const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
+
+/** ถูก / ผิด for one statement, pressed in the question the way a student does. */
+function TrueFalseChoice({ value, onSelect }: { value: string; onSelect: (next: string) => void }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {[{ value: 'true', label: 'ถูก' }, { value: 'false', label: 'ผิด' }].map(choice => (
+        <Button
+          key={choice.value}
+          type="button"
+          size="xs"
+          variant={value === choice.value ? 'secondary' : 'outline'}
+          aria-pressed={value === choice.value}
+          className={value === choice.value ? 'border-primary bg-primary/10 text-primary' : ''}
+          onClick={() => onSelect(choice.value)}
+        >
+          {choice.label}
+        </Button>
+      ))}
+    </span>
+  )
+}
+
+function TeachingQuestion({ question, index, total, showSolution, answer }: {
   question: TeachingQuestionView
   index: number
   total: number
   showSolution: boolean
+  /** The teacher's own answer so far, held by the card around this. */
+  answer: { values: string[]; set: (index: number, value: string) => void }
 }) {
   const renderedQuestion = interpolateValues(question.question_text, question.randomValues)
   const renderedSolution = interpolateValues(question.solution_text ?? '', question.randomValues)
@@ -134,20 +159,40 @@ function TeachingQuestion({ question, index, total, showSolution }: {
         </div>
       )}
 
+      {/* Pressed to answer, like the student's own ปรนัย — no second copy of
+          the ตัวเลือก anywhere on the page. */}
       {options.length > 0 && (
         <div className="space-y-2">
-          {options.map((option, optionIndex) => (
-            <div key={optionIndex} className="flex items-start gap-2 rounded-xl border border-border px-3 py-2 text-sm">
-              <span className="font-semibold text-muted-foreground">{String.fromCharCode(65 + optionIndex)}.</span>
-              <div className="min-w-0 flex-1">
-                {option.text && <RichText text={option.text} />}
-                {option.image_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={option.image_url} alt={`ตัวเลือก ${optionIndex + 1}`} className="mt-1 max-h-28 rounded-lg object-contain" />
-                )}
-              </div>
-            </div>
-          ))}
+          {options.map((option, optionIndex) => {
+            const value = `MCQ:${optionIndex}`
+            const picked = answer.values[0] === value
+            return (
+              <Button
+                key={optionIndex}
+                type="button"
+                variant="outline"
+                aria-pressed={picked}
+                onClick={() => answer.set(0, picked ? '' : value)}
+                className={`h-auto w-full items-start justify-start gap-3 whitespace-normal rounded-xl px-3 py-2 text-left text-sm ${
+                  picked ? 'border-primary bg-primary/10' : ''
+                }`}
+              >
+                <span className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                  picked ? 'border-primary bg-primary' : 'border-muted-foreground/40'
+                }`}>
+                  {picked && <span className="size-1.5 rounded-full bg-card" />}
+                </span>
+                <span className="shrink-0 font-semibold text-muted-foreground">{CHOICE_LABELS[optionIndex] ?? optionIndex + 1}.</span>
+                <span className="min-w-0 flex-1 font-normal">
+                  {option.text && <RichText text={option.text} />}
+                  {option.image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={option.image_url} alt={`ตัวเลือก ${optionIndex + 1}`} className="mt-1 max-h-28 rounded-lg object-contain" />
+                  )}
+                </span>
+              </Button>
+            )
+          })}
         </div>
       )}
 
@@ -181,11 +226,19 @@ function TeachingQuestion({ question, index, total, showSolution }: {
         </div>
       )}
 
-      {question.question_type === 'true_false' && (extra?.statements ?? []).length > 0 && (
+      {question.question_type === 'true_false' && (
         <div className="space-y-2">
-          {(extra.statements as any[]).map((statement, statementIndex) => (
-            <div key={statement.id ?? statementIndex} className="rounded-xl bg-muted/40 px-3 py-2 text-sm">
-              {statement.text}
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2 text-sm">
+            <span className="min-w-0 text-muted-foreground">ข้อความข้างบน</span>
+            <TrueFalseChoice value={answer.values[0] ?? ''} onSelect={next => answer.set(0, next)} />
+          </div>
+          {(extra?.statements as any[] ?? []).map((statement, statementIndex) => (
+            <div key={statement.id ?? statementIndex} className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2 text-sm">
+              <span className="min-w-0">{statement.text}</span>
+              <TrueFalseChoice
+                value={answer.values[statementIndex + 1] ?? ''}
+                onSelect={next => answer.set(statementIndex + 1, next)}
+              />
             </div>
           ))}
         </div>
@@ -216,6 +269,57 @@ function TeachingQuestion({ question, index, total, showSolution }: {
         </Card>
       )}
     </div>
+  )
+}
+
+/**
+ * One ข้อ as the class sees it, plus the teacher's own answer to it.
+ *
+ * The answer lives here because it is entered in two places: a ตัวเลือก
+ * pressed inside the question, or a box under it. Both feed the one array
+ * `TeachingAnswerCheck` grades.
+ */
+function TeachingQuestionCard({ question, index, total, showSolution, boardAction, outlined }: {
+  question: TeachingQuestionView
+  index: number
+  total: number
+  showSolution: boolean
+  boardAction?: React.ReactNode
+  outlined: boolean
+}) {
+  const fields = useMemo(() => tryFields(question), [question])
+  const [values, setValues] = useState<string[]>(() => (fields ?? []).map(() => ''))
+
+  // A different ข้อ starts from an empty answer rather than the last one's.
+  useEffect(() => {
+    setValues((tryFields(question) ?? []).map(() => ''))
+  }, [question])
+
+  const setValue = useCallback((position: number, next: string) => {
+    setValues(current => current.map((value, index) => index === position ? next : value))
+  }, [])
+
+  return (
+    <Card padding="lg" className={`space-y-4 ${outlined ? 'border-primary' : ''}`}>
+      {boardAction && <div className="flex justify-end">{boardAction}</div>}
+      <TeachingQuestion
+        question={question}
+        index={index}
+        total={total}
+        showSolution={showSolution}
+        answer={{ values, set: setValue }}
+      />
+      {fields && (
+        <TeachingAnswerCheck
+          question={question}
+          fields={fields}
+          values={values}
+          onChange={setValue}
+          onClear={() => setValues(fields.map(() => ''))}
+          revealAnswerKey={showSolution}
+        />
+      )}
+    </Card>
   )
 }
 
@@ -463,27 +567,23 @@ export function TeachingModeClient({
             const index = pageStart + offset
             const isBoardQuestion = index === questionIndex
             return (
-              <Card
+              <TeachingQuestionCard
                 key={pageQuestion.id}
-                padding="lg"
-                className={`space-y-4 ${perPage > 1 && isBoardQuestion ? 'border-primary' : ''}`}
-              >
-                {/* With several ข้อ on the page, one of them owns the board —
-                    say which, and let the teacher move it without leaving. */}
-                {perPage > 1 && (
-                  <div className="flex justify-end">
-                    {isBoardQuestion ? (
-                      <Badge variant="secondary"><Presentation /> กระดานของข้อนี้</Badge>
-                    ) : (
-                      <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
-                        <Presentation /> เขียนกระดานข้อนี้
-                      </Button>
-                    )}
-                  </div>
-                )}
-                <TeachingQuestion question={pageQuestion} index={index} total={questions.length} showSolution={showSolution} />
-                <TeachingTryAnswer question={pageQuestion} revealAnswerKey={showSolution} />
-              </Card>
+                question={pageQuestion}
+                index={index}
+                total={questions.length}
+                showSolution={showSolution}
+                outlined={perPage > 1 && isBoardQuestion}
+                /* With several ข้อ on the page, one of them owns the board —
+                   say which, and let the teacher move it without leaving. */
+                boardAction={perPage > 1 ? (isBoardQuestion ? (
+                  <Badge variant="secondary"><Presentation /> กระดานของข้อนี้</Badge>
+                ) : (
+                  <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
+                    <Presentation /> เขียนกระดานข้อนี้
+                  </Button>
+                )) : undefined}
+              />
             )
           })}
 
