@@ -415,40 +415,45 @@ export function TeachingModeClient({
                   const saved = ownBoards.find(board => board.slot === slot) ?? null
                   const selected = selectedSlot === slot && (!selectedBoard || selectedBoard.createdBy === currentUserId)
                   return (
-                    <div key={slot} className={`rounded-xl border p-2 ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}>
-                      {saved?.previewUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={saved.previewUrl}
-                          alt={`กระดานช่อง ${slot}`}
-                          className="mb-2 aspect-square w-full rounded-lg border bg-card object-cover"
-                          onError={() => void fetchBoards(question.id)}
-                        />
-                      ) : (
+                    <div key={slot} className="relative min-w-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => void openOwnSlot(slot)}
+                        aria-pressed={selected}
+                        aria-label={saved ? `เปิดกระดานช่อง ${slot}` : `เริ่มกระดานช่อง ${slot}`}
+                        className={`h-auto w-full flex-col items-stretch gap-2 whitespace-normal rounded-xl border p-2 ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
+                      >
+                        {saved?.previewUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={saved.previewUrl}
+                            alt=""
+                            className="aspect-square w-full rounded-lg border bg-card object-cover"
+                            onError={() => void fetchBoards(question.id)}
+                          />
+                        ) : (
+                          <span className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground">
+                            <Plus className="size-5" />
+                          </span>
+                        )}
+                        <span className="text-center text-xs font-medium">ช่อง {slot}</span>
+                      </Button>
+                      {/* A slot is only a fifth of the sidebar wide: beside the
+                          label this button overflowed under the next slot, which
+                          then swallowed every click on it. */}
+                      {saved && (
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => void openOwnSlot(slot)}
-                          className="mb-2 aspect-square h-auto w-full border-dashed p-0 text-muted-foreground hover:border-primary hover:text-primary"
-                          aria-label={`เริ่มกระดานช่อง ${slot}`}
+                          size="icon-sm"
+                          className="absolute right-1 top-1 bg-card/90 shadow-sm"
+                          onClick={() => void deleteBoard(saved)}
+                          aria-label={`ลบกระดานช่อง ${slot}`}
                         >
-                          <Plus className="size-5" />
+                          <Trash2 />
                         </Button>
                       )}
-                      <div className="flex items-center gap-1">
-                        {saved ? (
-                          <Button type="button" variant={selected ? 'secondary' : 'ghost'} size="xs" className="flex-1" onClick={() => void openOwnSlot(slot)}>
-                            ช่อง {slot}
-                          </Button>
-                        ) : (
-                          <p className="flex-1 py-1 text-center text-xs font-medium">ช่อง {slot}</p>
-                        )}
-                        {saved && (
-                          <Button type="button" variant="ghost" size="icon-xs" onClick={() => void deleteBoard(saved)} aria-label={`ลบกระดานช่อง ${slot}`}>
-                            <Trash2 />
-                          </Button>
-                        )}
-                      </div>
                     </div>
                   )
                 })}
