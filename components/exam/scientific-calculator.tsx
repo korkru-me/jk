@@ -16,6 +16,7 @@ import {
   evaluateCalculatorExpression,
   type CalculatorEvaluation,
 } from '@/lib/math/calculator'
+import { useMathCaret } from '@/hooks/use-math-caret'
 import type { MathInputMode } from '@/lib/types'
 
 interface HistoryEntry {
@@ -49,6 +50,7 @@ export default function ScientificCalculator({
   const [showHistory, setShowHistory] = useState(false)
   const [inverse, setInverse] = useState(false)
   const [justEvaluated, setJustEvaluated] = useState(false)
+  const caret = useMathCaret(inputRef)
 
   useEffect(() => {
     if (!open) return
@@ -61,20 +63,13 @@ export default function ScientificCalculator({
 
   if (!open || typeof document === 'undefined') return null
 
-  const selection = () => {
-    const start = inputRef.current?.selectionStart ?? expression.length
-    const end = inputRef.current?.selectionEnd ?? start
-    return { start, end }
-  }
+  const selection = () => caret.read(expression)
 
   const apply = (edit: MathInputEditResult) => {
     setExpression(edit.value)
     setEvaluation(null)
     setJustEvaluated(false)
-    requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.setSelectionRange(edit.cursor, edit.cursor)
-    })
+    caret.restore(edit.cursor)
   }
 
   const insert = (text: string, kind: 'number' | 'operator' | 'constant' = 'number', cursorOffset?: number) => {
@@ -137,7 +132,7 @@ export default function ScientificCalculator({
     setExpression('')
     setEvaluation(null)
     setJustEvaluated(false)
-    requestAnimationFrame(() => inputRef.current?.focus())
+    caret.restore(0)
   }
 
   const evaluate = () => {
@@ -159,6 +154,7 @@ export default function ScientificCalculator({
     setJustEvaluated(true)
     setShowHistory(false)
     onModeChange(entry.mode)
+    caret.restore(entry.expression.length)
   }
 
   const trig = inverse
@@ -246,10 +242,12 @@ export default function ScientificCalculator({
           aria-label="นิพจน์ในเครื่องคิดเลข"
           placeholder="เช่น sin(30) หรือ √(9+16)"
           className="h-10 text-right font-mono"
+          {...caret.inputProps}
           onChange={event => {
             setExpression(event.target.value)
             setEvaluation(null)
             setJustEvaluated(false)
+            caret.remember()
           }}
           onKeyDown={event => {
             if (event.key === 'Enter') {
@@ -271,7 +269,9 @@ export default function ScientificCalculator({
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* The keypad never takes focus: a blurred field reports a caret of 0
+            on iOS, which would send every key to the front of the expression. */}
+        <div className="flex items-center gap-1" {...caret.keypadProps}>
           <span className="mr-1 text-[10px] text-muted-foreground">หน่วยมุม</span>
           {(['deg', 'rad'] as const).map(option => (
             <Button
@@ -292,7 +292,7 @@ export default function ScientificCalculator({
           <span className="ml-auto text-[10px] text-muted-foreground">Enter = คำนวณ</span>
         </div>
 
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-5 gap-1.5" {...caret.keypadProps}>
           <Button type="button" variant={inverse ? 'secondary' : 'outline'} className={functionClass} aria-pressed={inverse} onClick={() => setInverse(value => !value)}>INV</Button>
           {trig.map(item => (
             <Button key={item.name} type="button" variant="outline" className={functionClass} aria-label={item.aria} onClick={() => insertFunction(item.name)}>{item.label}</Button>
@@ -312,7 +312,7 @@ export default function ScientificCalculator({
           <Button type="button" variant="outline" className={functionClass} aria-label="เปอร์เซ็นต์" onClick={() => insert('/100', 'operator')}>%</Button>
         </div>
 
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5" {...caret.keypadProps}>
           <Button type="button" variant="secondary" className={keyClass} onClick={() => insert('(', 'constant')}>(</Button>
           <Button type="button" variant="secondary" className={keyClass} onClick={() => insert(')', 'operator')}>)</Button>
           <Button type="button" variant="secondary" className={keyClass} onClick={() => insert('π', 'constant')}>π</Button>

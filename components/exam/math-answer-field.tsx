@@ -13,6 +13,7 @@ import {
   insertMathText,
   type MathInputEditResult,
 } from '@/lib/math/input-edit'
+import { useMathCaret } from '@/hooks/use-math-caret'
 import { cn } from '@/lib/utils'
 import type { MathInputMode } from '@/lib/types'
 
@@ -104,6 +105,7 @@ export function MathAnswerField({
   inputClassName,
 }: MathAnswerFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const caret = useMathCaret(inputRef)
   const panelId = useId()
   const [advanced, setAdvanced] = useState(false)
 
@@ -118,15 +120,11 @@ export function MathAnswerField({
 
   const apply = (edit: MathInputEditResult) => {
     onChange(edit.value)
-    requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.setSelectionRange(edit.cursor, edit.cursor)
-    })
+    caret.restore(edit.cursor)
   }
 
   const runAction = (action: KeyAction) => {
-    const start = inputRef.current?.selectionStart ?? value.length
-    const end = inputRef.current?.selectionEnd ?? start
+    const { start, end } = caret.read(value)
     if (action.kind === 'insert') {
       apply(insertMathText(value, start, end, action.value, action.cursorOffset))
     } else if (action.kind === 'function') {
@@ -159,8 +157,15 @@ export function MathAnswerField({
           aria-expanded={active}
           placeholder={placeholder}
           value={value}
-          onFocus={onActivate}
-          onChange={event => onChange(event.target.value)}
+          {...caret.inputProps}
+          onFocus={() => {
+            caret.remember()
+            onActivate()
+          }}
+          onChange={event => {
+            onChange(event.target.value)
+            caret.remember()
+          }}
           className={cn('min-w-[9rem]', inputClassName)}
         />
         <Button
@@ -204,7 +209,7 @@ export function MathAnswerField({
           padding="sm"
           className="fixed inset-x-2 bottom-2 z-[70] mx-auto max-w-2xl space-y-2 shadow-xl"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-          onMouseDown={event => event.preventDefault()}
+          {...caret.keypadProps}
         >
           <div className="flex items-center gap-2">
             <div>
