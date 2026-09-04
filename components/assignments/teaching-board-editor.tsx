@@ -63,6 +63,11 @@ interface Props {
   onSceneChange?: (scene: ScratchpadScene) => void
   /** This ข้อ's pictures, offered on the board itself as well as in the card. */
   questionImages?: string[]
+  /**
+   * Where a new board should be saved: the next free ช่อง, or — when all five
+   * are taken — the one the teacher chose to write over. Null cancels.
+   */
+  onResolveSaveSlot?: () => Promise<{ slot: number; replacing: boolean } | null>
   /** A รูปประกอบโจทย์ the teacher asked to drop onto this board. */
   insertImage?: { url: string; nonce: number } | null
   /** Given when the board can be put away. */
@@ -99,6 +104,7 @@ export default function TeachingBoardEditor({
   onDirtyChange,
   onSceneChange,
   questionImages = [],
+  onResolveSaveSlot,
   insertImage,
   onHide,
 }: Props) {
@@ -414,7 +420,15 @@ export default function TeachingBoardEditor({
   const saveBoard = async () => {
     const api = apiRef.current
     if (!api || !editable || saving) return
-    if (board) {
+
+    // Which ช่อง this lands in belongs to the parent: it is the side that
+    // knows all five, and the one that asks when they are all taken.
+    let target = { slot, replacing: Boolean(board) }
+    if (onResolveSaveSlot) {
+      const resolved = await onResolveSaveSlot()
+      if (!resolved) return
+      target = resolved
+    } else if (board) {
       const ok = await confirm({
         title: `บันทึกทับกระดาน ${questionLabel} ช่อง ${slot}?`,
         description: 'ภาพและไฟล์ต้นฉบับเดิมในช่องนี้จะถูกแทนที่ด้วยกระดานที่กำลังเปิดอยู่',
@@ -439,7 +453,7 @@ export default function TeachingBoardEditor({
       const prepared = await prepareTeachingBoardUpload({
         assignmentId,
         questionId,
-        slot,
+        slot: target.slot,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         previewFormat: preview.format,
       })
@@ -461,16 +475,18 @@ export default function TeachingBoardEditor({
       const saved = await saveTeachingBoard({
         assignmentId,
         questionId,
-        slot,
+        slot: target.slot,
         uploadId: prepared.uploadId,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
-        replaceExisting: Boolean(board),
+        replaceExisting: target.replacing,
         previewFormat: preview.format,
       })
       if (!saved || 'error' in saved) throw new Error(saved?.error ?? 'บันทึกกระดานสอนไม่สำเร็จ')
       markDirty(false)
-      await onSaved(slot)
-      toast.success(board ? `บันทึกทับ ${questionLabel} ช่อง ${slot} แล้ว` : `บันทึกกระดานลง ${questionLabel} ช่อง ${slot} แล้ว`)
+      await onSaved(target.slot)
+      toast.success(target.replacing
+        ? `บันทึกทับ ${questionLabel} ช่อง ${target.slot} แล้ว`
+        : `บันทึกกระดานลง ${questionLabel} ช่อง ${target.slot} แล้ว`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'บันทึกกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
     } finally {
@@ -485,7 +501,7 @@ export default function TeachingBoardEditor({
           <div className="flex flex-wrap items-center gap-2">
             <PenLine className="size-4 shrink-0 text-primary" aria-hidden="true" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{questionLabel} · ช่อง {slot}</p>
+              <p className="truncate text-sm font-semibold">{questionLabel}</p>
               <p className="text-[10px] text-muted-foreground" aria-live="polite">
                 {!editable ? 'ดูอย่างเดียว'
                   : insertingImage ? 'กำลังใส่รูปจากโจทย์...'
