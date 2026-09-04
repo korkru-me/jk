@@ -24,6 +24,7 @@ import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
 import type { TeachingBoardView } from '@/lib/math-work'
 import { TYPE_LABEL } from '@/lib/question-display'
+import { TeachingTryAnswer } from './teaching-try-answer'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
   ssr: false,
@@ -398,8 +399,9 @@ export function TeachingModeClient({
 
       <div className="grid min-h-0 min-w-0 flex-1 gap-4 lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]">
         <div className="min-w-0 space-y-4 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:pr-1">
-          <Card padding="lg">
+          <Card padding="lg" className="space-y-4">
             <TeachingQuestion question={question} index={questionIndex} total={questions.length} showSolution={showSolution} />
+            <TeachingTryAnswer question={question} revealAnswerKey={showSolution} />
           </Card>
 
           <Card padding="md" className="space-y-3">
