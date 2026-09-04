@@ -12,7 +12,7 @@ import type {
 } from '@excalidraw/excalidraw/types'
 import type { FileId } from '@excalidraw/excalidraw/element/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Eraser, Highlighter, Loader2, Maximize2, PanelRightClose, PenLine, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
+import { Eraser, Highlighter, ImagePlus, Loader2, Maximize2, PanelRightClose, PenLine, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -61,6 +61,8 @@ interface Props {
   onDirtyChange: (dirty: boolean) => void
   /** Reports the live scene so the ข้อ can be returned to as it was left. */
   onSceneChange?: (scene: ScratchpadScene) => void
+  /** This ข้อ's pictures, offered on the board itself as well as in the card. */
+  questionImages?: string[]
   /** A รูปประกอบโจทย์ the teacher asked to drop onto this board. */
   insertImage?: { url: string; nonce: number } | null
   /** Given when the board can be put away. */
@@ -96,6 +98,7 @@ export default function TeachingBoardEditor({
   onSaved,
   onDirtyChange,
   onSceneChange,
+  questionImages = [],
   insertImage,
   onHide,
 }: Props) {
@@ -113,6 +116,7 @@ export default function TeachingBoardEditor({
   const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
   const [toolsHidden, setToolsHidden] = useState(false)
   const [insertingImage, setInsertingImage] = useState(false)
+  const [pickingImage, setPickingImage] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [apiReady, setApiReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -535,6 +539,24 @@ export default function TeachingBoardEditor({
               />
               <span className="w-3 text-right font-mono text-[10px] text-foreground" aria-hidden="true">{strokeWidth}</span>
             </label>
+            {/* The same รูปประกอบโจทย์ the card offers, within reach of a
+                teacher whose eyes are already on the board. */}
+            {editable && questionImages.length > 0 && (
+              <Button
+                type="button"
+                variant={pickingImage ? 'secondary' : 'outline'}
+                size="xs"
+                disabled={insertingImage}
+                aria-pressed={questionImages.length > 1 ? pickingImage : undefined}
+                onClick={() => {
+                  if (questionImages.length === 1) void dropQuestionImage(questionImages[0])
+                  else setPickingImage(value => !value)
+                }}
+              >
+                {insertingImage ? <Loader2 className="animate-spin" /> : <ImagePlus />}
+                รูปโจทย์{questionImages.length > 1 ? ` (${questionImages.length})` : ''}
+              </Button>
+            )}
             <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
             <Button type="button" variant="outline" size="xs" onClick={fitPaper} title="จัดกระดาษให้พอดีจอ">
               <Maximize2 /> พอดีจอ
@@ -566,6 +588,29 @@ export default function TeachingBoardEditor({
             ))}
           </div>
         </div>
+
+        {pickingImage && questionImages.length > 1 && (
+          <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-border bg-muted/30 px-3 py-2">
+            {questionImages.map((url, index) => (
+              <Button
+                key={url}
+                type="button"
+                variant="outline"
+                disabled={insertingImage}
+                className="h-auto shrink-0 flex-col gap-1 p-1.5"
+                aria-label={`ใส่รูปโจทย์ที่ ${index + 1} ลงกระดาน`}
+                onClick={() => {
+                  setPickingImage(false)
+                  void dropQuestionImage(url)
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="h-14 w-20 rounded border bg-card object-contain" />
+                <span className="text-[10px] font-normal">รูปที่ {index + 1}</span>
+              </Button>
+            ))}
+          </div>
+        )}
 
         {/* `main-menu-trigger` is Excalidraw's ☰ button. An empty MainMenu
             leaves nothing behind it, and this takes the button away too. */}
