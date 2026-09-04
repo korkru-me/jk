@@ -29,6 +29,7 @@ import type { Question } from '@/lib/types'
 import type { TeachingBoardView } from '@/lib/math-work'
 import type { ScratchpadScene } from '@/lib/scratchpad'
 import { TYPE_LABEL } from '@/lib/question-display'
+import { drawingBackgroundStyle } from '@/components/exam/drawing-board-utils'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
@@ -682,7 +683,7 @@ export function TeachingModeClient({
     <div className="flex min-h-[calc(100dvh-7rem)] flex-col gap-4">
       {/* One line: the bar sits above every ข้อ and every board, so a second
           row of it is width taken from the teaching itself. */}
-      <Card padding="sm" className="shrink-0">
+      <Card padding="sm" className="sticky top-0 z-20 shrink-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <Button type="button" variant="ghost" size="xs" className="shrink-0" onClick={() => void leaveTeachingMode()}>
             <ChevronLeft /> กลับ
@@ -728,16 +729,12 @@ export function TeachingModeClient({
         </div>
       </Card>
 
-      {/* With the ข้อ and the slots put away the column disappears entirely,
-          which is what gives the board the whole width to write on. What is
-          put away leaves a button on the rail down the left edge. */}
-      <div className={`grid min-h-0 min-w-0 flex-1 gap-3 ${
-        showQuestion && showBoard
-          ? (railed ? 'lg:grid-cols-[auto_minmax(17rem,0.72fr)_minmax(30rem,1.28fr)]' : 'lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]')
-          : 'lg:grid-cols-[auto_1fr]'
-      }`}>
+      {/* Each ข้อ is one row of its own: the question and its saved slots on
+          the left, its board on the right. Scrolling to the next ข้อ brings
+          that ข้อ's board with it, because the board belongs to it. */}
+      <div className="flex min-h-0 min-w-0 flex-1 gap-3">
         {railed && (
-          <div className="flex shrink-0 flex-row flex-wrap gap-1.5 lg:flex-col">
+          <div className="flex shrink-0 flex-col gap-1.5">
             {!showQuestion && (
               <Button
                 type="button"
@@ -780,89 +777,103 @@ export function TeachingModeClient({
           </div>
         )}
 
-        {showQuestion && (
-        <div className="min-w-0 space-y-4 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:pr-1">
-          {showQuestion && pageQuestions.map((pageQuestion, offset) => {
+        <div className="min-w-0 flex-1 space-y-4">
+          {pageQuestions.map((pageQuestion, offset) => {
             const index = pageStart + offset
             const isBoardQuestion = index === questionIndex
             return (
-              <TeachingQuestionCard
+              <div
                 key={pageQuestion.id}
-                question={pageQuestion}
-                index={index}
-                total={questions.length}
-                showSolution={showSolution}
-                outlined={perPage > 1 && isBoardQuestion}
-                actions={
-                  <>
-                    {/* With several ข้อ on the page, one of them owns the board —
-                        say which, and let the teacher move it without leaving. */}
-                    {perPage > 1 && (isBoardQuestion ? (
-                      <Badge variant="secondary"><Presentation /> กระดานของข้อนี้</Badge>
-                    ) : (
-                      <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
-                        <Presentation /> เขียนกระดานข้อนี้
-                      </Button>
-                    ))}
-                    {/* The เฉลย and the hide control belong to the column, so
-                        they sit on the first ข้อ of the page rather than on
-                        every card or in the top bar. */}
-                    {offset === 0 && (
-                      <>
-                        <Button type="button" variant="outline" size="xs" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
-                          {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
-                        </Button>
-                        <Button type="button" variant="ghost" size="xs" onClick={() => setShowQuestion(false)}>
-                          <PanelLeftClose /> ซ่อนโจทย์
-                        </Button>
-                      </>
-                    )}
-                  </>
-                }
-                slots={showBoards ? (
-                  <TeachingBoardSlots
-                    boards={boardsByQuestion[pageQuestion.id] ?? []}
-                    loading={loadingQuestionIds.includes(pageQuestion.id)}
-                    canManage={canManage}
-                    currentUserId={currentUserId}
-                    active={isBoardQuestion}
-                    selectedSlot={selectedSlot}
-                    selectedBoardId={selectedBoardId}
-                    onOpenSlot={slot => void openSlotOn(index, slot)}
-                    onOpenBoard={board => void openBoardOn(index, board)}
-                    onDelete={board => void deleteBoard(board, pageQuestion.id)}
-                    onRefresh={() => void fetchBoards(pageQuestion.id)}
-                    onHide={() => setShowBoards(false)}
+                className={`grid min-w-0 gap-3 ${
+                  showQuestion && showBoard ? 'lg:grid-cols-[minmax(17rem,0.72fr)_minmax(30rem,1.28fr)]' : ''
+                }`}
+              >
+                {showQuestion && (
+                  <TeachingQuestionCard
+                    question={pageQuestion}
+                    index={index}
+                    total={questions.length}
+                    showSolution={showSolution}
+                    outlined={perPage > 1 && isBoardQuestion}
+                    actions={
+                      /* The เฉลย and the hide control belong to the whole
+                         column, so they sit on the first ข้อ of the page. */
+                      offset === 0 ? (
+                        <>
+                          <Button type="button" variant="outline" size="xs" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
+                            {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
+                          </Button>
+                          <Button type="button" variant="ghost" size="xs" onClick={() => setShowQuestion(false)}>
+                            <PanelLeftClose /> ซ่อนโจทย์
+                          </Button>
+                        </>
+                      ) : undefined
+                    }
+                    slots={showBoards ? (
+                      <TeachingBoardSlots
+                        boards={boardsByQuestion[pageQuestion.id] ?? []}
+                        loading={loadingQuestionIds.includes(pageQuestion.id)}
+                        canManage={canManage}
+                        currentUserId={currentUserId}
+                        active={isBoardQuestion}
+                        selectedSlot={selectedSlot}
+                        selectedBoardId={selectedBoardId}
+                        onOpenSlot={slot => void openSlotOn(index, slot)}
+                        onOpenBoard={board => void openBoardOn(index, board)}
+                        onDelete={board => void deleteBoard(board, pageQuestion.id)}
+                        onRefresh={() => void fetchBoards(pageQuestion.id)}
+                        onHide={() => setShowBoards(false)}
+                      />
+                    ) : undefined}
                   />
-                ) : undefined}
-              />
+                )}
+
+                {showBoard && (
+                  <div className="min-h-[560px] min-w-0 lg:min-h-0">
+                    {isBoardQuestion ? (
+                      <TeachingBoardEditor
+                        key={pageQuestion.id}
+                        assignmentId={assignmentId}
+                        questionId={pageQuestion.id}
+                        slot={selectedSlot}
+                        board={selectedBoard}
+                        canManage={canManage}
+                        loadNonce={loadNonce}
+                        resetNonce={resetNonce}
+                        questionLabel={`ข้อ ${index + 1}/${questions.length}`}
+                        initialScene={scenesRef.current.get(pageQuestion.id) ?? null}
+                        initialDirty={dirty}
+                        onSaved={handleSaved}
+                        onDirtyChange={setDirty}
+                        onSceneChange={scene => scenesRef.current.set(pageQuestion.id, scene)}
+                        onHide={hideBoard}
+                      />
+                    ) : (
+                      /* Only one board is live at a time: several Excalidraw
+                         canvases at once is more than a tablet should carry,
+                         and only one is being written on anyway. */
+                      <Card
+                        role="region"
+                        aria-label={`กระดานของข้อ ${index + 1}`}
+                        className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 p-6 text-center"
+                        style={drawingBackgroundStyle('lined')}
+                      >
+                        <PenLine className="size-5 text-primary" aria-hidden="true" />
+                        <p className="text-sm font-semibold">กระดานของข้อ {index + 1}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {scenesRef.current.has(pageQuestion.id) ? 'มีงานเขียนค้างไว้ในข้อนี้' : 'ยังไม่ได้เขียนอะไรในข้อนี้'}
+                        </p>
+                        <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
+                          <PenLine /> เขียนกระดานข้อนี้
+                        </Button>
+                      </Card>
+                    )}
+                  </div>
+                )}
+              </div>
             )
           })}
-
         </div>
-        )}
-
-        {showBoard && (
-        <div className="min-h-[560px] min-w-0 lg:min-h-0">
-          <TeachingBoardEditor
-            key={question.id}
-            assignmentId={assignmentId}
-            questionId={question.id}
-            slot={selectedSlot}
-            board={selectedBoard}
-            canManage={canManage}
-            loadNonce={loadNonce}
-            resetNonce={resetNonce}
-            questionLabel={`ข้อ ${questionIndex + 1}/${questions.length}`}
-            initialScene={scenesRef.current.get(question.id) ?? null}
-            initialDirty={dirty}
-            onSaved={handleSaved}
-            onDirtyChange={setDirty}
-            onSceneChange={scene => scenesRef.current.set(question.id, scene)}
-            onHide={hideBoard}
-          />
-        </div>
-        )}
       </div>
       {confirmDialog}
     </div>

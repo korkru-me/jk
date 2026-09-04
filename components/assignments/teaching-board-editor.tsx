@@ -1,7 +1,7 @@
 'use client'
 
 import '@excalidraw/excalidraw/index.css'
-import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, Excalidraw, MainMenu } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
@@ -401,7 +401,12 @@ export default function TeachingBoardEditor({
           </div>
         </div>
 
-        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden [&_.excalidraw]:!min-w-0" style={drawingBackgroundStyle(background)}>
+        {/* `main-menu-trigger` is Excalidraw's ☰ button. An empty MainMenu
+            leaves nothing behind it, and this takes the button away too. */}
+        <div
+          className="relative min-h-0 min-w-0 flex-1 overflow-hidden [&_.excalidraw]:!min-w-0 [&_.main-menu-trigger]:!hidden"
+          style={drawingBackgroundStyle(background)}
+        >
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-overlay/20 backdrop-blur-[1px]">
               <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-sm shadow-md">
@@ -445,7 +450,15 @@ export default function TeachingBoardEditor({
               },
               tools: { image: false },
             }}
-          />
+          >
+            {/*
+              Replaces Excalidraw's own ☰ menu, which otherwise offers Reset
+              the canvas — a second, blunter กระดานใหม่ that skips our state —
+              beside links out to Excalidraw's GitHub, X and Discord. A board
+              used to work an answer in front of a class needs none of it.
+            */}
+            <MainMenu />
+          </Excalidraw>
         </div>
       </Card>
       {confirmDialog}
