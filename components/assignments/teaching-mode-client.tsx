@@ -894,6 +894,7 @@ export function TeachingModeClient({
                         onSaved={handleSaved}
                         onDirtyChange={setDirty}
                         onSceneChange={scene => scenesRef.current.set(pageQuestion.id, scene)}
+                        questionImages={pageQuestion.image_urls ?? []}
                         insertImage={imageRequest?.questionId === pageQuestion.id ? imageRequest : null}
                         onHide={hideBoard}
                       />
