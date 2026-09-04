@@ -95,6 +95,7 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - `education_research_score_drafts` — ฉบับร่างคะแนน manual แยกตามครูผู้บันทึกและ project/participant/measurement; การบันทึกร่างครั้งใหม่แทนชุดเดิมของครูคนนั้นและยังไม่ถือเป็นคะแนนวิจัยจริง
 - `education_research_import_templates` / `education_research_import_template_rows` — รุ่นแม่แบบและ snapshot รายชื่อสำหรับดาวน์โหลด Excel แต่ละแถวผูก participant ด้วย UUID token สุ่มที่ซ่อนใน workbook และตรวจกลับฝั่ง server
 - `education_research_import_batches` / `education_research_import_batch_rows` — normalized preview ของไฟล์ที่อัปโหลด เก็บค่า incoming/current, action, สถานะ และข้อความตรวจ ไม่เก็บ binary workbook; batch ยืนยันได้ครั้งเดียวและใช้เป็น audit ของผลกระทบทั้งชุด
+- `education_research_export_events` — audit metadata แบบ append-only สำหรับการส่งออกข้อมูลรายบุคคล เก็บ project/org ผู้ดาวน์โหลด ชนิดไฟล์ จำนวนแถว เวลา และเวลาแก้คะแนนล่าสุดเท่านั้น ไม่เก็บชื่อ รหัส คะแนน ชื่อไฟล์ หรือเนื้อหา workbook
 
 Invariant สำคัญ:
 
@@ -108,6 +109,7 @@ Invariant สำคัญ:
 - ช่องว่างใน manual/Excel ไม่สร้างหรือลบ score; การเปลี่ยนคะแนนเดิมต้องมีเหตุผลใน audit และ Excel ต้องมีการยืนยัน overwrite ชัดเจน
 - Excel import ตรวจ template/project/row token/ตัวตน/ช่วงคะแนนตอนสร้าง preview และตรวจ roster/ค่าปัจจุบันซ้ำตอน confirm เพื่อให้ทั้งชุดสำเร็จหรือ rollback พร้อมกัน
 - ค่าเฉลี่ย, sample S.D., paired/one-sample t-test, ช่วงเชื่อมั่น และ effect size เป็นผลคำนวณ request-time จาก `education_research_scores` ไม่ใช่ entity ที่เก็บซ้ำในฐานข้อมูล เมื่อคะแนนเปลี่ยนหน้าผลจึงใช้ข้อมูลล่าสุดโดยไม่ต้อง sync summary row
+- browser เขียน export audit โดยตรงไม่ได้; route สร้าง workbook สำเร็จก่อนแล้วจึงเรียก service-role-only `record_education_research_export_event` ซึ่งตรวจ owner/co-teacher `admin/manage`/super admin ของ exact project ซ้ำและปฏิเสธชนิดไฟล์หรือจำนวนแถวที่อยู่นอก allowlist
 
 ## Snapshot ที่ต้องคงที่ต่อ attempt
 
