@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
@@ -48,6 +49,8 @@ interface Props {
   currentUserId: string
   canManage: boolean
   questions: TeachingQuestionView[]
+  /** The งาน's own ข้อต่อหน้า, so a class sees the paging its students get. */
+  questionsPerPage: number
   initialBoards: TeachingBoardView[]
   initialBoardsError?: string
 }
@@ -223,6 +226,7 @@ export function TeachingModeClient({
   currentUserId,
   canManage,
   questions,
+  questionsPerPage,
   initialBoards,
   initialBoardsError,
 }: Props) {
@@ -231,6 +235,9 @@ export function TeachingModeClient({
   const initialSlot = firstAvailableSlot(initialBoards, currentUserId)
   const initialBoard = initialBoards.find(board => board.createdBy === currentUserId && board.slot === initialSlot) ?? null
   const [questionIndex, setQuestionIndex] = useState(0)
+  const [perPage, setPerPage] = useState(() => (
+    Math.min(Math.max(1, Math.round(questionsPerPage) || 1), questions.length)
+  ))
   const [boards, setBoards] = useState(initialBoards)
   const [selectedSlot, setSelectedSlot] = useState(initialSlot)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(initialBoard?.id ?? null)
@@ -246,6 +253,16 @@ export function TeachingModeClient({
   const requestRef = useRef(0)
 
   const question = questions[questionIndex]
+  // Same paging arithmetic the exam page runs: the page is the block that
+  // holds the ข้อ whose board is open, so jumping to a ข้อ brings its page.
+  const pageStart = Math.floor(questionIndex / perPage) * perPage
+  const pageQuestions = questions.slice(pageStart, pageStart + perPage)
+  const pageNumber = Math.floor(pageStart / perPage) + 1
+  const pageCount = Math.ceil(questions.length / perPage)
+  const perPageOptions = useMemo(() => {
+    const values = new Set([1, 2, 3, 4, 5, Math.max(1, Math.round(questionsPerPage) || 1)])
+    return [...values].filter(value => value <= questions.length).sort((a, b) => a - b)
+  }, [questions.length, questionsPerPage])
   const selectedBoard = boards.find(board => board.id === selectedBoardId) ?? null
   const ownBoards = useMemo(
     () => boards.filter(board => board.createdBy === currentUserId),
@@ -396,12 +413,39 @@ export function TeachingModeClient({
           <Button type="button" variant={showBoards ? 'secondary' : 'outline'} size="sm" onClick={() => setShowBoards(value => !value)} aria-pressed={showBoards}>
             <Presentation />{showBoards ? 'ซ่อนช่องกระดาน' : 'ช่องกระดาน'}
           </Button>
-          <div className="flex items-center gap-1 sm:ml-2">
-            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(questionIndex - 1)} disabled={questionIndex === 0} aria-label="ข้อก่อนหน้า">
+          <NativeSelect
+            aria-label="ไปที่ข้อ"
+            className="h-8 w-auto max-w-56 text-xs sm:ml-2"
+            value={questionIndex}
+            onChange={event => void changeQuestion(Number(event.target.value))}
+          >
+            {questions.map((item, index) => (
+              <option key={item.id} value={index}>
+                ข้อ {index + 1}/{questions.length}{item.title ? ` · ${item.title}` : ''}
+              </option>
+            ))}
+          </NativeSelect>
+
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            ข้อต่อหน้า
+            <NativeSelect
+              aria-label="จำนวนข้อต่อหน้า"
+              className="h-8 w-16 text-xs"
+              value={perPage}
+              onChange={event => setPerPage(Number(event.target.value))}
+            >
+              {perPageOptions.map(value => <option key={value} value={value}>{value}</option>)}
+            </NativeSelect>
+          </label>
+
+          <div className="flex items-center gap-1">
+            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(pageStart - perPage)} disabled={pageStart === 0} aria-label="หน้าก่อนหน้า">
               <ChevronLeft />
             </Button>
-            <span className="min-w-12 text-center text-xs font-semibold">{questionIndex + 1} / {questions.length}</span>
-            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(questionIndex + 1)} disabled={questionIndex === questions.length - 1} aria-label="ข้อถัดไป">
+            <span className="min-w-12 text-center text-xs font-semibold">
+              {perPage > 1 && 'หน้า '}{pageNumber} / {pageCount}
+            </span>
+            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(pageStart + perPage)} disabled={pageStart + perPage >= questions.length} aria-label="หน้าถัดไป">
               <ChevronRight />
             </Button>
           </div>
@@ -415,12 +459,33 @@ export function TeachingModeClient({
       }`}>
         {(showQuestion || showBoards) && (
         <div className="min-w-0 space-y-4 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:pr-1">
-          {showQuestion && (
-          <Card padding="lg" className="space-y-4">
-            <TeachingQuestion question={question} index={questionIndex} total={questions.length} showSolution={showSolution} />
-            <TeachingTryAnswer question={question} revealAnswerKey={showSolution} />
-          </Card>
-          )}
+          {showQuestion && pageQuestions.map((pageQuestion, offset) => {
+            const index = pageStart + offset
+            const isBoardQuestion = index === questionIndex
+            return (
+              <Card
+                key={pageQuestion.id}
+                padding="lg"
+                className={`space-y-4 ${perPage > 1 && isBoardQuestion ? 'border-primary' : ''}`}
+              >
+                {/* With several ข้อ on the page, one of them owns the board —
+                    say which, and let the teacher move it without leaving. */}
+                {perPage > 1 && (
+                  <div className="flex justify-end">
+                    {isBoardQuestion ? (
+                      <Badge variant="secondary"><Presentation /> กระดานของข้อนี้</Badge>
+                    ) : (
+                      <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
+                        <Presentation /> เขียนกระดานข้อนี้
+                      </Button>
+                    )}
+                  </div>
+                )}
+                <TeachingQuestion question={pageQuestion} index={index} total={questions.length} showSolution={showSolution} />
+                <TeachingTryAnswer question={pageQuestion} revealAnswerKey={showSolution} />
+              </Card>
+            )
+          })}
 
           {showBoards && (
           <Card padding="md" className="space-y-3">
