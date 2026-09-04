@@ -10,7 +10,7 @@ import type {
   ExcalidrawImperativeAPI,
 } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Eraser, Highlighter, Loader2, PenLine, RotateCcw, Save } from 'lucide-react'
+import { Eraser, Highlighter, Loader2, PanelRightClose, PenLine, RotateCcw, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -51,6 +51,8 @@ interface Props {
   resetNonce: number
   onSaved: (slot: number) => Promise<void>
   onDirtyChange: (dirty: boolean) => void
+  /** Given when the board can be put away; it asks about unsaved work first. */
+  onHide?: () => void
 }
 
 function contentSignature(elements: readonly OrderedExcalidrawElement[]): string {
@@ -67,6 +69,7 @@ export default function TeachingBoardEditor({
   resetNonce,
   onSaved,
   onDirtyChange,
+  onHide,
 }: Props) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
   const sceneRef = useRef<ScratchpadScene>(emptyScratchpadScene())
@@ -322,6 +325,11 @@ export default function TeachingBoardEditor({
                 <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || (Boolean(board) && !dirty)}>
                   {saving ? <Loader2 className="animate-spin" /> : <Save />}
                   {saving ? 'กำลังบันทึก...' : board ? 'บันทึกทับ' : 'บันทึก'}
+                </Button>
+              )}
+              {onHide && (
+                <Button type="button" variant="ghost" size="xs" onClick={onHide} disabled={saving}>
+                  <PanelRightClose /> ซ่อน
                 </Button>
               )}
             </div>

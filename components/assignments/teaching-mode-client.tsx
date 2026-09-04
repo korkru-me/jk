@@ -12,6 +12,7 @@ import {
   FileText,
   Loader2,
   PanelLeftClose,
+  PenLine,
   Plus,
   Presentation,
   Trash2,
@@ -277,18 +278,138 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
 }
 
 /**
+ * The five slots that belong to one ข้อ, shown under that ข้อ.
+ *
+ * `active` marks the ข้อ whose board is open on the right: only that one can
+ * highlight a slot as selected, and pressing a slot on any other ข้อ moves
+ * the board there first.
+ */
+function TeachingBoardSlots({
+  boards, loading, canManage, currentUserId, active, selectedSlot, selectedBoardId,
+  onOpenSlot, onOpenBoard, onDelete, onRefresh, onHide,
+}: {
+  boards: TeachingBoardView[]
+  loading: boolean
+  canManage: boolean
+  currentUserId: string
+  active: boolean
+  selectedSlot: number
+  selectedBoardId: string | null
+  onOpenSlot: (slot: number) => void
+  onOpenBoard: (board: TeachingBoardView) => void
+  onDelete: (board: TeachingBoardView) => void
+  onRefresh: () => void
+  onHide: () => void
+}) {
+  const ownBoards = boards.filter(board => board.createdBy === currentUserId)
+  const sharedBoards = boards.filter(board => board.createdBy !== currentUserId)
+
+  return (
+    <div className="space-y-3 border-t border-border pt-3">
+      <div className="flex items-center gap-2">
+        <Presentation className="size-4 text-primary" />
+        <h3 className="text-sm font-semibold">กระดานที่บันทึกไว้</h3>
+        {loading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+        <Button type="button" variant="ghost" size="xs" className="ml-auto" onClick={onHide}>
+          <PanelLeftClose /> ซ่อน
+        </Button>
+      </div>
+
+      {canManage ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {Array.from({ length: 5 }, (_, index) => index + 1).map(slot => {
+            const saved = ownBoards.find(board => board.slot === slot) ?? null
+            const selected = active && selectedSlot === slot
+              && (!selectedBoardId || saved?.id === selectedBoardId)
+            return (
+              <div key={slot} className="relative min-w-0">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onOpenSlot(slot)}
+                  aria-pressed={selected}
+                  aria-label={saved ? `เปิดกระดานช่อง ${slot}` : `เริ่มกระดานช่อง ${slot}`}
+                  className={`h-auto w-full flex-col items-stretch gap-2 whitespace-normal rounded-xl border p-2 ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
+                >
+                  {saved?.previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={saved.previewUrl}
+                      alt=""
+                      className="aspect-square w-full rounded-lg border bg-card object-cover"
+                      onError={onRefresh}
+                    />
+                  ) : (
+                    <span className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground">
+                      <Plus className="size-5" />
+                    </span>
+                  )}
+                  <span className="text-center text-xs font-medium">ช่อง {slot}</span>
+                </Button>
+                {saved && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="absolute right-1 top-1 bg-card/90 shadow-sm"
+                    onClick={() => onDelete(saved)}
+                    aria-label={`ลบกระดานช่อง ${slot}`}
+                  >
+                    <Trash2 />
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">สิทธิ์ของคุณเปิดดูได้อย่างเดียว ผู้ดูแลหรือครูที่มีสิทธิ์จัดการจึงจะสร้างกระดานของตนได้</p>
+      )}
+
+      {sharedBoards.length > 0 && (
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-xs font-semibold"><UserRound className="size-3.5" /> กระดานของครูร่วม</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {sharedBoards.map(board => (
+              <Button
+                key={board.id}
+                type="button"
+                variant="ghost"
+                onClick={() => onOpenBoard(board)}
+                className={`h-auto w-24 shrink-0 flex-col items-stretch whitespace-normal rounded-xl border p-2 text-left ${active && selectedBoardId === board.id ? 'border-primary bg-primary/5' : 'border-border'}`}
+              >
+                {board.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={board.previewUrl} alt="ตัวอย่างกระดานของครูร่วม" className="mb-1 aspect-square w-full rounded-lg border object-cover" onError={onRefresh} />
+                ) : (
+                  <span className="mb-1 flex aspect-square items-center justify-center rounded-lg bg-muted text-xs">เปิดดู</span>
+                )}
+                <span className="truncate text-[10px] font-semibold">{board.creatorName}</span>
+                <span className="text-[10px] text-muted-foreground">ช่อง {board.slot}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * One ข้อ as the class sees it, plus the teacher's own answer to it.
  *
  * The answer lives here because it is entered in two places: a ตัวเลือก
  * pressed inside the question, or a box under it. Both feed the one array
  * `TeachingAnswerCheck` grades.
  */
-function TeachingQuestionCard({ question, index, total, showSolution, actions, outlined }: {
+function TeachingQuestionCard({ question, index, total, showSolution, actions, slots, outlined }: {
   question: TeachingQuestionView
   index: number
   total: number
   showSolution: boolean
   actions?: React.ReactNode
+  /** This ข้อ's own saved boards, grouped with it. */
+  slots?: React.ReactNode
   outlined: boolean
 }) {
   const fields = useMemo(() => tryFields(question), [question])
@@ -323,6 +444,7 @@ function TeachingQuestionCard({ question, index, total, showSolution, actions, o
           revealAnswerKey={showSolution}
         />
       )}
+      {slots}
     </Card>
   )
 }
@@ -346,7 +468,9 @@ export function TeachingModeClient({
   const [perPage, setPerPage] = useState(() => (
     Math.min(Math.max(1, Math.round(questionsPerPage) || 1), questions.length)
   ))
-  const [boards, setBoards] = useState(initialBoards)
+  const [boardsByQuestion, setBoardsByQuestion] = useState<Record<string, TeachingBoardView[]>>(
+    () => ({ [questions[0].id]: initialBoards }),
+  )
   const [selectedSlot, setSelectedSlot] = useState(initialSlot)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(initialBoard?.id ?? null)
   const [showSolution, setShowSolution] = useState(false)
@@ -354,11 +478,11 @@ export function TeachingModeClient({
   // The slots start put away: a teacher opens them to switch or save a board
   // and then wants the width back for writing.
   const [showBoards, setShowBoards] = useState(false)
+  const [showBoard, setShowBoard] = useState(true)
   const [dirty, setDirty] = useState(false)
-  const [loadingBoards, setLoadingBoards] = useState(false)
+  const [loadingQuestionIds, setLoadingQuestionIds] = useState<string[]>([])
   const [loadNonce, setLoadNonce] = useState(initialBoard ? 1 : 0)
   const [resetNonce, setResetNonce] = useState(initialBoard ? 0 : 1)
-  const requestRef = useRef(0)
 
   const question = questions[questionIndex]
   // Same paging arithmetic the exam page runs: the page is the block that
@@ -368,18 +492,15 @@ export function TeachingModeClient({
   const pageNumber = Math.floor(pageStart / perPage) + 1
   const pageCount = Math.ceil(questions.length / perPage)
   // Whatever is put away leaves its own button on the left rail.
-  const railed = !showQuestion || !showBoards
+  const railed = !showQuestion || !showBoards || !showBoard
   const perPageOptions = useMemo(() => {
     const values = new Set([1, 2, 3, 4, 5, Math.max(1, Math.round(questionsPerPage) || 1)])
     return [...values].filter(value => value <= questions.length).sort((a, b) => a - b)
   }, [questions.length, questionsPerPage])
+  const boards = useMemo(() => boardsByQuestion[question.id] ?? [], [boardsByQuestion, question.id])
   const selectedBoard = boards.find(board => board.id === selectedBoardId) ?? null
   const ownBoards = useMemo(
     () => boards.filter(board => board.createdBy === currentUserId),
-    [boards, currentUserId],
-  )
-  const sharedBoards = useMemo(
-    () => boards.filter(board => board.createdBy !== currentUserId),
     [boards, currentUserId],
   )
 
@@ -395,8 +516,7 @@ export function TeachingModeClient({
   }, [dirty])
 
   const fetchBoards = useCallback(async (questionId: string): Promise<TeachingBoardView[] | null> => {
-    const requestId = ++requestRef.current
-    setLoadingBoards(true)
+    setLoadingQuestionIds(current => current.includes(questionId) ? current : [...current, questionId])
     try {
       const { getTeachingBoards } = await import('@/lib/actions/math-work')
       const result = await getTeachingBoards(assignmentId, questionId)
@@ -404,15 +524,31 @@ export function TeachingModeClient({
         toast.error(result?.error ?? 'เปิดรายการกระดานสอนไม่สำเร็จ')
         return null
       }
-      if (requestId === requestRef.current) setBoards(result.boards)
+      // Kept under the ข้อ it belongs to, so a slow answer for one ข้อ can
+      // never land on another's slots.
+      setBoardsByQuestion(current => ({ ...current, [questionId]: result.boards }))
       return result.boards
     } catch {
       toast.error('เปิดรายการกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
       return null
     } finally {
-      if (requestId === requestRef.current) setLoadingBoards(false)
+      setLoadingQuestionIds(current => current.filter(id => id !== questionId))
     }
   }, [assignmentId])
+
+  // Every ข้อ on the page shows its own slots, so each one's boards are
+  // fetched once when it first appears. The ref keeps a second render from
+  // asking again while the first request is still out.
+  const requestedRef = useRef(new Set<string>([questions[0].id]))
+  const pageQuestionIds = pageQuestions.map(item => item.id).join('|')
+  useEffect(() => {
+    if (!showBoards) return
+    for (const id of pageQuestionIds.split('|')) {
+      if (requestedRef.current.has(id)) continue
+      requestedRef.current.add(id)
+      void fetchBoards(id)
+    }
+  }, [fetchBoards, pageQuestionIds, showBoards])
 
   const allowDiscard = async () => {
     if (!dirty) return true
@@ -424,17 +560,16 @@ export function TeachingModeClient({
     })
   }
 
-  const changeQuestion = async (nextIndex: number) => {
+  const changeQuestion = async (nextIndex: number, preferredSlot?: number) => {
     if (nextIndex < 0 || nextIndex >= questions.length || !await allowDiscard()) return
     const nextQuestion = questions[nextIndex]
     setQuestionIndex(nextIndex)
     setShowSolution(false)
     setDirty(false)
     setSelectedBoardId(null)
-    setBoards([])
-    const nextBoards = await fetchBoards(nextQuestion.id)
-    const slot = firstAvailableSlot(nextBoards ?? [], currentUserId)
-    const existing = (nextBoards ?? []).find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
+    const nextBoards = await fetchBoards(nextQuestion.id) ?? boardsByQuestion[nextQuestion.id] ?? []
+    const slot = preferredSlot ?? firstAvailableSlot(nextBoards, currentUserId)
+    const existing = nextBoards.find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
     setSelectedSlot(slot)
     setSelectedBoardId(existing?.id ?? null)
     if (existing) setLoadNonce(value => value + 1)
@@ -447,6 +582,23 @@ export function TeachingModeClient({
     setSelectedBoardId(board.id)
     setDirty(false)
     setLoadNonce(value => value + 1)
+  }
+
+  /** A slot pressed under another ข้อ moves the board to that ข้อ first. */
+  const openSlotOn = async (index: number, slot: number) => {
+    if (index === questionIndex) {
+      await openOwnSlot(slot)
+      return
+    }
+    await changeQuestion(index, slot)
+  }
+
+  const openBoardOn = async (index: number, board: TeachingBoardView) => {
+    if (index !== questionIndex) {
+      await changeQuestion(index, board.slot)
+      return
+    }
+    await openBoard(board)
   }
 
   const openOwnSlot = async (slot: number) => {
@@ -468,7 +620,7 @@ export function TeachingModeClient({
     setSelectedBoardId(saved?.id ?? null)
   }
 
-  const deleteBoard = async (board: TeachingBoardView) => {
+  const deleteBoard = async (board: TeachingBoardView, questionId: string) => {
     const ok = await confirm({
       title: `ลบกระดานช่อง ${board.slot}?`,
       description: 'ทั้งภาพตัวอย่างและไฟล์ที่ใช้กลับมาแก้ไขจะถูกลบ การกระทำนี้ย้อนกลับไม่ได้',
@@ -480,19 +632,23 @@ export function TeachingModeClient({
       const { deleteTeachingBoard } = await import('@/lib/actions/math-work')
       const result = await deleteTeachingBoard(board.id)
       if (!result || 'error' in result) throw new Error(result?.error ?? 'ลบกระดานไม่สำเร็จ')
-      const refreshed = await fetchBoards(question.id)
+      await fetchBoards(questionId)
       if (selectedBoardId === board.id) {
         setSelectedBoardId(null)
         setSelectedSlot(board.slot)
         setDirty(false)
         setResetNonce(value => value + 1)
-      } else if (refreshed) {
-        setBoards(refreshed)
       }
       toast.success(`ลบกระดานช่อง ${board.slot} แล้ว`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'ลบกระดานไม่สำเร็จ กรุณาลองใหม่')
     }
+  }
+
+  const hideBoard = async () => {
+    if (!await allowDiscard()) return
+    setDirty(false)
+    setShowBoard(false)
   }
 
   const leaveTeachingMode = async () => {
@@ -557,9 +713,9 @@ export function TeachingModeClient({
           which is what gives the board the whole width to write on. What is
           put away leaves a button on the rail down the left edge. */}
       <div className={`grid min-h-0 min-w-0 flex-1 gap-3 ${
-        showQuestion || showBoards
+        showQuestion && showBoard
           ? (railed ? 'lg:grid-cols-[auto_minmax(17rem,0.72fr)_minmax(30rem,1.28fr)]' : 'lg:grid-cols-[minmax(18rem,0.72fr)_minmax(32rem,1.28fr)]')
-          : (railed ? 'lg:grid-cols-[auto_1fr]' : '')
+          : 'lg:grid-cols-[auto_1fr]'
       }`}>
         {railed && (
           <div className="flex shrink-0 flex-row flex-wrap gap-1.5 lg:flex-col">
@@ -589,10 +745,23 @@ export function TeachingModeClient({
                 <Presentation />
               </Button>
             )}
+            {!showBoard && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-lg"
+                className="rounded-xl"
+                title="กระดานสอน"
+                aria-label="กระดานสอน"
+                onClick={() => setShowBoard(true)}
+              >
+                <PenLine />
+              </Button>
+            )}
           </div>
         )}
 
-        {(showQuestion || showBoards) && (
+        {showQuestion && (
         <div className="min-w-0 space-y-4 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:pr-1">
           {showQuestion && pageQuestions.map((pageQuestion, offset) => {
             const index = pageStart + offset
@@ -631,104 +800,30 @@ export function TeachingModeClient({
                     )}
                   </>
                 }
+                slots={showBoards ? (
+                  <TeachingBoardSlots
+                    boards={boardsByQuestion[pageQuestion.id] ?? []}
+                    loading={loadingQuestionIds.includes(pageQuestion.id)}
+                    canManage={canManage}
+                    currentUserId={currentUserId}
+                    active={isBoardQuestion}
+                    selectedSlot={selectedSlot}
+                    selectedBoardId={selectedBoardId}
+                    onOpenSlot={slot => void openSlotOn(index, slot)}
+                    onOpenBoard={board => void openBoardOn(index, board)}
+                    onDelete={board => void deleteBoard(board, pageQuestion.id)}
+                    onRefresh={() => void fetchBoards(pageQuestion.id)}
+                    onHide={() => setShowBoards(false)}
+                  />
+                ) : undefined}
               />
             )
           })}
 
-          {showBoards && (
-          <Card padding="md" className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Presentation className="size-4 text-primary" />
-              <h2 className="text-sm font-semibold">กระดานที่บันทึกไว้</h2>
-              {loadingBoards && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
-              <Button type="button" variant="ghost" size="xs" className="ml-auto" onClick={() => setShowBoards(false)}>
-                <PanelLeftClose /> ซ่อน
-              </Button>
-            </div>
-
-            {canManage ? (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-5">
-                {Array.from({ length: 5 }, (_, index) => index + 1).map(slot => {
-                  const saved = ownBoards.find(board => board.slot === slot) ?? null
-                  const selected = selectedSlot === slot && (!selectedBoard || selectedBoard.createdBy === currentUserId)
-                  return (
-                    <div key={slot} className="relative min-w-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => void openOwnSlot(slot)}
-                        aria-pressed={selected}
-                        aria-label={saved ? `เปิดกระดานช่อง ${slot}` : `เริ่มกระดานช่อง ${slot}`}
-                        className={`h-auto w-full flex-col items-stretch gap-2 whitespace-normal rounded-xl border p-2 ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
-                      >
-                        {saved?.previewUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={saved.previewUrl}
-                            alt=""
-                            className="aspect-square w-full rounded-lg border bg-card object-cover"
-                            onError={() => void fetchBoards(question.id)}
-                          />
-                        ) : (
-                          <span className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground">
-                            <Plus className="size-5" />
-                          </span>
-                        )}
-                        <span className="text-center text-xs font-medium">ช่อง {slot}</span>
-                      </Button>
-                      {/* A slot is only a fifth of the sidebar wide: beside the
-                          label this button overflowed under the next slot, which
-                          then swallowed every click on it. */}
-                      {saved && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon-sm"
-                          className="absolute right-1 top-1 bg-card/90 shadow-sm"
-                          onClick={() => void deleteBoard(saved)}
-                          aria-label={`ลบกระดานช่อง ${slot}`}
-                        >
-                          <Trash2 />
-                        </Button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">สิทธิ์ของคุณเปิดดูได้อย่างเดียว ผู้ดูแลหรือครูที่มีสิทธิ์จัดการจึงจะสร้างกระดานของตนได้</p>
-            )}
-
-            {sharedBoards.length > 0 && (
-              <div className="space-y-2 border-t border-border pt-3">
-                <p className="flex items-center gap-1.5 text-xs font-semibold"><UserRound className="size-3.5" /> กระดานของครูร่วม</p>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {sharedBoards.map(board => (
-                    <Button
-                      key={board.id}
-                      type="button"
-                      variant="ghost"
-                      onClick={() => void openBoard(board)}
-                      className={`h-auto w-24 shrink-0 flex-col items-stretch whitespace-normal rounded-xl border p-2 text-left ${selectedBoardId === board.id ? 'border-primary bg-primary/5' : 'border-border'}`}
-                    >
-                      {board.previewUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={board.previewUrl} alt="ตัวอย่างกระดานของครูร่วม" className="mb-1 aspect-square w-full rounded-lg border object-cover" onError={() => void fetchBoards(question.id)} />
-                      ) : (
-                        <div className="mb-1 flex aspect-square items-center justify-center rounded-lg bg-muted text-xs">เปิดดู</div>
-                      )}
-                      <p className="truncate text-[10px] font-semibold">{board.creatorName}</p>
-                      <p className="text-[10px] text-muted-foreground">ช่อง {board.slot}</p>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-          )}
         </div>
         )}
 
+        {showBoard && (
         <div className="min-h-[560px] min-w-0 lg:min-h-0">
           <TeachingBoardEditor
             key={question.id}
@@ -741,8 +836,10 @@ export function TeachingModeClient({
             resetNonce={resetNonce}
             onSaved={handleSaved}
             onDirtyChange={setDirty}
+            onHide={() => void hideBoard()}
           />
         </div>
+        )}
       </div>
       {confirmDialog}
     </div>
