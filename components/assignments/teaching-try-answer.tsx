@@ -1,41 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Eraser, Loader2, PencilLine, X } from 'lucide-react'
+import { Check, Eraser, Loader2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { partLabels } from '@/lib/part-labels'
 import type { AnswerFeedback } from '@/lib/answer-feedback'
 import type { TeachingQuestionView } from './teaching-mode-client'
 
 /** One thing the teacher fills in — a value, a ถูก/ผิด, or one ตัวเลือก. */
-interface TryField {
+export interface TryField {
   label: string
   kind: 'text' | 'truefalse' | 'choice'
 }
 
-interface Choice {
-  /** The value stored for this option, e.g. `MCQ:2`. */
-  value: string
-  label: string
-  text: string
-}
-
-const TRUE_FALSE_CHOICES = [
-  { value: 'true', label: 'ถูก' },
-  { value: 'false', label: 'ผิด' },
-]
-
 /**
- * The teacher's own answer boxes, or null for a ข้อ this panel cannot take.
+ * What the teacher fills in for this ข้อ, or null for one this cannot take.
  *
+ * A `choice` or `truefalse` field is answered by pressing the ตัวเลือก in the
+ * question itself, exactly as a student would; only `text` fields need a box.
  * จับคู่ / เรียงลำดับ / ผสม need the student's drag-and-drop layout to answer
  * at all, and บรรยาย / ส่งไฟล์ have no auto-verdict to give — those keep the
  * เฉลย button alone.
  */
-function tryFields(question: TeachingQuestionView): TryField[] | null {
+export function tryFields(question: TeachingQuestionView): TryField[] | null {
   const extra = question.extra_data as any
   const correct = question.correctAnswer ?? ''
 
@@ -49,11 +38,12 @@ function tryFields(question: TeachingQuestionView): TryField[] | null {
     case 'mcq':
       return (question.mcq_options ?? []).length > 0 ? [{ label: '', kind: 'choice' }] : null
     case 'true_false': {
+      // The ข้อ's own text is statement 0 and `extra.statements` follow it —
+      // the order buildAssignmentAttempt freezes into the TF: answer.
       const statements = (extra?.statements ?? []) as unknown[]
-      if (statements.length > 0) {
-        return statements.map((_, index) => ({ label: `ข้อ ${index + 1}`, kind: 'truefalse' as const }))
-      }
-      return [{ label: '', kind: 'truefalse' }]
+      return [{ label: '', kind: 'truefalse' as const }].concat(
+        statements.map(() => ({ label: '', kind: 'truefalse' as const })),
+      )
     }
     case 'fill_blank': {
       const blanks = (extra?.blanks ?? []) as unknown[]
@@ -68,16 +58,6 @@ function tryFields(question: TeachingQuestionView): TryField[] | null {
       return parts.map((_, index) => ({ label: labels[index] ?? `${index + 1}`, kind: 'text' as const }))
     }
   }
-}
-
-function mcqChoices(question: TeachingQuestionView): Choice[] {
-  // Teaching mode never shuffles, so an option's position in the authored
-  // list is the position an answer is recorded as.
-  return (question.mcq_options ?? []).map((option, index) => ({
-    value: `MCQ:${index}`,
-    label: String.fromCharCode(65 + index),
-    text: option.text || (option.image_url ? 'ตัวเลือกภาพ' : `ตัวเลือก ${index + 1}`),
-  }))
 }
 
 /**
@@ -105,43 +85,35 @@ const VERDICT_LABEL: Record<AnswerFeedback['verdict'], string> = {
 }
 
 /**
- * A teacher answering their own question in front of the class.
+ * The teacher's answer box and its verdict, laid out the way the student's
+ * own ข้อ is: no panel heading, because a field under a question already
+ * says "answer here", and no second copy of the ตัวเลือก — a ปรนัย or a
+ * ถูก/ผิด is answered by pressing the choice in the question itself, which
+ * is what the class is looking at.
  *
  * It grades in the browser with the same `gradeAnswer` + `buildAnswerFeedback`
  * a real attempt goes through — teacher preview already does this — so the
  * ถูก/ผิด shown here is the one the students would get. Both modules reach the
  * evaluator (~640 KB), so they load only when the button is pressed.
  */
-export function TeachingTryAnswer({ question, revealAnswerKey }: {
+export function TeachingAnswerCheck({ question, fields, values, onChange, onClear, revealAnswerKey }: {
   question: TeachingQuestionView
+  fields: TryField[]
+  values: string[]
+  onChange: (index: number, value: string) => void
+  onClear: () => void
   revealAnswerKey: boolean
 }) {
-  const fields = tryFields(question)
-  const [values, setValues] = useState<string[]>(() => (fields ?? []).map(() => ''))
   const [result, setResult] = useState<AnswerFeedback | null>(null)
   const [checking, setChecking] = useState(false)
 
-  // A new ข้อ starts from empty boxes rather than the previous one's answer.
-  useEffect(() => {
-    setValues((fields ?? []).map(() => ''))
-    setResult(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [question.id])
+  // Any edit — here or on a choice in the question — retires the verdict.
+  useEffect(() => { setResult(null) }, [values])
 
-  if (!fields || fields.length === 0) return null
-
-  const choices = question.question_type === 'mcq' ? mcqChoices(question) : []
   const answered = values.some(value => value.trim() !== '')
-
-  const setValue = (index: number, next: string) => {
-    setValues(current => current.map((value, position) => position === index ? next : value))
-    setResult(null)
-  }
-
-  const clear = () => {
-    setValues(fields.map(() => ''))
-    setResult(null)
-  }
+  const typed = fields
+    .map((field, index) => ({ field, index }))
+    .filter(entry => entry.field.kind === 'text')
 
   const check = async () => {
     if (checking || !answered) return
@@ -195,69 +167,31 @@ export function TeachingTryAnswer({ question, revealAnswerKey }: {
   }
 
   return (
-    <Card edge="dashed" padding="md" className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold">
-        <PencilLine className="size-4 text-primary" aria-hidden="true" /> ครูลองตอบ
-        <span className="text-[11px] font-normal text-muted-foreground">ตรวจแบบเดียวกับที่นักเรียนได้</span>
-      </div>
+    <div className="space-y-2">
+      {typed.map(({ field, index }) => (
+        <div key={index} className="flex flex-wrap items-center gap-2">
+          {field.label && <span className="min-w-8 text-sm font-semibold text-muted-foreground">{field.label}</span>}
+          <Input
+            value={values[index] ?? ''}
+            onChange={event => onChange(index, event.target.value)}
+            onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void check() } }}
+            placeholder="พิมพ์คำตอบ เช่น 10, 9+1 หรือ sin(30)"
+            inputMode="text"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={field.label ? `คำตอบ ${field.label}` : 'คำตอบ'}
+            className="h-9 min-w-40 flex-1 font-mono"
+          />
+        </div>
+      ))}
 
-      <div className="space-y-2">
-        {fields.map((field, index) => (
-          <div key={index} className="flex flex-wrap items-center gap-2">
-            {field.label && <span className="min-w-8 text-sm font-semibold text-muted-foreground">{field.label}</span>}
-            {field.kind === 'text' && (
-              <Input
-                value={values[index] ?? ''}
-                onChange={event => setValue(index, event.target.value)}
-                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void check() } }}
-                placeholder="พิมพ์คำตอบ เช่น 10, 9+1 หรือ sin(30)"
-                inputMode="text"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label={field.label ? `คำตอบ ${field.label}` : 'คำตอบของครู'}
-                className="h-9 min-w-40 flex-1 font-mono"
-              />
-            )}
-            {field.kind === 'truefalse' && TRUE_FALSE_CHOICES.map(choice => (
-              <Button
-                key={choice.value}
-                type="button"
-                size="xs"
-                variant={values[index] === choice.value ? 'secondary' : 'outline'}
-                aria-pressed={values[index] === choice.value}
-                onClick={() => setValue(index, choice.value)}
-              >
-                {choice.label}
-              </Button>
-            ))}
-            {field.kind === 'choice' && (
-              <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-                {choices.map(choice => (
-                  <Button
-                    key={choice.value}
-                    type="button"
-                    size="xs"
-                    variant={values[index] === choice.value ? 'secondary' : 'outline'}
-                    aria-pressed={values[index] === choice.value}
-                    onClick={() => setValue(index, choice.value)}
-                    className="max-w-full"
-                  >
-                    <span className="truncate">{choice.label}. {choice.text}</span>
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="xs" onClick={() => void check()} disabled={!answered || checking}>
           {checking ? <Loader2 className="animate-spin" /> : <Check />}
           {checking ? 'กำลังตรวจ...' : 'ตรวจคำตอบ'}
         </Button>
         {(answered || result) && (
-          <Button type="button" size="xs" variant="ghost" onClick={clear}>
+          <Button type="button" size="xs" variant="ghost" onClick={onClear}>
             <Eraser /> ล้าง
           </Button>
         )}
@@ -302,6 +236,6 @@ export function TeachingTryAnswer({ question, revealAnswerKey }: {
           </div>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
