@@ -23,6 +23,15 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { NativeSelect } from '@/components/ui/native-select'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { RichText } from '@/components/ui/rich-text'
@@ -505,13 +514,19 @@ export function TeachingModeClient({
   )
   const [selectedSlot, setSelectedSlot] = useState(initialSlot)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(initialBoard?.id ?? null)
-  const [showSolution, setShowSolution] = useState(false)
+  // Revealed per ข้อ: the button sits on each card, so pressing it there
+  // should show that ข้อ's เฉลย and leave the others on the page covered.
+  const [revealedQuestionIds, setRevealedQuestionIds] = useState<string[]>([])
   const [showQuestion, setShowQuestion] = useState(true)
   // The slots start put away: a teacher opens them to switch or save a board
   // and then wants the width back for writing.
   const [showBoards, setShowBoards] = useState(false)
   const [showBoard, setShowBoard] = useState(true)
   const [imageRequest, setImageRequest] = useState<{ questionId: string; url: string; nonce: number } | null>(null)
+  const [slotChoice, setSlotChoice] = useState<{
+    boards: TeachingBoardView[]
+    resolve: (slot: number | null) => void
+  } | null>(null)
   // One board per ข้อ: what is on it stays with it, so leaving and coming
   // back finds the same strokes, and a new ข้อ opens on a clean sheet.
   const scenesRef = useRef(new Map<string, ScratchpadScene>())
@@ -619,7 +634,6 @@ export function TeachingModeClient({
     const parked = scenesRef.current.get(nextQuestion.id)
     if (preferredSlot !== undefined && !await allowDiscard(nextQuestion.id)) return
     setQuestionIndex(nextIndex)
-    setShowSolution(false)
     setSelectedBoardId(null)
     const nextBoards = await fetchBoards(nextQuestion.id) ?? boardsByQuestion[nextQuestion.id] ?? []
     const slot = preferredSlot ?? firstAvailableSlot(nextBoards, currentUserId)
@@ -702,8 +716,50 @@ export function TeachingModeClient({
     }
   }
 
+  const toggleSolution = (questionId: string) => {
+    setRevealedQuestionIds(current => current.includes(questionId)
+      ? current.filter(id => id !== questionId)
+      : [...current, questionId])
+  }
+
   // The scene is parked, so putting the board away costs nothing.
   const hideBoard = () => setShowBoard(false)
+
+  /**
+   * Where the board about to be saved should land.
+   *
+   * A ข้อ holds five saved boards. While there is room the next free ช่อง is
+   * taken without asking; once all five are full the teacher picks which one
+   * this replaces, and saving over it removes the old picture and scene — the
+   * cap is what keeps a lesson's worth of boards from piling up in storage.
+   */
+  const resolveSaveSlot = async (questionId: string, label: string) => {
+    const saved = (boardsByQuestion[questionId] ?? []).filter(board => board.createdBy === currentUserId)
+    const used = new Set(saved.map(board => board.slot))
+    const free = [1, 2, 3, 4, 5].find(slot => !used.has(slot))
+
+    // All five taken — the teacher says which picture this one replaces, and
+    // saving over it deletes that picture and its scene.
+    if (free === undefined) {
+      const picked = await new Promise<number | null>(resolve => {
+        setSlotChoice({ boards: [...saved].sort((a, b) => a.slot - b.slot), resolve })
+      })
+      setSlotChoice(null)
+      return picked === null ? null : { slot: picked, replacing: true }
+    }
+
+    // A board opened from a ช่อง saves back over itself.
+    const open = questionId === question.id && selectedBoard?.createdBy === currentUserId ? selectedBoard : null
+    if (open) {
+      const ok = await confirm({
+        title: `บันทึกทับกระดาน ${label} ช่อง ${open.slot}?`,
+        description: 'ภาพและไฟล์ต้นฉบับเดิมในช่องนี้จะถูกแทนที่ด้วยกระดานที่กำลังเปิดอยู่',
+        confirmLabel: 'บันทึกทับ',
+      })
+      return ok ? { slot: open.slot, replacing: true } : null
+    }
+    return { slot: free, replacing: false }
+  }
 
   /**
    * Sends one of a ข้อ's pictures to its board — bringing the board out and
@@ -827,6 +883,7 @@ export function TeachingModeClient({
           {pageQuestions.map((pageQuestion, offset) => {
             const index = pageStart + offset
             const isBoardQuestion = index === questionIndex
+            const revealed = revealedQuestionIds.includes(pageQuestion.id)
             return (
               <div
                 key={pageQuestion.id}
@@ -839,23 +896,22 @@ export function TeachingModeClient({
                     question={pageQuestion}
                     index={index}
                     total={questions.length}
-                    showSolution={showSolution}
+                    showSolution={revealed}
                     outlined={perPage > 1 && isBoardQuestion}
                     onActivate={isBoardQuestion ? undefined : () => void changeQuestion(index)}
                     onInsertImage={url => void insertQuestionImage(index, url)}
                     actions={
-                      /* The เฉลย and the hide control belong to the whole
-                         column, so they sit on the first ข้อ of the page. */
-                      offset === 0 ? (
-                        <>
-                          <Button type="button" variant="outline" size="xs" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
-                            {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
-                          </Button>
-                          <Button type="button" variant="ghost" size="xs" onClick={() => setShowQuestion(false)}>
-                            <PanelLeftClose /> ซ่อนโจทย์
-                          </Button>
-                        </>
-                      ) : undefined
+                      /* Every ข้อ carries its own pair: the เฉลย it reveals is
+                         its own, and ซ่อนโจทย์ folds the column away from
+                         whichever card the teacher happens to be reading. */
+                      <>
+                        <Button type="button" variant="outline" size="xs" onClick={() => toggleSolution(pageQuestion.id)} aria-pressed={revealed}>
+                          {revealed ? <EyeOff /> : <Eye />}{revealed ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
+                        </Button>
+                        <Button type="button" variant="ghost" size="xs" onClick={() => setShowQuestion(false)}>
+                          <PanelLeftClose /> ซ่อนโจทย์
+                        </Button>
+                      </>
                     }
                     slots={showBoards ? (
                       <TeachingBoardSlots
@@ -895,6 +951,7 @@ export function TeachingModeClient({
                         onDirtyChange={setDirty}
                         onSceneChange={scene => scenesRef.current.set(pageQuestion.id, scene)}
                         questionImages={pageQuestion.image_urls ?? []}
+                        onResolveSaveSlot={() => resolveSaveSlot(pageQuestion.id, `ข้อ ${index + 1}/${questions.length}`)}
                         insertImage={imageRequest?.questionId === pageQuestion.id ? imageRequest : null}
                         onHide={hideBoard}
                       />
@@ -926,6 +983,40 @@ export function TeachingModeClient({
           })}
         </div>
       </div>
+      <Dialog open={slotChoice !== null} onOpenChange={open => { if (!open) slotChoice?.resolve(null) }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>ข้อนี้เก็บกระดานครบ 5 ช่องแล้ว</DialogTitle>
+            <DialogDescription>
+              เลือกช่องที่จะบันทึกทับ — ภาพและไฟล์ต้นฉบับเดิมของช่องนั้นจะถูกลบออกไป
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {(slotChoice?.boards ?? []).map(board => (
+              <Button
+                key={board.id}
+                type="button"
+                variant="ghost"
+                className="h-auto w-full flex-col items-stretch gap-2 whitespace-normal rounded-xl border border-border p-2"
+                onClick={() => slotChoice?.resolve(board.slot)}
+              >
+                {board.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={board.previewUrl} alt="" className="aspect-square w-full rounded-lg border bg-card object-cover" />
+                ) : (
+                  <span className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">
+                    ไม่มีตัวอย่าง
+                  </span>
+                )}
+                <span className="text-center text-xs font-medium">ช่อง {board.slot}</span>
+              </Button>
+            ))}
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline">ยกเลิก</Button>} />
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {confirmDialog}
     </div>
   )
