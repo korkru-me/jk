@@ -87,6 +87,8 @@
 
 ### SEB รายข้อสอบ — ร่างบนเว็บและ lab ที่ยังไม่ต่อระบบสอบ
 
+**ทิศทางงานต่อ ณ 5 กันยายน 2026:** ผู้ใช้เริ่ม N1 ของ [แผนใหม่ไม่เพิ่ม SEB Server](SEB_NO_SERVER_PLAN.md) ซึ่งยังรอการตัดสินใจและหลักฐาน automation; ข้อความเฟส 1–3 ด้านล่างเป็นสถาปัตยกรรมต้นแบบเดิม ไม่ใช่แผนให้ติดตั้ง SEB Server ต่อโดยอัตโนมัติ ยังไม่เลือก per-teacher/per-exam release model หรือเปลี่ยน runtime/CK + BEK
+
 เฟส 3 เพิ่มหน้า `/assignments/[id]/seb-password`, form และ Server Action สำหรับ **ร่างรหัสเท่านั้น** ใช้ session-bound client ตรวจ fresh auth + exact owner/org/online SEB exam ก่อนสร้าง admin client เพื่อเรียก service-only read/write RPC ซึ่งตรวจสิทธิ์ซ้ำ AES-GCM envelope ผูก org/teacher/assignment/revision; SQL ล็อก assignment row และทำ compare-and-swap revision พร้อม audit ใน transaction เดียว browser รับเฉพาะ metadata ไม่มี readback ของรหัสหรือ envelope ตาราง draft/audit ปิด browser access ด้วย RLS + ACL ร่างหมดอายุ 30 วันและ audit 90 วัน มี job ล้างข้อมูลแยก
 
 ฟีเจอร์ปิดโดย default ต้อง provision dedicated keyring และ apply migration `20260905072556_add_exam_seb_password_drafts.sql` ก่อนบันทึกได้ (ยังไม่ apply live) ไม่มี release/download/session/native exit implementation ห้ามออก SEB session จากผล draft หรืออ้างว่าร่างเปลี่ยนรหัสในไฟล์เดิม และไม่เปลี่ยน CK + BEK gate ดู [SEB_PHASE3.md](SEB_PHASE3.md) และ [rollout](SEB_PASSWORD_ROLLOUT.md)
