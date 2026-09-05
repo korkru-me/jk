@@ -258,6 +258,7 @@
 ### งานและข้อสอบ — มีโค้ดรองรับ
 
 - **SEB ไม่เพิ่ม SEB Server — แผนใหม่ N1 (5 กันยายน 2026):** ตรวจขอบเขต/หลักฐานและจัดแผนใหม่ 8 เฟสใน [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md) ยังรอข้อยุติพฤติกรรมออกและวิธีจัดการ BEK อัตโนมัติ ไม่ใช่เฟสที่ผ่านหรือ runtime ใหม่ ไฟล์รายครูใช้ซ้ำหลายข้อสอบอาจลดภาระ Key แต่การลงทะเบียน native ต่อ revision/build ยังไม่ตอบโจทย์ self-service เต็ม; Quit URL ไม่ใช่ native server-authorized exit เลขเฟสด้านล่างเป็นประวัติแผนเดิม ไม่เดินต่อ SEB Server โดยอัตโนมัติ รอบนี้แก้เอกสารเท่านั้น ไม่เปลี่ยน CK + BEK, ฐาน, env, ไฟล์ `.seb` หรือเปิด native app
+  - **ข้อยุติ D1 วันที่ 6 กันยายน:** ผู้ใช้เลือกพักรอบเดิม กลับมาทำต่อได้เมื่อครูอนุญาต และเวลาไม่หยุดอัตโนมัติ บันทึกเป็นนโยบายที่อนุมัติแล้ว ยังไม่ implement pause/resume ส่วน D2 เรื่อง Quit URL ยังเป็นคำถามขอคำอธิบาย ไม่ใช่การยอมรับความเสี่ยง; N1 และวิธี BEK อัตโนมัติยังไม่ผ่าน
 
 - **SEB Server — เตรียมตรวจ connection ก่อนต่อ runtime (5 กันยายน 2026):** read-only lab probe อ่านเฉพาะ numeric connection ID หลัง exact exam/institution/URL ผ่าน ตรวจ binding ซ้ำและตัด token/ข้อมูลเครื่องออก ไม่แปลง Active/granted/ping เป็นหลักฐาน trusted build หรือ student mapping เพิ่ม synthetic/loopback tests 35 ข้อ รวมทั้ง repo 1,005 ข้อ / 77 files ผ่าน ยังไม่มี server จริงหรือ production connector และเฟส 4–5 ยังไม่เสร็จ ดู [SEB_PHASE2.md](SEB_PHASE2.md)
 
