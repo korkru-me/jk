@@ -126,6 +126,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 ## Logging และ errors
 
+- SEB password/revision core ใน `lib/seb-password-*` ยังไม่ต่อ runtime/storage: expected org/teacher/assignment/revision ต้องมาจาก server-authorized record ไม่ใช่ browser และ AES-GCM binding ไม่ได้แทน authorization; ใช้ dedicated encryption key เท่านั้น ห้าม reuse session/CK/BEK/Supabase keys ไม่ส่ง private envelope/รหัสไป client/log การเพิ่ม persistence ภายหลังต้องมี atomic revision write + RLS/ownership checks และออกแบบ key management/retention ก่อน ดู `docs/SEB_PHASE3.md` การเลื่อน native test ไม่อนุญาตให้ promote draft เป็น applied หรือผ่อน gate เดิม
+
 - ห้าม log access code, token, service key, คำตอบเต็ม, health/family notes หรือข้อมูลผู้ปกครอง
 - ส่งข้อความทั่วไปให้ผู้ใช้และเก็บรายละเอียดเฉพาะ server log ที่ควบคุมสิทธิ์
 - อย่าแสดง SQL, table policy หรือ stack trace แก่ผู้ใช้

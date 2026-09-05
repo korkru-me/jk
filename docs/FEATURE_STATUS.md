@@ -257,6 +257,8 @@
 
 ### งานและข้อสอบ — มีโค้ดรองรับ
 
+- **SEB รายข้อสอบสำหรับ SaaS — เฟส 3ก เฉพาะ password/revision core (5 กันยายน 2026):** ผู้ใช้อนุญาตเลื่อน manual SEB test และเดินงานที่ไม่ขึ้นกับ Docker ต่อ เพิ่ม server-only owner policy + encrypted quit-password envelope ที่ผูก org/teacher/assignment/revision และ immutable draft version ไม่ต่อ route/UI/database/SEB Server และไม่เปลี่ยน gate เดิม ยังไม่มีช่องครูตั้งรหัสในเว็บ manual native/server tests ยังคง pending ดู [SEB_PHASE3.md](SEB_PHASE3.md)
+
 - **SEB รายข้อสอบสำหรับ SaaS — เฟส 2 เฉพาะ isolated SEB Server lab (5 กันยายน 2026):** ผู้ใช้อนุมัติสำรวจแยกจาก production; เพิ่ม Compose ที่ pin image/เปิดเฉพาะ loopback/แยก DB, ตัวสร้างรหัส lab ส่วนตัว และ read-only discovery/OAuth/exact-exam probe พร้อม tests 58 ข้อผ่าน (ทั้ง repo 811 ข้อ / 70 files) รวม HTTP synthetic stub ไม่ใช่ server จริง เครื่องยังไม่มี Docker จึงยังไม่ได้รัน SEB Server/native integration ไม่เพิ่มหน้าครูตั้งรหัส ไม่เปลี่ยน CK + BEK gate, `.seb` production, env หรือฐานข้อมูล ต้องพิสูจน์ trusted-build ASK/session binding และ native compatibility ก่อนต่อระบบจริง ดู [SEB_PHASE2.md](SEB_PHASE2.md)
 
 - **SEB รายข้อสอบสำหรับ SaaS — เฟส 1 เฉพาะ prototype (5 กันยายน 2026):** มี CLI offline สร้าง encrypted `.seb` A/B รหัสออกคนละค่าและไฟล์ modified, คำนวณ/เทียบ Config Key, automated tests 24 ข้อผ่าน (ทั้ง repo 753 ข้อผ่าน) แต่ยังไม่ผ่าน native import/CK/quit-password test บน Mac/iPad/Windows จึงยังไม่พร้อมใช้จริง ไม่แก้ gate CK + BEK, ไฟล์ production, Vercel หรือฐานข้อมูล ก่อนทำเฟสถัดไปต้องพิสูจน์ native compatibility และเลือกแนวทางตรวจตัวแอปที่รองรับ config จำนวนมาก เช่น SEB Server/ASK/server-driven BEK โดยไม่ลดเหลือ CK-only เงียบ ๆ ดู [SEB_PHASE1.md](SEB_PHASE1.md)

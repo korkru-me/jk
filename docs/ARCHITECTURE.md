@@ -87,7 +87,9 @@
 
 ### SEB รายข้อสอบ — lab แยกจาก runtime
 
-การสำรวจอยู่ใน `scripts/seb-phase1/` และ `scripts/seb-phase2/` เท่านั้น เฟส 2 เตรียม SEB Server/MariaDB loopback lab กับ read-only admin probe ไม่ถูก import เข้า `app/`/`lib/` ไม่ออก session นักเรียนหรือเปลี่ยน CK + BEK gate การต่อ server จริงยังต้องพิสูจน์ explicit ASK grant/server-driven BEK, exact org/assignment/student/connection mapping และ fail-closed behavior ดู [SEB_PHASE2.md](SEB_PHASE2.md) ห้ามนำผล API probe มาใช้แทน integrity verification
+เฟส 3กเพิ่ม `lib/seb-password-policy.ts` และ `lib/seb-password-vault.ts` เป็น server-only foundation ที่ยังไม่มี route/action/runtime caller: owner policy, AES-GCM envelope ผูก org/teacher/assignment/revision และ draft planner ไม่ใช่ persistence หรือ database lock ห้ามออก SEB session จากผล draft และไม่เปลี่ยน CK + BEK gate ดู [SEB_PHASE3.md](SEB_PHASE3.md)
+
+การสำรวจเฟส 1–2 อยู่ใน `scripts/seb-phase1/` และ `scripts/seb-phase2/` เท่านั้น เฟส 2 เตรียม SEB Server/MariaDB loopback lab กับ read-only admin probe ไม่ถูก import เข้า `app/`/`lib/` ไม่ออก session นักเรียนหรือเปลี่ยน CK + BEK gate การต่อ server จริงยังต้องพิสูจน์ explicit ASK grant/server-driven BEK, exact org/assignment/student/connection mapping และ fail-closed behavior ดู [SEB_PHASE2.md](SEB_PHASE2.md) ห้ามนำผล API probe มาใช้แทน integrity verification
 
 ### โฮมรูม
 
