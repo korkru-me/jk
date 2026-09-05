@@ -514,7 +514,9 @@ export function TeachingModeClient({
   )
   const [selectedSlot, setSelectedSlot] = useState(initialSlot)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(initialBoard?.id ?? null)
-  const [showSolution, setShowSolution] = useState(false)
+  // Revealed per ข้อ: the button sits on each card, so pressing it there
+  // should show that ข้อ's เฉลย and leave the others on the page covered.
+  const [revealedQuestionIds, setRevealedQuestionIds] = useState<string[]>([])
   const [showQuestion, setShowQuestion] = useState(true)
   // The slots start put away: a teacher opens them to switch or save a board
   // and then wants the width back for writing.
@@ -632,7 +634,6 @@ export function TeachingModeClient({
     const parked = scenesRef.current.get(nextQuestion.id)
     if (preferredSlot !== undefined && !await allowDiscard(nextQuestion.id)) return
     setQuestionIndex(nextIndex)
-    setShowSolution(false)
     setSelectedBoardId(null)
     const nextBoards = await fetchBoards(nextQuestion.id) ?? boardsByQuestion[nextQuestion.id] ?? []
     const slot = preferredSlot ?? firstAvailableSlot(nextBoards, currentUserId)
@@ -713,6 +714,12 @@ export function TeachingModeClient({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'ลบกระดานไม่สำเร็จ กรุณาลองใหม่')
     }
+  }
+
+  const toggleSolution = (questionId: string) => {
+    setRevealedQuestionIds(current => current.includes(questionId)
+      ? current.filter(id => id !== questionId)
+      : [...current, questionId])
   }
 
   // The scene is parked, so putting the board away costs nothing.
@@ -876,6 +883,7 @@ export function TeachingModeClient({
           {pageQuestions.map((pageQuestion, offset) => {
             const index = pageStart + offset
             const isBoardQuestion = index === questionIndex
+            const revealed = revealedQuestionIds.includes(pageQuestion.id)
             return (
               <div
                 key={pageQuestion.id}
@@ -888,23 +896,22 @@ export function TeachingModeClient({
                     question={pageQuestion}
                     index={index}
                     total={questions.length}
-                    showSolution={showSolution}
+                    showSolution={revealed}
                     outlined={perPage > 1 && isBoardQuestion}
                     onActivate={isBoardQuestion ? undefined : () => void changeQuestion(index)}
                     onInsertImage={url => void insertQuestionImage(index, url)}
                     actions={
-                      /* The เฉลย and the hide control belong to the whole
-                         column, so they sit on the first ข้อ of the page. */
-                      offset === 0 ? (
-                        <>
-                          <Button type="button" variant="outline" size="xs" onClick={() => setShowSolution(value => !value)} aria-pressed={showSolution}>
-                            {showSolution ? <EyeOff /> : <Eye />}{showSolution ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
-                          </Button>
-                          <Button type="button" variant="ghost" size="xs" onClick={() => setShowQuestion(false)}>
-                            <PanelLeftClose /> ซ่อนโจทย์
-                          </Button>
-                        </>
-                      ) : undefined
+                      /* Every ข้อ carries its own pair: the เฉลย it reveals is
+                         its own, and ซ่อนโจทย์ folds the column away from
+                         whichever card the teacher happens to be reading. */
+                      <>
+                        <Button type="button" variant="outline" size="xs" onClick={() => toggleSolution(pageQuestion.id)} aria-pressed={revealed}>
+                          {revealed ? <EyeOff /> : <Eye />}{revealed ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
+                        </Button>
+                        <Button type="button" variant="ghost" size="xs" onClick={() => setShowQuestion(false)}>
+                          <PanelLeftClose /> ซ่อนโจทย์
+                        </Button>
+                      </>
                     }
                     slots={showBoards ? (
                       <TeachingBoardSlots
