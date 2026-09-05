@@ -32,3 +32,14 @@ export const syntheticExam = () => ({
     SIGNATURE_KEY_CHECK_ENABLED: 'true', NUMERICAL_TRUST_THRESHOLD: '0',
   },
 })
+
+export const syntheticConnectionData = () => ({
+  cdat: {
+    id: 27, institutionId: 3, examId: 12, status: 'ACTIVE',
+    securityCheckGranted: true, clientVersionGranted: true,
+    connectionToken: 'SYNTHETIC-CONNECTION-TOKEN', examUserSessionId: 'SYNTHETIC-STUDENT-SESSION',
+    clientAddress: '192.0.2.1', clientOsName: 'SYNTHETIC-OS', clientVersion: 'SYNTHETIC-VERSION',
+    seb_info: 'SYNTHETIC-DEVICE-INFO', ask: 'SYNTHETIC-ASK-NEVER-OUTPUT',
+  },
+  miss: false, pnot: false, iVal: [], cg: [],
+})

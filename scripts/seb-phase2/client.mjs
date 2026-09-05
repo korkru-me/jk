@@ -43,10 +43,15 @@ export function validateConfig(config) {
       fail('SYNTHETIC_EXAM_REQUIRED')
     }
   }
+  if (config.connection !== undefined && (!config.exam || !record(config.connection) ||
+      !positiveId(config.connection.id) || Object.keys(config.connection).some((key) => key !== 'id'))) {
+    fail('EXACT_CONNECTION_REQUIRED')
+  }
   return {
     baseUrl: config.baseUrl, username: config.username, password: config.password,
     clientSecret: config.clientSecret,
     ...(config.exam === undefined ? {} : { exam: { ...config.exam } }),
+    ...(config.connection === undefined ? {} : { connection: { id: config.connection.id } }),
   }
 }
 
@@ -127,6 +132,30 @@ function summarizeExam(exam, expected) {
   }
 }
 
+function summarizeConnection(data, expected) {
+  // Pinned upstream ClientConnectionData serializes the connection as `cdat`.
+  // Never dump the row: it also contains token, user session, IP and SEB info.
+  const connection = data.cdat
+  if (!record(connection)) fail('INVALID_CONNECTION')
+  if (connection.id !== expected.connection.id || connection.examId !== expected.exam.id ||
+      connection.institutionId !== expected.exam.institutionId) fail('CONNECTION_BINDING_MISMATCH')
+  if (!['UNDEFINED', 'CONNECTION_REQUESTED', 'READY', 'ACTIVE', 'CLOSED', 'DISABLED'].includes(connection.status)) {
+    fail('INVALID_CONNECTION')
+  }
+  for (const value of [data.miss, connection.securityCheckGranted, connection.clientVersionGranted]) {
+    if (value !== undefined && value !== null && typeof value !== 'boolean') fail('INVALID_CONNECTION')
+  }
+  return {
+    bindingMatched: true, status: connection.status, missingPing: data.miss ?? null,
+    reportedSecurityCheckGranted: connection.securityCheckGranted ?? null,
+    reportedClientVersionGranted: connection.clientVersionGranted ?? null,
+    // These are administrative observations, not an attestation. A grant flag
+    // can follow upstream heuristics; neither this row nor its status proves
+    // trusted build, freshness, KorKru student identity or config revision.
+    explicitTrustedBuildVerified: false, freshnessVerified: false, studentBindingVerified: false,
+  }
+}
+
 export async function probeLab(input, { timeoutMs = 5000 } = {}) {
   const config = validateConfig(input)
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) fail('INVALID_TIMEOUT')
@@ -160,6 +189,17 @@ export async function probeLab(input, { timeoutMs = 5000 } = {}) {
       },
     }, timeoutMs)
     result.exam = summarizeExam(exam, config.exam)
+  }
+  if (config.connection) {
+    // Only after the exact exam/institution/URL read matched. No listing,
+    // user-controlled URL/token in the path, grants, instructions or writes.
+    const data = await requestJson(config.baseUrl, `/admin-api/v1/seb-client-connection/data/${config.connection.id}`, {
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    }, timeoutMs)
+    result.connection = summarizeConnection(data, config)
   }
   // Neither bearer/refresh token nor the raw exam object leaves this function.
   return result

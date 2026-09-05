@@ -91,7 +91,7 @@
 
 ฟีเจอร์ปิดโดย default ต้อง provision dedicated keyring และ apply migration `20260905072556_add_exam_seb_password_drafts.sql` ก่อนบันทึกได้ (ยังไม่ apply live) ไม่มี release/download/session/native exit implementation ห้ามออก SEB session จากผล draft หรืออ้างว่าร่างเปลี่ยนรหัสในไฟล์เดิม และไม่เปลี่ยน CK + BEK gate ดู [SEB_PHASE3.md](SEB_PHASE3.md) และ [rollout](SEB_PASSWORD_ROLLOUT.md)
 
-การสำรวจเฟส 1–2 อยู่ใน `scripts/seb-phase1/` และ `scripts/seb-phase2/` เท่านั้น เฟส 2 เตรียม SEB Server/MariaDB loopback lab กับ read-only admin probe ไม่ถูก import เข้า `app/`/`lib/` ไม่ออก session นักเรียนหรือเปลี่ยน CK + BEK gate การต่อ server จริงยังต้องพิสูจน์ explicit ASK grant/server-driven BEK, exact org/assignment/student/connection mapping และ fail-closed behavior ดู [SEB_PHASE2.md](SEB_PHASE2.md) ห้ามนำผล API probe มาใช้แทน integrity verification
+การสำรวจเฟส 1–2 อยู่ใน `scripts/seb-phase1/` และ `scripts/seb-phase2/` เท่านั้น เฟส 2 เตรียม SEB Server/MariaDB loopback lab กับ read-only admin probe ซึ่งอ่าน exact exam และ optional exact numeric connection แล้วตรวจ returned institution/exam/connection ซ้ำ ตัด token/ข้อมูลเครื่องออกและคง integrity/freshness/student-proof เป็น false ไม่ถูก import เข้า `app/`/`lib/` ไม่ออก session นักเรียนหรือเปลี่ยน CK + BEK gate การต่อ server จริงยังต้องพิสูจน์ explicit ASK grant/server-driven BEK, exact org/assignment/student/connection mapping และ fail-closed behavior ดู [SEB_PHASE2.md](SEB_PHASE2.md) ห้ามนำผล API probe มาใช้แทน integrity verification
 
 ### โฮมรูม
 

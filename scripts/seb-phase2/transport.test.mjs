@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { afterEach, expect, it } from 'vitest'
 import { probeLab } from './client.mjs'
-import { syntheticConfig, syntheticDiscovery, syntheticExam, syntheticToken } from './fixtures.mjs'
+import { syntheticConfig, syntheticConnectionData, syntheticDiscovery, syntheticExam, syntheticToken } from './fixtures.mjs'
 
 // Real loopback HTTP, but the peer below is a synthetic stub, NOT SEB Server.
 const servers = []
@@ -59,6 +59,38 @@ it('never follows a credential-bearing token redirect, including another loopbac
     else { response.writeHead(307, { Location: `${destination}/capture` }); response.end() }
   })
   await expect(probeLab({ ...syntheticConfig(), baseUrl })).rejects.toThrow('CONNECTION_FAILED')
+  expect(stolenRequests).toBe(0)
+})
+
+it('reads one connection over loopback HTTP without sending instruction/grant requests', async () => {
+  const calls = []
+  const baseUrl = await listen((request, response) => {
+    calls.push([request.method, request.url])
+    if (request.url === '/exam-api/discovery') send(response, syntheticDiscovery(baseUrl))
+    else if (request.url === '/oauth/token') send(response, syntheticToken())
+    else if (request.url === '/admin-api/v1/exam/12') send(response, syntheticExam())
+    else if (request.url === '/admin-api/v1/seb-client-connection/data/27') send(response, syntheticConnectionData())
+    else { response.writeHead(404); response.end() }
+  })
+  const result = await probeLab({ ...syntheticConfig(), baseUrl, connection: { id: 27 } })
+  expect(calls).toEqual([
+    ['GET', '/exam-api/discovery'], ['POST', '/oauth/token'], ['GET', '/admin-api/v1/exam/12'],
+    ['GET', '/admin-api/v1/seb-client-connection/data/27'],
+  ])
+  expect(result.connection.studentBindingVerified).toBe(false)
+  expect(JSON.stringify(result)).not.toContain('SYNTHETIC')
+})
+
+it('does not follow a redirect from an authenticated connection read', async () => {
+  let stolenRequests = 0
+  const destination = await listen((_request, response) => { stolenRequests++; send(response, syntheticConnectionData()) })
+  const baseUrl = await listen((request, response) => {
+    if (request.url === '/exam-api/discovery') send(response, syntheticDiscovery(baseUrl))
+    else if (request.url === '/oauth/token') send(response, syntheticToken())
+    else if (request.url === '/admin-api/v1/exam/12') send(response, syntheticExam())
+    else { response.writeHead(307, { Location: `${destination}/capture` }); response.end() }
+  })
+  await expect(probeLab({ ...syntheticConfig(), baseUrl, connection: { id: 27 } })).rejects.toThrow('CONNECTION_FAILED')
   expect(stolenRequests).toBe(0)
 })
 

@@ -12,9 +12,9 @@
 
 - `infra/seb-phase2/compose.json`: เตรียม SEB Server + MariaDB เท่านั้น ไม่มี screen proctoring เปิด port เฉพาะ `127.0.0.1:18080`; DB ไม่ publish port, network เป็น internal, named volume/project ใหม่แยกต่อชุด และไม่ restart เอง
 - `scripts/seb-phase2/prepare.mjs`: สร้างรหัสสุ่มใหม่ใน `.local/seb-phase2-*` ที่ git ignore; directory `0700`, `.env`/`connection.json` เป็น `0600` ไม่พิมพ์รหัส ไม่อ่าน production env ไม่เริ่ม container/app และไม่เขียนทับชุดเดิม
-- `client.mjs`/`probe.mjs`: discovery → admin OAuth scope `read` → optional GET exact exam; จำกัด literal loopback, ไม่ตาม redirect, จำกัดเวลาต่อ request และ JSON 128 KiB ไม่ส่ง token/รหัส/BEK/raw exam ในผลลัพธ์
+- `client.mjs`/`probe.mjs`: discovery → admin OAuth scope `read` → optional GET exact exam → optional GET exact connection; จำกัด literal loopback, ไม่ตาม redirect, จำกัดเวลาต่อ request และ JSON 128 KiB ไม่ส่ง token/รหัส/BEK/raw exam/ข้อมูลเครื่องในผลลัพธ์
 - `doctor.mjs`: ตรวจ Docker CLI/Compose/engine แบบอ่านอย่างเดียว ไม่เปิด ไม่ติดตั้ง ไม่ pull/run
-- Tests 58 ข้อผ่าน รวม HTTP loopback จริงกับ **synthetic stub ไม่ใช่ SEB Server จริง**
+- Tests ชุด lab ล่าสุด 93 ข้อผ่าน รวม HTTP loopback จริงกับ **synthetic stub ไม่ใช่ SEB Server จริง** (รอบแรก 58 ข้อ และเพิ่ม exact connection 35 ข้อ)
 
 ไม่เปลี่ยน `app/`, `lib/`, Supabase/schema/RLS, Vercel/env, CK + BEK gate, session cookie หรือ `.seb` production ไม่มี migration และไม่ได้เพิ่มหน้าครูตั้งรหัสหรือทางออกหลังส่ง
 
@@ -93,6 +93,20 @@ npm run seb:phase2:probe -- .local/seb-phase2-REPLACE/connection.json
 
 รัน probe ซ้ำ จากนั้นทดสอบ ID ของ B คู่กับ URL ของ A และ institution ผิดว่าตอบ `EXAM_BINDING_MISMATCH` โดยไม่แสดง password/BEK การอ่านผ่าน lab-admin ยังไม่ใช่การทดสอบ tenant ACL ของ KorKru
 
+### 3ก. ตรวจ connection สมมติเฉพาะรายการ — ส่วนเตรียมต่อ server
+
+เพิ่มใน `connection.json` เดิมได้เมื่อผู้ดูแลมี numeric connection ID ของ **lab สมมติ** ที่จะตรวจ เช่น `"connection": { "id": 27 }` (27 เป็นตัวอย่าง ต้องแทนด้วย ID ของ lab) ต้องมี `exam` ที่กำหนด ID/institution/URL แบบ exact อยู่แล้ว ไม่รับ connection token, URL ปลายทาง หรือชื่อผู้ใช้เป็น selector ไม่ list/browse connections ทั้งองค์กร
+
+Probe อ่านข้อสอบก่อน เมื่อ exact binding ผ่านแล้วจึง GET `/admin-api/v1/seb-client-connection/data/{id}` ใช้ read token เดิมและ Content-Type form-urlencoded ไม่ส่ง instruction/grant/quit request ข้อมูลถูก parse จาก `cdat` ตาม [ClientConnectionController](https://github.com/SafeExamBrowser/seb-server/blob/3a417abff04b42094bb83f0e622879e1cb751700/src/main/java/ch/ethz/seb/sebserver/webservice/weblayer/api/ClientConnectionController.java) และ [ClientConnectionData](https://github.com/SafeExamBrowser/seb-server/blob/3a417abff04b42094bb83f0e622879e1cb751700/src/main/java/ch/ethz/seb/sebserver/gbl/model/session/ClientConnectionData.java)
+
+ต้องตรงทั้ง returned connection ID, exam ID และ institution ID ไม่ตรงตอบ `CONNECTION_BINDING_MISMATCH` สถานะ/boolean ผิดชนิดตอบ `INVALID_CONNECTION` ข้อมูล token, student session, IP, OS/version, machine info, ASK หรือ fields อื่นไม่ออกจากฟังก์ชันและไม่ถูก log
+
+ผลมีเฉพาะสถานะ/boolean ที่ allowlist: `reportedSecurityCheckGranted`, `reportedClientVersionGranted` และ `missingPing` โดยค่าที่ไม่มีเป็น `null` ไม่แปลงเป็น false หรือสำเร็จ ไม่ว่า `ACTIVE`, granted=true หรือ missingPing=false ก็ยังคืน `explicitTrustedBuildVerified: false`, `freshnessVerified: false`, `studentBindingVerified: false` และ top-level `studentIntegrityVerified: false` เสมอ ตัวเลข ID ที่ตรงกัน **ไม่ใช่** mapping ของ KorKru student/attempt/config revision
+
+เหตุผลที่ไม่ใช้ granted flag เป็น proof: [SecurityKeyServiceImpl](https://github.com/SafeExamBrowser/seb-server/blob/3a417abff04b42094bb83f0e622879e1cb751700/src/main/java/ch/ethz/seb/sebserver/webservice/servicelayer/institution/impl/SecurityKeyServiceImpl.java) สามารถตั้ง security-check state หลังตรวจ explicit key หรือ numerical heuristic ได้ รายงานนี้ไม่ยืนยันว่า source เป็นการอนุมัติ trusted build อย่างชัดแจ้ง และ endpoint ไม่มีหลักฐาน freshness ที่เราตรวจรับได้ใน connector นี้
+
+เพิ่ม tests 35 ข้อสำหรับ malformed selector/response, wrong connection/exam/institution, uncertainty, redaction, HTTP exact path และไม่ตาม redirect จาก connection read; ทั้ง repo 1,005 tests / 77 files ผ่าน `node --check` และ diff check ผ่าน ยังไม่ใช่ live SEB Server/native test ไม่เปิดแอปหรือแก้ production การเพิ่ม probe นี้เป็นการเตรียมตรวจ integration ไม่ใช่เฟส 4–5 runtime เสร็จแล้ว
+
 ### 4. หยุดโดยเก็บข้อมูลทดลอง
 
 ```sh
@@ -112,7 +126,7 @@ docker compose --env-file .local/seb-phase2-REPLACE/.env -f infra/seb-phase2/com
 
 **ห้ามลด gate เป็น CK-only** หรือเพิ่ม flag เปิด production โดยไม่มี proof ไม่สร้าง ASK/BEK ปลอม การเช่าบริการ/เปิด network/แก้ production/เพิ่ม DB และ UI ครูยังต้องกำหนดขอบเขตงานถัดไป
 
-## ผลทดสอบรอบนี้
+## ผลทดสอบ lab รอบแรก (ก่อนเพิ่ม exact connection)
 
 - Unit/filesystem/Compose-contract + HTTP stub: 58 ผ่าน ครอบคลุม wrong origin/redirect, scope, malformed/oversized/timeout response, wrong exam/institution/URL, redaction และ private permissions
 - Sandbox ปฏิเสธ bind port ด้วย `EPERM`; รัน HTTP tests อีกครั้งด้วยสิทธิ์ loopback แล้วผ่าน ไม่ skip แล้วอ้างว่าเป็น network test
