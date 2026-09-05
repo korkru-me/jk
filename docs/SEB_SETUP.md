@@ -1,5 +1,7 @@
 # Safe Exam Browser — คู่มือติดตั้งและใช้งานเฟส 1–7
 
+> งานใหม่สำหรับรหัสออกแยกครู/ข้อสอบอยู่ใน [SEB SaaS เฟส 1](SEB_PHASE1.md): มีเฉพาะเครื่องมือทดลอง offline และยังรอ native compatibility test ไม่ได้เปลี่ยน config หรือ gate ของระบบเดิมในคู่มือนี้
+
 SEB รองรับ **Windows, macOS, iPhone และ iPad** ด้วยเว็บ KorKru เดิม ไม่รองรับ Android และไม่ต้องติดตั้ง SEB Server ระบบตรวจ Config Key (CK) และ Browser Exam Key (BEK) ที่ KorKru โดยตรง แล้วแสดงสถานะในห้องคุมสอบเดิม เฟส 3 เพิ่ม Android monitored mode แยกต่างหากซึ่งความมั่นใจต่ำกว่าและต้องให้ครูตรวจเครื่องต่อหน้า ดู `docs/ANDROID_EXAM_MODE.md` เฟส 4 เพิ่มเสียง/Browser Notification แบบ opt-in และคิวรับทราบเหตุการณ์ร่วมกันระหว่างครู เฟส 5 เพิ่ม roster เช็กอิน SEB ก่อนสอบจาก system check ที่ผ่านจริง เฟส 6 เพิ่มรายงานสัญญาณย้อนหลังแบบอ่านอย่างเดียวกับ CSV ที่จำกัดขนาด และเฟส 7 เป็นการทำ production readiness: ตรวจ migration, environment, ไฟล์ `.seb`, platform/build ที่อนุญาต และขั้นตอนทดสอบจริงก่อนเปิดใช้
 
 > การ merge โค้ดอย่างเดียวยังไม่ทำให้ SEB พร้อมใช้ ต้อง apply migration, ตั้ง environment, สร้างไฟล์ `.seb` และทดสอบเครื่องจริงก่อนเปิดสวิตช์ให้ข้อสอบ

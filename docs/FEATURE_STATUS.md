@@ -257,6 +257,8 @@
 
 ### งานและข้อสอบ — มีโค้ดรองรับ
 
+- **SEB รายข้อสอบสำหรับ SaaS — เฟส 1 เฉพาะ prototype (5 กันยายน 2026):** มี CLI offline สร้าง encrypted `.seb` A/B รหัสออกคนละค่าและไฟล์ modified, คำนวณ/เทียบ Config Key, automated tests 24 ข้อผ่าน (ทั้ง repo 753 ข้อผ่าน) แต่ยังไม่ผ่าน native import/CK/quit-password test บน Mac/iPad/Windows จึงยังไม่พร้อมใช้จริง ไม่แก้ gate CK + BEK, ไฟล์ production, Vercel หรือฐานข้อมูล ก่อนทำเฟสถัดไปต้องพิสูจน์ native compatibility และเลือกแนวทางตรวจตัวแอปที่รองรับ config จำนวนมาก เช่น SEB Server/ASK/server-driven BEK โดยไม่ลดเหลือ CK-only เงียบ ๆ ดู [SEB_PHASE1.md](SEB_PHASE1.md)
+
 - **ระบบสอบปลอดภัยเฟส 1–7 — SEB รองรับ Windows, macOS และ iOS/iPadOS; Android ใช้ monitored mode แยกที่ความมั่นใจต่ำกว่า** — ครูเปิด `secure_browser_mode = seb_required` ได้เฉพาะข้อสอบออนไลน์ ระบบบังคับเปิดห้องคุมสอบสด, นักเรียนได้หน้าแนะนำเปิด `.seb`, และ server ตรวจ CK + BEK ของ exact challenge URL ผ่าน SEB JavaScript API ก่อนออก HttpOnly session ที่ผูกผู้ใช้กับข้อสอบ
   - ตรวจ session ซ้ำที่ `startSubmission`, `getExamTakingData`, autosave/รูปวิธีทำ/ไฟล์แนบ, proctor heartbeat และ `submitSubmission`; การปลอม UI หรือเรียก Server Action ตรงจึงไม่ข้าม gate ส่วน forced-finalize ของ attempt หมดเวลายังทำงานได้
   - submission และห้องคุมสอบเก็บเฉพาะ verified timestamp/platform/version; ครูเห็นป้าย “SEB ยืนยันแล้ว” แบบ realtime โดยค่าฝั่งห้องคุมสอบถูก trigger คัดจาก submission ไม่รับจาก client
