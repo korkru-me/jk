@@ -257,6 +257,8 @@
 
 ### งานและข้อสอบ — มีโค้ดรองรับ
 
+- **แผน SEB ไม่เพิ่ม Server — เริ่ม N2.1 วันที่ 6 กันยายน 2026:** ผู้ใช้ยืนยันสอบผ่านเว็บในห้องเรียน ครูตรวจเครื่องได้ ไม่ใช่ remote proctoring และอนุมัติเริ่มต้นแบบ เพิ่ม `scripts/seb-no-server/` สำหรับไฟล์ `plnd` A/B/modified ไม่มี opening password กับ Mac-loopback CK + BEK/quit-link diagnostic แยกจาก production ไม่ออก session หรือใช้ CK-only แทน ยังไม่มีผล native ทุกระบบ, ยังไม่มีหน้าทดลอง submit/grant/resume/presence ของ N2.2 และยังไม่แก้ BEK automation; จึงไม่ถือว่า N2 หรือระบบรายครูพร้อมขาย ดู [SEB_NO_SERVER_N2.md](SEB_NO_SERVER_N2.md) และ [แผนหลัก](SEB_NO_SERVER_PLAN.md) ส่วนเพิ่ม timeout/reconnect alerts ให้หน้าคุมสอบเดิมอยู่ N5 และทดสอบในห้องจริง N7 ไม่มี migration/env/deploy/native launch ในรอบนี้
+
 - **SEB ไม่เพิ่ม SEB Server — แผนใหม่ N1 (5 กันยายน 2026):** ตรวจขอบเขต/หลักฐานและจัดแผนใหม่ 8 เฟสใน [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md) ยังรอข้อยุติพฤติกรรมออกและวิธีจัดการ BEK อัตโนมัติ ไม่ใช่เฟสที่ผ่านหรือ runtime ใหม่ ไฟล์รายครูใช้ซ้ำหลายข้อสอบอาจลดภาระ Key แต่การลงทะเบียน native ต่อ revision/build ยังไม่ตอบโจทย์ self-service เต็ม; Quit URL ไม่ใช่ native server-authorized exit เลขเฟสด้านล่างเป็นประวัติแผนเดิม ไม่เดินต่อ SEB Server โดยอัตโนมัติ รอบนี้แก้เอกสารเท่านั้น ไม่เปลี่ยน CK + BEK, ฐาน, env, ไฟล์ `.seb` หรือเปิด native app
   - **ข้อยุติ D1 วันที่ 6 กันยายน:** ผู้ใช้เลือกพักรอบเดิม กลับมาทำต่อได้เมื่อครูอนุญาต และเวลาไม่หยุดอัตโนมัติ บันทึกเป็นนโยบายที่อนุมัติแล้ว ยังไม่ implement pause/resume ส่วน D2 เรื่อง Quit URL ยังเป็นคำถามขอคำอธิบาย ไม่ใช่การยอมรับความเสี่ยง; N1 และวิธี BEK อัตโนมัติยังไม่ผ่าน
 

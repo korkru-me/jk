@@ -50,3 +50,6 @@ next-env.d.ts
 
 # Dedicated draft-password encryption key proposals (never public config files)
 /.local/seb-password-*/
+
+# Private no-server N2 test fixtures/keys, separate from the old SEB Server lab
+/.local/seb-no-server-*/
