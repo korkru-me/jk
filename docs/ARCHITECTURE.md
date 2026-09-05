@@ -85,6 +85,10 @@
 11. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
 12. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
 
+### SEB รายข้อสอบ — lab แยกจาก runtime
+
+การสำรวจอยู่ใน `scripts/seb-phase1/` และ `scripts/seb-phase2/` เท่านั้น เฟส 2 เตรียม SEB Server/MariaDB loopback lab กับ read-only admin probe ไม่ถูก import เข้า `app/`/`lib/` ไม่ออก session นักเรียนหรือเปลี่ยน CK + BEK gate การต่อ server จริงยังต้องพิสูจน์ explicit ASK grant/server-driven BEK, exact org/assignment/student/connection mapping และ fail-closed behavior ดู [SEB_PHASE2.md](SEB_PHASE2.md) ห้ามนำผล API probe มาใช้แทน integrity verification
+
 ### โฮมรูม
 
 1. ห้อง `homeroom` ใช้ roster ของตัวเอง

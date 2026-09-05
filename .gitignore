@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Private, synthetic SEB phase-1 fixtures (contain test passwords and Config Keys)
 /.local/seb-phase1-*/
+
+# Private SEB Server lab credentials; never used by the web application
+/.local/seb-phase2-*/

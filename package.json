@@ -11,6 +11,10 @@
     "seb:phase1:test": "vitest run scripts/seb-phase1/",
     "seb:phase1:generate": "node scripts/seb-phase1/generate.mjs",
     "seb:phase1:compare": "node scripts/seb-phase1/compare.mjs",
+    "seb:phase2:test": "vitest run scripts/seb-phase2/",
+    "seb:phase2:prepare": "node scripts/seb-phase2/prepare.mjs",
+    "seb:phase2:doctor": "node scripts/seb-phase2/doctor.mjs",
+    "seb:phase2:probe": "node scripts/seb-phase2/probe.mjs",
     "lint:tokens": "node scripts/check-design-tokens.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

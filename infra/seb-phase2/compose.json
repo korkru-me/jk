@@ -1,0 +1,57 @@
+{
+  "name": "${LAB_PROJECT_NAME:?Run seb:phase2:prepare first}",
+  "services": {
+    "db": {
+      "image": "mariadb@sha256:3b4dfcc32247eb07adbebec0793afae2a8eafa6860ec523ee56af4d3dec42f7f",
+      "restart": "no",
+      "environment": {
+        "MARIADB_ROOT_PASSWORD": "${LAB_DB_ROOT_PASSWORD:?Missing lab secret}",
+        "MARIADB_DATABASE": "SEBServer",
+        "MARIADB_USER": "seb_lab",
+        "MARIADB_PASSWORD": "${LAB_DB_PASSWORD:?Missing lab secret}"
+      },
+      "volumes": ["lab-db:/var/lib/mysql"],
+      "networks": ["lab"],
+      "healthcheck": {
+        "test": ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"],
+        "interval": "5s", "timeout": "5s", "retries": 30, "start_period": "30s"
+      },
+      "mem_limit": "512m",
+      "cpus": 1,
+      "logging": {"driver": "local", "options": {"max-size": "5m", "max-file": "2"}}
+    },
+    "server": {
+      "image": "anhefti/seb-server@sha256:bc95eef01fbcbe1f8fe672d56944cbed96196845e5924b50fce9d87800f3a0a8",
+      "platform": "linux/amd64",
+      "restart": "no",
+      "command": ["java", "-Xms256m", "-Xmx1024m", "-jar", "/sebserver/seb-server.jar", "--spring.config.location=classpath:/config/"],
+      "depends_on": {"db": {"condition": "service_healthy"}},
+      "ports": ["127.0.0.1:18080:8080"],
+      "networks": ["lab"],
+      "environment": {
+        "spring_profiles_active": "bundled",
+        "sebserver_password": "${LAB_SERVICE_PASSWORD:?Missing lab secret}",
+        "sebserver_mariadb_password": "${LAB_DB_PASSWORD:?Missing lab secret}",
+        "spring_datasource_username": "seb_lab",
+        "datastore_mariadb_server_address": "db",
+        "datastore_mariadb_server_port": "3306",
+        "sebserver_init_organisation_name": "KorKru isolated lab - synthetic only",
+        "sebserver_init_adminaccount_username": "lab-admin",
+        "sebserver_init_adminaccount_init_pwd": "${LAB_ADMIN_PASSWORD:?Missing lab secret}",
+        "sebserver_webservice_light_setup": "false",
+        "sebserver_webservice_http_external_scheme": "http",
+        "sebserver_webservice_http_external_servername": "127.0.0.1",
+        "sebserver_webservice_http_external_port": "18080",
+        "sebserver_webservice_api_admin_exam_app_signature_key_enabled": "true",
+        "sps_sebserver_client_secret": "${LAB_SERVICE_PASSWORD:?Missing lab secret}",
+        "sps_sebserver_password": "${LAB_SERVICE_PASSWORD:?Missing lab secret}",
+        "SPRING_APPLICATION_JSON": "{\"sebserver.feature.exam.seb.screenProctoring.enabled\":false,\"sebserver.feature.exam.seb.screenProctoring.bundled\":false,\"logging.level.ch\":\"WARN\",\"logging.level.ch.ethz.seb.SEB_SERVER_INIT\":\"WARN\"}"
+      },
+      "mem_limit": "1536m",
+      "cpus": 2,
+      "logging": {"driver": "local", "options": {"max-size": "5m", "max-file": "2"}}
+    }
+  },
+  "volumes": {"lab-db": {}},
+  "networks": {"lab": {"internal": true}}
+}
