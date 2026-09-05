@@ -91,13 +91,17 @@ Migrations ตามลำดับ:
 - Apply migrations สี่ไฟล์แรกตามลำดับสำเร็จ และตรวจยืนยันว่าประวัติ migration ฝั่ง local/remote ตรงกัน
 - Apply migrations hardening ลำดับที่ 5–6 กับ production สำเร็จเวลาประมาณ 20:00 น. (Asia/Bangkok) โดยใช้ `--skip-vault` จึงไม่แก้ Vault; ลำดับที่ 6 ถอนสิทธิ์ `MAINTAIN` ของ PostgreSQL 17 จาก role เว็บบนตาราง proctor/SEB และคืนเฉพาะ `SELECT` รวมเป็น migrations เฟสนี้ครบทั้งหกไฟล์แล้ว ทั้งนี้ทุก rollout ครั้งถัดไปยังต้องตรวจประวัติด้วย `supabase migration list --linked` ก่อน deploy
 
+อัปเดตวันที่ 5 กันยายน 2026:
+
+- canonical production origin คือ `https://www.korkru.com` และตั้ง `NEXT_PUBLIC_SITE_URL`, `SEB_SESSION_SECRET`, `SEB_CONFIG_KEY` กับ `SEB_BROWSER_EXAM_KEYS` สำหรับ macOS + iPadOS ใน Vercel Production แล้ว
+- ไฟล์ `korkru-production-v1.seb` ตรวจพบ outer gzip wrapper และ inner `pswd` block ตามรูปแบบไฟล์ SEB ที่เข้ารหัสด้วย password แล้ว และเพิ่มไว้ที่ public path `/exam/korkru-production-v1.seb`
+- ก่อน deploy ต้องตั้ง `NEXT_PUBLIC_SEB_CONFIG_URL=https://www.korkru.com/exam/korkru-production-v1.seb`; หลัง deploy ต้องทดสอบดาวน์โหลดไฟล์, system check, autosave/reconnect/submit และห้องคุมสอบด้วย Mac กับ iPad จริง
+- Windows ยังไม่อยู่ใน production matrix จนกว่าจะเก็บ BEK จาก SEB build ที่จะอนุญาตและผ่าน mock exam บนเครื่อง Windows จริง; Android ยังพักไว้ตามขอบเขตการเปิดใช้รอบนี้
+
 สิ่งที่ยังเป็น blocker และต้องจัดเตรียมก่อนเปิดข้อสอบ SEB จริง:
 
-- canonical production URL ที่นักเรียนจะเปิดจริง ต้องมี origin เดียวชัดเจนและตรงกับ `NEXT_PUBLIC_SITE_URL` ทุกตัวอักษร โดยไม่มี credential หรือ `/` ท้าย รวมทั้งมีนโยบาย redirect ของ `www`/โดเมนสำรอง
-- สิทธิ์เข้าถึงระบบ deploy/secret manager เพื่อกำหนด environment ฝั่ง production โดยไม่คัดลอก secret ลง repository
-- CK จากไฟล์ `.seb` รุ่นสุดท้าย และ BEK แยกตามทุก platform/build ที่โรงเรียนจะอนุญาต
-- ไฟล์ `.seb` ที่เข้ารหัสแล้ว พร้อม URL แจกไฟล์หรือขั้นตอนแจกแบบออฟไลน์
-- supported build matrix ที่ระบุ Windows, macOS และ iOS/iPadOS รุ่นที่ทดสอบและอนุญาตอย่างชัดเจน
+- ตั้ง `NEXT_PUBLIC_SEB_CONFIG_URL` ให้ชี้ไปยัง public path ที่ deploy แล้ว และยืนยันว่าเปิดดาวน์โหลดไฟล์จริงได้
+- supported build matrix สำหรับรอบนำร่องให้ระบุเฉพาะ macOS และ iPadOS build ที่ผ่าน device test; เพิ่ม Windows ภายหลังเมื่อเก็บ BEK และทดสอบเครื่องจริงแล้ว
 - staging ที่แยกจาก production พร้อมบัญชีครู/นักเรียนทดสอบและข้อสอบ fixture สำหรับทดสอบ login, Realtime, autosave, upload, reconnect และ submit โดยไม่สร้างข้อมูลทดสอบใน production
 
 รายการนี้เป็น production-readiness gate ไม่ควรแทนที่ด้วยค่า CK/BEK ปลอมหรือทดสอบสร้าง submission บนฐานข้อมูลจริง เมื่อได้ข้อมูลครบแล้วให้ deploy environment และไฟล์ `.seb` ไป staging ก่อน ทำ automated integration test ที่ไม่แตะ production แล้วจึงทดสอบเครื่องจริงตาม platform/build matrix
