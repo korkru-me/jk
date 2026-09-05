@@ -7,9 +7,9 @@ export default defineConfig({
     alias: { '@': import.meta.dirname },
   },
   test: {
-    // Only pure logic is covered: evaluator/scoring helpers and read-only
-    // deployment checks. Anything that needs Supabase or a browser is left to
-    // manual checking until there is a fixture database to point at.
+    // Pure logic, synthetic HTTP/adapter tests, and isolated PGlite SQL tests.
+    // These do not exercise live Supabase Auth/RLS, browser mutations, native
+    // SEB, or a running SEB Server; those require separate integration checks.
     include: ['lib/**/*.test.ts', 'scripts/**/*.test.mjs'],
     environment: 'node',
   },

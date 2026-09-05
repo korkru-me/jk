@@ -188,6 +188,19 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 - **`classroom-post-files` อยู่นอกวงกวาดนี้โดยตั้งใจ** RPC ข้างบนอ่านแค่ `questions` กับ `submission_answers` ถ้าเอา bucket นี้เข้าไปในรายการที่กวาด ไฟล์ในประกาศจะถูกรายงานว่ากำพร้าและถูกเสนอให้ลบทั้งที่ห้องเรียนยังอ่านอยู่ · การลบประกาศลบไฟล์ของตัวเองทันที (`deleteClassroomPost`) **แต่เช็คก่อนว่ามีประกาศอื่นอ้างไฟล์เดียวกันอยู่ไหม** เพราะการโพสต์ข้ามห้องใช้ไฟล์ก้อนเดียวกันหลายประกาศ — เช็คด้วย admin client เพราะสำเนาอีกใบอาจอยู่ในห้องที่คนลบไม่มีสิทธิ์อ่าน · ไฟล์ที่อัปแล้วไม่ได้โพสต์จะค้างในโฟลเดอร์ของครูคนนั้น ถ้าจะให้กวาดได้ต้องเพิ่ม `classroom_posts` เข้าไปใน RPC ก่อน แล้วค่อยเพิ่ม bucket
 - **การจับคู่ใช้ substring กับทั้งแถวที่ cast เป็น text ไม่ใช่ไล่ชื่อคอลัมน์** เพราะรูปอยู่ใน `image_urls`, `solution_image_urls`, `mcq_options[].image_url` และ `extra_data.attachment_urls` และคอลัมน์ที่เพิ่มทีหลังจะหลุดจากรายการที่เขียนไว้วันนี้ · ความไม่แม่นทุกแบบเอียงไปทาง "เก็บไฟล์ไว้" เสมอ ซึ่งเป็นทางเดียวที่ผิดแล้วไม่เสียหาย
 
+## SEB รายข้อสอบ — encrypted password drafts
+
+Migration `20260905072556_add_exam_seb_password_drafts.sql` เพิ่ม schema สำหรับร่างเท่านั้น **ยังไม่ apply กับฐานจริง** ไม่มีการเปลี่ยน submissions/คำตอบ/คะแนน/SEB session เดิม
+
+- `exam_seb_password_drafts`: latest head ต่อ `assignment_id`, exact `org_id`/`teacher_id`, UUID และเลข revision, `saved`/`discarded`/`expired`, AES-GCM envelope และ timestamp ไม่มี plaintext, CK/BEK, native connection หรือ published/applied state
+- `exam_seb_password_events`: metadata-only `saved`/`discarded`/`expired`, revision และ timestamp เก็บ 90 วัน ไม่มีรหัส/envelope/ข้อมูลนักเรียน จำกัด read summary ล่าสุด 10 รายการ
+- ทั้งสองตารางเปิด RLS และ revoke ALL จาก PUBLIC/anon/authenticated; ไม่มี browser policy หรือ Realtime publication ใช้ service-role-only RPC ที่ตรวจ exact owner + active teacher/admin + organization membership + online SEB exam ซ้ำ ไม่มี co-teacher/super-admin bypass
+- Write ล็อก assignment row ก่อน draft head เพื่อ serialize first-write และแก้ไข จากนั้น compare expected revision, increment counter, เปลี่ยน head และเขียน audit แบบ atomic; stale request ปฏิเสธ ไม่เขียนทับหรือ retry ด้วย revision ใหม่ บันทึกมี cooldown 10 วินาที ลบร่างได้ทันที
+- Secret หมดอายุ 30 วัน; read แสดง expired แม้ cron ยังไม่รัน `purge_expired_exam_seb_password_drafts()` ล้าง ciphertext ที่หมดอายุและ audit เกิน 90 วันทุกวัน 03:37 ตาม cron timezone; head revision คงไว้หลัง discard/expire กัน counter reset
+- Foreign keys cascade เมื่อลบ assignment/owner/org; ไม่ลบ submission/คะแนนใน purge นี้ การ replace draft ไม่เก็บ ciphertext เก่าเพราะยังไม่มีไฟล์ถูกแจก หากต่อ publish ต้องเพิ่ม immutable release model แยก ห้ามเปลี่ยนรหัสของ session เดิมด้วยการเขียนทับ head
+
+SQL ถูกทดสอบด้วย PGlite + synthetic dependency schema ไม่ใช่ full live Supabase/RLS/Auth/cron หรือ multi-connection load test ดู [SEB_PHASE3.md](SEB_PHASE3.md) และ [rollout](SEB_PASSWORD_ROLLOUT.md)
+
 ## กฎการเปลี่ยน schema
 
 1. ตรวจ migration history และ schema ของฐานข้อมูลเป้าหมาย

@@ -85,9 +85,11 @@
 11. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
 12. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
 
-### SEB รายข้อสอบ — lab แยกจาก runtime
+### SEB รายข้อสอบ — ร่างบนเว็บและ lab ที่ยังไม่ต่อระบบสอบ
 
-เฟส 3กเพิ่ม `lib/seb-password-policy.ts` และ `lib/seb-password-vault.ts` เป็น server-only foundation ที่ยังไม่มี route/action/runtime caller: owner policy, AES-GCM envelope ผูก org/teacher/assignment/revision และ draft planner ไม่ใช่ persistence หรือ database lock ห้ามออก SEB session จากผล draft และไม่เปลี่ยน CK + BEK gate ดู [SEB_PHASE3.md](SEB_PHASE3.md)
+เฟส 3 เพิ่มหน้า `/assignments/[id]/seb-password`, form และ Server Action สำหรับ **ร่างรหัสเท่านั้น** ใช้ session-bound client ตรวจ fresh auth + exact owner/org/online SEB exam ก่อนสร้าง admin client เพื่อเรียก service-only read/write RPC ซึ่งตรวจสิทธิ์ซ้ำ AES-GCM envelope ผูก org/teacher/assignment/revision; SQL ล็อก assignment row และทำ compare-and-swap revision พร้อม audit ใน transaction เดียว browser รับเฉพาะ metadata ไม่มี readback ของรหัสหรือ envelope ตาราง draft/audit ปิด browser access ด้วย RLS + ACL ร่างหมดอายุ 30 วันและ audit 90 วัน มี job ล้างข้อมูลแยก
+
+ฟีเจอร์ปิดโดย default ต้อง provision dedicated keyring และ apply migration `20260905072556_add_exam_seb_password_drafts.sql` ก่อนบันทึกได้ (ยังไม่ apply live) ไม่มี release/download/session/native exit implementation ห้ามออก SEB session จากผล draft หรืออ้างว่าร่างเปลี่ยนรหัสในไฟล์เดิม และไม่เปลี่ยน CK + BEK gate ดู [SEB_PHASE3.md](SEB_PHASE3.md) และ [rollout](SEB_PASSWORD_ROLLOUT.md)
 
 การสำรวจเฟส 1–2 อยู่ใน `scripts/seb-phase1/` และ `scripts/seb-phase2/` เท่านั้น เฟส 2 เตรียม SEB Server/MariaDB loopback lab กับ read-only admin probe ไม่ถูก import เข้า `app/`/`lib/` ไม่ออก session นักเรียนหรือเปลี่ยน CK + BEK gate การต่อ server จริงยังต้องพิสูจน์ explicit ASK grant/server-driven BEK, exact org/assignment/student/connection mapping และ fail-closed behavior ดู [SEB_PHASE2.md](SEB_PHASE2.md) ห้ามนำผล API probe มาใช้แทน integrity verification
 

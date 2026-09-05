@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { Assignment, User } from '@/lib/types'
 
-// Phase 3 foundation only: no route, database adapter, SEB session or release.
+// Draft policy only: never authorizes a native SEB session or config release.
 export const SEB_PASSWORD_MIN_LENGTH = 12
 export const SEB_PASSWORD_MAX_LENGTH = 64
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -15,6 +15,11 @@ export type SebPasswordErrorCode =
   | 'SEB_PASSWORD_REVISION_CONFLICT'
   | 'SEB_PASSWORD_KEYRING_INVALID'
   | 'SEB_PASSWORD_SECRET_UNAVAILABLE'
+  | 'SEB_PASSWORD_AUTH_REQUIRED'
+  | 'SEB_PASSWORD_DISABLED'
+  | 'SEB_PASSWORD_CONFIRMATION_MISMATCH'
+  | 'SEB_PASSWORD_STORAGE_UNAVAILABLE'
+  | 'SEB_PASSWORD_RATE_LIMITED'
 
 export class SebPasswordError extends Error {
   constructor(readonly code: SebPasswordErrorCode) {
@@ -32,7 +37,7 @@ export interface SebPasswordBinding {
 }
 
 /** This context MUST be freshly resolved from auth/session + RLS-protected
- * records by a future server adapter. Never accept this object from a client.
+ * records by the server adapter. Never accept this object from a client.
  * This pure policy check does not authenticate anyone or query membership. */
 export interface SebPasswordOwnerContext {
   readonly actor: Pick<User, 'id' | 'role' | 'status'>

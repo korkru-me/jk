@@ -2,7 +2,7 @@
 
 อัปเดต: 5 กันยายน 2026
 
-งานต่อเนื่อง: ผู้ใช้อนุญาตเลื่อน manual test เพื่อทำ [เฟส 3ก — password/revision core](SEB_PHASE3.md) ที่ไม่ต่อ runtime ก่อน ไม่ได้ทำให้ผล native/server test ที่ค้างอยู่ถือว่าผ่าน
+งานต่อเนื่อง: ผู้ใช้อนุญาตเลื่อน manual test เพื่อทำ [เฟส 3 — ร่างรหัสบนเว็บ](SEB_PHASE3.md) มี page/action/draft persistence แล้วแต่ไม่ต่อ SEB Server หรือระบบไฟล์จริง ไม่ได้ทำให้ผล native/server test ที่ค้างอยู่ถือว่าผ่าน
 
 ## สถานะและขอบเขตที่อนุมัติ
 

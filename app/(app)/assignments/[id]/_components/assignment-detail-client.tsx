@@ -40,6 +40,7 @@ interface Props {
   assignment: Assignment & { classrooms: { name: string } | null }
   questions: Question[]
   submissions: SubmissionRow[]
+  canManageSebPassword?: boolean
 }
 
 function seedRand(str: string, i: number) {
@@ -47,7 +48,7 @@ function seedRand(str: string, i: number) {
   return (((h * (i + 7) * 2654435761) >>> 0) % 100) / 100
 }
 
-export function AssignmentDetailClient({ assignment: a, questions, submissions }: Props) {
+export function AssignmentDetailClient({ assignment: a, questions, submissions, canManageSebPassword = false }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [isPending, startTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
@@ -237,6 +238,11 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
               <Pencil className="w-3.5 h-3.5" /> แก้ไขรายละเอียด
             </Button>
           </Link>
+          {canManageSebPassword && <Button
+            nativeButton={false} size="sm" variant="outline"
+            render={<Link href={`/assignments/${a.id}/seb-password`} />}
+            className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent"
+          ><LockKeyhole className="w-3.5 h-3.5" /> ร่างรหัสออก SEB</Button>}
           <Link href={`/assignments/${a.id}/results`}>
             <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
               <BarChart2 className="w-3.5 h-3.5" /> ดูคำตอบ &amp; คะแนน

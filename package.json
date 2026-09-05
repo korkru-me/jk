@@ -15,6 +15,8 @@
     "seb:phase2:prepare": "node scripts/seb-phase2/prepare.mjs",
     "seb:phase2:doctor": "node scripts/seb-phase2/doctor.mjs",
     "seb:phase2:probe": "node scripts/seb-phase2/probe.mjs",
+    "seb:password:prepare-keyring": "node scripts/seb-password/prepare-keyring.mjs",
+    "seb:password:test": "vitest run lib/seb-password*.test.ts scripts/seb-password/",
     "lint:tokens": "node scripts/check-design-tokens.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -56,6 +58,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/qrcode.react": "^1.0.5",

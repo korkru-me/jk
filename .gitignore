@@ -47,3 +47,6 @@ next-env.d.ts
 
 # Private SEB Server lab credentials; never used by the web application
 /.local/seb-phase2-*/
+
+# Dedicated draft-password encryption key proposals (never public config files)
+/.local/seb-password-*/

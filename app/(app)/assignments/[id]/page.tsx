@@ -123,6 +123,7 @@ export default async function AssignmentDetailPage({
       assignment={a}
       questions={orderedQuestions}
       submissions={roster}
+      canManageSebPassword={a.created_by === user.id && a.type === 'exam' && a.mode === 'online' && a.secure_browser_mode === 'seb_required'}
     />
   )
 }
