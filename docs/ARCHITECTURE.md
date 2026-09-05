@@ -105,8 +105,9 @@
 7. `/research/[id]/data` และเส้นทางย่อยอ่านข้อมูลระดับนักเรียนเฉพาะหลังตรวจ `can_manage_education_research_project`; co-teacher ที่มีแค่ `view` ไม่ได้รับชื่อ รหัส คะแนน หรือประวัติ
 8. submission ที่เสร็จของ assignment วิจัยจะซิงก์เข้า `education_research_scores` ด้วย database trigger ส่วนคะแนน manual/Excel เขียนผ่าน `SECURITY DEFINER` RPC ที่ตรวจ project/participant/measurement/org และช่วงคะแนนซ้ำใน transaction
 9. `/research/[id]/results` ตรวจ manage permission แล้วคำนวณผล request-time ด้วย pure module `lib/education-research-statistics.ts`; ไม่มี persisted result ที่อาจเก่ากว่า score source of truth และแท็บข้อมูลรายคนทำ filtering/pagination ฝั่ง server ก่อนส่งเฉพาะหน้าปัจจุบันไป browser
-9. แม่แบบ Excel สร้างผ่าน route handler แบบ `POST` หลังตรวจ session/สิทธิ์ และผูกแถวกับ template row token ที่ตรวจกลับในฐานข้อมูล การอัปโหลดอ่านไฟล์ในหน่วยความจำเท่านั้น แล้วเก็บเฉพาะ normalized preview/audit rows ไม่เก็บ binary ต้นฉบับ
-10. การยืนยัน import ล็อก batch, ตรวจค่าคะแนนปัจจุบันเทียบกับ preview ทุกแถว แล้วเขียนทั้งชุดใน transaction เดียว; batch ที่ยืนยันแล้ว retry ได้โดยไม่เขียนซ้ำ
+10. แม่แบบ Excel สร้างผ่าน route handler แบบ `POST` หลังตรวจ session/สิทธิ์ และผูกแถวกับ template row token ที่ตรวจกลับในฐานข้อมูล การอัปโหลดอ่านไฟล์ในหน่วยความจำเท่านั้น แล้วเก็บเฉพาะ normalized preview/audit rows ไม่เก็บ binary ต้นฉบับ
+11. การยืนยัน import ล็อก batch, ตรวจค่าคะแนนปัจจุบันเทียบกับ preview ทุกแถว แล้วเขียนทั้งชุดใน transaction เดียว; batch ที่ยืนยันแล้ว retry ได้โดยไม่เขียนซ้ำ
+12. `/api/research/[id]/data-export` รับชนิดไฟล์ผ่าน strict bounded JSON, ตรวจ manage permission แล้วอ่าน participant/score แบบแบ่งหน้าจนครบภายใต้ RLS แบบไม่ระบุตัวตนจะไม่ query ชื่อหรือรหัสและสุ่มลำดับใหม่ก่อนกำหนดรหัสต่อไฟล์ ส่วนแบบมีชื่อ query profile เฉพาะเมื่อเลือก จากนั้นสร้าง `.xlsx` ในหน่วยความจำและให้ service-role-only RPC ตรวจสิทธิ์ actor ซ้ำก่อนบันทึก export metadata; ไม่มี binary หรือข้อมูลนักเรียนถูกเก็บใน audit/Storage
 
 ## เครื่องมือคณิตศาสตร์และพื้นที่เขียน
 

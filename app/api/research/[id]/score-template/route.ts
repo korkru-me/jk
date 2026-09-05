@@ -5,6 +5,7 @@ import {
   type EducationResearchExcelTemplateRow,
 } from '@/lib/education-research-excel'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type { EducationResearchMeasurement, EducationResearchScore } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -45,20 +46,32 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const [templateResult, templateRowsResult, measurementsResult, scoresResult] = await Promise.all([
     supabase.from('education_research_import_templates').select('id, version').eq('id', templateId).single(),
-    supabase.from('education_research_import_template_rows').select('participant_id, row_token, roster_order_snapshot, student_code_snapshot, full_name_snapshot').eq('template_id', templateId).order('roster_order_snapshot', { ascending: true, nullsFirst: false }),
+    fetchAllRows<TemplateRow>((from, to) => supabase
+      .from('education_research_import_template_rows')
+      .select('participant_id, row_token, roster_order_snapshot, student_code_snapshot, full_name_snapshot')
+      .eq('template_id', templateId)
+      .order('roster_order_snapshot', { ascending: true, nullsFirst: false })
+      .order('participant_id', { ascending: true })
+      .range(from, to), { maxRows: 2000 }),
     supabase.from('education_research_measurements').select('*').eq('project_id', project.id),
-    supabase.from('education_research_scores').select('*').eq('project_id', project.id),
+    fetchAllRows<EducationResearchScore>((from, to) => supabase
+      .from('education_research_scores')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('participant_id', { ascending: true })
+      .order('measurement_id', { ascending: true })
+      .range(from, to)),
   ])
   if (!templateResult.data || templateRowsResult.error || measurementsResult.error || scoresResult.error) {
     return jsonError('เตรียมข้อมูลแม่แบบไม่สำเร็จ กรุณาลองใหม่', 500)
   }
 
   const measurements = (measurementsResult.data ?? []) as EducationResearchMeasurement[]
-  const scores = (scoresResult.data ?? []) as EducationResearchScore[]
+  const scores = scoresResult.rows
   const pretest = measurements.find(item => item.measurement_type === 'pretest') ?? null
   const posttest = measurements.find(item => item.measurement_type === 'posttest') ?? null
   const scoreByKey = new Map(scores.map(score => [`${score.participant_id}:${score.measurement_id}`, Number(score.raw_score)]))
-  const templateRows = (templateRowsResult.data ?? []) as TemplateRow[]
+  const templateRows = templateRowsResult.rows
   const rows: EducationResearchExcelTemplateRow[] = templateRows.map(row => ({
     row_token: row.row_token,
     roster_order: row.roster_order_snapshot,

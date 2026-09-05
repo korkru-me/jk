@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows, fetchRowsInChunks } from '@/lib/supabase/fetch-all-rows'
 import type {
   EducationResearchMeasurement,
   EducationResearchProject,
@@ -23,8 +24,10 @@ type ParticipantQueryRow = {
   id: string
   student_id: string
   roster_order: number | null
-  users: { id: string; full_name: string; email: string } | null
+  users: { id: string; full_name: string } | null
 }
+type ActorRow = { id: string; full_name: string }
+type ProfileRow = Pick<StudentProfile, 'student_id' | 'student_code' | 'class_number'>
 
 export default async function ResearchScoreDataPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ status?: string }> }) {
   const { id } = await params
@@ -63,40 +66,61 @@ export default async function ResearchScoreDataPage({ params, searchParams }: { 
       .from('education_research_measurements')
       .select('id, org_id, project_id, measurement_type, source_type, assignment_id, max_score, selection_mode, source_set_id, source_sections, source_question_ids, snapshot_question_ids, duration_minutes, created_at, updated_at')
       .eq('project_id', project.id),
-    supabase
+    fetchAllRows<ParticipantQueryRow>((from, to) => supabase
       .from('education_research_participants')
-      .select('id, student_id, roster_order, users(id, full_name, email)')
+      .select('id, student_id, roster_order, users(id, full_name)')
       .eq('project_id', project.id)
-      .order('roster_order', { ascending: true, nullsFirst: false }),
-    supabase
+      .order('roster_order', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true })
+      .range(from, to) as unknown as PromiseLike<{ data: ParticipantQueryRow[] | null; error: unknown }>),
+    fetchAllRows<EducationResearchScore>((from, to) => supabase
       .from('education_research_scores')
       .select('*')
-      .eq('project_id', project.id),
-    supabase
+      .eq('project_id', project.id)
+      .order('participant_id', { ascending: true })
+      .order('measurement_id', { ascending: true })
+      .range(from, to)),
+    fetchAllRows<EducationResearchScoreHistory>((from, to) => supabase
       .from('education_research_score_history')
       .select('*')
       .eq('project_id', project.id)
       .order('changed_at', { ascending: false })
-      .limit(2000),
+      .order('id', { ascending: false })
+      .range(from, to), { maxRows: 2000 }),
   ])
 
+  if (
+    measurementsResult.error
+    || participantsResult.error
+    || scoresResult.error
+    || historiesResult.error
+  ) {
+    throw new Error('Failed to load education research score data')
+  }
+
   const measurements = (measurementsResult.data ?? []) as EducationResearchMeasurement[]
-  const participants = (participantsResult.data ?? []) as unknown as ParticipantQueryRow[]
-  const scores = (scoresResult.data ?? []) as EducationResearchScore[]
-  const histories = (historiesResult.data ?? []) as EducationResearchScoreHistory[]
+  const participants = participantsResult.rows
+  const scores = scoresResult.rows
+  const histories = historiesResult.rows
   const studentIds = participants.map(participant => participant.student_id)
   const actorIds = [...new Set(histories.map(history => history.changed_by).filter((value): value is string => Boolean(value)))]
   const [profilesResult, actorsResult] = await Promise.all([
-    studentIds.length > 0
-      ? supabase.from('student_profiles').select('student_id, student_code, class_number').in('student_id', studentIds)
-      : Promise.resolve({ data: [] }),
-    actorIds.length > 0
-      ? supabase.from('users').select('id, full_name').in('id', actorIds)
-      : Promise.resolve({ data: [] }),
+    fetchRowsInChunks<ProfileRow, string>(studentIds, chunk => supabase
+      .from('student_profiles')
+      .select('student_id, student_code, class_number')
+      .in('student_id', chunk)),
+    fetchRowsInChunks<ActorRow, string>(actorIds, chunk => supabase
+      .from('users')
+      .select('id, full_name')
+      .in('id', chunk)),
   ])
 
-  const profiles = new Map((profilesResult.data ?? []).map(profile => [profile.student_id, profile as Pick<StudentProfile, 'student_id' | 'student_code' | 'class_number'>]))
-  const actorNames = new Map((actorsResult.data ?? []).map(actor => [actor.id, actor.full_name]))
+  if (profilesResult.error || actorsResult.error) {
+    throw new Error('Failed to load education research score identities')
+  }
+
+  const profiles = new Map(profilesResult.rows.map(profile => [profile.student_id, profile]))
+  const actorNames = new Map(actorsResult.rows.map(actor => [actor.id, actor.full_name]))
   const pretest = measurements.find(measurement => measurement.measurement_type === 'pretest') ?? null
   const posttest = measurements.find(measurement => measurement.measurement_type === 'posttest') ?? null
   const scoreByKey = new Map(scores.map(score => [`${score.participant_id}:${score.measurement_id}`, score]))
