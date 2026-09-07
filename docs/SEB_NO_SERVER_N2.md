@@ -1,6 +1,10 @@
 # N2 — พิสูจน์ SEB แบบไม่เพิ่ม SEB Server สำหรับสอบในห้องเรียน
 
-วันที่ 6 กันยายน 2026 · แผนหลัก [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md)
+อัปเดต 7 กันยายน 2026 · แผนหลัก [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md)
+
+**การช่วยทดสอบล่าสุด:** ผู้ใช้ขอคำแนะนำสั้น ๆ ทีละขั้น และรหัสทดลองจำง่าย อนุมัติสร้างชุดใหม่ด้วย `npm run seb:n2:prepare -- --simple-passwords`: A/A-modified ออกด้วย `1234`, B ออกด้วย `4321`, ตั้งค่าทั้งสองชุดด้วย `1111` ไม่มี opening password ตัวเลือกนี้ใช้เฉพาะ lab; คำสั่งปกติยังสุ่มรหัส เก็บชุดเก่าไว้และใช้ path ของชุดใหม่ในการเปิด probe Key/hash คำนวณใหม่ทั้งชุดและทะเบียน native เริ่มว่าง ต้องทดสอบใหม่ ห้ามนำ Key เก่ามาแทน อธิบายให้ผู้ใช้ทีละขั้น ไม่ส่งคู่มือทั้งชุดซ้ำ
+
+ชุดที่สร้างบนเครื่องนี้วันที่ 7 กันยายนคือ `.local/seb-no-server-sypouv/` (ไฟล์ส่วนตัว Git ignore ไม่ย้ายข้ามเครื่องด้วย Git); ชุดเก่า `.local/seb-no-server-nBkbsP/` ยังอยู่ ให้ใช้ชุดใหม่เมื่อช่วยผู้ใช้ต่อ ตรวจรหัสและ hash ที่ serialize ในไฟล์ทั้งสามกับ manifest/fingerprint และทะเบียน BEK ว่างผ่าน พร้อม regression format/kit 21 tests ผ่านและ `git diff --check` ผ่าน รอบนี้ไม่รัน full suite/build/TypeScript หรือ native เพราะเปลี่ยนเฉพาะตัวเลือกเครื่องมือ lab ไม่มี migration/env/deploy
 
 ## สถานะตรงตามจริง
 
@@ -24,7 +28,7 @@
 `scripts/seb-no-server/` แยกจาก `scripts/seb-phase2/` ซึ่งเป็น SEB Server lab เก่า:
 
 - `format.mjs`: รูปแบบ `gzip(plnd + gzip(XML plist))` ไม่มี opening password ไม่ใช่ encrypted file ใช้ serializer/CK subset เดิมโดยไม่เปลี่ยน encoder `pswd` เดิม
-- `kit.mjs` / `prepare.mjs`: สร้าง A/B ที่ต่างเฉพาะ quit-password hash และ A-modified ที่แก้ `allowPrint` เป็น valid XML; รหัสสุ่มใหม่ต่อชุด ไม่มี default password กลาง เขียนในไดเรกทอรีใหม่ทุกครั้ง ไม่ทับไฟล์เดิม
+- `kit.mjs` / `prepare.mjs`: สร้าง A/B ที่ต่างเฉพาะ quit-password hash และ A-modified ที่แก้ `allowPrint` เป็น valid XML; ปกติสุ่มรหัสใหม่ต่อชุด ตัวเลือก `--simple-passwords` ใช้รหัสสาธิตตามที่ผู้ใช้ขอ เขียนในไดเรกทอรีใหม่ทุกครั้ง ไม่ทับไฟล์เดิม
 - `probe-server.mjs` / `probe.mjs`: HTTP เฉพาะ `127.0.0.1:4175`, host/origin checks, challenge URL อายุ 5 นาที ใช้ครั้งเดียว ไม่เกิน 64 ค้าง, body ไม่เกิน 1 KiB ไม่เปิดอ่านไฟล์ผ่าน HTTP ไม่โหลด `.env` ไม่เก็บ raw hashes และตอบ `admissionGranted:false` เสมอ
 - Probe ตรวจ CK และ BEK แยกกัน: ไม่มี native BEK ที่ลงทะเบียนจะขึ้น `BEK_PENDING` ไม่แปลง hash ที่ browser ส่งเป็น trusted enrollment แม้มี API ก็ไม่ถือว่าผ่าน เมื่อทั้งคู่ตรงจึงเสนอ **ลิงก์ทดลองออก** ไม่ใช่การยืนยันว่าครูอนุญาต/ส่งงานสำเร็จ
 - Apple callback ใช้ named global function ตาม native bridge ไม่ใช้ anonymous callback

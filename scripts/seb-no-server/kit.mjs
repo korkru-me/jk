@@ -10,9 +10,11 @@ const hex = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
 const password = () => randomBytes(18).toString('base64url')
 export const CASE_IDS = ['a', 'b', 'a-modified']
 
-export function createFixtures() {
+export function createFixtures({ simplePasswords = false } = {}) {
   const runId = randomBytes(16).toString('hex')
-  const adminPassword = password(), quitA = password(), quitB = password()
+  // Explicit rehearsal option requested by the operator; random remains the default.
+  const adminPassword = simplePasswords ? '1111' : password()
+  const quitA = simplePasswords ? '1234' : password(), quitB = simplePasswords ? '4321' : password()
   const a = { ...labSettings({ startUrl: `${ORIGIN}/n2/${runId}`, quitPassword: quitA,
     adminPassword, salt: randomBytes(32) }), quitURL: `${ORIGIN}/quit/${runId}`,
     quitURLConfirm: true }
@@ -24,10 +26,10 @@ export function createFixtures() {
   ] }
 }
 
-export async function writeKit(parent) {
+export async function writeKit(parent, options = {}) {
   await mkdir(parent, { recursive: true, mode: 0o700 })
   const directory = await mkdtemp(join(parent, 'seb-no-server-'))
-  const { runId, fixtures } = createFixtures()
+  const { runId, fixtures } = createFixtures(options)
   const cases = []
   for (const fixture of fixtures) {
     const bytes = encodePlainExam(fixture.settings)
