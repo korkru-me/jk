@@ -126,7 +126,7 @@ export default function NewQuestionTypePage() {
                   comes along and turns decorative; the whole text block is
                   still the link. */}
               <div className="flex items-center gap-0.5 shrink-0 pt-3 pr-2">
-                <SamplePreview typeTitle={type.title} sample={SAMPLE_QUESTIONS[type.type]} />
+                <SamplePreview typeTitle={type.title} samples={SAMPLE_QUESTIONS[type.type]} />
                 <ChevronRight aria-hidden className="w-4 h-4 opacity-40" />
               </div>
             </Card>
