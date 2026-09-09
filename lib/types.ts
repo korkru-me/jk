@@ -405,6 +405,19 @@ export interface MCQOption {
   image_url?: string
 }
 
+// How a matching question is answered. 'slots' drags each choice into the box
+// beside its prompt; 'lines' lays the two columns out side by side and the
+// student draws a line between them. Presentation only — both produce the same
+// answer (the chosen right_text per prompt) and grade through the same 'MATCH:'
+// rule, so a teacher can switch an existing question over without invalidating
+// answers already given.
+export type MatchingAnswerMode = 'slots' | 'lines'
+
+export interface MatchingConfig {
+  /** undefined = 'slots', which is how every matching question behaved before. */
+  answer_mode?: MatchingAnswerMode
+}
+
 export interface MatchingPair {
   left_text: string
   right_text: string
@@ -479,7 +492,7 @@ export interface Question {
   rejected_reason: string | null
   image_urls: string[]
   requires_work_image: boolean
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | Record<string, never>
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig | Record<string, never>
   parent_question_id: string | null
   group_id: string | null
   order_in_group: number | null

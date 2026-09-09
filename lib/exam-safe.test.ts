@@ -43,6 +43,31 @@ function serializedSafe(questionType: string, overrides: Record<string, unknown>
 }
 
 describe('toSafeExamAnswer', () => {
+  // The matching layout is presentation, not an answer, so it has to survive
+  // the sanitiser — a question saved as โยงเส้น that reaches the exam without
+  // answer_mode silently falls back to the drag-into-slots layout instead.
+  it('carries the matching layout through, and defaults to slots', () => {
+    const lines = serializedSafe('matching', {
+      extra_data: { answer_mode: 'lines' },
+      mcq_options: [{ left_text: 'แรง', right_text: 'นิวตัน' }, { left_text: 'งาน', right_text: 'จูล' }],
+    })
+    expect(lines.safe.questions.extra_data).toEqual({ answer_mode: 'lines' })
+
+    const slots = serializedSafe('matching', {
+      extra_data: {},
+      mcq_options: [{ left_text: 'แรง', right_text: 'นิวตัน' }, { left_text: 'งาน', right_text: 'จูล' }],
+    })
+    expect(slots.safe.questions.extra_data).toEqual({})
+  })
+
+  it('does not let an unknown matching mode through', () => {
+    const { safe } = serializedSafe('matching', {
+      extra_data: { answer_mode: 'something-else', secret: 'LEAK' },
+      mcq_options: [{ left_text: 'แรง', right_text: 'นิวตัน' }],
+    })
+    expect(safe.questions.extra_data).toEqual({})
+  })
+
   it('uses an explicit allowlist for answer rows, variables and numeric answer parts', () => {
     const { safe, json } = serializedSafe('written')
 
