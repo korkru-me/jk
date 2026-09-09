@@ -20,6 +20,11 @@ import { useOnlineStatus } from '@/hooks/use-online-status'
 import { useExamProctor } from '@/hooks/use-exam-proctor'
 import { WorkImageUpload } from './work-image-upload'
 import { FileSubmissionUpload } from './file-submission-upload'
+import { MatchingDragInput, type MatchingOption } from './matching-drag-input'
+import { MatchingLineInput } from './matching-line-input'
+import { placementFromTexts, textsFromPlacement } from '@/lib/matching-answer'
+import { OrderingDragList } from './ordering-drag-list'
+import { orderingDisplayOrder, orderingIsAnswered } from '@/lib/ordering-answer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -34,10 +39,11 @@ import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
+import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
 import type {
   SafeAnswerPart,
   SafeCompositeConfig,
+  SafeMatchingConfig,
   SafeExamAnswer,
   SafeFillBlankConfig,
   SafeOrderingConfig,
@@ -954,6 +960,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <MatchingAnswerInput
                   prompts={current.questions.mcq_options}
                   options={current.questions.matching_options ?? []}
+                  mode={(current.questions.extra_data as SafeMatchingConfig | null)?.answer_mode}
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={val => handleAnswerChange(current.id, val)}
                 />
@@ -2517,14 +2524,23 @@ function stableItemShuffle(items: OrderingItem[], salt: string): OrderingItem[] 
 }
 
 // ─── Matching ────────────────────────────────────────────────────────────────
-// One dropdown per left-hand prompt, listing the whole (already shuffled)
-// right-hand column. The answer is stored as the chosen right_text per prompt,
-// in prompt order — the shape the 'MATCH:' branch in lib/assignment-attempt.ts
-// grades against. Options are deliberately not struck off as they're used: a
-// teacher may legitimately reuse a label across pairs.
-function MatchingAnswerInput({ prompts, options, rawValue, onChange }: {
+// Drag the choices from the bank underneath into the slot beside each prompt
+// (see MatchingDragInput for why it is pointer events plus a tap fallback, not
+// HTML5 drag-and-drop).
+//
+// The stored answer is unchanged: the chosen right_text per prompt, in prompt
+// order, which is what the 'MATCH:' branch in lib/assignment-attempt.ts grades
+// against. Only the way a student produces it changed, so answers saved by the
+// old dropdown version still load and still grade the same.
+//
+// Placement is derived from that stored text rather than held as state, so a
+// half-finished answer survives paging between questions and a reload — see
+// lib/matching-answer.ts, where the conversion lives so it can be tested.
+function MatchingAnswerInput({ prompts, options, mode, rawValue, onChange }: {
   prompts: Array<{ left_text?: string; left_image?: string }>
   options: Array<{ right_text: string; right_image?: string }>
+  /** Which layout the teacher chose. Undefined behaves as 'slots', as it always did. */
+  mode: MatchingAnswerMode | undefined
   rawValue: string
   onChange: (v: string) => void
 }) {
@@ -2532,42 +2548,30 @@ function MatchingAnswerInput({ prompts, options, rawValue, onChange }: {
   try { picked = rawValue ? JSON.parse(rawValue) : [] } catch { picked = [] }
   if (!Array.isArray(picked)) picked = []
 
-  const filled = prompts.every((_, i) => picked[i])
-
-  function update(index: number, value: string) {
-    const next = prompts.map((_, i) => (i === index ? value : picked[i] ?? ''))
-    onChange(JSON.stringify(next))
+  const shared = {
+    prompts: prompts.map(p => ({ text: p.left_text ?? '', imageUrl: p.left_image })),
+    options: options.map((o, j) => ({
+      id: String(j),
+      text: o.right_text,
+      imageUrl: o.right_image,
+    })) satisfies MatchingOption[],
+    placement: placementFromTexts(picked, options, prompts.length),
+    onChange: (next: (string | null)[]) =>
+      onChange(JSON.stringify(textsFromPlacement(next, options))),
   }
 
-  return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium">จับคู่แต่ละข้อกับคำตอบที่ถูกต้อง:</p>
-      <div className="space-y-2">
-        {prompts.map((prompt, i) => (
-          <Card radius="md" className="flex items-center gap-3 p-2.5" key={i}>
-            {prompt.left_image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={prompt.left_image} alt="" loading="lazy" decoding="async" className="w-12 h-12 object-contain rounded border shrink-0" />
-            )}
-            <span className="flex-1 min-w-0 text-sm"><RichText text={prompt.left_text ?? ''} /></span>
-            <NativeSelect
-              value={picked[i] ?? ''}
-              onChange={e => update(i, e.target.value)}
-              className="w-44 shrink-0"
-            >
-              <option value="">— เลือก —</option>
-              {options.map((o, j) => (
-                <option key={j} value={o.right_text}>{o.right_text}</option>
-              ))}
-            </NativeSelect>
-          </Card>
-        ))}
-      </div>
-      {filled && prompts.length > 0 && <p className="text-xs text-success">✓ จับคู่ครบแล้ว</p>}
-    </div>
-  )
+  return mode === 'lines' ? <MatchingLineInput {...shared} /> : <MatchingDragInput {...shared} />
 }
 
+// Ordering is dragged into place rather than numbered by dropdown, so a
+// duplicate or missing position is no longer possible to express — the answer
+// is always a complete permutation. The stored shape is the one 'ORDER:' in
+// lib/assignment-attempt.ts already grades: item ids in the student's order.
+//
+// An untouched question stays *unanswered*, which is why the list needs the
+// student to confirm an order they did not move. Writing the shuffled order on
+// mount would mark every ordering question answered before it was read, hide
+// who skipped it, and hand out partial credit for a lucky shuffle.
 function OrderingAnswerInput({ config, rawValue, onChange }: {
   answerId: string
   config: OrderingConfig | SafeOrderingConfig | null
@@ -2575,47 +2579,16 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
   onChange: (v: string) => void
 }) {
   const items: OrderingItem[] = config?.items ?? []
-  const n = items.length
   const shuffled = stableItemShuffle(items, 'ordering')
-  let sel: Record<string, string> = {}
-  if (rawValue.startsWith('{')) { try { sel = JSON.parse(rawValue) } catch { sel = {} } }
-  else if (rawValue.startsWith('[')) {
-    try { const a: string[] = JSON.parse(rawValue); a.forEach((id, i) => { if (id) sel[id] = String(i + 1) }) } catch { sel = {} }
-  }
-  const hasdup = Object.values(sel).length !== new Set(Object.values(sel)).size
-  const allFilled = shuffled.every(it => sel[it.id])
-  function updateSel(itemId: string, pos: string) {
-    const next = { ...sel }
-    if (pos) next[itemId] = pos; else delete next[itemId]
-    const filled = shuffled.every(it => next[it.id])
-    const noDup  = Object.values(next).length === new Set(Object.values(next)).size
-    if (filled && noDup) {
-      const arr: string[] = Array(n).fill('')
-      for (const [id, p] of Object.entries(next)) { const idx = parseInt(p) - 1; if (idx >= 0 && idx < n) arr[idx] = id }
-      onChange(JSON.stringify(arr))
-    } else { onChange(JSON.stringify(next)) }
-  }
+  const order = orderingDisplayOrder(rawValue, shuffled)
+
   return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium">เลือกลำดับสำหรับแต่ละรายการ:</p>
-      <div className="space-y-2">
-        {shuffled.map(item => (
-          <Card radius="md" className="flex items-center gap-3 p-2.5" key={item.id}>
-            {item.image_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.image_url} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border flex-shrink-0" />
-            )}
-            <span className="flex-1 text-sm">{item.text}</span>
-            <NativeSelect value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)} className="w-20 text-center">
-              <option value="">ลำดับ</option>
-              {Array.from({ length: n }, (_, i) => <option key={i + 1} value={String(i + 1)}>ที่ {i + 1}</option>)}
-            </NativeSelect>
-          </Card>
-        ))}
-      </div>
-      {hasdup     && <p className="text-xs text-flag bg-flag/10 px-3 py-1.5 rounded-lg">⚠️ มีลำดับซ้ำ</p>}
-      {allFilled && !hasdup && <p className="text-xs text-success">✓ เลือกครบแล้ว</p>}
-    </div>
+    <OrderingDragList
+      items={order}
+      answered={orderingIsAnswered(rawValue, items.length)}
+      onReorder={ids => onChange(JSON.stringify(ids))}
+      onConfirm={() => onChange(JSON.stringify(order.map(i => i.id)))}
+    />
   )
 }
 
@@ -2624,19 +2597,6 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
 // input style its standalone question type uses. The whole answer is stored
 // as one JSON array, one entry per part, in part order — see the 'COMP:'
 // grading branch in lib/actions/submissions.ts for the matching shape.
-
-function orderSelFromRaw(raw: string): Record<string, string> {
-  if (raw.startsWith('{')) { try { return JSON.parse(raw) } catch { return {} } }
-  if (raw.startsWith('[')) {
-    try {
-      const a: string[] = JSON.parse(raw)
-      const sel: Record<string, string> = {}
-      a.forEach((id, i) => { if (id) sel[id] = String(i + 1) })
-      return sel
-    } catch { return {} }
-  }
-  return {}
-}
 
 function CompositeAnswerInput({ config, rawValue, onChange }: {
   config: CompositeConfig | SafeCompositeConfig | null
@@ -2773,33 +2733,17 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
 
           {part.type === 'ordering' && (() => {
             const items = shuffledByPart[i] ?? []
-            const n = items.length
-            const sel = orderSelFromRaw(answers[i] ?? '')
-            function updateSel(itemId: string, pos: string) {
-              const next = { ...sel }
-              if (pos) next[itemId] = pos; else delete next[itemId]
-              const filled = items.every(it => next[it.id])
-              const noDup = Object.values(next).length === new Set(Object.values(next)).size
-              if (filled && noDup) {
-                const arr: string[] = Array(n).fill('')
-                for (const [id, p] of Object.entries(next)) { const idx = parseInt(p) - 1; if (idx >= 0 && idx < n) arr[idx] = id }
-                updatePart(i, JSON.stringify(arr))
-              } else { updatePart(i, JSON.stringify(next)) }
-            }
+            const raw = answers[i] ?? ''
+            const order = orderingDisplayOrder(raw, items)
             return (
               <>
                 <RichText text={part.text} className="text-sm block" />
-                <div className="space-y-2">
-                  {items.map(item => (
-                    <Card radius="md" className="flex items-center gap-3 p-2" key={item.id}>
-                      <RichText text={item.text} className="flex-1 text-sm" />
-                      <NativeSelect value={sel[item.id] ?? ''} onChange={e => updateSel(item.id, e.target.value)} className="w-20 text-center">
-                        <option value="">ลำดับ</option>
-                        {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
-                      </NativeSelect>
-                    </Card>
-                  ))}
-                </div>
+                <OrderingDragList
+                  items={order}
+                  answered={orderingIsAnswered(raw, items.length)}
+                  onReorder={ids => updatePart(i, JSON.stringify(ids))}
+                  onConfirm={() => updatePart(i, JSON.stringify(order.map(it => it.id)))}
+                />
               </>
             )
           })()}

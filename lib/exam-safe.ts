@@ -1,6 +1,7 @@
 import type {
   CompositePartType,
   FileUploadConfig,
+  MatchingAnswerMode,
   MathInputMode,
   OrderingItem,
   PythagoreanGroup,
@@ -61,6 +62,15 @@ export interface SafeCompositePart {
   options?: Array<{ text: string; image_url?: string }>
 }
 
+/**
+ * Which matching layout the student gets. Carries no answer — the pairs
+ * themselves are split into prompts and a shuffled option list elsewhere — so
+ * it passes through to the exam as-is.
+ */
+export interface SafeMatchingConfig {
+  answer_mode?: MatchingAnswerMode
+}
+
 export interface SafeCompositeConfig {
   parts: SafeCompositePart[]
   part_label_style?: PartLabelStyle
@@ -70,6 +80,7 @@ export type SafeExamExtraData =
   | SafeTrueFalseConfig
   | SafeFillBlankConfig
   | SafeOrderingConfig
+  | SafeMatchingConfig
   | SafeRandomQuestionConfig
   | FileUploadConfig
   | SafeCompositeConfig
@@ -224,6 +235,10 @@ function sanitizeExtraData(questionType: string, value: unknown, random: () => n
   if (questionType === 'ordering') {
     const items = Array.isArray(extra.items) ? extra.items.map(sanitizeOrderingItem) : []
     return { items: shuffle(items, random) }
+  }
+
+  if (questionType === 'matching') {
+    return extra.answer_mode === 'lines' ? { answer_mode: 'lines' as const } : {}
   }
 
   if (questionType === 'file_upload') {

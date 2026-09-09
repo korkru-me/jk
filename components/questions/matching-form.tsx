@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/ui/rich-text-editor'
 import { Plus, X, Image as ImageIcon } from 'lucide-react'
 
@@ -15,7 +16,7 @@ import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
-import type { Difficulty, Visibility, MatchingPair, Question } from '@/lib/types'
+import type { Difficulty, Visibility, MatchingPair, MatchingAnswerMode, MatchingConfig, Question } from '@/lib/types'
 import { questionsReturnTo } from '@/lib/question-return'
 
 interface PairState {
@@ -27,6 +28,19 @@ interface PairState {
   showLeftImage: boolean
   showRightImage: boolean
 }
+
+const ANSWER_MODES: Array<{ value: MatchingAnswerMode; label: string; desc: string }> = [
+  {
+    value: 'slots',
+    label: 'จับคู่ (ลากมาวางในช่อง)',
+    desc: 'คำตรงกันอยู่รวมกันด้านล่าง นักเรียนลากไปวางในช่องข้างรายการที่ตรงกัน',
+  },
+  {
+    value: 'lines',
+    label: 'โยงเส้น',
+    desc: 'วางสองคอลัมน์คู่กัน นักเรียนกดค้างที่จุดแล้วลากเส้นไปเชื่อมกับคำตรงกัน',
+  },
+]
 
 interface MatchingFormProps {
   allTags: string[]
@@ -91,6 +105,12 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
 
   const [pairs, setPairs] = useState<PairState[]>(pairsFromQuestion(question) ?? [newPair(), newPair(), newPair()])
+  // Presentation only. Both layouts produce the same answer and grade the
+  // same way, so switching an existing โจทย์ over does not invalidate
+  // answers students have already given.
+  const [answerMode, setAnswerMode] = useState<MatchingAnswerMode>(
+    (question?.extra_data as MatchingConfig | undefined)?.answer_mode === 'lines' ? 'lines' : 'slots'
+  )
   const [solutionText, setSolutionText] = useState(question?.solution_text ?? '')
   const [solutionImageUrls, setSolutionImageUrls] = useState<string[]>(question?.solution_image_urls ?? [])
 
@@ -107,6 +127,8 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
     setImageUrls(seed.image_urls ?? [])
     setSolutionText(seed.solution_text ?? '')
     setSolutionImageUrls(seed.solution_image_urls ?? [])
+
+    setAnswerMode((seed.extra_data as MatchingConfig | undefined)?.answer_mode === 'lines' ? 'lines' : 'slots')
 
     const seedPairs = (seed.mcq_options ?? []) as unknown as MatchingPair[]
     setPairs(seedPairs.map(p => ({
@@ -159,6 +181,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
       answer_formula: '', answer_unit: '', answer_tolerance: 0,
       mcq_options: [],
       matching_pairs: matchingPairs,
+      extra_data: { answer_mode: answerMode } satisfies MatchingConfig,
       solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
@@ -204,6 +227,39 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
           <Label>รูปภาพประกอบโจทย์</Label>
           <QuestionImageUpload value={imageUrls} onChange={setImageUrls} />
         </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">วิธีตอบของนักเรียน</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {ANSWER_MODES.map(option => {
+            const active = answerMode === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setAnswerMode(option.value)}
+                aria-pressed={active}
+                className="w-full text-left"
+              >
+                <Card
+                  radius="md"
+                  padding="md"
+                  interactive
+                  className={`h-full ${active ? 'border-primary bg-primary/10' : ''}`}
+                >
+                  <p className={`text-sm font-semibold ${active ? 'text-primary' : 'text-foreground'}`}>
+                    {option.label}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{option.desc}</p>
+                </Card>
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          เปลี่ยนได้ทีหลัง คำตอบและคะแนนของนักเรียนที่ทำไปแล้วไม่เปลี่ยนตาม เพราะทั้งสองแบบเก็บคำตอบเหมือนกัน
+        </p>
       </section>
 
       <section className="space-y-4">
@@ -308,6 +364,7 @@ export function MatchingForm({ allTags, mode = 'create', question, isOwner = tru
           matchingPairs={pairs.map(({ left_text, right_text, left_image, right_image }) => ({
             left_text, right_text, left_image, right_image,
           }))}
+          matchingConfig={{ answer_mode: answerMode }}
           imageUrls={imageUrls}
         />
         <Button type="submit" disabled={saving}>

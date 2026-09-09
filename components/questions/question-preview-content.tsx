@@ -10,11 +10,15 @@ import { Button } from '@/components/ui/button'
 import { WorkImageUpload } from '@/components/exam/work-image-upload'
 import { FileSubmissionUpload } from '@/components/exam/file-submission-upload'
 import { TeacherGradingPreview, type GradingRow } from './teacher-grading-preview'
+import { MatchingDragInput } from '@/components/exam/matching-drag-input'
+import { MatchingLineInput } from '@/components/exam/matching-line-input'
+import { OrderingDragList } from '@/components/exam/ordering-drag-list'
+import { orderingDisplayOrder, orderingIsAnswered } from '@/lib/ordering-answer'
 
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, SubmittedFile } from '@/lib/types'
+import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, SubmittedFile } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -27,7 +31,6 @@ import {
 } from '@/components/ui/dialog'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ']
-const RIGHT_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 function isPdfUrl(url: string) {
   return /\.pdf(\?|$)/i.test(url)
@@ -41,6 +44,7 @@ export interface QuestionPreviewProps {
   questionType: QuestionType
   mcqOptions?: MCQOption[]
   matchingPairs?: MatchingPair[]
+  matchingConfig?: MatchingConfig
   imageUrls?: string[]
   trueFalseConfig?: TrueFalseConfig
   fillBlankConfig?: FillBlankConfig
@@ -102,6 +106,7 @@ export function QuestionPreviewContent({
   questionType,
   mcqOptions = [],
   matchingPairs = [],
+  matchingConfig,
   imageUrls = [],
   trueFalseConfig,
   fillBlankConfig,
@@ -125,7 +130,7 @@ export function QuestionPreviewContent({
   const [mcqChecked, setMcqChecked] = useState(false)
 
   // matching
-  const [matchingSelections, setMatchingSelections] = useState<string[]>(() => matchingPairs.map(() => ''))
+  const [matchingSelections, setMatchingSelections] = useState<(string | null)[]>(() => matchingPairs.map(() => null))
   const [matchingChecked, setMatchingChecked] = useState(false)
 
   // true_false
@@ -144,7 +149,7 @@ export function QuestionPreviewContent({
   const [shuffledItems, setShuffledItems] = useState<OrderingItem[]>(
     () => orderingConfig?.items?.length ? [...orderingConfig.items].sort(() => Math.random() - 0.5) : []
   )
-  const [orderSelections, setOrderSelections] = useState<Record<string, string>>({})
+  const [orderAnswered, setOrderAnswered] = useState(false)
   const [orderChecked, setOrderChecked] = useState(false)
 
   // composite — one answer slot per part; ordering-type parts store their
@@ -205,7 +210,11 @@ export function QuestionPreviewContent({
     setWrittenChecked(false)
     setSelectedMcq(null)
     setMcqChecked(false)
-    setMatchingSelections(matchingPairs.map(() => ''))
+    // null, not '' — an empty string is not null, so resetting to '' left every
+    // prompt counting as answered: the check button unlocked with nothing
+    // joined, every connector dot drew as filled, and Number('') === 0 made
+    // prompt 1's answer look correct.
+    setMatchingSelections(matchingPairs.map(() => null))
     setMatchingChecked(false)
     setTfAnswers(Array(1 + (trueFalseConfig?.statements?.length ?? 0)).fill(null))
     setTfExplanation('')
@@ -217,7 +226,7 @@ export function QuestionPreviewContent({
     if (orderingConfig?.items?.length) {
       const shuffled = [...orderingConfig.items].sort(() => Math.random() - 0.5)
       setShuffledItems(shuffled)
-      setOrderSelections({})
+      setOrderAnswered(false)
       setOrderChecked(false)
     }
     setCompositeAnswers(compositeParts.map(() => ''))
@@ -245,10 +254,16 @@ export function QuestionPreviewContent({
       return !!correct && compositeAnswers[i] === correct.text
     }
     if (part.type === 'ordering') {
-      const items = part.items ?? []
-      let sel: Record<string, string> = {}
-      try { sel = JSON.parse(compositeAnswers[i] || '{}') } catch { sel = {} }
-      return items.every((it, idx) => sel[it.id] === String(idx + 1))
+      // Array of ids in the student's order — the same shape the 'COMP:'
+      // ordering branch in lib/assignment-attempt.ts compares position by
+      // position. The old object form was only ever produced by the dropdown
+      // preview, so a preview answer graded differently from the real thing.
+      const correct = (part.items ?? []).map(it => it.id)
+      let order: string[] = []
+      try { order = JSON.parse(compositeAnswers[i] || '[]') } catch { order = [] }
+      return Array.isArray(order)
+        && order.length === correct.length
+        && correct.every((id, idx) => order[idx] === id)
     }
     return null
   }
@@ -294,12 +309,29 @@ export function QuestionPreviewContent({
 
   const correctOptions = mcqOptions.map((o, i) => ({ ...o, idx: i })).filter(o => o.is_correct)
   const allWrittenFilled = writtenInputs.length > 0 && writtenInputs.every(v => v !== '')
-  const allMatchingFilled = matchingSelections.length > 0 && matchingSelections.every(v => v !== '')
+  const allMatchingFilled = matchingSelections.length > 0 && matchingSelections.every(v => v !== null)
 
-  const matchingScore = matchingSelections.filter((s, i) => {
-    const correctLabel = shuffledRight.length > 0 ? RIGHT_LABELS[shuffledRight.indexOf(i)] : RIGHT_LABELS[i]
-    return s === correctLabel
-  }).length
+  // shuffledRight is seeded once at mount; if the pair list changed underneath
+  // it (the authoring form previews as the teacher edits), fall back to the
+  // unshuffled order rather than indexing past the end.
+  const rightOrder = shuffledRight.length === matchingPairs.length
+    ? shuffledRight
+    : matchingPairs.map((_, i) => i)
+
+  /** The right-hand column as draggable chips, in the order it is shown. */
+  const matchingOptions = rightOrder.map((pairIdx, j) => ({
+    id: String(j),
+    text: matchingPairs[pairIdx]?.right_text || `คำตรงกัน ${j + 1}`,
+    imageUrl: matchingPairs[pairIdx]?.right_image,
+  }))
+
+  /** Prompt i is right when the chip it holds came from prompt i's own pair. */
+  const matchingCorrect = (i: number) => {
+    const sel = matchingSelections[i]
+    return sel !== null && sel !== undefined && rightOrder[Number(sel)] === i
+  }
+
+  const matchingScore = matchingPairs.filter((_, i) => matchingCorrect(i)).length
 
   // ── หน้าตรวจของครู (จำลอง) ───────────────────────────────────────────────
   // โจทย์ที่ครูกลับมายุ่งด้วยได้หลังนักเรียนส่ง แบ่งเป็นสองแบบ: แบบที่ระบบตรวจ
@@ -378,12 +410,14 @@ export function QuestionPreviewContent({
     }
     if (part.type === 'ordering') {
       const items = part.items ?? []
-      let sel: Record<string, string> = {}
-      try { sel = JSON.parse(raw || '{}') } catch { sel = {} }
-      const answered = items.filter(it => sel[it.id]).length
+      const byId = new Map(items.map(it => [it.id, it.text]))
+      let order: string[] = []
+      try { order = JSON.parse(raw || '[]') } catch { order = [] }
       return {
-        student: answered > 0 ? `เลือกลำดับแล้ว ${answered}/${items.length} รายการ` : '',
-        correct: 'เรียงตามลำดับที่ครูกำหนดไว้',
+        student: Array.isArray(order) && order.length > 0
+          ? order.map((id, idx) => `${idx + 1}. ${byId.get(id) ?? id}`).join('  ·  ')
+          : '',
+        correct: items.map((it, idx) => `${idx + 1}. ${it.text}`).join('  ·  '),
       }
     }
     return { student: raw, correct: null }
@@ -696,101 +730,35 @@ export function QuestionPreviewContent({
       {/* ── Matching ── */}
       {questionType === 'matching' && matchingPairs.length > 0 && (
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm border-collapse">
-              <thead className="bg-muted">
-                <tr className="text-xs text-muted-foreground">
-                  <th className="text-left py-2 px-3 font-medium border-b border-border w-1/2">รายการ</th>
-                  <th className="text-left py-2 px-3 font-medium border-b border-border w-1/2">คำตรงกัน (สุ่มลำดับแล้ว)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {matchingPairs.map((pair, i) => {
-                  const rightIdx = shuffledRight[i] ?? i
-                  const rightPair = matchingPairs[rightIdx]
-                  return (
-                    <tr key={i}>
-                      <td className="py-2 px-3 align-top">
-                        <div className="flex items-start gap-2">
-                          <span className="text-xs text-muted-foreground shrink-0 mt-0.5 font-medium">{i + 1}.</span>
-                          <div>
-                            <span className="text-foreground">{pair.left_text || `รายการ ${i + 1}`}</span>
-                            {pair.left_image && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={pair.left_image} alt="" loading="lazy" decoding="async" className="mt-1 max-h-16 rounded border border-border object-contain" />
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2 px-3 align-top">
-                        <div className="flex items-start gap-2">
-                          <span className="text-xs text-primary shrink-0 mt-0.5 font-medium">{RIGHT_LABELS[i]}.</span>
-                          <div>
-                            <span className="text-foreground">{rightPair?.right_text || `คำตรงกัน ${i + 1}`}</span>
-                            {rightPair?.right_image && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={rightPair.right_image} alt="" loading="lazy" decoding="async" className="mt-1 max-h-16 rounded border border-border object-contain" />
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">เลือกตัวอักษรที่ตรงกัน:</p>
-            {matchingPairs.map((pair, i) => {
-              const correctLabel = shuffledRight.length > 0
-                ? RIGHT_LABELS[shuffledRight.indexOf(i)]
-                : RIGHT_LABELS[i]
-              const studentSelected = matchingSelections[i] || ''
-              const isCorrect = matchingChecked && studentSelected === correctLabel
-              const isWrong = matchingChecked && studentSelected !== correctLabel
-              return (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground shrink-0 w-28 truncate">
-                    {i + 1}. {pair.left_text || `รายการ ${i + 1}`}
-                  </span>
-                  <NativeSelect
-                    value={studentSelected}
-                    onChange={(e) => {
-                      if (matchingChecked) return
-                      const next = [...matchingSelections]
-                      next[i] = e.target.value
-                      setMatchingSelections(next)
-                    }}
-                    disabled={matchingChecked}
-                    className={`h-8 w-20 border rounded-lg px-2 text-sm text-center ${
-                      isCorrect ? 'border-success bg-success/10 text-success' :
-                      isWrong ? 'border-destructive bg-destructive/10 text-destructive' :
-                      'border-border bg-card'
-                    }`}
-                  >
-                    <option value="">—</option>
-                    {RIGHT_LABELS.slice(0, matchingPairs.length).map(label => (
-                      <option key={label} value={label}>{label}</option>
-                    ))}
-                  </NativeSelect>
-                  {isCorrect && <span className="text-xs text-success font-medium">✓</span>}
-                  {isWrong && <span className="text-xs text-destructive">✗ เฉลย: <strong>{correctLabel}</strong></span>}
-                </div>
-              )
-            })}
-          </div>
+          {/* The same drag input a student gets, not a stand-in for it — the
+              two-column reference table this replaced existed only to hand out
+              the A/B/C letters the dropdowns needed. */}
+          {(() => {
+            const shared = {
+              prompts: matchingPairs.map((pair, i) => ({
+                text: pair.left_text || `รายการ ${i + 1}`,
+                imageUrl: pair.left_image,
+              })),
+              options: matchingOptions,
+              placement: matchingPairs.map((_, i) => matchingSelections[i] ?? null),
+              onChange: (next: (string | null)[]) => { if (!matchingChecked) setMatchingSelections(next) },
+              disabled: matchingChecked,
+              results: matchingChecked ? matchingPairs.map((_, i) => matchingCorrect(i)) : undefined,
+              correctText: matchingPairs.map(pair => pair.right_text),
+            }
+            return matchingConfig?.answer_mode === 'lines'
+              ? <MatchingLineInput {...shared} />
+              : <MatchingDragInput {...shared} />
+          })()}
 
           {!matchingChecked ? (
-            <button
+            <Button
               type="button"
               onClick={() => setMatchingChecked(true)}
               disabled={!allMatchingFilled}
-              className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
             >
               ตรวจคำตอบ
-            </button>
+            </Button>
           ) : (
             <div className={`p-3 rounded-lg text-sm font-medium border ${
               matchingScore === matchingPairs.length
@@ -1300,80 +1268,40 @@ export function QuestionPreviewContent({
       {questionType === 'ordering' && orderingConfig && shuffledItems.length > 0 && (() => {
         const n = shuffledItems.length
         const correctOrder = orderingConfig.items.map(i => i.id)
-        const allSelected = shuffledItems.every(it => orderSelections[it.id])
-        const selectedPositions = Object.values(orderSelections)
-        const hasDuplicate = selectedPositions.length !== new Set(selectedPositions).size
+        const correctPosition = Object.fromEntries(correctOrder.map((id, i) => [id, i + 1]))
+        const correct = shuffledItems.filter((it, i) => correctOrder[i] === it.id).length
 
         return (
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground font-medium">เลือกลำดับสำหรับแต่ละรายการ:</p>
-            <div className="space-y-2">
-              {shuffledItems.map((item) => {
-                const sel = orderSelections[item.id] ?? ''
-                const correctPos = correctOrder.indexOf(item.id) + 1
-                const isCorrect = orderChecked && sel === String(correctPos)
-                const isWrong = orderChecked && sel !== String(correctPos)
-                return (
-                  <div key={item.id} className={`flex items-center gap-3 p-2.5 rounded-lg border ${
-                    isCorrect ? 'border-success/20 bg-success/10' :
-                    isWrong ? 'border-destructive/20 bg-destructive/10' :
-                    'border-border bg-card'
-                  }`}>
-                    {item.image_url && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.image_url} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border border-border" />
-                    )}
-                    <span className="flex-1 text-sm text-foreground">{item.text}</span>
-                    <NativeSelect
-                      value={sel}
-                      onChange={(e) => {
-                        if (orderChecked) return
-                        setOrderSelections(p => ({ ...p, [item.id]: e.target.value }))
-                      }}
-                      disabled={orderChecked}
-                      className={`h-8 w-16 border rounded-lg px-1 text-sm text-center ${
-                        isCorrect ? 'border-success text-success' :
-                        isWrong ? 'border-destructive text-destructive' :
-                        'border-border'
-                      }`}
-                    >
-                      <option value="">—</option>
-                      {Array.from({ length: n }, (_, i) => (
-                        <option key={i + 1} value={String(i + 1)}>ที่ {i + 1}</option>
-                      ))}
-                    </NativeSelect>
-                    {isCorrect && <span className="text-xs text-success font-medium w-16">✓ ถูก</span>}
-                    {isWrong && <span className="text-xs text-destructive w-16">✗ ควรที่ {correctPos}</span>}
-                  </div>
-                )
-              })}
-            </div>
-
-            {hasDuplicate && !orderChecked && (
-              <p className="text-xs text-flag">⚠️ มีลำดับซ้ำกัน กรุณาเลือกใหม่</p>
-            )}
+            {/* The same drag list a student gets. `shuffledItems` is both what
+                is on screen and the answer — reordering it is the answer. */}
+            <OrderingDragList
+              items={shuffledItems}
+              answered={orderAnswered}
+              disabled={orderChecked}
+              onReorder={ids => {
+                if (orderChecked) return
+                const byId = new Map(shuffledItems.map(i => [i.id, i]))
+                setShuffledItems(ids.map(id => byId.get(id)).filter((i): i is OrderingItem => !!i))
+                setOrderAnswered(true)
+              }}
+              onConfirm={() => setOrderAnswered(true)}
+              correctPosition={orderChecked ? correctPosition : undefined}
+            />
 
             {!orderChecked ? (
-              <button
-                type="button"
-                onClick={() => setOrderChecked(true)}
-                disabled={!allSelected || hasDuplicate}
-                className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors"
-              >
+              <Button type="button" onClick={() => setOrderChecked(true)} disabled={!orderAnswered}>
                 ตรวจคำตอบ
-              </button>
-            ) : (() => {
-              const correct = shuffledItems.filter(it => orderSelections[it.id] === String(correctOrder.indexOf(it.id) + 1)).length
-              return (
-                <div className={`p-3 rounded-lg text-sm font-medium border ${
-                  correct === n ? 'bg-success/10 text-success border-success/20' :
-                  correct > 0 ? 'bg-flag/10 text-flag border-flag/20' :
-                  'bg-destructive/10 text-destructive border-destructive/20'
-                }`}>
-                  {correct === n ? '🎉 ถูกต้องทุกรายการ!' : `✅ ถูก ${correct}/${n} รายการ`}
-                </div>
-              )
-            })()}
+              </Button>
+            ) : (
+              <div className={`p-3 rounded-lg text-sm font-medium border ${
+                correct === n ? 'bg-success/10 text-success border-success/20' :
+                correct > 0 ? 'bg-flag/10 text-flag border-flag/20' :
+                'bg-destructive/10 text-destructive border-destructive/20'
+              }`}>
+                {correct === n ? '🎉 ถูกต้องทุกรายการ!' : `✅ ถูก ${correct}/${n} รายการ`}
+              </div>
+            )}
           </div>
         )
       })()}
@@ -1505,28 +1433,22 @@ export function QuestionPreviewContent({
 
                   {part.type === 'ordering' && (() => {
                     const items = compositeShuffledItems[i] ?? []
-                    const n = items.length
-                    let sel: Record<string, string> = {}
-                    try { sel = JSON.parse(compositeAnswers[i] || '{}') } catch { sel = {} }
-                    function setSel(itemId: string, pos: string) {
-                      const next = { ...sel, [itemId]: pos }
-                      setAnswer(JSON.stringify(next))
-                    }
+                    const raw = compositeAnswers[i] ?? ''
+                    const order = orderingDisplayOrder(raw, items)
+                    const correctPosition = Object.fromEntries(
+                      (part.items ?? []).map((it, oi) => [it.id, oi + 1])
+                    )
                     return (
                       <>
                         <RichText text={part.text} className="text-[15px] text-foreground" />
-                        <div className="space-y-2">
-                          {items.map(item => (
-                            <Card radius="sm" className="flex items-center gap-3 p-2" key={item.id}>
-                              <RichText text={item.text} className="flex-1 text-sm text-foreground" />
-                              <NativeSelect value={sel[item.id] ?? ''} disabled={compositeChecked}
-                                onChange={e => setSel(item.id, e.target.value)} className="w-16 text-center">
-                                <option value="">—</option>
-                                {Array.from({ length: n }, (_, oi) => <option key={oi + 1} value={String(oi + 1)}>ที่ {oi + 1}</option>)}
-                              </NativeSelect>
-                            </Card>
-                          ))}
-                        </div>
+                        <OrderingDragList
+                          items={order}
+                          answered={orderingIsAnswered(raw, items.length)}
+                          disabled={compositeChecked}
+                          onReorder={ids => setAnswer(JSON.stringify(ids))}
+                          onConfirm={() => setAnswer(JSON.stringify(order.map(it => it.id)))}
+                          correctPosition={compositeChecked ? correctPosition : undefined}
+                        />
                       </>
                     )
                   })()}

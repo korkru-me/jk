@@ -9,7 +9,7 @@ import { dedupeTags } from '@/lib/tag-suggest'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import { releaseQuestionFiles } from '@/lib/storage-release'
-import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig } from '@/lib/types'
+import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig, MatchingConfig } from '@/lib/types'
 import { safeQuestionsRedirect } from '@/lib/question-return'
 
 export interface QuestionFormData {
@@ -31,7 +31,7 @@ export interface QuestionFormData {
   mcq_options: MCQOption[]
   matching_pairs?: MatchingPair[]
   essay_rubric?: { criterion: string; points: number }[]
-  extra_data?: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig
+  extra_data?: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig
   solution_text: string
   solution_image_urls?: string[]
   tags: string[]
