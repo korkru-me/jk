@@ -1,12 +1,12 @@
 # SEB ไม่เพิ่ม SEB Server — แผนสอบในห้องเรียนและสถานะ N1–N8
 
-อัปเดต: 6 กันยายน 2026 · เริ่ม N2.1 ชุดทดลองแยกจาก application runtime
+อัปเดต: 10 กันยายน 2026 · N2.1 native core ผ่านบน Mac และ iPad; Windows/N2.2 ยัง pending
 
 ## สถานะและอำนาจที่ได้รับ
 
 ผู้ใช้ยืนยันว่าเป็น **การสอบผ่านเว็บในห้องเรียน มีครูตรวจเครื่องได้** และให้เริ่ม **เฟส 2** หลังอธิบายการปรับแผนวันที่ 6 กันยายน อนุมัติให้พิสูจน์ต้นแบบภายใต้บริบทนี้ ไม่ใช่อนุมัติลดการตรวจ CK + BEK, ติดตั้ง SEB Server หรือเปิดบริการรหัสรายครูจริง
 
-**ผลปัจจุบัน: GO เฉพาะการเตรียม/พิสูจน์ N2; ยังไม่ผ่าน N2 และยัง NO-GO สำหรับบริการอัตโนมัติเต็ม** D1 ยืนยันแล้ว ส่วน D2 อนุญาตให้ทดลองวิธีเว็บร่วมกับครูตรวจเครื่อง ไม่ใช่รับรองว่า Quit URL ถูกบังคับสิทธิ์จาก server หรือยอมรับทุกความเสี่ยงสำหรับ production ยังไม่มีวิธีที่พิสูจน์แล้วสำหรับการเผยแพร่ config ใหม่อัตโนมัติพร้อม CK + BEK ด้วย Vercel/Supabase เพียงอย่างเดียว
+**ผลปัจจุบัน: GO สำหรับต้นแบบ N2 ต่อ; ยังไม่ผ่าน N2 และยัง NO-GO สำหรับบริการอัตโนมัติเต็ม** Native core ผ่านบน Mac และ iPad แล้ว แต่ D2 อนุญาตเพียงการทดลองวิธีเว็บร่วมกับครูตรวจเครื่อง ไม่ใช่รับรองว่า Quit URL ถูกบังคับสิทธิ์จาก server หรือยอมรับทุกความเสี่ยงสำหรับ production ยังไม่มีวิธีที่พิสูจน์แล้วสำหรับการเผยแพร่ config ใหม่อัตโนมัติพร้อม CK + BEK ด้วย Vercel/Supabase เพียงอย่างเดียว
 
 เอกสารนี้เป็นแผนปัจจุบันสำหรับงานรหัสรายครู แทนลำดับงานที่สมมติว่าจะต่อ SEB Server ใน `SEB_PHASE1.md`, `SEB_PHASE2.md` และ `SEB_PASSWORD_ROLLOUT.md` เอกสารเหล่านั้นยังเก็บไว้เป็นประวัติ/คู่มือของต้นแบบเดิม ไม่ลบโค้ดหรือแปลว่าผลทดสอบเดิมผ่านเฟสใหม่
 
@@ -27,7 +27,7 @@ N2.1 เพิ่มเครื่องมือใน `scripts/seb-no-server/
 
 เป้าหมายวางแผนคง Mac, iPad และ Windows ตามบริบทเดิม ไม่ลดเหลือ Mac/iPad โดยถือว่าผู้ใช้ยินยอมแล้ว รุ่น OS/SEB/build ที่จะรับรองต้องระบุจากเครื่องจริงในเฟส 2
 
-- Mac และ iPad: ผู้ใช้มีเครื่องและเคยเปิดไฟล์เดิม แต่ยังไม่มีผลตรวจครบสำหรับ config แบบใหม่
+- Mac และ iPad: native core ของ config แบบใหม่ผ่านวันที่ 7 และ 10 กันยายน 2026 ตามลำดับ รวมไม่มี opening password, CK+BEK, รหัสออกแยก, quit link และ modified rejection; proof matrix บางกรณียังรอ
 - Windows: ยังไม่ยืนยันว่ามีเครื่อง/ผู้ช่วยทดสอบและ BEK สำหรับรุ่นที่จะใช้จริง จึงยังไม่ประกาศว่ารองรับ production จากการอ่าน source หรือผล Mac
 - หากไม่มี Windows ในรอบทดลอง ให้บันทึกว่า pending; การเปิดขายเฉพาะ Mac/iPad ต้องให้ผู้ใช้เลือกขอบเขตนั้นก่อน
 - Android monitored mode เดิมไม่ใช่ SEB และไม่ถูกนับเป็นแพลตฟอร์ม SEB ที่ผ่านการตรวจชุดนี้
@@ -124,7 +124,7 @@ Admin password ป้องกันการแก้ผ่านหน้า�
 
 ### N2 — ต้นแบบเล็กและพิสูจน์ native
 
-**เริ่มแล้วเฉพาะ N2.1:** ตัวสร้าง `plnd` A/B/modified และ loopback Key/quit-link diagnostic บน Mac ไม่ใช่ N2 ผ่านทั้งเฟส native results ทุกระบบยัง pending และยังไม่มีตัวอย่างส่งคำตอบ/teacher grant/resume/presence ใน lab ต้องพิสูจน์ import/Key/recovery ก่อนต่อ N2.2 ขั้นตอนอยู่ [SEB_NO_SERVER_N2.md](SEB_NO_SERVER_N2.md)
+**N2.1 native core ผ่านบน Mac/iPad:** ตัวสร้าง `plnd` A/B/modified และ local/private-Wi-Fi Key/quit-link diagnostic ผ่านผลจริงสองแพลตฟอร์ม แต่ Windows และ proof matrix บางกรณียัง pending และยังไม่มีตัวอย่างส่งคำตอบ/teacher grant/resume/presence ใน lab จึงไม่ใช่ N2 ผ่านทั้งเฟส ขั้นตอนอยู่ [SEB_NO_SERVER_N2.md](SEB_NO_SERVER_N2.md)
 
 เตรียมไฟล์ไม่มี opening password แยกรหัส A/B, Key ที่ถูกต้อง/ผิด, modified config และหน้าทดลองเข้า–ออกพร้อมข้อมูลสมมติ ผู้ใช้เปิด Mac/iPad/Windows ที่จะรองรับและช่วยเก็บผลตามขั้นตอน Agent ตรวจโค้ด/ค่าที่ต้องตรง ไม่รับ production secrets ในแชต ไม่เปิด native แทน
 
@@ -195,4 +195,4 @@ Agent ตรวจ authorization/replay/revision, build/tests, load/connection b
 
 - เริ่มเฉพาะ N2.1 แยกจากเว็บจริงตามขอบเขตสอบในห้อง ผล automated 1,040 tests / 80 files ผ่าน รวม N2 ใหม่ 35 ข้อ และ `plutil` ตรวจ fixture A ผ่าน ไม่ใช่ผล native
 - Independent review แก้การอ่าน prefix ให้เทียบ bytes ตรงตัวพร้อม regression แล้ว ตรวจซ้ำไม่พบข้อแก้ไขเพิ่มในขอบเขต lab
-- Native ทุกแพลตฟอร์มและ N2.2 ยัง pending รายละเอียด/ขั้นตอน/สิ่งที่ไม่ได้รันอยู่ [SEB_NO_SERVER_N2.md](SEB_NO_SERVER_N2.md)
+- วันที่ 7/10 กันยายน native core ผ่านบน Mac SEB 3.7 build 1591F และ iPad SEB 3.6.2 ตามลำดับ ชุด iPad ใช้ private IPv4 ของ Mac ใน Wi-Fi เดียวกันและ flow Share Keys แบบ `Only Keys`; Windows, proof matrix บางกรณี, N2.2 และ automation ยัง pending รายละเอียดอยู่ [SEB_NO_SERVER_N2.md](SEB_NO_SERVER_N2.md)

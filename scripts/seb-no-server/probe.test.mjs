@@ -45,7 +45,8 @@ async function withServer(run, { enrolled = true, clock } = {}) {
   const port = placeholder.address().port
   // Swap the request handler while retaining the allocated socket.
   const origin = `http://127.0.0.1:${port}`
-  const handler = createProbeServer({ manifest, caseId: 'a', browserKeys: enrolled ? [bek] : [], origin, now: clock })
+  const handler = createProbeServer({ manifest, caseId: 'a', browserKeys: enrolled ? [bek] : [], origin, now: clock,
+    testOnlyAllowEphemeralLoopback: true })
   placeholder.removeAllListeners('request')
   placeholder.on('request', handler.listeners('request')[0])
   try { await run(origin) }
@@ -111,8 +112,13 @@ describe('loopback transport boundaries (synthetic, not native)', () => {
     expect((await fetch(`${origin}/n2/test`, { redirect: 'manual' })).status).toBe(429)
     expect((await (await fetch(`${origin}/quit/test`)).json()).nativeQuitConfirmed).toBe(false)
   }))
-  it('refuses LAN/public origin in this first kit', () => {
+  it('allows an exact private-Wi-Fi origin but refuses public, HTTPS and wrong-port origins', () => {
+    expect(() => createProbeServer({ manifest: { origin: 'http://192.168.1.20:4175',
+      startUrl: 'http://192.168.1.20:4175/n2/test', quitUrl: 'http://192.168.1.20:4175/quit/test',
+      cases: [{ id: 'a', expectedConfigKey: ck }] }, caseId: 'a' })).not.toThrow()
     expect(() => createProbeServer({ manifest: { origin: 'https://www.korkru.com' }, caseId: 'a' })).toThrow()
+    expect(() => createProbeServer({ manifest: { origin: 'http://8.8.8.8:4175' }, caseId: 'a' })).toThrow()
+    expect(() => createProbeServer({ manifest: { origin: 'http://192.168.1.20:4176' }, caseId: 'a' })).toThrow()
   })
 })
 

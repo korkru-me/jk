@@ -42,6 +42,8 @@ describe('bounded SEB settings and canonical key', () => {
   })
   it('keeps changes to quit password and security options in CK', () => {
     const original = settings()
+    expect(original.sendBrowserExamKey).toBe(true)
+    expect(original.browserWindowWebView).toBe(3)
     expect(configKey(settings({ hashedQuitPassword: passwordHash('Synthetic-quit-B') }))).not.toBe(configKey(original))
     expect(configKey(settings({ allowQuit: false }))).not.toBe(configKey(original))
     expect(configKey(settings({ originatorVersion: 'unimportant' }))).toBe(configKey(original))

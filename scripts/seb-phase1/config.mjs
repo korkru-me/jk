@@ -200,7 +200,10 @@ export function labSettings({ startUrl, quitPassword, adminPassword, salt }) {
     allowQuit: true,
     allowPreferencesWindow: true,
     showSettingsInApp: true,
-    sendBrowserExamKey: false,
+    // iPad's trusted-operator Share Keys flow only exports the raw BEK when
+    // Browser & Config Keys are enabled. Policy 3 below keeps the modern
+    // WebView/JavaScript API used by the probe.
+    sendBrowserExamKey: true,
     browserWindowWebView: 3,
     quitURL: '',
     quitURLRestart: false,

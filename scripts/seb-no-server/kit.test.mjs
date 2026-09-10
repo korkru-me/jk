@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtemp, readFile, writeFile, rm, stat, chmod, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { writeKit, loadKit, loadNativeKeys, readPrivateJson } from './kit.mjs'
+import { writeKit, loadKit, loadNativeKeys, readPrivateJson, parseProbeOrigin, probeOriginForHost } from './kit.mjs'
 
 async function withKit(run) {
   const parent = await mkdtemp(join(tmpdir(), 'korkru-n2-test-'))
@@ -11,6 +11,27 @@ async function withKit(run) {
 }
 
 describe('private immutable N2 kit', () => {
+  it('accepts only exact loopback or private-Wi-Fi HTTP origins on the fixed lab port', () => {
+    for (const host of ['127.0.0.1', '10.0.0.8', '172.16.1.2', '172.31.255.254', '192.168.1.20']) {
+      const origin = `http://${host}:4175`
+      expect(probeOriginForHost(host)).toBe(origin)
+      expect(parseProbeOrigin(origin).origin).toBe(origin)
+    }
+    for (const origin of ['https://192.168.1.20:4175', 'http://192.168.1.20:4176',
+      'http://172.32.0.1:4175', 'http://8.8.8.8:4175', 'http://localhost:4175',
+      'http://192.168.1.20:4175/path']) expect(() => parseProbeOrigin(origin)).toThrow()
+  })
+  it('creates a separately fingerprinted kit for a private Wi-Fi origin', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'korkru-n2-lan-test-'))
+    try {
+      const origin = 'http://192.168.1.20:4175'
+      const kit = await writeKit(parent, { origin, simplePasswords: true })
+      expect(kit.manifest.origin).toBe(origin)
+      expect(kit.manifest.startUrl).toBe(`${origin}/n2/${kit.manifest.runId}`)
+      expect(kit.manifest.quitUrl).toBe(`${origin}/quit/${kit.manifest.runId}`)
+      expect((await loadKit(kit.directory)).origin).toBe(origin)
+    } finally { await rm(parent, { recursive: true, force: true }) }
+  })
   it('creates unique private bundles; never seeds an accepted BEK', async () => withKit(async (kit, parent) => {
     const second = await writeKit(parent)
     expect(second.directory).not.toBe(kit.directory)

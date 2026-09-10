@@ -1,17 +1,18 @@
 # N2 — พิสูจน์ SEB แบบไม่เพิ่ม SEB Server สำหรับสอบในห้องเรียน
 
-อัปเดต 7 กันยายน 2026 · แผนหลัก [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md)
+อัปเดต 10 กันยายน 2026 · แผนหลัก [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md)
 
 **การช่วยทดสอบล่าสุด:** ผู้ใช้ขอคำแนะนำสั้น ๆ ทีละขั้น และรหัสทดลองจำง่าย อนุมัติสร้างชุดใหม่ด้วย `npm run seb:n2:prepare -- --simple-passwords`: A/A-modified ออกด้วย `1234`, B ออกด้วย `4321`, ตั้งค่าทั้งสองชุดด้วย `1111` ไม่มี opening password ตัวเลือกนี้ใช้เฉพาะ lab; คำสั่งปกติยังสุ่มรหัส เก็บชุดเก่าไว้และใช้ path ของชุดใหม่ในการเปิด probe Key/hash คำนวณใหม่ทั้งชุดและทะเบียน native เริ่มว่าง ต้องทดสอบใหม่ ห้ามนำ Key เก่ามาแทน อธิบายให้ผู้ใช้ทีละขั้น ไม่ส่งคู่มือทั้งชุดซ้ำ
 
-ชุดที่สร้างบนเครื่องนี้วันที่ 7 กันยายนคือ `.local/seb-no-server-sypouv/` (ไฟล์ส่วนตัว Git ignore ไม่ย้ายข้ามเครื่องด้วย Git); ชุดเก่า `.local/seb-no-server-nBkbsP/` ยังอยู่ ให้ใช้ชุดใหม่เมื่อช่วยผู้ใช้ต่อ ตรวจรหัสและ hash ที่ serialize ในไฟล์ทั้งสามกับ manifest/fingerprint และทะเบียน BEK ว่างผ่าน พร้อม regression format/kit 21 tests ผ่านและ `git diff --check` ผ่าน รอบนี้ไม่รัน full suite/build/TypeScript หรือ native เพราะเปลี่ยนเฉพาะตัวเลือกเครื่องมือ lab ไม่มี migration/env/deploy
+ชุด Mac วันที่ 7 กันยายนอยู่ที่ `.local/seb-no-server-sypouv/` และชุด iPad แบบ Wi-Fi วันที่ 10 กันยายนอยู่ที่ `.local/seb-no-server-eHAu0h/` บนเครื่องนี้เท่านั้น (ไฟล์ส่วนตัว Git ignore และไม่ย้ายข้ามเครื่องด้วย Git) ห้ามคัดลอกรหัสหรือ Key จากสองชุดนี้ไป production
 
 ## สถานะตรงตามจริง
 
-**N2.1 เตรียมเครื่องมือแล้ว; N2 ทั้งเฟสยังไม่ผ่าน** ชุดนี้ตรวจรูปแบบไฟล์ การคำนวณ Key และการเรียก Quit URL แบบแยกจากเว็บจริง ไม่ใช่หน้าคุมสอบใหม่ ไม่ใช่ระบบรหัสรายครูพร้อมขาย ไม่เชื่อม Supabase/Vercel และไม่ออก session สอบ
+**N2.1 native core ผ่านแล้วบน Mac และ iPad; N2 ทั้งเฟสยังไม่ผ่าน** ชุดนี้ตรวจรูปแบบไฟล์ การคำนวณ Key และการเรียก Quit URL แบบแยกจากเว็บจริง ไม่ใช่หน้าคุมสอบใหม่ ไม่ใช่ระบบรหัสรายครูพร้อมขาย ไม่เชื่อม Supabase/Vercel และไม่ออก session สอบ
 
-- Mac: เครื่องมือพร้อมให้ผู้ใช้ทดสอบ แต่ยังไม่มีผล native
-- iPad/Windows: pending ต้องเตรียม origin ที่อุปกรณ์เปิดถึงได้และระบุ OS/SEB/build ก่อนสร้าง/ลงทะเบียนไฟล์สำหรับอุปกรณ์นั้น `127.0.0.1` หมายถึงเครื่องที่กำลังเปิด ไม่ใช่ Mac เสมอไป ห้ามส่งชุด Mac นี้ไปแล้วถือว่าระบบเสียเพราะเข้า localhost ไม่ได้
+- Mac: วันที่ 7 กันยายน 2026 ผ่าน A/B ไม่มี opening password, CK+BEK, รหัสออกแยกกัน, ลิงก์ออก และ A-modified ถูกปฏิเสธ บน macOS 26.4 (25E246), SEB 3.7 build 1591F
+- iPad: วันที่ 10 กันยายน 2026 ผ่านผลหลักเดียวกันบน SEB 3.6.2 ผ่าน private Wi-Fi origin และผู้ใช้ยืนยันว่าลิงก์ออกปลด session ได้
+- Windows: pending ต้องมีเครื่องจริงและระบุ Windows/SEB build ก่อนลงทะเบียน BEK และทดสอบ ห้ามอนุมานผลจาก Mac/iPad
 - N2.2 ยังต้องทำหน้าทดลองส่งคำตอบ/อนุญาตออกเฉพาะราย/พักและอนุญาตกลับรอบเดิม/สัญญาณขาดการติดต่อ หลัง import/Key/recovery ชุดแรกผ่าน ไม่ใช่ฟีเจอร์ที่มีแล้วเพียงรอ native test
 - automation ของ trusted BEK ยังไม่พิสูจน์ การเก็บ Key ด้วยมือใน lab ไม่ใช่การเลือกให้ครูทั่วประเทศทำงานด้วยมือ และไม่อนุมัติ CK-only
 
@@ -29,11 +30,13 @@
 
 - `format.mjs`: รูปแบบ `gzip(plnd + gzip(XML plist))` ไม่มี opening password ไม่ใช่ encrypted file ใช้ serializer/CK subset เดิมโดยไม่เปลี่ยน encoder `pswd` เดิม
 - `kit.mjs` / `prepare.mjs`: สร้าง A/B ที่ต่างเฉพาะ quit-password hash และ A-modified ที่แก้ `allowPrint` เป็น valid XML; ปกติสุ่มรหัสใหม่ต่อชุด ตัวเลือก `--simple-passwords` ใช้รหัสสาธิตตามที่ผู้ใช้ขอ เขียนในไดเรกทอรีใหม่ทุกครั้ง ไม่ทับไฟล์เดิม
-- `probe-server.mjs` / `probe.mjs`: HTTP เฉพาะ `127.0.0.1:4175`, host/origin checks, challenge URL อายุ 5 นาที ใช้ครั้งเดียว ไม่เกิน 64 ค้าง, body ไม่เกิน 1 KiB ไม่เปิดอ่านไฟล์ผ่าน HTTP ไม่โหลด `.env` ไม่เก็บ raw hashes และตอบ `admissionGranted:false` เสมอ
+- `probe-server.mjs` / `probe.mjs`: HTTP เฉพาะ `127.0.0.1:4175` หรือ private IPv4 ของ Mac ที่ port 4175, exact host/origin checks, challenge URL อายุ 5 นาที ใช้ครั้งเดียว ไม่เกิน 64 ค้าง, body ไม่เกิน 1 KiB ไม่เปิดอ่านไฟล์ผ่าน HTTP ไม่โหลด `.env` ไม่เก็บ raw hashes และตอบ `admissionGranted:false` เสมอ
 - Probe ตรวจ CK และ BEK แยกกัน: ไม่มี native BEK ที่ลงทะเบียนจะขึ้น `BEK_PENDING` ไม่แปลง hash ที่ browser ส่งเป็น trusted enrollment แม้มี API ก็ไม่ถือว่าผ่าน เมื่อทั้งคู่ตรงจึงเสนอ **ลิงก์ทดลองออก** ไม่ใช่การยืนยันว่าครูอนุญาต/ส่งงานสำเร็จ
 - Apple callback ใช้ named global function ตาม native bridge ไม่ใช้ anonymous callback
 
 ชุดนี้ตั้งใจผ่อนคลาย desktop restrictions เพื่อกู้คืนง่าย **ไม่ใช่ template ล็อกเครื่องจริง** และไม่รับรอง iPad Assessment Mode จากผล Mac ห้ามนำไปแทน `public/exam/korkru-production-v1.seb` หรือเพิ่ม CK/BEK ของ lab เข้า production environment
+
+สำหรับอุปกรณ์อีกเครื่องใน Wi-Fi เดียวกัน ให้สร้างชุดใหม่ด้วย `npm run seb:n2:prepare -- --simple-passwords --lan-host <private-ipv4-ของ-Mac>` รองรับเฉพาะ `10.x.x.x`, `172.16–31.x.x` หรือ `192.168.x.x` ที่ port 4175 ไม่รับ public IP, hostname, HTTPS หรือ port อื่น ชุดนี้เป็น HTTP lab ในวง LAN เท่านั้น ไม่ใช่วิธี deploy production
 
 ## ก่อนทดสอบ — ทำบน Mac ก่อนเพียงเครื่องเดียว
 
@@ -59,6 +62,8 @@
 4. หยุด/เริ่ม probe ใหม่เพื่ออ่านทะเบียนใหม่ แล้วเปิดไฟล์เดิม กดตรวจ: ต้องได้ `MATCHED_BOTH` จาก native ไม่ใช่สคริปต์สมมติ จึงลองลิงก์ออกได้
 5. ทดสอบลบ BEK ชั่วคราวจาก **ทะเบียน lab สำเนา/ชุดทดลองเท่านั้น**, BEK ผิด, B เมื่อคาดหวัง A และ A-modified เมื่อคาดหวัง A: ต้องไม่ผ่านครบและไม่เสนอปุ่มทดลองออก
 
+บน iPad SEB 3.6.2 ขั้นตอนอ่าน raw BEK ที่พิสูจน์แล้วคือ Settings → Exam Session → Share Keys → เปิด `Share Browser Exam Key`, ปิด `Share Config Key`, เลือก `Only Keys (Don't Modify Config)` แล้วกดย้อนกลับถึงหน้าหลัก Settings และกดปุ่ม Share ทันที ค่า `Only Keys` เป็นตัวเลือกชั่วคราวและอาจไม่คงอยู่หลังปิด/เปิด Settings ใหม่ ห้ามกด Apply เพราะจะเริ่ม session ตาม config อีกครั้ง ตัวสร้าง lab ตั้ง `sendBrowserExamKey=true` เพื่อให้ flow นี้ใช้ได้ และคง `browserWindowWebView=3` สำหรับ modern JavaScript API; การตั้งนี้ไม่ใช่การติดตั้งหรือใช้งาน SEB Server
+
 การเทียบครบไม่ได้แปลว่ามี approved enrollment อัตโนมัติหรือ identity ของนักเรียน ผู้ทดสอบต้องยืนยันที่มาของ BEK เอง รอบนี้ไม่มีการลงทะเบียนอัตโนมัติจาก client และไม่ออก auth cookie/session ของ KorKru
 
 ## ข้อจำกัดลิงก์ออกที่การทดสอบต้องไม่ปิดบัง
@@ -71,25 +76,25 @@ Quit URL อยู่ในไฟล์ก่อนปุ่มแสดง `pln
 
 บันทึกเฉพาะวันที่, fixture id/file SHA-256, OS, SEB version/build, ผลผ่าน/ไม่ผ่าน/ยังไม่ทดสอบ และอาการ ห้าม commit รหัส, raw CK/BEK/request hash, token, ข้อมูลนักเรียน หรือคำตอบจริง
 
-- [ ] A/B เปิดโดยไม่ถาม opening password บน native Mac
-- [ ] CK ตรงกับไฟล์ต้นฉบับโดยไม่บันทึกซ้ำ
-- [ ] รหัสออกไขว้ถูกปฏิเสธ และรหัสของตัวเองใช้ได้
-- [ ] BEK จริงตรงและ wrong/missing/swapped/modified ถูกปฏิเสธ
-- [ ] ลิงก์ทดลองออกทำงานบน native โดยมีทางกู้คืน
-- [ ] iPad: origin ที่เปิดถึง + native tests ครบ + การปลด lockdown
+- [x] Mac: A/B เปิดโดยไม่ถาม opening password; CK+BEK ตรง; รหัสไขว้ถูกปฏิเสธ; รหัสของตัวเองและลิงก์ทดลองออกใช้ได้
+- [x] iPad: A/B เปิดโดยไม่ถาม opening password; CK+BEK ตรง; รหัสไขว้ถูกปฏิเสธ; รหัสของตัวเองและลิงก์ทดลองออกใช้ได้
+- [x] BEK ที่ยังไม่ลงทะเบียนถูกปฏิเสธ และ A-modified ถูกปฏิเสธเมื่อคาดหวัง A บน Mac/iPad
+- [ ] wrong raw BEK และ swapped A/B proof matrix ครบทุกกรณีบน native ทุกแพลตฟอร์ม
 - [ ] Windows: มีผู้ทดสอบ/รุ่นจริง + native tests ครบ
 - [ ] N2.2: submit commit สำเร็จก่อนเสนอออก; save ล้มเหลวไม่รายงานสำเร็จ
 - [ ] N2.2: grant เฉพาะคน/รอบ; D1 คงคำตอบและ deadline เดิม กลับมาได้เมื่อครูอนุญาต
 - [ ] N2.2: visibility, normal close, lost heartbeat และ disconnect/reconnect โดยครูตรวจเครื่องได้
 - [ ] ข้อยุติ BEK automation/ขอบเขตผลิตภัณฑ์ ก่อน N3–N8 ของบริการจริง
 
-ทุกช่องยัง pending จนมีผลจริง Unit tests และ HTTP loopback สังเคราะห์ไม่ได้ติ๊กผล native แทนผู้ใช้
+ช่องที่ติ๊กมาจากผู้ใช้ทดสอบอุปกรณ์จริง ไม่ใช่ผล unit test แทน native ส่วน N2.2, Windows, proof matrix ที่เหลือ และ BEK automation ยัง pending จึงยังไม่ประกาศ N2 หรือ production พร้อม
+
+หลักฐานไฟล์ที่ไม่เป็นความลับ: Mac A `f635f891…b8bad`, B `a18cde0e…19bef`; iPad A `1c436295…b60c`, B `764643b2…aac86`, A-modified `0453e374…e9ab` (SHA-256 ย่อ; raw CK/BEK และรหัสไม่อยู่ใน Git)
 
 ## ตรวจอัตโนมัติ
 
 `npm run seb:n2:test` ทดสอบ envelope, XML, CK changes, private immutable artifacts, registry binding, exact URL/expiry/replay/origin/size, callback timeout และ production verifier regression ที่ BEK ว่างต้องปฏิเสธ บาง tests เปิด loopback HTTP ชั่วคราว จึงต้องมีสิทธิ์ listen ในเครื่อง
 
-ผลตรวจวันที่ 6 กันยายน 2026:
+ผลตรวจเดิมวันที่ 6 กันยายน 2026:
 
 - `npm test`: **1,040 tests / 80 files ผ่าน** รวม N2 ใหม่ 35 tests / 3 files; HTTP ใช้ loopback สังเคราะห์ ไม่ใช่ native SEB
 - `npm run lint:tokens`: ผ่าน ไม่มีไฟล์ที่เพิ่ม design-token debt (probe เป็น plain diagnostic HTML นอก application UI)
@@ -98,7 +103,14 @@ Quit URL อยู่ในไฟล์ก่อนปุ่มแสดง `pln
 - `git diff --check` ผ่าน และยืนยัน private bundle ถูก Git ignore ไม่ commit `.seb`, manifest, passwords หรือ native keys
 - ไม่รัน TypeScript/build เพราะไม่มีการเปลี่ยน TypeScript/application runtime/dependencies; ไม่ตรวจ live migration ledger หรือ apply schema เพราะไม่แตะฐาน ไม่ตั้ง keyring/env/deploy ไม่รัน native หรือ browser-device UAT
 
-**จุดหยุดถัดไป:** ให้ผู้ใช้ลอง N2.1 A/B บน Mac โดยมีรหัสกู้คืน แล้วบันทึกผลก่อนต่อ N2.2/ตั้ง origin สำหรับ iPad/Windows ผลด้านบนไม่ติ๊ก checklist native และไม่ประกาศ N2 ผ่าน
+ผลตรวจวันที่ 10 กันยายน 2026 หลังเพิ่ม private-Wi-Fi origin และ iPad Share Keys compatibility:
+
+- `npm run seb:phase1:test`: **24 tests / 2 files ผ่าน**
+- `npm run seb:n2:test`: **37 tests / 3 files ผ่าน** รวมขอบเขต RFC1918/fixed port และ LAN kit แยก fingerprint
+- ชุด iPad/ทะเบียน BEK ยังคง permission แบบ owner-only และ `.local/` ถูก Git ignore
+- ไม่รัน full suite/build/TypeScript/lint เพราะไม่เปลี่ยน application runtime, TypeScript หรือ UI; ไม่มี migration, env หรือ deploy
+
+**จุดหยุดถัดไป:** ทดสอบ Windows N2.1 เมื่อมีเครื่องจริง แล้วทำ N2.2 สำหรับ submit/grant/resume/presence ต่อ ผล Mac+iPad ไม่ได้ทำให้ Windows, automation หรือ N2 ทั้งเฟสผ่าน
 
 ## แหล่งอ้างอิง
 

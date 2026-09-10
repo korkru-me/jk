@@ -5,20 +5,47 @@ import { join } from 'node:path'
 import { labSettings, configKey, passwordHash, sha256 } from '../seb-phase1/config.mjs'
 import { encodePlainExam } from './format.mjs'
 
-export const ORIGIN = 'http://127.0.0.1:4175'
+export const PROBE_PORT = 4175
+export const ORIGIN = `http://127.0.0.1:${PROBE_PORT}`
 const hex = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
 const password = () => randomBytes(18).toString('base64url')
 export const CASE_IDS = ['a', 'b', 'a-modified']
 
-export function createFixtures({ simplePasswords = false } = {}) {
+function privateIPv4(hostname) {
+  const parts = hostname.split('.')
+  if (parts.length !== 4 || parts.some(part => !/^(0|[1-9][0-9]{0,2})$/.test(part))) return false
+  const [a, b, c, d] = parts.map(Number)
+  if ([a, b, c, d].some(part => part > 255)) return false
+  return hostname === '127.0.0.1' || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+}
+
+export function parseProbeOrigin(origin, { allowEphemeralLoopback = false } = {}) {
+  let parsed
+  try { parsed = new URL(origin) } catch { throw new Error('Invalid N2 probe origin') }
+  const port = Number(parsed.port)
+  const permittedPort = port === PROBE_PORT
+    || (allowEphemeralLoopback && parsed.hostname === '127.0.0.1' && Number.isInteger(port) && port > 0 && port <= 65535)
+  if (parsed.protocol !== 'http:' || parsed.origin !== origin || parsed.username || parsed.password
+    || !privateIPv4(parsed.hostname) || !permittedPort) throw new Error('Invalid N2 probe origin')
+  return parsed
+}
+
+export function probeOriginForHost(hostname) {
+  const origin = `http://${hostname}:${PROBE_PORT}`
+  parseProbeOrigin(origin)
+  return origin
+}
+
+export function createFixtures({ simplePasswords = false, origin = ORIGIN } = {}) {
+  parseProbeOrigin(origin)
   const runId = randomBytes(16).toString('hex')
   // Explicit rehearsal option requested by the operator; random remains the default.
   const adminPassword = simplePasswords ? '1111' : password()
   const quitA = simplePasswords ? '1234' : password(), quitB = simplePasswords ? '4321' : password()
-  const a = { ...labSettings({ startUrl: `${ORIGIN}/n2/${runId}`, quitPassword: quitA,
-    adminPassword, salt: randomBytes(32) }), quitURL: `${ORIGIN}/quit/${runId}`,
+  const a = { ...labSettings({ startUrl: `${origin}/n2/${runId}`, quitPassword: quitA,
+    adminPassword, salt: randomBytes(32) }), quitURL: `${origin}/quit/${runId}`,
     quitURLConfirm: true }
-  return { runId, fixtures: [
+  return { runId, origin, fixtures: [
     { id: 'a', settings: a, adminPassword, quitPassword: quitA },
     { id: 'b', settings: { ...a, hashedQuitPassword: passwordHash(quitB) }, adminPassword, quitPassword: quitB },
     // Same reachable start page and recovery; a valid edit, not damaged compression.
@@ -29,7 +56,7 @@ export function createFixtures({ simplePasswords = false } = {}) {
 export async function writeKit(parent, options = {}) {
   await mkdir(parent, { recursive: true, mode: 0o700 })
   const directory = await mkdtemp(join(parent, 'seb-no-server-'))
-  const { runId, fixtures } = createFixtures(options)
+  const { runId, origin, fixtures } = createFixtures(options)
   const cases = []
   for (const fixture of fixtures) {
     const bytes = encodePlainExam(fixture.settings)
@@ -40,7 +67,8 @@ export async function writeKit(parent, options = {}) {
       adminPassword: fixture.adminPassword })
   }
   const manifest = { lab: 'no-server-n2-v1', runId, createdAt: new Date().toISOString(),
-    origin: ORIGIN, startUrl: fixtures[0].settings.startURL, quitUrl: fixtures[0].settings.quitURL, cases }
+    origin,
+    startUrl: fixtures[0].settings.startURL, quitUrl: fixtures[0].settings.quitURL, cases }
   await writeFile(join(directory, 'private-manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
   await writeFile(join(directory, 'native-keys.private.json'), JSON.stringify({
     lab: manifest.lab, runId, entries: [],
@@ -53,7 +81,9 @@ export async function writeKit(parent, options = {}) {
     'ก่อนเปิด .seb ให้บันทึกงานอื่นและจด quitPassword กับ adminPassword ไว้นอกเครื่องทดสอบ',
     'A/B ต่างกันเฉพาะรหัสออก; A-modified แก้ค่าหนึ่งอย่างเพื่อทดสอบการปฏิเสธ',
     'อ่านขั้นตอนที่ docs/SEB_NO_SERVER_N2.md และเปิด probe ก่อนเปิด .seb',
-    'Start URL เป็น 127.0.0.1 จึงใช้บน Mac ที่รัน probe เท่านั้น ไม่ส่งไฟล์นี้ไป iPad/Windows เครื่องอื่น',
+    manifest.origin === ORIGIN
+      ? 'Start URL เป็น 127.0.0.1 จึงใช้บน Mac ที่รัน probe เท่านั้น ไม่ส่งไฟล์นี้ไป iPad/Windows เครื่องอื่น'
+      : `Start URL ใช้ private Wi-Fi origin ${manifest.origin} สำหรับ lab เท่านั้น อุปกรณ์ต้องอยู่ Wi-Fi วงเดียวกับ Mac ที่รัน probe`,
     'รหัสและ CK อยู่ใน private-manifest.json; native-keys.private.json ว่างโดยตั้งใจ',
     'CK ตรงอย่างเดียวยังไม่ผ่าน BEK และไม่ใช่สิทธิ์เข้าสอบ',
     'อย่าบันทึกไฟล์ซ้ำใน SEB เพราะ CK/BEK อาจเปลี่ยน',
@@ -72,9 +102,10 @@ export async function readPrivateJson(path) {
 
 export async function loadKit(directory) {
   const manifest = await readPrivateJson(join(directory, 'private-manifest.json'))
+  parseProbeOrigin(manifest.origin)
   if (manifest.lab !== 'no-server-n2-v1' || !/^[a-f0-9]{32}$/.test(manifest.runId)
-    || manifest.origin !== ORIGIN || manifest.startUrl !== `${ORIGIN}/n2/${manifest.runId}`
-    || manifest.quitUrl !== `${ORIGIN}/quit/${manifest.runId}` || !Array.isArray(manifest.cases)
+    || manifest.startUrl !== `${manifest.origin}/n2/${manifest.runId}`
+    || manifest.quitUrl !== `${manifest.origin}/quit/${manifest.runId}` || !Array.isArray(manifest.cases)
     || manifest.cases.length !== 3) throw new Error('Invalid N2 manifest')
   for (const id of CASE_IDS) {
     const matching = manifest.cases.filter(item => item.id === id)

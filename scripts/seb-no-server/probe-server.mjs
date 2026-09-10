@@ -2,6 +2,7 @@
 import { createServer } from 'node:http'
 import { randomBytes } from 'node:crypto'
 import { matchesConfigProof } from '../seb-phase1/config.mjs'
+import { parseProbeOrigin } from './kit.mjs'
 
 export function checkProof({ url, configKey, browserKeys, proof }) {
   const shapeOK = proof !== null && typeof proof === 'object' && !Array.isArray(proof)
@@ -86,12 +87,10 @@ async function bodyJson(req) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
 }
 
-export function createProbeServer({ manifest, caseId, browserKeys = [], origin = manifest.origin, now = Date.now }) {
-  // Tests use an ephemeral loopback port; the CLI always uses the fixed manifest origin.
-  const parsed = new URL(origin)
-  if (parsed.protocol !== 'http:' || parsed.hostname !== '127.0.0.1' || parsed.origin !== origin) {
-    throw new Error('Only exact loopback HTTP origins are allowed in this first lab')
-  }
+export function createProbeServer({ manifest, caseId, browserKeys = [], origin = manifest.origin, now = Date.now,
+  testOnlyAllowEphemeralLoopback = false }) {
+  // Native CLI uses exact loopback/private-Wi-Fi port 4175. Tests may allocate an ephemeral loopback port.
+  const parsed = parseProbeOrigin(origin, { allowEphemeralLoopback: testOnlyAllowEphemeralLoopback })
   const fixture = manifest.cases.find(item => item.id === caseId)
   if (!fixture || !/^(a|b|a-modified)$/.test(caseId)) throw new Error('Invalid fixture')
   const pathname = new URL(manifest.startUrl).pathname
