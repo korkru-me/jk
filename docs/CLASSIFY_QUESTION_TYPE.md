@@ -1,7 +1,7 @@
 # ประเภทโจทย์ `classify` (ตารางจำแนก)
 
-อัปเดตล่าสุด: 12 กันยายน 2026 · สถานะ: **เฟส 2 จาก 7 เสร็จ — ยังใช้งานไม่ได้**
-· schema พร้อมแล้ว (migration apply บนฐานจริงเรียบร้อย)
+อัปเดตล่าสุด: 12 กันยายน 2026 · สถานะ: **เฟส 3 จาก 7 เสร็จ — ยังใช้งานไม่ได้**
+· schema พร้อมแล้ว (migration apply บนฐานจริงเรียบร้อย) · ยังไม่มีตัวเรนเดอร์และฟอร์ม
 
 เอกสารนี้คือช่องทาง handoff ของงานนี้ตาม `AGENTS.md` แชตและ memory ของ agent ไม่ใช่ช่องทาง handoff
 ใครมาทำต่อ (Claude Code หรือ Codex เครื่องไหนก็ตาม) ให้เริ่มจากไฟล์นี้
@@ -80,7 +80,7 @@ row_label_style?: PartLabelStyle              // undefined = 'number' (3.1, 3.2,
 | 0 | ตัดสินใจ · ตรวจ `supabase migration list` · แตกเบรนช์ | ✅ เสร็จ |
 | 1 | types + คะแนน + เทสต์ (TypeScript ล้วน ไม่แตะ DB ไม่แตะ UI) | ✅ เสร็จ |
 | 2 | migration **2 ไฟล์แยกกัน** — `ALTER TYPE … ADD VALUE 'classify'` และสาขาใหม่ใน `education_research_question_max_score` | ✅ เสร็จ · apply บนฐานจริงแล้ว |
-| 3 | `lib/exam-safe.ts` — `SafeClassifyConfig` **ต้องตัด `rows[].answers` ทิ้งก่อนถึง browser** | ⬜ |
+| 3 | `lib/exam-safe.ts` — `SafeClassifyConfig` **ต้องตัด `rows[].answers` ทิ้งก่อนถึง browser** | ✅ เสร็จ |
 | 4 | ตัวเรนเดอร์ฝั่งนักเรียน (`exam-client.tsx`, `question-preview-content.tsx`) + responsive | ⬜ |
 | 5 | ฟอร์มสร้าง/แก้ · การ์ดเลือกประเภท · ป้ายชื่อ · ทำสำเนา · นำเข้า-ส่งออก | ⬜ |
 | 6 | ปลายทางหลังสอบ — `answer-feedback.ts`, หน้าตรวจ, หน้าผลสอบ | ⬜ |
@@ -122,6 +122,21 @@ row_label_style?: PartLabelStyle              // undefined = 'number' (3.1, 3.2,
 **apply บน Supabase จริงแล้ว 12 กันยายน 2026** ด้วย `supabase db push` (dry run ก่อน ยืนยันว่าส่งขึ้นเฉพาะ 2 ไฟล์นี้)
 หลัง push `supabase migration list` ไม่เหลือ local-only เลย — local กับ remote ตรงกันครบทุกตัว
 นี่คือขั้นที่ `20260726120000_file_upload_question_type.sql` เคยข้ามไป
+
+## สิ่งที่เฟส 3 ทำไปแล้ว
+
+- `lib/exam-safe.ts` — `SafeClassifyColumn`/`SafeClassifyRow`/`SafeClassifyConfig` + สาขา sanitizer
+  **`SafeClassifyRow` ไม่มีฟิลด์ `answers` เลย** ไม่ใช่ลบทิ้งทีหลัง — ไม่มีที่ให้มันไปอยู่ตั้งแต่แรก
+  ต่างจากปรนัยที่เฉลยเป็นแค่ธง `is_correct` ข้างตัวเลือก เฉลยทั้งชุดของ classify อยู่ในแถว
+  ถ้าหลุดไปคือนักเรียนได้ใบงานที่เฉลยมาให้เสร็จแล้ว
+- `lib/exam-safe.test.ts` — เทสต์ว่าไม่มีเฉลยหลุด + โครงสร้างพัง ๆ ไม่ทำให้ browser ได้ขยะ
+
+**ห้าม shuffle แถว คอลัมน์ หรือตัวเลือกในสาขานี้** — คำตอบนักเรียนเป็นกริด row-major ที่เทียบกับเฉลยที่ตรึงจาก config เดียวกัน
+สับลำดับเมื่อไหร่ทุกช่องเลื่อนหมด (ปรนัยสับได้เพราะ attempt เก็บ `option_order` ไว้แมปกลับ classify ไม่มีและไม่ต้องมี)
+
+ตรวจแล้ว: `tsc` ✓ · `npm test` 794 ✓ (เพิ่ม 2) · `lint:tokens` ✓ · `build` ✓
+**พิสูจน์ว่าเทสต์จับได้จริง**: ทดลองแก้ sanitizer ให้ปล่อย `answers` ผ่าน เทสต์ fail ตามคาด แล้ว restore กลับ
+(เทสต์แบบ "ต้องไม่มี" ที่ไม่เคยเห็นมัน fail เชื่อไม่ได้)
 
 ## ข้อจำกัดที่ยังค้างอยู่ ต้องรู้ก่อนทำเฟสต่อไป
 

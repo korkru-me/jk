@@ -163,6 +163,62 @@ describe('toSafeExamAnswer', () => {
     expect(fill.json).not.toContain('BLANK_SECRET')
   })
 
+  it('hands a ตารางจำแนก to the student with no cell key in it', () => {
+    // Unlike ปรนัย, where the key is an is_correct flag beside an option, a
+    // classify question keeps its entire key inside the rows. If answers
+    // survived the sanitiser the student would receive the finished worksheet.
+    const classify = serializedSafe('classify', {
+      extra_data: {
+        columns: [
+          { id: 'origin', title: 'จำแนกตามแหล่งกำเนิด', options: ['พอลิเมอร์ธรรมชาติ', 'พอลิเมอร์สังเคราะห์'] },
+          { id: 'monomer', title: 'จำแนกตามชนิดของมอนอเมอร์', options: ['โฮโมพอลิเมอร์', 'โคพอลิเมอร์'] },
+        ],
+        rows: [
+          { id: 'r1', text: 'เนื้อหมู', image_urls: ['https://example.test/pork.png'], answers: { origin: 0, monomer: 1 } },
+          { id: 'r2', text: 'ยางรัดของ', answers: { origin: 1, monomer: 0 }, CLASSIFY_ROW_SECRET: 'leak' },
+        ],
+        row_label_style: 'number',
+        CLASSIFY_CONFIG_SECRET: 'leak',
+      },
+    })
+
+    expect(classify.json).not.toContain('answers')
+    expect(classify.json).not.toContain('CLASSIFY_ROW_SECRET')
+    expect(classify.json).not.toContain('CLASSIFY_CONFIG_SECRET')
+
+    const config = classify.safe.questions.extra_data as {
+      columns: Array<{ id: string; title: string; options: string[] }>
+      rows: Array<Record<string, unknown>>
+      row_label_style?: string
+    }
+    // Everything the student needs to answer still arrives, in the order the
+    // frozen key was built from — a shuffle here would misalign every cell.
+    expect(config.columns.map(column => column.id)).toEqual(['origin', 'monomer'])
+    expect(config.columns[1].options).toEqual(['โฮโมพอลิเมอร์', 'โคพอลิเมอร์'])
+    expect(config.rows.map(row => row.text)).toEqual(['เนื้อหมู', 'ยางรัดของ'])
+    expect(config.rows[0].image_urls).toEqual(['https://example.test/pork.png'])
+    expect(config.row_label_style).toBe('number')
+    for (const row of config.rows) expect(Object.keys(row)).not.toContain('answers')
+  })
+
+  it('keeps a malformed ตารางจำแนก from reaching the browser as junk', () => {
+    const classify = serializedSafe('classify', {
+      extra_data: {
+        columns: [{ id: 7, title: null, options: 'not-an-array' }, 'not-an-object'],
+        rows: 'not-an-array',
+      },
+    })
+    const config = classify.safe.questions.extra_data as {
+      columns: Array<{ id: string; title: string; options: string[] }>
+      rows: unknown[]
+    }
+    expect(config.columns).toEqual([
+      { id: '', title: '', options: [] },
+      { id: '', title: '', options: [] },
+    ])
+    expect(config.rows).toEqual([])
+  })
+
   it('shuffles ordering prompts and strips every composite answer key', () => {
     const ordering = serializedSafe('ordering', {
       extra_data: {

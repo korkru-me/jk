@@ -71,6 +71,41 @@ export interface SafeMatchingConfig {
   answer_mode?: MatchingAnswerMode
 }
 
+/**
+ * A ตารางจำแนก as the student may see it.
+ *
+ * The whole answer key of this type lives inside the rows — ClassifyRow.answers
+ * maps each column id to the position of the option that column's cell should
+ * hold — so unlike ปรนัย, where the key is one `is_correct` flag beside each
+ * option, dropping a single field here is the difference between a worksheet
+ * and a worksheet with the answers printed on it. SafeClassifyRow therefore has
+ * no `answers` member at all: it cannot be forgotten, because there is nowhere
+ * for it to go.
+ *
+ * Order is load-bearing. The student's answer is a row-major grid of option
+ * positions compared against a key frozen from this same config, so the
+ * sanitiser must not shuffle rows, columns or options — it copies them through
+ * in place. (ปรนัย can shuffle because its attempt persists an option_order to
+ * map the shuffle back; classify has no such record and needs none.)
+ */
+export interface SafeClassifyColumn {
+  id: string
+  title: string
+  options: string[]
+}
+
+export interface SafeClassifyRow {
+  id: string
+  text: string
+  image_urls?: string[]
+}
+
+export interface SafeClassifyConfig {
+  columns: SafeClassifyColumn[]
+  rows: SafeClassifyRow[]
+  row_label_style?: PartLabelStyle
+}
+
 export interface SafeCompositeConfig {
   parts: SafeCompositePart[]
   part_label_style?: PartLabelStyle
@@ -84,6 +119,7 @@ export type SafeExamExtraData =
   | SafeRandomQuestionConfig
   | FileUploadConfig
   | SafeCompositeConfig
+  | SafeClassifyConfig
   | null
 
 export interface SafeAnswerPart {
@@ -287,6 +323,38 @@ function sanitizeExtraData(questionType: string, value: unknown, random: () => n
     return {
       parts,
       ...(asOptionalString(extra.part_label_style) ? { part_label_style: extra.part_label_style as PartLabelStyle } : {}),
+    }
+  }
+
+  if (questionType === 'classify') {
+    const columns: SafeClassifyColumn[] = Array.isArray(extra.columns)
+      ? extra.columns.map((rawColumn) => {
+          const column = asRecord(rawColumn)
+          return {
+            id: asString(column.id),
+            title: asString(column.title),
+            options: asStringArray(column.options) ?? [],
+          }
+        })
+      : []
+    // Rebuilt field by field, like every other branch here: a row is copied as
+    // id, text and images and nothing else, so `answers` is left behind by
+    // construction rather than by a delete that a later edit could drop.
+    const rows: SafeClassifyRow[] = Array.isArray(extra.rows)
+      ? extra.rows.map((rawRow) => {
+          const row = asRecord(rawRow)
+          const imageUrls = asStringArray(row.image_urls)
+          return {
+            id: asString(row.id),
+            text: asString(row.text),
+            ...(imageUrls ? { image_urls: imageUrls } : {}),
+          }
+        })
+      : []
+    return {
+      columns,
+      rows,
+      ...(asOptionalString(extra.row_label_style) ? { row_label_style: extra.row_label_style as PartLabelStyle } : {}),
     }
   }
 
