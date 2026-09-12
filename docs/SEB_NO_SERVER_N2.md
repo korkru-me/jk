@@ -1,18 +1,19 @@
 # N2 — พิสูจน์ SEB แบบไม่เพิ่ม SEB Server สำหรับสอบในห้องเรียน
 
-อัปเดต 10 กันยายน 2026 · แผนหลัก [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md)
+อัปเดต 12 กันยายน 2026 · แผนหลัก [SEB_NO_SERVER_PLAN.md](SEB_NO_SERVER_PLAN.md)
 
 **การช่วยทดสอบล่าสุด:** ผู้ใช้ขอคำแนะนำสั้น ๆ ทีละขั้น และรหัสทดลองจำง่าย อนุมัติสร้างชุดใหม่ด้วย `npm run seb:n2:prepare -- --simple-passwords`: A/A-modified ออกด้วย `1234`, B ออกด้วย `4321`, ตั้งค่าทั้งสองชุดด้วย `1111` ไม่มี opening password ตัวเลือกนี้ใช้เฉพาะ lab; คำสั่งปกติยังสุ่มรหัส เก็บชุดเก่าไว้และใช้ path ของชุดใหม่ในการเปิด probe Key/hash คำนวณใหม่ทั้งชุดและทะเบียน native เริ่มว่าง ต้องทดสอบใหม่ ห้ามนำ Key เก่ามาแทน อธิบายให้ผู้ใช้ทีละขั้น ไม่ส่งคู่มือทั้งชุดซ้ำ
 
-ชุด Mac วันที่ 7 กันยายนอยู่ที่ `.local/seb-no-server-sypouv/` และชุด iPad แบบ Wi-Fi วันที่ 10 กันยายนอยู่ที่ `.local/seb-no-server-eHAu0h/` บนเครื่องนี้เท่านั้น (ไฟล์ส่วนตัว Git ignore และไม่ย้ายข้ามเครื่องด้วย Git) ห้ามคัดลอกรหัสหรือ Key จากสองชุดนี้ไป production
+ชุด Mac วันที่ 7 กันยายนอยู่ที่ `.local/seb-no-server-sypouv/` และชุด iPad/iPhone แบบ Wi-Fi วันที่ 10–12 กันยายนอยู่ที่ `.local/seb-no-server-eHAu0h/` บนเครื่องนี้เท่านั้น (ไฟล์ส่วนตัว Git ignore และไม่ย้ายข้ามเครื่องด้วย Git) ห้ามคัดลอกรหัสหรือ Key จากสองชุดนี้ไป production
 
 ## สถานะตรงตามจริง
 
-**N2.1 native core ผ่านแล้วบน Mac และ iPad; N2 ทั้งเฟสยังไม่ผ่าน** ชุดนี้ตรวจรูปแบบไฟล์ การคำนวณ Key และการเรียก Quit URL แบบแยกจากเว็บจริง ไม่ใช่หน้าคุมสอบใหม่ ไม่ใช่ระบบรหัสรายครูพร้อมขาย ไม่เชื่อม Supabase/Vercel และไม่ออก session สอบ
+**N2.1 native core ผ่านแล้วบน Mac, iPad และ iPhone; N2 ทั้งเฟสยังไม่ผ่าน** ชุดนี้ตรวจรูปแบบไฟล์ การคำนวณ Key และการเรียก Quit URL แบบแยกจากเว็บจริง ไม่ใช่หน้าคุมสอบใหม่ ไม่ใช่ระบบรหัสรายครูพร้อมขาย ไม่เชื่อม Supabase/Vercel และไม่ออก session สอบ
 
 - Mac: วันที่ 7 กันยายน 2026 ผ่าน A/B ไม่มี opening password, CK+BEK, รหัสออกแยกกัน, ลิงก์ออก และ A-modified ถูกปฏิเสธ บน macOS 26.4 (25E246), SEB 3.7 build 1591F
 - iPad: วันที่ 10 กันยายน 2026 ผ่านผลหลักเดียวกันบน SEB 3.6.2 ผ่าน private Wi-Fi origin และผู้ใช้ยืนยันว่าลิงก์ออกปลด session ได้
-- Windows: pending ต้องมีเครื่องจริงและระบุ Windows/SEB build ก่อนลงทะเบียน BEK และทดสอบ ห้ามอนุมานผลจาก Mac/iPad
+- iPhone: วันที่ 12 กันยายน 2026 ผ่าน A/B ไม่มี opening password, CK+BEK, รหัสไขว้ถูกปฏิเสธ, รหัสของตัวเองใช้ได้, ลิงก์ออกไม่ถามรหัส และ A-modified ถูกปฏิเสธ บน iOS 26.6.1, SEB 3.7.1
+- Windows: pending ต้องมีเครื่องจริงและระบุ Windows/SEB build ก่อนลงทะเบียน BEK และทดสอบ ห้ามอนุมานผลจาก Mac/iPad/iPhone
 - N2.2 ยังต้องทำหน้าทดลองส่งคำตอบ/อนุญาตออกเฉพาะราย/พักและอนุญาตกลับรอบเดิม/สัญญาณขาดการติดต่อ หลัง import/Key/recovery ชุดแรกผ่าน ไม่ใช่ฟีเจอร์ที่มีแล้วเพียงรอ native test
 - automation ของ trusted BEK ยังไม่พิสูจน์ การเก็บ Key ด้วยมือใน lab ไม่ใช่การเลือกให้ครูทั่วประเทศทำงานด้วยมือ และไม่อนุมัติ CK-only
 
@@ -78,17 +79,19 @@ Quit URL อยู่ในไฟล์ก่อนปุ่มแสดง `pln
 
 - [x] Mac: A/B เปิดโดยไม่ถาม opening password; CK+BEK ตรง; รหัสไขว้ถูกปฏิเสธ; รหัสของตัวเองและลิงก์ทดลองออกใช้ได้
 - [x] iPad: A/B เปิดโดยไม่ถาม opening password; CK+BEK ตรง; รหัสไขว้ถูกปฏิเสธ; รหัสของตัวเองและลิงก์ทดลองออกใช้ได้
-- [x] BEK ที่ยังไม่ลงทะเบียนถูกปฏิเสธ และ A-modified ถูกปฏิเสธเมื่อคาดหวัง A บน Mac/iPad
+- [x] iPhone: A/B เปิดโดยไม่ถาม opening password; CK+BEK ตรง; รหัสไขว้ถูกปฏิเสธ; รหัสของตัวเองและลิงก์ทดลองออกใช้ได้
+- [x] BEK ที่ยังไม่ลงทะเบียนถูกปฏิเสธ และ A-modified ถูกปฏิเสธเมื่อคาดหวัง A บน Mac/iPad/iPhone
 - [ ] wrong raw BEK และ swapped A/B proof matrix ครบทุกกรณีบน native ทุกแพลตฟอร์ม
 - [ ] Windows: มีผู้ทดสอบ/รุ่นจริง + native tests ครบ
+- [ ] หลัง SEB ผ่าน Mac/iPad/iPhone/Windows ครบ ให้เตือนผู้ใช้เริ่มทดสอบหน้าข้อสอบ KorKru จริงบนแต่ละขนาดจอ: อ่านโจทย์, พิมพ์/คณิตศาสตร์, แนบไฟล์ และส่งคำตอบ
 - [ ] N2.2: submit commit สำเร็จก่อนเสนอออก; save ล้มเหลวไม่รายงานสำเร็จ
 - [ ] N2.2: grant เฉพาะคน/รอบ; D1 คงคำตอบและ deadline เดิม กลับมาได้เมื่อครูอนุญาต
 - [ ] N2.2: visibility, normal close, lost heartbeat และ disconnect/reconnect โดยครูตรวจเครื่องได้
 - [ ] ข้อยุติ BEK automation/ขอบเขตผลิตภัณฑ์ ก่อน N3–N8 ของบริการจริง
 
-ช่องที่ติ๊กมาจากผู้ใช้ทดสอบอุปกรณ์จริง ไม่ใช่ผล unit test แทน native ส่วน N2.2, Windows, proof matrix ที่เหลือ และ BEK automation ยัง pending จึงยังไม่ประกาศ N2 หรือ production พร้อม
+ช่องที่ติ๊กมาจากผู้ใช้ทดสอบอุปกรณ์จริง ไม่ใช่ผล unit test แทน native ส่วน N2.2, Windows, proof matrix ที่เหลือ, device-UX test ที่ผู้ใช้ขอพักไว้ และ BEK automation ยัง pending จึงยังไม่ประกาศ N2 หรือ production พร้อม
 
-หลักฐานไฟล์ที่ไม่เป็นความลับ: Mac A `f635f891…b8bad`, B `a18cde0e…19bef`; iPad A `1c436295…b60c`, B `764643b2…aac86`, A-modified `0453e374…e9ab` (SHA-256 ย่อ; raw CK/BEK และรหัสไม่อยู่ใน Git)
+หลักฐานไฟล์ที่ไม่เป็นความลับ: Mac A `f635f891…b8bad`, B `a18cde0e…19bef`; iPad/iPhone A `1c436295…b60c`, B `764643b2…aac86`, A-modified `0453e374…e9ab` (SHA-256 ย่อ; raw CK/BEK และรหัสไม่อยู่ใน Git)
 
 ## ตรวจอัตโนมัติ
 
@@ -110,12 +113,13 @@ Quit URL อยู่ในไฟล์ก่อนปุ่มแสดง `pln
 - ชุด iPad/ทะเบียน BEK ยังคง permission แบบ owner-only และ `.local/` ถูก Git ignore
 - ไม่รัน full suite/build/TypeScript/lint เพราะไม่เปลี่ยน application runtime, TypeScript หรือ UI; ไม่มี migration, env หรือ deploy
 
-**จุดหยุดถัดไป:** ทดสอบ Windows N2.1 เมื่อมีเครื่องจริง แล้วทำ N2.2 สำหรับ submit/grant/resume/presence ต่อ ผล Mac+iPad ไม่ได้ทำให้ Windows, automation หรือ N2 ทั้งเฟสผ่าน
+**จุดหยุดถัดไป:** ทดสอบ Windows N2.1 เมื่อมีเครื่องจริง จากนั้นเตือนผู้ใช้ทำ device-UX test ที่พักไว้ แล้วทำ N2.2 สำหรับ submit/grant/resume/presence ต่อ ผล Mac+iPad+iPhone ไม่ได้ทำให้ Windows, automation หรือ N2 ทั้งเฟสผ่าน
 
 ## แหล่งอ้างอิง
 
 - [SEB file format](https://safeexambrowser.org/developer/seb-file-format.html)
 - [SEB Config Key และ JavaScript API](https://safeexambrowser.org/developer/seb-config-key.html)
+- [SEB 3.7.1 for iOS release notes](https://safeexambrowser.org/ios/ios_release_notes_en.html)
 - [Apple plnd reader](https://github.com/SafeExamBrowser/seb-mac/blob/b56ae815a30f35cc26cc78a5c2597c9bdcfb1a53/Classes/ConfigFiles/SEBConfigFileManager.m#L167)
 - [Windows binary parser](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/20ca462306636421fe53a804cc8f55941f9d21b6/SafeExamBrowser.Configuration/DataFormats/BinaryParser.cs#L78)
 - [Apple callback bridge](https://github.com/SafeExamBrowser/seb-mac/blob/b56ae815a30f35cc26cc78a5c2597c9bdcfb1a53/Classes/BrowserComponents/SEBAbstractModernWebView.swift#L73)
