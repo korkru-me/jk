@@ -2,7 +2,7 @@ import Link from 'next/link'
 import {
   BookOpen, Layers, GraduationCap, Plus, ChevronRight, Users, FileText,
   House, ListChecks, PenLine, NotebookPen, ToggleLeft, TextCursorInput,
-  ArrowLeftRight, ListOrdered, Paperclip, Boxes,
+  ArrowLeftRight, ListOrdered, Paperclip, Boxes, Table2,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
@@ -72,6 +72,7 @@ const TYPE_ICON: Record<string, React.ElementType> = {
   ordering: ListOrdered,
   file_upload: Paperclip,
   composite: Boxes,
+  classify: Table2,
 }
 
 export interface DashboardClassroom {

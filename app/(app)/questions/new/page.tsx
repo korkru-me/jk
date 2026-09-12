@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, FileUp, Blocks } from 'lucide-react'
+import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, FileUp, Blocks, Table2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { SAMPLE_QUESTIONS } from './_data/sample-questions'
 import { SamplePreview } from './_components/sample-preview'
@@ -77,6 +77,15 @@ const QUESTION_TYPES = [
     desc: 'แนบไฟล์รูปภาพหรือ PDF พร้อมคำสั่ง ให้นักเรียนส่งไฟล์คำตอบกลับมา',
     color: 'bg-tint-2/10 border-tint-2/20 text-tint-2',
     iconColor: 'text-tint-2',
+  },
+  {
+    href: '/questions/new/classify',
+    type: 'classify' as QuestionType,
+    icon: Table2,
+    title: 'ตารางจำแนก',
+    desc: 'ตารางเดียว — แถวคือสิ่งที่ให้จำแนก คอลัมน์คือมิติการจำแนก นักเรียนเลือก 1 ตัวเลือกต่อช่อง',
+    color: 'bg-tint-4/10 border-tint-4/20 text-tint-4',
+    iconColor: 'text-tint-4',
   },
   {
     href: '/questions/new/composite',
