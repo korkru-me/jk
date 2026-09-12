@@ -1,7 +1,7 @@
 # ประเภทโจทย์ `classify` (ตารางจำแนก)
 
 อัปเดตล่าสุด: 12 กันยายน 2026 · สถานะ: **เฟส 2 จาก 7 เสร็จ — ยังใช้งานไม่ได้**
-· ⚠️ **migration เขียนแล้วแต่ยังไม่ apply บนฐานจริง**
+· schema พร้อมแล้ว (migration apply บนฐานจริงเรียบร้อย)
 
 เอกสารนี้คือช่องทาง handoff ของงานนี้ตาม `AGENTS.md` แชตและ memory ของ agent ไม่ใช่ช่องทาง handoff
 ใครมาทำต่อ (Claude Code หรือ Codex เครื่องไหนก็ตาม) ให้เริ่มจากไฟล์นี้
@@ -79,7 +79,7 @@ row_label_style?: PartLabelStyle              // undefined = 'number' (3.1, 3.2,
 |---|---|---|
 | 0 | ตัดสินใจ · ตรวจ `supabase migration list` · แตกเบรนช์ | ✅ เสร็จ |
 | 1 | types + คะแนน + เทสต์ (TypeScript ล้วน ไม่แตะ DB ไม่แตะ UI) | ✅ เสร็จ |
-| 2 | migration **2 ไฟล์แยกกัน** — `ALTER TYPE … ADD VALUE 'classify'` และสาขาใหม่ใน `education_research_question_max_score` | ⚠️ เขียนและทดสอบแล้ว **ยังไม่ apply บน remote** |
+| 2 | migration **2 ไฟล์แยกกัน** — `ALTER TYPE … ADD VALUE 'classify'` และสาขาใหม่ใน `education_research_question_max_score` | ✅ เสร็จ · apply บนฐานจริงแล้ว |
 | 3 | `lib/exam-safe.ts` — `SafeClassifyConfig` **ต้องตัด `rows[].answers` ทิ้งก่อนถึง browser** | ⬜ |
 | 4 | ตัวเรนเดอร์ฝั่งนักเรียน (`exam-client.tsx`, `question-preview-content.tsx`) + responsive | ⬜ |
 | 5 | ฟอร์มสร้าง/แก้ · การ์ดเลือกประเภท · ป้ายชื่อ · ทำสำเนา · นำเข้า-ส่งออก | ⬜ |
@@ -118,19 +118,20 @@ row_label_style?: PartLabelStyle              // undefined = 'number' (3.1, 3.2,
   (ไม่มีอะไรใน JavaScript อ่านลำดับ enum กลับมาได้ การเรียงตามประเภทโจทย์จึงเพี้ยนเงียบ ๆ ได้ถ้าสองฝั่งไม่ตรงกัน)
 
 ตรวจแล้ว: `tsc` ✓ · `npm test` 792 ✓ (เพิ่ม 14) · migration ทั้งสองไฟล์ apply สำเร็จบน PGlite แยก transaction กัน
-ยังไม่ได้ตรวจ: **ยังไม่ได้ apply บน Supabase จริง** — ดูข้อ 1 ข้างล่าง
+
+**apply บน Supabase จริงแล้ว 12 กันยายน 2026** ด้วย `supabase db push` (dry run ก่อน ยืนยันว่าส่งขึ้นเฉพาะ 2 ไฟล์นี้)
+หลัง push `supabase migration list` ไม่เหลือ local-only เลย — local กับ remote ตรงกันครบทุกตัว
+นี่คือขั้นที่ `20260726120000_file_upload_question_type.sql` เคยข้ามไป
 
 ## ข้อจำกัดที่ยังค้างอยู่ ต้องรู้ก่อนทำเฟสต่อไป
 
-1. **migration ของ classify ทั้งสองไฟล์ยังไม่ถูก apply บนฐานจริง**
-   ตรวจ `supabase migration list` ก่อนสร้างแล้ว: ฐานของเบรนช์นี้ตรงกับ remote ครบ 108 ตัว ไม่มี local-only
-   หลังเพิ่มสองไฟล์นี้จะขึ้นเป็น local-only 2 ตัวจนกว่าจะ apply
-   **ห้ามลืมขั้นนี้** — `20260726120000_file_upload_question_type.sql` เคยค้างแบบนี้
-   แล้วประเภท "ส่งไฟล์งาน" พังใน production อยู่ 4 เดือนโดยไม่มีใครรู้
-   ต้อง apply **ก่อน**เฟส 5 (ฟอร์มบันทึกโจทย์) เป็นอย่างช้า ไม่งั้นครูกดบันทึกแล้วจะ error ที่ enum
+1. **schema พร้อมแล้ว แต่ค่า enum `classify` อยู่บนฐาน production ก่อนที่ UI จะมี**
+   ปลอดภัย: การเพิ่ม label ไม่ rewrite แถวไหน และยังไม่มีทางเขียนค่านี้ลงไปจนกว่าฟอร์มของเฟส 5 จะขึ้น
+   แต่แปลว่า **ห้าม revert migration สองตัวนี้** — Postgres ลบค่า enum ออกไม่ได้ ถ้าต้องถอยต้องสร้าง type ใหม่ทั้งตัว
 
    งาน SEB เฟส 3 (`20260905072556_add_exam_seb_password_drafts`) ยังค้างไม่ apply เหมือนเดิมบนเบรนช์ของมัน
    แต่ไม่มีบน `master` จึงไม่พ่วงมากับ classify — นั่นคือเหตุผลที่เบรนช์นี้แตกจาก master
+   เมื่อเบรนช์ SEB rebase มาทับ master ทีหลัง มันจะเห็น migration ของ classify เป็นของที่ apply แล้ว ไม่ชนกัน
 
 2. **`/exam-screen-lab` ไม่มีบน `master`** อยู่บนเบรนช์ SEB เท่านั้น (commit `47dd7a2`)
    เฟส 4 วางแผนจะใช้หน้านี้พิสูจน์ตัวเรนเดอร์โดยไม่ต้อง login และไม่ต้องมีข้อมูลใน DB
