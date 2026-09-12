@@ -6,6 +6,7 @@ import { BookOpen, Clock, AlertCircle, CheckCircle2, XCircle, RotateCcw, Target,
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
+import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
 import { Card } from '@/components/ui/card'
@@ -158,7 +159,7 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <BookOpen size={11} />
-          {questionCount} ข้อ{a.random_question_count ? ` (สุ่มจาก ${a.question_ids.length})` : ''}
+          {assignmentSizeLabel(a)}
         </span>
         {a.duration_minutes && (
           <span className="flex items-center gap-1">

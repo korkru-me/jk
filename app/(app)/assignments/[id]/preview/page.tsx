@@ -145,11 +145,26 @@ export default async function AssignmentPreviewPage({
     isWorkImageEnforced: a.require_work_image ?? false,
     // Show the teacher exactly the แบบฝึกหัด their students will get, ปุ่มตรวจ
     // and all — including whether it opens the เฉลย.
-    instantCheck: a.type === 'exercise' && a.mode === 'online' && a.instant_check === true,
+    instantCheck: a.mode === 'online'
+      && a.instant_check === true
+      && (a.type === 'exercise' || a.completion_rule === 'streak'),
     instantCheckAnswerKey: a.instant_check_answer_key !== false,
     calculatorEnabled: a.calculator_enabled === true,
     scratchpadEnabled: a.scratchpad_enabled === true,
   }
+
+  // A streak งาน is previewed as its whole คลัง rather than as the run: this
+  // route has no submission behind it, so there is nothing for the draw to
+  // append rows to. The teacher can still read every ข้อ and try the ตรวจ
+  // panel, which is most of what they open a preview for — but they are told
+  // plainly that the ordering and the count are not what a student will meet.
+  const streakPreviewNote = a.completion_rule === 'streak'
+    ? `งานนี้จบเมื่อถูกติดต่อกัน ${a.streak_target} ข้อ — ตัวอย่างนี้แสดงโจทย์ทั้งคลังเรียงตามลำดับ ไม่ใช่ลำดับและจำนวนข้อที่นักเรียนจะได้รับจริง`
+    : null
+  const editWarning = startedSubmission
+    ? 'มีนักเรียนเริ่มทำงานนี้แล้ว — การแก้โจทย์มีผลกับครั้งที่เริ่มใหม่เท่านั้น ครั้งที่ทำค้างอยู่ยังใช้โจทย์และเฉลยเดิมที่ตรึงไว้ตอนเริ่ม'
+    : null
+  const previewWarning = [streakPreviewNote, editWarning].filter(Boolean).join(' · ') || undefined
 
   // The โหมดตัวอย่าง banner rides in ExamClient's own column, so there is no
   // height to reserve here — it takes whichever of its one or two lines it
@@ -168,9 +183,7 @@ export default async function AssignmentPreviewPage({
         questionsPerPage={Math.max(1, Number(a.questions_per_page ?? 1))}
         previewMode
         previewReturnHref={`/assignments/${id}`}
-        previewEditWarning={startedSubmission
-          ? 'มีนักเรียนเริ่มทำงานนี้แล้ว — การแก้โจทย์มีผลกับครั้งที่เริ่มใหม่เท่านั้น ครั้งที่ทำค้างอยู่ยังใช้โจทย์และเฉลยเดิมที่ตรึงไว้ตอนเริ่ม'
-          : undefined}
+        previewEditWarning={previewWarning}
       />
     </div>
   )

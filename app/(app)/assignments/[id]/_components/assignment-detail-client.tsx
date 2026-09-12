@@ -385,9 +385,20 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
             { label: 'เวลาทำ', value: a.duration_minutes ? `${a.duration_minutes} นาที` : 'ไม่จำกัด' },
             { label: 'เปิดรับ', value: a.start_at ? new Date(a.start_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ทันที' },
             { label: 'ปิดรับ', value: a.end_at ? new Date(a.end_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่กำหนด' },
-            ...(a.passing_type != null && a.passing_value != null
-              ? [{ label: 'เกณฑ์ผ่าน', value: a.passing_type === 'percent' ? `${a.passing_value}%` : `${a.passing_value} คะแนน` }]
-              : []),
+            // The three endings are mutually exclusive — the database refuses
+            // a streak งาน that also carries a score threshold — so this reads
+            // as one row, not two that could both appear.
+            ...(a.completion_rule === 'streak'
+              ? [
+                  { label: 'เงื่อนไขจบ', value: `ถูกติดต่อกัน ${a.streak_target} ข้อ` },
+                  ...(a.streak_question_cap != null
+                    ? [{ label: 'หยุดอัตโนมัติ', value: `ทำครบ ${a.streak_question_cap} ข้อ` }]
+                    : []),
+                  { label: 'ทำครบคลังแล้ว', value: a.streak_recycle_pool === false ? 'จบเลย' : 'วนกลับมาใหม่' },
+                ]
+              : a.passing_type != null && a.passing_value != null
+                ? [{ label: 'เกณฑ์ผ่าน', value: a.passing_type === 'percent' ? `${a.passing_value}%` : `${a.passing_value} คะแนน` }]
+                : [{ label: 'เงื่อนไขจบ', value: 'ทำครบแล้วจบ' }]),
           ].map(row => (
             <div key={row.label} className="flex justify-between py-2.5 text-sm">
               <span className="text-muted-foreground">{row.label}</span>

@@ -9,6 +9,7 @@ import {
 import { buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import type { AssignmentRow } from '../page'
 import { Card } from '@/components/ui/card'
 
@@ -98,7 +99,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                     <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <FileText className="w-3 h-3" />
-                        {a.random_question_count ?? a.question_ids.length} ข้อ{a.random_question_count ? ` (สุ่มจาก ${a.question_ids.length})` : ''}
+                        {assignmentSizeLabel(a)}
                       </span>
                       {a.duration_minutes && <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{a.duration_minutes} นาที</span>}
                       {a.end_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />ถึง {new Date(a.end_at).toLocaleDateString('th-TH', { dateStyle: 'short' })}</span>}

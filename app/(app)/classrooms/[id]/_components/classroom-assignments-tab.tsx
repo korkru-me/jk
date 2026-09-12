@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { formatPassingThreshold } from '@/lib/grading'
+import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computeAssignmentProgress } from '@/lib/classroom-progress'
 import { Card } from '@/components/ui/card'
 import {
@@ -24,6 +25,8 @@ export interface ClassroomAssignmentRow {
   end_at: string | null
   question_ids: string[]
   random_question_count: number | null
+  completion_rule: string | null
+  streak_target: number | null
   created_at: string
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
@@ -121,7 +124,7 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                       <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
                         <span className="text-xs text-muted-foreground">
-                          {a.random_question_count ? `${a.random_question_count} ข้อ/คน · คลัง ${a.question_ids.length}` : `${a.question_ids.length} ข้อ`}
+                          {assignmentSizeLabel(a)}
                         </span>
                         {a.max_attempts != null && (
                           <span className="flex items-center gap-0.5 text-xs text-muted-foreground">

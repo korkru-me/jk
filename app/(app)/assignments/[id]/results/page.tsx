@@ -20,7 +20,7 @@ export default async function ResultsPage({
   // assignments_co_teacher_all) already scopes this to owner or co-teacher.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('title, question_ids, score_strategy, display_max_score, passing_type, passing_value, classrooms(name)')
+    .select('title, question_ids, score_strategy, display_max_score, passing_type, passing_value, completion_rule, streak_target, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
@@ -35,7 +35,7 @@ export default async function ResultsPage({
   const [{ data: submissions }, { data: questionRows }] = await Promise.all([
     supabase
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, submitted_at, attempt_number, users!submissions_student_id_fkey(full_name, email)')
+      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name, email)')
       .eq('assignment_id', id),
     supabase
       .from('questions')
@@ -101,6 +101,8 @@ export default async function ResultsPage({
       classroomName={(assignment as any).classrooms?.name ?? null}
       passingType={assignment.passing_type}
       passingValue={assignment.passing_value}
+      completionRule={assignment.completion_rule === 'streak' ? 'streak' : 'fixed'}
+      streakTarget={assignment.streak_target ?? null}
       questions={orderedQuestions}
       submitted={submitted}
       answers={(answerRows ?? []) as AnswerRow[]}

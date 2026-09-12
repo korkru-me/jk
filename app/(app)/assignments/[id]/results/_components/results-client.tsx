@@ -20,7 +20,13 @@ export interface SubmittedRow {
   total_score: number | null
   max_score: number
   submitted_at: string | null
+  /** Needed only to report how long a streak attempt took. */
+  started_at?: string | null
   attempt_number: number
+  /** Zero/false for every งาน that is not a "ถูกติดต่อกัน" run. */
+  current_streak?: number
+  best_streak?: number
+  streak_reached?: boolean
   users: { full_name: string; email: string } | null
 }
 
@@ -43,6 +49,11 @@ interface Props {
   classroomName: string | null
   passingType: 'score' | 'percent' | null
   passingValue: number | null
+  /** 'streak' swaps this page's columns: a score out of a total is not what
+   *  this งาน measured, and two students' totals are not comparable because
+   *  they answered different numbers of ข้อ. */
+  completionRule: 'fixed' | 'streak'
+  streakTarget: number | null
   questions: Question[]
   submitted: SubmittedRow[]
   answers: AnswerRow[]
@@ -117,6 +128,7 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
 
 export function ResultsClient({
   assignmentId, assignmentTitle, classroomName, passingType, passingValue,
+  completionRule, streakTarget,
   questions, submitted, answers, profiles, inProgressCount,
 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('individual')
@@ -144,6 +156,43 @@ export function ResultsClient({
     s => computePassed(s.total_score, s.max_score, passingType, passingValue) === true
   ).length
 
+  // ── "ถูกติดต่อกัน" results ─────────────────────────────────────────────────
+  // This งาน did not measure a score out of a total. Two students answered
+  // different numbers of ข้อ, so "8/12" and "5/9" are not on the same scale
+  // and averaging them says nothing. What it measured is whether the run was
+  // reached, and how much work it took to get there.
+  const isStreakRun = completionRule === 'streak'
+  const streakStats = useMemo(() => {
+    if (!isStreakRun) return null
+    const perStudent = submitted.map(s => {
+      const rows = answers.filter(a => a.submission_id === s.id)
+      const elapsedMs = s.started_at && s.submitted_at
+        ? new Date(s.submitted_at).getTime() - new Date(s.started_at).getTime()
+        : null
+      return {
+        id: s.id,
+        asked: rows.length,
+        // Full marks only, matching what advanced the run in the first place.
+        correct: rows.filter(a => a.max_score > 0 && a.score >= a.max_score).length,
+        best: s.best_streak ?? 0,
+        reached: s.streak_reached === true,
+        elapsedMs: elapsedMs != null && elapsedMs >= 0 ? elapsedMs : null,
+      }
+    })
+    const byId = new Map(perStudent.map(p => [p.id, p]))
+    const reachedCount = perStudent.filter(p => p.reached).length
+    // The median, not the mean: one student who ground through sixty ข้อ would
+    // drag an average far away from what the class actually experienced, and
+    // this number exists to tell a teacher how hard their คลัง turned out to be.
+    const askedSorted = perStudent.map(p => p.asked).sort((a, b) => a - b)
+    const medianAsked = askedSorted.length === 0
+      ? null
+      : askedSorted.length % 2 === 1
+        ? askedSorted[(askedSorted.length - 1) / 2]
+        : Math.round((askedSorted[askedSorted.length / 2 - 1] + askedSorted[askedSorted.length / 2]) / 2)
+    return { byId, reachedCount, medianAsked }
+  }, [answers, isStreakRun, submitted])
+
   const activeQuestion = questions[activeQuestionIndex]
 
   function toggleSort(key: StudentSortKey) {
@@ -162,11 +211,60 @@ export function ResultsClient({
           <p className="text-sm text-muted-foreground">{classroomName}</p>
         </div>
         {viewMode === 'individual' && (
-          <ExportButton submissions={sortedRows as any} title={assignmentTitle} />
+          <ExportButton
+            submissions={sortedRows as any}
+            title={assignmentTitle}
+            rows={isStreakRun && streakStats
+              ? [
+                  ['ชื่อ', 'อีเมล', 'ผล', 'ทำไปกี่ข้อ', 'ถูก', 'ติดกันมากสุด', 'เกณฑ์', 'เวลาที่ใช้'],
+                  ...sortedRows.map(s => {
+                    const stat = streakStats.byId.get(s.id)
+                    return [
+                      s.users?.full_name ?? '',
+                      s.users?.email ?? '',
+                      stat?.reached ? 'ผ่าน' : 'ยังไม่ผ่าน',
+                      stat?.asked ?? 0,
+                      stat?.correct ?? 0,
+                      stat?.best ?? 0,
+                      streakTarget ?? '',
+                      formatElapsed(stat?.elapsedMs ?? null),
+                    ]
+                  }),
+                ]
+              : undefined}
+          />
         )}
       </div>
 
       {/* Summary cards */}
+      {isStreakRun && streakStats ? (
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+          <Card radius="md" padding="md" className="text-center">
+            <p className="text-xs text-muted-foreground">ส่งแล้ว</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{submitted.length}</p>
+          </Card>
+          <Card radius="md" padding="md" className="text-center">
+            <p className="text-xs text-muted-foreground">ผ่านแล้ว (ติดกัน {streakTarget})</p>
+            <p className="text-2xl font-bold mt-1">
+              <span className="text-success">{streakStats.reachedCount}</span>
+              <span className="text-muted-foreground/40"> / </span>
+              <span className="text-destructive">{submitted.length - streakStats.reachedCount}</span>
+            </p>
+          </Card>
+          <Card radius="md" padding="md" className="text-center">
+            {/* The number that says how hard this คลัง turned out to be —
+                closer to the truth than an average score this งาน never had. */}
+            <p className="text-xs text-muted-foreground">ค่ากลางจำนวนข้อที่ใช้</p>
+            <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">
+              {streakStats.medianAsked ?? '—'}
+            </p>
+          </Card>
+          <Card radius="md" padding="md" className="text-center">
+            <p className="text-xs text-muted-foreground">กำลังทำ</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{inProgressCount}</p>
+          </Card>
+        </div>
+      ) : (
       <div className={`grid gap-3 ${hasPassingThreshold ? 'grid-cols-4' : 'grid-cols-3'}`}>
         <Card radius="md" padding="md" className="text-center">
           <p className="text-xs text-muted-foreground">ส่งแล้ว</p>
@@ -195,13 +293,18 @@ export function ResultsClient({
           </Card>
         )}
       </div>
+      )}
 
       {/* Mode toggle + sort */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
           {([
             { key: 'individual', label: 'รายคน' },
-            { key: 'question', label: 'รายข้อ' },
+            // A streak run can ask the same ข้อ more than once (with new
+            // numbers, when the teacher left recycling on) and gives different
+            // students different ข้อ, so a one-row-per-ข้อ grid has no single
+            // cell to put an answer in. Left out rather than shown wrong.
+            ...(isStreakRun ? [] : [{ key: 'question' as const, label: 'รายข้อ' }]),
           ] as { key: ViewMode; label: string }[]).map(m => (
             <button
               key={m.key}
@@ -235,7 +338,11 @@ export function ResultsClient({
       </div>
 
       {viewMode === 'individual' ? (
-        <IndividualTable rows={sortedRows} hasPassingThreshold={hasPassingThreshold} passingType={passingType} passingValue={passingValue} />
+        isStreakRun && streakStats ? (
+          <StreakTable rows={sortedRows} stats={streakStats.byId} target={streakTarget} />
+        ) : (
+          <IndividualTable rows={sortedRows} hasPassingThreshold={hasPassingThreshold} passingType={passingType} passingValue={passingValue} />
+        )
       ) : (
         <QuestionGrid
           questions={questions}
@@ -251,6 +358,101 @@ export function ResultsClient({
 }
 
 // ─── Individual mode ───────────────────────────────────────────────────────
+
+/** How long an attempt took, in the units a teacher reads at a glance. */
+function formatElapsed(ms: number | null): string {
+  if (ms == null) return '—'
+  const totalMinutes = Math.floor(ms / 60_000)
+  const seconds = Math.floor((ms % 60_000) / 1000)
+  if (totalMinutes < 60) return `${totalMinutes}:${String(seconds).padStart(2, '0')}`
+  return `${Math.floor(totalMinutes / 60)} ชม. ${totalMinutes % 60} นาที`
+}
+
+interface StreakStat {
+  asked: number
+  correct: number
+  best: number
+  reached: boolean
+  elapsedMs: number | null
+}
+
+/**
+ * Results for a งาน that ended on a run of correct answers.
+ *
+ * No คะแนน and no % column: this งาน handed different students different
+ * numbers of ข้อ, so a score out of a total puts them on scales that cannot be
+ * compared. What it measured is whether the run was reached, and the other
+ * columns say how much work that took — which is also what tells a teacher
+ * whether their คลัง was the right difficulty.
+ */
+function StreakTable({ rows, stats, target }: {
+  rows: SubmittedRow[]
+  stats: Map<string, StreakStat>
+  target: number | null
+}) {
+  return (
+    <Card radius="md" className="overflow-hidden overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-muted border-b border-border">
+          <tr>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อ</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ผล</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ทำไปกี่ข้อ</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ถูก</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ติดกันมากสุด</th>
+            <th className="text-center px-4 py-3 font-medium text-muted-foreground">เวลาที่ใช้</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={7} className="text-center py-10 text-muted-foreground">
+                ยังไม่มีการส่งงาน
+              </td>
+            </tr>
+          ) : (
+            rows.map((s, i) => {
+              const stat = stats.get(s.id)
+              return (
+                <tr key={s.id} className="hover:bg-muted">
+                  <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
+                  <td className="px-4 py-3">
+                    <Link href={`/submissions/${s.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
+                      {s.users?.full_name}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">{s.users?.email}</p>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                      stat?.reached ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                    }`}>
+                      {stat?.reached ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      {stat?.reached ? 'ผ่าน' : 'ยังไม่ผ่าน'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center text-foreground tabular-nums">{stat?.asked ?? '—'}</td>
+                  <td className="px-4 py-3 text-center text-foreground tabular-nums">{stat?.correct ?? '—'}</td>
+                  <td className="px-4 py-3 text-center tabular-nums">
+                    {/* Against the target, because "4" only means something
+                        next to the 5 the student was reaching for. */}
+                    <span className={`font-bold ${stat?.reached ? 'text-success' : 'text-foreground'}`}>
+                      {stat?.best ?? '—'}
+                    </span>
+                    {target != null && <span className="text-muted-foreground"> / {target}</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center text-muted-foreground text-xs tabular-nums">
+                    {formatElapsed(stat?.elapsedMs ?? null)}
+                  </td>
+                </tr>
+              )
+            })
+          )}
+        </tbody>
+      </table>
+    </Card>
+  )
+}
 
 function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue }: {
   rows: SubmittedRow[]

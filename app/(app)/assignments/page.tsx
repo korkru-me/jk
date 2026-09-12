@@ -14,6 +14,8 @@ export interface AssignmentRow {
   title: string
   question_ids: string[]
   random_question_count: number | null
+  completion_rule: string | null
+  streak_target: number | null
   duration_minutes: number | null
   end_at: string | null
   show_results: string
@@ -64,7 +66,7 @@ export default async function AssignmentsPage() {
   const { data: published } = cids.length > 0
     ? await admin
         .from('assignments')
-        .select('id, title, question_ids, random_question_count, duration_minutes, end_at, show_results, max_attempts, score_strategy, retry_scope, display_max_score, secure_browser_mode, android_exam_mode, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .select('id, title, question_ids, random_question_count, completion_rule, streak_target, duration_minutes, end_at, show_results, max_attempts, score_strategy, retry_scope, display_max_score, secure_browser_mode, android_exam_mode, classrooms(name), assignment_classrooms!inner(classroom_id)')
         .in('assignment_classrooms.classroom_id', cids)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
@@ -75,6 +77,8 @@ export default async function AssignmentsPage() {
     title: row.title,
     question_ids: row.question_ids ?? [],
     random_question_count: row.random_question_count ?? null,
+    completion_rule: row.completion_rule ?? null,
+    streak_target: row.streak_target ?? null,
     duration_minutes: row.duration_minutes,
     end_at: row.end_at,
     show_results: row.show_results,

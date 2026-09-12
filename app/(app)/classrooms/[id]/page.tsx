@@ -117,7 +117,7 @@ export default async function ClassroomDetailPage({
     const { data: assignmentRows } = assignmentIds.length > 0
       ? await admin
           .from('assignments')
-          .select('id, title, question_ids, random_question_count, end_at, duration_minutes, type, max_attempts, score_strategy, retry_scope, passing_type, passing_value, display_max_score, show_results')
+          .select('id, title, question_ids, random_question_count, completion_rule, streak_target, end_at, duration_minutes, type, max_attempts, score_strategy, retry_scope, passing_type, passing_value, display_max_score, show_results')
           .in('id', assignmentIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false })
@@ -170,6 +170,8 @@ export default async function ClassroomDetailPage({
       title: a.title,
       question_ids: a.question_ids ?? [],
       random_question_count: a.random_question_count ?? null,
+      completion_rule: a.completion_rule ?? null,
+      streak_target: a.streak_target ?? null,
       end_at: a.end_at,
       duration_minutes: a.duration_minutes,
       type: a.type,
@@ -294,7 +296,8 @@ export default async function ClassroomDetailPage({
 
   let classroomAssignments: {
     id: string; title: string; type: string; mode: string; status: string
-    start_at: string | null; end_at: string | null; question_ids: string[]; random_question_count: number | null; created_at: string
+    start_at: string | null; end_at: string | null; question_ids: string[]; random_question_count: number | null
+    completion_rule: string | null; streak_target: number | null; created_at: string
     passing_type: 'score' | 'percent' | null; passing_value: number | null
     max_attempts: number | null; score_strategy: 'best' | 'average' | 'latest'
     display_order: number | null
@@ -319,7 +322,7 @@ export default async function ClassroomDetailPage({
     const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }, { data: pendingAnswerRows }] = await Promise.all([
       admin
         .from('assignments')
-        .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score')
+        .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, completion_rule, streak_target, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score')
         .in('id', linkedAssignmentIds)
         .order('created_at', { ascending: false }),
       admin

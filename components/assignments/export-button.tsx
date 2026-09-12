@@ -6,11 +6,23 @@ interface Submission {
   max_score: number
 }
 
-export function ExportButton({ submissions, title }: { submissions: Submission[]; title: string }) {
+export function ExportButton({ submissions, title, rows: rowsOverride }: {
+  submissions: Submission[]
+  title: string
+  /**
+   * Replaces the score columns entirely, header row included.
+   *
+   * A งาน that ended on a run of correct answers has no score out of a total —
+   * the results table stopped showing those columns for that reason, and an
+   * export that still carried them would hand the teacher the exact numbers
+   * the page had decided were misleading.
+   */
+  rows?: (string | number)[][]
+}) {
   return (
     <button
       onClick={() => {
-        const rows: (string | number)[][] = [
+        const rows: (string | number)[][] = rowsOverride ?? [
           ['ชื่อ', 'อีเมล', 'คะแนน', 'คะแนนเต็ม', '%'],
           ...submissions.map((s) => [
             s.users?.full_name ?? '',
