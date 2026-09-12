@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 4 กันยายน 2026
+ตรวจจาก repository: 12 กันยายน 2026
 
 ## วิธีอ่านสถานะ
 
@@ -300,6 +300,8 @@
 
 ### งานและข้อสอบ — มีโค้ดรองรับ
 
+- **Device-UX QA เฟส 1 วันที่ 12 กันยายน:** เพิ่ม `/exam-screen-lab` เป็นห้องทดลอง development-only ที่ใช้ `ExamClient` จริงใน `previewMode` กับข้อมูลสมมติใน memory 12 กรณี ครบ question type ที่บันทึกได้ 10 ชนิด รวม true/false สองโหมด, matching แบบช่อง/ลากเส้น และตารางจำแนก เปิดหนึ่งหรือสามข้อต่อหน้า บังคับรูปวิธีทำ เครื่องคิดเลข และกระดาษทดได้ proxy ข้าม Supabase session refresh เฉพาะ route นี้ใน development, preview ไม่เขียน answer backup ลง localStorage, สร้าง submission id ใหม่ทุกครั้ง และ production ตอบ 404 จึงใช้ตรวจขนาดจอได้โดยไม่สร้างข้อมูลทดสอบใน production แต่ยังไม่ใช่หลักฐาน autosave/upload/submit/RLS/SEB จริง ดู [แผนตรวจ 8 เฟส](EXAM_SCREEN_QA.md)
+- **Device-UX QA เฟส 2A วันที่ 12 กันยายน:** ผ่านเฉพาะการเตรียมและ browser simulation ก่อนผู้ใช้ว่างทดสอบ iPhone จริง ปิด lab แบบ fail-closed นอก development/test, ทำหน้าสอบจริงให้ไม่ซ้อน app sidebar ในเส้นทาง `/assignments/[id]/take`, แก้โหมดโฟกัส/เวลา/ตัวนำทางมือถือ/ช่องเรียงความ/พื้นที่แตะ/แป้นคณิตศาสตร์/กล่องยืนยันส่ง และจำลอง 375×667, 390×844, 844×390 ทั้งหนึ่ง–สามข้อต่อหน้าโดยไม่พบ horizontal overflow ไม่มี migration/env/database/storage/deployment เปลี่ยน ผลนี้ไม่ใช่ Safari/WebKit/SEB บน iPhone จริงและไม่ทำให้เฟส 2 ผ่าน; physical UAT อยู่ใน [รายการเฟส 2B](EXAM_SCREEN_QA_IPHONE.md)
 - **ระบบสอบปลอดภัยเฟส 1–7 — SEB รองรับ Windows, macOS และ iOS/iPadOS; Android ใช้ monitored mode แยกที่ความมั่นใจต่ำกว่า** — ครูเปิด `secure_browser_mode = seb_required` ได้เฉพาะข้อสอบออนไลน์ ระบบบังคับเปิดห้องคุมสอบสด, นักเรียนได้หน้าแนะนำเปิด `.seb`, และ server ตรวจ CK + BEK ของ exact challenge URL ผ่าน SEB JavaScript API ก่อนออก HttpOnly session ที่ผูกผู้ใช้กับข้อสอบ
   - ตรวจ session ซ้ำที่ `startSubmission`, `getExamTakingData`, autosave/รูปวิธีทำ/ไฟล์แนบ, proctor heartbeat และ `submitSubmission`; การปลอม UI หรือเรียก Server Action ตรงจึงไม่ข้าม gate ส่วน forced-finalize ของ attempt หมดเวลายังทำงานได้
   - submission และห้องคุมสอบเก็บเฉพาะ verified timestamp/platform/version; ครูเห็นป้าย “SEB ยืนยันแล้ว” แบบ realtime โดยค่าฝั่งห้องคุมสอบถูก trigger คัดจาก submission ไม่รับจาก client

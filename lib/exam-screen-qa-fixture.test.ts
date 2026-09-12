@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MatchingConfig, TrueFalseConfig } from '@/lib/types'
+import type { CompositeConfig, FillBlankConfig, MatchingConfig, OrderingConfig, TrueFalseConfig } from '@/lib/types'
 import {
   buildExamScreenQaFixture,
   buildExamScreenQaQuestions,
@@ -46,6 +46,26 @@ describe('exam screen QA fixture', () => {
     expect(new Set(questionIds).size).toBe(EXAM_SCREEN_QA_CASES.length)
     expect(fixture.answers.every(answer => answer.max_score > 0)).toBe(true)
     expect(sectionQuestionIds).toEqual(questionIds)
+  })
+
+  it('keeps the mobile stress cases substantial enough to expose cramped inputs', () => {
+    const questions = buildExamScreenQaQuestions()
+    const byType = new Map(questions.map(question => [question.question_type, question]))
+    const written = byType.get('written')!
+    const mcq = byType.get('mcq')!
+    const fillBlank = byType.get('fill_blank')!
+    const ordering = byType.get('ordering')!
+    const essay = byType.get('essay')!
+    const composite = byType.get('composite')!
+
+    expect(written.answer_parts?.length).toBeGreaterThanOrEqual(2)
+    expect(mcq.image_urls?.[0]).toMatch(/^data:image\/svg\+xml/)
+    expect((fillBlank.extra_data as FillBlankConfig).blanks.map(blank => blank.type))
+      .toEqual(expect.arrayContaining(['fixed', 'dropdown']))
+    expect((ordering.extra_data as OrderingConfig).items).toHaveLength(5)
+    expect(essay.question_text).toContain('5–8 บรรทัด')
+    expect(essay.answer_parts).toBeNull()
+    expect((composite.extra_data as CompositeConfig).parts).toHaveLength(4)
   })
 
   it('contains no external URL, account identifier, or production-looking email', () => {

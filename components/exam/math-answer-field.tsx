@@ -207,7 +207,7 @@ export function MathAnswerField({
           role="group"
           aria-label="แป้นคณิตศาสตร์"
           padding="sm"
-          className="fixed inset-x-2 bottom-2 z-[70] mx-auto max-w-2xl space-y-2 shadow-xl"
+          className="fixed inset-x-2 bottom-2 z-[80] mx-auto max-h-[calc(var(--app-height,100dvh)-1rem)] max-w-2xl space-y-2 overflow-y-auto overscroll-contain shadow-xl"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
           {...caret.keypadProps}
         >

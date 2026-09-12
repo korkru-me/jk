@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, Smartphone } from 'lucide-react'
 import {
   activateAndroidExamSession,
@@ -138,6 +139,10 @@ export function AndroidExamGate({ assignmentId }: { assignmentId: string }) {
             </Button>
           </div>
         )}
+
+        <Link href="/assignments" className="inline-flex min-h-10 items-center text-sm text-primary hover:underline">
+          ← กลับหน้ารายการข้อสอบ
+        </Link>
       </Card>
     </div>
   )

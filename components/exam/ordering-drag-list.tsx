@@ -224,6 +224,7 @@ export function OrderingDragList({
                   <IconButton
                     size="xs"
                     label={`เลื่อน "${item.text}" ขึ้น`}
+                    className="h-10 w-10"
                     disabled={i === 0}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={() => move(i, -1)}
@@ -233,6 +234,7 @@ export function OrderingDragList({
                   <IconButton
                     size="xs"
                     label={`เลื่อน "${item.text}" ลง`}
+                    className="h-10 w-10"
                     disabled={i === rows.length - 1}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={() => move(i, 1)}

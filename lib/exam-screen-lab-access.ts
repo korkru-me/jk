@@ -2,7 +2,7 @@ export const EXAM_SCREEN_LAB_PATH = '/exam-screen-lab'
 
 /** The device-QA lab must never be reachable from a production build. */
 export function isExamScreenLabEnabled(nodeEnv: string | undefined): boolean {
-  return nodeEnv !== 'production'
+  return nodeEnv === 'development' || nodeEnv === 'test'
 }
 
 export function isExamScreenLabPath(pathname: string): boolean {

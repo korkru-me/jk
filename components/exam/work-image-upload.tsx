@@ -125,10 +125,12 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-full bg-transparent"
             aria-label="นำรูปวิธีทำออก"
           >
-            <X className="w-3 h-3" />
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm">
+              <X className="h-3 w-3" />
+            </span>
           </button>
         </div>
       ) : (
@@ -136,7 +138,7 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
+          className={`flex min-h-10 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all ${
             required
               ? 'border-warning text-warning bg-warning/8'
               : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
