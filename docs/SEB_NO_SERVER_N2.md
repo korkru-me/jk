@@ -83,13 +83,13 @@ Quit URL อยู่ในไฟล์ก่อนปุ่มแสดง `pln
 - [x] BEK ที่ยังไม่ลงทะเบียนถูกปฏิเสธ และ A-modified ถูกปฏิเสธเมื่อคาดหวัง A บน Mac/iPad/iPhone
 - [ ] wrong raw BEK และ swapped A/B proof matrix ครบทุกกรณีบน native ทุกแพลตฟอร์ม
 - [ ] Windows: มีผู้ทดสอบ/รุ่นจริง + native tests ครบ
-- [ ] หลัง SEB ผ่าน Mac/iPad/iPhone/Windows ครบ ให้เตือนผู้ใช้เริ่มทดสอบหน้าข้อสอบ KorKru จริงบนแต่ละขนาดจอ: อ่านโจทย์, พิมพ์/คณิตศาสตร์, แนบไฟล์ และส่งคำตอบ
+- [ ] Device-UX ของหน้าข้อสอบจริง: ผู้ใช้เปลี่ยนลำดับวันที่ 12 กันยายน 2026 ให้เริ่ม iPhone/iPad/Mac ก่อน Windows โดยใช้ [แผน 8 เฟส](EXAM_SCREEN_QA.md); การเปลี่ยนลำดับนี้ไม่ทำให้ Windows ผ่าน
 - [ ] N2.2: submit commit สำเร็จก่อนเสนอออก; save ล้มเหลวไม่รายงานสำเร็จ
 - [ ] N2.2: grant เฉพาะคน/รอบ; D1 คงคำตอบและ deadline เดิม กลับมาได้เมื่อครูอนุญาต
 - [ ] N2.2: visibility, normal close, lost heartbeat และ disconnect/reconnect โดยครูตรวจเครื่องได้
 - [ ] ข้อยุติ BEK automation/ขอบเขตผลิตภัณฑ์ ก่อน N3–N8 ของบริการจริง
 
-ช่องที่ติ๊กมาจากผู้ใช้ทดสอบอุปกรณ์จริง ไม่ใช่ผล unit test แทน native ส่วน N2.2, Windows, proof matrix ที่เหลือ, device-UX test ที่ผู้ใช้ขอพักไว้ และ BEK automation ยัง pending จึงยังไม่ประกาศ N2 หรือ production พร้อม
+ช่องที่ติ๊กมาจากผู้ใช้ทดสอบอุปกรณ์จริง ไม่ใช่ผล unit test แทน native ส่วน N2.2, Windows, proof matrix ที่เหลือ, device-UX test ที่เริ่มทำก่อน Windows และ BEK automation ยัง pending จึงยังไม่ประกาศ N2 หรือ production พร้อม
 
 หลักฐานไฟล์ที่ไม่เป็นความลับ: Mac A `f635f891…b8bad`, B `a18cde0e…19bef`; iPad/iPhone A `1c436295…b60c`, B `764643b2…aac86`, A-modified `0453e374…e9ab` (SHA-256 ย่อ; raw CK/BEK และรหัสไม่อยู่ใน Git)
 
@@ -113,7 +113,7 @@ Quit URL อยู่ในไฟล์ก่อนปุ่มแสดง `pln
 - ชุด iPad/ทะเบียน BEK ยังคง permission แบบ owner-only และ `.local/` ถูก Git ignore
 - ไม่รัน full suite/build/TypeScript/lint เพราะไม่เปลี่ยน application runtime, TypeScript หรือ UI; ไม่มี migration, env หรือ deploy
 
-**จุดหยุดถัดไป:** ทดสอบ Windows N2.1 เมื่อมีเครื่องจริง จากนั้นเตือนผู้ใช้ทำ device-UX test ที่พักไว้ แล้วทำ N2.2 สำหรับ submit/grant/resume/presence ต่อ ผล Mac+iPad+iPhone ไม่ได้ทำให้ Windows, automation หรือ N2 ทั้งเฟสผ่าน
+**จุดหยุดถัดไป:** ทำ [device-UX test ของหน้าข้อสอบตามแผน 8 เฟส](EXAM_SCREEN_QA.md) บน iPhone/iPad/Mac ก่อนตามที่ผู้ใช้เลือก แล้วกลับมาทดสอบ Windows N2.1 เมื่อมีเครื่องจริง และทำ N2.2 สำหรับ submit/grant/resume/presence ต่อ ผล Mac+iPad+iPhone ไม่ได้ทำให้ Windows, automation หรือ N2 ทั้งเฟสผ่าน
 
 ## แหล่งอ้างอิง
 

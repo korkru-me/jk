@@ -126,7 +126,7 @@ Admin password ป้องกันการแก้ผ่านหน้า�
 
 **N2.1 native core ผ่านบน Mac/iPad/iPhone:** ตัวสร้าง `plnd` A/B/modified และ local/private-Wi-Fi Key/quit-link diagnostic ผ่านผลจริงสามรูปแบบอุปกรณ์ แต่ Windows และ proof matrix บางกรณียัง pending และยังไม่มีตัวอย่างส่งคำตอบ/teacher grant/resume/presence ใน lab จึงไม่ใช่ N2 ผ่านทั้งเฟส ขั้นตอนอยู่ [SEB_NO_SERVER_N2.md](SEB_NO_SERVER_N2.md)
 
-เตรียมไฟล์ไม่มี opening password แยกรหัส A/B, Key ที่ถูกต้อง/ผิด, modified config และหน้าทดลองเข้า–ออกพร้อมข้อมูลสมมติ ผู้ใช้เปิด Mac/iPad/iPhone/Windows ที่จะรองรับและช่วยเก็บผลตามขั้นตอน Agent ตรวจโค้ด/ค่าที่ต้องตรง ไม่รับ production secrets ในแชต ไม่เปิด native แทน เมื่อ SEB ผ่านครบทุกแพลตฟอร์ม ให้เตือนผู้ใช้ทำ device-UX test ของหน้าข้อสอบจริงที่ขอพักไว้
+เตรียมไฟล์ไม่มี opening password แยกรหัส A/B, Key ที่ถูกต้อง/ผิด, modified config และหน้าทดลองเข้า–ออกพร้อมข้อมูลสมมติ ผู้ใช้เปิด Mac/iPad/iPhone/Windows ที่จะรองรับและช่วยเก็บผลตามขั้นตอน Agent ตรวจโค้ด/ค่าที่ต้องตรง ไม่รับ production secrets ในแชต ไม่เปิด native แทน วันที่ 12 กันยายนผู้ใช้เลือกเริ่ม [device-UX test ของหน้าข้อสอบจริง](EXAM_SCREEN_QA.md) บน iPhone/iPad/Mac ก่อนมีเครื่อง Windows; ลำดับใหม่นี้ไม่ลด Windows release gate
 
 ผ่านเมื่อเปิดโดยไม่ถามรหัส, CK/BEK ถูกต้อง, รหัสออกแยกกัน, เส้นทางปกติส่งแล้ว/ครูอนุญาตออกทำงานและ iPad ปลด lockdown มีทางกู้คืน และมีวิธีจัดการ Key ที่ตรงกับขอบเขตที่อนุมัติ ถ้าผ่านแค่ manual pilot ให้บันทึก pilot ไม่ใช่ผ่าน nationwide automation **N3–N8 สำหรับเป้าหมายเต็มยังหยุดอยู่**
 
