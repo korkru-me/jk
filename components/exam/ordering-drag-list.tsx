@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { RichText } from '@/components/ui/rich-text'
+import { shouldDelayOrderingDrag, startOrderingHandleDrag } from '@/lib/ordering-pointer'
 import { cn } from '@/lib/utils'
 import type { OrderingItem } from '@/lib/types'
 
@@ -34,13 +35,13 @@ const MOVE_THRESHOLD = 6
 /**
  * Ordering answered by dragging the rows into place, numbered down the left.
  *
- * Touch needs a long press first. `touch-action: none` would make dragging
+ * A finger or pen needs a long press first. `touch-action: none` would make dragging
  * work immediately, but it also takes vertical scrolling away from whatever it
  * covers — on a phone a five-row list can fill the screen, and a student who
  * cannot scroll past the question cannot finish the exam. Holding for a moment
  * says "this is a drag, not a scroll" and is the same gesture the phone's own
- * reorderable lists use. A mouse never scrolls by dragging, so there it starts
- * on the first movement.
+ * reorderable lists use. A mouse never scrolls by dragging, so it starts on
+ * the first movement. The dedicated handle starts immediately for every pointer.
  *
  * The ↑/↓ buttons are not decoration: they are the keyboard route, and the one
  * that still works if a drag misbehaves on hardware nobody here has tested.
@@ -101,7 +102,7 @@ export function OrderingDragList({
     endGesture()
     // The handle carries touch-action:none, so a touch that starts there can
     // never have been a scroll and needs no hold to prove it.
-    const touch = e.pointerType !== 'mouse' && !viaHandle
+    const touch = shouldDelayOrderingDrag(e.pointerType, viaHandle)
     startRef.current = { id, x: e.clientX, y: e.clientY, touch, armed: !touch, dragging: false }
 
     // Non-passive so it can cancel the scroll once the hold has been recognised.
@@ -171,7 +172,7 @@ export function OrderingDragList({
   return (
     <div className="space-y-3">
       <p className="text-xs font-medium text-muted-foreground">
-        เรียงรายการให้ถูกลำดับ — กดค้างที่แถวแล้วลากขึ้นลง หรือใช้ปุ่มลูกศรก็ได้
+        เรียงรายการให้ถูกลำดับ — ใช้นิ้วหรือปากกากดค้างแล้วลาก จับไอคอนลากได้ทันที หรือใช้ปุ่มลูกศรก็ได้
       </p>
 
       <div className="space-y-2">
@@ -224,7 +225,7 @@ export function OrderingDragList({
                   <IconButton
                     size="xs"
                     label={`เลื่อน "${item.text}" ขึ้น`}
-                    className="h-10 w-10"
+                    className="h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11"
                     disabled={i === 0}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={() => move(i, -1)}
@@ -234,7 +235,7 @@ export function OrderingDragList({
                   <IconButton
                     size="xs"
                     label={`เลื่อน "${item.text}" ลง`}
-                    className="h-10 w-10"
+                    className="h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11"
                     disabled={i === rows.length - 1}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={() => move(i, 1)}
@@ -246,10 +247,13 @@ export function OrderingDragList({
                       the long press first. */}
                   <span
                     aria-hidden
-                    onPointerDown={e => onRowPointerDown(e, item.id, true)}
-                    className="touch-none cursor-grab px-1 text-muted-foreground"
+                    onPointerDown={e => startOrderingHandleDrag(
+                      e,
+                      () => onRowPointerDown(e, item.id, true),
+                    )}
+                    className="flex h-11 w-11 touch-none cursor-grab items-center justify-center text-muted-foreground"
                   >
-                    <GripVertical className="h-4 w-4" />
+                    <GripVertical className="h-5 w-5" />
                   </span>
                 </span>
               )}
@@ -265,7 +269,13 @@ export function OrderingDragList({
       {!answered && !disabled && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-warning/10 px-3 py-2">
           <span className="text-xs text-warning">ยังไม่ได้บันทึกคำตอบข้อนี้</span>
-          <Button type="button" variant="outline" size="xs" onClick={onConfirm}>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            className="min-h-10 pointer-coarse:min-h-11"
+            onClick={onConfirm}
+          >
             ใช้ลำดับนี้เป็นคำตอบ
           </Button>
         </div>

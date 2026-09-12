@@ -213,7 +213,7 @@ export function MatchingDragInput({
         aria-label={`ตัวเลือก ${option.text}`}
         onPointerDown={e => onChipPointerDown(e, option.id, from)}
         className={cn(
-          'h-auto max-w-full touch-none select-none whitespace-normal px-3 py-1.5 text-left',
+          'h-auto max-w-full touch-none select-none whitespace-normal px-3 py-1.5 text-left pointer-coarse:min-h-11',
           !disabled && 'cursor-grab active:cursor-grabbing',
           isSelected && 'border-primary bg-primary/10 text-primary',
           isDragging && 'opacity-40'
@@ -283,6 +283,7 @@ export function MatchingDragInput({
                       <IconButton
                         size="xs"
                         label={`เอาคำตอบของข้อ ${i + 1} ออก`}
+                        className="pointer-coarse:h-11 pointer-coarse:w-11"
                         onClick={() => clearSlot(i)}
                       >
                         <X />
@@ -297,7 +298,7 @@ export function MatchingDragInput({
                     disabled={disabled}
                     aria-label={`ช่องคำตอบของข้อ ${i + 1} ยังว่าง`}
                     onClick={() => onSlotActivate(i)}
-                    className="h-auto w-full justify-start py-1.5 text-xs font-normal text-muted-foreground"
+                    className="h-auto min-h-10 w-full justify-start py-1.5 text-xs font-normal text-muted-foreground pointer-coarse:min-h-11"
                   >
                     {selected ? 'แตะเพื่อวางตรงนี้' : 'ลากคำตอบมาวาง'}
                   </Button>

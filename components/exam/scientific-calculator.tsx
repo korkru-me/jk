@@ -169,17 +169,18 @@ export default function ScientificCalculator({
         { label: 'tan', name: 'tan', aria: 'แทนเจนต์' },
       ]
 
-  const keyClass = 'h-9 min-w-0 px-1 font-mono text-sm'
-  const functionClass = 'h-8 min-w-0 px-1 font-mono text-xs'
+  const keyClass = 'h-9 min-w-0 px-1 font-mono text-sm pointer-coarse:h-11'
+  const functionClass = 'h-8 min-w-0 px-1 font-mono text-xs pointer-coarse:h-11'
 
   return createPortal((
-    <Card
-      role="dialog"
-      aria-label="เครื่องคิดเลขวิทยาศาสตร์"
-      elevation="xl"
-      className="fixed inset-x-2 bottom-2 z-[80] max-h-[calc(100dvh-1rem)] overflow-y-auto sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[23rem]"
-      style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-    >
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[80] flex h-[var(--app-height,100dvh)] items-end justify-center p-2 sm:justify-end sm:p-4">
+      <Card
+        role="dialog"
+        aria-label="เครื่องคิดเลขวิทยาศาสตร์"
+        elevation="xl"
+        className="pointer-events-auto max-h-full w-full overflow-y-auto overscroll-contain sm:w-[23rem]"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+      >
       <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
         <Calculator className="size-4 text-primary" aria-hidden="true" />
         <div className="min-w-0">
@@ -192,14 +193,14 @@ export default function ScientificCalculator({
           type="button"
           variant={showHistory ? 'secondary' : 'ghost'}
           size="icon-sm"
-          className="ml-auto"
+          className="ml-auto pointer-coarse:size-11"
           onClick={() => setShowHistory(show => !show)}
           aria-label="ประวัติการคำนวณ"
           aria-pressed={showHistory}
         >
           <History />
         </Button>
-        <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="ปิดเครื่องคิดเลข">
+        <Button type="button" variant="ghost" size="icon-sm" className="pointer-coarse:size-11" onClick={onClose} aria-label="ปิดเครื่องคิดเลข">
           <X />
         </Button>
       </div>
@@ -209,7 +210,7 @@ export default function ScientificCalculator({
           <div className="flex items-center justify-between px-1">
             <span className="text-[10px] font-semibold text-muted-foreground">ประวัติในครั้งนี้</span>
             {history.length > 0 && (
-              <Button type="button" variant="ghost" size="xs" onClick={() => setHistory([])}>
+              <Button type="button" variant="ghost" size="xs" className="pointer-coarse:min-h-11" onClick={() => setHistory([])}>
                 <RotateCcw /> ล้าง
               </Button>
             )}
@@ -221,7 +222,7 @@ export default function ScientificCalculator({
               key={`${entry.mode}:${entry.expression}:${index}`}
               type="button"
               variant="ghost"
-              className="h-auto w-full justify-between gap-3 px-2 py-1 text-left font-mono text-xs"
+              className="h-auto w-full justify-between gap-3 px-2 py-1 text-left font-mono text-xs pointer-coarse:min-h-11"
               onClick={() => recall(entry)}
             >
               <span className="truncate">{entry.expression}</span>
@@ -279,6 +280,7 @@ export default function ScientificCalculator({
               type="button"
               variant={mode === option ? 'secondary' : 'outline'}
               size="xs"
+              className="pointer-coarse:min-h-11"
               aria-pressed={mode === option}
               onClick={() => {
                 onModeChange(option)
@@ -337,13 +339,14 @@ export default function ScientificCalculator({
         <Button
           type="button"
           variant="outline"
-          className="w-full"
+          className="w-full pointer-coarse:min-h-11"
           disabled={!evaluation?.ok || !targetLabel}
           onClick={() => evaluation?.ok && onInsertResult(evaluation.display)}
         >
           ใส่ผลลัพธ์ในคำตอบ
         </Button>
       </div>
-    </Card>
+      </Card>
+    </div>
   ), document.body)
 }

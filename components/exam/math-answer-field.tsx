@@ -175,6 +175,7 @@ export function MathAnswerField({
           aria-label={active ? 'ปิดแป้นคณิตศาสตร์' : 'เปิดแป้นคณิตศาสตร์'}
           aria-expanded={active}
           aria-controls={panelId}
+          className="pointer-coarse:size-11"
           onClick={() => active ? onDeactivate() : focusInput()}
         >
           <Keyboard />
@@ -194,7 +195,7 @@ export function MathAnswerField({
               onActivate()
               onModeChange(option)
             }}
-            className={cn(mode === option && 'border-primary bg-primary/10 text-primary')}
+            className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
           >
             {option.toUpperCase()}
           </Button>
@@ -202,21 +203,22 @@ export function MathAnswerField({
       </span>
 
       {active && typeof document !== 'undefined' && createPortal((
-        <Card
-          id={panelId}
-          role="group"
-          aria-label="แป้นคณิตศาสตร์"
-          padding="sm"
-          className="fixed inset-x-2 bottom-2 z-[80] mx-auto max-h-[calc(var(--app-height,100dvh)-1rem)] max-w-2xl space-y-2 overflow-y-auto overscroll-contain shadow-xl"
-          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-          {...caret.keypadProps}
-        >
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[80] flex h-[var(--app-height,100dvh)] items-end justify-center p-2">
+          <Card
+            id={panelId}
+            role="group"
+            aria-label="แป้นคณิตศาสตร์"
+            padding="sm"
+            className="pointer-events-auto max-h-full w-full max-w-2xl space-y-2 overflow-y-auto overscroll-contain shadow-xl"
+            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+            {...caret.keypadProps}
+          >
           <div className="flex items-center gap-2">
             <div>
               <p className="text-sm font-semibold">แป้นคณิตศาสตร์</p>
               <p className="text-[11px] text-muted-foreground">ใส่ที่ตำแหน่งเคอร์เซอร์ · กด Esc เพื่อปิด</p>
             </div>
-            <Button type="button" variant="ghost" size="icon-sm" className="ml-auto" onClick={onDeactivate} aria-label="ปิดแป้นคณิตศาสตร์">
+            <Button type="button" variant="ghost" size="icon-sm" className="ml-auto pointer-coarse:size-11" onClick={onDeactivate} aria-label="ปิดแป้นคณิตศาสตร์">
               <X />
             </Button>
           </div>
@@ -231,12 +233,12 @@ export function MathAnswerField({
                 size="xs"
                 aria-pressed={mode === option}
                 onClick={() => onModeChange(option)}
-                className={cn(mode === option && 'border-primary bg-primary/10 text-primary')}
+                className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
               >
                 {option.toUpperCase()}
               </Button>
             ))}
-            <Button type="button" variant="ghost" size="sm" className="ml-auto" onClick={() => setAdvanced(show => !show)}>
+            <Button type="button" variant="ghost" size="sm" className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
               {advanced ? <ChevronUp /> : <ChevronDown />}
               ขั้นสูง
             </Button>
@@ -250,7 +252,7 @@ export function MathAnswerField({
                     key={`${mathKey.label}-${keyIndex}`}
                     type="button"
                     variant="outline"
-                    className="h-9 min-w-0 px-1 font-mono"
+                    className="h-9 min-w-0 px-1 font-mono pointer-coarse:h-11"
                     aria-label={mathKey.ariaLabel ?? mathKey.label}
                     onClick={() => runAction(mathKey.action)}
                   >
@@ -268,7 +270,7 @@ export function MathAnswerField({
                   key={`${mathKey.label}-${index}`}
                   type="button"
                   variant="secondary"
-                  className="h-9 min-w-0 px-1 font-mono text-xs"
+                  className="h-9 min-w-0 px-1 font-mono text-xs pointer-coarse:h-11"
                   aria-label={mathKey.ariaLabel ?? mathKey.label}
                   onClick={() => runAction(mathKey.action)}
                 >
@@ -277,7 +279,8 @@ export function MathAnswerField({
               ))}
             </div>
           )}
-        </Card>
+          </Card>
+        </div>
       ), document.body)}
     </span>
   )

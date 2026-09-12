@@ -865,7 +865,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               {run.title && (
                 <p className="mb-1.5 truncate text-[10px] font-semibold text-muted-foreground">{run.title}</p>
               )}
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className={`grid ${touchFriendly ? 'grid-cols-5 gap-1.5' : 'grid-cols-4 gap-1.5 pointer-coarse:gap-1'}`}>
                 {run.question_ids.map((_, offset) => {
                   const i = startIndex + offset
                   const answer = answers[i]
@@ -890,7 +890,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                       }}
                       aria-label={`ไปข้อ ${i + 1}`}
                       aria-current={isCurrent ? 'page' : undefined}
-                      className={`${touchFriendly ? 'h-10 w-10 text-sm' : 'h-8 w-8 text-[11px]'} rounded-lg font-bold transition-all hover:scale-105 ${tone}`}
+                      className={`${touchFriendly ? 'h-11 w-11' : 'h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11'} rounded-lg text-sm font-bold transition-all hover:scale-105 ${tone}`}
                     >
                       {i + 1}
                     </button>
@@ -1231,7 +1231,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       </div>
 
       {/* RIGHT: Nav panel */}
-      <div className={`hidden shrink-0 flex-col gap-3 md:flex ${focusMode ? 'w-60' : 'w-56'}`}>
+      <div className={`hidden min-h-0 shrink-0 flex-col gap-3 lg:flex ${focusMode ? 'w-60' : 'w-56'}`}>
 
         {/* Timer */}
         {secondsLeft !== null && (
@@ -1285,7 +1285,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         </Card>
 
         {/* Nav grid */}
-        <Card padding="md" className="flex-1">
+        <Card padding="md" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">นำทางข้อ</p>
           {renderQuestionNavigation()}
         </Card>
@@ -1410,7 +1410,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Focus mode: full-screen overlay ────────────────────────────────── */}
       {focusMode && !previewResult && (
-        <div className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden">
+        <div className="fixed inset-x-0 top-0 z-50 flex h-[var(--app-height,100dvh)] flex-col overflow-hidden bg-background">
           {previewBanner(false)}
           {/* Focus header */}
           <div className="shrink-0 border-b bg-card">
@@ -1427,7 +1427,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 </p>
                 {secondsLeft !== null && (
                   <span
-                    className={`flex items-center gap-1 font-mono text-xs font-bold md:hidden ${
+                    className={`flex items-center gap-1 font-mono text-xs font-bold lg:hidden ${
                       timerDanger ? 'text-destructive' : timerUrgent ? 'text-flag' : 'text-foreground'
                     }`}
                     aria-label={`เวลาที่เหลือ ${formatTime(secondsLeft)}`}
@@ -1444,7 +1444,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   size="sm"
                   onClick={() => setShowQuestionNavigator(true)}
                   aria-label="ดูทุกข้อ"
-                  className="h-10 min-w-10 px-2 md:hidden"
+                  className="h-10 min-w-10 px-2 lg:hidden"
                 >
                   <ListChecks />
                 </Button>
@@ -1501,12 +1501,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         </div>
       )}
 
-      {/* Phone-sized screens hide the persistent right navigator. This sheet
+      {/* Compact screens hide the persistent right navigator. This sheet
           keeps direct access to unanswered and flagged questions without
           squeezing the question itself into a narrow column. */}
       {showQuestionNavigator && !previewResult && (
         <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-overlay p-3 backdrop-blur-sm"
+          className="fixed inset-x-0 top-0 z-[90] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay p-3 backdrop-blur-sm"
           role="presentation"
         >
           <Card
@@ -1600,7 +1600,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Submit confirmation dialog ──────────────────────────────────────── */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-overlay p-3 backdrop-blur-sm">
+        <div className="fixed inset-x-0 top-0 z-[90] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay p-3 backdrop-blur-sm">
           <Card
             ref={submitDialogRef}
             padding="xl"
@@ -2038,7 +2038,7 @@ function ExamToolbar({
         )}
         {timeLabel !== null && (
           <span
-            className={`flex items-center gap-1 font-mono font-bold md:hidden ${
+            className={`flex items-center gap-1 font-mono font-bold lg:hidden ${
               timerDanger ? 'text-destructive' : timerUrgent ? 'text-flag' : 'text-foreground'
             }`}
             aria-label={`เวลาที่เหลือ ${timeLabel}`}
@@ -2055,7 +2055,7 @@ function ExamToolbar({
           size="sm"
           onClick={onOpenNavigator}
           aria-label="ดูทุกข้อ"
-          className="h-10 min-w-10 px-2 md:hidden"
+          className="h-10 min-w-10 px-2 lg:hidden"
         >
           <ListChecks />
         </Button>
@@ -2298,6 +2298,7 @@ function WorkProofSlot({
               type="button"
               variant="outline"
               size="sm"
+              className="pointer-coarse:min-h-11"
               onClick={() => onOpenScratchpad(answerId, partIndex, scratchpadLabel)}
             >
               <NotebookPen /> เขียนบนกระดาษทด
@@ -3048,12 +3049,10 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
 // (`block lg:table-cell` and friends), so each row becomes a card that stacks
 // its dimensions.
 //
-// The switch is at lg rather than md because md was measured, not guessed: at
-// 768 and at 812 (a phone on its side) the table fits without overflowing, but
-// the exam page's sidebar leaves the three columns so little room that
-// "พอลิเมอร์ธรรมชาติ" wraps onto three lines. The rule is to break where the
-// content stops reading well rather than at a named device width, and a
-// landscape phone must not inherit a crowded desktop layout.
+// The switch is at lg because 768–820px iPad portrait widths need the stacked
+// cards, while a wider landscape viewport has room for the full table beside
+// the exam navigator. The rule is to break where the content stops reading
+// well rather than at a named device width.
 // The header row hides itself there and each cell reprints its own column title
 // instead, because a radio group with no label is unanswerable.
 //

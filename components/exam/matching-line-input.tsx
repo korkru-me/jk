@@ -262,7 +262,7 @@ export function MatchingLineInput({
                       setSelected(previous => previous === i ? null : i)
                     }
                   }}
-                  className="absolute -right-5 top-1/2 h-10 w-10 min-w-0 -translate-y-1/2 touch-none rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
+                  className="absolute -right-5 top-1/2 h-10 w-10 min-w-0 -translate-y-1/2 touch-none rounded-full border-0 bg-transparent p-0 hover:bg-transparent pointer-coarse:h-11 pointer-coarse:w-11"
                 >
                   <span
                     aria-hidden
@@ -296,7 +296,7 @@ export function MatchingLineInput({
                 aria-label={`ตัวเลือก ${option.text}`}
                 onClick={() => { if (selected !== null) connect(selected, j) }}
                 className={cn(
-                  'relative flex h-auto w-full items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors',
+                  'relative flex h-auto min-h-10 w-full items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors pointer-coarse:min-h-11',
                   isHovered ? 'border-primary bg-primary/10'
                     : verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'
