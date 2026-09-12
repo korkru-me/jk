@@ -1,6 +1,6 @@
 ---
-description: KorKru brand, Thai copy, accessibility, and prototype-truth rules
-globs: "{app/**/*.tsx,components/**/*.tsx}"
+description: KorKru brand, Thai copy, responsive UI, accessibility, and prototype-truth rules
+globs: "{app/**/*.tsx,components/**/*.tsx,app/**/*.css}"
 alwaysApply: false
 ---
 
@@ -12,5 +12,20 @@ alwaysApply: false
 - Do not present mock analytics, invoices, usage, pricing, compliance, security, or unfinished actions as real.
 - State clearly which answers are auto-graded and which require teacher review.
 - Keep forms keyboard-accessible with visible labels, useful errors, and pending states.
-- Respect responsive layouts, color contrast, and `prefers-reduced-motion`.
+- Respect color contrast and `prefers-reduced-motion`.
 - Use existing UI primitives and visual tokens before introducing one-off patterns.
+
+## Responsive UI
+
+- Treat responsive behavior as part of the definition of done for every new or changed page, component, button, control, overlay, and UI-affecting function.
+- Support desktop, iPad/tablet in portrait and landscape, and phone in portrait and landscape. Do not rely on hover, one orientation, or one viewport width.
+- Add breakpoints where content actually stops fitting or reading well, not just at named-device widths. A landscape phone must not accidentally receive a crowded tablet/desktop layout.
+- Keep primary content and actions visible and close to what they affect. Reflow, wrap, stack, or change navigation form as space shrinks; never hide an essential action without an accessible alternative.
+- Prevent unintended page-level horizontal scrolling, overlapping controls, clipped text, and actions covered by fixed UI. Confine genuinely wide content to a clearly scrollable region.
+- Let Thai labels, validation messages, realistic long content, and enlarged text wrap safely. Truncate only non-essential text and keep the full value accessible.
+- Keep touch targets comfortable (normally at least 44 x 44 CSS px), separate adjacent actions, and give icon-only controls accessible labels. Do not depend on hover alone.
+- Preserve logical keyboard order, visible focus, expected Enter/Space/Escape behavior, modal focus containment, and focus restoration.
+- Keep dialogs, sheets, menus, popovers, and sticky/fixed controls inside the visible viewport. Account for safe-area insets, browser chrome, orientation changes, and the on-screen keyboard; allow internal scrolling when needed.
+- Verify loading, empty, error, permission, pending, and confirmation states at every supported size, not only the happy path.
+- Validate changed UI with realistic long Thai content by resizing continuously from a narrow phone through tablet to wide desktop, in both orientations and at enlarged text/zoom. Also inspect the component in its narrowest supported container.
+- Responsive acceptance requires no overlap, clipping, unintended page scroll, unreachable action, obscured focus, or disruptive layout jump at intermediate widths. Browser simulation does not replace required physical-device or SEB testing; record unavailable device checks as pending.
