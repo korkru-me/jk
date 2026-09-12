@@ -13,7 +13,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
-import type { Assignment, Question, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { Assignment, CompletionRule, Question, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import {
+  STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN, STREAK_CAP_MAX, STREAK_CAP_MIN,
+  decideCompletion, defaultQuestionCap, streakEligibleCount, streakExcludedCount, streakPoolAdvice,
+} from '@/lib/streak-completion'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import {
@@ -59,6 +63,10 @@ export type EditableAssignment = Pick<
   | 'questions_per_page'
   | 'instant_check'
   | 'instant_check_answer_key'
+  | 'completion_rule'
+  | 'streak_target'
+  | 'streak_question_cap'
+  | 'streak_recycle_pool'
   | 'passing_type'
   | 'passing_value'
   | 'show_results'
@@ -118,6 +126,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [requireWorkImage, setRequireWorkImage] = useState(a.require_work_image ?? false)
   const [calculatorEnabled, setCalculatorEnabled] = useState(a.calculator_enabled ?? false)
   const [scratchpadEnabled, setScratchpadEnabled] = useState(a.scratchpad_enabled ?? false)
+  const [completionRule, setCompletionRule] = useState<CompletionRule>(a.completion_rule ?? 'fixed')
+  const [streakTarget, setStreakTarget] = useState(
+    a.streak_target != null ? String(a.streak_target) : String(STREAK_TARGET_DEFAULT)
+  )
+  const [streakCapEnabled, setStreakCapEnabled] = useState(a.streak_question_cap != null)
+  const [streakCap, setStreakCap] = useState(
+    String(a.streak_question_cap ?? defaultQuestionCap(a.streak_target ?? STREAK_TARGET_DEFAULT))
+  )
+  const [streakRecycle, setStreakRecycle] = useState(a.streak_recycle_pool !== false)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
@@ -142,6 +159,45 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   // Only เติมคำตอบตัวเลข has working to photograph, so the ask appears exactly
   // when this งาน holds one — and follows the list as the teacher edits it.
   const hasWorkImageQuestions = orderedQuestions.some(q => q.question_type === 'written')
+
+  // ── เงื่อนไขจบงาน ────────────────────────────────────────────────────────
+  // Same resolver as the create wizard and updateAssignment, so all three
+  // agree on whether this งาน can end on a run of correct answers. Read off
+  // the list as the teacher edits it, not off the stored set.
+  const poolQuestionTypes = orderedQuestions.map(q => q.question_type ?? '')
+  const streakEligible = streakEligibleCount(poolQuestionTypes)
+  const streakExcluded = streakExcludedCount(poolQuestionTypes)
+  const streakCapValue = streakCapEnabled && streakCap.trim() !== '' ? Number(streakCap) : null
+  const streakDecision = decideCompletion({
+    requested: 'streak',
+    mode: a.mode,
+    target: Number(streakTarget),
+    questionCap: streakCapValue,
+    recyclePool: streakRecycle,
+    poolQuestionTypes,
+  })
+  const streakBlocked = streakDecision.refusedReason
+  const streakAdvice = streakBlocked ? null : streakPoolAdvice(poolQuestionTypes, streakDecision.target as number)
+  const streakOffered = a.mode === 'online'
+  const streakOn = completionRule === 'streak'
+  // The rule and the target are what passing means, so both freeze the moment
+  // anyone starts — otherwise two students' results measure different things.
+  // The ceiling and pool recycling stay editable: relaxing either does not
+  // change what "ผ่าน" means. The server refuses the locked pair as well.
+  const canEditCompletion = !hasSubmissions
+  const completionChoice: 'complete' | 'threshold' | 'streak' =
+    streakOn ? 'streak' : (passingEnabled ? 'threshold' : 'complete')
+
+  function chooseCompletion(choice: 'complete' | 'threshold' | 'streak') {
+    if (!canEditCompletion) return
+    if (choice === 'streak') {
+      setCompletionRule('streak')
+      setPassingEnabled(false)
+      return
+    }
+    setCompletionRule('fixed')
+    setPassingEnabled(choice === 'threshold')
+  }
 
   function applyQuestionChange(next: { sections: typeof sections; question_ids: string[] }) {
     setSections(next.sections)
@@ -228,8 +284,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         questions_per_page: Number(questionsPerPage) || 1,
         instant_check: instantCheck,
         instant_check_answer_key: instantCheckAnswerKey,
-        passing_type: passingEnabled && passingValue ? passingType : null,
-        passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
+        completion_rule: completionRule,
+        streak_target: streakOn ? Number(streakTarget) : null,
+        streak_question_cap: streakOn ? streakCapValue : null,
+        streak_recycle_pool: streakRecycle,
+        // Cleared for a streak งาน for the same reason the controls are hidden:
+        // a variable-length attempt has no fixed total to take a share of, and
+        // the database refuses the pair.
+        passing_type: streakOn ? null : (passingEnabled && passingValue ? passingType : null),
+        passing_value: streakOn ? null : (passingEnabled && passingValue ? Number(passingValue) : null),
         // Sent only when the teacher could actually change it, so a frozen
         // assignment never trips the server's "already started" refusal just
         // by saving an unrelated field.
@@ -563,28 +626,187 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </div>
       </Card>
 
-      <Card padding="xl" className="space-y-1.5">
-        <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <Target className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">ตั้งเกณฑ์คะแนนผ่าน</p>
-              <p className="text-xs text-muted-foreground">
-                {a.type === 'exercise'
-                  ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
-                  : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
-              </p>
-            </div>
+      <Card padding="xl" className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Target className="w-4 h-4 text-muted-foreground" />
           </div>
-          <input
-            type="checkbox"
-            checked={passingEnabled}
-            onChange={e => setPassingEnabled(e.target.checked)}
-            className="accent-primary w-4 h-4 shrink-0"
-          />
-        </label>
+          <div>
+            <h2 className="font-semibold text-foreground">เงื่อนไขจบงาน</h2>
+            <p className="text-xs text-muted-foreground">
+              {canEditCompletion
+                ? 'นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร'
+                : 'ล็อกแล้วเพราะมีนักเรียนเริ่มทำ — เปลี่ยนตอนนี้จะทำให้ผลของคนที่ทำไปแล้วเทียบกับคนที่ทำทีหลังไม่ได้'}
+            </p>
+          </div>
+        </div>
+
+        <div className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+          {([
+            { key: 'complete' as const, label: 'ทำครบแล้วจบ', desc: 'ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน' },
+            { key: 'threshold' as const, label: 'ต้องผ่านเกณฑ์', desc: 'ดูว่าถึงเปอร์เซ็นต์หรือคะแนนที่ตั้งไว้ไหม' },
+            ...(streakOffered ? [{
+              key: 'streak' as const, label: 'ถูกติดกันจึงจบ', desc: 'ทำไปเรื่อย ๆ จนตอบถูกติดต่อกันครบ',
+            }] : []),
+          ]).map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => chooseCompletion(opt.key)}
+              disabled={!canEditCompletion}
+              className={`p-3 rounded-xl border-2 text-left transition-all ${
+                completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border'
+              } ${canEditCompletion ? 'hover:border-ring' : 'opacity-60 cursor-not-allowed'}`}
+            >
+              <p className="font-medium text-sm text-foreground">{opt.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+
+        {completionChoice === 'threshold' && (
+          <div className="flex items-center gap-2 p-3 rounded-xl border border-border flex-wrap">
+            <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
+              {(['percent', 'score'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setPassingType(t)}
+                  className={`px-3 py-2 text-xs font-medium transition-all ${
+                    passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
+                </button>
+              ))}
+            </div>
+            <Input
+              type="number"
+              min={0}
+              max={passingType === 'percent' ? 100 : undefined}
+              value={passingValue}
+              onChange={e => setPassingValue(e.target.value)}
+              placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
+              className="max-w-[120px]"
+            />
+            <span className="text-sm text-muted-foreground shrink-0">
+              {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
+            </span>
+          </div>
+        )}
+
+        {completionChoice === 'streak' && (
+          <div className="space-y-3 p-4 rounded-xl border border-border">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Label htmlFor="edit-streak-target" className="text-sm text-muted-foreground">
+                ต้องตอบถูกติดต่อกัน
+              </Label>
+              <Input
+                id="edit-streak-target"
+                type="number"
+                min={STREAK_TARGET_MIN}
+                max={STREAK_TARGET_MAX}
+                value={streakTarget}
+                onChange={event => setStreakTarget(event.target.value)}
+                disabled={!canEditCompletion}
+                className="max-w-[100px]"
+              />
+              <span className="text-sm text-muted-foreground">ข้อ จึงจะจบ · ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0</span>
+            </div>
+
+            {/* The ceiling and pool recycling stay editable after students
+                start: neither changes what passing means. */}
+            <div className="space-y-1.5">
+              <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                <div>
+                  <p className="text-sm font-medium text-foreground">หยุดให้เองเมื่อทำครบจำนวนที่กำหนด</p>
+                  <p className="text-xs text-muted-foreground">ถึงเพดานแล้วจบเป็น “ยังไม่ผ่าน”</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={streakCapEnabled}
+                  onChange={event => setStreakCapEnabled(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+              {streakCapEnabled && (
+                <div className="flex items-center gap-2 pl-3">
+                  <Input
+                    type="number"
+                    min={STREAK_CAP_MIN}
+                    max={STREAK_CAP_MAX}
+                    value={streakCap}
+                    onChange={event => setStreakCap(event.target.value)}
+                    className="max-w-[100px]"
+                  />
+                  <span className="text-sm text-muted-foreground">ข้อ</span>
+                </div>
+              )}
+            </div>
+
+            <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+              <div>
+                <p className="text-sm font-medium text-foreground">ทำครบคลังแล้ววนกลับมาใหม่</p>
+                <p className="text-xs text-muted-foreground">
+                  โจทย์สุ่มตัวเลขได้ตัวเลขชุดใหม่ ข้อคงที่ซ้ำของเดิม · ปิดไว้ = ทำครบคลังแล้วจบเลย
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={streakRecycle}
+                onChange={event => setStreakRecycle(event.target.checked)}
+                className="accent-primary w-4 h-4 shrink-0"
+              />
+            </label>
+
+            {streakBlocked && (
+              <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{streakBlocked}</p>
+            )}
+            {!streakBlocked && streakExcluded > 0 && (
+              <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                ข้อเขียนและข้อส่งไฟล์ {streakExcluded} ข้อจะไม่ถูกสุ่มมาในโหมดนี้ — เหลือโจทย์ที่ใช้ได้ {streakEligible} ข้อ
+              </p>
+            )}
+            {streakAdvice && (
+              <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">{streakAdvice}</p>
+            )}
+
+            {/* Same reason as in the create wizard: this mode hides the
+                ตรวจทีละข้อ switch because it is forced on, but whether the
+                check reveals the เฉลย is still the teacher's to choose. */}
+            <div className="border-t border-border pt-3 space-y-1.5">
+              <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                <div>
+                  <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                  <p className="text-xs text-muted-foreground">
+                    {instantCheckAnswerKey
+                      ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำทันที'
+                      : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ'}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={instantCheckAnswerKey}
+                  onChange={event => setInstantCheckAnswerKey(event.target.checked)}
+                  className="accent-primary w-4 h-4 shrink-0"
+                />
+              </label>
+              {a.type === 'exam' && instantCheckAnswerKey && (
+                <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                  งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือเฉลยออกไปจากห้องได้ แนะนำให้ปิด
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              โหมดนี้ตั้งให้เอง: เปิดการตรวจทีละข้อ · แสดงทีละ 1 ข้อ · ไม่ใช้เกณฑ์คะแนน/เปอร์เซ็นต์ ·
+              เก็บคะแนนจากรอบที่ดีที่สุด · รอบใหม่เริ่มใหม่ทั้งชุด
+            </p>
+          </div>
+        )}
+      </Card>
+
+      <Card padding="xl" className="space-y-1.5">
 
         {assignmentSections.length > 0 && (
           <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
@@ -676,36 +898,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </label>
         )}
 
-        {passingEnabled && (
-          <div className="flex items-center gap-2 p-3 rounded-xl border border-border">
-            <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
-              {(['percent', 'score'] as const).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setPassingType(t)}
-                  className={`px-3 py-2 text-xs font-medium transition-all ${
-                    passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
-                </button>
-              ))}
-            </div>
-            <Input
-              type="number"
-              min={0}
-              max={passingType === 'percent' ? 100 : undefined}
-              value={passingValue}
-              onChange={e => setPassingValue(e.target.value)}
-              placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
-              className="max-w-[120px]"
-            />
-            <span className="text-sm text-muted-foreground shrink-0">
-              {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
-            </span>
-          </div>
-        )}
       </Card>
 
       <Card padding="xl" className="space-y-4">
@@ -737,7 +929,14 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           />
         </div>
 
-        {a.mode === 'online' && (
+        {a.mode === 'online' && streakOn && (
+          <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+            เงื่อนไขจบงานเป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
+            ปรับสองอย่างนี้ที่นี่ไม่ได้
+          </p>
+        )}
+
+        {a.mode === 'online' && !streakOn && (
           <div className="space-y-1.5">
             <Label htmlFor="edit-per-page" className="flex items-center gap-1.5">
               <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
@@ -805,7 +1004,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           />
         </div>
 
-        {maxAttempts !== '1' && (
+        {maxAttempts !== '1' && !streakOn && (
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5">
               <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
@@ -827,7 +1026,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         )}
 
-        {a.mode === 'online' && a.type === 'exercise' && (
+        {a.mode === 'online' && a.type === 'exercise' && !streakOn && (
           <div className="space-y-3 rounded-xl border border-border p-4">
             <label className="flex items-center justify-between gap-4 cursor-pointer">
               <div className="flex items-start gap-3">
@@ -870,7 +1069,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         )}
 
-        {a.mode === 'online' && maxAttempts !== '1' && (
+        {a.mode === 'online' && maxAttempts !== '1' && !streakOn && (
           <div className="space-y-3 rounded-xl border border-border p-4">
             <label className="flex items-center justify-between gap-4 cursor-pointer">
               <div className="flex items-start gap-3">

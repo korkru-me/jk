@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
-import type { AndroidExamMode, AssignmentStatus, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
+import type { AndroidExamMode, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
+import { decideCompletion, streakForcedSettings } from '@/lib/streak-completion'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 import { inspectSebReadiness } from '@/lib/seb'
 import { resolveNewAssignmentMathTools } from '@/lib/assignment-math-tools'
@@ -70,6 +71,10 @@ interface CreateAssignmentData {
   questions_per_page?: number | null
   instant_check?: boolean
   instant_check_answer_key?: boolean
+  completion_rule?: CompletionRule
+  streak_target?: number | null
+  streak_question_cap?: number | null
+  streak_recycle_pool?: boolean
   access_code?: string | null
   passing_type?: 'score' | 'percent' | null
   passing_value?: number | null
@@ -83,6 +88,25 @@ interface CreateAssignmentData {
   secure_browser_mode?: SecureBrowserMode
   android_exam_mode?: AndroidExamMode
   status?: AssignmentStatus
+}
+
+/**
+ * The pool's question types, read from the คลัง rather than taken from the
+ * form. `decideCompletion` refuses a streak whose pool cannot reach the
+ * target, and that count is exactly the thing a tampered client would lie
+ * about. Only fetched when a streak is actually requested — every other งาน
+ * pays nothing for this.
+ */
+async function fetchPoolQuestionTypes(
+  supabase: ServerSupabaseClient,
+  questionIds: string[],
+): Promise<{ types: string[] } | { error: string }> {
+  const { data, error } = await supabase
+    .from('questions')
+    .select('question_type')
+    .in('id', questionIds)
+  if (error) return { error: 'ตรวจชนิดของโจทย์ในคลังไม่สำเร็จ กรุณาลองใหม่' }
+  return { types: (data ?? []).map(row => row.question_type as string) }
 }
 
 export async function createAssignment(data: CreateAssignmentData) {
@@ -166,6 +190,28 @@ export async function createAssignment(data: CreateAssignmentData) {
       ? data.random_question_count
       : null
 
+  // What "จบงาน" means for this งาน. A refused streak is reported rather than
+  // stored as 'fixed': a งาน that ends a different way than the teacher chose
+  // is not the งาน they created, and silently dropping the value is the same
+  // failure สุ่มชุดโจทย์ had when its own gate lived out of sight of the form.
+  const completionPool = data.completion_rule === 'streak'
+    ? await fetchPoolQuestionTypes(supabase, questionIds)
+    : { types: [] as string[] }
+  if ('error' in completionPool) return { error: completionPool.error }
+  const completion = decideCompletion({
+    requested: data.completion_rule,
+    mode: data.mode,
+    target: data.streak_target,
+    questionCap: data.streak_question_cap,
+    recyclePool: data.streak_recycle_pool,
+    poolQuestionTypes: completionPool.types,
+  })
+  if (completion.refusedReason) return { error: completion.refusedReason }
+  // Non-null only for a streak, where these settings are not the teacher's to
+  // choose — each is also a CHECK constraint or an invariant the ทำข้อสอบ loop
+  // depends on. See streakForcedSettings() for why each one is fixed.
+  const forced = completion.rule === 'streak' ? streakForcedSettings() : null
+
   // Only keep overrides for questions actually in this assignment, with a
   // valid positive point value — drops anything a tampered client might add.
   const questionIdSet = new Set(questionIds)
@@ -206,14 +252,25 @@ export async function createAssignment(data: CreateAssignmentData) {
       random_question_count: randomQuestionCount,
       show_results: showResults,
       max_attempts: data.max_attempts || null,
-      score_strategy: data.score_strategy ?? 'best',
-      retry_scope: retryScope,
-      questions_per_page: normalizeQuestionsPerPage(data.mode, data.questions_per_page),
-      instant_check: isOnlineExercise && data.instant_check !== false,
+      score_strategy: forced?.score_strategy ?? data.score_strategy ?? 'best',
+      retry_scope: forced?.retry_scope ?? retryScope,
+      questions_per_page: forced?.questions_per_page
+        ?? normalizeQuestionsPerPage(data.mode, data.questions_per_page),
+      // A streak ข้อสอบ checks each ข้อ as it goes — that is how the run is
+      // counted — so this is the one case where an exam gets instant_check.
+      // Ordinary ข้อสอบ still keep their single ส่งคำตอบ at the end.
+      instant_check: forced?.instant_check ?? (isOnlineExercise && data.instant_check !== false),
       instant_check_answer_key: data.instant_check_answer_key !== false,
+      completion_rule: completion.rule,
+      streak_target: completion.target,
+      streak_question_cap: completion.questionCap,
+      streak_recycle_pool: completion.recyclePool,
       access_code: data.access_code?.trim() || null,
-      passing_type: data.passing_type ?? null,
-      passing_value: data.passing_value ?? null,
+      // `forced` carries nulls here, so these cannot use `??` — a nullish
+      // fallback would let the teacher's threshold through on a streak งาน and
+      // the insert would be rejected by the CHECK constraint.
+      passing_type: forced ? null : (data.passing_type ?? null),
+      passing_value: forced ? null : (data.passing_value ?? null),
       require_work_image: data.require_work_image ?? false,
       calculator_enabled: calculatorEnabled,
       scratchpad_enabled: scratchpadEnabled,
@@ -288,6 +345,14 @@ interface UpdateAssignmentData {
   /** Omit either to leave the งาน's answer untouched. */
   instant_check?: boolean
   instant_check_answer_key?: boolean
+  /** How the งาน ends. Omit to leave it, and the streak settings, untouched.
+   *  Changing it is refused once anyone has started, like the สุ่ม draw size:
+   *  a งาน whose ending moved mid-way gives two students results that cannot
+   *  be compared. */
+  completion_rule?: CompletionRule
+  streak_target?: number | null
+  streak_question_cap?: number | null
+  streak_recycle_pool?: boolean
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   /** The question set and its order. Omit to leave both untouched. */
@@ -329,7 +394,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, sections, type, mode, status, random_question_count, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode')
+    .select('question_ids, sections, type, mode, status, random_question_count, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -424,6 +489,50 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       ? data.random_question_count
       : null
 
+  // เงื่อนไขจบงาน, resolved the same way createAssignment does it. Omitting
+  // `completion_rule` leaves the stored rule and all three streak settings
+  // untouched, so a form that does not offer this cannot clear it.
+  const completionRequested = data.completion_rule !== undefined
+  const nextCompletionPool = completionRequested && data.completion_rule === 'streak'
+    ? await fetchPoolQuestionTypes(supabase, nextIds)
+    : { types: [] as string[] }
+  if ('error' in nextCompletionPool) return { error: nextCompletionPool.error }
+  const completion = completionRequested
+    ? decideCompletion({
+        requested: data.completion_rule,
+        mode: existing.mode as 'online' | 'print',
+        target: data.streak_target,
+        questionCap: data.streak_question_cap,
+        recyclePool: data.streak_recycle_pool,
+        poolQuestionTypes: nextCompletionPool.types,
+      })
+    : null
+  if (completion?.refusedReason) return { error: completion.refusedReason }
+  const forced = (completion?.rule ?? existing.completion_rule) === 'streak'
+    ? streakForcedSettings()
+    : null
+
+  // Moving a งาน between "จบเมื่อทำครบ" and "จบเมื่อถูกติดกัน" after anyone has
+  // started would leave two students' results measuring different things, the
+  // same reason the สุ่ม draw size is frozen below. Only the rule itself and
+  // the target are locked; the ceiling and pool recycling can still be relaxed
+  // mid-way without changing what passing means.
+  if (
+    completion
+    && (completion.rule !== existing.completion_rule || completion.target !== existing.streak_target)
+  ) {
+    const { data: startedCompletion, error: startedCompletionError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedCompletionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedCompletion) {
+      return { error: 'เปลี่ยนเงื่อนไขจบงานไม่ได้หลังมีนักเรียนเริ่มทำแล้ว' }
+    }
+  }
+
   // Existing attempts already have their subset frozen. Refuse to change the
   // draw size after anyone has started so later students do not receive a
   // materially different exam by accident.
@@ -497,19 +606,38 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
       max_attempts: data.max_attempts || null,
-      score_strategy: data.score_strategy,
-      ...(data.retry_scope === undefined ? {} : { retry_scope: updatedRetryScope }),
-      ...(data.questions_per_page === undefined
+      score_strategy: forced?.score_strategy ?? data.score_strategy,
+      ...(data.retry_scope === undefined && !forced
         ? {}
-        : { questions_per_page: normalizeQuestionsPerPage(existing.mode, data.questions_per_page) }),
-      ...(data.instant_check === undefined
+        : { retry_scope: forced?.retry_scope ?? updatedRetryScope }),
+      ...(data.questions_per_page === undefined && !forced
         ? {}
-        : { instant_check: isOnlineExercise && data.instant_check }),
+        : {
+            questions_per_page: forced?.questions_per_page
+              ?? normalizeQuestionsPerPage(existing.mode, data.questions_per_page),
+          }),
+      // A streak งาน must keep instant_check on whatever the form sent — the
+      // database refuses the row otherwise, and the run has nothing to count.
+      // This is also the only path by which a ข้อสอบ gets instant_check.
+      ...(data.instant_check === undefined && !forced
+        ? {}
+        : { instant_check: forced?.instant_check ?? (isOnlineExercise && data.instant_check) }),
       ...(data.instant_check_answer_key === undefined
         ? {}
         : { instant_check_answer_key: data.instant_check_answer_key }),
-      passing_type: data.passing_type,
-      passing_value: data.passing_value,
+      ...(completion
+        ? {
+            completion_rule: completion.rule,
+            streak_target: completion.target,
+            streak_question_cap: completion.questionCap,
+            streak_recycle_pool: completion.recyclePool,
+          }
+        : {}),
+      // Nullish coalescing is wrong here for the same reason as in
+      // createAssignment: `forced` carries nulls, and letting the teacher's
+      // threshold through on a streak งาน would be rejected by the CHECK.
+      passing_type: forced ? null : data.passing_type,
+      passing_value: forced ? null : data.passing_value,
       question_points: questionPoints,
       display_max_score: displayMaxScore,
       show_results: data.show_results,
@@ -615,6 +743,17 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       score_strategy: source.score_strategy,
       retry_scope: source.retry_scope ?? 'all',
       questions_per_page: source.questions_per_page ?? 1,
+      // Carried, not defaulted. A สำเนา of a แบบฝึกหัด that let students check
+      // each ข้อ used to come back with that turned off, because these two
+      // were simply missing from this payload and the columns default to
+      // false. They are also what the streak CHECK below depends on: a copied
+      // streak งาน without instant_check would be rejected outright.
+      instant_check: source.instant_check ?? false,
+      instant_check_answer_key: source.instant_check_answer_key ?? true,
+      completion_rule: source.completion_rule ?? 'fixed',
+      streak_target: source.streak_target ?? null,
+      streak_question_cap: source.streak_question_cap ?? null,
+      streak_recycle_pool: source.streak_recycle_pool ?? true,
       access_code: null,
       passing_type: source.passing_type,
       passing_value: source.passing_value,

@@ -61,3 +61,20 @@ export function isAttemptExpired(startedAt: string, durationMinutes: number | nu
 export function isInstantCheckable(questionType: string): boolean {
   return questionType !== 'essay'
 }
+
+// Whether a ข้อ may be drawn into a "ถูกติดต่อกัน" pool.
+//
+// Stricter than isInstantCheckable, and deliberately a separate question. A
+// ส่งไฟล์งาน is instant-checkable — gradeAnswer gives it full marks the moment
+// any file is attached, which is honest feedback for a แบบฝึกหัด where the
+// teacher reads the file afterwards. But full marks is also what advances a
+// streak, so in this mode the same rule turns a blank photo into a free step
+// toward passing, over and over. It is excluded here without touching
+// isInstantCheckable, which ordinary แบบฝึกหัด still rely on.
+//
+// ข้อเขียน is excluded for the reason it always is: nothing can decide it
+// while the student is still in the attempt, and a streak cannot wait for a
+// teacher.
+export function isStreakEligible(questionType: string): boolean {
+  return isInstantCheckable(questionType) && questionType !== 'file_upload'
+}

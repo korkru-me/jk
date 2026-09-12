@@ -21,7 +21,12 @@ import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
-import type { Classroom, QuestionSet, AssignmentStatus, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type { Classroom, QuestionSet, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import {
+  STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN,
+  STREAK_CAP_MAX, STREAK_CAP_MIN,
+  decideCompletion, defaultQuestionCap, streakEligibleCount, streakExcludedCount, streakPoolAdvice,
+} from '@/lib/streak-completion'
 import type { BankQuestion } from '@/lib/question-bank'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
@@ -153,6 +158,15 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
   const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>('browser')
   const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>('blocked')
+  // เงื่อนไขจบงาน. The three choices a teacher sees are a view over two stored
+  // values — 'fixed' + no threshold, 'fixed' + a threshold, or 'streak' — so
+  // that turning a threshold on and choosing to end on a run are visibly the
+  // same decision rather than two switches that can disagree.
+  const [completionRule, setCompletionRule] = useState<CompletionRule>('fixed')
+  const [streakTarget, setStreakTarget] = useState(String(STREAK_TARGET_DEFAULT))
+  const [streakCapEnabled, setStreakCapEnabled] = useState(true)
+  const [streakCap, setStreakCap] = useState(String(defaultQuestionCap(STREAK_TARGET_DEFAULT)))
+  const [streakRecycle, setStreakRecycle] = useState(true)
   const [passingEnabled, setPassingEnabled] = useState(false)
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
@@ -283,6 +297,54 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   // different amounts end up graded out of different totals. คะแนนเต็มที่
   // แสดงผล is the existing fix, so the warning offers it rather than only
   // naming the problem.
+  // ── เงื่อนไขจบงาน ────────────────────────────────────────────────────────
+  // The same resolver createAssignment uses, asked with the same inputs, so a
+  // streak the form shows as ready is a streak the server will accept — and a
+  // refusal is a sentence on screen instead of an error after ยืนยัน.
+  const poolQuestionTypes = previewQuestions.map(q => q.question_type)
+  const streakEligible = streakEligibleCount(poolQuestionTypes)
+  const streakExcluded = streakExcludedCount(poolQuestionTypes)
+  const streakCapValue = streakCapEnabled && streakCap.trim() !== '' ? Number(streakCap) : null
+  const streakDecision = decideCompletion({
+    requested: 'streak',
+    mode,
+    target: Number(streakTarget),
+    questionCap: streakCapValue,
+    recyclePool: streakRecycle,
+    poolQuestionTypes,
+  })
+  const streakBlocked = streakDecision.refusedReason
+  const streakAdvice = streakBlocked
+    ? null
+    : streakPoolAdvice(poolQuestionTypes, streakDecision.target as number)
+  // Never offered where it cannot work at all, rather than offered and then
+  // refused: a printed ใบงาน has no moment at which a ข้อ is judged.
+  const streakOffered = mode === 'online'
+  const streakOn = completionRule === 'streak'
+
+  // What the three cards read as. Kept derived so the pair can never end up in
+  // a state no card represents (a streak งาน with a percentage threshold is
+  // refused by the database, not just by the form).
+  const completionChoice: 'complete' | 'threshold' | 'streak' =
+    streakOn ? 'streak' : (passingEnabled ? 'threshold' : 'complete')
+
+  function chooseCompletion(choice: 'complete' | 'threshold' | 'streak') {
+    if (choice === 'streak') {
+      setCompletionRule('streak')
+      setPassingEnabled(false)
+      return
+    }
+    setCompletionRule('fixed')
+    setPassingEnabled(choice === 'threshold')
+  }
+
+  // Switching to a printed ใบงาน after choosing a streak would leave a งาน the
+  // server refuses, so the choice falls back to the plain ending — the same
+  // reason the สุ่ม draw is cleared on that switch.
+  useEffect(() => {
+    if (mode === 'print' && completionRule === 'streak') setCompletionRule('fixed')
+  }, [mode, completionRule])
+
   const pointValues = previewQuestions.map(q => Number.parseFloat(pointsDraft(q.id)) || 0)
   const drawnPointsVary = randomDrawOn && new Set(pointValues).size > 1
   const displayMaxSet = displayMaxScore.trim() !== '' && Number(displayMaxScore) > 0
@@ -290,6 +352,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   function canNext() {
     if (step === 0) return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
     if (step === 1) return selectedIds.length > 0
+    // Refuse to leave คะแนนและเกณฑ์ with a streak the server would reject, so
+    // the teacher reads the reason next to the field that caused it rather
+    // than as an error after ยืนยัน three screens later.
+    if (step === 2) return !(streakOn && streakBlocked)
     return true
   }
 
@@ -392,8 +458,15 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         instant_check: instantCheck,
         instant_check_answer_key: instantCheckAnswerKey,
         access_code: accessCode.trim() || null,
-        passing_type: passingEnabled && passingValue ? passingType : null,
-        passing_value: passingEnabled && passingValue ? Number(passingValue) : null,
+        completion_rule: completionRule,
+        streak_target: completionRule === 'streak' ? Number(streakTarget) : null,
+        streak_question_cap: completionRule === 'streak' ? streakCapValue : null,
+        streak_recycle_pool: streakRecycle,
+        // A streak งาน has no fixed total to take a percentage of, and the
+        // database refuses the pair outright — the card hides these controls
+        // for that reason, so nothing is lost by clearing them here too.
+        passing_type: streakOn ? null : (passingEnabled && passingValue ? passingType : null),
+        passing_value: streakOn ? null : (passingEnabled && passingValue ? Number(passingValue) : null),
         // A งาน with nothing to photograph is stored as not requiring it,
         // whatever the switch was left on before the last โจทย์ was removed.
         require_work_image: hasWorkImageQuestions && requireWorkImage,
@@ -786,31 +859,62 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </div>
           </Card>
 
-          <Card padding="xl" className="space-y-1.5">
-            <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Target className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">ตั้งเกณฑ์คะแนนผ่าน</p>
-                  <p className="text-xs text-muted-foreground">
-                    {assignmentType === 'exercise'
-                      ? 'นักเรียนที่ยังไม่ผ่านจะเห็นข้อความชวนทำใหม่'
-                      : 'ครูจะเห็นว่านักเรียนคนไหนสอบผ่าน/ไม่ผ่าน'}
-                  </p>
-                </div>
+          <Card padding="xl" className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <Target className="w-4 h-4 text-muted-foreground" />
               </div>
-              <input
-                type="checkbox"
-                checked={passingEnabled}
-                onChange={e => setPassingEnabled(e.target.checked)}
-                className="accent-primary w-4 h-4 shrink-0"
-              />
-            </label>
+              <div>
+                <h2 className="font-semibold text-foreground">เงื่อนไขจบงาน</h2>
+                <p className="text-xs text-muted-foreground">
+                  นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร
+                </p>
+              </div>
+            </div>
 
-            {passingEnabled && (
-              <div className="flex items-center gap-2 p-3 rounded-xl border border-border">
+            <div className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+              {([
+                {
+                  key: 'complete' as const,
+                  label: 'ทำครบแล้วจบ',
+                  desc: questionsPerAttempt > 0
+                    ? `ทำ ${questionsPerAttempt} ข้อที่ได้รับ ได้เท่าไหร่ก็เท่านั้น`
+                    : 'ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน',
+                },
+                {
+                  key: 'threshold' as const,
+                  label: 'ต้องผ่านเกณฑ์',
+                  desc: 'ทำครบแล้วดูว่าถึงเปอร์เซ็นต์หรือคะแนนที่ตั้งไว้ไหม',
+                },
+                ...(streakOffered ? [{
+                  key: 'streak' as const,
+                  label: 'ถูกติดกันจึงจบ',
+                  desc: 'ทำไปเรื่อย ๆ จนตอบถูกติดต่อกันครบตามที่ตั้ง',
+                }] : []),
+              ]).map(opt => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => chooseCompletion(opt.key)}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
+                  }`}
+                >
+                  <p className="font-medium text-sm text-foreground">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {completionChoice === 'complete' && (
+              <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+                ไม่ต้องตั้งค่าอะไรเพิ่ม — บันทึกคะแนนที่ทำได้ตามจริง
+                {assignmentType === 'exercise' ? ' เหมาะกับแบบฝึกหัดเก็บคะแนนตามปกติ' : ' เหมาะกับข้อสอบเก็บคะแนนตามปกติ'}
+              </p>
+            )}
+
+            {completionChoice === 'threshold' && (
+              <div className="flex items-center gap-2 p-3 rounded-xl border border-border flex-wrap">
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
                   {(['percent', 'score'] as const).map(t => (
                     <button
@@ -839,6 +943,127 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 </span>
               </div>
             )}
+
+            {completionChoice === 'streak' && (
+              <div className="space-y-3 p-4 rounded-xl border border-border">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Label htmlFor="streak-target" className="text-sm text-muted-foreground">
+                    ต้องตอบถูกติดต่อกัน
+                  </Label>
+                  <Input
+                    id="streak-target"
+                    type="number"
+                    min={STREAK_TARGET_MIN}
+                    max={STREAK_TARGET_MAX}
+                    value={streakTarget}
+                    onChange={event => setStreakTarget(event.target.value)}
+                    className="max-w-[100px]"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    ข้อ จึงจะจบ · ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">หยุดให้เองเมื่อทำครบจำนวนที่กำหนด</p>
+                      <p className="text-xs text-muted-foreground">
+                        ถึงเพดานแล้วจบเป็น “ยังไม่ผ่าน” — กันไม่ให้เด็กที่ยังไม่แม่นทำวนอยู่ทั้งคืน
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={streakCapEnabled}
+                      onChange={event => setStreakCapEnabled(event.target.checked)}
+                      className="accent-primary w-4 h-4 shrink-0"
+                    />
+                  </label>
+                  {streakCapEnabled && (
+                    <div className="flex items-center gap-2 pl-3">
+                      <Input
+                        type="number"
+                        min={STREAK_CAP_MIN}
+                        max={STREAK_CAP_MAX}
+                        value={streakCap}
+                        onChange={event => setStreakCap(event.target.value)}
+                        className="max-w-[100px]"
+                      />
+                      <span className="text-sm text-muted-foreground">ข้อ</span>
+                    </div>
+                  )}
+                </div>
+
+                <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">ทำครบคลังแล้ววนกลับมาใหม่</p>
+                    <p className="text-xs text-muted-foreground">
+                      โจทย์สุ่มตัวเลขจะได้ตัวเลขชุดใหม่ทุกครั้งที่วนกลับมา ข้อคงที่จะซ้ำของเดิม ·
+                      ปิดไว้ = ทำครบคลังแล้วจบเลย
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={streakRecycle}
+                    onChange={event => setStreakRecycle(event.target.checked)}
+                    className="accent-primary w-4 h-4 shrink-0"
+                  />
+                </label>
+
+                {streakBlocked && (
+                  <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+                    {streakBlocked}
+                  </p>
+                )}
+                {!streakBlocked && streakExcluded > 0 && (
+                  <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                    ข้อเขียนและข้อส่งไฟล์ {streakExcluded} ข้อจะไม่ถูกสุ่มมาในโหมดนี้ เพราะระบบตัดสินถูก/ผิดให้ทันทีไม่ได้
+                    — เหลือโจทย์ที่ใช้ได้ {streakEligible} ข้อ
+                  </p>
+                )}
+                {streakAdvice && (
+                  <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">{streakAdvice}</p>
+                )}
+
+                {/* Lives here rather than with the ตรวจทีละข้อ switch in
+                    ตั้งค่า, which this mode hides because it is forced on. It
+                    is the one part of that switch still worth choosing, and
+                    for a ข้อสอบ it is the difference between an answer key
+                    that stays in the room and one that walks out. */}
+                <div className="border-t border-border pt-3 space-y-1.5">
+                  <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                      <p className="text-xs text-muted-foreground">
+                        {instantCheckAnswerKey
+                          ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำทันที เหมาะกับการฝึกให้เข้าใจ'
+                          : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={instantCheckAnswerKey}
+                      onChange={event => setInstantCheckAnswerKey(event.target.checked)}
+                      className="accent-primary w-4 h-4 shrink-0"
+                    />
+                  </label>
+                  {assignmentType === 'exam' && instantCheckAnswerKey && (
+                    <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                      งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือเฉลยออกไปจากห้องได้ แนะนำให้ปิด
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-t border-border pt-3 space-y-1">
+                  <p className="text-xs font-medium text-foreground">โหมดนี้ตั้งค่าต่อไปนี้ให้เอง</p>
+                  <p className="text-xs text-muted-foreground">
+                    เปิดการตรวจทีละข้อ · แสดงทีละ 1 ข้อ · ไม่ใช้เกณฑ์คะแนน/เปอร์เซ็นต์ ·
+                    บันทึกเป็นผ่าน/ยังไม่ผ่าน โดยผ่าน = คะแนนเต็มที่ตั้งไว้ · เก็บคะแนนจากรอบที่ดีที่สุด ·
+                    รอบใหม่เริ่มใหม่ทั้งชุด
+                  </p>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -863,7 +1088,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             />
           </div>
 
-          {mode === 'online' && (
+          {mode === 'online' && streakOn && (
+            <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+              เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
+              และเปิดการตรวจทีละข้อให้เสมอ ปรับสองอย่างนี้ที่นี่ไม่ได้
+            </p>
+          )}
+
+          {mode === 'online' && !streakOn && (
             <div className="space-y-1.5">
               <Label htmlFor="per-page" className="flex items-center gap-1.5">
                 <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
@@ -887,7 +1119,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               // rest rather than among the shuffles. Never offered to a ข้อสอบ
               // (one ส่งคำตอบ at the end is what a ข้อสอบ is) or to a printed
               // ใบงาน (nothing to press).
-              ...(mode === 'online' && assignmentType === 'exercise' ? [{
+              ...(mode === 'online' && assignmentType === 'exercise' && !streakOn ? [{
                 label: 'ให้นักเรียนกดตรวจทีละข้อ',
                 desc: 'ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย — คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน',
                 icon: CircleCheck,
@@ -972,7 +1204,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               // Hidden while a สุ่ม draw is on: the point of a draw is that the
               // next round is a different paper, which is the opposite of
               // coming back to the same ข้อ that were missed.
-              ...(mode === 'online' && maxAttempts !== '1' && !randomDrawOn ? [{
+              ...(mode === 'online' && maxAttempts !== '1' && !randomDrawOn && !streakOn ? [{
                 label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
                 desc: 'รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ',
                 icon: RotateCcw,
@@ -1213,7 +1445,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             />
           </div>
 
-          {maxAttempts !== '1' && (
+          {maxAttempts !== '1' && !streakOn && (
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5">
                 <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
@@ -1296,7 +1528,16 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 },
                 { label: 'โหมด',      value: mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
                 ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
-                ...(passingEnabled && passingValue ? [{ label: 'เกณฑ์ผ่าน', value: passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน` }] : []),
+                {
+                  label: 'เงื่อนไขจบ',
+                  value: streakOn
+                    ? `ถูกติดกัน ${streakTarget} ข้อ`
+                    : (passingEnabled && passingValue
+                        ? `ผ่านเกณฑ์ ${passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน`}`
+                        : 'ทำครบแล้วจบ'),
+                },
+                ...(streakOn && streakCapValue ? [{ label: 'เพดานข้อ', value: `${streakCapValue} ข้อ` }] : []),
+                ...(streakOn ? [{ label: 'ทำครบคลังแล้ว', value: streakRecycle ? 'วนกลับมาใหม่' : 'จบเลย' }] : []),
                 ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
                 ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
                 ...(mode === 'online' && maxAttempts !== '1' && !randomDrawOn && retryScope === 'wrong_only'

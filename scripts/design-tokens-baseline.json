@@ -95,12 +95,6 @@
     "control": 0,
     "button": 1
   },
-  "app/(app)/classrooms/[id]/_components/classroom-stream.tsx": {
-    "palette": 1,
-    "card": 0,
-    "control": 0,
-    "button": 4
-  },
   "app/(app)/classrooms/[id]/_components/co-teachers.tsx": {
     "palette": 2,
     "card": 0,
@@ -174,7 +168,7 @@
     "button": 4
   },
   "app/(app)/classrooms/_components/homeroom-banner.tsx": {
-    "palette": 5,
+    "palette": 4,
     "card": 0,
     "control": 0,
     "button": 0
@@ -195,7 +189,7 @@
     "palette": 7,
     "card": 0,
     "control": 0,
-    "button": 9
+    "button": 6
   },
   "app/(app)/classrooms/page.tsx": {
     "palette": 3,
@@ -214,54 +208,6 @@
     "card": 0,
     "control": 0,
     "button": 2
-  },
-  "app/(app)/dashboard/_components/class-insights.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 1
-  },
-  "app/(app)/dashboard/_components/command-palette.tsx": {
-    "palette": 2,
-    "card": 0,
-    "control": 0,
-    "button": 2
-  },
-  "app/(app)/dashboard/_components/daily-tips.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 2
-  },
-  "app/(app)/dashboard/_components/fork-remix.tsx": {
-    "palette": 7,
-    "card": 0,
-    "control": 0,
-    "button": 0
-  },
-  "app/(app)/dashboard/_components/question-health.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 1
-  },
-  "app/(app)/dashboard/_components/quick-create.tsx": {
-    "palette": 1,
-    "card": 0,
-    "control": 0,
-    "button": 0
-  },
-  "app/(app)/dashboard/_components/teacher-dashboard.tsx": {
-    "palette": 0,
-    "card": 1,
-    "control": 0,
-    "button": 1
-  },
-  "app/(app)/dashboard/_components/upcoming-tasks.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 1
   },
   "app/(app)/dashboard/page.tsx": {
     "palette": 1,
@@ -291,7 +237,7 @@
     "palette": 0,
     "card": 0,
     "control": 0,
-    "button": 4
+    "button": 1
   },
   "app/(app)/settings/team/_components.tsx": {
     "palette": 0,
@@ -327,13 +273,13 @@
     "palette": 4,
     "card": 0,
     "control": 0,
-    "button": 7
+    "button": 8
   },
   "components/assignments/edit-assignment-form.tsx": {
     "palette": 0,
     "card": 0,
     "control": 0,
-    "button": 3
+    "button": 4
   },
   "components/assignments/export-button.tsx": {
     "palette": 0,
@@ -345,7 +291,7 @@
     "palette": 0,
     "card": 0,
     "control": 0,
-    "button": 3
+    "button": 2
   },
   "components/assignments/score-editor.tsx": {
     "palette": 0,
@@ -366,7 +312,7 @@
     "button": 1
   },
   "components/auth/signup-form.tsx": {
-    "palette": 1,
+    "palette": 0,
     "card": 0,
     "control": 0,
     "button": 2
@@ -383,35 +329,17 @@
     "control": 0,
     "button": 1
   },
-  "components/exam/calculator.tsx": {
-    "palette": 1,
-    "card": 0,
-    "control": 0,
-    "button": 3
-  },
   "components/exam/exam-client.tsx": {
-    "palette": 10,
+    "palette": 9,
     "card": 0,
     "control": 0,
-    "button": 9
+    "button": 6
   },
   "components/exam/file-submission-upload.tsx": {
     "palette": 0,
     "card": 0,
     "control": 0,
     "button": 2
-  },
-  "components/exam/formula-sheet.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 3
-  },
-  "components/exam/scratchpad.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 6
   },
   "components/exam/work-image-upload.tsx": {
     "palette": 0,
@@ -573,7 +501,7 @@
     "palette": 1,
     "card": 0,
     "control": 0,
-    "button": 12
+    "button": 11
   },
   "components/questions/question-preview.tsx": {
     "palette": 0,
@@ -634,12 +562,6 @@
     "card": 0,
     "control": 0,
     "button": 1
-  },
-  "components/questions/random-numeric/unit-field.tsx": {
-    "palette": 0,
-    "card": 0,
-    "control": 0,
-    "button": 4
   },
   "components/questions/random-numeric/value-card.tsx": {
     "palette": 0,
