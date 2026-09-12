@@ -240,7 +240,7 @@ export interface QuestionCategory {
   created_at: string
 }
 
-export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering' | 'file_upload' | 'composite'
+export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering' | 'file_upload' | 'composite' | 'classify'
 
 export type TrueFalseExplanationMode = 'none' | 'wrong_only' | 'always'
 
@@ -349,6 +349,41 @@ export interface CompositePart {
 export interface CompositeConfig {
   parts: CompositePart[]
   part_label_style?: PartLabelStyle
+}
+
+// ตารางจำแนก — rows are the things being judged, columns are the ways of
+// judging them, and every cell is one choice among that column's options. See
+// lib/classify.ts, which owns the answer key, the point value and the ข้อย่อย
+// count so that the three cannot drift apart.
+
+export interface ClassifyColumn {
+  id: string
+  /** Plain text, not rich text — this is a table heading and has to stay one line. */
+  title: string
+  /** Shared by every row in this column; the student picks exactly one of them per cell. */
+  options: string[]
+}
+
+export interface ClassifyRow {
+  id: string
+  text: string             // rich text (HTML) — what is being classified, e.g. "เนื้อหมู"
+  image_urls?: string[]    // same convention as CompositePart.image_urls
+  /**
+   * The teacher's key for this row: column id -> position in that column's
+   * `options`. Keyed by column id rather than by position so that reordering or
+   * deleting a column cannot silently re-point every row's answer at the wrong
+   * category. A column with no entry here is simply unkeyed — see
+   * classifyCorrectGrid for what that costs (nothing: it is not gradable and
+   * not worth a point).
+   */
+  answers: Record<string, number>
+}
+
+export interface ClassifyConfig {
+  columns: ClassifyColumn[]
+  rows: ClassifyRow[]
+  /** undefined = 'number' (3.1, 3.2, …), which is how a จำแนก worksheet numbers its items. */
+  row_label_style?: PartLabelStyle
 }
 
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'analytical'
@@ -492,7 +527,7 @@ export interface Question {
   rejected_reason: string | null
   image_urls: string[]
   requires_work_image: boolean
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig | Record<string, never>
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig | ClassifyConfig | Record<string, never>
   parent_question_id: string | null
   group_id: string | null
   order_in_group: number | null

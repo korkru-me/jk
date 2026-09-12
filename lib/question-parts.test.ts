@@ -29,10 +29,41 @@ describe('subQuestionCount', () => {
     expect(subQuestionCount(q('composite', { extra_data: { parts: [{}, {}, {}] } }))).toBe(3)
   })
 
+  it('counts ตารางจำแนก by keyed cells, so 2 แถว × 2 คอลัมน์ is four things asked', () => {
+    expect(subQuestionCount(q('classify', { extra_data: {
+        columns: [
+          { id: 'c1', title: 'แหล่งกำเนิด', options: ['ธรรมชาติ', 'สังเคราะห์'] },
+          { id: 'c2', title: 'ชนิดมอนอเมอร์', options: ['โฮโม', 'โค'] },
+        ],
+        rows: [
+          { id: 'r1', text: 'เนื้อหมู', answers: { c1: 0, c2: 1 } },
+          { id: 'r2', text: 'ยางรัดของ', answers: { c1: 1, c2: 0 } },
+        ],
+      } }))).toBe(4)
+  })
+
+  it('leaves an unkeyed ตารางจำแนก cell out of the count', () => {
+    // It is not answerable and not gradable, so it is not a ข้อย่อย either —
+    // and the badge has to say the same number the งาน scores.
+    const partial = {
+      columns: [
+        { id: 'c1', title: 'แหล่งกำเนิด', options: ['ธรรมชาติ', 'สังเคราะห์'] },
+        { id: 'c2', title: 'ชนิดมอนอเมอร์', options: ['โฮโม', 'โค'] },
+      ],
+      rows: [
+        { id: 'r1', text: 'เนื้อหมู', answers: { c1: 0, c2: 1 } },
+        { id: 'r2', text: 'ยางรัดของ', answers: { c1: 1 } },
+      ],
+    }
+    expect(subQuestionCount(q('classify', { extra_data: partial }))).toBe(3)
+  })
+
   it('never goes below one, however empty the row is', () => {
     expect(subQuestionCount(q('fill_blank', { extra_data: {} }))).toBe(1)
     expect(subQuestionCount(q('composite', { extra_data: { parts: [] } }))).toBe(1)
     expect(subQuestionCount(q('matching'))).toBe(1)
+    expect(subQuestionCount(q('classify', { extra_data: {} }))).toBe(1)
+    expect(subQuestionCount(q('classify', { extra_data: { columns: [], rows: [] } }))).toBe(1)
   })
 
   it('takes a group parent count over the parent row own (empty) shape', () => {
@@ -51,6 +82,16 @@ describe('subQuestionCount', () => {
       q('written', { answer_parts: [{}, {}] }),
       q('mcq'),
       q('true_false', { extra_data: { statements: [{}, {}], explanation_mode: 'none' } }),
+      q('classify', { extra_data: {
+        columns: [
+          { id: 'c1', title: 'แหล่งกำเนิด', options: ['ธรรมชาติ', 'สังเคราะห์'] },
+          { id: 'c2', title: 'ชนิดมอนอเมอร์', options: ['โฮโม', 'โค'] },
+        ],
+        rows: [
+          { id: 'r1', text: 'เนื้อหมู', answers: { c1: 0, c2: 1 } },
+          { id: 'r2', text: 'ยางรัดของ', answers: { c1: 1, c2: 0 } },
+        ],
+      } }),
     ]
     for (const question of cases) {
       expect(naturalMaxScore(
@@ -69,6 +110,16 @@ describe('subQuestionLabel', () => {
     expect(subQuestionLabel(q('fill_blank', { extra_data: { blanks: [{}, {}, {}] } }))).toBe('3 ช่องเติม')
     expect(subQuestionLabel(q('matching', { mcq_options: [{}, {}] }))).toBe('2 คู่จับคู่')
     expect(subQuestionLabel(q('ordering', { extra_data: { items: [{}, {}] } }))).toBe('2 รายการเรียง')
+    expect(subQuestionLabel(q('classify', { extra_data: {
+        columns: [
+          { id: 'c1', title: 'แหล่งกำเนิด', options: ['ธรรมชาติ', 'สังเคราะห์'] },
+          { id: 'c2', title: 'ชนิดมอนอเมอร์', options: ['โฮโม', 'โค'] },
+        ],
+        rows: [
+          { id: 'r1', text: 'เนื้อหมู', answers: { c1: 0, c2: 1 } },
+          { id: 'r2', text: 'ยางรัดของ', answers: { c1: 1, c2: 0 } },
+        ],
+      } }))).toBe('4 ช่องจำแนก')
   })
 
   it('calls a group parts ข้อย่อย whatever type its rows are', () => {

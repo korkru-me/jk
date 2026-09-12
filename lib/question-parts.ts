@@ -16,6 +16,7 @@
  */
 
 import type { Question } from '@/lib/types'
+import { classifyCellCount } from '@/lib/classify'
 
 /** The columns a part count is read from — everything else about the row is irrelevant. */
 export type CountableQuestion = Pick<Question, 'question_type'> & {
@@ -56,6 +57,11 @@ export function subQuestionCount(q: CountableQuestion, groupPartCount?: number):
       return len(q.mcq_options) || 1
     case 'composite':
       return len(extra.parts) || 1
+    // Cells, not rows: one choice per (row, column) is one thing asked and one
+    // point earned, which is the same number classifyCellCount gives
+    // naturalMaxScore.
+    case 'classify':
+      return classifyCellCount(q.extra_data) || 1
     // ปรนัย choices and ไฟล์งาน attachments are not questions of their own.
     case 'mcq':
     case 'file_upload':
@@ -81,6 +87,8 @@ export function subQuestionUnit(questionType: string): string {
       return 'คู่จับคู่'
     case 'ordering':
       return 'รายการเรียง'
+    case 'classify':
+      return 'ช่องจำแนก'
     default:
       return 'ข้อย่อย'
   }

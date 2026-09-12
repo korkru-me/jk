@@ -576,6 +576,108 @@ function gradeEssay(correctAnswer: string, student: string | null) {
   return gradeAnswer(answer({ correct: correctAnswer, student, questionType: 'essay' }))
 }
 
+describe('ตารางจำแนก, from attempt to grade', () => {
+  const config = {
+    columns: [
+      { id: 'origin', title: 'จำแนกตามแหล่งกำเนิด', options: ['ธรรมชาติ', 'สังเคราะห์'] },
+      { id: 'monomer', title: 'จำแนกตามชนิดของมอนอเมอร์', options: ['โฮโม', 'โค'] },
+    ],
+    rows: [
+      { id: 'r1', text: 'เนื้อหมู', answers: { origin: 0, monomer: 1 } },
+      { id: 'r2', text: 'ยางรัดของ', answers: { origin: 1, monomer: 0 } },
+    ],
+  }
+
+  function classifyQuestion(extra: unknown = config): Question {
+    return {
+      id: 'q1',
+      question_type: 'classify',
+      answer_formula: '',
+      answer_parts: null,
+      variables: [],
+      logic_rules: [],
+      extra_data: extra,
+      mcq_options: null,
+    } as unknown as Question
+  }
+
+  const grade = (correct: string, student: string | null, extraData: unknown = config, maxScore = 4) =>
+    gradeAnswer(answer({ correct, student, questionType: 'classify', extraData, maxScore }))
+
+  it('freezes the key as a grid of option positions, one cell at a time', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
+    expect(skeleton.correct_answer).toBe('CLS:[[0,1],[1,0]]')
+    expect(skeleton.max_score).toBe(4)
+  })
+
+  it('is worth one point per cell, not per row', () => {
+    expect(naturalMaxScore('classify', config, null)).toBe(4)
+  })
+
+  it('credits a fully correct grid', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
+    expect(grade(skeleton.correct_answer, '[[0,1],[1,0]]')).toMatchObject({ is_correct: true, score: 4 })
+  })
+
+  it('gives part marks for the cells that are right', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
+    // Both of row 1 right, one of row 2 right.
+    expect(grade(skeleton.correct_answer, '[[0,1],[0,0]]')).toMatchObject({ is_correct: false, score: 3 })
+  })
+
+  it('scores an untouched grid zero without calling it pending', () => {
+    // Nothing here is ever waiting on a teacher, unlike อัตนัย or a manual blank.
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
+    expect(grade(skeleton.correct_answer, null)).toMatchObject({ is_correct: false, score: 0 })
+    expect(grade(skeleton.correct_answer, '')).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('ignores cells the student answered past the end of the key', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
+    expect(grade(skeleton.correct_answer, '[[0,1],[1,0],[1,1]]')).toMatchObject({ is_correct: true, score: 4 })
+  })
+
+  it('does not charge for a cell the teacher never keyed', () => {
+    // The cell is left out of both the maximum and the grading, so a student
+    // who answers everything they were actually asked still scores full marks.
+    const partial = { ...config, rows: [config.rows[0], { id: 'r2', text: 'ยางรัดของ', answers: { origin: 1 } }] }
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion(partial)])
+    expect(skeleton.correct_answer).toBe('CLS:[[0,1],[1,-1]]')
+    expect(skeleton.max_score).toBe(3)
+    expect(grade(skeleton.correct_answer, '[[0,1],[1,0]]', partial, 3)).toMatchObject({ is_correct: true, score: 3 })
+    expect(grade(skeleton.correct_answer, '[[0,1],[1,1]]', partial, 3)).toMatchObject({ is_correct: true, score: 3 })
+  })
+
+  it('scales to a custom point override', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
+    expect(grade(skeleton.correct_answer, '[[0,1],[1,0]]', config, 10).score).toBe(10)
+    expect(grade(skeleton.correct_answer, '[[0,1],[0,0]]', config, 10).score).toBe(7.5)
+  })
+
+  it('stays within the question\'s worth after the teacher deletes a column', () => {
+    // The frozen key still has two columns; the live config has one. Dividing
+    // by the live count would pay out more than the question is worth.
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
+    const narrowed = {
+      columns: [config.columns[0]],
+      rows: [{ id: 'r1', text: 'เนื้อหมู', answers: { origin: 0 } }, { id: 'r2', text: 'ยางรัดของ', answers: { origin: 1 } }],
+    }
+    expect(grade(skeleton.correct_answer, '[[0,1],[1,0]]', narrowed, 4).score).toBe(4)
+  })
+
+  it('survives a question whose config never came from the form', () => {
+    const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion({})])
+    expect(skeleton.correct_answer).toBe('CLS:[]')
+    expect(skeleton.max_score).toBe(1)
+    expect(grade(skeleton.correct_answer, '[[0]]', {}, 1)).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('does not collide with another type\'s stored key', () => {
+    // 'CLS:' has to be unmistakable, the way MCQ: and COMP: are.
+    expect(gradeAnswer(answer({ correct: 'CLS:[[0]]', student: 'COMP:[]', questionType: 'classify' })).is_correct).toBe(false)
+  })
+})
+
 describe('essay, from attempt to grade', () => {
   it('records no answer to compare against', () => {
     const [skeleton] = buildAssignmentAttempt(assignment, [essayQuestion()])

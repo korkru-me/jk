@@ -18,7 +18,7 @@ import { orderingDisplayOrder, orderingIsAnswered } from '@/lib/ordering-answer'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, SubmittedFile } from '@/lib/types'
+import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, SubmittedFile } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -50,6 +50,7 @@ export interface QuestionPreviewProps {
   fillBlankConfig?: FillBlankConfig
   orderingConfig?: OrderingConfig
   compositeConfig?: CompositeConfig
+  classifyConfig?: ClassifyConfig
   partLabelStyle?: PartLabelStyle
   attachmentUrls?: string[]
   /** ค่าคลาดเคลื่อนระดับโจทย์ ใช้เมื่อข้อย่อยไม่ได้กำหนดของตัวเอง — กติกาเดียวกับ gradeAnswer */

@@ -1,6 +1,10 @@
 import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
 import { getBlankType, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
+import {
+  CLASSIFY_PREFIX, CLASSIFY_UNSET,
+  classifyCellCount, classifyCorrectAnswer, parseClassifyGrid,
+} from '@/lib/classify'
 import type { Assignment, AnswerPart, Question, Variable, LogicRule } from '@/lib/types'
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -46,6 +50,10 @@ export function naturalMaxScore(
     // point per pair.
     return matchingPairCount || 1
   }
+  // 1 คะแนนต่อช่อง, counting only the cells the teacher actually keyed — an
+  // unkeyed cell is not gradable, so charging the student for it would repeat
+  // the composite เติมคำ mistake. classifyCellCount owns that rule.
+  if (questionType === 'classify') return classifyCellCount(extraData) || 1
   if (questionType === 'file_upload') return 1
   if (questionType === 'composite') {
     const parts: any[] = extraData?.parts ?? []
@@ -162,6 +170,17 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
       return { type: p.type, correct: null, score }
     })
     return { question_id: q.id, random_values: {}, correct_answer: 'COMP:' + JSON.stringify(answers), max_score: naturalMaxScore(q.question_type, extraData, null) }
+  }
+
+  // ตารางจำแนก: the key is a row-major grid of option positions, one entry per
+  // cell — see lib/classify.ts, which builds it and decides which cells count.
+  if (q.question_type === 'classify') {
+    return {
+      question_id: q.id,
+      random_values: {},
+      correct_answer: classifyCorrectAnswer(extraData),
+      max_score: naturalMaxScore(q.question_type, extraData, null),
+    }
   }
 
   // Multiple choice: the answer is which option, recorded as its position in
@@ -548,6 +567,37 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
     const structuralMax = naturalMaxScore('composite', a.questions?.extra_data, null)
     const isFullyCorrect = Math.round(earned * 1000) === Math.round(structuralMax * 1000)
     return { id: a.id, is_correct: hasManual ? null : isFullyCorrect, score: scaleScore(earned, structuralMax, a.max_score) }
+  }
+
+  // ตารางจำแนก grading — one point per cell the student put the same option in
+  // as the frozen key. Cells the key left unset are skipped rather than counted
+  // wrong, matching how they were left out of max_score in the first place.
+  //
+  // The denominator is the frozen key's own gradable-cell count, not a fresh
+  // naturalMaxScore off the live extra_data as the branches above use. A
+  // teacher who deletes a column after students have answered would otherwise
+  // shrink the denominator while `earned` still came from the wider frozen
+  // grid, and scaleScore would hand out more than the question is worth.
+  if (correctAns.startsWith(CLASSIFY_PREFIX)) {
+    const correctGrid = parseClassifyGrid(correctAns.slice(CLASSIFY_PREFIX.length))
+    const studentGrid = parseClassifyGrid(studentAns)
+
+    let gradable = 0
+    let earned = 0
+    for (let r = 0; r < correctGrid.length; r++) {
+      for (let c = 0; c < correctGrid[r].length; c++) {
+        const key = correctGrid[r][c]
+        if (key === CLASSIFY_UNSET) continue
+        gradable++
+        if (studentGrid[r]?.[c] === key) earned++
+      }
+    }
+
+    return {
+      id: a.id,
+      is_correct: gradable > 0 && earned === gradable,
+      score: scaleScore(earned, gradable, a.max_score),
+    }
   }
 
   // Multiple-choice grading — compares which option was picked. Attempts

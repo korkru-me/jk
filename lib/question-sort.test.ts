@@ -201,11 +201,11 @@ describe('compareQuestions', () => {
       .map(id => diffs[Number(id)].difficulty))
       .toEqual(['easy', 'medium', 'hard', 'analytical'])
 
-    const types = ['composite', 'mcq', 'essay']
+    const types = ['classify', 'composite', 'mcq', 'essay']
       .map((question_type, i) => row({ id: String(i), question_type }))
     expect(idsAfterSort(types, { key: 'type', dir: 'asc' })
       .map(id => types[Number(id)].question_type))
-      .toEqual(['mcq', 'essay', 'composite'])
+      .toEqual(['mcq', 'essay', 'composite', 'classify'])
   })
 
   it('sorts Thai titles the way Thai is read, leading vowels and all', () => {

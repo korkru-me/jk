@@ -225,6 +225,31 @@ export const SAMPLE_QUESTIONS: Record<QuestionType, SampleQuestion[]> = {
     },
   ],
 
+  classify: [
+    {
+      title: 'จำแนกประเภทพอลิเมอร์จากสิ่งของรอบตัว',
+      props: {
+        questionType: 'classify',
+        questionText:
+          'พิจารณาสิ่งของต่อไปนี้ แล้วจำแนกประเภทของพอลิเมอร์ที่เป็นองค์ประกอบ ' +
+          'ทั้งตามแหล่งกำเนิดและตามชนิดของมอนอเมอร์',
+        isRandom: false,
+        variables: [],
+        answerParts: [],
+        classifyConfig: {
+          columns: [
+            { id: 'origin', title: 'จำแนกตามแหล่งกำเนิด', options: ['พอลิเมอร์ธรรมชาติ', 'พอลิเมอร์สังเคราะห์'] },
+            { id: 'monomer', title: 'จำแนกตามชนิดของมอนอเมอร์', options: ['โฮโมพอลิเมอร์', 'โคพอลิเมอร์'] },
+          ],
+          rows: [
+            { id: 'r1', text: 'เนื้อหมู', answers: { origin: 0, monomer: 1 } },
+            { id: 'r2', text: 'ยางรัดของ', answers: { origin: 1, monomer: 0 } },
+            { id: 'r3', text: 'เชือกป่าน', answers: { origin: 0, monomer: 0 } },
+          ],
+        },
+      },
+    },
+  ],
   composite: [
     {
       title: 'การเคลื่อนที่ของรถทดลอง',
