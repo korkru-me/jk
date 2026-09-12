@@ -12,6 +12,10 @@ export interface ExamTakingData {
     started_at: string
     assignment_id: string
     student_id: string
+    /** Counters for a "ถูกติดต่อกัน" attempt; all zero/false for every other. */
+    current_streak: number
+    best_streak: number
+    streak_reached: boolean
   }
   assignment: {
     duration_minutes: number | null
@@ -32,6 +36,9 @@ export interface ExamTakingData {
     instant_check_answer_key: boolean
     calculator_enabled: boolean
     scratchpad_enabled: boolean
+    completion_rule: 'fixed' | 'streak'
+    streak_target: number | null
+    streak_question_cap: number | null
   }
   answers: SafeExamAnswer[]
   artifacts: StudentWorkArtifactView[]
@@ -55,7 +62,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   // query, which reads here as an attempt that cannot be opened at all.
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled, scratchpad_enabled)')
+    .select('id, started_at, assignment_id, student_id, status, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled, scratchpad_enabled, completion_rule, streak_target, streak_question_cap)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -138,6 +145,9 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       started_at: submission.started_at,
       assignment_id: submission.assignment_id,
       student_id: submission.student_id,
+      current_streak: Number(submission.current_streak ?? 0),
+      best_streak: Number(submission.best_streak ?? 0),
+      streak_reached: submission.streak_reached === true,
     },
     assignment: {
       duration_minutes: assignment.duration_minutes,
@@ -163,6 +173,9 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
         && assignment.mode === 'online'
         && assignment.instant_check === true,
       instant_check_answer_key: assignment.instant_check_answer_key !== false,
+      completion_rule: (assignment.completion_rule === 'streak' ? 'streak' : 'fixed') as 'fixed' | 'streak',
+      streak_target: assignment.streak_target ?? null,
+      streak_question_cap: assignment.streak_question_cap ?? null,
       calculator_enabled: assignment.calculator_enabled === true,
       scratchpad_enabled: assignment.scratchpad_enabled === true,
     },

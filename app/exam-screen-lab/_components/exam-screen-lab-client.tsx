@@ -8,10 +8,22 @@ export function ExamScreenLabClient({
   fixture,
   submissionId,
   questionsPerPage,
+  streak,
 }: {
   fixture: ExamScreenQaFixture
   submissionId: string
   questionsPerPage: number
+  /** Opt-in via ?streak=1, so the default lab screen is unchanged. Lets the
+   *  "ถูกติดต่อกัน" chrome be looked at on a real device without a teacher
+   *  login or a live attempt behind it. */
+  streak?: {
+    target: number
+    current: number
+    best: number
+    reached: boolean
+    askedCount: number
+    questionCap: number | null
+  }
 }) {
   useAppViewport()
 
@@ -37,6 +49,7 @@ export function ExamScreenLabClient({
         }}
         sections={fixture.sections}
         questionsPerPage={questionsPerPage}
+        streak={streak}
         previewMode
         previewReturnHref={`/exam-screen-lab?perPage=${questionsPerPage}`}
         previewEditWarning="ห้องทดลองเฉพาะเครื่องนักพัฒนา • ไม่บันทึกคำตอบ รูป หรือไฟล์ขึ้นระบบ"

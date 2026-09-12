@@ -2,7 +2,10 @@
 
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
-import { checkAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
+import { useRouter } from 'next/navigation'
+import { checkAnswer, drawNextStreakQuestion, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
+import { StreakEndScreen, StreakMeter, type StreakView } from '@/components/exam/streak-progress'
+import type { StreakEnding } from '@/lib/streak-run'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
 // previewMode grading ever runs. Importing it statically shipped that whole
 // evaluator to every student's phone and pushed the exam page past what a
@@ -159,6 +162,12 @@ interface Props {
    *  assignment saved before the setting existed) is the original
    *  one-question-per-screen layout. */
   questionsPerPage?: number
+  /** Present only for a "ถูกติดต่อกัน" งาน. Its rows arrive one at a time, so
+   *  `answers` holds what has been handed out so far rather than the whole
+   *  paper, and the count — not a question number — is what the student is
+   *  working toward. Absent for every other งาน, which is what keeps this
+   *  mode out of their way entirely. */
+  streak?: StreakView
   // Teacher-facing "see it as a student would" mode: renders the exact same
   // UI/interactions but never calls the save/submit server actions (there is
   // no real submission row behind `submissionId` to write to), and exits via
@@ -221,7 +230,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
+export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
@@ -241,6 +250,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   )
   const [submitting, setSubmitting] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
+  /** -1 for every งาน that is not a streak run, which disables the sync below. */
+  const streakLatestIndex = streak != null ? answers.length - 1 : -1
   // Runs follow the order this student actually sees (shuffling reorders
   // submission_answers), so a shuffled exam simply breaks into short runs
   // instead of printing headings over the wrong questions.
@@ -283,6 +294,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     setScratchpadTarget(null)
     setLoadAttachedNonce(0)
   }, [])
+
+  // In a streak run the ข้อ in hand is always the newest row, and a drawn ข้อ
+  // arrives by refreshing the route. Without this the refresh would land the
+  // student back on the first ข้อ they already answered, with a ตรวจแล้ว panel
+  // and a ข้อต่อไป button that draws nothing.
+  useEffect(() => {
+    if (streakLatestIndex >= 0) setCurrentIndex(streakLatestIndex)
+  }, [streakLatestIndex])
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
@@ -345,6 +364,16 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     })
     setAnswer(answerId, value)
   }, [setAnswer])
+
+  // ── "ถูกติดต่อกัน" run ─────────────────────────────────────────────────────
+  // Seeded from the server and then moved by what checkAnswer reports, so the
+  // meter follows the count the server actually stored rather than a guess
+  // made from the verdict on screen.
+  const router = useRouter()
+  const [streakState, setStreakState] = useState<StreakView | undefined>(streak)
+  const [streakEnd, setStreakEnd] = useState<Exclude<StreakEnding, null> | null>(null)
+  const [drawingNext, setDrawingNext] = useState(false)
+  const streakOn = streakState != null
 
   const clearCheck = useCallback((answerId: string) => {
     setChecked(prev => {
@@ -432,12 +461,69 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         return
       }
       setChecked(prev => ({ ...prev, [answerId]: { ...result.feedback, checkCount: result.checkCount } }))
+      // The count the server just wrote. Reading it back here is what keeps the
+      // meter honest about a ข้อ whose verdict was pending and therefore did
+      // not move it.
+      if ('streak' in result && result.streak) {
+        const next = result.streak
+        setStreakState(prev => prev && {
+          ...prev,
+          current: next.current,
+          best: next.best,
+          reached: next.reached,
+        })
+      }
     } catch {
       toast.error('ตรวจคำตอบไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       setCheckingId(null)
     }
   }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, localMathInputModesRef, previewMode])
+
+  /**
+   * Ask the server for the next ข้อ, or find out the attempt is over.
+   *
+   * The new row is fetched by refreshing the route rather than being returned
+   * here: the ข้อ a student sees has to come through getExamTakingData and
+   * toSafeExamAnswer, which is what strips the answer key. Handing it back
+   * from an action would be a second, unstripped path to the same data.
+   */
+  const handleDrawNext = useCallback(async (keepPracticing = false) => {
+    if (drawingNext || previewMode) return
+    setDrawingNext(true)
+    try {
+      const synced = await flushQueuedAnswers()
+      if (!synced.ok) {
+        toast.error(synced.error ?? 'ยังบันทึกคำตอบล่าสุดไม่ครบ กรุณาตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง')
+        return
+      }
+      const result = await drawNextStreakQuestion(submissionId, { keepPracticing })
+      if (!result || 'error' in result) {
+        toast.error(result?.error ?? 'ดึงโจทย์ข้อต่อไปไม่สำเร็จ กรุณาลองใหม่')
+        return
+      }
+      if (result.streak) {
+        const next = result.streak
+        setStreakState(prev => prev && {
+          ...prev,
+          current: next.current,
+          best: next.best,
+          reached: next.reached,
+          askedCount: result.askedCount ?? prev.askedCount,
+        })
+      }
+      if ('ending' in result && result.ending) {
+        setStreakEnd(result.ending)
+        return
+      }
+      setStreakEnd(null)
+      router.refresh()
+    } catch {
+      toast.error('ดึงโจทย์ข้อต่อไปไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setDrawingNext(false)
+    }
+  }, [drawingNext, flushQueuedAnswers, previewMode, router, submissionId])
 
   const handlePartAnswerChange = useCallback((
     answerId: string, partIndex: number, value: string, totalParts: number, currentRaw: string,
@@ -873,7 +959,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             {/* Question card */}
             <Card padding="lg" className="space-y-4">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="font-mono text-xs">ข้อ {questionIndex + 1} / {answers.length}</Badge>
+                {/* "ข้อ 3 / 5" would be a lie in a streak run: answers.length
+                    is only what has been handed out so far, and the งาน's
+                    length is not known to anybody yet. */}
+                <Badge variant="outline" className="font-mono text-xs">
+                  {streakOn ? `ข้อที่ ${questionIndex + 1}` : `ข้อ ${questionIndex + 1} / ${answers.length}`}
+                </Badge>
                 {sectionOwner.get(current.question_id)?.title && (
                   <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
                 )}
@@ -902,6 +993,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                       แก้ไขโจทย์
                     </a>
                   )}
+                  {/* A flag marks a ข้อ to come back to. In a streak run the
+                      verdict is already counted and there is no coming back,
+                      so the button would only ever mislead. */}
+                  {!streakOn && (
                   <button
                     onClick={() => toggleFlag(current.id)}
                     className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
@@ -913,6 +1008,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     <Flag size={11} className={isFlagged ? 'fill-flag' : ''} />
                     {isFlagged ? 'ยกเลิกธง' : 'ปักธง'}
                   </button>
+                  )}
                 </div>
               </div>
 
@@ -1053,6 +1149,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 answered={hasAnswered(current.id)}
                 onCheck={() => handleCheck(current.id)}
                 onRetry={() => clearCheck(current.id)}
+                allowRetry={!streakOn}
+                checkHint={streakOn
+                  ? 'ตรวจได้ครั้งเดียว ผลนับเข้าจำนวนข้อที่ถูกติดต่อกันทันที'
+                  : undefined}
               />
             )}
 
@@ -1060,8 +1160,68 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           )
         })}
 
+        {streakOn && streakState && !streakEnd && (
+          <Card padding="md" className="mb-3">
+            <StreakMeter
+              streak={streakState}
+              lastVerdict={(() => {
+                // The verdict of the ข้อ on screen, so a miss colours the
+                // meter at the moment it resets rather than silently.
+                const current = answers[answers.length - 1]
+                const fb = current ? checked[current.id] : null
+                if (!fb) return null
+                return fb.verdict === 'correct' ? 'correct' : fb.verdict === 'pending' ? 'pending' : 'wrong'
+              })()}
+            />
+          </Card>
+        )}
+
+        {/* A streak run replaces paging entirely: there is no previous ข้อ to
+            go back to (the verdict is already counted), no page after this
+            one until the server hands it over, and no bulk ส่งคำตอบ — the
+            attempt ends when the run does. */}
+        {streakOn && streakState && (
+          streakEnd ? (
+            <div className="pb-2">
+              <StreakEndScreen
+                ending={streakEnd}
+                streak={streakState}
+                submitting={submitting}
+                onFinish={() => handleSubmit()}
+                onKeepPracticing={
+                  streakEnd === 'reached' ? () => handleDrawNext(true) : undefined
+                }
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 pb-2">
+              <Button
+                variant="outline"
+                onClick={() => handleSubmit()}
+                disabled={submitting || drawingNext}
+              >
+                ออกไว้ก่อน
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => handleDrawNext(streakState.reached)}
+                disabled={
+                  drawingNext
+                  || checkingId !== null
+                  // The verdict for the ข้อ on screen. Checking a *previous*
+                  // ข้อ must not unlock the next draw.
+                  || !(answers[answers.length - 1] && checked[answers[answers.length - 1].id])
+                }
+              >
+                {drawingNext ? 'กำลังดึงโจทย์...' : 'ข้อต่อไป →'}
+              </Button>
+            </div>
+          )
+        )}
+
         {/* Prev / Next — a page at a time, which is one question at a time
             on the default setting */}
+        {!streakOn && (
         <div className="flex items-center gap-3 pb-2">
           <Button
             variant="outline" className="flex-1"
@@ -1083,6 +1243,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             </Button>
           )}
         </div>
+        )}
       </div>
 
       {/* RIGHT: Nav panel */}
@@ -1112,7 +1273,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           </div>
         )}
 
-        {/* Progress */}
+        {/* Progress — replaced by the streak meter under the ข้อ in a streak
+            run, where "3/12" would be a share of a total the งาน has not
+            settled on. */}
+        {!streakOn && (
         <Card padding="md" className="space-y-2">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>คืบหน้า</span>
@@ -1138,8 +1302,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             )}
           </div>
         </Card>
+        )}
 
-        {/* Nav grid */}
+        {/* Nav grid — a streak run has nowhere to jump to: every earlier ข้อ
+            is closed and the next one is not drawn until this one is judged. */}
+        {!streakOn && (
         <Card padding="md" className="flex-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">นำทางข้อ</p>
           {(() => {
@@ -1202,6 +1369,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             ))}
           </div>
         </Card>
+        )}
 
         {/* Anti-cheat counter */}
         {tabSwitchCount > 0 && (
@@ -1214,13 +1382,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           </div>
         )}
 
-        <Button
-          onClick={openSubmitDialog}
-          disabled={submitting}
-          className="w-full bg-success hover:bg-success/90 text-success-foreground border-0"
-        >
-          {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
-        </Button>
+        {/* A streak run has no bulk ส่งคำตอบ: the attempt ends when the run
+            does, and its controls live under the ข้อ itself. */}
+        {!streakOn && (
+          <Button
+            onClick={openSubmitDialog}
+            disabled={submitting}
+            className="w-full bg-success hover:bg-success/90 text-success-foreground border-0"
+          >
+            {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -1504,7 +1676,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
  * threading a `disabled` prop through nine different answer inputs.
  */
 function InstantCheckPanel({
-  feedback, busy, disabled, answered, onCheck, onRetry,
+  feedback, busy, disabled, answered, onCheck, onRetry, allowRetry = true, checkHint,
 }: {
   feedback: (AnswerFeedback & { checkCount: number }) | null
   busy: boolean
@@ -1512,6 +1684,12 @@ function InstantCheckPanel({
   answered: boolean
   onCheck: () => void
   onRetry: () => void
+  /** False in a "ถูกติดต่อกัน" งาน: the verdict counted, and the server refuses
+   *  a second check on the same ข้อ. Offering ทำใหม่ there would be a button
+   *  whose only outcome is an error. */
+  allowRetry?: boolean
+  /** Replaces the "แก้แล้วตรวจใหม่ได้ไม่จำกัด" line, which is untrue in a streak. */
+  checkHint?: string
 }) {
   if (!feedback) {
     return (
@@ -1526,7 +1704,7 @@ function InstantCheckPanel({
         </Button>
         <p className="text-xs text-muted-foreground">
           {answered
-            ? 'รู้ผลทันที แก้แล้วตรวจใหม่ได้ไม่จำกัด คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน'
+            ? (checkHint ?? 'รู้ผลทันที แก้แล้วตรวจใหม่ได้ไม่จำกัด คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน')
             : 'ตอบข้อนี้ก่อนจึงจะตรวจได้'}
         </p>
       </div>
@@ -1560,10 +1738,12 @@ function InstantCheckPanel({
         {feedback.checkCount > 1 && (
           <span className="text-[11px] text-muted-foreground">ตรวจไปแล้ว {feedback.checkCount} ครั้ง</span>
         )}
-        <Button variant="outline" size="sm" onClick={onRetry} className="ml-auto">
-          <RotateCcw size={14} />
-          ทำใหม่
-        </Button>
+        {allowRetry && (
+          <Button variant="outline" size="sm" onClick={onRetry} className="ml-auto">
+            <RotateCcw size={14} />
+            ทำใหม่
+          </Button>
+        )}
       </div>
 
       {feedback.note && (
