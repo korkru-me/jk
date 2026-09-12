@@ -12,6 +12,7 @@ import {
   type PendingAnswerPayload,
 } from '@/lib/math/answer-backup'
 import type { MathInputMode } from '@/lib/types'
+import { shouldPersistExamAnswerLocally } from '@/lib/exam-autosave-policy'
 
 const LS_KEY = (submissionId: string) => `korkru_exam_${submissionId}`
 const DEBOUNCE_MS = 500
@@ -34,7 +35,7 @@ interface Options {
   initialAnswers: () => Record<string, string>
   /** DEG/RAD per logical numeric input, grouped by answer id. */
   initialMathInputModes?: () => Record<string, MathInputModes>
-  /** Teacher preview keeps local behaviour but never writes a submission row. */
+  /** Teacher preview keeps answers in React state only and never writes a recovery backup or submission row. */
   previewMode?: boolean
 }
 
@@ -49,6 +50,7 @@ export function useAnswerAutosave({
   initialMathInputModes,
   previewMode = false,
 }: Options) {
+  const persistenceEnabled = shouldPersistExamAnswerLocally(previewMode)
   const [localAnswers, setLocalAnswers] = useState<Record<string, string>>(initialAnswers)
   const [localMathInputModes, setLocalMathInputModes] = useState<Record<string, MathInputModes>>(
     () => initialMathInputModes?.() ?? {},
@@ -69,6 +71,7 @@ export function useAnswerAutosave({
   }), [])
 
   const persistPendingBackup = useCallback(() => {
+    if (!persistenceEnabled) return
     try {
       if (backupRef.current.size === 0) {
         localStorage.removeItem(LS_KEY(submissionId))
@@ -76,7 +79,7 @@ export function useAnswerAutosave({
       }
       localStorage.setItem(LS_KEY(submissionId), serializeAnswerBackup(backupRef.current))
     } catch { /* ignore quota errors */ }
-  }, [submissionId])
+  }, [persistenceEnabled, submissionId])
 
   const refreshSavingState = useCallback(() => {
     setSaving(
@@ -146,6 +149,7 @@ export function useAnswerAutosave({
   }, [currentPayload, persistPendingBackup, previewMode, refreshSavingState])
 
   const scheduleSave = useCallback((answerId: string, payload: PendingAnswerPayload) => {
+    if (!persistenceEnabled) return
     pendingRef.current.set(answerId, payload)
     backupRef.current.set(answerId, payload)
     persistPendingBackup()
@@ -166,7 +170,7 @@ export function useAnswerAutosave({
       void flushAnswer(answerId)
     }, DEBOUNCE_MS)
     saveTimersRef.current.set(answerId, timer)
-  }, [flushAnswer, persistPendingBackup, refreshSavingState])
+  }, [flushAnswer, persistPendingBackup, persistenceEnabled, refreshSavingState])
 
   const flushQueuedAnswers = useCallback(async (): Promise<SaveOutcome> => {
     const queuedIds = [...pendingRef.current.keys()]
@@ -203,13 +207,15 @@ export function useAnswerAutosave({
   }, [currentPayload, flushAnswer, pendingSync])
 
   const clearSavedAnswers = useCallback(() => {
+    if (!persistenceEnabled) return
     backupRef.current.clear()
     try {
       localStorage.removeItem(LS_KEY(submissionId))
     } catch { /* ignore */ }
-  }, [submissionId])
+  }, [persistenceEnabled, submissionId])
 
   useEffect(() => {
+    if (!persistenceEnabled) return
     try {
       const saved = localStorage.getItem(LS_KEY(submissionId))
       if (!saved) return
@@ -248,7 +254,7 @@ export function useAnswerAutosave({
         refreshSavingState()
       }
     } catch { /* ignore corrupt data */ }
-  }, [flushAnswer, persistPendingBackup, refreshSavingState, submissionId])
+  }, [flushAnswer, persistPendingBackup, persistenceEnabled, refreshSavingState, submissionId])
 
   useEffect(() => () => {
     for (const timer of saveTimersRef.current.values()) clearTimeout(timer)
