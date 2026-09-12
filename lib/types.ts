@@ -555,6 +555,12 @@ export type AndroidExamMode = 'blocked' | 'monitored'
 export type ShowResultsMode = 'immediate' | 'score_only' | 'after_due' | 'never'
 export type ScoreStrategy = 'best' | 'average' | 'latest'
 export type RetryScope = 'all' | 'wrong_only'
+/** What "จบงาน" means. `fixed` is every งาน handed out before this existed:
+ *  the student receives a known number of ข้อ and is done when they run out.
+ *  `streak` makes the length of the attempt an outcome rather than a setting —
+ *  ข้อ keep coming until `streak_target` of them are answered correctly in a
+ *  row, so no two students necessarily answer the same number of them. */
+export type CompletionRule = 'fixed' | 'streak'
 export type MathInputMode = 'deg' | 'rad'
 
 export type { QuestionSetSection } from '@/lib/question-set-sections'
@@ -619,6 +625,23 @@ export interface Assignment {
    *  says ถูก/ผิด and leaves the student to think again. Meaningless while
    *  `instant_check` is false. */
   instant_check_answer_key: boolean
+  /** Whether the attempt ends at a fixed number of ข้อ or at a run of correct
+   *  ones. `streak` is enforced structurally, not only by the form: the
+   *  database refuses it without `streak_target`, without `instant_check`
+   *  (there is no run to count if the student never learns a ข้อ's verdict),
+   *  and alongside `passing_type`/`passing_value` (a variable-length attempt
+   *  gives two students totals that cannot be compared). */
+  completion_rule: CompletionRule
+  /** How many correct answers in a row end the attempt. One wrong answer
+   *  restarts the count at 0. NULL while `completion_rule` is `fixed`. */
+  streak_target: number | null
+  /** Stops an attempt that is not converging: once this many ข้อ have been
+   *  answered the attempt ends as ยังไม่ผ่าน. NULL = no ceiling. */
+  streak_question_cap: number | null
+  /** Whether a pool that runs out is drawn from again. A โจทย์สุ่มตัวเลข comes
+   *  back with fresh values, so recycling is not the same as repeating; a
+   *  fixed โจทย์ does repeat verbatim. */
+  streak_recycle_pool: boolean
   access_code: string | null
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
@@ -700,6 +723,19 @@ export interface Submission {
   exam_access_mode: 'browser' | 'seb' | 'android_monitored'
   android_approved_at: string | null
   android_approved_by: string | null
+  /** How many ข้อ in a row this attempt currently has right. Lives here rather
+   *  than being recomputed from the answer rows because "in a row" is a
+   *  property of the order the student answered in, not of their total — and
+   *  because it is what lets them close the tab and resume on the same count
+   *  instead of starting over. 0 for every `fixed` งาน. */
+  current_streak: number
+  /** The highest `current_streak` this attempt ever reached. Kept separately so
+   *  a teacher can see how close a student who did not pass actually got,
+   *  which `current_streak` hides once it resets. */
+  best_streak: number
+  /** Whether this attempt ever hit `streak_target`. Never cleared afterwards —
+   *  a student who passes and then keeps practising has still passed. */
+  streak_reached: boolean
   created_at: string
 }
 
