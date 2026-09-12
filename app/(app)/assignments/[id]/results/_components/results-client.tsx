@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown } 
 import { ExportButton } from '@/components/assignments/export-button'
 import { ScoreEditor } from '@/components/assignments/score-editor'
 import { computePassed } from '@/lib/grading'
+import { formatElapsed, summarizeStreakResults, type StreakAttemptStat } from '@/lib/streak-results'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSortDir, type SortableStudentProfile } from '@/lib/student-sort'
 import type { Question } from '@/lib/types'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
@@ -162,36 +163,14 @@ export function ResultsClient({
   // and averaging them says nothing. What it measured is whether the run was
   // reached, and how much work it took to get there.
   const isStreakRun = completionRule === 'streak'
-  const streakStats = useMemo(() => {
-    if (!isStreakRun) return null
-    const perStudent = submitted.map(s => {
-      const rows = answers.filter(a => a.submission_id === s.id)
-      const elapsedMs = s.started_at && s.submitted_at
-        ? new Date(s.submitted_at).getTime() - new Date(s.started_at).getTime()
-        : null
-      return {
-        id: s.id,
-        asked: rows.length,
-        // Full marks only, matching what advanced the run in the first place.
-        correct: rows.filter(a => a.max_score > 0 && a.score >= a.max_score).length,
-        best: s.best_streak ?? 0,
-        reached: s.streak_reached === true,
-        elapsedMs: elapsedMs != null && elapsedMs >= 0 ? elapsedMs : null,
-      }
-    })
-    const byId = new Map(perStudent.map(p => [p.id, p]))
-    const reachedCount = perStudent.filter(p => p.reached).length
-    // The median, not the mean: one student who ground through sixty ข้อ would
-    // drag an average far away from what the class actually experienced, and
-    // this number exists to tell a teacher how hard their คลัง turned out to be.
-    const askedSorted = perStudent.map(p => p.asked).sort((a, b) => a - b)
-    const medianAsked = askedSorted.length === 0
-      ? null
-      : askedSorted.length % 2 === 1
-        ? askedSorted[(askedSorted.length - 1) / 2]
-        : Math.round((askedSorted[askedSorted.length / 2 - 1] + askedSorted[askedSorted.length / 2]) / 2)
-    return { byId, reachedCount, medianAsked }
-  }, [answers, isStreakRun, submitted])
+  // The arithmetic lives in lib/streak-results.ts (22 cases): a median over an
+  // even count, "ถูก" meaning full marks rather than any marks, and an elapsed
+  // span that has to refuse nonsense instead of printing it — none of which is
+  // checkable while it sits inline in a useMemo.
+  const streakStats = useMemo(
+    () => (isStreakRun ? summarizeStreakResults(submitted, answers) : null),
+    [answers, isStreakRun, submitted],
+  )
 
   const activeQuestion = questions[activeQuestionIndex]
 
@@ -359,23 +338,6 @@ export function ResultsClient({
 
 // ─── Individual mode ───────────────────────────────────────────────────────
 
-/** How long an attempt took, in the units a teacher reads at a glance. */
-function formatElapsed(ms: number | null): string {
-  if (ms == null) return '—'
-  const totalMinutes = Math.floor(ms / 60_000)
-  const seconds = Math.floor((ms % 60_000) / 1000)
-  if (totalMinutes < 60) return `${totalMinutes}:${String(seconds).padStart(2, '0')}`
-  return `${Math.floor(totalMinutes / 60)} ชม. ${totalMinutes % 60} นาที`
-}
-
-interface StreakStat {
-  asked: number
-  correct: number
-  best: number
-  reached: boolean
-  elapsedMs: number | null
-}
-
 /**
  * Results for a งาน that ended on a run of correct answers.
  *
@@ -387,7 +349,7 @@ interface StreakStat {
  */
 function StreakTable({ rows, stats, target }: {
   rows: SubmittedRow[]
-  stats: Map<string, StreakStat>
+  stats: Map<string, StreakAttemptStat>
   target: number | null
 }) {
   return (

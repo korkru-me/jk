@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  buildAssignmentAttempt, buildRetryAttempt, gradeAnswer, naturalMaxScore, scaleScore,
+  buildAssignmentAttempt, buildAttemptQuestion, buildRetryAttempt, gradeAnswer, naturalMaxScore, scaleScore,
   type GradableAnswer, type PreviousAttemptAnswer,
 } from './assignment-attempt'
 import type { AnswerPart, Assignment, Question } from '@/lib/types'
@@ -303,6 +303,60 @@ function mcqQuestion(options: { text: string; is_correct: boolean }[]): Question
     mcq_options: options,
   } as unknown as Question
 }
+
+describe('buildAttemptQuestion, the single-ข้อ builder', () => {
+  const options = [
+    { text: 'ก', is_correct: false },
+    { text: 'ข', is_correct: true },
+  ]
+
+  it('freezes the same correct answer buildAssignmentAttempt does', () => {
+    const one = buildAttemptQuestion(mcqQuestion(options), { orderIndex: 0, shuffleOptions: false })
+    const [whole] = buildAssignmentAttempt(assignment, [mcqQuestion(options)])
+    expect(one.correct_answer).toBe(whole.correct_answer)
+  })
+
+  // The draw appends after every row already handed out, so this is how the
+  // student's sequence is kept — a wrong index here would reorder the attempt.
+  it('takes its order_index from the caller', () => {
+    expect(buildAttemptQuestion(mcqQuestion(options), { orderIndex: 7, shuffleOptions: false }).order_index)
+      .toBe(7)
+  })
+
+  it('leaves ปรนัย options in authored order when shuffling is off', () => {
+    expect(buildAttemptQuestion(mcqQuestion(options), { orderIndex: 0, shuffleOptions: false }).option_order)
+      .toBeNull()
+  })
+
+  it('freezes a permutation when shuffling is on', () => {
+    const skeleton = buildAttemptQuestion(mcqQuestion(options), { orderIndex: 0, shuffleOptions: true })
+    expect([...(skeleton.option_order as number[])].sort()).toEqual([0, 1])
+  })
+
+  // A จับคู่ is only a question once its right-hand column is scrambled, so it
+  // shuffles regardless of the assignment's ปรนัย setting. Asserted here
+  // because the streak path is the one caller that passes shuffleOptions false
+  // for every งาน whose teacher left ปรนัย shuffling off.
+  it('still scrambles a จับคู่ when ปรนัย shuffling is off', () => {
+    const matching = {
+      ...mcqQuestion(options),
+      question_type: 'matching',
+    } as unknown as Question
+    const skeleton = buildAttemptQuestion(matching, { orderIndex: 0, shuffleOptions: false })
+    expect(skeleton.option_order).not.toBeNull()
+  })
+
+  it('applies the assignment\'s point override', () => {
+    expect(buildAttemptQuestion(mcqQuestion(options), {
+      orderIndex: 0, shuffleOptions: false, pointOverride: 4,
+    }).max_score).toBe(4)
+  })
+
+  it('falls back to the ข้อ\'s own value with no override', () => {
+    const natural = buildAttemptQuestion(mcqQuestion(options), { orderIndex: 0, shuffleOptions: false })
+    expect(natural.max_score).toBe(1)
+  })
+})
 
 function gradeMcq(correctAnswer: string, student: string, maxScore = 1) {
   return gradeAnswer(answer({ correct: correctAnswer, student, questionType: 'mcq', maxScore }))
