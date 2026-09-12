@@ -1,0 +1,27 @@
+-- New question type: "ตารางจำแนก" (classify) — one table per question, where
+-- the rows are the things being judged (a picture of เนื้อหมู, ยางรัดของ,
+-- เชือกป่าน), the columns are the ways of judging them (จำแนกตามแหล่งกำเนิด,
+-- จำแนกตามชนิดของมอนอเมอร์), and every cell is one choice among that column's
+-- options.
+--
+-- The options belong to the column rather than to the cell, which is what no
+-- existing type can express: a `composite` of ปรนัย parts makes the teacher
+-- retype "พอลิเมอร์ธรรมชาติ / พอลิเมอร์สังเคราะห์" once per row, and flattens a
+-- two-dimensional answer into a list where nothing downstream can tell which
+-- sub-answer belonged to which row or column.
+--
+-- No new columns, tables or buckets: the grid lives in `questions.extra_data`
+-- (see ClassifyConfig in lib/types.ts), row images reuse the existing
+-- `question-images` bucket the way composite part images already do, and the
+-- frozen answer key is one more prefix on `submission_answers.correct_answer`
+-- ('CLS:', alongside TF:, FILL:, ORDER:, MATCH:, COMP: and MCQ:).
+--
+-- This file adds the enum value and nothing else, on purpose. Postgres refuses
+-- to *use* a value added by ALTER TYPE ... ADD VALUE inside the transaction
+-- that added it, and the CLI runs each migration file in one transaction — so
+-- the function that compares question_type against 'classify' has to be the
+-- migration after this one, not part of it.
+--
+-- Adding a label rewrites no rows and changes no existing behaviour: until the
+-- classify form ships, nothing can write the value.
+ALTER TYPE question_type ADD VALUE IF NOT EXISTS 'classify';

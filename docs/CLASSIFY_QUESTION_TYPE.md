@@ -1,6 +1,7 @@
 # ประเภทโจทย์ `classify` (ตารางจำแนก)
 
-อัปเดตล่าสุด: 12 กันยายน 2026 · สถานะ: **เฟส 1 จาก 7 เสร็จ — ยังใช้งานไม่ได้**
+อัปเดตล่าสุด: 12 กันยายน 2026 · สถานะ: **เฟส 2 จาก 7 เสร็จ — ยังใช้งานไม่ได้**
+· ⚠️ **migration เขียนแล้วแต่ยังไม่ apply บนฐานจริง**
 
 เอกสารนี้คือช่องทาง handoff ของงานนี้ตาม `AGENTS.md` แชตและ memory ของ agent ไม่ใช่ช่องทาง handoff
 ใครมาทำต่อ (Claude Code หรือ Codex เครื่องไหนก็ตาม) ให้เริ่มจากไฟล์นี้
@@ -78,7 +79,7 @@ row_label_style?: PartLabelStyle              // undefined = 'number' (3.1, 3.2,
 |---|---|---|
 | 0 | ตัดสินใจ · ตรวจ `supabase migration list` · แตกเบรนช์ | ✅ เสร็จ |
 | 1 | types + คะแนน + เทสต์ (TypeScript ล้วน ไม่แตะ DB ไม่แตะ UI) | ✅ เสร็จ |
-| 2 | migration **2 ไฟล์แยกกัน** — `ALTER TYPE … ADD VALUE 'classify'` และสาขาใหม่ใน `education_research_question_max_score` | ⬜ |
+| 2 | migration **2 ไฟล์แยกกัน** — `ALTER TYPE … ADD VALUE 'classify'` และสาขาใหม่ใน `education_research_question_max_score` | ⚠️ เขียนและทดสอบแล้ว **ยังไม่ apply บน remote** |
 | 3 | `lib/exam-safe.ts` — `SafeClassifyConfig` **ต้องตัด `rows[].answers` ทิ้งก่อนถึง browser** | ⬜ |
 | 4 | ตัวเรนเดอร์ฝั่งนักเรียน (`exam-client.tsx`, `question-preview-content.tsx`) + responsive | ⬜ |
 | 5 | ฟอร์มสร้าง/แก้ · การ์ดเลือกประเภท · ป้ายชื่อ · ทำสำเนา · นำเข้า-ส่งออก | ⬜ |
@@ -105,12 +106,31 @@ row_label_style?: PartLabelStyle              // undefined = 'number' (3.1, 3.2,
 ตรวจแล้ว: `tsc` ✓ · `npm test` 778 ✓ · `lint:tokens` ไม่ regress ✓ · `npm run build` ✓
 ยังไม่ได้ตรวจ: ไม่มีอะไรแตะ Supabase, server action หรือ browser ในเฟสนี้ — ไม่มีให้ตรวจ
 
+## สิ่งที่เฟส 2 ทำไปแล้ว
+
+- `supabase/migrations/20260912073312_add_classify_question_type.sql` — `ALTER TYPE question_type ADD VALUE IF NOT EXISTS 'classify'` อย่างเดียว
+- `supabase/migrations/20260912073314_classify_research_max_score.sql` — `CREATE OR REPLACE` ของ
+  `education_research_question_max_score` เพิ่มสาขา classify **ยกตัวฟังก์ชันเดิมมาทั้งดุ้นด้วยสคริปต์ ไม่ได้พิมพ์ใหม่**
+  (พิมพ์ผิดตรงนี้จะเปลี่ยนคะแนนเต็มของทุกประเภทโดยไม่มีอะไรฟ้อง) — diff เทียบกับของเดิมมีแค่บรรทัด `CREATE OR REPLACE` กับสาขาใหม่
+- `lib/classify-sql.test.ts` (ใหม่) — รัน migration ทั้งสองไฟล์จริงบน **PGlite** (Postgres ตัวจริงคอมไพล์เป็น wasm ในโปรเซส)
+  แล้วตรวจว่า SQL ให้เลขเดียวกับ `classifyCellCount` ครบ 12 กรณี · ยืนยันว่าประเภทอื่นคะแนนไม่ขยับ ·
+  และยืนยันลำดับ enum จากฐานจริงว่าตรงกับ `QUESTION_TYPE_ORDER` ที่ `lib/question-sort.ts` เขียนไว้ด้วยมือ
+  (ไม่มีอะไรใน JavaScript อ่านลำดับ enum กลับมาได้ การเรียงตามประเภทโจทย์จึงเพี้ยนเงียบ ๆ ได้ถ้าสองฝั่งไม่ตรงกัน)
+
+ตรวจแล้ว: `tsc` ✓ · `npm test` 792 ✓ (เพิ่ม 14) · migration ทั้งสองไฟล์ apply สำเร็จบน PGlite แยก transaction กัน
+ยังไม่ได้ตรวจ: **ยังไม่ได้ apply บน Supabase จริง** — ดูข้อ 1 ข้างล่าง
+
 ## ข้อจำกัดที่ยังค้างอยู่ ต้องรู้ก่อนทำเฟสต่อไป
 
-1. **`20260905072556_add_exam_seb_password_drafts` ยังไม่ apply บนฐานจริง**
-   เป็นงาน SEB เฟส 3 ที่ตั้งใจค้างไว้ (`docs/SEB_PHASE3.md`) ไฟล์นี้ไม่มีบน `master`
-   เบรนช์ classify จึงแตกจาก master เพื่อให้ migration ของ classify ไม่ลากมันขึ้น production ไปด้วย
-   **ก่อนทำเฟส 2 ให้รัน `supabase migration list` ซ้ำ** และยืนยันว่าฐานของเบรนช์ยังตรงกับ remote
+1. **migration ของ classify ทั้งสองไฟล์ยังไม่ถูก apply บนฐานจริง**
+   ตรวจ `supabase migration list` ก่อนสร้างแล้ว: ฐานของเบรนช์นี้ตรงกับ remote ครบ 108 ตัว ไม่มี local-only
+   หลังเพิ่มสองไฟล์นี้จะขึ้นเป็น local-only 2 ตัวจนกว่าจะ apply
+   **ห้ามลืมขั้นนี้** — `20260726120000_file_upload_question_type.sql` เคยค้างแบบนี้
+   แล้วประเภท "ส่งไฟล์งาน" พังใน production อยู่ 4 เดือนโดยไม่มีใครรู้
+   ต้อง apply **ก่อน**เฟส 5 (ฟอร์มบันทึกโจทย์) เป็นอย่างช้า ไม่งั้นครูกดบันทึกแล้วจะ error ที่ enum
+
+   งาน SEB เฟส 3 (`20260905072556_add_exam_seb_password_drafts`) ยังค้างไม่ apply เหมือนเดิมบนเบรนช์ของมัน
+   แต่ไม่มีบน `master` จึงไม่พ่วงมากับ classify — นั่นคือเหตุผลที่เบรนช์นี้แตกจาก master
 
 2. **`/exam-screen-lab` ไม่มีบน `master`** อยู่บนเบรนช์ SEB เท่านั้น (commit `47dd7a2`)
    เฟส 4 วางแผนจะใช้หน้านี้พิสูจน์ตัวเรนเดอร์โดยไม่ต้อง login และไม่ต้องมีข้อมูลใน DB
