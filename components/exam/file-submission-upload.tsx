@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { FileUp, FileText, Loader2, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 import type { SubmittedFile } from '@/lib/types'
@@ -137,13 +138,20 @@ export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmiss
           {value.map((f) => (
             <div key={f.url} className="relative group">
               {isImageType(f.type) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={f.url}
-                  alt={f.name}
-                  className="w-24 h-24 rounded-lg object-cover border cursor-pointer"
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={`เปิดไฟล์ ${f.name}`}
                   onClick={() => window.open(f.url, '_blank')}
-                />
+                  className="block h-auto w-auto rounded-lg p-0"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={f.url}
+                    alt=""
+                    className="h-24 w-24 cursor-pointer rounded-lg border object-cover"
+                  />
+                </Button>
               ) : (
                 <a
                   href={f.url}

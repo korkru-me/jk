@@ -43,6 +43,7 @@ export default function ScientificCalculator({
   onInsertResult,
   onClose,
 }: ScientificCalculatorProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [expression, setExpression] = useState('')
   const [evaluation, setEvaluation] = useState<CalculatorEvaluation | null>(null)
@@ -51,15 +52,37 @@ export default function ScientificCalculator({
   const [inverse, setInverse] = useState(false)
   const [justEvaluated, setJustEvaluated] = useState(false)
   const caret = useMathCaret(inputRef)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const openedFromKeyboard = previousFocus?.matches(':focus-visible') ?? false
+    const finePointer = window.matchMedia('(pointer: fine)').matches
+    const frame = window.requestAnimationFrame(() => {
+      // Do not summon an on-screen keyboard just because a touch user opened
+      // the tool. Desktop pointer and keyboard users can type immediately.
+      if (openedFromKeyboard || finePointer) inputRef.current?.focus()
+    })
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      onCloseRef.current()
     }
     window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [onClose, open])
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('keydown', closeOnEscape)
+      const activeElement = document.activeElement
+      const focusNeedsRestoring = activeElement === document.body
+        || activeElement === document.documentElement
+        || (activeElement instanceof Node && panelRef.current?.contains(activeElement))
+      if (focusNeedsRestoring && previousFocus?.isConnected && previousFocus.getClientRects().length > 0) {
+        previousFocus.focus()
+      }
+    }
+  }, [open])
 
   if (!open || typeof document === 'undefined') return null
 
@@ -175,6 +198,7 @@ export default function ScientificCalculator({
   return createPortal((
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[80] flex h-[var(--app-height,100dvh)] items-end justify-center p-2 sm:justify-end sm:p-4">
       <Card
+        ref={panelRef}
         role="dialog"
         aria-label="เครื่องคิดเลขวิทยาศาสตร์"
         elevation="xl"

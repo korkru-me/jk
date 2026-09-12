@@ -212,6 +212,13 @@ export function MatchingDragInput({
         aria-pressed={isSelected}
         aria-label={`ตัวเลือก ${option.text}`}
         onPointerDown={e => onChipPointerDown(e, option.id, from)}
+        onClick={e => {
+          // Enter/Space dispatch a click without pointer detail. Pointer taps
+          // already toggle in `pointerup`, so handling those here as well
+          // would immediately undo the selection.
+          if (e.detail !== 0 || disabled) return
+          setSelected(prev => (prev === option.id ? null : option.id))
+        }}
         className={cn(
           'h-auto max-w-full touch-none select-none whitespace-normal px-3 py-1.5 text-left pointer-coarse:min-h-11',
           !disabled && 'cursor-grab active:cursor-grabbing',

@@ -97,12 +97,29 @@ export default function Scratchpad({
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const mountedRef = useRef(true)
   const loadedArtifactNonceRef = useRef(0)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const compactLayoutRef = useRef(false)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   const [background, setBackground] = useState<ScratchpadBackground>('lined')
   const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
   const [status, setStatus] = useState<SaveStatus>(persistenceEnabled ? 'loading' : 'idle')
   const [apiReady, setApiReady] = useState(false)
   const [attaching, setAttaching] = useState(false)
   const [loadingAttached, setLoadingAttached] = useState(false)
+  const [compactLayout, setCompactLayout] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)')
+    const update = () => {
+      compactLayoutRef.current = media.matches
+      setCompactLayout(media.matches)
+    }
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   const initialData = useMemo(async () => {
     let scene = emptyScratchpadScene()
@@ -156,12 +173,57 @@ export default function Scratchpad({
 
   useEffect(() => {
     if (!open) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const openedFromKeyboard = previousFocus?.matches(':focus-visible') ?? false
+    const finePointer = window.matchMedia('(pointer: fine)').matches
+    const frame = window.requestAnimationFrame(() => {
+      // Excalidraw owns canvas focus. The close control is a predictable entry
+      // point when a desktop or keyboard user opens an already-mounted panel.
+      if (compactLayoutRef.current || openedFromKeyboard || finePointer) closeButtonRef.current?.focus()
+    })
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || event.defaultPrevented || !compactLayoutRef.current) return
+
+      const panel = panelRef.current
+      if (!panel) return
+      const controls = Array.from(panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
+      )).filter(element => (
+        !element.hidden
+        && element.getAttribute('aria-hidden') !== 'true'
+        && element.getClientRects().length > 0
+      ))
+      if (controls.length === 0) return
+
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      const activeElement = document.activeElement
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [onClose, open])
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('keydown', closeOnEscape)
+      const activeElement = document.activeElement
+      const focusNeedsRestoring = activeElement === document.body
+        || activeElement === document.documentElement
+        || (activeElement instanceof Node && panelRef.current?.contains(activeElement))
+      if (focusNeedsRestoring && previousFocus?.isConnected && previousFocus.getClientRects().length > 0) {
+        previousFocus.focus()
+      }
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -395,7 +457,9 @@ export default function Scratchpad({
 
   return createPortal((
     <Card
+      ref={panelRef}
       role="dialog"
+      aria-modal={compactLayout || undefined}
       aria-label="กระดาษทด"
       elevation="xl"
       className={open
@@ -439,7 +503,7 @@ export default function Scratchpad({
             {attaching ? <Loader2 className="animate-spin" /> : <Paperclip />}
             {attaching ? 'กำลังแนบ...' : artifact ? 'อัปเดตวิธีทำ' : 'แนบวิธีทำ'}
           </Button>
-          <Button type="button" variant="ghost" size="icon-sm" className="size-10 pointer-coarse:size-11" onClick={onClose} aria-label="ปิดกระดาษทด">
+          <Button ref={closeButtonRef} type="button" variant="ghost" size="icon-sm" className="size-10 pointer-coarse:size-11" onClick={onClose} aria-label="ปิดกระดาษทด">
             <X />
           </Button>
         </div>

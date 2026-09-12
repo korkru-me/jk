@@ -1,6 +1,6 @@
 # แผนตรวจหน้าข้อสอบจริงตามขนาดจอ
 
-อัปเดต: 12 กันยายน 2026 · **เฟส 1 ผ่าน · เฟส 2A ผ่านการจำลอง / 2B รอ iPhone จริง · เฟส 3A ผ่านการจำลอง / 3B รอ iPad จริง**
+อัปเดต: 12 กันยายน 2026 · **เฟส 1 ผ่าน · เฟส 2A ผ่านการจำลอง / 2B รอ iPhone จริง · เฟส 3A ผ่านการจำลอง / 3B รอ iPad จริง · เฟส 4A ผ่านการจำลอง / 4B รอ Mac Safari จริง**
 
 เอกสารนี้เป็นแผนตรวจหน้าข้อสอบ KorKru บน iPhone, iPad และ Mac ก่อนกลับไปทดสอบ SEB บน Windows ตามลำดับที่ผู้ใช้เลือก ไม่ได้เปลี่ยน Windows ให้เป็น “ผ่าน” และไม่ได้ใช้ผลจาก Apple อนุมานแทน Windows
 
@@ -8,7 +8,7 @@
 
 เครื่องพัฒนาปัจจุบันเชื่อมกับ Supabase project ที่เอกสารโครงการระบุว่าเป็น production และยังไม่มี staging แยก จึงห้ามสร้างบัญชี ห้องเรียน ข้อสอบ คำตอบ การส่งงาน หรือไฟล์ QA ในฐานนี้
 
-เฟส 1–3A ใช้ `/exam-screen-lab` ซึ่งมีคุณสมบัติดังนี้:
+เฟส 1–4A ใช้ `/exam-screen-lab` ซึ่งมีคุณสมบัติดังนี้:
 
 - เปิดได้เฉพาะเมื่อ environment ระบุชัดว่าเป็น development/test; production, preview, staging, ค่าว่าง และค่าที่ไม่รู้จักตอบ 404
 - ใช้ `ExamClient` ตัวเดียวกับหน้าทำข้อสอบจริง แต่เปิด `previewMode`
@@ -131,9 +131,34 @@ Agent จะเปิด local URL และบอกทีละขั้น �
 
 ### เฟส 4 — Mac
 
-สถานะ: รอ
+สถานะ: **4A ผ่านเฉพาะ agent-only code audit และ Chromium CDP simulation · 4B รอ Mac Safari จริง**
 
-ผู้ใช้ช่วยตรวจหน้าต่างเล็ก/ใหญ่ keyboard navigation, scroll, drag, file picker, focus mode และ modal Agent แก้เฉพาะปัญหาที่ทำซ้ำได้แล้ว rerun regression
+#### เฟส 4A — Agent ตรวจโดยยังไม่รบกวนผู้ใช้
+
+ทำแล้ว:
+
+- ตรวจโค้ดเส้นทาง keyboard, focus, mouse/drag, scroll และ floating tools โดยไม่ใช้ข้อมูลจริงหรือเขียนขึ้น server
+- ใช้ Chromium CDP จำลองหน้าต่าง 900×600, 1280×720, 1440×900 และ 1728×1117 ครบชุดจำลอง 12 กรณี ทั้งหนึ่งและสามข้อต่อหน้า ไม่พบ horizontal overflow
+- จำลองพื้นที่แสดงผลเทียบเท่า browser zoom 200% และตัวอักษร 125% โดยไม่พบองค์ประกอบหลุดขอบ, console error, exception หรือ resource load failure
+- ตรวจตัวนำทางข้อ, โหมดโฟกัส, เครื่องคิดเลข, กระดาษทด, แป้นคณิตศาสตร์, จับคู่, เรียงลำดับ, ตัวอย่างไฟล์ และกล่องยืนยันส่ง รวม focus trap และการย้าย focus ข้ามหน้าข้อแล้ว
+- แก้เส้นทาง keyboard ของโจทย์จับคู่ให้ Enter/Space เลือกชิปได้ โดยไม่ทำให้การแตะหรือลากสลับสถานะซ้ำ
+
+ผลข้างต้นเป็นเพียง code audit กับ Chromium CDP simulation บนเครื่องพัฒนา ไม่ใช่ผลจาก Safari/WebKit, แอป SEB, native fullscreen, native file picker หรือ trackpad บน Mac จริง จึงยังห้ามเรียกเฟส 4 ทั้งเฟสว่า “ผ่าน”
+
+ผลตรวจรอบปิดเฟส 4A:
+
+- `npm test`: 74 files / 819 tests ผ่าน
+- `npx tsc --noEmit`: ผ่าน
+- `npm run lint:tokens`: ผ่าน ไม่มี design-token debt เพิ่ม
+- `npm run build`: ผ่าน สร้าง static pages 62 หน้า
+- development simulation: ครบ 12 fixtures, `perPage=1/3` และ 4 viewport; keyboard/focus, การลากด้วย mouse, synthetic file preview และ overlay สำคัญผ่าน
+- production smoke: `/exam-screen-lab` ตอบ 404 และ `/login` ซึ่งใช้เป็น control ตอบ 200
+- `/assignments/[id]/take` client bundle ประมาณ 0.238 MiB gzip (819,496 bytes raw / 249,380 bytes gzip)
+- ไม่มี migration, env, database, storage หรือ deployment เปลี่ยน
+
+#### เฟส 4B — รอผู้ใช้ว่าง
+
+ผู้ใช้ช่วยตรวจ Mac Safari จริงตาม [รายการทดสอบเฟส 4B](EXAM_SCREEN_QA_MAC.md) ทั้งหน้าต่างเล็ก/ใหญ่, keyboard navigation, scroll, trackpad/mouse drag, native file picker, focus mode และ modal ส่วน Safari, SEB และ native fullscreen ยังเป็น pending จนกว่าจะทดสอบบนเครื่องจริง ผู้ใช้ยังไม่ต้องทำขั้นตอนนี้จนกว่าจะบอกว่าพร้อม
 
 ### เฟส 5 — เส้นทางนักเรียนจริงใน browser ปกติ
 

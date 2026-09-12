@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronUp, Delete, Keyboard, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -105,18 +105,26 @@ export function MathAnswerField({
   inputClassName,
 }: MathAnswerFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const toggleButtonRef = useRef<HTMLButtonElement>(null)
   const caret = useMathCaret(inputRef)
   const panelId = useId()
   const [advanced, setAdvanced] = useState(false)
 
+  const closeKeypad = useCallback(() => {
+    onDeactivate()
+    requestAnimationFrame(() => toggleButtonRef.current?.focus({ preventScroll: true }))
+  }, [onDeactivate])
+
   useEffect(() => {
     if (!active) return
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onDeactivate()
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      closeKeypad()
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [active, onDeactivate])
+  }, [active, closeKeypad])
 
   const apply = (edit: MathInputEditResult) => {
     onChange(edit.value)
@@ -169,6 +177,7 @@ export function MathAnswerField({
           className={cn('min-w-[9rem]', inputClassName)}
         />
         <Button
+          ref={toggleButtonRef}
           type="button"
           variant={active ? 'secondary' : 'outline'}
           size="icon"
@@ -176,7 +185,7 @@ export function MathAnswerField({
           aria-expanded={active}
           aria-controls={panelId}
           className="pointer-coarse:size-11"
-          onClick={() => active ? onDeactivate() : focusInput()}
+          onClick={() => active ? closeKeypad() : focusInput()}
         >
           <Keyboard />
         </Button>
@@ -218,7 +227,7 @@ export function MathAnswerField({
               <p className="text-sm font-semibold">แป้นคณิตศาสตร์</p>
               <p className="text-[11px] text-muted-foreground">ใส่ที่ตำแหน่งเคอร์เซอร์ · กด Esc เพื่อปิด</p>
             </div>
-            <Button type="button" variant="ghost" size="icon-sm" className="ml-auto pointer-coarse:size-11" onClick={onDeactivate} aria-label="ปิดแป้นคณิตศาสตร์">
+            <Button type="button" variant="ghost" size="icon-sm" className="ml-auto pointer-coarse:size-11" onClick={closeKeypad} aria-label="ปิดแป้นคณิตศาสตร์">
               <X />
             </Button>
           </div>
