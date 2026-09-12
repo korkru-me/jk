@@ -283,27 +283,44 @@ export function buildAssignmentAttempt(
   const questionPoints = assignment.question_points
 
   return questionOrder
-    .map((qid, orderIndex) => {
-      const q = questionsById.get(qid) as Question
-      // A matching question is only a question if the right-hand column is
-      // scrambled, so it shuffles regardless of the assignment's
-      // shuffle_options setting (which is about MCQ choices). Frozen into
-      // option_order either way, so the student sees one stable order.
-      const shufflesOptions = q.question_type === 'matching'
-        || (assignment.shuffle_options && q.question_type === 'mcq')
-      const optionOrder = shufflesOptions && q.mcq_options
-        ? shuffleArray((q.mcq_options as unknown[]).map((_, i) => i))
-        : null
+    .map((qid, orderIndex) => buildAttemptQuestion(questionsById.get(qid) as Question, {
+      orderIndex,
+      shuffleOptions: assignment.shuffle_options === true,
+      pointOverride: questionPoints?.[qid],
+    }))
+}
 
-      const base = buildSkeletonBase(q)
-      const override = questionPoints?.[qid]
-      return {
-        ...base,
-        max_score: override ?? base.max_score,
-        order_index: orderIndex,
-        option_order: optionOrder,
-      }
-    })
+/**
+ * One row of an attempt: the frozen correct answer, random values, point
+ * value and option order for a single ข้อ.
+ *
+ * Split out of buildAssignmentAttempt so a "ถูกติดต่อกัน" งาน — which does not
+ * know its own length and appends one ข้อ at a time as the student earns it —
+ * builds its rows through exactly the same code as an ordinary attempt. Two
+ * builders would eventually disagree about something that has to be identical,
+ * such as whether a จับคู่ scrambles its right-hand column.
+ */
+export function buildAttemptQuestion(
+  question: Question,
+  opts: { orderIndex: number; shuffleOptions: boolean; pointOverride?: number },
+): AssignmentAttemptSkeleton {
+  // A matching question is only a question if the right-hand column is
+  // scrambled, so it shuffles regardless of the assignment's shuffle_options
+  // setting (which is about MCQ choices). Frozen into option_order either way,
+  // so the student sees one stable order.
+  const shufflesOptions = question.question_type === 'matching'
+    || (opts.shuffleOptions && question.question_type === 'mcq')
+  const optionOrder = shufflesOptions && question.mcq_options
+    ? shuffleArray((question.mcq_options as unknown[]).map((_, i) => i))
+    : null
+
+  const base = buildSkeletonBase(question)
+  return {
+    ...base,
+    max_score: opts.pointOverride ?? base.max_score,
+    order_index: opts.orderIndex,
+    option_order: optionOrder,
+  }
 }
 
 // One answer row of the attempt a wrong-only retry is built from. Only the

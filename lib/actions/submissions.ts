@@ -3,9 +3,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-import { isAttemptExpired, isInstantCheckable } from '@/lib/grading'
+import { isAttemptExpired, isInstantCheckable, isStreakEligible } from '@/lib/grading'
+import {
+  advanceStreakForVerdict, pickNextStreakQuestion, streakEnding, type StreakEnding,
+} from '@/lib/streak-run'
 import {
   buildAssignmentAttempt,
+  buildAttemptQuestion,
   buildRetryAttempt,
   gradeAnswer,
   type AssignmentAttemptSkeleton,
@@ -213,6 +217,21 @@ export async function startSubmission(
     }
     skeletons = split.retried
     carried = split.carried
+  } else if (assignment.completion_rule === 'streak') {
+    // A streak attempt has no length to freeze. It opens with no rows and
+    // drawNextStreakQuestion appends the first ข้อ, so there is exactly one
+    // code path that hands a ข้อ out and one place that decides which.
+    //
+    // Re-checked here and not only at สร้างงาน: ข้อ can be deleted from the
+    // คลัง between the two, and a งาน whose pool has since fallen below its own
+    // target is unpassable. Saying so at the door beats letting the student
+    // find out after fifteen ข้อ.
+    const eligible = (questions as Question[]).filter(q => isStreakEligible(q.question_type))
+    const target = Number(assignment.streak_target ?? 0)
+    if (eligible.length < target) {
+      return { error: 'โจทย์ที่ระบบตรวจได้ในคลังเหลือน้อยกว่าเกณฑ์ที่ตั้งไว้ กรุณาแจ้งครูผู้สอน' }
+    }
+    skeletons = []
   } else {
     skeletons = buildAssignmentAttempt(assignment, questions as Question[])
     if (assignment.random_question_count && skeletons.length < assignment.random_question_count) {
@@ -259,11 +278,15 @@ export async function startSubmission(
 
   if (subError) return { error: subError.message }
 
-  const { error: answersError } = await admin.from('submission_answers').insert([
-    ...skeletons.map(s => ({ ...s, org_id: orgId, submission_id: submission.id, carried_over: false })),
-    ...carried.map(c => ({ ...c, org_id: orgId, submission_id: submission.id })),
-  ])
-  if (answersError) return { error: answersError.message }
+  // A streak attempt opens with neither, and an empty insert is not worth
+  // asking the database about.
+  if (skeletons.length > 0 || carried.length > 0) {
+    const { error: answersError } = await admin.from('submission_answers').insert([
+      ...skeletons.map(s => ({ ...s, org_id: orgId, submission_id: submission.id, carried_over: false })),
+      ...carried.map(c => ({ ...c, org_id: orgId, submission_id: submission.id })),
+    ])
+    if (answersError) return { error: answersError.message }
+  }
 
   return { submissionId: submission.id }
 }
@@ -279,7 +302,12 @@ async function getWritableStudentAnswer(
       id, submission_id, work_images, carried_over, check_count,
       submissions(
         id, student_id, status, started_at, assignment_id,
-        assignments(id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode, instant_check, instant_check_answer_key)
+        current_streak, best_streak, streak_reached,
+        assignments(
+          id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode,
+          instant_check, instant_check_answer_key,
+          completion_rule, streak_target, streak_question_cap, streak_recycle_pool
+        )
       )
     `)
     .eq('id', submissionAnswerId)
@@ -323,6 +351,62 @@ async function getWritableStudentAnswer(
   }
 
   return { answer, submission, assignment }
+}
+
+/**
+ * The same four gates getWritableStudentAnswer applies, for an action that
+ * addresses the attempt rather than one answer row — currently only
+ * drawNextStreakQuestion, which hands out a ข้อ and so must be as hard to
+ * reach as writing one.
+ *
+ * Extracted rather than copied: an attempt that is out of time, past its
+ * deadline, or missing its SEB session has to be refused identically in both
+ * places, and four checks written twice is where the two eventually differ.
+ */
+async function attemptWriteBlocked(
+  admin: ReturnType<typeof createAdminClient>,
+  submission: { id: string; student_id: string; status: string; started_at: string; assignment_id: string },
+  assignment: {
+    duration_minutes?: number | null
+    end_at?: string | null
+    secure_browser_mode?: string | null
+    android_exam_mode?: string | null
+  } | null,
+  studentId: string,
+): Promise<string | null> {
+  if (submission.student_id !== studentId) return 'ไม่มีสิทธิ์'
+  if (submission.status !== 'in_progress') return 'ส่งงานแล้ว'
+
+  const durationMinutes = assignment?.duration_minutes
+  if (durationMinutes) {
+    const deadline = new Date(submission.started_at).getTime() + durationMinutes * 60_000
+    if (Date.now() > deadline) return 'หมดเวลาทำข้อสอบแล้ว'
+  }
+
+  if (assignment?.end_at && new Date(assignment.end_at).getTime() < Date.now()) {
+    const { data: extension } = await admin
+      .from('assignment_extensions')
+      .select('extended_end_at')
+      .eq('assignment_id', submission.assignment_id)
+      .eq('student_id', studentId)
+      .maybeSingle()
+    if (!extension?.extended_end_at || new Date(extension.extended_end_at).getTime() < Date.now()) {
+      return 'หมดเวลาส่งแล้ว'
+    }
+  }
+
+  if (
+    assignment?.secure_browser_mode === 'seb_required'
+    && !await getExamAccessSession(
+      studentId,
+      submission.assignment_id,
+      assignment.android_exam_mode === 'monitored',
+    )
+  ) {
+    return 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่'
+  }
+
+  return null
 }
 
 export async function saveAnswer(
@@ -425,17 +509,31 @@ export async function checkAnswer(submissionAnswerId: string) {
     mode?: string
     instant_check?: boolean
     instant_check_answer_key?: boolean
+    completion_rule?: string
+    streak_target?: number | null
   } | null
 
+  // A "ถูกติดต่อกัน" งาน is the one case where a ข้อสอบ checks ข้อ as it goes:
+  // the run cannot be counted without a verdict per ข้อ. Ordinary ข้อสอบ keep
+  // their single ส่งคำตอบ at the end, which is what the type gate below still
+  // says for every other งาน.
+  const isStreakRun = assignment?.completion_rule === 'streak'
   if (
-    assignment?.type !== 'exercise'
-    || assignment?.mode !== 'online'
+    assignment?.mode !== 'online'
     || assignment?.instant_check !== true
+    || (!isStreakRun && assignment?.type !== 'exercise')
   ) {
     return { error: 'งานนี้ไม่ได้เปิดให้ตรวจทีละข้อ' }
   }
   if ((writable.answer as { carried_over?: boolean }).carried_over) {
     return { error: 'ข้อนี้ยกคะแนนมาจากครั้งก่อน ไม่ต้องทำใหม่' }
+  }
+  // In an ordinary แบบฝึกหัด, checking a ข้อ again after fixing it is the whole
+  // point. In a streak it would be a way to finish the งาน: answer, look, fix,
+  // look again, and every ข้อ eventually reads ถูก. One verdict per ข้อ, and it
+  // is the one that counts.
+  if (isStreakRun && Number((writable.answer as { check_count?: number }).check_count ?? 0) > 0) {
+    return { error: 'ข้อนี้ตรวจไปแล้ว — กดข้อต่อไปเพื่อทำข้อใหม่' }
   }
 
   const { data: row } = await admin
@@ -507,19 +605,250 @@ export async function checkAnswer(submissionAnswerId: string) {
     .eq('id', submissionAnswerId)
     .eq('submission_id', writable.submission.id)
 
+  const feedback = buildAnswerFeedback({
+    correct_answer: row.correct_answer ?? '',
+    student_answer: row.student_answer,
+    math_input_modes: row.math_input_modes,
+    question: { ...question, mcq_options: displayOptions },
+    isCorrect: graded.is_correct,
+    score: graded.score,
+    maxScore,
+    revealAnswerKey: assignment.instant_check_answer_key !== false,
+  })
+
+  if (!isStreakRun) return { success: true as const, checkCount, feedback }
+
+  // The count moves here, from the verdict the server just produced — never
+  // from anything the page reports. A browser that could say "ถูกแล้วนะ" is a
+  // browser that can finish the งาน from the console.
+  const submissionRow = writable.submission as unknown as {
+    current_streak?: number
+    best_streak?: number
+    streak_reached?: boolean
+  }
+  const target = Number(assignment.streak_target ?? 0)
+  const before = {
+    current: Number(submissionRow.current_streak ?? 0),
+    best: Number(submissionRow.best_streak ?? 0),
+    reached: submissionRow.streak_reached === true,
+  }
+  const after = advanceStreakForVerdict(before, feedback.verdict, target)
+  await admin
+    .from('submissions')
+    .update({
+      current_streak: after.current,
+      best_streak: after.best,
+      streak_reached: after.reached,
+    })
+    .eq('id', writable.submission.id)
+
   return {
     success: true as const,
     checkCount,
-    feedback: buildAnswerFeedback({
-      correct_answer: row.correct_answer ?? '',
-      student_answer: row.student_answer,
-      math_input_modes: row.math_input_modes,
-      question: { ...question, mcq_options: displayOptions },
-      isCorrect: graded.is_correct,
-      score: graded.score,
-      maxScore,
-      revealAnswerKey: assignment.instant_check_answer_key !== false,
-    }),
+    feedback,
+    streak: {
+      current: after.current,
+      best: after.best,
+      target,
+      reached: after.reached,
+      // A ข้อ nobody can judge yet leaves the count alone, and the page says so
+      // rather than drawing a dot that did not move for no visible reason.
+      counted: feedback.verdict !== 'pending',
+    },
+  }
+}
+
+/**
+ * Hand out the next ข้อ of a "ถูกติดต่อกัน" attempt, or report that the attempt
+ * is over.
+ *
+ * A streak งาน does not know its own length, so its rows are appended one at a
+ * time as the student earns them instead of being frozen at the start the way
+ * every other attempt's are. Everything that decides — the count, whether the
+ * attempt ends, and which ข้อ comes next — is server-side and read from stored
+ * rows, never from what the page claims to have done.
+ *
+ * Idempotent on purpose. A double-click, a reload mid-draw, or a resumed
+ * attempt all find the un-checked ข้อ already waiting and return it rather than
+ * appending another, which would skip a ข้อ the student never saw and inflate
+ * the count toward the ceiling.
+ */
+export async function drawNextStreakQuestion(
+  submissionId: string,
+  options?: {
+    /**
+     * Keep handing out ข้อ after the target was already met — the ฝึกต่ออีก
+     * button. Only the 'reached' ending is skipped: the ceiling and an
+     * exhausted pool still stop the attempt, and `streak_reached` is sticky,
+     * so practising on cannot cost the student the pass they earned.
+     */
+    keepPracticing?: boolean
+  },
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const admin = createAdminClient()
+
+  const { data: submission } = await admin
+    .from('submissions')
+    .select(`
+      id, student_id, status, started_at, assignment_id,
+      current_streak, best_streak, streak_reached,
+      assignments(
+        id, org_id, question_ids, question_points, shuffle_options, mode, duration_minutes, end_at,
+        secure_browser_mode, android_exam_mode,
+        completion_rule, streak_target, streak_question_cap, streak_recycle_pool
+      )
+    `)
+    .eq('id', submissionId)
+    .maybeSingle()
+
+  if (!submission) return { error: 'ไม่พบการทำข้อสอบ' }
+  const assignment = (Array.isArray(submission.assignments)
+    ? submission.assignments[0]
+    : submission.assignments) as {
+      id: string
+      org_id: string
+      question_ids: string[]
+      question_points: Record<string, number> | null
+      shuffle_options: boolean | null
+      mode: string
+      duration_minutes: number | null
+      end_at: string | null
+      secure_browser_mode: string | null
+      android_exam_mode: string | null
+      completion_rule: string | null
+      streak_target: number | null
+      streak_question_cap: number | null
+      streak_recycle_pool: boolean | null
+    } | null
+
+  const blocked = await attemptWriteBlocked(
+    admin,
+    {
+      id: submission.id as string,
+      student_id: submission.student_id as string,
+      status: submission.status as string,
+      started_at: submission.started_at as string,
+      assignment_id: submission.assignment_id as string,
+    },
+    assignment,
+    user.id,
+  )
+  if (blocked) return { error: blocked }
+  if (assignment?.completion_rule !== 'streak') {
+    return { error: 'งานนี้ไม่ได้ใช้เงื่อนไขถูกติดต่อกัน' }
+  }
+
+  const target = Number(assignment.streak_target ?? 0)
+  const state = {
+    current: Number(submission.current_streak ?? 0),
+    best: Number(submission.best_streak ?? 0),
+    reached: submission.streak_reached === true,
+  }
+
+  const { data: existing } = await admin
+    .from('submission_answers')
+    .select('id, question_id, order_index, check_count, carried_over, max_score')
+    .eq('submission_id', submission.id)
+    .order('order_index')
+
+  const rows = existing ?? []
+
+  // A ข้อ already in hand is returned, not replaced. This is what makes the
+  // action safe to call twice.
+  const open = rows.find(r => !r.carried_over && Number(r.check_count ?? 0) === 0)
+  if (open) {
+    return {
+      success: true as const,
+      submissionAnswerId: open.id as string,
+      alreadyOpen: true as const,
+      askedCount: rows.length,
+      streak: { ...state, target },
+    }
+  }
+
+  const { data: poolQuestions } = await admin
+    .from('questions')
+    .select('*')
+    .in('id', assignment.question_ids)
+
+  const questionsById = new Map(((poolQuestions ?? []) as Question[]).map(q => [q.id, q]))
+  // Authored order, minus ids whose ข้อ was deleted from the คลัง, minus the
+  // types this mode cannot judge on the spot — the same filter the wizard
+  // counted with before letting the teacher choose this ending.
+  const eligibleIds = assignment.question_ids.filter(id => {
+    const q = questionsById.get(id)
+    return q != null && isStreakEligible(q.question_type)
+  })
+  const askedIds = rows.filter(r => !r.carried_over).map(r => r.question_id as string)
+
+  const nextId = pickNextStreakQuestion({
+    eligibleIds,
+    askedIds,
+    recyclePool: assignment.streak_recycle_pool !== false,
+  })
+
+  const ending: StreakEnding = streakEnding({
+    state: options?.keepPracticing ? { ...state, reached: false } : state,
+    target,
+    askedCount: askedIds.length,
+    questionCap: assignment.streak_question_cap,
+    anotherAvailable: nextId != null,
+  })
+  if (ending) {
+    return {
+      success: true as const,
+      ending,
+      askedCount: askedIds.length,
+      streak: { ...state, target },
+    }
+  }
+
+  const question = questionsById.get(nextId as string) as Question
+  const skeleton = buildAttemptQuestion(question, {
+    // Appended after every row already handed out, including any carried from
+    // a previous attempt, so order_index stays the sequence the student saw.
+    orderIndex: rows.length,
+    shuffleOptions: assignment.shuffle_options === true,
+    pointOverride: assignment.question_points?.[question.id],
+  })
+
+  const { data: inserted, error: insertError } = await admin
+    .from('submission_answers')
+    // org_id and carried_over are spelled out for the same reasons
+    // startSubmission spells them out: a submission_answer belongs to the
+    // assignment's immutable tenant, not the student's, and a freshly drawn ข้อ
+    // is one the student answers now, never one carried from a past attempt.
+    .insert({
+      ...skeleton,
+      org_id: assignment.org_id,
+      submission_id: submission.id,
+      carried_over: false,
+    })
+    .select('id')
+    .single()
+
+  if (insertError || !inserted) return { error: 'ดึงโจทย์ข้อต่อไปไม่สำเร็จ กรุณาลองใหม่' }
+
+  // submissions.max_score is written once at startSubmission from a frozen
+  // set, and gradeAndFinalizeSubmission never recomputes it — so an attempt
+  // that grows has to keep it current here, or every "x / y" the student and
+  // the teacher read would be the first ข้อ's ceiling forever.
+  const nextMaxScore = rows.reduce((sum, r) => sum + Number(r.max_score ?? 0), 0)
+    + Number(skeleton.max_score ?? 0)
+  await admin
+    .from('submissions')
+    .update({ max_score: nextMaxScore })
+    .eq('id', submission.id)
+
+  return {
+    success: true as const,
+    submissionAnswerId: inserted.id as string,
+    alreadyOpen: false as const,
+    askedCount: askedIds.length + 1,
+    streak: { ...state, target },
   }
 }
 
