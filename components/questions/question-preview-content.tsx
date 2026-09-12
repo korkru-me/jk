@@ -93,6 +93,20 @@ function RenderText({ text }: { text: string }) {
   return <p className="text-foreground leading-relaxed whitespace-pre-line text-[15px]">{text}</p>
 }
 
+/** A composite part's own รูปประกอบ — see PartImages in exam-client.tsx. */
+function PartImages({ urls }: { urls?: string[] }) {
+  if (!urls?.length) return null
+  return (
+    <div className="flex flex-wrap gap-3">
+      {urls.map((url) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={url} src={url} alt="รูปประกอบข้อย่อย"
+          className="max-h-40 rounded-lg border border-border object-contain" />
+      ))}
+    </div>
+  )
+}
+
 // ── QuestionPreviewContent ──────────────────────────────────────────────────────
 // The interactive "student view" itself — answerable, self-grading where the
 // question type allows it. Self-contained (owns its own state, seeded fresh on
@@ -1340,6 +1354,7 @@ export function QuestionPreviewContent({
                     return (
                       <>
                         <RichText text={part.text} className="text-[15px] text-foreground" />
+                        <PartImages urls={part.image_urls} />
                         <p className="text-xs text-muted-foreground">ข้อใดต่อไปนี้{part.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
                         <div className="space-y-1.5">
                           {part.choices!.map((c, ci) => {
@@ -1363,6 +1378,7 @@ export function QuestionPreviewContent({
                   {part.type === 'true_false' && !(Array.isArray(part.choices) && part.choices.length > 0) && (
                     <>
                       <RichText text={part.text} className="text-[15px] text-foreground" />
+                      <PartImages urls={part.image_urls} />
                       <div className="flex gap-3">
                         {[{ val: true, label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' }, { val: false, label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' }].map(({ val, label, cls }) => (
                           <button key={String(val)} type="button" disabled={compositeChecked}
@@ -1403,21 +1419,26 @@ export function QuestionPreviewContent({
                     if (!split) return (
                       <>
                         <RichText text={part.text} className="text-[15px] text-foreground" />
+                        <PartImages urls={part.image_urls} />
                         <div className="mt-2">{control}</div>
                       </>
                     )
                     return (
-                      <p className="leading-loose text-[15px] text-foreground">
-                        <RichText text={split[0]} />
-                        {control}
-                        <RichText text={split[1]} />
-                      </p>
+                      <>
+                        <PartImages urls={part.image_urls} />
+                        <p className="leading-loose text-[15px] text-foreground">
+                          <RichText text={split[0]} />
+                          {control}
+                          <RichText text={split[1]} />
+                        </p>
+                      </>
                     )
                   })()}
 
                   {part.type === 'mcq' && (
                     <>
                       <RichText text={part.text} className="text-[15px] text-foreground" />
+                      <PartImages urls={part.image_urls} />
                       <div className="space-y-1.5">
                         {(part.options ?? []).map((opt, oi) => (
                           <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${compositeAnswers[i] === opt.text ? 'border-tint-1 bg-tint-1/10' : 'border-border'} ${compositeChecked ? 'cursor-not-allowed opacity-80' : ''}`}>
@@ -1441,6 +1462,7 @@ export function QuestionPreviewContent({
                     return (
                       <>
                         <RichText text={part.text} className="text-[15px] text-foreground" />
+                        <PartImages urls={part.image_urls} />
                         <OrderingDragList
                           items={order}
                           answered={orderingIsAnswered(raw, items.length)}

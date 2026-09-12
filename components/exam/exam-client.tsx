@@ -2598,6 +2598,25 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
 // as one JSON array, one entry per part, in part order — see the 'COMP:'
 // grading branch in lib/actions/submissions.ts for the matching shape.
 
+// A part's own รูปประกอบ. Both composite forms let a teacher upload one per
+// ข้อย่อย (composite-form.tsx, true-false-group-form.tsx) and it survives into
+// SafeCompositePart, but nothing ever drew it — the teacher saw the upload
+// succeed and the student got the sub-question without its picture. Drawn
+// under that part's prompt, matching the order the whole question uses (text,
+// then images), so the picture reads as belonging to this part and not the one
+// above it.
+function PartImages({ urls }: { urls?: string[] }) {
+  if (!urls?.length) return null
+  return (
+    <div className="flex flex-wrap gap-2">
+      {urls.map(url => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={url} src={url} alt="รูปประกอบข้อย่อย" className="max-h-40 rounded-xl border object-contain" />
+      ))}
+    </div>
+  )
+}
+
 function CompositeAnswerInput({ config, rawValue, onChange }: {
   config: CompositeConfig | SafeCompositeConfig | null
   rawValue: string
@@ -2635,6 +2654,7 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
             return (
               <>
                 <RichText text={part.text} className="text-sm block" />
+                <PartImages urls={part.image_urls} />
                 <p className="text-xs text-muted-foreground">ข้อใดต่อไปนี้{target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
                 <div className="space-y-1.5">
                   {part.choices!.map((c, ci) => (
@@ -2653,6 +2673,7 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
           {part.type === 'true_false' && !(Array.isArray(part.choices) && part.choices.length > 0) && (
             <>
               <RichText text={part.text} className="text-sm block" />
+              <PartImages urls={part.image_urls} />
               <div className="flex gap-3">
                 {([
                   { val: 'true', label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
@@ -2697,21 +2718,26 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
             if (!split) return (
               <>
                 <RichText text={part.text} className="text-sm block" />
+                <PartImages urls={part.image_urls} />
                 <div className="mt-2">{control}</div>
               </>
             )
             return (
-              <p className="text-sm leading-loose">
-                <RichText text={split[0]} />
-                {control}
-                <RichText text={split[1]} />
-              </p>
+              <>
+                <PartImages urls={part.image_urls} />
+                <p className="text-sm leading-loose">
+                  <RichText text={split[0]} />
+                  {control}
+                  <RichText text={split[1]} />
+                </p>
+              </>
             )
           })()}
 
           {part.type === 'mcq' && (
             <>
               <RichText text={part.text} className="text-sm block" />
+              <PartImages urls={part.image_urls} />
               <div className="space-y-1.5">
                 {(part.options ?? []).map((opt, oi) => {
                   // Same MCQ:<position> identity a standalone mcq uses; a
@@ -2738,6 +2764,7 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
             return (
               <>
                 <RichText text={part.text} className="text-sm block" />
+                <PartImages urls={part.image_urls} />
                 <OrderingDragList
                   items={order}
                   answered={orderingIsAnswered(raw, items.length)}
