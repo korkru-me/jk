@@ -39,11 +39,13 @@ import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig } from '@/lib/types'
+import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig } from '@/lib/types'
+import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import type {
   SafeAnswerPart,
   SafeCompositeConfig,
   SafeMatchingConfig,
+  SafeClassifyConfig,
   SafeExamAnswer,
   SafeFillBlankConfig,
   SafeOrderingConfig,
@@ -999,6 +1001,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={files => handleFileSubmissionChange(current.id, files)}
                   localOnly={previewMode}
+                />
+              ) : current.questions.question_type === 'classify' ? (
+                <ClassifyAnswerInput
+                  config={current.questions.extra_data as ClassifyConfig | SafeClassifyConfig}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
                 />
               ) : current.questions.question_type === 'composite' ? (
                 <CompositeAnswerInput
@@ -2777,6 +2785,113 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
         </div>
       ))}
     </div>
+  )
+}
+
+// ─── Classify (ตารางจำแนก) ────────────────────────────────────────────────────
+//
+// One <table>, two layouts. Above lg it is a table: the thing being classified
+// on the left, one column per way of classifying it, the column's options
+// repeated down the rows. Below lg every table element turns back into a block
+// (`block lg:table-cell` and friends), so each row becomes a card that stacks
+// its dimensions.
+//
+// The switch is at lg rather than md because md was measured, not guessed: at
+// 768 and at 812 (a phone on its side) the table fits without overflowing, but
+// the exam page's sidebar leaves the three columns so little room that
+// "พอลิเมอร์ธรรมชาติ" wraps onto three lines. The rule is to break where the
+// content stops reading well rather than at a named device width, and a
+// landscape phone must not inherit a crowded desktop layout.
+// The header row hides itself there and each cell reprints its own column title
+// instead, because a radio group with no label is unanswerable.
+//
+// The answer is a row-major grid of chosen option positions, one entry per
+// cell, -1 where nothing is chosen — the shape lib/classify.ts freezes as the
+// 'CLS:' key and grades against. Rows, columns and options are rendered in the
+// order they arrive and never shuffled; the grid is positional, so any
+// reordering here would misalign every answer.
+
+function ClassifyAnswerInput({ config, rawValue, onChange }: {
+  config: ClassifyConfig | SafeClassifyConfig | null
+  rawValue: string
+  onChange: (v: string) => void
+}) {
+  const columns = config?.columns ?? []
+  const rows = config?.rows ?? []
+  const labels = partLabels(config?.row_label_style ?? 'number')
+
+  const stored = parseClassifyGrid(rawValue)
+  const grid = rows.map((_, r) => columns.map((_, c) => stored[r]?.[c] ?? CLASSIFY_UNSET))
+
+  function choose(r: number, c: number, option: number) {
+    const next = grid.map(row => [...row])
+    next[r][c] = option
+    onChange(JSON.stringify(next))
+  }
+
+  if (columns.length === 0 || rows.length === 0) {
+    return <p className="text-sm text-warning">โจทย์นี้ยังไม่มีตารางให้ตอบ — แจ้งครูผู้สอน</p>
+  }
+
+  return (
+    <table className="block w-full border-separate border-spacing-0 lg:table">
+      <thead className="hidden lg:table-header-group">
+        <tr>
+          <th className="w-px whitespace-nowrap p-2 text-left align-bottom text-xs font-semibold text-muted-foreground">
+            รายการ
+          </th>
+          {columns.map(column => (
+            <th key={column.id} className="p-2 text-left align-bottom text-xs font-semibold text-muted-foreground">
+              {column.title}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="block lg:table-row-group">
+        {rows.map((row, r) => (
+          <tr key={row.id} className="mb-3 block rounded-xl border p-3 last:mb-0 lg:mb-0 lg:table-row lg:rounded-none lg:border-0 lg:p-0">
+            <th scope="row" className="block p-0 pb-2 text-left align-top font-normal lg:table-cell lg:w-px lg:whitespace-nowrap lg:border-t lg:p-2 lg:pr-4">
+              <span className="flex items-start gap-2">
+                <span className="text-xs font-bold text-muted-foreground">{labels[r] ?? r + 1}.</span>
+                <RichText text={row.text} className="text-sm" />
+              </span>
+              {(row.image_urls ?? []).length > 0 && (
+                <span className="mt-2 flex flex-wrap gap-2">
+                  {(row.image_urls ?? []).map(url => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={url} src={url} alt="รูปประกอบรายการ" className="max-h-28 rounded-lg border object-contain" />
+                  ))}
+                </span>
+              )}
+            </th>
+            {columns.map((column, c) => (
+              <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-t lg:p-2">
+                <span className="mb-1 block text-xs font-semibold text-muted-foreground lg:hidden">{column.title}</span>
+                <span className="flex flex-col gap-1.5">
+                  {(column.options ?? []).map((option, oi) => (
+                    <label
+                      key={oi}
+                      className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                        grid[r][c] === oi ? 'border-tint-1 bg-tint-1/10' : 'border-border'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        className="shrink-0"
+                        name={`classify-${row.id}-${column.id}`}
+                        checked={grid[r][c] === oi}
+                        onChange={() => choose(r, c, oi)}
+                      />
+                      <span className="min-w-0">{option}</span>
+                    </label>
+                  ))}
+                </span>
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 

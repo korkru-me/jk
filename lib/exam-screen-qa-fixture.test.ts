@@ -12,7 +12,7 @@ describe('exam screen QA fixture', () => {
     const questions = buildExamScreenQaQuestions()
     const types = new Set(questions.map(question => question.question_type))
 
-    expect(questions).toHaveLength(11)
+    expect(questions).toHaveLength(12)
     expect(types).toEqual(new Set([
       'mcq',
       'written',
@@ -23,6 +23,7 @@ describe('exam screen QA fixture', () => {
       'ordering',
       'file_upload',
       'composite',
+      'classify',
     ]))
     expect(questions
       .filter(question => question.question_type === 'matching')

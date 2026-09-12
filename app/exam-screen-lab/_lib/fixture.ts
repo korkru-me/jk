@@ -26,6 +26,7 @@ export const EXAM_SCREEN_QA_CASES = [
   { slug: 'matching-lines', source: 'matching', label: 'จับคู่แบบลากเส้น' },
   { slug: 'ordering', source: 'ordering', label: 'เรียงลำดับ' },
   { slug: 'composite', source: 'composite', label: 'โจทย์หลายรูปแบบในข้อเดียว' },
+  { slug: 'classify', source: 'classify', label: 'ตารางจำแนกหลายมิติ' },
   { slug: 'essay', source: 'essay', label: 'คำตอบยาวภาษาไทย' },
   { slug: 'file-upload', source: 'file_upload', label: 'แนบรูปหรือ PDF' },
 ] as const satisfies ReadonlyArray<{
@@ -76,6 +77,7 @@ function extraDataFor(
     return { attachment_urls: props.attachmentUrls ?? [] }
   }
   if (source === 'composite') return props.compositeConfig!
+  if (source === 'classify') return props.classifyConfig!
   return {}
 }
 

@@ -19,6 +19,7 @@ import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, SubmittedFile } from '@/lib/types'
+import { CLASSIFY_UNSET, classifyCorrectGrid } from '@/lib/classify'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -127,6 +128,7 @@ export function QuestionPreviewContent({
   fillBlankConfig,
   orderingConfig,
   compositeConfig,
+  classifyConfig,
   partLabelStyle,
   attachmentUrls = [],
   answerTolerance,
@@ -177,6 +179,16 @@ export function QuestionPreviewContent({
   )
   const [compositeChecked, setCompositeChecked] = useState(false)
   const [compositeResults, setCompositeResults] = useState<(boolean | null)[]>([])
+
+  // classify — one chosen option position per cell, CLASSIFY_UNSET where the
+  // teacher has not picked yet. Same row-major grid the exam stores, so what is
+  // tried here and what a student submits are the same value.
+  const classifyColumns = classifyConfig?.columns ?? []
+  const classifyRows = classifyConfig?.rows ?? []
+  const classifyKey = classifyCorrectGrid(classifyConfig)
+  const emptyClassifyGrid = () => classifyRows.map(() => classifyColumns.map(() => CLASSIFY_UNSET))
+  const [classifyGrid, setClassifyGrid] = useState<number[][]>(emptyClassifyGrid)
+  const [classifyChecked, setClassifyChecked] = useState(false)
 
   // essay / file_upload — ไม่มีการตรวจอัตโนมัติให้เก็บผล แต่ยังต้องรู้ว่าครู
   // ลองตอบไปหรือยัง ก่อนเปิดหน้าตรวจจำลอง และเอาคำตอบนั้นไปแสดงในหน้านั้น
@@ -248,6 +260,8 @@ export function QuestionPreviewContent({
     setCompositeShuffledItems(compositeParts.map(p => p.items?.length ? [...p.items].sort(() => Math.random() - 0.5) : []))
     setCompositeChecked(false)
     setCompositeResults([])
+    setClassifyGrid(emptyClassifyGrid())
+    setClassifyChecked(false)
   }
 
   function checkCompositePart(part: CompositePart, i: number): boolean | null {
@@ -381,6 +395,11 @@ export function QuestionPreviewContent({
     if (questionType === 'fill_blank') return fillBlanks.length > 0 && fillBlanks.every((_, i) => filled(fillAnswers[i]))
     if (questionType === 'true_false') {
       return tfItems.every((_, i) => tfAnswers[i] !== null) && filled(tfExplanation)
+    }
+    if (questionType === 'classify') {
+      // เฉพาะช่องที่ครูใส่เฉลยไว้ — ช่องที่ยังไม่มีเฉลยตอบไปก็ไม่มีอะไรให้เทียบ
+      return classifyKey.every((row, r) => row.every((key, c) =>
+        key === CLASSIFY_UNSET || classifyGrid[r]?.[c] !== CLASSIFY_UNSET))
     }
     if (questionType === 'composite') {
       // ข้อย่อยที่ครูยังไม่ได้ใส่ตัวเลือก/รายการอะไรเลยก็ยังไม่มีอะไรให้ตอบ
@@ -1500,6 +1519,97 @@ export function QuestionPreviewContent({
           </div>
         )
       })()}
+
+      {/* ── ตารางจำแนก ── */}
+      {/* Same table-that-becomes-cards as the exam screen (see
+          ClassifyAnswerInput in components/exam/exam-client.tsx), plus the
+          per-cell verdict the preview adds on top — a teacher trying their own
+          question needs to see which cell they got wrong, not just a tally. */}
+      {questionType === 'classify' && classifyColumns.length > 0 && classifyRows.length > 0 && (
+        <div className="space-y-3">
+          <table className="block w-full border-separate border-spacing-0 lg:table">
+            <thead className="hidden lg:table-header-group">
+              <tr>
+                <th className="w-px whitespace-nowrap p-2 text-left align-bottom text-xs font-semibold text-muted-foreground">รายการ</th>
+                {classifyColumns.map(column => (
+                  <th key={column.id} className="p-2 text-left align-bottom text-xs font-semibold text-muted-foreground">{column.title}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="block lg:table-row-group">
+              {classifyRows.map((row, r) => (
+                <tr key={row.id} className="mb-3 block rounded-xl border p-3 last:mb-0 lg:mb-0 lg:table-row lg:rounded-none lg:border-0 lg:p-0">
+                  <th scope="row" className="block p-0 pb-2 text-left align-top font-normal lg:table-cell lg:w-px lg:whitespace-nowrap lg:border-t lg:p-2 lg:pr-4">
+                    <span className="flex items-start gap-2">
+                      <span className="text-xs font-bold text-muted-foreground">{r + 1}.</span>
+                      <RichText text={row.text} className="text-[15px] text-foreground" />
+                    </span>
+                    <PartImages urls={row.image_urls} />
+                  </th>
+                  {classifyColumns.map((column, c) => (
+                    <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-t lg:p-2">
+                      <span className="mb-1 block text-xs font-semibold text-muted-foreground lg:hidden">{column.title}</span>
+                      <span className="flex flex-col gap-1.5">
+                        {(column.options ?? []).map((option, oi) => {
+                          const picked = classifyGrid[r]?.[c] === oi
+                          const key = classifyKey[r]?.[c]
+                          let cls = 'border-border'
+                          if (classifyChecked && key === oi) cls = 'border-success bg-success/10'
+                          else if (classifyChecked && picked) cls = 'border-destructive bg-destructive/10'
+                          else if (picked) cls = 'border-tint-1 bg-tint-1/10'
+                          return (
+                            <label key={oi} className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-sm ${cls} ${classifyChecked ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'}`}>
+                              <input
+                                type="radio"
+                                className="shrink-0"
+                                name={`preview-classify-${row.id}-${column.id}`}
+                                disabled={classifyChecked}
+                                checked={picked}
+                                onChange={() => setClassifyGrid(prev => {
+                                  const next = prev.map(gridRow => [...gridRow])
+                                  next[r][c] = oi
+                                  return next
+                                })}
+                              />
+                              <span className="min-w-0">{option}</span>
+                            </label>
+                          )
+                        })}
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {!classifyChecked ? (
+            <button type="button" onClick={() => setClassifyChecked(true)}
+              className="px-5 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 font-medium transition-colors">
+              ตรวจคำตอบ
+            </button>
+          ) : (() => {
+            let gradable = 0
+            let correct = 0
+            classifyKey.forEach((keyRow, r) => keyRow.forEach((key, c) => {
+              if (key === CLASSIFY_UNSET) return
+              gradable++
+              if (classifyGrid[r]?.[c] === key) correct++
+            }))
+            return (
+              <div className={`p-3 rounded-lg text-sm font-medium border ${
+                gradable > 0 && correct === gradable ? 'bg-success/10 text-success border-success/20' :
+                correct > 0 ? 'bg-flag/10 text-flag border-flag/20' :
+                'bg-destructive/10 text-destructive border-destructive/20'
+              }`}>
+                {gradable > 0 && correct === gradable
+                  ? `🎉 ถูกต้องทุกช่อง! ${correct}/${gradable} คะแนน`
+                  : `✅ ถูก ${correct}/${gradable} ช่อง — ได้ ${correct} คะแนน`}
+              </div>
+            )
+          })()}
+        </div>
+      )}
 
       {/* ทางเข้าหน้าตรวจจำลอง — ขึ้นเฉพาะโจทย์ที่ครูกลับมาให้คะแนนเองได้ */}
       {hasTeacherGrading && (
