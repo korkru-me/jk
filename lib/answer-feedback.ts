@@ -3,6 +3,7 @@ import { evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
 import { gradeValue } from '@/lib/assignment-attempt'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
+import { CLASSIFY_PREFIX, CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import type { AnswerPart, FillBlankItem } from '@/lib/types'
 
 /**
@@ -122,6 +123,11 @@ function formatNumber(value: string): string {
   return parseFloat(n.toPrecision(4)).toString()
 }
 
+/** A row's prompt is rich text; the panel is plain lines. */
+function stripTags(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+}
+
 function blank(value: string | null | undefined): string {
   const trimmed = (value ?? '').trim()
   return trimmed === '' ? '—' : trimmed
@@ -147,7 +153,7 @@ function rowStatus(correct: boolean): FeedbackRow['status'] {
  * Turns one graded answer into the panel the student reads.
  *
  * Every branch mirrors the corresponding branch of `gradeAnswer` — the frozen
- * `correct_answer` prefixes (TF:, FILL:, COMP:, MCQ:, MATCH:, ORDER:, a JSON
+ * `correct_answer` prefixes (TF:, FILL:, COMP:, CLS:, MCQ:, MATCH:, ORDER:, a JSON
  * array, or a bare value) are the same discriminator there. When the two ever
  * need changing, change them together: a panel that disagrees with the score
  * is worse than no panel.
@@ -260,6 +266,45 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
       ...(hasManual ? { note: 'บางช่องเป็นคำตอบที่ครูตรวจเอง คะแนนส่วนนั้นจะมาภายหลัง' } : {}),
       rows,
     }
+  }
+
+  // ─── ตารางจำแนก (classify) ───────────────────────────────────────────────
+  // One line per cell the teacher keyed, labelled by where it sits — "1 ·
+  // จำแนกตามแหล่งกำเนิด" — because a flat list of six verdicts tells a student
+  // nothing about which row they misread. Cells the key left unset are not
+  // shown at all: they were left out of the score too, so a line saying
+  // nothing about them is the honest one.
+  if (correctAns.startsWith(CLASSIFY_PREFIX)) {
+    const correctGrid = parseClassifyGrid(correctAns.slice(CLASSIFY_PREFIX.length))
+    const studentGrid = parseClassifyGrid(studentAns)
+    const config = (question.extra_data ?? {}) as {
+      columns?: Array<{ id?: string; title?: string; options?: string[] }>
+      rows?: Array<{ text?: string }>
+    }
+    const columns = Array.isArray(config.columns) ? config.columns : []
+    const rowsConfig = Array.isArray(config.rows) ? config.rows : []
+    const optionText = (c: number, index: number) => {
+      const option = columns[c]?.options?.[index]
+      return typeof option === 'string' && option.trim() !== '' ? option : `ตัวเลือกที่ ${index + 1}`
+    }
+
+    const rows: FeedbackRow[] = []
+    correctGrid.forEach((keyRow, r) => keyRow.forEach((key, c) => {
+      if (key === CLASSIFY_UNSET) return
+      const picked = studentGrid[r]?.[c] ?? CLASSIFY_UNSET
+      // The row's own words where the question still has them; its number
+      // otherwise, so a question edited after submission still reads.
+      const rowName = stripTags(rowsConfig[r]?.text ?? '') || `แถวที่ ${r + 1}`
+      const columnName = columns[c]?.title?.trim() || `มิติที่ ${c + 1}`
+      rows.push({
+        label: `${rowName} · ${columnName}`,
+        student: picked === CLASSIFY_UNSET ? '—' : optionText(c, picked),
+        ...reveal(optionText(c, key)),
+        status: rowStatus(picked === key),
+      })
+    }))
+
+    return { ...base, rows }
   }
 
   // ─── ข้อความรวมหลายรูปแบบ (composite) ────────────────────────────────────

@@ -8,6 +8,7 @@ import { ScoreEditor } from '@/components/assignments/score-editor'
 import { computePassed } from '@/lib/grading'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSortDir, type SortableStudentProfile } from '@/lib/student-sort'
 import type { Question } from '@/lib/types'
+import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -87,6 +88,21 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
       const arr: string[] = parsed?.answers ?? []
       return arr.map(v => (v === 'true' ? 'จริง' : v === 'false' ? 'เท็จ' : '—')).join(', ')
     } catch { return studentAnswer }
+  }
+
+  // ตารางจำแนก: a grid of option positions is meaningless as digits, so it is
+  // counted instead — the teacher opens the submission to see which cell.
+  if (correctAnswer.startsWith('CLS:')) {
+    const key = parseClassifyGrid(correctAnswer.slice(4))
+    const picked = parseClassifyGrid(studentAnswer)
+    let answered = 0
+    let gradable = 0
+    key.forEach((row, r) => row.forEach((cell, c) => {
+      if (cell === CLASSIFY_UNSET) return
+      gradable++
+      if ((picked[r]?.[c] ?? CLASSIFY_UNSET) !== CLASSIFY_UNSET) answered++
+    }))
+    return gradable > 0 ? `ตอบ ${answered}/${gradable} ช่อง` : '—'
   }
 
   if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:') || correctAnswer.startsWith('COMP:') || correctAnswer.startsWith('MATCH:')) {

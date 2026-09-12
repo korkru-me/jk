@@ -9,6 +9,7 @@ import { StudyPathPanel } from '@/components/student/study-path-panel'
 import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Trophy, RotateCcw, School, FileText, EyeOff } from 'lucide-react'
 import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
 import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
+import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
 import { evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStudent } from '@/lib/scoring'
@@ -843,6 +844,64 @@ function AnswerReview({
             </div>
           )
         })}
+      </div>
+    )
+  }
+
+  // ─── ตารางจำแนก — one line per keyed cell, named by where it sits ────────
+  // Unlike the COMP: branch below, this reads the question's own config rather
+  // than the frozen key alone: a grid of option positions is unreadable as
+  // digits, and "ช่อง 3" tells a teacher nothing about which row a student
+  // misread. Cells the teacher never keyed are skipped — they were left out of
+  // the score, so there is nothing to report about them.
+  if (correctAnswer.startsWith('CLS:')) {
+    const correctGrid = parseClassifyGrid(correctAnswer.slice(4))
+    const studentGrid = parseClassifyGrid(studentAnswer ?? '')
+    const config = (extraData ?? {}) as {
+      columns?: Array<{ title?: string; options?: string[] }>
+      rows?: Array<{ text?: string }>
+    }
+    const columns = Array.isArray(config.columns) ? config.columns : []
+    const configRows = Array.isArray(config.rows) ? config.rows : []
+    const optionText = (c: number, index: number) => {
+      const option = columns[c]?.options?.[index]
+      return typeof option === 'string' && option.trim() !== '' ? option : `ตัวเลือกที่ ${index + 1}`
+    }
+    const plain = (html: string) => html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+
+    const cells: Array<{ key: string; row: string; column: string; student: string; correct: string; ok: boolean }> = []
+    correctGrid.forEach((keyRow, r) => keyRow.forEach((key, c) => {
+      if (key === CLASSIFY_UNSET) return
+      const picked = studentGrid[r]?.[c] ?? CLASSIFY_UNSET
+      cells.push({
+        key: `${r}-${c}`,
+        row: plain(configRows[r]?.text ?? '') || `แถวที่ ${r + 1}`,
+        column: columns[c]?.title?.trim() || `มิติที่ ${c + 1}`,
+        student: picked === CLASSIFY_UNSET ? '—' : optionText(c, picked),
+        correct: optionText(c, key),
+        ok: picked === key,
+      })
+    }))
+
+    return (
+      <div className="mt-2 space-y-2 text-sm">
+        {cells.map(cell => (
+          <div key={cell.key} className={`pl-3 border-l-2 space-y-0.5 ${cell.ok ? 'border-success/30' : 'border-destructive/30'}`}>
+            <p className={`text-xs font-semibold ${cell.ok ? 'text-success' : 'text-destructive'}`}>
+              {cell.ok ? '✓' : '✗'} {cell.row} · {cell.column}
+            </p>
+            <div className="flex gap-2">
+              <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
+              <span className="font-medium">{cell.student}</span>
+            </div>
+            {!cell.ok && (
+              <div className="flex gap-2">
+                <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
+                <span className="font-medium">{cell.correct}</span>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     )
   }

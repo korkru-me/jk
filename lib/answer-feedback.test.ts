@@ -239,6 +239,78 @@ describe('buildAnswerFeedback — the other question types', () => {
   })
 })
 
+describe('buildAnswerFeedback — ตารางจำแนก', () => {
+  const config = {
+    columns: [
+      { id: 'origin', title: 'จำแนกตามแหล่งกำเนิด', options: ['ธรรมชาติ', 'สังเคราะห์'] },
+      { id: 'monomer', title: 'จำแนกตามชนิดของมอนอเมอร์', options: ['โฮโม', 'โค'] },
+    ],
+    rows: [
+      { id: 'r1', text: '<p>เนื้อหมู</p>', answers: { origin: 0, monomer: 1 } },
+      { id: 'r2', text: 'ยางรัดของ', answers: { origin: 1, monomer: 0 } },
+    ],
+  }
+  const key = 'CLS:[[0,1],[1,0]]'
+
+  it('names every cell by its row and its dimension, not by a number', () => {
+    // A flat "ช่อง 3" says nothing about which row the student misread, which
+    // is the only thing this question type is asking them to notice.
+    const feedback = check({ correct: key, student: '[[0,1],[1,0]]', questionType: 'classify', extraData: config, maxScore: 4 })
+    expect(feedback.rows.map(row => row.label)).toEqual([
+      'เนื้อหมู · จำแนกตามแหล่งกำเนิด',
+      'เนื้อหมู · จำแนกตามชนิดของมอนอเมอร์',
+      'ยางรัดของ · จำแนกตามแหล่งกำเนิด',
+      'ยางรัดของ · จำแนกตามชนิดของมอนอเมอร์',
+    ])
+    expect(feedback.rows.every(row => row.status === 'correct')).toBe(true)
+    expect(feedback.verdict).toBe('correct')
+  })
+
+  it('reads the options back as words, on both sides', () => {
+    const feedback = check({ correct: key, student: '[[1,1],[1,0]]', questionType: 'classify', extraData: config, maxScore: 4 })
+    expect(feedback.rows[0]).toMatchObject({ student: 'สังเคราะห์', correct: 'ธรรมชาติ', status: 'wrong' })
+    expect(feedback.rows[1]).toMatchObject({ student: 'โค', correct: 'โค', status: 'correct' })
+  })
+
+  it('agrees with the score gradeAnswer banked', () => {
+    // Three of four cells right must read as three correct rows and a partial
+    // verdict — a panel that disagrees with the score is worse than no panel.
+    const feedback = check({ correct: key, student: '[[1,1],[1,0]]', questionType: 'classify', extraData: config, maxScore: 4 })
+    expect(feedback.rows.filter(row => row.status === 'correct')).toHaveLength(3)
+    expect(feedback.score).toBe(3)
+    expect(feedback.verdict).toBe('partial')
+  })
+
+  it('shows an unanswered cell as a dash rather than an option', () => {
+    const feedback = check({ correct: key, student: '[[0,1]]', questionType: 'classify', extraData: config, maxScore: 4 })
+    expect(feedback.rows[2]).toMatchObject({ student: '—', status: 'wrong' })
+    expect(feedback.rows[3]).toMatchObject({ student: '—', status: 'wrong' })
+  })
+
+  it('withholds the เฉลย when the teacher does', () => {
+    const feedback = check({ correct: key, student: '[[1,1],[1,0]]', questionType: 'classify', extraData: config, maxScore: 4, reveal: false })
+    expect(feedback.rows.every(row => row.correct === undefined)).toBe(true)
+  })
+
+  it('says nothing about a cell the teacher never keyed', () => {
+    // It was left out of the score, so a line claiming a verdict for it would
+    // be inventing one.
+    const partial = { ...config, rows: [config.rows[0], { id: 'r2', text: 'ยางรัดของ', answers: { origin: 1 } }] }
+    const feedback = check({ correct: 'CLS:[[0,1],[1,-1]]', student: '[[0,1],[1,0]]', questionType: 'classify', extraData: partial, maxScore: 3 })
+    expect(feedback.rows).toHaveLength(3)
+    expect(feedback.rows.map(row => row.label)).not.toContain('ยางรัดของ · จำแนกตามชนิดของมอนอเมอร์')
+    expect(feedback.verdict).toBe('correct')
+  })
+
+  it('still reads when the question was edited after the answer was frozen', () => {
+    // Row words and column titles come from the live question; the key does
+    // not. A question whose config went missing falls back to positions.
+    const feedback = check({ correct: key, student: '[[0,1],[1,0]]', questionType: 'classify', extraData: {}, maxScore: 4 })
+    expect(feedback.rows[0].label).toBe('แถวที่ 1 · มิติที่ 1')
+    expect(feedback.rows[0].correct).toBe('ตัวเลือกที่ 1')
+  })
+})
+
 describe('isInstantCheckable', () => {
   it('withholds the button from ข้อเขียน, which has no answer key to check', () => {
     expect(isInstantCheckable('essay')).toBe(false)
