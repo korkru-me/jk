@@ -120,7 +120,7 @@ export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmiss
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all disabled:opacity-50"
+          className="flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-foreground disabled:opacity-50"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
           {uploading ? 'กำลังอัปโหลด...' : 'แนบไฟล์'}
@@ -158,9 +158,12 @@ export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmiss
               <button
                 type="button"
                 onClick={() => removeFile(f.url)}
-                className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-full bg-transparent"
+                aria-label={`นำไฟล์ ${f.name} ออก`}
               >
-                <X className="w-3 h-3" />
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm">
+                  <X className="h-3 w-3" />
+                </span>
               </button>
             </div>
           ))}

@@ -31,7 +31,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
-  Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2,
+  Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -64,6 +64,29 @@ import { hasCompleteWorkEvidence, workArtifactPartKey, type StudentWorkArtifactV
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 const ScientificCalculator = lazy(() => import('./scientific-calculator'))
 const Scratchpad = lazy(() => import('./scratchpad'))
+
+function keepKeyboardFocusInside(event: KeyboardEvent, root: HTMLElement | null) {
+  if (event.key !== 'Tab' || !root) return
+  const controls = Array.from(root.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter(element => (
+    !element.hidden
+    && element.getAttribute('aria-hidden') !== 'true'
+    && element.getClientRects().length > 0
+  ))
+  if (controls.length === 0) return
+
+  const first = controls[0]
+  const last = controls[controls.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !root.contains(active))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (active === last || !root.contains(active))) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 
 interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
   correct_answer?: string
@@ -262,6 +285,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [flagged, setFlagged] = useState<Set<string>>(new Set())
   const [eliminated, setEliminated] = useState<Record<string, Set<number>>>({})
   const [focusMode, setFocusMode] = useState(false)
+  const [showQuestionNavigator, setShowQuestionNavigator] = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitCountdown, setSubmitCountdown] = useState(0)
   const [activeMathField, setActiveMathField] = useState<string | null>(null)
@@ -273,6 +297,50 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [showScratchpad, setShowScratchpad] = useState(false)
   const [scratchpadTarget, setScratchpadTarget] = useState<ScratchpadTarget | null>(null)
   const [loadAttachedNonce, setLoadAttachedNonce] = useState(0)
+  const questionNavigatorDialogRef = useRef<HTMLDivElement | null>(null)
+  const questionNavigatorCloseRef = useRef<HTMLButtonElement | null>(null)
+  const submitDialogRef = useRef<HTMLDivElement | null>(null)
+  const submitCancelRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    if (!showQuestionNavigator) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const frame = window.requestAnimationFrame(() => questionNavigatorCloseRef.current?.focus())
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setShowQuestionNavigator(false)
+        return
+      }
+      keepKeyboardFocusInside(event, questionNavigatorDialogRef.current)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', onKeyDown)
+      if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0) previousFocus.focus()
+    }
+  }, [showQuestionNavigator])
+
+  useEffect(() => {
+    if (!showSubmitConfirm) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const frame = window.requestAnimationFrame(() => submitCancelRef.current?.focus())
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setShowSubmitConfirm(false)
+        return
+      }
+      keepKeyboardFocusInside(event, submitDialogRef.current)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', onKeyDown)
+      if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0) previousFocus.focus()
+    }
+  }, [showSubmitConfirm])
 
   const navigateTo = useCallback((index: number) => {
     setCurrentIndex(index)
@@ -738,11 +806,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     const missingIndex = findMissingWorkImage()
     if (missingIndex !== null) {
       toast.error(`กรุณาแนบวิธีทำให้ครบก่อนส่งคำตอบ (ข้อ ${missingIndex + 1})`)
+      setShowQuestionNavigator(false)
       navigateTo(missingIndex)
       return
     }
     setShowCalculator(false)
     setShowScratchpad(false)
+    setActiveMathField(null)
+    setShowQuestionNavigator(false)
     setShowSubmitConfirm(true)
     setSubmitCountdown(3)
   }
@@ -779,6 +850,74 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const progress      = Math.round((answeredCount / answers.length) * 100)
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
+
+  const renderQuestionNavigation = (touchFriendly = false) => {
+    let numbered = 0
+    return (
+      <>
+        {sectionRuns.map((run, runIndex) => {
+          const startIndex = numbered
+          numbered += run.question_ids.length
+          return (
+            <div key={runIndex} className={runIndex > 0 ? 'mt-3' : undefined}>
+              {run.title && (
+                <p className="mb-1.5 truncate text-[10px] font-semibold text-muted-foreground">{run.title}</p>
+              )}
+              <div className="grid grid-cols-5 gap-1.5">
+                {run.question_ids.map((_, offset) => {
+                  const i = startIndex + offset
+                  const answer = answers[i]
+                  const isCurrent = i >= pageStart && i < pageStart + perPage
+                  const isAnswered = hasAnswered(answer.id)
+                  const isFlagged = flagged.has(answer.id)
+                  const verdict = checked[answer.id]?.verdict
+                  let tone = 'bg-muted text-muted-foreground'
+                  if (isCurrent) tone = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
+                  else if (isFlagged) tone = 'bg-flag text-white'
+                  else if (verdict === 'correct') tone = 'bg-success text-success-foreground'
+                  else if (verdict === 'wrong' || verdict === 'partial') tone = 'bg-destructive/15 text-destructive border border-destructive/30'
+                  else if (isAnswered) tone = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
+
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        navigateTo(i)
+                        if (touchFriendly) setShowQuestionNavigator(false)
+                      }}
+                      aria-label={`ไปข้อ ${i + 1}`}
+                      aria-current={isCurrent ? 'page' : undefined}
+                      className={`${touchFriendly ? 'h-10 w-10 text-sm' : 'h-8 w-8 text-[11px]'} rounded-lg font-bold transition-all hover:scale-105 ${tone}`}
+                    >
+                      {i + 1}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+        <div className="mt-3 space-y-1.5 border-t pt-3">
+          {[
+            { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
+            { cls: 'bg-success/10 border border-success/20 dark:bg-success/15', label: 'ตอบแล้ว' },
+            ...(instantCheckOn ? [
+              { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
+              { cls: 'bg-destructive/15 border border-destructive/30', label: 'ตรวจแล้ว ยังไม่ถูก' },
+            ] : []),
+            { cls: 'bg-flag', label: 'ปักธง' },
+            { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-2">
+              <div className={`h-3 w-3 shrink-0 rounded-sm ${item.cls}`} />
+              <span className="text-[10px] text-muted-foreground">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </>
+    )
+  }
 
   // The teacher chooses how many questions share a screen. `currentIndex`
   // stays a question index rather than becoming a page number: the นำทาง grid
@@ -894,7 +1033,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                       href={`/questions/${current.question_id}/edit`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground transition-all hover:border-primary hover:text-primary"
+                      className="flex min-h-10 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-primary hover:text-primary"
                     >
                       <Pencil size={11} />
                       แก้ไขโจทย์
@@ -902,7 +1041,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   )}
                   <button
                     onClick={() => toggleFlag(current.id)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
+                    className={`flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all ${
                       isFlagged
                         ? 'bg-flag/15 border-flag/30 text-flag dark:text-flag'
                         : 'border-border text-muted-foreground hover:border-flag hover:text-flag'
@@ -1000,6 +1139,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   onChange={files => handleFileSubmissionChange(current.id, files)}
                   localOnly={previewMode}
                 />
+              ) : current.questions.question_type === 'essay' ? (
+                <EssayAnswerInput
+                  answerId={current.id}
+                  value={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
               ) : current.questions.question_type === 'composite' ? (
                 <CompositeAnswerInput
                   config={current.questions.extra_data as CompositeConfig | SafeCompositeConfig}
@@ -1056,19 +1201,19 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             on the default setting */}
         <div className="flex items-center gap-3 pb-2">
           <Button
-            variant="outline" className="flex-1"
+            variant="outline" className="min-h-10 flex-1"
             onClick={() => navigateTo(Math.max(0, pageStart - perPage))}
             disabled={pageStart === 0}
           >
             ← ก่อนหน้า
           </Button>
           {!isLastPage ? (
-            <Button className="flex-1" onClick={() => navigateTo(pageStart + perPage)}>
+            <Button className="min-h-10 flex-1" onClick={() => navigateTo(pageStart + perPage)}>
               ถัดไป →
             </Button>
           ) : (
             <Button
-              className="flex-1 bg-success hover:bg-success/90 text-success-foreground border-0"
+              className="min-h-10 flex-1 border-0 bg-success text-success-foreground hover:bg-success/90"
               onClick={openSubmitDialog}
             >
               ส่งคำตอบ ✓
@@ -1078,7 +1223,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       </div>
 
       {/* RIGHT: Nav panel */}
-      <div className={`shrink-0 flex flex-col gap-3 ${focusMode ? 'w-60' : 'hidden md:flex w-56'}`}>
+      <div className={`hidden shrink-0 flex-col gap-3 md:flex ${focusMode ? 'w-60' : 'w-56'}`}>
 
         {/* Timer */}
         {secondsLeft !== null && (
@@ -1134,65 +1279,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         {/* Nav grid */}
         <Card padding="md" className="flex-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">นำทางข้อ</p>
-          {(() => {
-            let numbered = 0
-            return sectionRuns.map((run, runIndex) => {
-              const startIndex = numbered
-              numbered += run.question_ids.length
-              return (
-                <div key={runIndex} className={runIndex > 0 ? 'mt-3' : undefined}>
-                  {run.title && (
-                    <p className="text-[10px] font-semibold text-muted-foreground truncate mb-1.5">{run.title}</p>
-                  )}
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {run.question_ids.map((_, offset) => {
-                      const i = startIndex + offset
-                      const a = answers[i]
-                      const isCur = i >= pageStart && i < pageStart + perPage
-                      const isAns = hasAnswered(a.id)
-                      const isFlg = flagged.has(a.id)
-                      // On a แบบฝึกหัด a ข้อ that has been checked says so here
-                      // too — the point of checking one ข้อ at a time is being
-                      // able to see, at a glance, what is left to fix.
-                      const verdict = checked[a.id]?.verdict
-                      let cls = 'bg-muted text-muted-foreground'
-                      if (isCur)      cls = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
-                      else if (isFlg) cls = 'bg-flag text-white'
-                      else if (verdict === 'correct') cls = 'bg-success text-success-foreground'
-                      else if (verdict === 'wrong' || verdict === 'partial') cls = 'bg-destructive/15 text-destructive border border-destructive/30'
-                      else if (isAns) cls = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => navigateTo(i)}
-                          className={`w-8 h-8 rounded-lg text-[11px] font-bold transition-all hover:scale-105 ${cls}`}
-                        >
-                          {i + 1}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })
-          })()}
-          <div className="mt-3 border-t pt-3 space-y-1.5">
-            {[
-              { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
-              { cls: 'bg-success/10 border border-success/20 dark:bg-success/15', label: 'ตอบแล้ว' },
-              ...(instantCheckOn ? [
-                { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
-                { cls: 'bg-destructive/15 border border-destructive/30', label: 'ตรวจแล้ว ยังไม่ถูก' },
-              ] : []),
-              { cls: 'bg-flag', label: 'ปักธง' },
-              { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
-            ].map(l => (
-              <div key={l.label} className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-sm shrink-0 ${l.cls}`} />
-                <span className="text-[10px] text-muted-foreground">{l.label}</span>
-              </div>
-            ))}
-          </div>
+          {renderQuestionNavigation()}
         </Card>
 
         {/* Anti-cheat counter */}
@@ -1209,7 +1296,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         <Button
           onClick={openSubmitDialog}
           disabled={submitting}
-          className="w-full bg-success hover:bg-success/90 text-success-foreground border-0"
+          className="min-h-10 w-full border-0 bg-success text-success-foreground hover:bg-success/90"
         >
           {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
         </Button>
@@ -1297,6 +1384,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             scratchpadOpen={showScratchpad}
             onToggleScratchpad={toggleScratchpad}
             onFocusMode={() => setFocusMode(true)}
+            timeLabel={secondsLeft === null ? null : formatTime(secondsLeft)}
+            timerUrgent={timerUrgent}
+            timerDanger={timerDanger}
+            onOpenNavigator={() => setShowQuestionNavigator(true)}
           />
           {/* Progress bar */}
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -1315,20 +1406,40 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           {previewBanner(false)}
           {/* Focus header */}
           <div className="shrink-0 border-b bg-card">
-            <div className="flex items-center gap-4 px-6 py-3">
-              <div className="flex-1 flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 px-3 py-2 sm:gap-4 sm:px-6 sm:py-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">
                   โหมดโฟกัส
                 </span>
                 <span className="h-3 w-px bg-border shrink-0" />
-                <p className="text-sm font-medium truncate">
+                <p className="hidden truncate text-sm font-medium min-[430px]:block">
                   {perPage === 1
                     ? (pageAnswers[0]?.questions.title || 'ชุดข้อสอบ')
                     : `ข้อ ${pageStart + 1}–${pageStart + pageAnswers.length} จาก ${answers.length}`}
                 </p>
+                {secondsLeft !== null && (
+                  <span
+                    className={`flex items-center gap-1 font-mono text-xs font-bold md:hidden ${
+                      timerDanger ? 'text-destructive' : timerUrgent ? 'text-flag' : 'text-foreground'
+                    }`}
+                    aria-label={`เวลาที่เหลือ ${formatTime(secondsLeft)}`}
+                  >
+                    <Clock size={13} aria-hidden /> {formatTime(secondsLeft)}
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowQuestionNavigator(true)}
+                  aria-label="ดูทุกข้อ"
+                  className="h-10 min-w-10 px-2 md:hidden"
+                >
+                  <ListChecks />
+                </Button>
                 {config.scratchpadEnabled && (
                   <Button
                     type="button"
@@ -1336,8 +1447,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     size="sm"
                     onClick={toggleScratchpad}
                     aria-pressed={showScratchpad}
+                    aria-label="กระดาษทด"
+                    className="h-10 min-w-10 px-2"
                   >
-                    <NotebookPen /> กระดาษทด
+                    <NotebookPen /> <span className="hidden sm:inline">กระดาษทด</span>
                   </Button>
                 )}
                 {config.calculatorEnabled && (
@@ -1347,12 +1460,21 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     size="sm"
                     onClick={toggleCalculator}
                     aria-pressed={showCalculator}
+                    aria-label="เครื่องคิดเลข"
+                    className="h-10 min-w-10 px-2"
                   >
-                    <CalculatorIcon /> เครื่องคิดเลข
+                    <CalculatorIcon /> <span className="hidden sm:inline">เครื่องคิดเลข</span>
                   </Button>
                 )}
-                <Button type="button" variant="outline" size="sm" onClick={() => setFocusMode(false)}>
-                  <Minimize2 /> ออก
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFocusMode(false)}
+                  aria-label="ออกจากโหมดโฟกัส"
+                  className="h-10 min-w-10 px-2"
+                >
+                  <Minimize2 /> <span className="hidden sm:inline">ออก</span>
                 </Button>
               </div>
             </div>
@@ -1365,9 +1487,67 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             </div>
           </div>
 
-          <div className="flex-1 overflow-hidden p-6 max-w-6xl mx-auto w-full">
+          <div className="mx-auto w-full max-w-6xl flex-1 overflow-hidden p-2 sm:p-6">
             {examBody}
           </div>
+        </div>
+      )}
+
+      {/* Phone-sized screens hide the persistent right navigator. This sheet
+          keeps direct access to unanswered and flagged questions without
+          squeezing the question itself into a narrow column. */}
+      {showQuestionNavigator && !previewResult && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-overlay p-3 backdrop-blur-sm"
+          role="presentation"
+        >
+          <Card
+            ref={questionNavigatorDialogRef}
+            padding="lg"
+            elevation="xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-question-navigator-title"
+            className="max-h-[calc(var(--app-height,100dvh)-1.5rem)] w-full max-w-sm overflow-y-auto overscroll-contain"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          >
+            <div className="mb-3 flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 id="mobile-question-navigator-title" className="font-bold">ดูทุกข้อ</h2>
+                <p className="text-xs text-muted-foreground">ตอบแล้ว {answeredCount}/{answers.length} ข้อ</p>
+              </div>
+              {secondsLeft !== null && (
+                <span
+                  className={`font-mono text-sm font-bold ${
+                    timerDanger ? 'text-destructive' : timerUrgent ? 'text-flag' : 'text-foreground'
+                  }`}
+                  aria-label={`เวลาที่เหลือ ${formatTime(secondsLeft)}`}
+                >
+                  {formatTime(secondsLeft)}
+                </span>
+              )}
+              <Button
+                ref={questionNavigatorCloseRef}
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowQuestionNavigator(false)}
+                aria-label="ปิดรายการข้อ"
+                className="h-10 w-10"
+              >
+                <X />
+              </Button>
+            </div>
+            {renderQuestionNavigation(true)}
+            <Button
+              type="button"
+              onClick={openSubmitDialog}
+              disabled={submitting}
+              className="mt-4 min-h-10 w-full bg-success text-success-foreground hover:bg-success/90"
+            >
+              {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
+            </Button>
+          </Card>
         </div>
       )}
 
@@ -1412,13 +1592,22 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Submit confirmation dialog ──────────────────────────────────────── */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <Card padding="xl" elevation="xl" className="max-w-sm w-full mx-4">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-overlay p-3 backdrop-blur-sm">
+          <Card
+            ref={submitDialogRef}
+            padding="xl"
+            elevation="xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="submit-confirm-title"
+            className="max-h-[calc(var(--app-height,100dvh)-1.5rem)] w-full max-w-sm overflow-y-auto overscroll-contain"
+            style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+          >
             <div className="text-center mb-5">
               <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 size={28} className="text-success" />
               </div>
-              <h3 className="font-bold text-lg">ยืนยันการส่งข้อสอบ</h3>
+              <h3 id="submit-confirm-title" className="font-bold text-lg">ยืนยันการส่งข้อสอบ</h3>
 
               <div className="mt-4 space-y-2 text-sm text-left bg-muted/40 rounded-xl p-4">
                 <div className="flex justify-between">
@@ -1457,13 +1646,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
             <div className="flex gap-2">
               <Button
-                variant="outline" className="flex-1"
+                ref={submitCancelRef}
+                variant="outline" className="min-h-10 flex-1"
                 onClick={() => setShowSubmitConfirm(false)}
               >
                 กลับไปตรวจ
               </Button>
               <Button
-                className="flex-1 bg-success hover:bg-success/90 text-success-foreground border-0 transition-all"
+                className="min-h-10 flex-1 bg-success hover:bg-success/90 text-success-foreground border-0 transition-all"
                 onClick={() => { setShowSubmitConfirm(false); handleSubmit() }}
                 disabled={submitting || submitCountdown > 0}
               >
@@ -1511,7 +1701,7 @@ function InstantCheckPanel({
         <Button
           onClick={onCheck}
           disabled={busy || disabled || !answered}
-          className="bg-success hover:bg-success/90 text-success-foreground border-0"
+          className="min-h-10 border-0 bg-success text-success-foreground hover:bg-success/90"
         >
           <CircleCheck size={16} />
           {busy ? 'กำลังตรวจ...' : 'ตรวจคำตอบข้อนี้'}
@@ -1738,6 +1928,39 @@ function PreviewResultSummary({
   )
 }
 
+// ─── Essay input ─────────────────────────────────────────────────────────────
+
+function EssayAnswerInput({
+  answerId,
+  value,
+  onChange,
+}: {
+  answerId: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const inputId = `essay-answer-${answerId}`
+  const noteId = `${inputId}-note`
+
+  return (
+    <div className="space-y-2">
+      <label htmlFor={inputId} className="text-sm font-medium">คำตอบแบบบรรยาย</label>
+      <Textarea
+        id={inputId}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        rows={7}
+        placeholder="พิมพ์คำตอบที่นี่..."
+        aria-describedby={noteId}
+        className="min-h-40 w-full resize-y"
+      />
+      <p id={noteId} className="text-xs text-muted-foreground">
+        ครูจะเป็นผู้ตรวจและให้คะแนนคำตอบข้อนี้
+      </p>
+    </div>
+  )
+}
+
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
 function ExamToolbar({
@@ -1745,6 +1968,7 @@ function ExamToolbar({
   proctorStatus,
   proctorActiveConnectionCount,
   config, calculatorOpen, onToggleCalculator, scratchpadOpen, onToggleScratchpad, onFocusMode,
+  timeLabel, timerUrgent, timerDanger, onOpenNavigator,
 }: {
   saving: boolean
   isOnline: boolean
@@ -1758,11 +1982,15 @@ function ExamToolbar({
   scratchpadOpen: boolean
   onToggleScratchpad: () => void
   onFocusMode: () => void
+  timeLabel: string | null
+  timerUrgent: boolean
+  timerDanger: boolean
+  onOpenNavigator: () => void
 }) {
   return (
     <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
       {/* Status indicators */}
-      <div className="flex items-center gap-2 text-xs">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
         {saving ? (
           <span className="text-muted-foreground animate-pulse">บันทึก...</span>
         ) : pendingSync > 0 ? (
@@ -1800,9 +2028,29 @@ function ExamToolbar({
             <MonitorSmartphone size={11} /> เปิดพร้อมกัน {proctorActiveConnectionCount} จุด
           </span>
         )}
+        {timeLabel !== null && (
+          <span
+            className={`flex items-center gap-1 font-mono font-bold md:hidden ${
+              timerDanger ? 'text-destructive' : timerUrgent ? 'text-flag' : 'text-foreground'
+            }`}
+            aria-label={`เวลาที่เหลือ ${timeLabel}`}
+          >
+            <Clock size={12} aria-hidden /> {timeLabel}
+          </span>
+        )}
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onOpenNavigator}
+          aria-label="ดูทุกข้อ"
+          className="h-10 min-w-10 px-2 md:hidden"
+        >
+          <ListChecks />
+        </Button>
         {config.scratchpadEnabled && (
           <Button
             type="button"
@@ -1811,6 +2059,7 @@ function ExamToolbar({
             onClick={onToggleScratchpad}
             aria-label="กระดาษทด"
             aria-pressed={scratchpadOpen}
+            className="h-10 min-w-10 px-2"
           >
             <NotebookPen />
             <span className="hidden sm:inline">กระดาษทด</span>
@@ -1824,12 +2073,13 @@ function ExamToolbar({
             onClick={onToggleCalculator}
             aria-label="เครื่องคิดเลข"
             aria-pressed={calculatorOpen}
+            className="h-10 min-w-10 px-2"
           >
             <CalculatorIcon />
             <span className="hidden sm:inline">เครื่องคิดเลข</span>
           </Button>
         )}
-        <Button type="button" variant="outline" size="sm" onClick={onFocusMode} aria-label="โฟกัส">
+        <Button type="button" variant="outline" size="sm" onClick={onFocusMode} aria-label="โฟกัส" className="h-10 min-w-10 px-2">
           <Maximize2 />
           <span className="hidden sm:inline">โฟกัส</span>
         </Button>
@@ -1902,8 +2152,10 @@ function MCQInput({
               />
             </label>
             <button
+              type="button"
               onClick={() => onToggleEliminate(i)}
-              className={`p-2 mr-2 rounded-lg transition-all shrink-0 ${
+              aria-label={isEliminated ? `เรียกคืนตัวเลือก ${CHOICE_LABELS[i]}` : `ตัดตัวเลือก ${CHOICE_LABELS[i]}`}
+              className={`mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-all ${
                 isEliminated ? 'text-destructive bg-destructive/10' : 'text-muted-foreground hover:text-destructive/80 hover:bg-muted'
               }`}
               title={isEliminated ? 'เรียกคืนตัวเลือก' : 'ตัดทิ้ง'}
@@ -2485,7 +2737,7 @@ function FillBlankAnswerInput({ questionText, config, rawValue, onChange }: {
           <span key={i}>
             <RichText text={part} />
             {type === 'dropdown' ? (
-              <NativeSelect value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)} className="inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center">
+              <NativeSelect value={ans[i] ?? ''} onChange={e => updateBlank(i, e.target.value)} className="mx-1 inline-block w-auto max-w-full border-b-2 border-primary bg-primary/10 text-center">
                 <option value="">เลือกคำตอบ</option>
                 {(blank?.options ?? []).map((opt, oi) => (
                   <option key={oi} value={opt}>{opt}</option>
@@ -2682,7 +2934,7 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
             const control = type === 'dropdown' ? (
               <NativeSelect value={answers[i] ?? ''} onChange={e => updatePart(i, e.target.value)}
                 className={split
-                  ? 'inline-block mx-1 border-b-2 border-primary bg-primary/10 text-center'
+                  ? 'mx-1 inline-block w-auto max-w-full border-b-2 border-primary bg-primary/10 text-center'
                   : 'border-b-2 border-primary bg-primary/10'}>
                 <option value="">เลือกคำตอบ</option>
                 {(blank.options ?? []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}

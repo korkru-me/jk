@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { useAppViewport } from '@/hooks/use-app-viewport'
+import { isAssignmentTakingPath } from '@/lib/app-shell-mode'
 import type { User } from '@/lib/types'
 
 const SIDEBAR_COLLAPSE_KEY = 'korkru:sidebar-collapsed'
@@ -21,6 +23,8 @@ export function ShellClient({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const pathname = usePathname()
+  const isTakingAssignment = isAssignmentTakingPath(pathname)
 
   // Nothing inside the shell scrolls the page itself, so its height has to
   // track the visible area rather than 100vh — see the hook for why iOS turns
@@ -37,6 +41,21 @@ export function ShellClient({
       localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? '1' : '0')
       return next
     })
+  }
+
+  // The exam already carries its own status, navigation and submit controls.
+  // Removing the ordinary app chrome here prevents a landscape phone from
+  // crossing the `md` breakpoint and losing most of its question width to two
+  // sidebars. Authentication and the route's server checks still run in the
+  // parent layout; this changes presentation only.
+  if (isTakingAssignment) {
+    return (
+      <div className="h-[var(--app-height,100dvh)] overflow-hidden bg-muted/30">
+        <main className="h-full overflow-y-auto overscroll-contain p-2 sm:p-3 md:p-4">
+          {children}
+        </main>
+      </div>
+    )
   }
 
   return (

@@ -8,10 +8,16 @@ export function ExamScreenLabClient({
   fixture,
   submissionId,
   questionsPerPage,
+  timerEnabled,
+  startedAt,
+  workImageRequired,
 }: {
   fixture: ExamScreenQaFixture
   submissionId: string
   questionsPerPage: number
+  timerEnabled: boolean
+  startedAt: string
+  workImageRequired: boolean
 }) {
   useAppViewport()
 
@@ -22,14 +28,14 @@ export function ExamScreenLabClient({
         storageOwnerId="qa-synthetic-student"
         answers={fixture.answers}
         initialWorkArtifacts={[]}
-        durationMinutes={null}
-        startedAt="2026-01-01T00:00:00.000Z"
+        durationMinutes={timerEnabled ? 60 : null}
+        startedAt={startedAt}
         config={{
           proctoringEnabled: false,
           isFullscreenEnforced: false,
           blockClipboard: false,
           watermarkText: 'ข้อมูลจำลอง • DEVICE QA',
-          isWorkImageEnforced: true,
+          isWorkImageEnforced: workImageRequired,
           instantCheck: true,
           instantCheckAnswerKey: true,
           calculatorEnabled: true,
@@ -38,7 +44,7 @@ export function ExamScreenLabClient({
         sections={fixture.sections}
         questionsPerPage={questionsPerPage}
         previewMode
-        previewReturnHref={`/exam-screen-lab?perPage=${questionsPerPage}`}
+        previewReturnHref={`/exam-screen-lab?perPage=${questionsPerPage}${timerEnabled ? '&timer=1' : ''}${workImageRequired ? '' : '&work=0'}`}
         previewEditWarning="ห้องทดลองเฉพาะเครื่องนักพัฒนา • ไม่บันทึกคำตอบ รูป หรือไฟล์ขึ้นระบบ"
       />
     </div>

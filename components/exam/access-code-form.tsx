@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { KeyRound } from 'lucide-react'
 import { startSubmission } from '@/lib/actions/submissions'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,9 @@ export function AccessCodeForm({ assignmentId }: { assignmentId: string }) {
         <Button onClick={submit} disabled={isPending || !code.trim()} className="w-full">
           {isPending ? 'กำลังตรวจสอบ...' : 'เข้าสอบ'}
         </Button>
+        <Link href="/assignments" className="inline-flex min-h-10 items-center text-sm text-primary hover:underline">
+          ← กลับหน้ารายการข้อสอบ
+        </Link>
       </div>
     </div>
   )

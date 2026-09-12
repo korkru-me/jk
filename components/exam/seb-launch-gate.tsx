@@ -164,20 +164,28 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
           </div>
         )}
 
-        <a
-          href="https://safeexambrowser.org/download_en.html"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-        >
-          ดาวน์โหลด Safe Exam Browser <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-        <Link
-          href={`/assignments/${assignmentId}/system-check`}
-          className="ml-3 inline-flex items-center text-sm text-primary hover:underline"
-        >
-          ตรวจเครื่องโดยไม่เริ่มจับเวลา
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <a
+            href="https://safeexambrowser.org/download_en.html"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-10 items-center gap-1 text-sm text-primary hover:underline"
+          >
+            ดาวน์โหลด Safe Exam Browser <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+          <Link
+            href={`/assignments/${assignmentId}/system-check`}
+            className="inline-flex min-h-10 items-center text-sm text-primary hover:underline"
+          >
+            ตรวจเครื่องโดยไม่เริ่มจับเวลา
+          </Link>
+          <Link
+            href="/assignments"
+            className="inline-flex min-h-10 items-center text-sm text-primary hover:underline"
+          >
+            ← กลับหน้ารายการข้อสอบ
+          </Link>
+        </div>
       </Card>
     </div>
   )

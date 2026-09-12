@@ -187,7 +187,7 @@ export function MatchingLineInput({
       <p className="text-sm font-medium">โยงเส้นจับคู่ให้ถูกต้อง:</p>
       <p className="text-xs text-muted-foreground">
         กดค้างที่จุดวงกลมด้านขวาของรายการฝั่งซ้าย แล้วลากไปปล่อยที่รายการฝั่งขวา
-        หรือแตะรายการฝั่งซ้ายหนึ่งครั้งแล้วแตะฝั่งขวาก็ได้
+        หรือแตะจุดวงกลมฝั่งซ้ายหนึ่งครั้งแล้วแตะรายการฝั่งขวาก็ได้
       </p>
 
       <div ref={boxRef} className="relative grid grid-cols-2 gap-x-8 gap-y-2 sm:gap-x-16">
@@ -240,11 +240,11 @@ export function MatchingLineInput({
                   <RichText text={prompt.text} />
                 </span>
 
-                {/* The grab point, half outside the card so the line starts at
-                    the edge rather than under the text. */}
+                {/* Keep the visible connector small, but give a finger a 40px
+                    hit area. The grid gap remains tappable and the line itself
+                    is still measured from the card edge. */}
                 <Button
                   variant="ghost"
-                  size="icon-2xs"
                   disabled={disabled}
                   aria-label={
                     connected
@@ -253,16 +253,29 @@ export function MatchingLineInput({
                   }
                   aria-pressed={isSelected}
                   onPointerDown={e => onDotPointerDown(e, i)}
-                  onClick={() => { if (connected && !drag) disconnect(i) }}
-                  className={cn(
-                    'absolute -right-2 top-1/2 h-4 w-4 min-w-0 -translate-y-1/2 touch-none rounded-full border-2 p-0 transition-colors',
-                    !disabled && 'cursor-grab',
-                    verdict === true ? 'border-success bg-success'
-                      : verdict === false ? 'border-destructive bg-destructive'
-                      : connected || isSelected ? 'border-primary bg-primary'
-                      : 'border-border bg-card'
-                  )}
-                />
+                  onClick={event => {
+                    if (connected && !drag) disconnect(i)
+                    else if (event.detail === 0 && !drag) {
+                      // Keyboard activation does not emit pointer events, so
+                      // select the prompt here. Pointer taps are handled on
+                      // pointer-up and must not be toggled a second time.
+                      setSelected(previous => previous === i ? null : i)
+                    }
+                  }}
+                  className="absolute -right-5 top-1/2 h-10 w-10 min-w-0 -translate-y-1/2 touch-none rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'h-4 w-4 rounded-full border-2 transition-colors',
+                      !disabled && 'cursor-grab',
+                      verdict === true ? 'border-success bg-success'
+                        : verdict === false ? 'border-destructive bg-destructive'
+                        : connected || isSelected ? 'border-primary bg-primary'
+                        : 'border-border bg-card'
+                    )}
+                  />
+                </Button>
               </div>
             )
           })}
