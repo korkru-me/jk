@@ -38,7 +38,9 @@ export function IocFormWizard({ draft }: { draft: IocFormWizardDraft }) {
   const router = useRouter()
   const [header, setHeader] = useState<IocHeaderInput>(draft.header)
   const [instruction, setInstruction] = useState(draft.instruction_text)
-  const [threshold, setThreshold] = useState(String(draft.threshold))
+  // Shown the way the document prints it, so 0.5 does not read as a
+  // different rule from the 0.50 in the hint underneath.
+  const [threshold, setThreshold] = useState(draft.threshold.toFixed(2))
   const [percentRule, setPercentRule] = useState<IocPercentRule>(draft.percent_rule)
   const [showSolutions, setShowSolutions] = useState(draft.show_solutions)
   const [touched, setTouched] = useState(false)

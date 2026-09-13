@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 import { formatIocIndex } from '@/lib/ioc'
 import type { IocForm, IocFormStatus } from '@/lib/types'
+import { IocFormDeleteButton } from './_components/ioc-form-delete-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ฟอร์ม IOC — KorKru' }
@@ -119,12 +120,14 @@ export default async function IocFormsPage() {
                 {form.grade_level ? <span>ชั้น{form.grade_level}</span> : null}
                 <span>เกณฑ์ {formatIocIndex(form.threshold)}</span>
               </div>
-              {/* Every form is still a draft until links can be issued, so both
-                  labels lead back to the wizard. The dashboard at
-                  /research/ioc/[formId] arrives with the expert links. */}
-              <Button className="mt-4" variant="outline" render={<Link href={`/research/ioc/new?form=${form.id}`} />}>
-                {form.status === 'draft' ? 'ทำต่อ' : 'เปิดฟอร์ม'}
-              </Button>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button variant="outline" render={<Link href={`/research/ioc/${form.id}`} />}>
+                  {form.status === 'draft' ? 'ทำต่อ' : 'เปิดฟอร์ม'}
+                </Button>
+                {form.status === 'draft' ? (
+                  <IocFormDeleteButton formId={form.id} examTitle={form.exam_title} />
+                ) : null}
+              </div>
             </Card>
           ))}
         </div>

@@ -61,8 +61,12 @@ export default async function NewIocFormPage({ searchParams }: Props) {
 
   const { data: orgId } = await supabase.rpc('get_user_org_id')
   const { data: org } = orgId
-    ? await supabase.from('organizations').select('name').eq('id', orgId as string).maybeSingle()
+    ? await supabase.from('organizations').select('name, is_personal').eq('id', orgId as string).maybeSingle()
     : { data: null }
+  // A personal workspace is named "<ชื่อ>'s Workspace" by the signup trigger.
+  // That is not a school, and printing it on an official header would be worse
+  // than leaving the line blank for the teacher to fill in.
+  const schoolName = org && org.is_personal === false ? ((org.name as string | undefined) ?? '') : ''
 
   const header: IocHeaderInput = existing
     ? {
@@ -78,7 +82,7 @@ export default async function NewIocFormPage({ searchParams }: Props) {
       }
     : {
         ...emptyIocHeader(),
-        school_name: (org?.name as string | undefined) ?? '',
+        school_name: schoolName,
         author_name: (profile.full_name as string | undefined) ?? '',
       }
 

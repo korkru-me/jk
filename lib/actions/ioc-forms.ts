@@ -111,6 +111,10 @@ export async function createIocFormDraft(input: CreateIocFormInput) {
     .single()
 
   if (error || !data) {
+    // The reason stays in the server log: a teacher gets a sentence they can
+    // act on, and the constraint or policy that refused is not guesswork for
+    // whoever reads the log next.
+    console.error('[ioc] create form failed', error)
     return { error: 'บันทึกฟอร์มไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
   }
 

@@ -35,24 +35,35 @@ export interface IocHeaderValidation {
   errors: Partial<Record<IocHeaderField, string>>
 }
 
+/** The header's fields, in the order the document prints them. */
+export const IOC_HEADER_FIELDS = [
+  'exam_title',
+  'subject_name',
+  'subject_code',
+  'grade_level',
+  'term_label',
+  'academic_year',
+  'school_name',
+  'author_name',
+  'author_position',
+] as const satisfies readonly IocHeaderField[]
+
 export function emptyIocHeader(): IocHeaderInput {
-  return {
-    exam_title: '',
-    subject_name: '',
-    subject_code: '',
-    grade_level: '',
-    term_label: '',
-    academic_year: '',
-    school_name: '',
-    author_name: '',
-    author_position: '',
-  }
+  const header = {} as IocHeaderInput
+  for (const field of IOC_HEADER_FIELDS) header[field] = ''
+  return header
 }
 
-export function normalizeIocHeader(input: IocHeaderInput): IocHeaderInput {
+/**
+ * Reads only the header's own fields. Callers hand this whole form payloads —
+ * thresholds, booleans, ids — and copying every key it was given would both
+ * leak them into the header and crash on the first one that is not a string.
+ */
+export function normalizeIocHeader(input: Partial<Record<IocHeaderField, unknown>>): IocHeaderInput {
   const trimmed = {} as IocHeaderInput
-  for (const key of Object.keys(input) as IocHeaderField[]) {
-    trimmed[key] = input[key].trim().replace(/\s+/g, ' ')
+  for (const field of IOC_HEADER_FIELDS) {
+    const value = input[field]
+    trimmed[field] = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
   }
   return trimmed
 }
@@ -62,7 +73,7 @@ export function normalizeIocHeader(input: IocHeaderInput): IocHeaderInput {
  * skipped if absent, because a form for a school-written outcome may have no
  * subject code, and a tutor has no school name to give.
  */
-export function validateIocHeader(input: IocHeaderInput): IocHeaderValidation {
+export function validateIocHeader(input: Partial<Record<IocHeaderField, unknown>>): IocHeaderValidation {
   const header = normalizeIocHeader(input)
   const errors: Partial<Record<IocHeaderField, string>> = {}
 
@@ -79,11 +90,15 @@ export function validateIocHeader(input: IocHeaderInput): IocHeaderValidation {
  * The three centred lines at the top of every page. Each line drops the parts
  * the teacher left blank instead of printing a dangling label.
  */
-export function buildIocDocumentTitle(input: IocHeaderInput): string[] {
+export function buildIocDocumentTitle(input: Partial<Record<IocHeaderField, unknown>>): string[] {
   const header = normalizeIocHeader(input)
-  const lines: string[] = [
-    `การหาค่าความสอดคล้อง (IOC) ของมาตรฐานตัวชี้วัด/ผลการเรียนรู้ กับ${header.exam_title}`,
-  ]
+  const lines: string[] = []
+  // Without an exam to name, the line would end on a dangling "กับ". The
+  // preview is shown while the field is still empty, so this is the normal
+  // state of a form being filled in, not an error.
+  if (header.exam_title) {
+    lines.push(`การหาค่าความสอดคล้อง (IOC) ของมาตรฐานตัวชี้วัด/ผลการเรียนรู้ กับ${header.exam_title}`)
+  }
 
   const subjectParts = [
     header.subject_name ? `รายวิชา${header.subject_name}` : '',
@@ -98,11 +113,12 @@ export function buildIocDocumentTitle(input: IocHeaderInput): string[] {
 }
 
 /** The คำชี้แจง paragraph, which the teacher may then edit in their own words. */
-export function buildIocInstructionText(input: IocHeaderInput): string {
+export function buildIocInstructionText(input: Partial<Record<IocHeaderField, unknown>>): string {
   const header = normalizeIocHeader(input)
   const subject = header.subject_name ? ` รายวิชา${header.subject_name}` : ''
+  const exam = header.exam_title || 'แบบทดสอบฉบับนี้'
   return (
-    `ขอให้ท่านได้แสดงความคิดเห็นของท่านที่มีต่อ${header.exam_title}${subject} `
+    `ขอให้ท่านได้แสดงความคิดเห็นของท่านที่มีต่อ${exam}${subject} `
     + 'โดยใส่เครื่องหมาย ✓ ลงในช่องความเห็นของท่าน '
     + 'พร้อมเขียนข้อเสนอแนะที่เป็นประโยชน์ในการนำไปพิจารณาปรับปรุงต่อไป'
   )

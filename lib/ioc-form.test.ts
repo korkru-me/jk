@@ -55,6 +55,23 @@ describe('validateIocHeader', () => {
     expect(validateIocHeader({ ...HEADER, academic_year: '' }).valid).toBe(true)
   })
 
+  it('ignores the non-header fields a form payload carries alongside it', () => {
+    // The create action hands the whole payload over — threshold is a number,
+    // show_solutions a boolean — and reading every key it was given both
+    // crashed on the first non-string and leaked them into the header.
+    const payload = {
+      ...HEADER,
+      threshold: 0.5,
+      show_solutions: false,
+      classroom_id: null,
+      instruction_text: 'คำชี้แจง',
+    }
+    const header = normalizeIocHeader(payload)
+    expect(header.exam_title).toBe(HEADER.exam_title)
+    expect(Object.keys(header).sort()).toEqual(Object.keys(emptyIocHeader()).sort())
+    expect(validateIocHeader(payload).valid).toBe(true)
+  })
+
   it('treats whitespace as empty rather than as a value', () => {
     expect(validateIocHeader({ ...HEADER, author_name: '   ' }).valid).toBe(false)
     expect(normalizeIocHeader({ ...HEADER, subject_code: '  ค   33102 ' }).subject_code).toBe('ค 33102')
@@ -70,6 +87,14 @@ describe('buildIocDocumentTitle', () => {
     ])
   })
 
+  it('prints no title at all while the exam has no name yet', () => {
+    // The preview is on screen from the first keystroke, and a line ending on
+    // a dangling "กับ" looks like a bug rather than an empty field.
+    expect(buildIocDocumentTitle(emptyIocHeader())).toEqual([])
+    const partial = buildIocDocumentTitle({ ...emptyIocHeader(), subject_code: 'ค 33102' })
+    expect(partial).toEqual(['รหัสวิชา ค 33102'])
+  })
+
   it('drops a line rather than printing an empty label', () => {
     const lines = buildIocDocumentTitle({
       ...emptyIocHeader(),
@@ -83,6 +108,10 @@ describe('buildIocDocumentTitle', () => {
   it('keeps a subject line that has only some of its parts', () => {
     const lines = buildIocDocumentTitle({ ...emptyIocHeader(), exam_title: 'ข้อสอบ', subject_code: 'ว 23102' })
     expect(lines[1]).toBe('รหัสวิชา ว 23102')
+  })
+
+  it('names the exam generically in the instruction until it has a title', () => {
+    expect(buildIocInstructionText(emptyIocHeader())).toContain('แบบทดสอบฉบับนี้')
   })
 })
 
