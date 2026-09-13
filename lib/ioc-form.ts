@@ -10,6 +10,7 @@
  * the source document described in docs/EDUCATION_RESEARCH_IOC.md.
  */
 
+import { IOC_DEFAULT_PERCENT_RULE, IOC_DEFAULT_THRESHOLD } from '@/lib/ioc'
 import type { MCQOption } from '@/lib/types'
 
 /** Same letters the ตรวจแล้ว panel uses, so one exam reads the same everywhere. */
@@ -226,3 +227,10 @@ export function formatStandardLabel(
   if (code && description) return `${code} — ${description}`
   return code || description
 }
+
+/** What a new form starts with before the teacher changes anything. */
+export const IOC_FORM_DEFAULTS = {
+  threshold: IOC_DEFAULT_THRESHOLD,
+  percent_rule: IOC_DEFAULT_PERCENT_RULE,
+  show_solutions: false,
+} as const
