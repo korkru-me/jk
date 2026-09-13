@@ -816,3 +816,43 @@ export async function saveIocFormExperts(input: SaveIocFormExpertsInput) {
   revalidatePath(`/research/ioc/${form.id}`)
   return { form_id: form.id, expert_count: experts.length }
 }
+
+// ── Phase 4: the teacher's own wording of the summary ──────────────────────
+
+const summaryTextSchema = z.object({
+  form_id: z.string().uuid(),
+  summary_text: z.string().max(4000),
+})
+
+export type SaveIocSummaryTextInput = z.input<typeof summaryTextSchema>
+
+/**
+ * Stores the prose around the numbers. Passing an empty string clears it,
+ * which puts the generated paragraph back — the way out of an edit a teacher
+ * regrets, without a second button for it.
+ */
+export async function saveIocSummaryText(input: SaveIocSummaryTextInput) {
+  const parsed = summaryTextSchema.safeParse(input)
+  if (!parsed.success) return { error: firstValidationError(parsed.error) }
+
+  const auth = await requireTeacher()
+  if ('error' in auth) return { error: auth.error }
+  const { supabase } = auth
+
+  const text = parsed.data.summary_text.trim()
+  const { error } = await supabase
+    .from('ioc_forms')
+    .update({
+      summary_text: text || null,
+      summary_text_updated_at: text ? new Date().toISOString() : null,
+    })
+    .eq('id', parsed.data.form_id)
+
+  if (error) {
+    console.error('[ioc] save summary text failed', error)
+    return { error: 'บันทึกข้อความสรุปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
+  }
+
+  revalidatePath(`/research/ioc/${parsed.data.form_id}`)
+  return { saved: true, cleared: text.length === 0 }
+}

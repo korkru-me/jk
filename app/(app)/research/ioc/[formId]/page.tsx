@@ -6,7 +6,12 @@ import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import type { IocForm, IocFormExpert, IocFormItem, IocFormStandard } from '@/lib/types'
 import { IocFormEditor, type IocEditorSources } from '../_components/ioc-form-editor'
-import { IocFormDashboard, type DashboardExpert } from '../_components/ioc-form-dashboard'
+import { IocFormFollowUp } from '../_components/ioc-form-followup'
+import type { DashboardExpert } from '../_components/ioc-form-dashboard'
+import type { SummaryRow } from '../_components/ioc-summary-panel'
+import { summarizeIocForm, type IocScore } from '@/lib/ioc'
+import { buildIocSummaryParagraph, isIocSummaryTextStale } from '@/lib/ioc-summary'
+import { formatStandardLabel } from '@/lib/ioc-form'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ฟอร์ม IOC — KorKru' }
@@ -31,7 +36,7 @@ export default async function IocFormPage({ params }: Props) {
 
   const { data: formRow } = await supabase
     .from('ioc_forms')
-    .select('id, exam_title, subject_name, subject_code, grade_level, status, source_kind, measurement_id, assignment_id, author_name, author_signature_mode, threshold, items_frozen_at')
+    .select('id, exam_title, subject_name, subject_code, grade_level, status, source_kind, measurement_id, assignment_id, author_name, author_signature_mode, threshold, percent_rule, summary_text, summary_text_updated_at, items_frozen_at')
     .eq('id', formId)
     .maybeSingle()
 
@@ -39,7 +44,8 @@ export default async function IocFormPage({ params }: Props) {
   const form = formRow as Pick<
     IocForm,
     'id' | 'exam_title' | 'subject_name' | 'subject_code' | 'grade_level' | 'status' | 'source_kind'
-    | 'measurement_id' | 'assignment_id' | 'author_name' | 'author_signature_mode' | 'threshold' | 'items_frozen_at'
+    | 'measurement_id' | 'assignment_id' | 'author_name' | 'author_signature_mode' | 'threshold'
+    | 'percent_rule' | 'summary_text' | 'summary_text_updated_at' | 'items_frozen_at'
   >
 
   const [itemsResult, standardsResult, expertsResult] = await Promise.all([
@@ -64,7 +70,10 @@ export default async function IocFormPage({ params }: Props) {
   // Only a form that has gone out needs progress per expert.
   const { data: ratingRows } = isDraft
     ? { data: null }
-    : await supabase.from('ioc_ratings').select('expert_id').eq('form_id', formId)
+    : await supabase
+        .from('ioc_ratings')
+        .select('expert_id, item_id, score, comment, updated_at')
+        .eq('form_id', formId)
 
   const ratedByExpert = new Map<string, number>()
   for (const row of ratingRows ?? []) {
@@ -134,6 +143,78 @@ export default async function IocFormPage({ params }: Props) {
       .filter(option => option.question_count > 0),
   }
 
+  const items = (itemsResult.data ?? []) as Pick<
+    IocFormItem,
+    'id' | 'order_index' | 'item_label' | 'section_label' | 'group_intro' | 'prompt' | 'choices' | 'standard_id'
+  >[]
+  const standards = (standardsResult.data ?? []) as Pick<IocFormStandard, 'id' | 'order_index' | 'code' | 'description'>[]
+
+  const submittedExpertIds = dashboardExperts
+    .filter(expert => expert.status === 'submitted')
+    .map(expert => expert.id)
+
+  const summary = summarizeIocForm({
+    itemIds: items.map(item => item.id),
+    submittedExpertIds,
+    ratings: (ratingRows ?? []).map(row => ({
+      expertId: row.expert_id as string,
+      itemId: row.item_id as string,
+      score: row.score as IocScore,
+    })),
+    threshold: Number(form.threshold),
+    percentRule: form.percent_rule,
+  })
+
+  const standardById = new Map(standards.map(standard => [standard.id, standard]))
+  const expertById = new Map(dashboardExperts.map(expert => [expert.id, expert]))
+  const summaryByItem = new Map(summary.items.map(item => [item.itemId, item]))
+
+  const summaryRows: SummaryRow[] = items.map(item => {
+    const computed = summaryByItem.get(item.id)
+    const standard = item.standard_id ? standardById.get(item.standard_id) : undefined
+    return {
+      item_id: item.id,
+      item_label: item.item_label,
+      standard_label: standard ? formatStandardLabel(standard) : '',
+      agree: computed?.agree ?? 0,
+      unsure: computed?.unsure ?? 0,
+      disagree: computed?.disagree ?? 0,
+      rated_by: computed?.ratedBy ?? 0,
+      index: computed?.index ?? null,
+      passed: computed?.passed ?? null,
+      // Only what was actually sent carries a suggestion worth printing; a
+      // comment still sitting in someone's draft is their private working.
+      comments: (ratingRows ?? [])
+        .filter(row =>
+          row.item_id === item.id
+          && submittedExpertIds.includes(row.expert_id as string)
+          && ((row.comment as string) ?? '').trim(),
+        )
+        .map(row => {
+          const expert = expertById.get(row.expert_id as string)
+          return {
+            expert_order: expert?.expert_order ?? 0,
+            display_name: expert?.display_name ?? '',
+            comment: ((row.comment as string) ?? '').trim(),
+          }
+        })
+        .sort((left, right) => left.expert_order - right.expert_order),
+    }
+  })
+
+  const failedLabels = summaryRows.filter(row => row.passed === false).map(row => row.item_label)
+  const generatedParagraph = buildIocSummaryParagraph({
+    header: { exam_title: form.exam_title, subject_name: form.subject_name, grade_level: form.grade_level },
+    summary,
+    failedLabels,
+  })
+
+  const latestRatingAt = (ratingRows ?? []).reduce<string | null>((latest, row) => {
+    const value = row.updated_at as string | null
+    if (!value) return latest
+    return !latest || value > latest ? value : latest
+  }, null)
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -168,11 +249,8 @@ export default async function IocFormPage({ params }: Props) {
             author_signature_mode: form.author_signature_mode,
             frozen: Boolean(form.items_frozen_at),
           }}
-          items={(itemsResult.data ?? []) as Pick<
-            IocFormItem,
-            'id' | 'order_index' | 'item_label' | 'section_label' | 'group_intro' | 'prompt' | 'choices' | 'standard_id'
-          >[]}
-          standards={(standardsResult.data ?? []) as Pick<IocFormStandard, 'id' | 'order_index' | 'code' | 'description'>[]}
+          items={items}
+          standards={standards}
           experts={(expertsResult.data ?? []) as Pick<
             IocFormExpert,
             'id' | 'expert_order' | 'display_name' | 'position_title' | 'affiliation'
@@ -180,13 +258,20 @@ export default async function IocFormPage({ params }: Props) {
           sources={sources}
         />
       ) : (
-        <IocFormDashboard
+        <IocFormFollowUp
           formId={form.id}
           examTitle={form.exam_title}
           authorName={form.author_name}
-          itemCount={(itemsResult.data ?? []).length}
+          itemCount={items.length}
           experts={dashboardExperts}
-          freshLinks={[]}
+          summary={summary}
+          rows={summaryRows}
+          percentRuleLabel={
+            form.percent_rule === 'items_passing' ? 'จำนวนข้อที่ผ่านเกณฑ์' : 'ค่าเฉลี่ยดัชนีทุกข้อ'
+          }
+          generatedParagraph={generatedParagraph}
+          savedParagraph={form.summary_text}
+          paragraphStale={isIocSummaryTextStale(form.summary_text_updated_at, latestRatingAt)}
         />
       )}
     </div>
