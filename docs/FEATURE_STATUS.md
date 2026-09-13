@@ -470,6 +470,9 @@
 - เจ้าของผลิตภัณฑ์อนุมัติให้ merge/deploy ก่อนมีโครงการจริง จึงไม่อ้างว่าระยะ 3.2 ผ่าน ไม่สร้าง fixture ใน production และคง checklist หลายบทบาทเป็นงานหลังปล่อย รายละเอียดการตัดสินใจและ smoke test อยู่ใน `docs/EDUCATION_RESEARCH_RELEASE.md`
 - คู่มือครูตั้งแต่เตรียม roster, เลือกแหล่งคะแนน, อ่านผล ไปจนถึงส่งออกอย่างปลอดภัยอยู่ใน `docs/EDUCATION_RESEARCH_USER_GUIDE.md`
 - `master` merge commit `f7448f9` deploy ผ่าน Vercel สำเร็จ Public page และ auth guard ของ `/research` ผ่าน production smoke test โดยไม่เขียน fixture; การตรวจหลังล็อกอินบน production รวมไว้กับ checklist ห้องจริงระยะ 3.2
+- **ฟอร์ม IOC (ความสอดคล้องของตัวชี้วัดกับแบบทดสอบ) — วางแผน อยู่ระยะ 0** ยังไม่มีโค้ด ไม่มี migration และยังไม่มีหน้าจอ ·
+  สเปกที่ตกลงกับเจ้าของผลิตภัณฑ์ สูตร เกณฑ์ โครงเอกสาร โมเดลลิงก์ผู้ทรงคุณวุฒิ และการแบ่งเฟส 0–7 อยู่ใน `docs/EDUCATION_RESEARCH_IOC.md` ·
+  ภาพร่าง 5 หน้าแรกอยู่ใน `docs/research/mockups/phase-ioc-*-draft-v1.png` รอเจ้าของผลิตภัณฑ์ตรวจทีละหน้าก่อนเริ่มเฟส 1
 
 ### Dashboard — มีโค้ดรองรับ (ฝั่งครู)
 
@@ -500,11 +503,11 @@
 - มี notifications, posts, comments, pin และ weekly homeroom digest
 - ต้องตรวจ delivery/cron จริงและ privacy ของข้อความ notification
 
-### Export, PDF และ OMR — บางส่วน/ต้นแบบ
+### Export, PDF และ OMR — ถอดออกแล้ว
 
-- มี routes และ UI สำหรับ print/export/PDF/OMR
-- PDF preview มี fallback เป็น `MOCK_QUESTIONS`
-- ต้องยืนยันการสร้างไฟล์จริง การสุ่มชุดต่อคน ความถูกต้องของ answer key และ browser/print compatibility
+- **เส้นทางกระดาษทั้งหมดถูกลบไปกับ `bdafbca` (13 กันยายน 2569)** — `assignments/[id]/export`, `assignments/[id]/print`, `print-worksheet.tsx`, ใบ OMR และ PDF preview ที่เคยมี fallback เป็น `MOCK_QUESTIONS` ไม่มีอยู่ในโค้ดแล้ว งานที่เคยตั้งเป็นโหมดพิมพ์ถูกย้ายเป็น `online` ด้วย migration `20260913102000_retire_print_assignment_mode.sql`
+- ส่งออกที่ยังมีจริงคือ Excel ของงานวิจัย (`lib/education-research-export.ts` ผ่าน `app/api/research/[id]/data-export`), แม่แบบคะแนน Excel, ไฟล์โจทย์ `.korkru.json` และรายงานห้องเรียนที่สั่งพิมพ์จากเบราว์เซอร์ที่ `classrooms/[id]/report`
+- เอกสาร PDF ชุดถัดไปที่วางแผนไว้คือฟอร์ม IOC ซึ่งใช้หน้าพิมพ์ A4 ของเบราว์เซอร์เช่นกัน ไม่ใช่ PDF library — เหตุผลและข้อกำหนดอยู่ใน `docs/EDUCATION_RESEARCH_IOC.md`
 
 ### Analytics — บางส่วน/ต้นแบบ
 
