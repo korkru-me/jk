@@ -253,6 +253,12 @@ export type TrueFalseExplanationMode = 'none' | 'wrong_only' | 'always'
 export type TrueFalseAnswerMode = 'judge_each' | 'select_matching'
 export type TrueFalseSelectTarget = 'correct' | 'wrong'
 
+// How a list of ticked boxes turns into points — see lib/choice-ticks.ts.
+// 'partial' (default/legacy) pays for every box judged right, ticked or left
+// alone; 'all_or_nothing' pays the whole thing only for a spotless list, which
+// is how the same question is marked on paper.
+export type ChoiceScoring = 'partial' | 'all_or_nothing'
+
 export interface TrueFalseStatement {
   id: string
   text: string   // rich text (HTML) — the statement to judge true/false
@@ -268,6 +274,7 @@ export interface TrueFalseConfig {
   part_label_style?: PartLabelStyle
   answer_mode?: TrueFalseAnswerMode        // undefined = 'judge_each' (backward compatible)
   select_target?: TrueFalseSelectTarget    // used when answer_mode === 'select_matching'; undefined = 'correct'
+  choice_scoring?: ChoiceScoring           // used when answer_mode === 'select_matching'; undefined = 'partial'
 }
 
 // 'text': student may answer anything, teacher grades manually
@@ -341,6 +348,7 @@ export interface CompositePart {
   // composite true_false part never has this.
   choices?: TrueFalseStatement[]
   select_target?: TrueFalseSelectTarget   // used when `choices` present
+  choice_scoring?: ChoiceScoring          // used when `choices` present; undefined = 'partial'
   blanks?: FillBlankItem[]          // type === 'fill_blank' — same shape/marker convention as FillBlankConfig.blanks
   items?: OrderingItem[]            // type === 'ordering'
   options?: MCQOption[]             // type === 'mcq'

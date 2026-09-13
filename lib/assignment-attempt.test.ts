@@ -175,6 +175,76 @@ describe('gradeAnswer — true/false', () => {
     expect(result.score).toBe(2)
     expect(result.is_correct).toBe(false)
   })
+
+  // judge_each asks for an explicit ✓ถูก/✗ผิด, so a statement the student never
+  // reached is unanswered — it must not be read as 'ผิด' and marked for them.
+  it('pays nothing for a statement judge_each left untouched', () => {
+    const result = gradeAnswer(answer({
+      correct: 'TF:' + JSON.stringify(['true', 'false', 'false']),
+      student: JSON.stringify({ answers: ['true'] }),
+      questionType: 'true_false',
+      extraData: { statements: [{}, {}], score_answer: 1, explanation_mode: 'none' },
+      maxScore: 3,
+    }))
+    expect(result).toMatchObject({ score: 1, is_correct: false })
+  })
+})
+
+// ─── ถูก-ผิด answered by ticking (answer_mode: 'select_matching') ─────────────
+//
+// The student sees every statement at once and ticks the ones matching
+// select_target, so an untouched statement has been judged rather than skipped
+// — the opposite of judge_each above, and the reason the two cannot share one
+// comparison.
+
+/** Ticks as TrueFalseSelectMatching writes them: only clicked indices exist. */
+function tfTicks(...clicked: number[]): string {
+  const answers: (string | null)[] = []
+  for (const i of clicked) {
+    while (answers.length < i) answers.push(null)
+    answers[i] = 'true'
+  }
+  return JSON.stringify({ answers, explanation: '' })
+}
+
+describe('gradeAnswer — ถูก-ผิด แบบติ๊กข้อที่ตรง', () => {
+  /** Four statements, of which the first and third are the ones to tick. */
+  const KEY = 'TF:' + JSON.stringify(['true', 'false', 'true', 'false'])
+  const CONFIG = {
+    statements: [{}, {}, {}],
+    score_answer: 1,
+    explanation_mode: 'none',
+    answer_mode: 'select_matching',
+  }
+
+  function grade(student: string | null, extra: Record<string, unknown> = {}) {
+    return gradeAnswer(answer({
+      correct: KEY, student, questionType: 'true_false',
+      extraData: { ...CONFIG, ...extra }, maxScore: 4,
+    }))
+  }
+
+  // The regression: ticking 1 and 3 leaves 2 and 4 unwritten, and reading those
+  // as unanswered scored 2 of 4 for a spotless answer.
+  it('gives full marks for ticking exactly the right statements', () => {
+    expect(grade(tfTicks(0, 2))).toMatchObject({ score: 4, is_correct: true })
+  })
+
+  it('docks a statement ticked that should not have been', () => {
+    expect(grade(tfTicks(0, 1, 2))).toMatchObject({ score: 3, is_correct: false })
+  })
+
+  it('pays nothing for a question the student never opened', () => {
+    expect(grade(null)).toMatchObject({ score: 0, is_correct: false })
+    expect(grade(JSON.stringify({ answers: [] }))).toMatchObject({ score: 0, is_correct: false })
+  })
+
+  it('pays all or nothing when the teacher asked for it', () => {
+    expect(grade(tfTicks(0, 2), { choice_scoring: 'all_or_nothing' }))
+      .toMatchObject({ score: 4, is_correct: true })
+    expect(grade(tfTicks(0), { choice_scoring: 'all_or_nothing' }))
+      .toMatchObject({ score: 0, is_correct: false })
+  })
 })
 
 describe('gradeAnswer — ordering', () => {
@@ -706,6 +776,33 @@ describe('gradeAnswer — ถูก-ผิดแบบชุด', () => {
 
   it('scores ticking every box by how many of them wanted ticking', () => {
     expect(grade(ticks(0, 1, 2, 3, 4, 5, 6))).toMatchObject({ is_correct: false, score: 0.5 * 4 / 7 })
+  })
+
+  describe('marked all-or-nothing, the way the paper marks it', () => {
+    const q = beakerQuestion()
+    const parts = (q.extra_data as { parts: Record<string, unknown>[] }).parts
+    parts[0].choice_scoring = 'all_or_nothing'
+    const strict = buildAttemptQuestion(q, { orderIndex: 0, shuffleOptions: false })
+
+    function gradeStrict(student: string | null) {
+      return gradeAnswer(answer({
+        correct: strict.correct_answer, student, questionType: 'composite',
+        extraData: q.extra_data, maxScore: strict.max_score,
+      }))
+    }
+
+    it('freezes the rule into the key, so re-marking the question spares work already handed in', () => {
+      expect(strict.correct_answer).toContain('"scoring":"all_or_nothing"')
+    })
+
+    it('pays a spotless answer in full', () => {
+      expect(gradeStrict(ticks(0, 2, 4, 5))).toMatchObject({ is_correct: true, score: 0.5 })
+    })
+
+    it('pays nothing for one box out of place', () => {
+      expect(gradeStrict(ticks(0, 2, 4))).toMatchObject({ is_correct: false, score: 0 })
+      expect(gradeStrict(ticks(0))).toMatchObject({ is_correct: false, score: 0 })
+    })
   })
 
   // select_target: 'wrong' flips the key at build time, so grading never sees

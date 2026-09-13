@@ -5,6 +5,7 @@ import {
   CLASSIFY_PREFIX, CLASSIFY_UNSET,
   classifyCellCount, classifyCorrectAnswer, parseClassifyGrid,
 } from '@/lib/classify'
+import { scoreChoiceTicks } from '@/lib/choice-ticks'
 import type { Assignment, AnswerPart, Question, Variable, LogicRule } from '@/lib/types'
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -149,7 +150,7 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
         if (Array.isArray(p.choices) && p.choices.length > 0) {
           const flip = p.select_target === 'wrong'
           const correct = p.choices.map((c) => ((flip ? !c.correct_answer : c.correct_answer) ? 'true' : 'false'))
-          return { type: 'true_false', correct, score }
+          return { type: 'true_false', correct, score, scoring: p.choice_scoring }
         }
         return { type: 'true_false', correct: p.correct_answer ? 'true' : 'false', score }
       }
@@ -490,15 +491,31 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
   // Multi-statement True/False grading
   if (correctAns.startsWith('TF:')) {
     const correctAnswers: string[] = JSON.parse(correctAns.slice(3))
-    let studentAnswers: string[] = []
-    try { studentAnswers = JSON.parse(studentAns || '{}').answers ?? [] } catch { /* keep empty */ }
+    let studentAnswers: unknown[] = []
+    try {
+      const parsed = JSON.parse(studentAns || '{}').answers
+      if (Array.isArray(parsed)) studentAnswers = parsed
+    } catch { /* keep empty */ }
     const extraData = a.questions?.extra_data as any
     const scoreAnswer: number = extraData?.score_answer ?? 1
+    const structuralMax = naturalMaxScore('true_false', extraData, null)
+
+    // The two answer modes disagree about what an untouched statement means,
+    // which is why they cannot share one comparison. select_matching hands the
+    // student checkboxes, so a statement left alone has been judged — it scores
+    // through the shared tick rule. judge_each asks for an explicit ✓ถูก/✗ผิด on
+    // each statement, where silence is a statement not yet answered and earns
+    // nothing; reading it as 'ผิด' would mark a half-finished question for them.
+    if (extraData?.answer_mode === 'select_matching') {
+      const { perfect, share } = scoreChoiceTicks(studentAnswers, correctAnswers, extraData?.choice_scoring)
+      const earned = share * correctAnswers.length * scoreAnswer
+      return { id: a.id, is_correct: perfect, score: scaleScore(earned, structuralMax, a.max_score) }
+    }
+
     let correctCount = 0
     for (let i = 0; i < correctAnswers.length; i++) {
-      if ((studentAnswers[i] ?? '').trim() === correctAnswers[i]) correctCount++
+      if (String(studentAnswers[i] ?? '').trim() === correctAnswers[i]) correctCount++
     }
-    const structuralMax = naturalMaxScore('true_false', extraData, null)
     return { id: a.id, is_correct: correctCount === correctAnswers.length, score: scaleScore(correctCount * scoreAnswer, structuralMax, a.max_score) }
   }
 
@@ -538,7 +555,7 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
   // its manually-graded 'text' sub-type, same "leave pending" behavior as
   // FILL: above.
   if (correctAns.startsWith('COMP:')) {
-    type CompCorrectPart = { type: string; correct: unknown; blankType?: import('@/lib/types').FillBlankType; caseSensitive?: boolean; score?: number }
+    type CompCorrectPart = { type: string; correct: unknown; blankType?: import('@/lib/types').FillBlankType; caseSensitive?: boolean; score?: number; scoring?: import('@/lib/types').ChoiceScoring }
     const correctParts: CompCorrectPart[] = JSON.parse(correctAns.slice(5))
     let studentAnswers: string[] = []
     try { studentAnswers = JSON.parse(studentAns || '[]') } catch { /* keep empty */ }
@@ -553,37 +570,15 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
         hasManual = true
         continue
       }
-      // Grouped true/false sub-question — `correct` is one 'true'/'false' per
-      // choice, scored proportionally like the standalone multi-statement
-      // true_false grading above.
-      //
-      // These choices are checkboxes, so a box left alone is an answer
-      // ('false'), not a missing one — and that is the difference from the
-      // multi-statement branch, where the student picks ✓ถูก/✗ผิด explicitly and
-      // silence really does mean unanswered. CompositeAnswerInput in
-      // exam-client.tsx only writes the indices the student actually clicked,
-      // leaving every untouched box null, so an unticked box has to be read as
-      // 'false' here. Comparing the raw null against 'false' instead capped a
-      // part at (ticks it wanted / choices it had): ticking exactly the right
-      // 4 boxes out of 7 matched only those 4 and scored 4/7 of the part, and
-      // no realistic answer could ever be fully correct.
-      //
-      // An empty array still earns nothing, though: that is a part the student
-      // never opened, and paying it for every 'false' target would put points
-      // on a blank submission.
+      // Grouped true/false sub-question (ถูก-ผิดแบบชุด) — `correct` is one
+      // 'true'/'false' per choice and the student answers with checkboxes, so
+      // the ticks score through lib/choice-ticks.ts, which owns what an
+      // untouched box means and what the part's scoring rule does with it.
+      // `scoring` is read off the frozen key rather than off live extra_data,
+      // beside the point value, so re-marking a question cannot silently
+      // re-mark work already handed in under the old rule.
       if (cp.type === 'true_false' && Array.isArray(cp.correct)) {
-        const targets = cp.correct as string[]
-        let studentChoices: unknown[] = []
-        try { studentChoices = JSON.parse(sa || '[]') } catch { /* keep empty */ }
-        const answered = Array.isArray(studentChoices) && studentChoices.length > 0
-        let matched = 0
-        if (answered) {
-          for (let j = 0; j < targets.length; j++) {
-            const ticked = String(studentChoices[j] ?? '').trim() === 'true'
-            if ((ticked ? 'true' : 'false') === targets[j]) matched++
-          }
-        }
-        earned += targets.length > 0 ? (matched / targets.length) * partScore : 0
+        earned += scoreChoiceTicks(sa, cp.correct as string[], cp.scoring).share * partScore
         continue
       }
       let ok = false

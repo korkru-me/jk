@@ -21,7 +21,7 @@ import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
 import { Card } from '@/components/ui/card'
 import type {
   Difficulty, Visibility, Question,
-  CompositeConfig, CompositePart, TrueFalseStatement, TrueFalseSelectTarget,
+  ChoiceScoring, CompositeConfig, CompositePart, TrueFalseStatement, TrueFalseSelectTarget,
 } from '@/lib/types'
 import { questionsReturnTo } from '@/lib/question-return'
 
@@ -45,12 +45,13 @@ interface SubQuestionDraft {
   text: string
   imageUrls: string[]
   selectTarget: TrueFalseSelectTarget
+  choiceScoring: ChoiceScoring
   choices: TrueFalseStatement[]
   score: number
 }
 
 function newSubQuestion(): SubQuestionDraft {
-  return { id: newId(), text: '', imageUrls: [], selectTarget: 'correct', choices: [newChoice(), newChoice()], score: 1 }
+  return { id: newId(), text: '', imageUrls: [], selectTarget: 'correct', choiceScoring: 'partial', choices: [newChoice(), newChoice()], score: 1 }
 }
 
 function draftFromPart(part: CompositePart): SubQuestionDraft {
@@ -59,6 +60,7 @@ function draftFromPart(part: CompositePart): SubQuestionDraft {
     text: part.text,
     imageUrls: part.image_urls ?? [],
     selectTarget: part.select_target ?? 'correct',
+    choiceScoring: part.choice_scoring ?? 'partial',
     choices: part.choices?.length ? part.choices : [newChoice(), newChoice()],
     score: part.score ?? 1,
   }
@@ -183,6 +185,30 @@ function SubQuestionCard({
             />
             <span className="text-xs text-muted-foreground">คะแนน</span>
           </div>
+
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            <span className="text-xs text-muted-foreground">ให้คะแนน:</span>
+            {([
+              { value: 'partial' as const, label: 'ตามจำนวนข้อที่ตัดสินถูก' },
+              { value: 'all_or_nothing' as const, label: 'ถูกทุกข้อจึงได้คะแนน' },
+            ]).map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onUpdate({ choiceScoring: opt.value })}
+                className={`px-2.5 py-1.5 rounded-lg border-2 text-xs font-medium transition-colors ${
+                  subQuestion.choiceScoring === opt.value ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-ring'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {subQuestion.choiceScoring === 'all_or_nothing'
+              ? 'ติ๊กผิดหรือตกไปข้อเดียว ได้ 0 คะแนน — เหมือนที่ตรวจบนกระดาษ'
+              : 'ทุกตัวเลือกที่ตัดสินถูก (ทั้งที่ติ๊กและที่เว้นไว้) ได้คะแนนส่วนของมัน'}
+          </p>
         </div>
       </div>
     </div>
@@ -278,6 +304,7 @@ export function TrueFalseGroupForm({ allTags, mode = 'create', question, isOwner
       score: sq.score,
       choices: sq.choices,
       select_target: sq.selectTarget === 'wrong' ? 'wrong' : undefined,
+      choice_scoring: sq.choiceScoring === 'all_or_nothing' ? 'all_or_nothing' : undefined,
     })),
     part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
   }

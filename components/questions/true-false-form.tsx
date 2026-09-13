@@ -16,7 +16,7 @@ import { AnswerPartCard, LabelStyleToggle, AddSubItemButton } from './answer-set
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
-import type { Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement, TrueFalseAnswerMode, TrueFalseSelectTarget, Question } from '@/lib/types'
+import type { ChoiceScoring, Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement, TrueFalseAnswerMode, TrueFalseSelectTarget, Question } from '@/lib/types'
 import { questionsReturnTo } from '@/lib/question-return'
 
 interface TrueFalseFormProps {
@@ -118,6 +118,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
   const [statements, setStatements] = useState<TrueFalseStatement[]>(existingConfig?.statements ?? [])
   const [answerMode, setAnswerMode] = useState<TrueFalseAnswerMode>(existingConfig?.answer_mode ?? 'judge_each')
   const [selectTarget, setSelectTarget] = useState<TrueFalseSelectTarget>(existingConfig?.select_target ?? 'correct')
+  const [choiceScoring, setChoiceScoring] = useState<ChoiceScoring>(existingConfig?.choice_scoring ?? 'partial')
   const [labelStyle, setLabelStyle] = useState<PartLabelStyle>(existingConfig?.part_label_style ?? 'thai')
   const [explanationMode, setExplanationMode] = useState<TrueFalseExplanationMode>(existingConfig?.explanation_mode ?? 'none')
   const [scoreAnswer, setScoreAnswer] = useState(existingConfig?.score_answer ?? 1)
@@ -148,6 +149,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
     setLabelStyle(config.part_label_style ?? 'thai')
     setAnswerMode(config.answer_mode ?? 'judge_each')
     setSelectTarget(config.select_target ?? 'correct')
+    setChoiceScoring(config.choice_scoring ?? 'partial')
   })
 
   const labels = PART_LABEL_SETS[labelStyle]
@@ -171,6 +173,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
     part_label_style: labelStyle !== 'thai' ? labelStyle : undefined,
     answer_mode: answerMode === 'select_matching' ? 'select_matching' : undefined,
     select_target: answerMode === 'select_matching' && selectTarget === 'wrong' ? 'wrong' : undefined,
+    choice_scoring: answerMode === 'select_matching' && choiceScoring === 'all_or_nothing' ? 'all_or_nothing' : undefined,
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -272,6 +275,31 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
                 </button>
               ))}
               <span className="text-[11px] text-muted-foreground">นักเรียนจะเห็นรายการทั้งหมด แล้วติ๊กเฉพาะข้อที่ตรงกับที่เลือกไว้ (เลือกได้มากกว่า 1 ข้อ)</span>
+            </div>
+          )}
+          {answerMode === 'select_matching' && (
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <span className="text-xs text-muted-foreground">ให้คะแนน:</span>
+              {([
+                { value: 'partial' as const, label: 'ตามจำนวนข้อที่ตัดสินถูก' },
+                { value: 'all_or_nothing' as const, label: 'ถูกทุกข้อจึงได้คะแนน' },
+              ]).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setChoiceScoring(opt.value)}
+                  className={`px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-colors ${
+                    choiceScoring === opt.value ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-ring'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <span className="text-[11px] text-muted-foreground">
+                {choiceScoring === 'all_or_nothing'
+                  ? 'ติ๊กผิดหรือตกไปข้อเดียว ได้ 0 คะแนน — เหมือนที่ตรวจบนกระดาษ'
+                  : 'ทุกข้อความที่ตัดสินถูก (ทั้งที่ติ๊กและที่เว้นไว้) ได้คะแนนส่วนของมัน'}
+              </span>
             </div>
           )}
         </div>
