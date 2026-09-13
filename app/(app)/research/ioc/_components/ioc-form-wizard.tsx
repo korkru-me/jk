@@ -88,7 +88,8 @@ export function IocFormWizard({ draft }: { draft: IocFormWizardDraft }) {
       }
 
       toast.success('บันทึกหัวเอกสารแล้ว')
-      router.push('/research/ioc')
+      const savedId = 'form_id' in result ? result.form_id : draft.form_id
+      router.push(savedId ? `/research/ioc/${savedId}` : '/research/ioc')
       router.refresh()
     })
   }

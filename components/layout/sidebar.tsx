@@ -19,6 +19,7 @@ const teacherNav: NavItem[] = [
   { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
   { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
   { href: '/research', label: 'วิจัยการศึกษา', icon: '🧪' },
+  { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: '📋' },
   { href: '/settings/profile', label: 'ตั้งค่า', icon: '⚙️' },
 ]
 
@@ -32,6 +33,9 @@ const studentNav: NavItem[] = [
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard'
   if (href === '/settings/profile') return pathname.startsWith('/settings')
+  // /research/ioc is its own menu entry, so the research item must not claim
+  // it as a child the way the default prefix rule would.
+  if (href === '/research') return pathname === '/research' || pathname.startsWith('/research/') && !pathname.startsWith('/research/ioc')
   if (href === '/questions/sets') {
     return pathname === '/questions' || (
       pathname.startsWith('/questions/')
