@@ -82,7 +82,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [classroomIds, setClassroomIds] = useState<string[]>(
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
-  const [mode, setMode] = useState<'online' | 'print'>('online')
   const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exercise')
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
@@ -250,9 +249,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     : '1 = แสดงทีละข้อเหมือนเดิม'
 
   // ── สุ่มชุดโจทย์รายคน ────────────────────────────────────────────────────
-  // One printed ใบงาน is one paper for the whole room, so drawing per student
-  // only means anything online. Below two โจทย์ there is nothing to draw from.
-  const canDrawRandomSubset = mode === 'online' && selectedIds.length >= 2
+  // Below two โจทย์ there is nothing to draw from.
+  const canDrawRandomSubset = selectedIds.length >= 2
   const randomDrawOn = canDrawRandomSubset && Number(randomQuestionCount) > 0
   // Highest draw that is still a draw: taking all of them is the other option.
   const maxRandomDraw = Math.max(1, selectedIds.length - 1)
@@ -265,17 +263,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     if (Number(randomQuestionCount) > maxRandomDraw) setRandomQuestionCount(String(maxRandomDraw))
   }, [maxRandomDraw, randomQuestionCount])
 
-  // A printed งาน cannot draw, so switching to พิมพ์ drops the draw rather
-  // than keeping a setting the teacher can no longer see or change.
   useEffect(() => {
-    if (mode === 'print') setRandomQuestionCount('')
-  }, [mode])
-
-  useEffect(() => {
-    const defaultEnabled = mode === 'online' && assignmentType === 'exercise'
+    const defaultEnabled = assignmentType === 'exercise'
     setCalculatorEnabled(defaultEnabled)
     setScratchpadEnabled(defaultEnabled)
-  }, [assignmentType, mode])
+  }, [assignmentType])
 
 
   const previewQuestions = selectedIds
@@ -307,7 +299,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const streakCapValue = streakCapEnabled && streakCap.trim() !== '' ? Number(streakCap) : null
   const streakDecision = decideCompletion({
     requested: 'streak',
-    mode,
     target: Number(streakTarget),
     questionCap: streakCapValue,
     recyclePool: streakRecycle,
@@ -317,9 +308,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const streakAdvice = streakBlocked
     ? null
     : streakPoolAdvice(poolQuestionTypes, streakDecision.target as number)
-  // Never offered where it cannot work at all, rather than offered and then
-  // refused: a printed ใบงาน has no moment at which a ข้อ is judged.
-  const streakOffered = mode === 'online'
   const streakOn = completionRule === 'streak'
 
   // What the three cards read as. Kept derived so the pair can never end up in
@@ -337,13 +325,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setCompletionRule('fixed')
     setPassingEnabled(choice === 'threshold')
   }
-
-  // Switching to a printed ใบงาน after choosing a streak would leave a งาน the
-  // server refuses, so the choice falls back to the plain ending — the same
-  // reason the สุ่ม draw is cleared on that switch.
-  useEffect(() => {
-    if (mode === 'print' && completionRule === 'streak') setCompletionRule('fixed')
-  }, [mode, completionRule])
 
   const pointValues = previewQuestions.map(q => Number.parseFloat(pointsDraft(q.id)) || 0)
   const drawnPointsVary = randomDrawOn && new Set(pointValues).size > 1
@@ -442,7 +423,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         start_at: effectiveStartAt || null,
         end_at: endAt || null,
         duration_minutes: duration ? Number(duration) : null,
-        mode,
+        mode: 'online' as const,
         type: assignmentType,
         shuffle_questions: shuffleQ,
         shuffle_options: shuffleA,
@@ -470,8 +451,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         // A งาน with nothing to photograph is stored as not requiring it,
         // whatever the switch was left on before the last โจทย์ was removed.
         require_work_image: hasWorkImageQuestions && requireWorkImage,
-        calculator_enabled: mode === 'online' && calculatorEnabled,
-        scratchpad_enabled: mode === 'online' && scratchpadEnabled,
+        calculator_enabled: calculatorEnabled,
+        scratchpad_enabled: scratchpadEnabled,
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
         block_clipboard: blockClipboard,
@@ -611,29 +592,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </div>
           </Card>
 
-          <Card padding="xl" className="space-y-3">
-            <h2 className="font-semibold text-foreground">โหมดการสอบ</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(['online', 'print'] as const).map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
-                    mode === m ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                  }`}
-                >
-                  <div className="text-xl leading-none shrink-0">{m === 'online' ? '💻' : '🖨️'}</div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm text-foreground">{m === 'online' ? 'ออนไลน์' : 'พิมพ์ใบงาน'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {m === 'online' ? 'นักเรียนทำบนเว็บ + จับเวลา' : 'สร้าง PDF พร้อม QR Code'}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
         </div>
       )}
 
@@ -872,7 +830,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {([
                 {
                   key: 'complete' as const,
@@ -886,11 +844,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   label: 'ต้องผ่านเกณฑ์',
                   desc: 'ทำครบแล้วดูว่าถึงเปอร์เซ็นต์หรือคะแนนที่ตั้งไว้ไหม',
                 },
-                ...(streakOffered ? [{
+                {
                   key: 'streak' as const,
                   label: 'ถูกติดกันจึงจบ',
                   desc: 'ทำไปเรื่อย ๆ จนตอบถูกติดต่อกันครบตามที่ตั้ง',
-                }] : []),
+                },
               ]).map(opt => (
                 <button
                   key={opt.key}
@@ -1088,14 +1046,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             />
           </div>
 
-          {mode === 'online' && streakOn && (
+          {streakOn && (
             <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
               เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
               และเปิดการตรวจทีละข้อให้เสมอ ปรับสองอย่างนี้ที่นี่ไม่ได้
             </p>
           )}
 
-          {mode === 'online' && !streakOn && (
+          {!streakOn && (
             <div className="space-y-1.5">
               <Label htmlFor="per-page" className="flex items-center gap-1.5">
                 <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
@@ -1116,10 +1074,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           <div className="space-y-2">
             {[
               // The แบบฝึกหัด/ข้อสอบ difference itself, so it sits above the
-              // rest rather than among the shuffles. Never offered to a ข้อสอบ
-              // (one ส่งคำตอบ at the end is what a ข้อสอบ is) or to a printed
-              // ใบงาน (nothing to press).
-              ...(mode === 'online' && assignmentType === 'exercise' && !streakOn ? [{
+              // rest rather than among the shuffles. Never offered to a ข้อสอบ:
+              // one ส่งคำตอบ at the end is what a ข้อสอบ is.
+              ...(assignmentType === 'exercise' && !streakOn ? [{
                 label: 'ให้นักเรียนกดตรวจทีละข้อ',
                 desc: 'ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย — คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน',
                 icon: CircleCheck,
@@ -1151,7 +1108,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   </div>
                 ) : null) as React.ReactNode,
               }] : []),
-              ...(mode === 'online' ? [{
+              {
                 label: 'ให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์',
                 desc: 'เปิดปุ่มเครื่องคิดเลขในหน้าทำโจทย์ นักเรียนเลือก DEG/RAD ตามช่องคำตอบที่กำลังใช้ได้',
                 icon: Calculator,
@@ -1165,7 +1122,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 value: scratchpadEnabled,
                 set: setScratchpadEnabled,
                 footer: null as React.ReactNode,
-              }] : []),
+              },
               ...(assignedSections.length > 0 ? [{
                 label: 'แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น',
                 desc: shuffleQ
@@ -1199,12 +1156,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               }] : []),
               // Reads as an on/off choice like the ones above it, so it is one
               // of them rather than a differently-shaped card further down the
-              // step. Only offered where it can do anything: one attempt has no
-              // "next time", and a printed ใบงาน has no attempts at all.
+              // step. Only offered where it can do anything: one attempt has
+              // no "next time".
               // Hidden while a สุ่ม draw is on: the point of a draw is that the
               // next round is a different paper, which is the opposite of
               // coming back to the same ข้อ that were missed.
-              ...(mode === 'online' && maxAttempts !== '1' && !randomDrawOn && !streakOn ? [{
+              ...(maxAttempts !== '1' && !randomDrawOn && !streakOn ? [{
                 label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
                 desc: 'รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ',
                 icon: RotateCcw,
@@ -1256,7 +1213,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             )}
           </div>
 
-          {mode === 'online' && assignmentType === 'exam' && (
+          {assignmentType === 'exam' && (
             <div className="space-y-3 rounded-xl border border-border p-4">
               <label className="flex items-center justify-between gap-4 cursor-pointer">
                 <div className="flex items-start gap-3">
@@ -1318,7 +1275,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               watermark for no reason other than both being exam-only. It is
               now its own card in เลือกโจทย์, next to the คลัง it draws from,
               and available to แบบฝึกหัด as well. */}
-          {mode === 'online' && assignmentType === 'exam' && (
+          {assignmentType === 'exam' && (
             <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 cursor-pointer">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -1338,7 +1295,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </label>
           )}
 
-          {mode === 'online' && assignmentType === 'exam' && (
+          {assignmentType === 'exam' && (
             <div className="space-y-3 rounded-xl border border-border p-4">
               <label className="flex items-center justify-between gap-4 cursor-pointer">
                 <div className="flex items-start gap-3">
@@ -1526,7 +1483,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     ? `${displayMaxScore} คะแนน (จริง ${pointsSum})`
                     : `${pointsSum} คะแนน`,
                 },
-                { label: 'โหมด',      value: mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
                 ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
                 {
                   label: 'เงื่อนไขจบ',
@@ -1540,32 +1496,30 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(streakOn ? [{ label: 'ทำครบคลังแล้ว', value: streakRecycle ? 'วนกลับมาใหม่' : 'จบเลย' }] : []),
                 ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
                 ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
-                ...(mode === 'online' && maxAttempts !== '1' && !randomDrawOn && retryScope === 'wrong_only'
+                ...(maxAttempts !== '1' && !randomDrawOn && retryScope === 'wrong_only'
                   ? [{ label: 'การทำรอบต่อไป', value: 'แก้เฉพาะข้อที่ไม่ถูกต้อง' }]
                   : []),
                 ...(randomDrawOn && maxAttempts !== '1'
                   ? [{ label: 'การทำรอบต่อไป', value: 'สุ่มชุดใหม่ทั้งชุด' }]
                   : []),
-                ...(mode === 'online' && perPageValue > 1
+                ...(perPageValue > 1
                   ? [{ label: 'ข้อต่อหน้า', value: `${perPageValue} ข้อ` }]
                   : []),
                 ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
-                ...(mode === 'online' && assignmentType === 'exam' && proctoringEnabled
+                ...(assignmentType === 'exam' && proctoringEnabled
                   ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
                   : []),
-                ...(mode === 'online' && assignmentType === 'exam' && secureBrowserMode === 'seb_required'
+                ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
                   ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
                   : []),
-                ...(mode === 'online' && assignmentType === 'exam' && androidExamMode === 'monitored'
+                ...(assignmentType === 'exam' && androidExamMode === 'monitored'
                   ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]
                   : []),
                 ...(hasWorkImageQuestions
                   ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
                   : []),
-                ...(mode === 'online' ? [
-                  { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
-                  { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
-                ] : []),
+                { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
+                { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
                 { label: 'แสดงผล',    value: SHOW_RESULTS_SUMMARY[showResults] },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">

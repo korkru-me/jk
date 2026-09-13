@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
-import type { AndroidExamMode, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
+import type { AndroidExamMode, AssignmentMode, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { decideCompletion, streakForcedSettings } from '@/lib/streak-completion'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 import { inspectSebReadiness } from '@/lib/seb'
@@ -59,7 +59,7 @@ interface CreateAssignmentData {
   start_at: string | null
   end_at: string | null
   duration_minutes: number | null
-  mode: 'online' | 'print'
+  mode: AssignmentMode
   type?: 'exercise' | 'exam'
   shuffle_questions?: boolean
   shuffle_options?: boolean
@@ -152,7 +152,6 @@ export async function createAssignment(data: CreateAssignmentData) {
   // students have been getting; see the migration's backfill.
   const isOnlineExercise = data.mode === 'online' && assignmentType === 'exercise'
   const { calculatorEnabled, scratchpadEnabled } = resolveNewAssignmentMathTools({
-    mode: data.mode,
     type: assignmentType,
     calculatorEnabled: data.calculator_enabled,
     scratchpadEnabled: data.scratchpad_enabled,
@@ -200,7 +199,6 @@ export async function createAssignment(data: CreateAssignmentData) {
   if ('error' in completionPool) return { error: completionPool.error }
   const completion = decideCompletion({
     requested: data.completion_rule,
-    mode: data.mode,
     target: data.streak_target,
     questionCap: data.streak_question_cap,
     recyclePool: data.streak_recycle_pool,
@@ -245,7 +243,10 @@ export async function createAssignment(data: CreateAssignmentData) {
       start_at: data.start_at || null,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
-      mode: data.mode,
+      // Not `data.mode`: there is one mode left, and writing it here rather
+      // than echoing the client is what stops a tampered payload from
+      // reviving the retired 'print' value the enum still accepts.
+      mode: 'online',
       type: assignmentType,
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? false,
@@ -500,7 +501,6 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const completion = completionRequested
     ? decideCompletion({
         requested: data.completion_rule,
-        mode: existing.mode as 'online' | 'print',
         target: data.streak_target,
         questionCap: data.streak_question_cap,
         recyclePool: data.streak_recycle_pool,

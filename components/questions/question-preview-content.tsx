@@ -20,6 +20,9 @@ import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers,
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, SubmittedFile } from '@/lib/types'
 import { CLASSIFY_UNSET, classifyCorrectGrid } from '@/lib/classify'
+import { choiceListHint } from '@/lib/choice-list-hint'
+import { scoreChoiceTicks } from '@/lib/choice-ticks'
+import { choicesFitOneRow } from '@/lib/choice-layout'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -262,6 +265,13 @@ export function QuestionPreviewContent({
     setCompositeResults([])
     setClassifyGrid(emptyClassifyGrid())
     setClassifyChecked(false)
+  }
+
+  /** A grouped ถูก-ผิด part's share of its own points, by the part's own rule. */
+  function compositeChoiceShare(part: CompositePart, raw: string): number {
+    const flip = part.select_target === 'wrong'
+    const targets = (part.choices ?? []).map(c => ((flip ? !c.correct_answer : c.correct_answer) ? 'true' : 'false'))
+    return scoreChoiceTicks(raw, targets, part.choice_scoring).share
   }
 
   function checkCompositePart(part: CompositePart, i: number): boolean | null {
@@ -568,11 +578,25 @@ export function QuestionPreviewContent({
         }
       })
       rows.push({ label: 'เหตุผล', studentAnswer: tfExplanation, correctAnswer: null, status: 'pending' })
+      // A ticked list may be marked all-or-nothing, so the points cannot be
+      // assumed to be one per row judged right — ask the same function the
+      // real grader asks, or this panel promises a score no one will get.
+      const strict = selectMode && trueFalseConfig.choice_scoring === 'all_or_nothing'
+      const autoScore = selectMode
+        ? scoreChoiceTicks(
+            tfAnswers,
+            tfItems.map(item => ((flip ? !item.correct_answer : item.correct_answer) ? 'true' : 'false')),
+            trueFalseConfig.choice_scoring,
+          ).share * tfItems.length * scoreAnswer
+        : correctCount * scoreAnswer
       return {
         rows,
-        autoScore: correctCount * scoreAnswer,
+        autoScore,
         maxScore: naturalMaxScore('true_false', trueFalseConfig, null),
         manualNote:
+          (strict
+            ? 'ข้อนี้ตั้งให้ “ถูกทุกข้อจึงได้คะแนน” — ติ๊กผิดหรือตกไปข้อเดียวได้ 0 คะแนน · '
+            : '') +
           `ส่วนถูก/ผิดระบบตรวจให้เองข้อละ ${scoreAnswer} คะแนน แต่ “เหตุผล” ที่นักเรียนเขียน ` +
           `(${trueFalseConfig.score_explanation ?? 1} คะแนน) ไม่มีเฉลยให้เทียบ ระบบจึงเว้นไว้และค้างทั้งข้อเป็น ` +
           '“รอครูตรวจ” จนกว่าครูจะอ่านเหตุผลแล้วกดที่คะแนนเพื่อรวมคะแนนส่วนนั้นเข้าไป',
@@ -586,7 +610,16 @@ export function QuestionPreviewContent({
         const { student, correct } = compositeDisplay(part, raw)
         const manual = compositeManual(part)
         const ok = manual ? null : checkCompositePart(part, i)
-        if (ok === true) earned += typeof part.score === 'number' && part.score > 0 ? part.score : 1
+        const partScore = typeof part.score === 'number' && part.score > 0 ? part.score : 1
+        // checkCompositePart answers "is the whole part right", which is the
+        // row's ✓/✗ but not its points: a grouped ถูก-ผิด left on the default
+        // 'partial' pays for every choice judged right, so counting only
+        // spotless parts showed a teacher 0 for work the grader pays for.
+        if (part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0) {
+          earned += compositeChoiceShare(part, compositeAnswers[i] ?? '') * partScore
+        } else if (ok === true) {
+          earned += partScore
+        }
         return {
           label: `ข้อ ${labels[i] ?? i + 1}`,
           studentAnswer: student,
@@ -1018,14 +1051,14 @@ export function QuestionPreviewContent({
       {questionType === 'true_false' && trueFalseConfig && trueFalseConfig.answer_mode === 'select_matching' && (() => {
         const subStatements = trueFalseConfig.statements ?? []
         const labels = partLabels(trueFalseConfig.part_label_style)
-        const items = [{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...subStatements]
+        const items = [{ text: renderedText, correct_answer: trueFalseConfig.correct_answer }, ...subStatements]
         const isTarget = (correct: boolean) => trueFalseConfig.select_target === 'wrong' ? !correct : correct
         const correctCount = items.reduce((n, st, i) => n + (((tfAnswers[i] === 'true') === isTarget(st.correct_answer)) ? 1 : 0), 0)
         const total = items.length
         return (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground font-medium">
-              ข้อใดต่อไปนี้{trueFalseConfig.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)
+              {choiceListHint(questionText, trueFalseConfig.select_target)}
             </p>
             <div className="space-y-2">
               {items.map((st, i) => {
@@ -1047,7 +1080,7 @@ export function QuestionPreviewContent({
                     />
                     <span className="flex items-center gap-1.5 flex-wrap text-sm text-foreground">
                       <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-                      {i > 0 && <RenderText text={st.text} />}
+                      {st.text && <RenderText text={st.text} />}
                     </span>
                   </label>
                 )
@@ -1106,12 +1139,12 @@ export function QuestionPreviewContent({
         return (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
-            {[{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...subStatements].map((st, i) => (
+            {[{ text: renderedText, correct_answer: trueFalseConfig.correct_answer }, ...subStatements].map((st, i) => (
               <div key={i} className="space-y-1.5">
                 {hasSubs && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-                    {i > 0 && <RenderText text={st.text} />}
+                    {st.text && <RenderText text={st.text} />}
                   </div>
                 )}
                 <div className="flex gap-3">
@@ -1375,8 +1408,8 @@ export function QuestionPreviewContent({
                       <>
                         <RichText text={part.text} className="text-[15px] text-foreground" />
                         <PartImages urls={part.image_urls} />
-                        <p className="text-xs text-muted-foreground">ข้อใดต่อไปนี้{part.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
-                        <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">{choiceListHint(part.text, part.select_target)}</p>
+                        <div className={choicesFitOneRow(part.choices!.map(c => c.text)) ? 'flex flex-wrap gap-1.5' : 'space-y-1.5'}>
                           {part.choices!.map((c, ci) => {
                             const ticked = ticks[ci] === 'true'
                             const isTargetChoice = flip ? !c.correct_answer : c.correct_answer
@@ -1549,7 +1582,7 @@ export function QuestionPreviewContent({
                   {classifyColumns.map((column, c) => (
                     <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-t lg:p-2">
                       <span className="mb-1 block text-xs font-semibold text-muted-foreground lg:hidden">{column.title}</span>
-                      <span className="flex flex-col gap-1.5">
+                      <span className={choicesFitOneRow(column.options ?? []) ? 'flex flex-wrap gap-1.5' : 'flex flex-col gap-1.5'}>
                         {(column.options ?? []).map((option, oi) => {
                           const picked = classifyGrid[r]?.[c] === oi
                           const key = classifyKey[r]?.[c]

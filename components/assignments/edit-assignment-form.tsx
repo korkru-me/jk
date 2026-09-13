@@ -170,7 +170,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const streakCapValue = streakCapEnabled && streakCap.trim() !== '' ? Number(streakCap) : null
   const streakDecision = decideCompletion({
     requested: 'streak',
-    mode: a.mode,
     target: Number(streakTarget),
     questionCap: streakCapValue,
     recyclePool: streakRecycle,

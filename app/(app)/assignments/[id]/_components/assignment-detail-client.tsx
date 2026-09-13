@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
-  Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
+  Play, Square, BarChart2, Trash2, TrendingUp,
   AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
   FileClock, Presentation,
 } from 'lucide-react'
@@ -113,9 +113,6 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
                 <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
                 {statusMeta.label}
               </span>
-              <span className="text-xs text-surface-inverse-muted border border-surface-inverse-border px-2.5 py-1 rounded-full">
-                {a.mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์'}
-              </span>
               {a.secure_browser_mode === 'seb_required' && (
                 <span className="flex items-center gap-1 text-xs text-success border border-success/40 bg-success/10 px-2.5 py-1 rounded-full">
                   <LockKeyhole className="w-3 h-3" /> Safe Exam Browser
@@ -193,13 +190,6 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
               <Square className="w-3.5 h-3.5" /> ปิดการสอบ
             </Button>
           )}
-          {a.mode === 'print' && (
-            <Link href={`/assignments/${a.id}/print`} target="_blank">
-              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-                <Printer className="w-3.5 h-3.5" /> พิมพ์ใบงาน
-              </Button>
-            </Link>
-          )}
           {a.mode === 'online' && a.question_ids.length > 0 && (
             <Link href={`/assignments/${a.id}/preview`} target="_blank">
               <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
@@ -245,11 +235,6 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
           <Link href={`/assignments/${a.id}/analytics`}>
             <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
               <TrendingUp className="w-3.5 h-3.5" /> วิเคราะห์เชิงลึก
-            </Button>
-          </Link>
-          <Link href={`/assignments/${a.id}/export`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-              <Settings className="w-3.5 h-3.5" /> ส่งออก &amp; พิมพ์
             </Button>
           </Link>
           <button
@@ -381,7 +366,6 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
         <div className="divide-y divide-border">
           {[
             { label: 'ห้องเรียน', value: a.classrooms?.name ?? '—' },
-            { label: 'โหมด', value: a.mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
             { label: 'เวลาทำ', value: a.duration_minutes ? `${a.duration_minutes} นาที` : 'ไม่จำกัด' },
             { label: 'เปิดรับ', value: a.start_at ? new Date(a.start_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ทันที' },
             { label: 'ปิดรับ', value: a.end_at ? new Date(a.end_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่กำหนด' },

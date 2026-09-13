@@ -597,13 +597,13 @@
     "palette": 0,
     "card": 0,
     "control": 0,
-    "button": 4
+    "button": 5
   },
   "components/questions/true-false-group-form.tsx": {
     "palette": 0,
     "card": 0,
     "control": 0,
-    "button": 5
+    "button": 6
   },
   "components/questions/variable-editor.tsx": {
     "palette": 2,

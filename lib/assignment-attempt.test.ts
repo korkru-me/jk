@@ -175,6 +175,76 @@ describe('gradeAnswer — true/false', () => {
     expect(result.score).toBe(2)
     expect(result.is_correct).toBe(false)
   })
+
+  // judge_each asks for an explicit ✓ถูก/✗ผิด, so a statement the student never
+  // reached is unanswered — it must not be read as 'ผิด' and marked for them.
+  it('pays nothing for a statement judge_each left untouched', () => {
+    const result = gradeAnswer(answer({
+      correct: 'TF:' + JSON.stringify(['true', 'false', 'false']),
+      student: JSON.stringify({ answers: ['true'] }),
+      questionType: 'true_false',
+      extraData: { statements: [{}, {}], score_answer: 1, explanation_mode: 'none' },
+      maxScore: 3,
+    }))
+    expect(result).toMatchObject({ score: 1, is_correct: false })
+  })
+})
+
+// ─── ถูก-ผิด answered by ticking (answer_mode: 'select_matching') ─────────────
+//
+// The student sees every statement at once and ticks the ones matching
+// select_target, so an untouched statement has been judged rather than skipped
+// — the opposite of judge_each above, and the reason the two cannot share one
+// comparison.
+
+/** Ticks as TrueFalseSelectMatching writes them: only clicked indices exist. */
+function tfTicks(...clicked: number[]): string {
+  const answers: (string | null)[] = []
+  for (const i of clicked) {
+    while (answers.length < i) answers.push(null)
+    answers[i] = 'true'
+  }
+  return JSON.stringify({ answers, explanation: '' })
+}
+
+describe('gradeAnswer — ถูก-ผิด แบบติ๊กข้อที่ตรง', () => {
+  /** Four statements, of which the first and third are the ones to tick. */
+  const KEY = 'TF:' + JSON.stringify(['true', 'false', 'true', 'false'])
+  const CONFIG = {
+    statements: [{}, {}, {}],
+    score_answer: 1,
+    explanation_mode: 'none',
+    answer_mode: 'select_matching',
+  }
+
+  function grade(student: string | null, extra: Record<string, unknown> = {}) {
+    return gradeAnswer(answer({
+      correct: KEY, student, questionType: 'true_false',
+      extraData: { ...CONFIG, ...extra }, maxScore: 4,
+    }))
+  }
+
+  // The regression: ticking 1 and 3 leaves 2 and 4 unwritten, and reading those
+  // as unanswered scored 2 of 4 for a spotless answer.
+  it('gives full marks for ticking exactly the right statements', () => {
+    expect(grade(tfTicks(0, 2))).toMatchObject({ score: 4, is_correct: true })
+  })
+
+  it('docks a statement ticked that should not have been', () => {
+    expect(grade(tfTicks(0, 1, 2))).toMatchObject({ score: 3, is_correct: false })
+  })
+
+  it('pays nothing for a question the student never opened', () => {
+    expect(grade(null)).toMatchObject({ score: 0, is_correct: false })
+    expect(grade(JSON.stringify({ answers: [] }))).toMatchObject({ score: 0, is_correct: false })
+  })
+
+  it('pays all or nothing when the teacher asked for it', () => {
+    expect(grade(tfTicks(0, 2), { choice_scoring: 'all_or_nothing' }))
+      .toMatchObject({ score: 4, is_correct: true })
+    expect(grade(tfTicks(0), { choice_scoring: 'all_or_nothing' }))
+      .toMatchObject({ score: 0, is_correct: false })
+  })
 })
 
 describe('gradeAnswer — ordering', () => {
@@ -609,6 +679,150 @@ describe('gradeAnswer — composite with an mcq part', () => {
     expect(result).toMatchObject({ is_correct: false, score: 0 })
   })
 })
+
+// ─── ถูก-ผิดแบบชุด (grouped true/false) ───────────────────────────────────────
+//
+// The shape the dedicated "ถูก-ผิดแบบชุด" page saves (see lib/true-false-group.ts):
+// a composite whose parts each carry `choices` the student ticks 1+ of. The
+// beaker question these are written against offers 7 choices of which 4 are
+// correct — the case that used to cap a perfect answer at 4/7.
+
+/** The 7 beakers, with 1, 3, 5 and 6 the ones that rust. */
+const BEAKERS = ['1', '2', '3', '4', '5', '6', '7'].map((text, i) => ({
+  id: `c${i}`, text, correct_answer: [0, 2, 4, 5].includes(i),
+}))
+
+function beakerQuestion(): Question {
+  return {
+    id: 'q1',
+    question_type: 'composite',
+    answer_formula: '',
+    answer_parts: null,
+    variables: [],
+    logic_rules: [],
+    mcq_options: null,
+    extra_data: {
+      parts: [{
+        id: 'p1',
+        type: 'true_false',
+        text: 'ตะปูเหล็กที่เกิดสนิมอยู่ในบีกเกอร์หมายเลข',
+        score: 0.5,
+        choices: BEAKERS,
+        select_target: 'correct',
+      }],
+    },
+  } as unknown as Question
+}
+
+/** One part's ticks, as CompositeAnswerInput sends them: only the indices the
+ *  student actually clicked are written, so anything after the last click is
+ *  absent and anything skipped before it is null. */
+function ticks(...clicked: number[]): string {
+  const arr: (string | null)[] = []
+  for (const i of clicked) {
+    while (arr.length < i) arr.push(null)
+    arr[i] = 'true'
+  }
+  return JSON.stringify([JSON.stringify(arr)])
+}
+
+describe('gradeAnswer — ถูก-ผิดแบบชุด', () => {
+  const skeleton = buildAttemptQuestion(beakerQuestion(), { orderIndex: 0, shuffleOptions: false })
+
+  function grade(student: string | null) {
+    return gradeAnswer(answer({
+      correct: skeleton.correct_answer,
+      student,
+      questionType: 'composite',
+      extraData: beakerQuestion().extra_data,
+      maxScore: skeleton.max_score,
+    }))
+  }
+
+  it('keys every choice, not just the correct ones', () => {
+    expect(skeleton.correct_answer).toBe('COMP:' + JSON.stringify([{
+      type: 'true_false',
+      correct: ['true', 'false', 'true', 'false', 'true', 'true', 'false'],
+      score: 0.5,
+    }]))
+    expect(skeleton.max_score).toBe(0.5)
+  })
+
+  // The regression: ticking 1, 3, 5 and 6 leaves 2, 4 and 7 unwritten, and
+  // reading those as unanswered rather than as "not ticked" scored 4/7.
+  it('gives full marks for ticking exactly the right boxes', () => {
+    expect(grade(ticks(0, 2, 4, 5))).toMatchObject({ is_correct: true, score: 0.5 })
+  })
+
+  it('gives the same full marks when every box was written out explicitly', () => {
+    const explicit = ['true', 'false', 'true', 'false', 'true', 'true', 'false']
+    expect(grade(JSON.stringify([JSON.stringify(explicit)]))).toMatchObject({ is_correct: true, score: 0.5 })
+  })
+
+  it('docks a box ticked that should not have been', () => {
+    // 1, 3, 5, 6 plus a wrong 2 — six of seven judged right.
+    expect(grade(ticks(0, 1, 2, 4, 5))).toMatchObject({ is_correct: false, score: 0.5 * 6 / 7 })
+  })
+
+  it('docks a correct box left unticked', () => {
+    expect(grade(ticks(0, 2, 4))).toMatchObject({ is_correct: false, score: 0.5 * 6 / 7 })
+  })
+
+  it('pays nothing for a part the student never answered', () => {
+    expect(grade(null)).toMatchObject({ is_correct: false, score: 0 })
+    expect(grade(JSON.stringify(['']))).toMatchObject({ is_correct: false, score: 0 })
+    expect(grade(JSON.stringify([JSON.stringify([])]))).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('scores ticking every box by how many of them wanted ticking', () => {
+    expect(grade(ticks(0, 1, 2, 3, 4, 5, 6))).toMatchObject({ is_correct: false, score: 0.5 * 4 / 7 })
+  })
+
+  describe('marked all-or-nothing, the way the paper marks it', () => {
+    const q = beakerQuestion()
+    const parts = (q.extra_data as { parts: Record<string, unknown>[] }).parts
+    parts[0].choice_scoring = 'all_or_nothing'
+    const strict = buildAttemptQuestion(q, { orderIndex: 0, shuffleOptions: false })
+
+    function gradeStrict(student: string | null) {
+      return gradeAnswer(answer({
+        correct: strict.correct_answer, student, questionType: 'composite',
+        extraData: q.extra_data, maxScore: strict.max_score,
+      }))
+    }
+
+    it('freezes the rule into the key, so re-marking the question spares work already handed in', () => {
+      expect(strict.correct_answer).toContain('"scoring":"all_or_nothing"')
+    })
+
+    it('pays a spotless answer in full', () => {
+      expect(gradeStrict(ticks(0, 2, 4, 5))).toMatchObject({ is_correct: true, score: 0.5 })
+    })
+
+    it('pays nothing for one box out of place', () => {
+      expect(gradeStrict(ticks(0, 2, 4))).toMatchObject({ is_correct: false, score: 0 })
+      expect(gradeStrict(ticks(0))).toMatchObject({ is_correct: false, score: 0 })
+    })
+  })
+
+  // select_target: 'wrong' flips the key at build time, so grading never sees
+  // the difference — the ticks that earn full marks are the other three.
+  it('follows a part that asks which choices are wrong', () => {
+    const q = beakerQuestion()
+    const parts = (q.extra_data as { parts: { select_target: string }[] }).parts
+    parts[0].select_target = 'wrong'
+    const flipped = buildAttemptQuestion(q, { orderIndex: 0, shuffleOptions: false })
+
+    const result = gradeAnswer(answer({
+      correct: flipped.correct_answer,
+      student: ticks(1, 3, 6),
+      questionType: 'composite',
+      extraData: q.extra_data,
+      maxScore: flipped.max_score,
+    }))
+    expect(result).toMatchObject({ is_correct: true, score: 0.5 })
+  })
+})
 // ─── Essay ───────────────────────────────────────────────────────────────────
 
 /** An essay question shaped the way essay-form.tsx saves one: no formula, no
@@ -666,6 +880,25 @@ describe('ตารางจำแนก, from attempt to grade', () => {
 
   it('is worth one point per cell, not per row', () => {
     expect(naturalMaxScore('classify', config, null)).toBe(4)
+  })
+
+  // A worksheet's ตารางจำแนก is usually worth less than one point a cell — the
+  // polymer question prints four rows for 2.0 คะแนน. Nothing in the question
+  // itself says so, and nothing needs to: the assignment's question_points
+  // sets what the ข้อ is worth there, and grading hands out that ceiling in
+  // the cells' own proportions. A per-cell multiplier on the question would
+  // only be a second way to say the same thing.
+  it('hands out an assignment\'s own ceiling in the cells\' proportions', () => {
+    const worth2 = { ...assignment, question_points: { q1: 2 } }
+    const [skeleton] = buildAssignmentAttempt(worth2, [classifyQuestion()])
+    expect(skeleton.max_score).toBe(2)
+
+    const at = (student: string) =>
+      gradeAnswer(answer({ correct: skeleton.correct_answer, student, questionType: 'classify', extraData: config, maxScore: 2 }))
+
+    expect(at('[[0,1],[1,0]]')).toMatchObject({ is_correct: true, score: 2 })     // 4 of 4 cells
+    expect(at('[[0,1],[1,1]]')).toMatchObject({ is_correct: false, score: 1.5 })  // 3 of 4
+    expect(at('[[-1,-1],[-1,-1]]')).toMatchObject({ is_correct: false, score: 0 })
   })
 
   it('credits a fully correct grid', () => {

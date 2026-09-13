@@ -21,6 +21,7 @@ export const EXAM_SCREEN_QA_CASES = [
   { slug: 'mcq', source: 'mcq', label: 'ปรนัยพร้อมรูปประกอบ' },
   { slug: 'true-false-judge', source: 'true_false', label: 'ถูก–ผิดทีละข้อความ' },
   { slug: 'true-false-select', source: 'true_false', label: 'เลือกข้อความที่ไม่ถูกต้อง' },
+  { slug: 'true-false-group', source: 'composite', label: 'ถูก-ผิดแบบชุด ตัวเลือกสั้น' },
   { slug: 'fill-blank', source: 'fill_blank', label: 'เติมคำและรายการเลือก' },
   { slug: 'matching-slots', source: 'matching', label: 'จับคู่แบบช่อง' },
   { slug: 'matching-lines', source: 'matching', label: 'จับคู่แบบลากเส้น' },
@@ -47,6 +48,44 @@ const QA_DIAGRAM = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
 `)}`
 
 const FIXED_TIMESTAMP = '2026-01-01T00:00:00.000Z'
+
+/**
+ * ถูก-ผิดแบบชุด, which is saved as a composite whose parts each carry `choices`
+ * (see lib/true-false-group.ts) — a shape the generic composite sample has no
+ * way to produce, so this case builds its own.
+ *
+ * Modelled on the corrosion question a worksheet prints as one row of seven
+ * boxes, which is also the case the one-row choice layout exists for: seven
+ * choices this short stacked down the page cost most of a phone screen.
+ */
+const TRUE_FALSE_GROUP_CONFIG = {
+  parts: [
+    {
+      id: 'qa-tfg-rust',
+      type: 'true_false' as const,
+      text: 'ตะปูเหล็กที่เกิดสนิมอยู่ในบีกเกอร์หมายเลข',
+      score: 0.5,
+      select_target: 'correct' as const,
+      choices: ['1', '2', '3', '4', '5', '6', '7'].map((text, i) => ({
+        id: `qa-tfg-rust-${text}`, text, correct_answer: [0, 2, 4, 5].includes(i),
+      })),
+    },
+    {
+      id: 'qa-tfg-cathodic',
+      type: 'true_false' as const,
+      text: 'บีกเกอร์ที่ใช้วิธีการป้องกันการผุกร่อนแบบแคโทดิก คือ หมายเลข',
+      score: 0.5,
+      select_target: 'correct' as const,
+      choice_scoring: 'all_or_nothing' as const,
+      choices: ['1', '2', '3', '4', '5', '6', '7'].map((text, i) => ({
+        id: `qa-tfg-cathodic-${text}`, text, correct_answer: [3, 6].includes(i),
+      })),
+    },
+  ],
+}
+
+const TRUE_FALSE_GROUP_TEXT =
+  'พิจารณาการทดลองการเกิดสนิมของตะปูเหล็กในบีกเกอร์ที่ 1–7 แล้วตอบคำถามต่อไปนี้'
 
 function extraDataFor(
   source: QuestionType,
@@ -76,7 +115,9 @@ function extraDataFor(
   if (source === 'file_upload') {
     return { attachment_urls: props.attachmentUrls ?? [] }
   }
-  if (source === 'composite') return props.compositeConfig!
+  if (source === 'composite') {
+    return slug === 'true-false-group' ? TRUE_FALSE_GROUP_CONFIG : props.compositeConfig!
+  }
   if (source === 'classify') return props.classifyConfig!
   return {}
 }
@@ -108,7 +149,7 @@ export function buildExamScreenQaQuestions(): Question[] {
       grade_level: 'มัธยมศึกษา',
       subject: 'วิทยาศาสตร์',
       title: `${index + 1}. ${testCase.label}`,
-      question_text: props.questionText,
+      question_text: testCase.slug === 'true-false-group' ? TRUE_FALSE_GROUP_TEXT : props.questionText,
       question_type: testCase.source,
       difficulty: 'medium',
       visibility: 'private',
@@ -202,9 +243,9 @@ export function buildExamScreenQaFixture(): ExamScreenQaFixture {
   return {
     answers,
     sections: [
-      { id: 'qa-section-input', title: 'การตอบพื้นฐาน', question_ids: questionIds.slice(0, 5) },
-      { id: 'qa-section-touch', title: 'การลากและจัดลำดับ', question_ids: questionIds.slice(5, 9) },
-      { id: 'qa-section-long', title: 'คำตอบยาวและไฟล์', question_ids: questionIds.slice(9) },
+      { id: 'qa-section-input', title: 'การตอบพื้นฐาน', question_ids: questionIds.slice(0, 6) },
+      { id: 'qa-section-touch', title: 'การลากและจัดลำดับ', question_ids: questionIds.slice(6, 10) },
+      { id: 'qa-section-long', title: 'คำตอบยาวและไฟล์', question_ids: questionIds.slice(10) },
     ],
   }
 }

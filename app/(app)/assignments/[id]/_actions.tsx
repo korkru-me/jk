@@ -14,10 +14,9 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 interface Props {
   assignmentId: string
   currentStatus: AssignmentStatus
-  mode: 'online' | 'print'
 }
 
-export function AssignmentActions({ assignmentId, currentStatus, mode }: Props) {
+export function AssignmentActions({ assignmentId, currentStatus }: Props) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const [confirm, confirmDialog] = useConfirm()
@@ -58,15 +57,6 @@ export function AssignmentActions({ assignmentId, currentStatus, mode }: Props) 
         <Button onClick={() => changeStatus('closed')} disabled={loading} variant="destructive">
           ปิดการสอบ
         </Button>
-      )}
-      {mode === 'print' && (
-        <Link
-          href={`/assignments/${assignmentId}/print`}
-          target="_blank"
-          className={cn(buttonVariants({ variant: 'outline' }))}
-        >
-          🖨️ พิมพ์ใบงาน
-        </Link>
       )}
       <Link
         href={`/assignments/${assignmentId}/results`}

@@ -36,7 +36,6 @@ export const COMFORTABLE_POOL_MULTIPLE = 3
 
 export interface CompletionRequest {
   requested?: CompletionRule | null
-  mode: 'online' | 'print'
   target?: number | null
   questionCap?: number | null
   recyclePool?: boolean | null
@@ -102,12 +101,6 @@ export function decideCompletion(request: CompletionRequest): CompletionDecision
   }
 
   if (request.requested !== 'streak') return fixed
-
-  // A printed ใบงาน has no moment at which a ข้อ is judged, so there is never
-  // a run to count.
-  if (request.mode !== 'online') {
-    return { ...fixed, refusedReason: 'โหมดพิมพ์ใช้เงื่อนไข “ถูกติดต่อกัน” ไม่ได้ เพราะใบงานบนกระดาษไม่มีการตรวจทีละข้อ' }
-  }
 
   if (invalidTarget(request.target)) {
     return {

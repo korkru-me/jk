@@ -41,7 +41,7 @@ describe('streakEligibleCount', () => {
 
 describe('decideCompletion', () => {
   it('defaults to fixed, the behavior of every งาน before this setting', () => {
-    const d = decideCompletion({ mode: 'online', poolQuestionTypes: mcqPool(10) })
+    const d = decideCompletion({ poolQuestionTypes: mcqPool(10) })
     expect(d.rule).toBe('fixed')
     expect(d.target).toBeNull()
     expect(d.questionCap).toBeNull()
@@ -50,14 +50,14 @@ describe('decideCompletion', () => {
 
   it('keeps streak fields null when the rule is fixed, whatever was sent', () => {
     const d = decideCompletion({
-      requested: 'fixed', mode: 'online', target: 5, questionCap: 30, poolQuestionTypes: mcqPool(10),
+      requested: 'fixed', target: 5, questionCap: 30, poolQuestionTypes: mcqPool(10),
     })
     expect(d).toMatchObject({ rule: 'fixed', target: null, questionCap: null })
   })
 
   it('accepts a streak the pool can support', () => {
     const d = decideCompletion({
-      requested: 'streak', mode: 'online', target: 5, questionCap: 30, poolQuestionTypes: mcqPool(20),
+      requested: 'streak', target: 5, questionCap: 30, poolQuestionTypes: mcqPool(20),
     })
     expect(d).toMatchObject({
       rule: 'streak', target: 5, questionCap: 30, recyclePool: true, refusedReason: null,
@@ -65,36 +65,29 @@ describe('decideCompletion', () => {
   })
 
   it('treats an absent recyclePool as on and an explicit false as off', () => {
-    const base = { requested: 'streak' as const, mode: 'online' as const, target: 3, poolQuestionTypes: mcqPool(20) }
+    const base = { requested: 'streak' as const, target: 3, poolQuestionTypes: mcqPool(20) }
     expect(decideCompletion(base).recyclePool).toBe(true)
     expect(decideCompletion({ ...base, recyclePool: false }).recyclePool).toBe(false)
   })
 
   // The point of refusedReason: a refused streak must not come back looking
   // like a งาน the teacher successfully created with a different ending.
-  it('refuses print mode with a reason rather than downgrading silently', () => {
-    const d = decideCompletion({
-      requested: 'streak', mode: 'print', target: 5, poolQuestionTypes: mcqPool(20),
-    })
-    expect(d.rule).toBe('fixed')
-    expect(d.refusedReason).toMatch(/โหมดพิมพ์/)
-  })
 
   it('refuses a target outside the column bounds', () => {
     const pool = mcqPool(40)
-    expect(decideCompletion({ requested: 'streak', mode: 'online', target: STREAK_TARGET_MIN - 1, poolQuestionTypes: pool }).refusedReason)
+    expect(decideCompletion({ requested: 'streak', target: STREAK_TARGET_MIN - 1, poolQuestionTypes: pool }).refusedReason)
       .toMatch(/ระหว่าง/)
-    expect(decideCompletion({ requested: 'streak', mode: 'online', target: STREAK_TARGET_MAX + 1, poolQuestionTypes: pool }).refusedReason)
+    expect(decideCompletion({ requested: 'streak', target: STREAK_TARGET_MAX + 1, poolQuestionTypes: pool }).refusedReason)
       .toMatch(/ระหว่าง/)
-    expect(decideCompletion({ requested: 'streak', mode: 'online', target: 2.5, poolQuestionTypes: pool }).refusedReason)
+    expect(decideCompletion({ requested: 'streak', target: 2.5, poolQuestionTypes: pool }).refusedReason)
       .toMatch(/ระหว่าง/)
-    expect(decideCompletion({ requested: 'streak', mode: 'online', poolQuestionTypes: pool }).refusedReason)
+    expect(decideCompletion({ requested: 'streak', poolQuestionTypes: pool }).refusedReason)
       .toMatch(/ระหว่าง/)
   })
 
   it('refuses a pool with fewer usable ข้อ than the target', () => {
     const d = decideCompletion({
-      requested: 'streak', mode: 'online', target: 5, poolQuestionTypes: mcqPool(4),
+      requested: 'streak', target: 5, poolQuestionTypes: mcqPool(4),
     })
     expect(d.rule).toBe('fixed')
     expect(d.refusedReason).toMatch(/อย่างน้อย 5 ข้อ ตอนนี้มี 4 ข้อ/)
@@ -103,8 +96,7 @@ describe('decideCompletion', () => {
   it('counts only usable ข้อ when refusing, and says what was skipped', () => {
     const d = decideCompletion({
       requested: 'streak',
-      mode: 'online',
-      target: 5,
+            target: 5,
       // Six ข้อ looks like enough until the three that cannot be judged
       // mid-attempt are taken out, which is the whole reason the message
       // names them: "ผมเลือกไว้ 6 ข้อแล้วนี่" is the teacher's first thought.
@@ -117,7 +109,7 @@ describe('decideCompletion', () => {
 
   it('accepts a pool whose usable count exactly equals the target', () => {
     const d = decideCompletion({
-      requested: 'streak', mode: 'online', target: 5,
+      requested: 'streak', target: 5,
       poolQuestionTypes: ['mcq', 'mcq', 'mcq', 'mcq', 'mcq', 'essay', 'file_upload'],
     })
     expect(d).toMatchObject({ rule: 'streak', target: 5, refusedReason: null })
@@ -125,15 +117,15 @@ describe('decideCompletion', () => {
 
   it('drops a ceiling outside the column bounds instead of refusing the งาน', () => {
     const pool = mcqPool(20)
-    expect(decideCompletion({ requested: 'streak', mode: 'online', target: 5, questionCap: 0, poolQuestionTypes: pool }).questionCap).toBeNull()
-    expect(decideCompletion({ requested: 'streak', mode: 'online', target: 5, questionCap: STREAK_CAP_MAX + 1, poolQuestionTypes: pool }).questionCap).toBeNull()
+    expect(decideCompletion({ requested: 'streak', target: 5, questionCap: 0, poolQuestionTypes: pool }).questionCap).toBeNull()
+    expect(decideCompletion({ requested: 'streak', target: 5, questionCap: STREAK_CAP_MAX + 1, poolQuestionTypes: pool }).questionCap).toBeNull()
   })
 
   // A ceiling under the target would end every attempt one ข้อ before it could
   // pass, which reads as a broken งาน rather than a strict one.
   it('raises a ceiling below the target up to the target', () => {
     const d = decideCompletion({
-      requested: 'streak', mode: 'online', target: 8, questionCap: 3, poolQuestionTypes: mcqPool(20),
+      requested: 'streak', target: 8, questionCap: 3, poolQuestionTypes: mcqPool(20),
     })
     expect(d.questionCap).toBe(8)
   })
