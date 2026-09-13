@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MatchingConfig, TrueFalseConfig } from '@/lib/types'
+import { isTrueFalseGroupQuestion } from '@/lib/true-false-group'
 import {
   buildExamScreenQaFixture,
   buildExamScreenQaQuestions,
@@ -12,7 +13,7 @@ describe('exam screen QA fixture', () => {
     const questions = buildExamScreenQaQuestions()
     const types = new Set(questions.map(question => question.question_type))
 
-    expect(questions).toHaveLength(12)
+    expect(questions).toHaveLength(13)
     expect(types).toEqual(new Set([
       'mcq',
       'written',
@@ -34,6 +35,10 @@ describe('exam screen QA fixture', () => {
       .map(question => (question.extra_data as TrueFalseConfig).answer_mode ?? 'judge_each'))
       .toEqual(['judge_each', 'select_matching'])
     expect(questions.filter(question => question.question_type === 'matching').every(question => matchingPairs(question).length >= 4)).toBe(true)
+    // ถูก-ผิดแบบชุด rides on 'composite', so only `choices` tells it apart from
+    // the plain composite case beside it — see lib/true-false-group.ts.
+    expect(questions.filter(isTrueFalseGroupQuestion).map(question => question.id))
+      .toEqual(['qa-question-true-false-group'])
   })
 
   it('uses unique synthetic ids, valid scores, and complete section coverage', () => {

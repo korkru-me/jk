@@ -29,6 +29,7 @@ import { placementFromTexts, textsFromPlacement } from '@/lib/matching-answer'
 import { OrderingDragList } from './ordering-drag-list'
 import { orderingDisplayOrder, orderingIsAnswered } from '@/lib/ordering-answer'
 import { choiceListHint } from '@/lib/choice-list-hint'
+import { choicesFitOneRow } from '@/lib/choice-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -2847,12 +2848,13 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
               updatePart(i, JSON.stringify(next))
             }
             const target = part.select_target ?? 'correct'
+            const inRow = choicesFitOneRow(part.choices!.map(c => c.text))
             return (
               <>
                 <RichText text={part.text} className="text-sm block" />
                 <PartImages urls={part.image_urls} />
                 <p className="text-xs text-muted-foreground">{choiceListHint(part.text, target)}</p>
-                <div className="space-y-1.5">
+                <div className={inRow ? 'flex flex-wrap gap-1.5' : 'space-y-1.5'}>
                   {part.choices!.map((c, ci) => (
                     <label key={c.id} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
                       choiceAnswers[ci] === 'true' ? 'border-primary bg-primary/10' : 'border-border'
@@ -3055,7 +3057,7 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
             {columns.map((column, c) => (
               <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-t lg:p-2">
                 <span className="mb-1 block text-xs font-semibold text-muted-foreground lg:hidden">{column.title}</span>
-                <span className="flex flex-col gap-1.5">
+                <span className={choicesFitOneRow(column.options ?? []) ? 'flex flex-wrap gap-1.5' : 'flex flex-col gap-1.5'}>
                   {(column.options ?? []).map((option, oi) => (
                     <label
                       key={oi}

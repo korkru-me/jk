@@ -22,6 +22,7 @@ import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, Match
 import { CLASSIFY_UNSET, classifyCorrectGrid } from '@/lib/classify'
 import { choiceListHint } from '@/lib/choice-list-hint'
 import { scoreChoiceTicks } from '@/lib/choice-ticks'
+import { choicesFitOneRow } from '@/lib/choice-layout'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -1408,7 +1409,7 @@ export function QuestionPreviewContent({
                         <RichText text={part.text} className="text-[15px] text-foreground" />
                         <PartImages urls={part.image_urls} />
                         <p className="text-xs text-muted-foreground">{choiceListHint(part.text, part.select_target)}</p>
-                        <div className="space-y-1.5">
+                        <div className={choicesFitOneRow(part.choices!.map(c => c.text)) ? 'flex flex-wrap gap-1.5' : 'space-y-1.5'}>
                           {part.choices!.map((c, ci) => {
                             const ticked = ticks[ci] === 'true'
                             const isTargetChoice = flip ? !c.correct_answer : c.correct_answer
@@ -1581,7 +1582,7 @@ export function QuestionPreviewContent({
                   {classifyColumns.map((column, c) => (
                     <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-t lg:p-2">
                       <span className="mb-1 block text-xs font-semibold text-muted-foreground lg:hidden">{column.title}</span>
-                      <span className="flex flex-col gap-1.5">
+                      <span className={choicesFitOneRow(column.options ?? []) ? 'flex flex-wrap gap-1.5' : 'flex flex-col gap-1.5'}>
                         {(column.options ?? []).map((option, oi) => {
                           const picked = classifyGrid[r]?.[c] === oi
                           const key = classifyKey[r]?.[c]
