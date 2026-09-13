@@ -882,6 +882,25 @@ describe('ตารางจำแนก, from attempt to grade', () => {
     expect(naturalMaxScore('classify', config, null)).toBe(4)
   })
 
+  // A worksheet's ตารางจำแนก is usually worth less than one point a cell — the
+  // polymer question prints four rows for 2.0 คะแนน. Nothing in the question
+  // itself says so, and nothing needs to: the assignment's question_points
+  // sets what the ข้อ is worth there, and grading hands out that ceiling in
+  // the cells' own proportions. A per-cell multiplier on the question would
+  // only be a second way to say the same thing.
+  it('hands out an assignment\'s own ceiling in the cells\' proportions', () => {
+    const worth2 = { ...assignment, question_points: { q1: 2 } }
+    const [skeleton] = buildAssignmentAttempt(worth2, [classifyQuestion()])
+    expect(skeleton.max_score).toBe(2)
+
+    const at = (student: string) =>
+      gradeAnswer(answer({ correct: skeleton.correct_answer, student, questionType: 'classify', extraData: config, maxScore: 2 }))
+
+    expect(at('[[0,1],[1,0]]')).toMatchObject({ is_correct: true, score: 2 })     // 4 of 4 cells
+    expect(at('[[0,1],[1,1]]')).toMatchObject({ is_correct: false, score: 1.5 })  // 3 of 4
+    expect(at('[[-1,-1],[-1,-1]]')).toMatchObject({ is_correct: false, score: 0 })
+  })
+
   it('credits a fully correct grid', () => {
     const [skeleton] = buildAssignmentAttempt(assignment, [classifyQuestion()])
     expect(grade(skeleton.correct_answer, '[[0,1],[1,0]]')).toMatchObject({ is_correct: true, score: 4 })
