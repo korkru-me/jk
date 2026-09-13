@@ -1019,7 +1019,7 @@ export function QuestionPreviewContent({
       {questionType === 'true_false' && trueFalseConfig && trueFalseConfig.answer_mode === 'select_matching' && (() => {
         const subStatements = trueFalseConfig.statements ?? []
         const labels = partLabels(trueFalseConfig.part_label_style)
-        const items = [{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...subStatements]
+        const items = [{ text: renderedText, correct_answer: trueFalseConfig.correct_answer }, ...subStatements]
         const isTarget = (correct: boolean) => trueFalseConfig.select_target === 'wrong' ? !correct : correct
         const correctCount = items.reduce((n, st, i) => n + (((tfAnswers[i] === 'true') === isTarget(st.correct_answer)) ? 1 : 0), 0)
         const total = items.length
@@ -1048,7 +1048,7 @@ export function QuestionPreviewContent({
                     />
                     <span className="flex items-center gap-1.5 flex-wrap text-sm text-foreground">
                       <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-                      {i > 0 && <RenderText text={st.text} />}
+                      {st.text && <RenderText text={st.text} />}
                     </span>
                   </label>
                 )
@@ -1107,12 +1107,12 @@ export function QuestionPreviewContent({
         return (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
-            {[{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...subStatements].map((st, i) => (
+            {[{ text: renderedText, correct_answer: trueFalseConfig.correct_answer }, ...subStatements].map((st, i) => (
               <div key={i} className="space-y-1.5">
                 {hasSubs && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-                    {i > 0 && <RenderText text={st.text} />}
+                    {st.text && <RenderText text={st.text} />}
                   </div>
                 )}
                 <div className="flex gap-3">

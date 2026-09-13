@@ -1076,7 +1076,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <TrueFalseAnswerInput
                   answerId={current.id}
                   config={current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig}
-                  questionText={current.questions.question_text}
+                  questionText={currentQuestionText}
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={val => handleAnswerChange(current.id, val)}
                 />
@@ -2515,7 +2515,13 @@ function TrueFalseSelectMatching({ config, subStatements, mode, questionText, ra
   function updateExplanation(exp: string) {
     onChange(JSON.stringify({ answers, explanation: exp }))
   }
-  const items = [null, ...subStatements]
+  // ก) is the question's own statement: a multi-statement ถูก-ผิด keeps it in
+  // question_text rather than in `statements`, which start at ข). The exam also
+  // shows question_text above as the stem, so writing it into the list repeats
+  // it — but a row that reads just "ก)" with nothing beside it, between rows
+  // that do have text, reads as a statement that failed to load, and the
+  // student is left to guess that it means the sentence further up the page.
+  const items: Array<{ text: string }> = [{ text: questionText }, ...subStatements]
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">{choiceListHint(questionText, target)}</p>
@@ -2527,7 +2533,7 @@ function TrueFalseSelectMatching({ config, subStatements, mode, questionText, ra
             <input type="checkbox" className="mt-0.5" checked={answers[i] === 'true'} onChange={() => toggle(i)} />
             <span className="flex items-center gap-1.5 flex-wrap text-sm">
               <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-              {st && <RichText text={st.text} />}
+              {st.text && <RichText text={st.text} />}
             </span>
           </label>
         ))}
@@ -2614,11 +2620,11 @@ function TrueFalseAnswerInput({ config, questionText, rawValue, onChange }: {
   return (
     <div className="space-y-4">
       <p className="text-sm font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
-      {[null, ...subStatements].map((st, i) => (
+      {([{ text: questionText }, ...subStatements] as Array<{ text: string }>).map((st, i) => (
         <div key={i} className="space-y-1.5">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-            {st && <RichText text={st.text} className="text-sm" />}
+            {st.text && <RichText text={st.text} className="text-sm" />}
           </div>
           <div className="flex gap-3">
             {([
