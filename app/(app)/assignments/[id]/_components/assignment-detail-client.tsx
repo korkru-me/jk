@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
-  Play, Square, Printer, BarChart2, Settings, Trash2, TrendingUp,
+  Play, Square, Printer, BarChart2, Trash2, TrendingUp,
   AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
   FileClock, Presentation,
 } from 'lucide-react'
@@ -245,11 +245,6 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
           <Link href={`/assignments/${a.id}/analytics`}>
             <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
               <TrendingUp className="w-3.5 h-3.5" /> วิเคราะห์เชิงลึก
-            </Button>
-          </Link>
-          <Link href={`/assignments/${a.id}/export`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-              <Settings className="w-3.5 h-3.5" /> ส่งออก &amp; พิมพ์
             </Button>
           </Link>
           <button
