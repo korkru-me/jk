@@ -1,3 +1,4 @@
+import type { IocPercentRule } from './ioc'
 import type { PartLabelStyle } from './part-labels'
 import type { SubjectGroup } from './subject-groups'
 
@@ -229,6 +230,140 @@ export interface EducationResearchImportBatchRow {
   posttest_action: EducationResearchImportScoreAction | null
   validation_status: EducationResearchImportRowStatus
   messages: string[]
+  created_at: string
+}
+
+// IOC — the congruence of an exam item with the indicator it claims to
+// measure. Lives beside education research in the menu but does not require a
+// research project: an ordinary midterm needs the same document.
+// Rules and document layout: docs/EDUCATION_RESEARCH_IOC.md.
+
+export type IocFormStatus = 'draft' | 'collecting' | 'closed'
+export type IocFormSourceKind = 'research_measurement' | 'assignment' | 'question_selection'
+export type IocSignatureMode = 'drawn' | 'uploaded' | 'typed' | 'none'
+export type IocExpertStatus = 'invited' | 'opened' | 'submitted'
+
+export interface IocForm {
+  id: string
+  org_id: string
+  created_by: string
+  classroom_id: string | null
+  project_id: string | null
+  measurement_id: string | null
+  assignment_id: string | null
+  source_kind: IocFormSourceKind
+  exam_title: string
+  subject_name: string
+  subject_code: string
+  grade_level: string
+  term_label: string
+  academic_year: string
+  school_name: string
+  author_name: string
+  author_position: string
+  instruction_text: string
+  summary_text: string | null
+  summary_text_updated_at: string | null
+  threshold: number
+  /** Which rule turns per-item results into the headline percentage. */
+  percent_rule: IocPercentRule
+  show_solutions: boolean
+  author_signature_mode: IocSignatureMode
+  author_signature_path: string | null
+  author_signature_consent_at: string | null
+  status: IocFormStatus
+  /** Once set, the items and indicators of this form are immutable. */
+  items_frozen_at: string | null
+  opened_at: string | null
+  closed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface IocFormStandard {
+  id: string
+  org_id: string
+  form_id: string
+  order_index: number
+  code: string
+  description: string
+  created_at: string
+  updated_at: string
+}
+
+export interface IocFormItem {
+  id: string
+  org_id: string
+  form_id: string
+  standard_id: string | null
+  order_index: number
+  /** The number printed in the document, which need not match the position. */
+  item_label: string
+  section_label: string
+  group_intro: string
+  prompt: string
+  choices: string[]
+  image_urls: string[]
+  solution: string | null
+  source_question_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface IocFormExpert {
+  id: string
+  org_id: string
+  form_id: string
+  expert_order: number
+  display_name: string
+  position_title: string
+  affiliation: string
+  token_issued_at: string | null
+  token_expires_at: string | null
+  revoked_at: string | null
+  status: IocExpertStatus
+  first_opened_at: string | null
+  last_opened_at: string | null
+  submitted_at: string | null
+  reopened_at: string | null
+  overall_comment: string
+  signature_mode: IocSignatureMode
+  signature_path: string | null
+  signature_consent_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface IocRating {
+  id: string
+  org_id: string
+  form_id: string
+  expert_id: string
+  item_id: string
+  score: -1 | 0 | 1
+  comment: string
+  created_at: string
+  updated_at: string
+}
+
+/** A school's reusable indicator, remembered so the next form prefills itself. */
+export interface LearningStandard {
+  id: string
+  org_id: string
+  created_by: string | null
+  code: string
+  description: string
+  subject: string | null
+  grade_level: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface QuestionStandard {
+  question_id: string
+  standard_id: string
+  org_id: string
+  created_by: string | null
   created_at: string
 }
 
