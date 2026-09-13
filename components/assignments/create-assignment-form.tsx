@@ -326,7 +326,6 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setPassingEnabled(choice === 'threshold')
   }
 
-  // Switching to a printed ใบงาน after choosing a streak would leave a งาน the
   const pointValues = previewQuestions.map(q => Number.parseFloat(pointsDraft(q.id)) || 0)
   const drawnPointsVary = randomDrawOn && new Set(pointValues).size > 1
   const displayMaxSet = displayMaxScore.trim() !== '' && Number(displayMaxScore) > 0
@@ -1075,9 +1074,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
           <div className="space-y-2">
             {[
               // The แบบฝึกหัด/ข้อสอบ difference itself, so it sits above the
-              // rest rather than among the shuffles. Never offered to a ข้อสอบ
-              // (one ส่งคำตอบ at the end is what a ข้อสอบ is) or to a printed
-              // ใบงาน (nothing to press).
+              // rest rather than among the shuffles. Never offered to a ข้อสอบ:
+              // one ส่งคำตอบ at the end is what a ข้อสอบ is.
               ...(assignmentType === 'exercise' && !streakOn ? [{
                 label: 'ให้นักเรียนกดตรวจทีละข้อ',
                 desc: 'ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย — คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน',
@@ -1158,8 +1156,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               }] : []),
               // Reads as an on/off choice like the ones above it, so it is one
               // of them rather than a differently-shaped card further down the
-              // step. Only offered where it can do anything: one attempt has no
-              // "next time", and a printed ใบงาน has no attempts at all.
+              // step. Only offered where it can do anything: one attempt has
+              // no "next time".
               // Hidden while a สุ่ม draw is on: the point of a draw is that the
               // next round is a different paper, which is the opposite of
               // coming back to the same ข้อ that were missed.

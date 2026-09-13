@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Clock, MoreVertical, Copy, BarChart3, Monitor, Printer, Pencil, RefreshCw, Target, Users, CheckCircle2 } from 'lucide-react'
+import { Plus, Clock, MoreVertical, Copy, BarChart3, Pencil, RefreshCw, Target, Users, CheckCircle2 } from 'lucide-react'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
@@ -140,11 +140,6 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                           <span className="text-xs text-muted-foreground">
                             · เก็บ{SCORE_STRATEGY_LABELS[a.score_strategy]}
                           </span>
-                        )}
-                        {a.mode === 'online' ? (
-                          <Monitor className="w-3 h-3 text-muted-foreground/40" />
-                        ) : (
-                          <Printer className="w-3 h-3 text-muted-foreground/40" />
                         )}
                         {a.end_at && (
                           <span className="flex items-center gap-0.5 text-xs text-muted-foreground">

@@ -140,18 +140,6 @@ const FEATURE_GROUPS: { group: string; rows: FeatureRow[] }[] = [
     group: 'การส่งออกและรายงาน',
     rows: [
       {
-        feature: 'พิมพ์ใบงาน PDF',
-        free: true,
-        pro: true,
-        enterprise: true,
-      },
-      {
-        feature: 'Export PDF แบบสุ่มตัวเลขทุกคนต่างกัน',
-        free: false,
-        pro: true,
-        enterprise: true,
-      },
-      {
         feature: 'Export คะแนนเป็น Excel',
         free: false,
         pro: true,

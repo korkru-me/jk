@@ -113,9 +113,6 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
                 <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
                 {statusMeta.label}
               </span>
-              <span className="text-xs text-surface-inverse-muted border border-surface-inverse-border px-2.5 py-1 rounded-full">
-                {a.mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์'}
-              </span>
               {a.secure_browser_mode === 'seb_required' && (
                 <span className="flex items-center gap-1 text-xs text-success border border-success/40 bg-success/10 px-2.5 py-1 rounded-full">
                   <LockKeyhole className="w-3 h-3" /> Safe Exam Browser
@@ -369,7 +366,6 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
         <div className="divide-y divide-border">
           {[
             { label: 'ห้องเรียน', value: a.classrooms?.name ?? '—' },
-            { label: 'โหมด', value: a.mode === 'online' ? '💻 ออนไลน์' : '🖨️ พิมพ์' },
             { label: 'เวลาทำ', value: a.duration_minutes ? `${a.duration_minutes} นาที` : 'ไม่จำกัด' },
             { label: 'เปิดรับ', value: a.start_at ? new Date(a.start_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ทันที' },
             { label: 'ปิดรับ', value: a.end_at ? new Date(a.end_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่กำหนด' },
