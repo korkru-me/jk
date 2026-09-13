@@ -609,6 +609,123 @@ describe('gradeAnswer — composite with an mcq part', () => {
     expect(result).toMatchObject({ is_correct: false, score: 0 })
   })
 })
+
+// ─── ถูก-ผิดแบบชุด (grouped true/false) ───────────────────────────────────────
+//
+// The shape the dedicated "ถูก-ผิดแบบชุด" page saves (see lib/true-false-group.ts):
+// a composite whose parts each carry `choices` the student ticks 1+ of. The
+// beaker question these are written against offers 7 choices of which 4 are
+// correct — the case that used to cap a perfect answer at 4/7.
+
+/** The 7 beakers, with 1, 3, 5 and 6 the ones that rust. */
+const BEAKERS = ['1', '2', '3', '4', '5', '6', '7'].map((text, i) => ({
+  id: `c${i}`, text, correct_answer: [0, 2, 4, 5].includes(i),
+}))
+
+function beakerQuestion(): Question {
+  return {
+    id: 'q1',
+    question_type: 'composite',
+    answer_formula: '',
+    answer_parts: null,
+    variables: [],
+    logic_rules: [],
+    mcq_options: null,
+    extra_data: {
+      parts: [{
+        id: 'p1',
+        type: 'true_false',
+        text: 'ตะปูเหล็กที่เกิดสนิมอยู่ในบีกเกอร์หมายเลข',
+        score: 0.5,
+        choices: BEAKERS,
+        select_target: 'correct',
+      }],
+    },
+  } as unknown as Question
+}
+
+/** One part's ticks, as CompositeAnswerInput sends them: only the indices the
+ *  student actually clicked are written, so anything after the last click is
+ *  absent and anything skipped before it is null. */
+function ticks(...clicked: number[]): string {
+  const arr: (string | null)[] = []
+  for (const i of clicked) {
+    while (arr.length < i) arr.push(null)
+    arr[i] = 'true'
+  }
+  return JSON.stringify([JSON.stringify(arr)])
+}
+
+describe('gradeAnswer — ถูก-ผิดแบบชุด', () => {
+  const skeleton = buildAttemptQuestion(beakerQuestion(), { orderIndex: 0, shuffleOptions: false })
+
+  function grade(student: string | null) {
+    return gradeAnswer(answer({
+      correct: skeleton.correct_answer,
+      student,
+      questionType: 'composite',
+      extraData: beakerQuestion().extra_data,
+      maxScore: skeleton.max_score,
+    }))
+  }
+
+  it('keys every choice, not just the correct ones', () => {
+    expect(skeleton.correct_answer).toBe('COMP:' + JSON.stringify([{
+      type: 'true_false',
+      correct: ['true', 'false', 'true', 'false', 'true', 'true', 'false'],
+      score: 0.5,
+    }]))
+    expect(skeleton.max_score).toBe(0.5)
+  })
+
+  // The regression: ticking 1, 3, 5 and 6 leaves 2, 4 and 7 unwritten, and
+  // reading those as unanswered rather than as "not ticked" scored 4/7.
+  it('gives full marks for ticking exactly the right boxes', () => {
+    expect(grade(ticks(0, 2, 4, 5))).toMatchObject({ is_correct: true, score: 0.5 })
+  })
+
+  it('gives the same full marks when every box was written out explicitly', () => {
+    const explicit = ['true', 'false', 'true', 'false', 'true', 'true', 'false']
+    expect(grade(JSON.stringify([JSON.stringify(explicit)]))).toMatchObject({ is_correct: true, score: 0.5 })
+  })
+
+  it('docks a box ticked that should not have been', () => {
+    // 1, 3, 5, 6 plus a wrong 2 — six of seven judged right.
+    expect(grade(ticks(0, 1, 2, 4, 5))).toMatchObject({ is_correct: false, score: 0.5 * 6 / 7 })
+  })
+
+  it('docks a correct box left unticked', () => {
+    expect(grade(ticks(0, 2, 4))).toMatchObject({ is_correct: false, score: 0.5 * 6 / 7 })
+  })
+
+  it('pays nothing for a part the student never answered', () => {
+    expect(grade(null)).toMatchObject({ is_correct: false, score: 0 })
+    expect(grade(JSON.stringify(['']))).toMatchObject({ is_correct: false, score: 0 })
+    expect(grade(JSON.stringify([JSON.stringify([])]))).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('scores ticking every box by how many of them wanted ticking', () => {
+    expect(grade(ticks(0, 1, 2, 3, 4, 5, 6))).toMatchObject({ is_correct: false, score: 0.5 * 4 / 7 })
+  })
+
+  // select_target: 'wrong' flips the key at build time, so grading never sees
+  // the difference — the ticks that earn full marks are the other three.
+  it('follows a part that asks which choices are wrong', () => {
+    const q = beakerQuestion()
+    const parts = (q.extra_data as { parts: { select_target: string }[] }).parts
+    parts[0].select_target = 'wrong'
+    const flipped = buildAttemptQuestion(q, { orderIndex: 0, shuffleOptions: false })
+
+    const result = gradeAnswer(answer({
+      correct: flipped.correct_answer,
+      student: ticks(1, 3, 6),
+      questionType: 'composite',
+      extraData: q.extra_data,
+      maxScore: flipped.max_score,
+    }))
+    expect(result).toMatchObject({ is_correct: true, score: 0.5 })
+  })
+})
 // ─── Essay ───────────────────────────────────────────────────────────────────
 
 /** An essay question shaped the way essay-form.tsx saves one: no formula, no

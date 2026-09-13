@@ -553,17 +553,35 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
         hasManual = true
         continue
       }
-      // Grouped true/false sub-question — `correct` is one 'true'/'false'
-      // per choice, student ticks are stored the same way (JSON array of
-      // 'true'/'false' strings), scored proportionally like the standalone
-      // multi-statement true_false grading above.
+      // Grouped true/false sub-question — `correct` is one 'true'/'false' per
+      // choice, scored proportionally like the standalone multi-statement
+      // true_false grading above.
+      //
+      // These choices are checkboxes, so a box left alone is an answer
+      // ('false'), not a missing one — and that is the difference from the
+      // multi-statement branch, where the student picks ✓ถูก/✗ผิด explicitly and
+      // silence really does mean unanswered. CompositeAnswerInput in
+      // exam-client.tsx only writes the indices the student actually clicked,
+      // leaving every untouched box null, so an unticked box has to be read as
+      // 'false' here. Comparing the raw null against 'false' instead capped a
+      // part at (ticks it wanted / choices it had): ticking exactly the right
+      // 4 boxes out of 7 matched only those 4 and scored 4/7 of the part, and
+      // no realistic answer could ever be fully correct.
+      //
+      // An empty array still earns nothing, though: that is a part the student
+      // never opened, and paying it for every 'false' target would put points
+      // on a blank submission.
       if (cp.type === 'true_false' && Array.isArray(cp.correct)) {
         const targets = cp.correct as string[]
-        let studentChoices: string[] = []
+        let studentChoices: unknown[] = []
         try { studentChoices = JSON.parse(sa || '[]') } catch { /* keep empty */ }
+        const answered = Array.isArray(studentChoices) && studentChoices.length > 0
         let matched = 0
-        for (let j = 0; j < targets.length; j++) {
-          if ((studentChoices[j] ?? '').trim() === targets[j]) matched++
+        if (answered) {
+          for (let j = 0; j < targets.length; j++) {
+            const ticked = String(studentChoices[j] ?? '').trim() === 'true'
+            if ((ticked ? 'true' : 'false') === targets[j]) matched++
+          }
         }
         earned += targets.length > 0 ? (matched / targets.length) * partScore : 0
         continue
