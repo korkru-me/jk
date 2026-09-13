@@ -470,9 +470,11 @@
 - เจ้าของผลิตภัณฑ์อนุมัติให้ merge/deploy ก่อนมีโครงการจริง จึงไม่อ้างว่าระยะ 3.2 ผ่าน ไม่สร้าง fixture ใน production และคง checklist หลายบทบาทเป็นงานหลังปล่อย รายละเอียดการตัดสินใจและ smoke test อยู่ใน `docs/EDUCATION_RESEARCH_RELEASE.md`
 - คู่มือครูตั้งแต่เตรียม roster, เลือกแหล่งคะแนน, อ่านผล ไปจนถึงส่งออกอย่างปลอดภัยอยู่ใน `docs/EDUCATION_RESEARCH_USER_GUIDE.md`
 - `master` merge commit `f7448f9` deploy ผ่าน Vercel สำเร็จ Public page และ auth guard ของ `/research` ผ่าน production smoke test โดยไม่เขียน fixture; การตรวจหลังล็อกอินบน production รวมไว้กับ checklist ห้องจริงระยะ 3.2
-- **ฟอร์ม IOC (ความสอดคล้องของตัวชี้วัดกับแบบทดสอบ) — วางแผน อยู่ระยะ 0** ยังไม่มีโค้ด ไม่มี migration และยังไม่มีหน้าจอ ·
-  สเปกที่ตกลงกับเจ้าของผลิตภัณฑ์ สูตร เกณฑ์ โครงเอกสาร โมเดลลิงก์ผู้ทรงคุณวุฒิ และการแบ่งเฟส 0–7 อยู่ใน `docs/EDUCATION_RESEARCH_IOC.md` ·
-  ภาพร่าง 5 หน้าแรกอยู่ใน `docs/research/mockups/phase-ioc-*-draft-v1.png` รอเจ้าของผลิตภัณฑ์ตรวจทีละหน้าก่อนเริ่มเฟส 1
+- **ฟอร์ม IOC (ความสอดคล้องของตัวชี้วัดกับแบบทดสอบ) — ระยะ 1 มีโค้ดแล้วแต่ยังไม่ถึงฐานข้อมูลจริง** ·
+  `lib/ioc.ts` คำนวณดัชนีรายข้อ ร้อยละความสอดคล้อง และคำเตือนเมื่อข้อมูลไม่ครบ มี vitest 22 เคสรวมชุดตัวอย่างเดียวกับภาพร่าง ·
+  `supabase/migrations/20260913135353_ioc_forms_foundation.sql` มี 6 ตาราง RLS bucket ลายเซ็น และ trigger ที่ตรึงข้อสอบหลังส่งลิงก์ —
+  **migration นี้ยังไม่ถูก apply** และยังไม่มี route หรือ UI ใดเรียกใช้ · สเปก เกณฑ์ และเฟสถัดไปอยู่ใน `docs/EDUCATION_RESEARCH_IOC.md`
+  ภาพร่างทั้ง 11 หน้าได้รับอนุมัติแล้วที่ `docs/research/mockups/phase-ioc-*-approved-v1.png`
 
 ### Dashboard — มีโค้ดรองรับ (ฝั่งครู)
 
