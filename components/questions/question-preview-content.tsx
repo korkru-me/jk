@@ -21,6 +21,7 @@ import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-bl
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, SubmittedFile } from '@/lib/types'
 import { CLASSIFY_UNSET, classifyCorrectGrid } from '@/lib/classify'
 import { choiceListHint } from '@/lib/choice-list-hint'
+import { scoreChoiceTicks } from '@/lib/choice-ticks'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -263,6 +264,13 @@ export function QuestionPreviewContent({
     setCompositeResults([])
     setClassifyGrid(emptyClassifyGrid())
     setClassifyChecked(false)
+  }
+
+  /** A grouped ถูก-ผิด part's share of its own points, by the part's own rule. */
+  function compositeChoiceShare(part: CompositePart, raw: string): number {
+    const flip = part.select_target === 'wrong'
+    const targets = (part.choices ?? []).map(c => ((flip ? !c.correct_answer : c.correct_answer) ? 'true' : 'false'))
+    return scoreChoiceTicks(raw, targets, part.choice_scoring).share
   }
 
   function checkCompositePart(part: CompositePart, i: number): boolean | null {
@@ -569,11 +577,25 @@ export function QuestionPreviewContent({
         }
       })
       rows.push({ label: 'เหตุผล', studentAnswer: tfExplanation, correctAnswer: null, status: 'pending' })
+      // A ticked list may be marked all-or-nothing, so the points cannot be
+      // assumed to be one per row judged right — ask the same function the
+      // real grader asks, or this panel promises a score no one will get.
+      const strict = selectMode && trueFalseConfig.choice_scoring === 'all_or_nothing'
+      const autoScore = selectMode
+        ? scoreChoiceTicks(
+            tfAnswers,
+            tfItems.map(item => ((flip ? !item.correct_answer : item.correct_answer) ? 'true' : 'false')),
+            trueFalseConfig.choice_scoring,
+          ).share * tfItems.length * scoreAnswer
+        : correctCount * scoreAnswer
       return {
         rows,
-        autoScore: correctCount * scoreAnswer,
+        autoScore,
         maxScore: naturalMaxScore('true_false', trueFalseConfig, null),
         manualNote:
+          (strict
+            ? 'ข้อนี้ตั้งให้ “ถูกทุกข้อจึงได้คะแนน” — ติ๊กผิดหรือตกไปข้อเดียวได้ 0 คะแนน · '
+            : '') +
           `ส่วนถูก/ผิดระบบตรวจให้เองข้อละ ${scoreAnswer} คะแนน แต่ “เหตุผล” ที่นักเรียนเขียน ` +
           `(${trueFalseConfig.score_explanation ?? 1} คะแนน) ไม่มีเฉลยให้เทียบ ระบบจึงเว้นไว้และค้างทั้งข้อเป็น ` +
           '“รอครูตรวจ” จนกว่าครูจะอ่านเหตุผลแล้วกดที่คะแนนเพื่อรวมคะแนนส่วนนั้นเข้าไป',
@@ -587,7 +609,16 @@ export function QuestionPreviewContent({
         const { student, correct } = compositeDisplay(part, raw)
         const manual = compositeManual(part)
         const ok = manual ? null : checkCompositePart(part, i)
-        if (ok === true) earned += typeof part.score === 'number' && part.score > 0 ? part.score : 1
+        const partScore = typeof part.score === 'number' && part.score > 0 ? part.score : 1
+        // checkCompositePart answers "is the whole part right", which is the
+        // row's ✓/✗ but not its points: a grouped ถูก-ผิด left on the default
+        // 'partial' pays for every choice judged right, so counting only
+        // spotless parts showed a teacher 0 for work the grader pays for.
+        if (part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0) {
+          earned += compositeChoiceShare(part, compositeAnswers[i] ?? '') * partScore
+        } else if (ok === true) {
+          earned += partScore
+        }
         return {
           label: `ข้อ ${labels[i] ?? i + 1}`,
           studentAnswer: student,
