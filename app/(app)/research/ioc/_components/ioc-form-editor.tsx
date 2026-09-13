@@ -17,6 +17,8 @@ import {
   saveIocFormStandards,
   setIocFormSource,
 } from '@/lib/actions/ioc-forms'
+import { issueIocFormLinks, type IssuedIocLink } from '@/lib/actions/ioc-links'
+import { iocLinkPath } from '@/lib/ioc-token'
 import type { IocFormSourceKind, IocSignatureMode } from '@/lib/types'
 
 export interface IocEditorSources {
@@ -123,6 +125,9 @@ export function IocFormEditor({
       {step === 1 ? <SourceStep form={form} items={items} sources={sources} onDone={() => setStep(2)} /> : null}
       {step === 2 ? (
         <StandardsStep
+          // Remount when the server sends different items, so the step is never
+          // initialised from the exam that was just replaced.
+          key={items.map(item => `${item.id}:${item.standard_id ?? ''}`).join('|')}
           formId={form.id}
           frozen={form.frozen}
           items={items}
@@ -602,7 +607,22 @@ function ExpertsStep({
   const [signatureMode, setSignatureMode] = useState<'typed' | 'none'>(
     form.author_signature_mode === 'typed' ? 'typed' : 'none',
   )
+  const [issued, setIssued] = useState<IssuedIocLink[]>([])
   const [pending, startTransition] = useTransition()
+
+  function issueLinks() {
+    startTransition(async () => {
+      const result = await issueIocFormLinks({ form_id: form.id, expires_in_days: 30 })
+      if ('error' in result && result.error) {
+        toast.error(result.error)
+        return
+      }
+      if ('links' in result && result.links) {
+        setIssued(result.links)
+        toast.success(`ตรึงข้อสอบและสร้างลิงก์ให้ผู้ทรงคุณวุฒิ ${result.links.length} ท่านแล้ว`)
+      }
+    })
+  }
 
   function update(key: string, patch: Partial<DraftExpert>) {
     setDrafts(current => current.map(draft => (draft.key === key ? { ...draft, ...patch } : draft)))
@@ -707,6 +727,8 @@ function ExpertsStep({
         </div>
       </Card>
 
+      {issued.length > 0 ? <IssuedLinksPanel links={issued} /> : null}
+
       <Card padding="lg" className="space-y-3">
         <h2 className="font-semibold text-foreground">พร้อมส่งให้ผู้ทรงคุณวุฒิหรือยัง</h2>
         <ul className="space-y-1 text-sm">
@@ -716,12 +738,16 @@ function ExpertsStep({
               : `ยังมีข้อที่ไม่มีตัวชี้วัด: ${readiness.missingLabels.slice(0, 8).join(', ')}${readiness.missingLabels.length > 8 ? '…' : ''}`}
           </li>
           <li className="text-muted-foreground">
-            การสร้างลิงก์ ตรึงข้อสอบ และหน้ากรอกของผู้ทรงคุณวุฒิ เป็นงานขั้นถัดไปที่ยังไม่เปิดใช้งาน
+            เมื่อกดส่งลิงก์ ข้อสอบในฟอร์มจะถูกตรึงถาวร แก้ข้อสอบและตัวชี้วัดไม่ได้อีก
+            เพราะผู้ทรงคุณวุฒิกำลังจะลงนามรับรองฉบับนี้
           </li>
         </ul>
-        <div className="flex justify-end">
-          <Button onClick={save} disabled={pending || form.frozen}>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" onClick={save} disabled={pending || form.frozen}>
             {pending ? 'กำลังบันทึก…' : 'บันทึกผู้ทรงคุณวุฒิและลายเซ็น'}
+          </Button>
+          <Button onClick={issueLinks} disabled={pending || form.frozen || !readiness.ready}>
+            ตรึงข้อสอบและสร้างลิงก์
           </Button>
         </div>
       </Card>
@@ -756,5 +782,46 @@ function SignatureChoice({
         <span className="mt-1 block text-xs text-muted-foreground">{detail}</span>
       </span>
     </label>
+  )
+}
+
+/**
+ * The only moment these links exist in readable form. The database keeps their
+ * hashes, so a teacher who closes the page has to issue new ones — which the
+ * copy says here rather than leaving them to discover it.
+ */
+function IssuedLinksPanel({ links }: { links: IssuedIocLink[] }) {
+  const router = useRouter()
+  const origin = typeof window === 'undefined' ? '' : window.location.origin
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('คัดลอกแล้ว')
+    } catch {
+      toast.error('คัดลอกไม่สำเร็จ กรุณาคัดลอกด้วยตนเอง')
+    }
+  }
+
+  return (
+    <Card padding="lg" className="space-y-3 border-primary/30 bg-primary/5">
+      <div>
+        <h2 className="font-semibold text-foreground">ลิงก์สำหรับผู้ทรงคุณวุฒิ</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          ลิงก์เหล่านี้แสดงเพียงครั้งเดียว คัดลอกส่งให้แต่ละท่านก่อนปิดหน้านี้
+          ถ้าปิดไปแล้วให้กด “ออกลิงก์ใหม่” ในหน้าติดตาม ซึ่งจะยกเลิกลิงก์เดิมด้วย
+        </p>
+      </div>
+      {links.map(link => (
+        <Card key={link.expert_id} padding="md" radius="sm" className="space-y-2">
+          <p className="text-sm font-semibold text-foreground">
+            ผู้ประเมินคนที่ {link.expert_order} · {link.display_name}
+          </p>
+          <p className="break-all font-mono text-xs text-muted-foreground">{origin}{iocLinkPath(link.token)}</p>
+          <Button size="sm" onClick={() => copy(`${origin}${iocLinkPath(link.token)}`)}>คัดลอกลิงก์</Button>
+        </Card>
+      ))}
+      <Button variant="outline" onClick={() => router.refresh()}>คัดลอกครบแล้ว ไปหน้าติดตามผู้ทรง</Button>
+    </Card>
   )
 }

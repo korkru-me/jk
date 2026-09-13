@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildIocInstructionText,
   buildIocItemDrafts,
@@ -165,7 +166,16 @@ export async function updateIocFormHeader(input: UpdateIocFormHeaderInput) {
   return { form_id: parsed.data.form_id }
 }
 
-export async function deleteIocFormDraft(formId: string) {
+/**
+ * A form can be thrown away until someone has judged it.
+ *
+ * The line is submission, not the link: a teacher who issued links by mistake
+ * can still take it all back, and revoking three links while a dead form sits
+ * in the list forever is not taking it back. Once an expert has sent their
+ * ratings, the form holds their judgement and their signature, and deleting it
+ * would destroy the evidence the whole feature exists to produce.
+ */
+export async function deleteIocForm(formId: string) {
   if (!z.string().uuid().safeParse(formId).success) return { error: 'ฟอร์มไม่ถูกต้อง' }
 
   const auth = await requireTeacher()
@@ -179,13 +189,48 @@ export async function deleteIocFormDraft(formId: string) {
     .maybeSingle()
 
   if (!form) return { error: 'ไม่พบฟอร์มนี้ หรือคุณไม่มีสิทธิ์ลบ' }
-  // Once experts hold links, the form is evidence rather than a draft.
-  if (form.status !== 'draft') {
-    return { error: 'ฟอร์มนี้ส่งให้ผู้ทรงคุณวุฒิแล้ว ลบไม่ได้ — เพิกถอนลิงก์แทนได้จากหน้าฟอร์ม' }
+
+  const { count } = await supabase
+    .from('ioc_form_experts')
+    .select('id', { count: 'exact', head: true })
+    .eq('form_id', formId)
+    .eq('status', 'submitted')
+
+  if ((count ?? 0) > 0) {
+    return { error: 'มีผู้ทรงคุณวุฒิส่งผลประเมินแล้ว ลบฟอร์มนี้ไม่ได้ — ผลและลายเซ็นของท่านอยู่ในฟอร์มนี้' }
   }
+
+  // Storage is not reached by a cascade, so signature files would outlive the
+  // form that explains them. Collected before the delete, while the rows that
+  // name them still exist.
+  const { data: signatureRows } = await supabase
+    .from('ioc_form_experts')
+    .select('signature_path')
+    .eq('form_id', formId)
+    .not('signature_path', 'is', null)
+  const { data: formRow } = await supabase
+    .from('ioc_forms')
+    .select('author_signature_path')
+    .eq('id', formId)
+    .maybeSingle()
+
+  const signaturePaths = [
+    ...(signatureRows ?? []).map(row => row.signature_path as string),
+    (formRow?.author_signature_path as string | null) ?? null,
+  ].filter((path): path is string => Boolean(path))
 
   const { error } = await supabase.from('ioc_forms').delete().eq('id', formId)
   if (error) return { error: 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
+
+  if (signaturePaths.length > 0) {
+    // A leftover file is untidy, not broken, so this never fails the delete.
+    try {
+      const admin = createAdminClient()
+      await admin.storage.from('ioc-signatures').remove(signaturePaths)
+    } catch (cleanupError) {
+      console.error('[ioc] could not remove signature files', cleanupError)
+    }
+  }
 
   revalidatePath('/research/ioc')
   return { deleted: true }

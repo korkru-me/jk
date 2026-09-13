@@ -6,6 +6,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import type { IocForm, IocFormExpert, IocFormItem, IocFormStandard } from '@/lib/types'
 import { IocFormEditor, type IocEditorSources } from '../_components/ioc-form-editor'
+import { IocFormDashboard, type DashboardExpert } from '../_components/ioc-form-dashboard'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ฟอร์ม IOC — KorKru' }
@@ -30,7 +31,7 @@ export default async function IocFormPage({ params }: Props) {
 
   const { data: formRow } = await supabase
     .from('ioc_forms')
-    .select('id, exam_title, subject_name, subject_code, grade_level, status, source_kind, measurement_id, assignment_id, author_signature_mode, threshold, items_frozen_at')
+    .select('id, exam_title, subject_name, subject_code, grade_level, status, source_kind, measurement_id, assignment_id, author_name, author_signature_mode, threshold, items_frozen_at')
     .eq('id', formId)
     .maybeSingle()
 
@@ -38,7 +39,7 @@ export default async function IocFormPage({ params }: Props) {
   const form = formRow as Pick<
     IocForm,
     'id' | 'exam_title' | 'subject_name' | 'subject_code' | 'grade_level' | 'status' | 'source_kind'
-    | 'measurement_id' | 'assignment_id' | 'author_signature_mode' | 'threshold' | 'items_frozen_at'
+    | 'measurement_id' | 'assignment_id' | 'author_name' | 'author_signature_mode' | 'threshold' | 'items_frozen_at'
   >
 
   const [itemsResult, standardsResult, expertsResult] = await Promise.all([
@@ -54,12 +55,38 @@ export default async function IocFormPage({ params }: Props) {
       .order('order_index'),
     supabase
       .from('ioc_form_experts')
-      .select('id, expert_order, display_name, position_title, affiliation')
+      .select('id, expert_order, display_name, position_title, affiliation, status, first_opened_at, last_opened_at, submitted_at, token_expires_at, revoked_at')
       .eq('form_id', formId)
       .order('expert_order'),
   ])
 
-  const [measurementsResult, assignmentsResult, setsResult] = await Promise.all([
+  const isDraft = form.status === 'draft'
+  // Only a form that has gone out needs progress per expert.
+  const { data: ratingRows } = isDraft
+    ? { data: null }
+    : await supabase.from('ioc_ratings').select('expert_id').eq('form_id', formId)
+
+  const ratedByExpert = new Map<string, number>()
+  for (const row of ratingRows ?? []) {
+    const expertId = row.expert_id as string
+    ratedByExpert.set(expertId, (ratedByExpert.get(expertId) ?? 0) + 1)
+  }
+
+  const dashboardExperts: DashboardExpert[] = (expertsResult.data ?? []).map(row => ({
+    id: row.id as string,
+    expert_order: row.expert_order as number,
+    display_name: row.display_name as string,
+    position_title: (row.position_title as string) ?? '',
+    status: row.status as DashboardExpert['status'],
+    first_opened_at: row.first_opened_at as string | null,
+    last_opened_at: row.last_opened_at as string | null,
+    submitted_at: row.submitted_at as string | null,
+    token_expires_at: row.token_expires_at as string | null,
+    revoked_at: row.revoked_at as string | null,
+    rated_count: ratedByExpert.get(row.id as string) ?? 0,
+  }))
+
+  const [measurementsResult, assignmentsResult, setsResult] = isDraft ? await Promise.all([
     supabase
       .from('education_research_measurements')
       .select('id, measurement_type, snapshot_question_ids, education_research_projects(title)')
@@ -75,7 +102,7 @@ export default async function IocFormPage({ params }: Props) {
       .select('id, title, question_ids, created_at')
       .order('created_at', { ascending: false })
       .limit(SOURCE_LIMIT),
-  ])
+  ]) : [{ data: null }, { data: null }, { data: null }]
 
   const sources: IocEditorSources = {
     measurements: (measurementsResult.data ?? [])
@@ -130,27 +157,38 @@ export default async function IocFormPage({ params }: Props) {
         </Card>
       ) : null}
 
-      <IocFormEditor
-        form={{
-          id: form.id,
-          status: form.status,
-          source_kind: form.source_kind,
-          measurement_id: form.measurement_id,
-          assignment_id: form.assignment_id,
-          author_signature_mode: form.author_signature_mode,
-          frozen: Boolean(form.items_frozen_at),
-        }}
-        items={(itemsResult.data ?? []) as Pick<
-          IocFormItem,
-          'id' | 'order_index' | 'item_label' | 'section_label' | 'group_intro' | 'prompt' | 'choices' | 'standard_id'
-        >[]}
-        standards={(standardsResult.data ?? []) as Pick<IocFormStandard, 'id' | 'order_index' | 'code' | 'description'>[]}
-        experts={(expertsResult.data ?? []) as Pick<
-          IocFormExpert,
-          'id' | 'expert_order' | 'display_name' | 'position_title' | 'affiliation'
-        >[]}
-        sources={sources}
-      />
+      {isDraft ? (
+        <IocFormEditor
+          form={{
+            id: form.id,
+            status: form.status,
+            source_kind: form.source_kind,
+            measurement_id: form.measurement_id,
+            assignment_id: form.assignment_id,
+            author_signature_mode: form.author_signature_mode,
+            frozen: Boolean(form.items_frozen_at),
+          }}
+          items={(itemsResult.data ?? []) as Pick<
+            IocFormItem,
+            'id' | 'order_index' | 'item_label' | 'section_label' | 'group_intro' | 'prompt' | 'choices' | 'standard_id'
+          >[]}
+          standards={(standardsResult.data ?? []) as Pick<IocFormStandard, 'id' | 'order_index' | 'code' | 'description'>[]}
+          experts={(expertsResult.data ?? []) as Pick<
+            IocFormExpert,
+            'id' | 'expert_order' | 'display_name' | 'position_title' | 'affiliation'
+          >[]}
+          sources={sources}
+        />
+      ) : (
+        <IocFormDashboard
+          formId={form.id}
+          examTitle={form.exam_title}
+          authorName={form.author_name}
+          itemCount={(itemsResult.data ?? []).length}
+          experts={dashboardExperts}
+          freshLinks={[]}
+        />
+      )}
     </div>
   )
 }

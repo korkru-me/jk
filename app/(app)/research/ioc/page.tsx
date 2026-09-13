@@ -16,7 +16,7 @@ export const metadata = { title: 'ฟอร์ม IOC — KorKru' }
 type IocFormRow = Pick<
   IocForm,
   'id' | 'exam_title' | 'subject_name' | 'subject_code' | 'grade_level' | 'status' | 'threshold' | 'items_frozen_at' | 'created_at'
->
+> & { ioc_form_experts: { status: string }[] | null }
 
 const STATUS_LABEL: Record<IocFormStatus, string> = {
   draft: 'ฉบับร่าง',
@@ -46,7 +46,7 @@ export default async function IocFormsPage() {
 
   const { data, error } = await supabase
     .from('ioc_forms')
-    .select('id, exam_title, subject_name, subject_code, grade_level, status, threshold, items_frozen_at, created_at')
+    .select('id, exam_title, subject_name, subject_code, grade_level, status, threshold, items_frozen_at, created_at, ioc_form_experts(status)')
     .order('created_at', { ascending: false })
 
   if (error) return <IocLoadError />
@@ -124,7 +124,7 @@ export default async function IocFormsPage() {
                 <Button variant="outline" render={<Link href={`/research/ioc/${form.id}`} />}>
                   {form.status === 'draft' ? 'ทำต่อ' : 'เปิดฟอร์ม'}
                 </Button>
-                {form.status === 'draft' ? (
+                {(form.ioc_form_experts ?? []).every(expert => expert.status !== 'submitted') ? (
                   <IocFormDeleteButton formId={form.id} examTitle={form.exam_title} />
                 ) : null}
               </div>
