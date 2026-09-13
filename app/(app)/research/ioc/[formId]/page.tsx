@@ -61,7 +61,7 @@ export default async function IocFormPage({ params }: Props) {
       .order('order_index'),
     supabase
       .from('ioc_form_experts')
-      .select('id, expert_order, display_name, position_title, affiliation, status, first_opened_at, last_opened_at, submitted_at, token_expires_at, revoked_at')
+      .select('id, expert_order, display_name, position_title, affiliation, status, first_opened_at, last_opened_at, submitted_at, token_expires_at, revoked_at, signature_mode')
       .eq('form_id', formId)
       .order('expert_order'),
   ])
@@ -269,6 +269,14 @@ export default async function IocFormPage({ params }: Props) {
           percentRuleLabel={
             form.percent_rule === 'items_passing' ? 'จำนวนข้อที่ผ่านเกณฑ์' : 'ค่าเฉลี่ยดัชนีทุกข้อ'
           }
+          exportExperts={(expertsResult.data ?? []).map(row => ({
+            id: row.id as string,
+            expert_order: row.expert_order as number,
+            display_name: row.display_name as string,
+            submitted: row.status === 'submitted',
+            signed: row.signature_mode !== 'none' && row.status === 'submitted',
+          }))}
+          authorSignatureAvailable={form.author_signature_mode !== 'none'}
           generatedParagraph={generatedParagraph}
           savedParagraph={form.summary_text}
           paragraphStale={isIocSummaryTextStale(form.summary_text_updated_at, latestRatingAt)}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { IocFormDashboard, type DashboardExpert } from './ioc-form-dashboard'
 import { IocSummaryPanel, type SummaryRow } from './ioc-summary-panel'
+import { IocExportPanel } from './ioc-export-panel'
 import type { IocSummary } from '@/lib/ioc'
 
 /**
@@ -24,6 +25,8 @@ export function IocFormFollowUp({
   generatedParagraph,
   savedParagraph,
   paragraphStale,
+  exportExperts,
+  authorSignatureAvailable,
 }: {
   formId: string
   examTitle: string
@@ -36,8 +39,10 @@ export function IocFormFollowUp({
   generatedParagraph: string
   savedParagraph: string | null
   paragraphStale: boolean
+  exportExperts: { id: string; expert_order: number; display_name: string; submitted: boolean; signed: boolean }[]
+  authorSignatureAvailable: boolean
 }) {
-  const [tab, setTab] = useState<'experts' | 'summary'>('experts')
+  const [tab, setTab] = useState<'experts' | 'summary' | 'export'>('experts')
   const submitted = experts.filter(expert => expert.status === 'submitted').length
 
   return (
@@ -59,6 +64,14 @@ export function IocFormFollowUp({
         >
           สรุปผล
         </Button>
+        <Button
+          size="sm"
+          variant={tab === 'export' ? 'default' : 'outline'}
+          aria-current={tab === 'export' ? 'page' : undefined}
+          onClick={() => setTab('export')}
+        >
+          ส่งออกเอกสาร
+        </Button>
       </nav>
 
       {tab === 'experts' ? (
@@ -70,7 +83,7 @@ export function IocFormFollowUp({
           experts={experts}
           freshLinks={[]}
         />
-      ) : (
+      ) : tab === 'summary' ? (
         <IocSummaryPanel
           formId={formId}
           summary={summary}
@@ -80,6 +93,13 @@ export function IocFormFollowUp({
           generatedParagraph={generatedParagraph}
           savedParagraph={savedParagraph}
           paragraphStale={paragraphStale}
+        />
+      ) : (
+        <IocExportPanel
+          formId={formId}
+          hasItems={itemCount > 0}
+          experts={exportExperts}
+          authorSignatureAvailable={authorSignatureAvailable}
         />
       )}
     </div>
