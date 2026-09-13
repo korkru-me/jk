@@ -68,7 +68,8 @@ export default async function IocFormsPage() {
             ส่งลิงก์ให้ผู้ทรงคุณวุฒิกรอก แล้วคำนวณดัชนีความสอดคล้องกับตารางสรุปให้อัตโนมัติ
           </p>
         </div>
-        <div className="text-left sm:text-right">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button variant="outline" render={<Link href="/research/ioc/standards" />}>คลังตัวชี้วัด</Button>
           <Button render={<Link href="/research/ioc/new" />}>สร้างฟอร์ม IOC</Button>
         </div>
       </div>

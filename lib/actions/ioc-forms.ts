@@ -856,3 +856,146 @@ export async function saveIocSummaryText(input: SaveIocSummaryTextInput) {
   revalidatePath(`/research/ioc/${parsed.data.form_id}`)
   return { saved: true, cleared: text.length === 0 }
 }
+
+// ── Phase 6: a second round from the first ────────────────────────────────
+
+/**
+ * Copies a form into a fresh draft: the same header, rules, indicators, items
+ * and panel, with none of the evidence.
+ *
+ * This is the way back from a form that came out with items below the
+ * threshold. The alert on the summary page tells a teacher to fix those items
+ * and evaluate again; without this they would retype the header, retype every
+ * indicator and re-match all of it by hand.
+ *
+ * Ratings, signatures, links and timestamps are deliberately not copied. The
+ * new form has been judged by nobody, and a copy that arrived carrying someone
+ * else's ticks would be a forged document.
+ */
+export async function duplicateIocForm(formId: string) {
+  if (!z.string().uuid().safeParse(formId).success) return { error: 'ฟอร์มไม่ถูกต้อง' }
+
+  const auth = await requireTeacher()
+  if ('error' in auth) return { error: auth.error }
+  const { supabase, user } = auth
+
+  const { data: source } = await supabase
+    .from('ioc_forms')
+    .select('*')
+    .eq('id', formId)
+    .maybeSingle()
+
+  if (!source) return { error: 'ไม่พบฟอร์มนี้ หรือคุณไม่มีสิทธิ์เข้าถึง' }
+
+  const { data: created, error: createError } = await supabase
+    .from('ioc_forms')
+    .insert({
+      org_id: source.org_id,
+      created_by: user.id,
+      classroom_id: source.classroom_id,
+      project_id: source.project_id,
+      measurement_id: source.measurement_id,
+      assignment_id: source.assignment_id,
+      source_kind: source.source_kind,
+      exam_title: `${source.exam_title} (รอบใหม่)`,
+      subject_name: source.subject_name,
+      subject_code: source.subject_code,
+      grade_level: source.grade_level,
+      term_label: source.term_label,
+      academic_year: source.academic_year,
+      school_name: source.school_name,
+      author_name: source.author_name,
+      author_position: source.author_position,
+      instruction_text: source.instruction_text,
+      threshold: source.threshold,
+      percent_rule: source.percent_rule,
+      show_solutions: source.show_solutions,
+      author_signature_mode: source.author_signature_mode,
+      // The file belongs to the form it was uploaded for; the new form asks
+      // for the signature again rather than reusing a path it does not own.
+      author_signature_path: null,
+      status: 'draft',
+    })
+    .select('id')
+    .single()
+
+  if (createError || !created) {
+    console.error('[ioc] duplicate form failed', createError)
+    return { error: 'ทำสำเนาฟอร์มไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
+  }
+
+  const newFormId = created.id as string
+
+  const { data: standards } = await supabase
+    .from('ioc_form_standards')
+    .select('id, order_index, code, description')
+    .eq('form_id', formId)
+    .order('order_index')
+
+  const standardIdMap = new Map<string, string>()
+  for (const standard of standards ?? []) {
+    const { data: copy } = await supabase
+      .from('ioc_form_standards')
+      .insert({
+        org_id: source.org_id,
+        form_id: newFormId,
+        order_index: standard.order_index,
+        code: standard.code,
+        description: standard.description,
+      })
+      .select('id')
+      .single()
+    if (copy) standardIdMap.set(standard.id as string, copy.id as string)
+  }
+
+  const { data: items } = await supabase
+    .from('ioc_form_items')
+    .select('order_index, item_label, section_label, group_intro, prompt, choices, image_urls, solution, source_question_id, standard_id')
+    .eq('form_id', formId)
+    .order('order_index')
+
+  if ((items ?? []).length > 0) {
+    const { error: itemError } = await supabase.from('ioc_form_items').insert(
+      (items ?? []).map(item => ({
+        org_id: source.org_id,
+        form_id: newFormId,
+        standard_id: item.standard_id ? standardIdMap.get(item.standard_id as string) ?? null : null,
+        order_index: item.order_index,
+        item_label: item.item_label,
+        section_label: item.section_label,
+        group_intro: item.group_intro,
+        prompt: item.prompt,
+        choices: item.choices,
+        image_urls: item.image_urls,
+        solution: item.solution,
+        source_question_id: item.source_question_id,
+      })),
+    )
+    if (itemError) {
+      console.error('[ioc] duplicate items failed', itemError)
+      return { error: 'คัดลอกข้อสอบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
+    }
+  }
+
+  const { data: experts } = await supabase
+    .from('ioc_form_experts')
+    .select('expert_order, display_name, position_title, affiliation')
+    .eq('form_id', formId)
+    .order('expert_order')
+
+  if ((experts ?? []).length > 0) {
+    await supabase.from('ioc_form_experts').insert(
+      (experts ?? []).map(expert => ({
+        org_id: source.org_id,
+        form_id: newFormId,
+        expert_order: expert.expert_order,
+        display_name: expert.display_name,
+        position_title: expert.position_title,
+        affiliation: expert.affiliation,
+      })),
+    )
+  }
+
+  revalidatePath('/research/ioc')
+  return { form_id: newFormId }
+}

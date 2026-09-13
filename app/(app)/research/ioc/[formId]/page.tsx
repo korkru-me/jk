@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { IocForm, IocFormExpert, IocFormItem, IocFormStandard } from '@/lib/types'
 import { IocFormEditor, type IocEditorSources } from '../_components/ioc-form-editor'
 import { IocFormFollowUp } from '../_components/ioc-form-followup'
+import { IocDuplicateButton } from '../_components/ioc-duplicate-button'
 import type { DashboardExpert } from '../_components/ioc-form-dashboard'
 import type { SummaryRow } from '../_components/ioc-summary-panel'
 import { summarizeIocForm, type IocScore } from '@/lib/ioc'
@@ -227,7 +228,12 @@ export default async function IocFormPage({ params }: Props) {
             {form.grade_level ? <span>ชั้น{form.grade_level}</span> : null}
           </p>
         </div>
-        <Button variant="outline" render={<Link href="/research/ioc" />}>กลับรายการฟอร์ม</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {items.length > 0 ? (
+            <IocDuplicateButton formId={form.id} examTitle={form.exam_title} />
+          ) : null}
+          <Button variant="outline" render={<Link href="/research/ioc" />}>กลับรายการฟอร์ม</Button>
+        </div>
       </div>
 
       {form.items_frozen_at ? (

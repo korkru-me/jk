@@ -12,6 +12,7 @@ import { iocLinkDaysLeft } from '@/lib/ioc-token'
 import type { IocReviewContext } from '@/lib/ioc-review-server'
 import type { IocScore } from '@/lib/ioc'
 import { SignaturePad } from '@/components/ioc/signature-pad'
+import { SignatureUpload } from '@/components/ioc/signature-upload'
 
 type Screen = 'rating' | 'review' | 'done'
 
@@ -267,7 +268,7 @@ function ReviewScreen({
 }) {
   const { items } = context
   const [overall, setOverall] = useState(context.expert.overall_comment)
-  const [mode, setMode] = useState<'drawn' | 'typed' | 'none'>('drawn')
+  const [mode, setMode] = useState<'drawn' | 'uploaded' | 'typed' | 'none'>('drawn')
   const [signature, setSignature] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
   const [pending, startTransition] = useTransition()
@@ -283,8 +284,8 @@ function ReviewScreen({
       toast.error('กรุณาติ๊กยอมรับการใช้ลายเซ็นก่อนส่ง')
       return
     }
-    if (mode === 'drawn' && !signature) {
-      toast.error('ยังไม่ได้เซ็น กรุณาเซ็นในกรอบก่อน')
+    if ((mode === 'drawn' || mode === 'uploaded') && !signature) {
+      toast.error(mode === 'drawn' ? 'ยังไม่ได้เซ็น กรุณาเซ็นในกรอบก่อน' : 'ยังไม่ได้เลือกรูปลายเซ็น')
       return
     }
 
@@ -293,7 +294,7 @@ function ReviewScreen({
         token,
         overall_comment: overall,
         signature_mode: mode,
-        signature_data_url: mode === 'drawn' ? signature : null,
+        signature_data_url: mode === 'drawn' || mode === 'uploaded' ? signature : null,
         consent,
       })
       if ('error' in result && result.error) {
@@ -359,16 +360,17 @@ function ReviewScreen({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {([
             { value: 'drawn', label: 'เซ็นด้วยนิ้ว/เมาส์' },
+            { value: 'uploaded', label: 'อัปโหลดรูป' },
             { value: 'typed', label: 'พิมพ์ชื่อ' },
             { value: 'none', label: 'เว้นไว้เซ็นเอง' },
           ] as const).map(choice => (
             <Button
               key={choice.value}
               variant={mode === choice.value ? 'default' : 'outline'}
-              onClick={() => setMode(choice.value)}
+              onClick={() => { setMode(choice.value); setSignature(null) }}
               aria-pressed={mode === choice.value}
               className="h-auto py-3 text-sm font-semibold"
             >
@@ -378,6 +380,7 @@ function ReviewScreen({
         </div>
 
         {mode === 'drawn' ? <SignaturePad onChange={setSignature} /> : null}
+        {mode === 'uploaded' ? <SignatureUpload onChange={setSignature} /> : null}
         {mode === 'typed' ? (
           <p className="rounded-xl bg-muted p-3 text-center text-lg text-foreground">
             {context.expert.display_name}

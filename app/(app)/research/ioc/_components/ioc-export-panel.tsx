@@ -197,6 +197,21 @@ export function IocExportPanel({
           หน้าพิมพ์จะเปิดในแท็บใหม่ · ในหน้าต่างพิมพ์ของเบราว์เซอร์ เลือกปลายทาง “บันทึกเป็น PDF”
           และปิด “หัวกระดาษและท้ายกระดาษ” เพื่อให้เลขหน้าของเอกสารเป็นเลขเดียวที่ปรากฏ
         </p>
+
+        <div className="border-t pt-4">
+          <Button
+            variant="outline"
+            className="w-full justify-center"
+            disabled={!availability.summary.available}
+            render={<a href={`/api/ioc/${formId}/summary-export`} />}
+          >
+            ดาวน์โหลดตารางสรุปเป็น Excel
+          </Button>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            สำหรับวางลงแม่แบบรายงานที่ต้นสังกัดใช้อยู่ · ตัวเลขชุดเดียวกับเอกสารที่พิมพ์
+            และมีคอลัมน์ข้อเสนอแนะของผู้ทรงรายข้อ
+          </p>
+        </div>
       </Card>
 
       <Card padding="lg" className="space-y-3">

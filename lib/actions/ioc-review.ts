@@ -19,8 +19,8 @@ export type SaveIocReviewRatingInput = z.input<typeof ratingSchema>
 const submitSchema = z.object({
   token: z.string().min(20).max(200),
   overall_comment: z.string().max(4000),
-  signature_mode: z.enum(['drawn', 'typed', 'none']),
-  /** Only for `drawn`: a PNG data URL straight from the canvas. */
+  signature_mode: z.enum(['drawn', 'uploaded', 'typed', 'none']),
+  /** For `drawn` and `uploaded`: a PNG data URL from the canvas. */
   signature_data_url: z.string().max(400_000).nullable(),
   consent: z.boolean(),
 })
@@ -105,8 +105,14 @@ export async function submitIocReview(input: SubmitIocReviewInput) {
     signature_path: null,
   }
 
-  if (parsed.data.signature_mode === 'drawn') {
-    if (!parsed.data.signature_data_url) return { error: 'ยังไม่ได้เซ็น กรุณาเซ็นในกรอบก่อน' }
+  if (parsed.data.signature_mode === 'drawn' || parsed.data.signature_mode === 'uploaded') {
+    if (!parsed.data.signature_data_url) {
+      return {
+        error: parsed.data.signature_mode === 'drawn'
+          ? 'ยังไม่ได้เซ็น กรุณาเซ็นในกรอบก่อน'
+          : 'ยังไม่ได้เลือกรูปลายเซ็น',
+      }
+    }
     const signature = parseIocSignatureDataUrl(parsed.data.signature_data_url)
     if (!signature.ok) return { error: signature.error }
 
