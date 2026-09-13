@@ -28,6 +28,7 @@ import { MatchingLineInput } from './matching-line-input'
 import { placementFromTexts, textsFromPlacement } from '@/lib/matching-answer'
 import { OrderingDragList } from './ordering-drag-list'
 import { orderingDisplayOrder, orderingIsAnswered } from '@/lib/ordering-answer'
+import { choiceListHint } from '@/lib/choice-list-hint'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -1075,6 +1076,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <TrueFalseAnswerInput
                   answerId={current.id}
                   config={current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig}
+                  questionText={current.questions.question_text}
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={val => handleAnswerChange(current.id, val)}
                 />
@@ -2492,10 +2494,11 @@ function MultiPartAnswerInput({
 // { answers: string[], explanation } encoding as the classic multi-statement
 // mode below: answers[i] === 'true' means "ticked", compared directly
 // against the pre-flipped target built in submissions.ts.
-function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChange }: {
+function TrueFalseSelectMatching({ config, subStatements, mode, questionText, rawValue, onChange }: {
   config: TrueFalseConfig | SafeTrueFalseConfig | null
   subStatements: Array<TrueFalseStatement | SafeTrueFalseStatement>
   mode: TrueFalseExplanationMode
+  questionText: string
   rawValue: string; onChange: (v: string) => void
 }) {
   let answers: string[] = []; let explanation = ''
@@ -2515,9 +2518,7 @@ function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChan
   const items = [null, ...subStatements]
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium">
-        ข้อใดต่อไปนี้{target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? <span className="text-xs text-muted-foreground font-normal">(เลือกได้มากกว่า 1 ข้อ)</span>
-      </p>
+      <p className="text-xs text-muted-foreground">{choiceListHint(questionText, target)}</p>
       <div className="space-y-2">
         {items.map((st, i) => (
           <label key={i} className={`flex items-start gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-colors ${
@@ -2545,9 +2546,10 @@ function TrueFalseSelectMatching({ config, subStatements, mode, rawValue, onChan
   )
 }
 
-function TrueFalseAnswerInput({ config, rawValue, onChange }: {
+function TrueFalseAnswerInput({ config, questionText, rawValue, onChange }: {
   answerId: string
   config: TrueFalseConfig | SafeTrueFalseConfig | null
+  questionText: string
   rawValue: string
   onChange: (v: string) => void
 }) {
@@ -2555,7 +2557,7 @@ function TrueFalseAnswerInput({ config, rawValue, onChange }: {
   const subStatements = config?.statements ?? []
 
   if (config?.answer_mode === 'select_matching') {
-    return <TrueFalseSelectMatching config={config} subStatements={subStatements} mode={mode} rawValue={rawValue} onChange={onChange} />
+    return <TrueFalseSelectMatching config={config} subStatements={subStatements} mode={mode} questionText={questionText} rawValue={rawValue} onChange={onChange} />
   }
 
   if (subStatements.length === 0) {
@@ -2843,7 +2845,7 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
               <>
                 <RichText text={part.text} className="text-sm block" />
                 <PartImages urls={part.image_urls} />
-                <p className="text-xs text-muted-foreground">ข้อใดต่อไปนี้{target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
+                <p className="text-xs text-muted-foreground">{choiceListHint(part.text, target)}</p>
                 <div className="space-y-1.5">
                   {part.choices!.map((c, ci) => (
                     <label key={c.id} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-sm ${

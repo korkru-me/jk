@@ -20,6 +20,7 @@ import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers,
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, SubmittedFile } from '@/lib/types'
 import { CLASSIFY_UNSET, classifyCorrectGrid } from '@/lib/classify'
+import { choiceListHint } from '@/lib/choice-list-hint'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -1025,7 +1026,7 @@ export function QuestionPreviewContent({
         return (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground font-medium">
-              ข้อใดต่อไปนี้{trueFalseConfig.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)
+              {choiceListHint(questionText, trueFalseConfig.select_target)}
             </p>
             <div className="space-y-2">
               {items.map((st, i) => {
@@ -1375,7 +1376,7 @@ export function QuestionPreviewContent({
                       <>
                         <RichText text={part.text} className="text-[15px] text-foreground" />
                         <PartImages urls={part.image_urls} />
-                        <p className="text-xs text-muted-foreground">ข้อใดต่อไปนี้{part.select_target === 'wrong' ? 'ผิด' : 'ถูกต้อง'}? (เลือกได้มากกว่า 1 ข้อ)</p>
+                        <p className="text-xs text-muted-foreground">{choiceListHint(part.text, part.select_target)}</p>
                         <div className="space-y-1.5">
                           {part.choices!.map((c, ci) => {
                             const ticked = ticks[ci] === 'true'
