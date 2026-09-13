@@ -12,6 +12,8 @@ do $$ begin create type difficulty as enum ('easy', 'medium', 'hard', 'analytica
 do $$ begin create type visibility as enum ('private', 'school', 'public', 'pending'); exception when duplicate_object then null; end $$;
 do $$ begin create type user_status as enum ('active', 'suspended'); exception when duplicate_object then null; end $$;
 do $$ begin create type assignment_status as enum ('draft', 'published', 'closed'); exception when duplicate_object then null; end $$;
+-- 'print' เลิกใช้แล้ว (ดู migration 20260913102000) แต่ยังอยู่ใน enum เพราะ
+-- Postgres ลบค่าใน enum ไม่ได้ ไม่มีโค้ดส่วนไหนเขียนค่านี้อีก
 do $$ begin create type assignment_mode as enum ('online', 'print'); exception when duplicate_object then null; end $$;
 do $$ begin create type submission_status as enum ('in_progress', 'submitted', 'graded'); exception when duplicate_object then null; end $$;
 

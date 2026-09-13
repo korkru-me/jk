@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
-  Play, Square, Printer, BarChart2, Trash2, TrendingUp,
+  Play, Square, BarChart2, Trash2, TrendingUp,
   AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
   FileClock, Presentation,
 } from 'lucide-react'
@@ -192,13 +192,6 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             <Button onClick={close} disabled={isPending} size="sm" variant="destructive" className="gap-1.5">
               <Square className="w-3.5 h-3.5" /> ปิดการสอบ
             </Button>
-          )}
-          {a.mode === 'print' && (
-            <Link href={`/assignments/${a.id}/print`} target="_blank">
-              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-                <Printer className="w-3.5 h-3.5" /> พิมพ์ใบงาน
-              </Button>
-            </Link>
           )}
           {a.mode === 'online' && a.question_ids.length > 0 && (
             <Link href={`/assignments/${a.id}/preview`} target="_blank">

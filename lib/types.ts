@@ -555,7 +555,13 @@ export interface Question {
 }
 
 export type AssignmentStatus = 'draft' | 'published' | 'closed'
-export type AssignmentMode = 'online' | 'print'
+// The `assignment_mode` enum in Postgres still carries 'print' — an enum value
+// cannot be dropped there without rewriting the type — but nothing writes it any
+// more: งานโหมดพิมพ์ was removed along with the PDF export, and the migration
+// that removed it moved every งาน that had it onto 'online'. Narrowed here on
+// purpose, so a branch written for a printed ใบงาน stops compiling instead of
+// sitting unread.
+export type AssignmentMode = 'online'
 export type AssignmentType = 'exercise' | 'exam'
 export type SecureBrowserMode = 'browser' | 'seb_required'
 export type AndroidExamMode = 'blocked' | 'monitored'
