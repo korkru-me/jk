@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 4 กันยายน 2026
+ตรวจจาก repository: 14 กันยายน 2569
 
 ## วิธีอ่านสถานะ
 
@@ -470,6 +470,28 @@
 - เจ้าของผลิตภัณฑ์อนุมัติให้ merge/deploy ก่อนมีโครงการจริง จึงไม่อ้างว่าระยะ 3.2 ผ่าน ไม่สร้าง fixture ใน production และคง checklist หลายบทบาทเป็นงานหลังปล่อย รายละเอียดการตัดสินใจและ smoke test อยู่ใน `docs/EDUCATION_RESEARCH_RELEASE.md`
 - คู่มือครูตั้งแต่เตรียม roster, เลือกแหล่งคะแนน, อ่านผล ไปจนถึงส่งออกอย่างปลอดภัยอยู่ใน `docs/EDUCATION_RESEARCH_USER_GUIDE.md`
 - `master` merge commit `f7448f9` deploy ผ่าน Vercel สำเร็จ Public page และ auth guard ของ `/research` ผ่าน production smoke test โดยไม่เขียน fixture; การตรวจหลังล็อกอินบน production รวมไว้กับ checklist ห้องจริงระยะ 3.2
+- **ฟอร์ม IOC (ความสอดคล้องของตัวชี้วัดกับแบบทดสอบ) — ระยะ 7 ครบแล้ว UAT ด้านเทคนิคผ่าน ยังไม่ merge เข้า `master`** ·
+  `/research/ioc` รายการ · `/research/ioc/new` หัวเอกสาร · `/research/ioc/[formId]` ตัวช่วยสร้าง 4 ขั้น
+  และสามแท็บเมื่อส่งลิงก์แล้ว · `/research/ioc/standards` คลังตัวชี้วัด · `/ioc/[token]` หน้าผู้ทรง ·
+  `/ioc-print/[formId]` เอกสาร A4 · `/api/ioc/[formId]/summary-export` ตารางสรุป Excel
+  - **เอกสาร**: A4 สี่แบบ (ฟอร์มเปล่า / ฉบับผู้ทรง / ตารางสรุป / เล่มรวม) แบ่งหน้าเองให้พอดี A4 พร้อมเลขหน้า ·
+    Excel ของตารางสรุปมีคอลัมน์ข้อเสนอแนะรายข้อที่กระดาษแสดงไม่ไหว
+  - **ลายเซ็น 4 ทาง**: วาด, อัปโหลดรูป (แปลงเป็น PNG ในเบราว์เซอร์ก่อนส่ง), พิมพ์ชื่อ, เว้นไว้เซ็นเอง ·
+    เก็บใน bucket ส่วนตัวและอ่านผ่าน signed URL อายุ 15 นาที
+  - **สร้างฟอร์มรอบใหม่จากฟอร์มเดิม** คัดลอกหัวเอกสาร ตัวชี้วัด ข้อสอบ และรายชื่อผู้ทรง แต่ไม่คัดลอกคะแนนหรือลายเซ็น
+  - **คลังตัวชี้วัดของโรงเรียน** ดูจำนวนโจทย์ที่ผูกไว้ แก้/ลบได้เฉพาะแถวที่ตัวเองเพิ่ม
+  - `lib/ioc*.ts` (ดัชนี, ฟอร์ม, token, ลายเซ็น, สรุป, เอกสาร, Excel) มี vitest รวม 88 เคส
+  - **ตรวจกับข้อมูลจริงทุกเส้นทางแล้ว** ตั้งแต่สร้างฟอร์ม ส่งลิงก์ ผู้ทรงกรอกและลงนาม อ่านผลสรุป พิมพ์เอกสาร
+    ดาวน์โหลด Excel ทำสำเนาฟอร์ม จนถึงลบฟอร์มและลบตัวชี้วัดออกจากคลัง · ข้อมูลทดสอบถูกลบออกหมดแล้ว
+  - **UAT ด้านเทคนิคผ่าน** รวมการพิสูจน์บนสายจริงว่าเฉลยไม่ถึงเบราว์เซอร์ของผู้ทรงเมื่อสวิตช์ปิด ·
+    anon ถูกปฏิเสธที่ระดับ grant ทุกตาราง · bucket ลายเซ็นเปิดอ่านสาธารณะไม่ได้ · `record_ioc_form_event`
+    ปฏิเสธ detail ที่มี token หรือ signature · ลิงก์ผิด หมดอายุ และถูกเพิกถอน ตอบหน้าเดียวกันโดยไม่บอกสาเหตุ
+  - **ยังไม่ได้ทำ**: ส่งออก Word (.docx) ต้องเพิ่ม dependency และเขียน layout ซ้ำอีกชุด รอเจ้าของผลิตภัณฑ์ตัดสินใจ ·
+    ยังไม่มีใครสั่งพิมพ์เป็นไฟล์ PDF จริงผ่านหน้าต่างพิมพ์ · คณะผู้ทรงคุณวุฒิตัวจริงยังไม่เคยใช้ ·
+    ยังไม่ได้ยืนยันการแยกองค์กรด้วยบัญชีครูคนที่สอง · **ยังไม่ merge เข้า `master` และยังไม่ deploy**
+  - สเปก เกณฑ์ และภาพร่าง 11 หน้า (อนุมัติแล้ว 5 รอตรวจ 6) อยู่ใน `docs/EDUCATION_RESEARCH_IOC.md` ·
+    รายการตรวจและผลอยู่ใน `docs/EDUCATION_RESEARCH_IOC_UAT.md` · คู่มือครูอยู่ใน
+    `docs/EDUCATION_RESEARCH_IOC_USER_GUIDE.md` · การตัดสินใจของรุ่นอยู่ใน `docs/EDUCATION_RESEARCH_IOC_RELEASE.md`
 
 ### Dashboard — มีโค้ดรองรับ (ฝั่งครู)
 
@@ -500,11 +522,11 @@
 - มี notifications, posts, comments, pin และ weekly homeroom digest
 - ต้องตรวจ delivery/cron จริงและ privacy ของข้อความ notification
 
-### Export, PDF และ OMR — บางส่วน/ต้นแบบ
+### Export, PDF และ OMR — ถอดออกแล้ว
 
-- มี routes และ UI สำหรับ print/export/PDF/OMR
-- PDF preview มี fallback เป็น `MOCK_QUESTIONS`
-- ต้องยืนยันการสร้างไฟล์จริง การสุ่มชุดต่อคน ความถูกต้องของ answer key และ browser/print compatibility
+- **เส้นทางกระดาษทั้งหมดถูกลบไปกับ `bdafbca` (13 กันยายน 2569)** — `assignments/[id]/export`, `assignments/[id]/print`, `print-worksheet.tsx`, ใบ OMR และ PDF preview ที่เคยมี fallback เป็น `MOCK_QUESTIONS` ไม่มีอยู่ในโค้ดแล้ว งานที่เคยตั้งเป็นโหมดพิมพ์ถูกย้ายเป็น `online` ด้วย migration `20260913102000_retire_print_assignment_mode.sql`
+- ส่งออกที่ยังมีจริงคือ Excel ของงานวิจัย (`lib/education-research-export.ts` ผ่าน `app/api/research/[id]/data-export`), แม่แบบคะแนน Excel, ไฟล์โจทย์ `.korkru.json` และรายงานห้องเรียนที่สั่งพิมพ์จากเบราว์เซอร์ที่ `classrooms/[id]/report`
+- เอกสาร PDF ชุดถัดไปที่วางแผนไว้คือฟอร์ม IOC ซึ่งใช้หน้าพิมพ์ A4 ของเบราว์เซอร์เช่นกัน ไม่ใช่ PDF library — เหตุผลและข้อกำหนดอยู่ใน `docs/EDUCATION_RESEARCH_IOC.md`
 
 ### Analytics — บางส่วน/ต้นแบบ
 
