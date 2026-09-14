@@ -143,10 +143,63 @@ export interface IocSignatureBlock {
   role: string
   /** A signed URL for the image, or null to leave the dotted line empty. */
   imageUrl: string | null
+  /**
+   * Where the image lives in the private bucket, for renderers that need the
+   * bytes rather than a URL: a .docx file carries its own images, so a signed
+   * URL would be a link to something the reader cannot open.
+   */
+  signaturePath: string | null
   /** Typed signatures print the name above the line in a script face. */
   typedName: string | null
   signedAt: string | null
 }
+
+export interface DocHeader {
+  titleLines: string[]
+  subtitle: string | null
+}
+
+export interface SummaryPrintRow {
+  itemLabel: string
+  standardLabel: string
+  agree: number
+  unsure: number
+  disagree: number
+  index: string
+  belowThreshold: boolean
+}
+
+/**
+ * One document's worth of content, before anything decides how to draw it.
+ *
+ * Both renderers read this: the A4 page that the browser prints, and the .docx
+ * file that Word opens. Keeping the shape here is what stops the two from
+ * drifting — a number that appears in one and not the other would be a number
+ * somebody has to reconcile by hand, which is the whole problem this feature
+ * exists to remove.
+ */
+export type PrintSection =
+  | {
+      kind: 'evaluation'
+      key: string
+      header: DocHeader
+      instruction: string
+      rows: IocPrintRow[]
+      standardLabels: Record<string, string>
+      showComments: boolean
+      signatures: IocSignatureBlock[]
+    }
+  | {
+      kind: 'summary'
+      key: string
+      header: DocHeader
+      facts: string[]
+      percentLine: string
+      paragraph: string
+      rows: SummaryPrintRow[]
+      footnotes: string[]
+      signatures: IocSignatureBlock[]
+    }
 
 export interface IocPrintHeaderLines {
   title: string[]

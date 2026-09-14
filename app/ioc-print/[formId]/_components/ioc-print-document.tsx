@@ -2,45 +2,19 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { groupRowsByStandard, type IocPrintRow, type IocSignatureBlock } from '@/lib/ioc-print'
+import { renderMathInHtml } from '@/lib/math/latex'
+import {
+  groupRowsByStandard,
+  type DocHeader,
+  type IocPrintRow,
+  type IocSignatureBlock,
+  type PrintSection,
+  type SummaryPrintRow,
+} from '@/lib/ioc-print'
 
-export interface DocHeader {
-  titleLines: string[]
-  subtitle: string | null
-}
-
-export interface SummaryPrintRow {
-  itemLabel: string
-  standardLabel: string
-  agree: number
-  unsure: number
-  disagree: number
-  index: string
-  belowThreshold: boolean
-}
-
-export type PrintSection =
-  | {
-      kind: 'evaluation'
-      key: string
-      header: DocHeader
-      instruction: string
-      rows: IocPrintRow[]
-      standardLabels: Record<string, string>
-      showComments: boolean
-      signatures: IocSignatureBlock[]
-    }
-  | {
-      kind: 'summary'
-      key: string
-      header: DocHeader
-      facts: string[]
-      percentLine: string
-      paragraph: string
-      rows: SummaryPrintRow[]
-      footnotes: string[]
-      signatures: IocSignatureBlock[]
-    }
+// Declared in lib/ioc-print.ts so the Word exporter reads the same shape;
+// re-exported here because this file is where the print page imports them from.
+export type { DocHeader, PrintSection, SummaryPrintRow }
 
 /**
  * A4 at 96dpi, with the margins Thai official documents use: 2.5cm at the top
@@ -344,16 +318,16 @@ function EvaluationRow({
       <td>
         {row.sectionLabel ? <p className="ioc-section-label">{row.sectionLabel}</p> : null}
         {row.groupIntro ? (
-          <div className="ioc-group-intro" dangerouslySetInnerHTML={{ __html: row.groupIntro }} />
+          <div className="ioc-group-intro" dangerouslySetInnerHTML={{ __html: renderMathInHtml(row.groupIntro) }} />
         ) : null}
         <div className="ioc-prompt">
           <b>{row.itemLabel}. </b>
-          <span dangerouslySetInnerHTML={{ __html: row.prompt }} />
+          <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(row.prompt) }} />
         </div>
         {row.choices.length > 0 ? (
           <div className="ioc-choices">
             {row.choices.map(choice => (
-              <span key={choice} dangerouslySetInnerHTML={{ __html: choice }} />
+              <span key={choice} dangerouslySetInnerHTML={{ __html: renderMathInHtml(choice) }} />
             ))}
           </div>
         ) : null}

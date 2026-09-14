@@ -63,7 +63,11 @@ export function IocExportPanel({
   })
 
   const current = availability[options.doc]
-  const href = `/ioc-print/${formId}?${serializeIocPrintOptions(options)}`
+  const query = serializeIocPrintOptions(options)
+  const href = `/ioc-print/${formId}?${query}`
+  // The Word file is the same document under the same options, so it reads the
+  // same query string rather than growing a second set of switches.
+  const docxHref = `/api/ioc/${formId}/docx-export?${query}`
   const anySignedExpert = submitted.some(expert => expert.signed)
 
   function set(patch: Partial<IocPrintOptions>) {
@@ -198,7 +202,25 @@ export function IocExportPanel({
           และปิด “หัวกระดาษและท้ายกระดาษ” เพื่อให้เลขหน้าของเอกสารเป็นเลขเดียวที่ปรากฏ
         </p>
 
-        <div className="border-t pt-4">
+        <div className="space-y-2 border-t pt-4">
+          <Button
+            variant="outline"
+            className="w-full justify-center"
+            disabled={!current.available}
+            render={<a href={docxHref} />}
+          >
+            ดาวน์โหลดเป็นไฟล์ Word
+          </Button>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            สำหรับเอกสารที่ต้องแก้ถ้อยคำก่อนยื่น · เนื้อหาและตัวเลขชุดเดียวกับหน้าพิมพ์
+            Word แบ่งหน้าและนับเลขหน้าให้เอง จึงยังถูกต้องหลังคุณแก้ · ใช้ฟอนต์ TH SarabunPSK
+            ถ้าเครื่องไม่มีฟอนต์นี้ Word จะเลือกฟอนต์อื่นแทนและหน้าตาจะขยับเล็กน้อย
+            {' '}<b>รูปภาพและสูตรคณิตศาสตร์ไม่ติดไปกับไฟล์นี้</b> รูปจะขึ้นเป็นข้อความบอกตำแหน่งไว้แทน
+            ส่วนสูตรจะเป็นโค้ด LaTeX ตามที่พิมพ์ไว้ · ถ้าข้อสอบมีรูปหรือสูตรมาก ให้ใช้ PDF
+          </p>
+        </div>
+
+        <div className="space-y-2 border-t pt-4">
           <Button
             variant="outline"
             className="w-full justify-center"
@@ -207,7 +229,7 @@ export function IocExportPanel({
           >
             ดาวน์โหลดตารางสรุปเป็น Excel
           </Button>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="text-xs leading-relaxed text-muted-foreground">
             สำหรับวางลงแม่แบบรายงานที่ต้นสังกัดใช้อยู่ · ตัวเลขชุดเดียวกับเอกสารที่พิมพ์
             และมีคอลัมน์ข้อเสนอแนะของผู้ทรงรายข้อ
           </p>
