@@ -78,6 +78,8 @@ migration ทั้งสามตัวถูก `supabase db push` ไปแ�
 - แก้บั๊กที่เจอระหว่างทาง: เอกสาร A4 ไม่เคยเรนเดอร์สูตรคณิตศาสตร์ `\(…\)` พิมพ์ออกมาเป็นแบ็กสแลชดิบ
 - ผลตรวจ 17 ข้ออยู่ในหัวข้อ 4ข ของ `docs/EDUCATION_RESEARCH_IOC_UAT.md` · `npm test` 88 ไฟล์ 1046 เทสต์ · `npx tsc --noEmit`, `npm run lint:tokens`, `npm run build` ผ่านทั้งหมด
 - ข้อมูลทดสอบถูกลบหมดแล้ว รวมไฟล์ลายเซ็นใน Storage ยืนยันด้วยการนับแถว
+- commit `8ee2466` · push ขึ้น `master` แล้ว · Vercel deploy สำเร็จ · `/api/ioc/<uuid>/docx-export` เปลี่ยนจาก 404 เป็น **401** เมื่อ 14 กันยายน 2569 เวลา 21:23 น. (Asia/Bangkok) ซึ่งเป็นคำตอบที่ถูกต้องสำหรับผู้ไม่ล็อกอิน
+- smoke test ซ้ำทั้งชุดหลัง deploy รอบสอง: `/` และ `/login` 200 · `/research/ioc` และ `/ioc-print/<uuid>` 307 → `/login` · `summary-export` และ `docx-export` (ทั้งแบบมีและไม่มี query) 401 · `/ioc/<token ที่ไม่มีอยู่จริง>` 200 พร้อมข้อความลิงก์ใช้ไม่ได้ · ทุกตารางของโมดูลยังเป็นศูนย์และ bucket ยังว่าง
 
 ## บันทึก deployment
 
