@@ -470,7 +470,7 @@
 - เจ้าของผลิตภัณฑ์อนุมัติให้ merge/deploy ก่อนมีโครงการจริง จึงไม่อ้างว่าระยะ 3.2 ผ่าน ไม่สร้าง fixture ใน production และคง checklist หลายบทบาทเป็นงานหลังปล่อย รายละเอียดการตัดสินใจและ smoke test อยู่ใน `docs/EDUCATION_RESEARCH_RELEASE.md`
 - คู่มือครูตั้งแต่เตรียม roster, เลือกแหล่งคะแนน, อ่านผล ไปจนถึงส่งออกอย่างปลอดภัยอยู่ใน `docs/EDUCATION_RESEARCH_USER_GUIDE.md`
 - `master` merge commit `f7448f9` deploy ผ่าน Vercel สำเร็จ Public page และ auth guard ของ `/research` ผ่าน production smoke test โดยไม่เขียน fixture; การตรวจหลังล็อกอินบน production รวมไว้กับ checklist ห้องจริงระยะ 3.2
-- **ฟอร์ม IOC (ความสอดคล้องของตัวชี้วัดกับแบบทดสอบ) — ระยะ 7 ครบแล้ว UAT ด้านเทคนิคผ่าน ยังไม่ merge เข้า `master`** ·
+- **ฟอร์ม IOC (ความสอดคล้องของตัวชี้วัดกับแบบทดสอบ) — ครบทั้ง 7 ระยะ merge เข้า `master` และ deploy แล้ว 14 ก.ย. 2569** ·
   `/research/ioc` รายการ · `/research/ioc/new` หัวเอกสาร · `/research/ioc/[formId]` ตัวช่วยสร้าง 4 ขั้น
   และสามแท็บเมื่อส่งลิงก์แล้ว · `/research/ioc/standards` คลังตัวชี้วัด · `/ioc/[token]` หน้าผู้ทรง ·
   `/ioc-print/[formId]` เอกสาร A4 · `/api/ioc/[formId]/summary-export` ตารางสรุป Excel
@@ -488,7 +488,8 @@
     ปฏิเสธ detail ที่มี token หรือ signature · ลิงก์ผิด หมดอายุ และถูกเพิกถอน ตอบหน้าเดียวกันโดยไม่บอกสาเหตุ
   - **ยังไม่ได้ทำ**: ส่งออก Word (.docx) ต้องเพิ่ม dependency และเขียน layout ซ้ำอีกชุด รอเจ้าของผลิตภัณฑ์ตัดสินใจ ·
     ยังไม่มีใครสั่งพิมพ์เป็นไฟล์ PDF จริงผ่านหน้าต่างพิมพ์ · คณะผู้ทรงคุณวุฒิตัวจริงยังไม่เคยใช้ ·
-    ยังไม่ได้ยืนยันการแยกองค์กรด้วยบัญชีครูคนที่สอง · **ยังไม่ merge เข้า `master` และยังไม่ deploy**
+    ยังไม่ได้ยืนยันการแยกองค์กรด้วยบัญชีครูคนที่สอง · ยังไม่ได้เดินเส้นทางครูบน production หลังล็อกอิน
+    (smoke test ของผู้ไม่ล็อกอินผ่านครบ)
   - สเปก เกณฑ์ และภาพร่าง 11 หน้า (อนุมัติแล้ว 5 รอตรวจ 6) อยู่ใน `docs/EDUCATION_RESEARCH_IOC.md` ·
     รายการตรวจและผลอยู่ใน `docs/EDUCATION_RESEARCH_IOC_UAT.md` · คู่มือครูอยู่ใน
     `docs/EDUCATION_RESEARCH_IOC_USER_GUIDE.md` · การตัดสินใจของรุ่นอยู่ใน `docs/EDUCATION_RESEARCH_IOC_RELEASE.md`
