@@ -141,7 +141,6 @@ function cell(children: Paragraph[], options?: {
   widthMm?: number
   rowSpan?: number
   columnSpan?: number
-  align?: (typeof AlignmentType)[keyof typeof AlignmentType]
 }): TableCell {
   return new TableCell({
     children: children.length > 0 ? children : [new Paragraph({ children: [] })],
