@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
 
@@ -12,18 +14,37 @@ interface NavItem {
   icon: string
 }
 
-const teacherNav: NavItem[] = [
+/** A heading that opens to reveal its pages instead of navigating anywhere. */
+interface NavGroup {
+  label: string
+  icon: string
+  children: NavItem[]
+}
+
+type NavEntry = NavItem | NavGroup
+
+function isGroup(entry: NavEntry): entry is NavGroup {
+  return 'children' in entry
+}
+
+const teacherNav: NavEntry[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
   { href: '/questions/import', label: 'นำเข้าโจทย์', icon: '📥' },
   { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
   { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
-  { href: '/research', label: 'วิจัยการศึกษา', icon: '🧪' },
-  { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: '📋' },
+  {
+    label: 'วิจัยการศึกษา',
+    icon: '🧪',
+    children: [
+      { href: '/research', label: 'โครงการวิจัย', icon: '📊' },
+      { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: '📋' },
+    ],
+  },
   { href: '/settings/profile', label: 'ตั้งค่า', icon: '⚙️' },
 ]
 
-const studentNav: NavItem[] = [
+const studentNav: NavEntry[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
   { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: '🏫' },
   { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: '📋' },
@@ -44,6 +65,91 @@ function isNavActive(pathname: string, href: string): boolean {
     )
   }
   return pathname === href || pathname.startsWith(href + '/')
+}
+
+/**
+ * A nav heading whose pages slide down underneath it.
+ *
+ * Opens itself whenever the current page is one of its own, so arriving from a
+ * link or a reload never leaves the menu looking like the page is not in it.
+ * An explicit click overrides that for as long as the sidebar stays mounted —
+ * a teacher who closes the group keeps it closed while moving around inside it.
+ *
+ * The slide is a 0fr→1fr grid row rather than a max-height guess: it animates
+ * to whatever the links actually measure, with no magic number to outgrow when
+ * a page is added. (The newer interpolate-size/calc-size route does the same
+ * job but is Chrome/Edge only — on Safari and Firefox it would snap open.)
+ */
+function NavGroupItem({ group, pathname, onNavigate }: {
+  group: NavGroup
+  pathname: string
+  onNavigate?: () => void
+}) {
+  const hasActiveChild = group.children.some(child => isNavActive(pathname, child.href))
+  const [override, setOverride] = useState<boolean | null>(null)
+  const open = override ?? hasActiveChild
+  const panelId = `nav-group-${group.label}`
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOverride(!open)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className={cn(
+          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+          hasActiveChild
+            ? 'text-primary'
+            : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+        )}
+      >
+        <span className="text-base">{group.icon}</span>
+        {group.label}
+        <ChevronDown
+          aria-hidden="true"
+          className={cn(
+            'ml-auto size-4 transition-transform duration-200 motion-reduce:transition-none',
+            open && 'rotate-180'
+          )}
+        />
+      </button>
+
+      <div
+        id={panelId}
+        // `inert` keeps the collapsed links out of the tab order and the
+        // screen-reader tree — overflow-hidden alone only hides them visually.
+        inert={!open}
+        className={cn(
+          'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        )}
+      >
+        <div className="overflow-hidden">
+          {/* Indented under the heading, with a rail so the nesting reads at a
+              glance rather than only from the padding. */}
+          <div className="ml-6 mt-1 space-y-1 border-l pl-2">
+            {group.children.map(child => (
+              <Link
+                key={child.href}
+                href={child.href}
+                onClick={onNavigate}
+                className={cn(
+                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  isNavActive(pathname, child.href)
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <span className="text-sm">{child.icon}</span>
+                {child.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 interface SidebarProps {
@@ -82,21 +188,25 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                isNavActive(pathname, item.href)
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-foreground/70 hover:bg-muted hover:text-foreground'
-              )}
-            >
-              <span className="text-base">{item.icon}</span>
-              {item.label}
-            </Link>
+          {navItems.map((entry) => (
+            isGroup(entry)
+              ? <NavGroupItem key={entry.label} group={entry} pathname={pathname} onNavigate={onClose} />
+              : (
+                <Link
+                  key={entry.href}
+                  href={entry.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                    isNavActive(pathname, entry.href)
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  <span className="text-base">{entry.icon}</span>
+                  {entry.label}
+                </Link>
+              )
           ))}
         </nav>
 

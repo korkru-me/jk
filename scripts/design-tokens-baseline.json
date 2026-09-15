@@ -365,6 +365,12 @@
     "control": 0,
     "button": 1
   },
+  "components/layout/sidebar.tsx": {
+    "palette": 0,
+    "card": 0,
+    "control": 0,
+    "button": 1
+  },
   "components/layout/topbar.tsx": {
     "palette": 0,
     "card": 0,
