@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Clock, MoreVertical, Copy, BarChart3, Pencil, RefreshCw, Target, Users, CheckCircle2 } from 'lucide-react'
+import { Plus, Clock, MoreVertical, Copy, BarChart3, Pencil, RefreshCw, Target, Users, CheckCircle2, ClipboardCheck } from 'lucide-react'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
@@ -57,10 +57,12 @@ interface Props {
   assignments: ClassroomAssignmentRow[]
   submissions: ClassroomAssignmentSubmissionRow[]
   studentCount: number
+  /** Hand-ins still waiting for a teacher's score, keyed by assignment id. */
+  pendingReviewByAssignment?: Record<string, number>
   onViewScores?: () => void
 }
 
-export function ClassroomAssignmentsTab({ classroomId, assignments, submissions, studentCount, onViewScores }: Props) {
+export function ClassroomAssignmentsTab({ classroomId, assignments, submissions, studentCount, pendingReviewByAssignment, onViewScores }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [isPending, startTransition] = useTransition()
 
@@ -114,6 +116,12 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
               const TypeIcon = typeCfg.icon
               const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
               const stats = computeAssignmentProgress(a, submissions)
+              const pendingReview = pendingReviewByAssignment?.[a.id] ?? 0
+              // Land straight on the ตรวจ worklist when something is waiting,
+              // and on the plain results page when nothing is.
+              const gradeHref = pendingReview > 0
+                ? `/assignments/${a.id}/results?pending=1`
+                : `/assignments/${a.id}/results`
               return (
                 <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
                   <Link href={`/assignments/${a.id}`} className="flex-1 min-w-0 flex items-center gap-3">
@@ -164,9 +172,22 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                             </>
                           )
                         )}
+                        {pendingReview > 0 && (
+                          <span className="flex items-center gap-0.5 text-xs font-medium text-warning">
+                            <ClipboardCheck className="w-3 h-3" /> รอตรวจ {pendingReview} ชิ้น
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Link>
+                  {pendingReview > 0 && (
+                    <Link
+                      href={gradeHref}
+                      className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-warning/10 text-warning hover:bg-warning/20 text-xs font-semibold shrink-0 transition-colors"
+                    >
+                      <ClipboardCheck className="w-3.5 h-3.5" /> ตรวจให้คะแนน
+                    </Link>
+                  )}
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeCfg.bg} ${typeCfg.text}`}>
                     {typeCfg.label}
                   </span>
@@ -178,6 +199,10 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                       <MoreVertical className="w-3.5 h-3.5" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem render={<Link href={gradeHref} />}>
+                        <ClipboardCheck className="w-3.5 h-3.5 text-muted-foreground" /> ตรวจให้คะแนน
+                        {pendingReview > 0 && <span className="ml-auto text-xs font-semibold text-warning">{pendingReview}</span>}
+                      </DropdownMenuItem>
                       <DropdownMenuItem render={<Link href={`/assignments/${a.id}/edit`} />}>
                         <Pencil className="w-3.5 h-3.5 text-muted-foreground" /> แก้ไขรายละเอียด
                       </DropdownMenuItem>

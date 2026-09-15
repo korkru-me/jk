@@ -8,7 +8,7 @@ import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, BarChart2, Trash2, TrendingUp,
   AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
-  FileClock, Presentation,
+  FileClock, Presentation, ClipboardCheck, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
@@ -40,6 +40,11 @@ interface Props {
   assignment: Assignment & { classrooms: { name: string } | null }
   questions: Question[]
   submissions: SubmissionRow[]
+  /** Hand-ins with at least one ข้อ still waiting for a teacher to score it —
+   *  ข้อเขียน, ช่องเติมคำที่ครูตรวจเอง, เหตุผลของถูก/ผิด, and the like. */
+  pendingSubmissionIds: string[]
+  /** The lookup stops at a row cap — true means the count is a floor. */
+  pendingReviewCapped: boolean
 }
 
 function seedRand(str: string, i: number) {
@@ -47,13 +52,24 @@ function seedRand(str: string, i: number) {
   return (((h * (i + 7) * 2654435761) >>> 0) % 100) / 100
 }
 
-export function AssignmentDetailClient({ assignment: a, questions, submissions }: Props) {
+export function AssignmentDetailClient({
+  assignment: a, questions, submissions, pendingSubmissionIds, pendingReviewCapped,
+}: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [isPending, startTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
 
   const statusMeta = STATUS_META[a.status]
+  const pendingIdSet = new Set(pendingSubmissionIds)
+  // Counted as hand-ins, not students — the same unit the classroom overview
+  // and the "งานที่มอบหมาย" list use, so the three screens never disagree.
+  // A retry counts on its own because grading it can change which attempt
+  // wins under a "best" score strategy.
+  const pendingCount = pendingSubmissionIds.length
+  const gradeHref = pendingCount > 0
+    ? `/assignments/${a.id}/results?pending=1`
+    : `/assignments/${a.id}/results`
   const submittedSubs = submissions.filter(s => s.status === 'submitted' || s.status === 'graded')
   const inProgressSubs = submissions.filter(s => s.status === 'in_progress')
   const avgScore = submittedSubs.length > 0
@@ -227,9 +243,21 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
               <Pencil className="w-3.5 h-3.5" /> แก้ไขรายละเอียด
             </Button>
           </Link>
-          <Link href={`/assignments/${a.id}/results`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-              <BarChart2 className="w-3.5 h-3.5" /> ดูคำตอบ &amp; คะแนน
+          {/* The way in to scoring by hand. Solid, and first among the
+              outline buttons, whenever something is actually waiting — that
+              is the one action a teacher comes to this page to take. */}
+          <Link href={gradeHref}>
+            <Button
+              size="sm"
+              className={pendingCount > 0
+                ? 'gap-1.5 border-0 bg-warning text-warning-foreground hover:bg-warning/90'
+                : 'gap-1.5 border-surface-inverse-border bg-transparent text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'}
+              variant={pendingCount > 0 ? 'default' : 'outline'}
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              {pendingCount > 0
+                ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
+                : 'ตรวจให้คะแนน / ดูคำตอบ'}
             </Button>
           </Link>
           <Link href={`/assignments/${a.id}/analytics`}>
@@ -289,6 +317,9 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             inProgressCount={inProgressSubs.length}
             totalSubs={submissions.length}
             avgScore={avgScore}
+            pendingCount={pendingCount}
+            pendingReviewCapped={pendingReviewCapped}
+            gradeHref={gradeHref}
           />
         )}
         {activeTab === 'questions' && (
@@ -298,7 +329,7 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
             showSections={a.show_sections !== false}
           />
         )}
-        {activeTab === 'students' && <StudentsTab submissions={submissions} assignmentId={a.id} />}
+        {activeTab === 'students' && <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />}
         {activeTab === 'analytics' && <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />}
       </div>
       {confirmDialog}
@@ -308,12 +339,15 @@ export function AssignmentDetailClient({ assignment: a, questions, submissions }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }: {
+function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore, pendingCount, pendingReviewCapped, gradeHref }: {
   a: Assignment & { classrooms: { name: string } | null }
   submittedCount: number
   inProgressCount: number
   totalSubs: number
   avgScore: number | null
+  pendingCount: number
+  pendingReviewCapped: boolean
+  gradeHref: string
 }) {
   const stats = [
     { label: 'ส่งแล้ว',      value: submittedCount,  icon: CheckCircle2, color: 'bg-success/10 text-success' },
@@ -324,6 +358,31 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore }
 
   return (
     <div className="space-y-5">
+      {/* งานที่ระบบตรวจเองไม่ได้ — ข้อเขียน ช่องเติมคำที่ครูตรวจเอง เหตุผลของ
+          ถูก/ผิด — ค้างอยู่จนกว่าครูจะกรอกคะแนน คะแนนรวมของนักเรียนจึงยัง
+          ไม่นิ่ง ปุ่มนี้พาไปที่หน้ากรอกคะแนนโดยตรง */}
+      {pendingCount > 0 && (
+        <Link
+          href={gradeHref}
+          className="flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3.5 transition-colors hover:bg-warning/15"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
+            <ClipboardCheck className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">
+              มี {pendingCount}{pendingReviewCapped ? '+' : ''} ชิ้นที่ระบบตรวจให้ไม่ได้ รอครูกรอกคะแนนเอง
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              คะแนนรวมของนักเรียนจะยังไม่ครบจนกว่าจะกรอกคะแนนข้อเหล่านี้
+            </p>
+          </div>
+          <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-warning">
+            ตรวจให้คะแนน <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {stats.map(s => {
           const Icon = s.icon
@@ -466,7 +525,7 @@ function QuestionsTab({ questions, sections, showSections }: {
 
 // ─── Students Tab ─────────────────────────────────────────────────────────────
 
-function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow[]; assignmentId: string }) {
+function StudentsTab({ submissions, pendingIdSet }: { submissions: SubmissionRow[]; pendingIdSet: Set<string> }) {
   const [sort, setSort] = useState<'name' | 'score' | 'time'>('time')
 
   const sorted = [...submissions].sort((a, b) => {
@@ -490,7 +549,9 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">ส่งแล้ว {submittedCount} / {submissions.length} คน</p>
+        <p className="text-sm text-muted-foreground">
+          ส่งแล้ว {submittedCount} / {submissions.length} คน · กดที่ชื่อเพื่อเปิดคำตอบและกรอกคะแนน
+        </p>
         <div className="flex gap-1">
           {(['time', 'score', 'name'] as const).map(s => (
             <button
@@ -516,9 +577,23 @@ function StudentsTab({ submissions, assignmentId }: { submissions: SubmissionRow
         {sorted.map(s => {
           const isDone = s.status === 'submitted' || s.status === 'graded'
           const pct = s.total_score != null && s.max_score > 0 ? Math.round((s.total_score / s.max_score) * 100) : null
+          // A row only opens when there is an attempt to read; a student who
+          // has not started has nothing to score yet.
+          const isPending = s.id != null && pendingIdSet.has(s.id)
           return (
             <div key={s.id ?? s.student_id} className="grid grid-cols-[1fr_auto_auto_auto] gap-0 items-center px-5 py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-              <span className="text-sm font-medium text-foreground">{s.users?.full_name ?? '—'}</span>
+              {s.id ? (
+                <Link href={`/submissions/${s.id}`} className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground hover:text-primary hover:underline">
+                  <span className="truncate">{s.users?.full_name ?? '—'}</span>
+                  {isPending && (
+                    <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning no-underline">
+                      <ClipboardCheck className="h-3 w-3" /> รอตรวจ
+                    </span>
+                  )}
+                </Link>
+              ) : (
+                <span className="text-sm font-medium text-foreground">{s.users?.full_name ?? '—'}</span>
+              )}
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-20 text-center ${
                 isDone ? 'bg-success/10 text-success' :
                 s.status === 'in_progress' ? 'bg-warning/10 text-warning' :

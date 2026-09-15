@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { revalidatePath } from 'next/cache'
 import { isAttemptExpired, isInstantCheckable, isStreakEligible } from '@/lib/grading'
 import {
@@ -855,8 +856,11 @@ export async function drawNextStreakQuestion(
 // Manual score override for a teacher grading (or re-grading) one student's
 // answer to one question — e.g. bumping an auto-graded 0 up to partial/full
 // credit, or resolving a pending-manual fill-blank. Bounded to
-// [0, max_score] both here (readable error) and in the RLS WITH CHECK
-// (submission_answers_org_teacher_update, the real security boundary).
+// [0, max_score] here, which is the only place that bound is still enforced:
+// migration 20260824053336 revoked UPDATE on submission_answers from
+// `authenticated`, so submission_answers_org_teacher_update can no longer
+// fire and this service-role path, with the checks below, is the security
+// boundary.
 export async function updateSubmissionAnswerScore(submissionAnswerId: string, newScore: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -867,14 +871,18 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
 
   const { data: sa } = await admin
     .from('submission_answers')
-    .select('id, submission_id, max_score, submissions(id, status, assignment_id, assignments(created_by))')
+    .select('id, submission_id, max_score, submissions(id, status, assignment_id)')
     .eq('id', submissionAnswerId)
     .maybeSingle()
 
   if (!sa) return { error: 'ไม่พบคำตอบ' }
   const submission = (sa as any).submissions
-  const assignment = submission?.assignments
-  if (assignment?.created_by !== user.id) return { error: 'ไม่มีสิทธิ์แก้ไขคะแนนนี้' }
+  const assignmentId = submission?.assignment_id as string | undefined
+  // Owner or an admin/manage co-teacher — the same people the database lets
+  // manage the assignment row itself. A 'view' co-teacher is not a grader.
+  if (!assignmentId || !await canManageAssignment(assignmentId, user.id)) {
+    return { error: 'ไม่มีสิทธิ์แก้ไขคะแนนนี้' }
+  }
   if (submission?.status === 'in_progress') return { error: 'นักเรียนยังทำไม่เสร็จ แก้คะแนนไม่ได้' }
   if (newScore > sa.max_score) return { error: `คะแนนต้องไม่เกิน ${sa.max_score}` }
 
