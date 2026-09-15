@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
@@ -9,6 +10,10 @@ import { AssignmentDetailClient } from './_components/assignment-detail-client'
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
 
 const NOT_STARTED_SENTINEL = '1970-01-01T00:00:00.000Z'
+
+// Row cap on the "waiting for a teacher" lookup, matching the classroom
+// overview's cap so the two never disagree about how they were counted.
+const PENDING_REVIEW_ROW_CAP = 1000
 
 export type SubmissionRow = {
   id: string | null
@@ -47,12 +52,18 @@ export default async function AssignmentDetailPage({
 
   const admin = createAdminClient()
 
-  const [{ data: questions }, { data: submissions }, { data: classroomLinks }] = await Promise.all([
+  // Hand-ins are read with the service role because submissions has no
+  // co-teacher RLS policy — its teacher-side policy is scoped to
+  // assignments.created_by, so a co-teacher used to see an empty
+  // "นักเรียน" tab here. Authorization is stated instead of inherited.
+  if (!await canManageAssignment(id, user.id)) notFound()
+
+  const [{ data: questions }, { data: submissions }, { data: classroomLinks }, { data: pendingAnswerRows }] = await Promise.all([
     supabase
       .from('questions')
       .select('id, title, question_type, difficulty, question_text')
       .in('id', a.question_ids),
-    supabase
+    admin
       .from('submissions')
       .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', id)
@@ -61,7 +72,24 @@ export default async function AssignmentDetailPage({
       .from('assignment_classrooms')
       .select('classroom_id')
       .eq('assignment_id', id),
+    // Auto-grading leaves `is_correct` null exactly on the answers a person
+    // has to read — ข้อเขียน, ช่องเติมคำที่ครูตรวจเอง, เหตุผลของถูก/ผิด. Same
+    // rule the classroom overview and the submission page use. Capped, so a
+    // huge งาน cannot turn this page into a full-table scan; past the cap the
+    // count is reported as a floor ("n+").
+    admin
+      .from('submission_answers')
+      .select('submission_id, submissions!inner(assignment_id, status)')
+      .eq('submissions.assignment_id', id)
+      .neq('submissions.status', 'in_progress')
+      .is('is_correct', null)
+      .limit(PENDING_REVIEW_ROW_CAP),
   ])
+
+  const pendingSubmissionIds = Array.from(
+    new Set((pendingAnswerRows ?? []).map((row: any) => row.submission_id as string))
+  )
+  const pendingReviewCapped = (pendingAnswerRows?.length ?? 0) >= PENDING_REVIEW_ROW_CAP
 
   // Re-order questions to match assignment's question_ids order
   const qMap = new Map((questions ?? []).map((q: any) => [q.id, q]))
@@ -123,6 +151,8 @@ export default async function AssignmentDetailPage({
       assignment={a}
       questions={orderedQuestions}
       submissions={roster}
+      pendingSubmissionIds={pendingSubmissionIds}
+      pendingReviewCapped={pendingReviewCapped}
     />
   )
 }

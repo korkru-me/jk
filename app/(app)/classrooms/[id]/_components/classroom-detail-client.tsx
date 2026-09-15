@@ -104,6 +104,8 @@ interface Props {
   pendingReviewCount: number
   /** The lookup above stops at a row cap — true means the count is a floor. */
   pendingReviewCapped: boolean
+  /** The same waiting hand-ins split per งาน, keyed by assignment id. */
+  pendingReviewByAssignment: Record<string, number>
   /** Student ids that have seen each announcement, keyed by post id. */
   seenByPost: Record<string, string[]>
   /** Live classrooms the same announcement can be cross-posted to. */
@@ -114,7 +116,7 @@ export function ClassroomDetailClient({
   classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
   classroomAssignments, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
-  pendingReviewCount, pendingReviewCapped, seenByPost, crossPostTargets,
+  pendingReviewCount, pendingReviewCapped, pendingReviewByAssignment, seenByPost, crossPostTargets,
 }: Props) {
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
@@ -280,6 +282,7 @@ export function ClassroomDetailClient({
             assignments={classroomAssignments}
             submissions={classroomSubmissions}
             studentCount={students.length}
+            pendingReviewByAssignment={pendingReviewByAssignment}
             onViewScores={() => setActiveTab('scores')}
           />
         )}

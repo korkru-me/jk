@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ClipboardCheck } from 'lucide-react'
 import { ExportButton } from '@/components/assignments/export-button'
 import { ScoreEditor } from '@/components/assignments/score-editor'
 import { computePassed } from '@/lib/grading'
@@ -10,6 +10,7 @@ import { formatElapsed, summarizeStreakResults, type StreakAttemptStat } from '@
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSortDir, type SortableStudentProfile } from '@/lib/student-sort'
 import type { Question } from '@/lib/types'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
@@ -60,6 +61,8 @@ interface Props {
   answers: AnswerRow[]
   profiles: Record<string, SortableStudentProfile>
   inProgressCount: number
+  /** Arrived from a ตรวจให้คะแนน button — start with the filter switched on. */
+  initialPendingOnly: boolean
 }
 
 type ViewMode = 'individual' | 'question'
@@ -130,12 +133,34 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
 export function ResultsClient({
   assignmentId, assignmentTitle, classroomName, passingType, passingValue,
   completionRule, streakTarget,
-  questions, submitted, answers, profiles, inProgressCount,
+  questions, submitted, answers, profiles, inProgressCount, initialPendingOnly,
 }: Props) {
+  // ── What still needs a person ──────────────────────────────────────────────
+  // Auto-grading leaves `is_correct` null exactly on the answers nothing can
+  // decide for the teacher — ข้อเขียน, ช่องเติมคำที่ครูตรวจเอง, เหตุผลของ
+  // ถูก/ผิด. Same rule the หน้าชุดข้อสอบ counts with, read here off the
+  // answers this page already loaded, so the filter and the table can never
+  // disagree about what is waiting.
+  const { pendingBySubmission, pendingQuestionIds, pendingAnswerCount } = useMemo(() => {
+    const bySubmission = new Map<string, number>()
+    const questionIds = new Set<string>()
+    let count = 0
+    for (const a of answers) {
+      if (a.is_correct !== null) continue
+      count++
+      bySubmission.set(a.submission_id, (bySubmission.get(a.submission_id) ?? 0) + 1)
+      questionIds.add(a.question_id)
+    }
+    return { pendingBySubmission: bySubmission, pendingQuestionIds: questionIds, pendingAnswerCount: count }
+  }, [answers])
+
   const [viewMode, setViewMode] = useState<ViewMode>('individual')
   const [sortKey, setSortKey] = useState<StudentSortKey>('name')
   const [sortDir, setSortDir] = useState<StudentSortDir>('asc')
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0)
+  // Never starts on when there is nothing to show — a teacher who follows the
+  // button after finishing should land on the ordinary table, not an empty one.
+  const [pendingOnly, setPendingOnly] = useState(initialPendingOnly && pendingAnswerCount > 0)
 
   const sortedRows = useMemo(() => {
     const sortable = submitted.map(s => ({ id: s.student_id, full_name: s.users?.full_name ?? '', row: s }))
@@ -172,7 +197,25 @@ export function ResultsClient({
     [answers, isStreakRun, submitted],
   )
 
-  const activeQuestion = questions[activeQuestionIndex]
+  // Rows the tables actually draw. Filtering here rather than inside each
+  // table keeps every view — รายคน, รายข้อ, ถูกติดต่อกัน — on one definition.
+  const visibleRows = useMemo(
+    () => (pendingOnly ? sortedRows.filter(s => pendingBySubmission.has(s.id)) : sortedRows),
+    [pendingOnly, sortedRows, pendingBySubmission],
+  )
+
+  // With the filter on, a ข้อ nobody is waiting on has nothing to grade, so
+  // the stepper skips it. The index still counts against the full ชุด, so
+  // "ข้อที่ 5 / 12" keeps meaning the fifth ข้อ, not the fifth one shown.
+  const effectiveQuestionIndex = useMemo(() => {
+    if (!pendingOnly) return activeQuestionIndex
+    const current = questions[activeQuestionIndex]
+    if (current && pendingQuestionIds.has(current.id)) return activeQuestionIndex
+    const first = questions.findIndex(q => pendingQuestionIds.has(q.id))
+    return first === -1 ? activeQuestionIndex : first
+  }, [pendingOnly, activeQuestionIndex, questions, pendingQuestionIds])
+
+  const activeQuestion = questions[effectiveQuestionIndex]
 
   function toggleSort(key: StudentSortKey) {
     setSortDir(d => (sortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
@@ -274,6 +317,37 @@ export function ResultsClient({
       </div>
       )}
 
+      {/* The ตรวจให้คะแนน worklist: what is left, and a way to see only that.
+          Hidden entirely once nothing is waiting, rather than sitting there as
+          a switch that does nothing. */}
+      {pendingAnswerCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <ClipboardCheck className="h-4 w-4 shrink-0 text-warning" />
+          <p className="min-w-0 flex-1 text-sm text-foreground">
+            <span className="font-semibold">
+              เหลือ {pendingAnswerCount} ข้อ จากนักเรียน {pendingBySubmission.size} คน
+            </span>
+            {' '}ที่ระบบตรวจให้ไม่ได้ — กดที่ป้ายคะแนนในตารางเพื่อพิมพ์คะแนนได้เลย
+          </p>
+          <Button
+            size="sm"
+            variant={pendingOnly ? 'default' : 'outline'}
+            onClick={() => setPendingOnly(v => !v)}
+            aria-pressed={pendingOnly}
+            className={pendingOnly
+              ? 'shrink-0 border-0 bg-warning text-warning-foreground hover:bg-warning/90'
+              : 'shrink-0 border-warning/40 bg-transparent text-warning hover:bg-warning/15 hover:text-warning'}
+          >
+            {pendingOnly ? 'กำลังดูเฉพาะที่รอตรวจ' : 'ดูเฉพาะที่รอตรวจ'}
+          </Button>
+        </div>
+      ) : initialPendingOnly ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+          <p className="text-sm text-foreground">ตรวจครบทุกข้อแล้ว ไม่มีข้อไหนรอครูให้คะแนน</p>
+        </div>
+      ) : null}
+
       {/* Mode toggle + sort */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
@@ -318,18 +392,26 @@ export function ResultsClient({
 
       {viewMode === 'individual' ? (
         isStreakRun && streakStats ? (
-          <StreakTable rows={sortedRows} stats={streakStats.byId} target={streakTarget} />
+          <StreakTable rows={visibleRows} stats={streakStats.byId} target={streakTarget} />
         ) : (
-          <IndividualTable rows={sortedRows} hasPassingThreshold={hasPassingThreshold} passingType={passingType} passingValue={passingValue} />
+          <IndividualTable
+            rows={visibleRows}
+            hasPassingThreshold={hasPassingThreshold}
+            passingType={passingType}
+            passingValue={passingValue}
+            pendingBySubmission={pendingBySubmission}
+            emptyMessage={pendingOnly ? 'ไม่มีนักเรียนที่รอตรวจแล้ว' : undefined}
+          />
         )
       ) : (
         <QuestionGrid
           questions={questions}
-          activeQuestionIndex={activeQuestionIndex}
+          activeQuestionIndex={effectiveQuestionIndex}
           activeQuestion={activeQuestion}
           onChangeIndex={setActiveQuestionIndex}
-          rows={sortedRows}
+          rows={visibleRows}
           answerMap={answerMap}
+          pendingQuestionIds={pendingOnly ? pendingQuestionIds : null}
         />
       )}
     </div>
@@ -416,11 +498,14 @@ function StreakTable({ rows, stats, target }: {
   )
 }
 
-function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue }: {
+function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue, pendingBySubmission, emptyMessage }: {
   rows: SubmittedRow[]
   hasPassingThreshold: boolean
   passingType: 'score' | 'percent' | null
   passingValue: number | null
+  /** How many ข้อ of each hand-in are still waiting for a teacher's score. */
+  pendingBySubmission: Map<string, number>
+  emptyMessage?: string
 }) {
   return (
     <Card radius="md" className="overflow-hidden overflow-x-auto">
@@ -441,13 +526,14 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
           {rows.length === 0 ? (
             <tr>
               <td colSpan={hasPassingThreshold ? 6 : 5} className="text-center py-10 text-muted-foreground">
-                ยังไม่มีการส่งงาน
+                {emptyMessage ?? 'ยังไม่มีการส่งงาน'}
               </td>
             </tr>
           ) : (
             rows.map((s, i) => {
               const pct = s.max_score > 0 ? Math.round(((s.total_score ?? 0) / s.max_score) * 100) : 0
               const passed = computePassed(s.total_score, s.max_score, passingType, passingValue)
+              const pendingCount = pendingBySubmission.get(s.id) ?? 0
               return (
                 <tr key={s.id} className="hover:bg-muted">
                   <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
@@ -458,7 +544,14 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
                     <p className="text-xs text-muted-foreground">{s.users?.email}</p>
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-foreground">
+                    {/* The total cannot be final while a ข้อ is unscored, so it
+                        says so instead of reading like a finished grade. */}
                     {s.total_score}/{s.max_score}
+                    {pendingCount > 0 && (
+                      <span className="mt-1 flex items-center justify-center gap-0.5 text-[10px] font-semibold text-warning">
+                        <Clock className="h-3 w-3" /> รอตรวจ {pendingCount} ข้อ
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -496,14 +589,26 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue 
 
 // ─── Question mode ─────────────────────────────────────────────────────────
 
-function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChangeIndex, rows, answerMap }: {
+function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChangeIndex, rows, answerMap, pendingQuestionIds }: {
   questions: Question[]
   activeQuestionIndex: number
   activeQuestion: Question | undefined
   onChangeIndex: (i: number) => void
   rows: SubmittedRow[]
   answerMap: Map<string, AnswerRow>
+  /** Non-null while "ดูเฉพาะที่รอตรวจ" is on: the ข้อ the stepper may land on. */
+  pendingQuestionIds: Set<string> | null
 }) {
+  // Which positions the arrows can reach. Positions, not a filtered list, so
+  // the label keeps counting against the whole ชุด — ข้อที่ 5 stays ข้อที่ 5
+  // even when ข้อ 1–4 have nothing left to grade.
+  const steppable = questions
+    .map((q, i) => (pendingQuestionIds == null || pendingQuestionIds.has(q.id) ? i : -1))
+    .filter(i => i !== -1)
+  const stepPosition = steppable.indexOf(activeQuestionIndex)
+  const prevIndex = stepPosition > 0 ? steppable[stepPosition - 1] : null
+  const nextIndex = stepPosition >= 0 && stepPosition < steppable.length - 1 ? steppable[stepPosition + 1] : null
+
   if (questions.length === 0 || !activeQuestion) {
     return (
       <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
@@ -512,9 +617,23 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
     )
   }
 
+  if (pendingQuestionIds != null && steppable.length === 0) {
+    return (
+      <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
+        ไม่มีข้อไหนรอตรวจแล้ว
+      </div>
+    )
+  }
+
   const questionMaxScore = rows
     .map(r => answerMap.get(`${r.id}::${activeQuestion.id}`)?.max_score)
     .find((v): v is number => v != null) ?? 1
+
+  // With the filter on, a student already scored on this particular ข้อ is not
+  // part of the work left here, even though another ข้อ of theirs still is.
+  const visibleRows = pendingQuestionIds == null
+    ? rows
+    : rows.filter(r => answerMap.get(`${r.id}::${activeQuestion.id}`)?.is_correct === null)
 
   return (
     <div className="space-y-3">
@@ -522,18 +641,21 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
       <Card radius="md" padding="md" className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <button
-            onClick={() => onChangeIndex(Math.max(0, activeQuestionIndex - 1))}
-            disabled={activeQuestionIndex === 0}
+            onClick={() => prevIndex != null && onChangeIndex(prevIndex)}
+            disabled={prevIndex == null}
             className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <p className="text-sm font-semibold text-muted-foreground">
             ข้อที่ {activeQuestionIndex + 1} / {questions.length} · เต็ม {questionMaxScore} คะแนน
+            {pendingQuestionIds != null && steppable.length < questions.length && (
+              <span className="font-normal"> · ข้ามข้อที่ตรวจแล้ว ({steppable.length} ข้อรอตรวจ)</span>
+            )}
           </p>
           <button
-            onClick={() => onChangeIndex(Math.min(questions.length - 1, activeQuestionIndex + 1))}
-            disabled={activeQuestionIndex === questions.length - 1}
+            onClick={() => nextIndex != null && onChangeIndex(nextIndex)}
+            disabled={nextIndex == null}
             className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30"
           >
             <ChevronRight className="w-4 h-4" />
@@ -556,12 +678,14 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-10 text-muted-foreground">ยังไม่มีการส่งงาน</td>
+                <td colSpan={5} className="text-center py-10 text-muted-foreground">
+                  {pendingQuestionIds != null ? 'ตรวจข้อนี้ครบทุกคนแล้ว' : 'ยังไม่มีการส่งงาน'}
+                </td>
               </tr>
             ) : (
-              rows.map((s, i) => {
+              visibleRows.map((s, i) => {
                 const answer = answerMap.get(`${s.id}::${activeQuestion.id}`)
                 const isPending = answer != null && answer.is_correct === null
                 return (

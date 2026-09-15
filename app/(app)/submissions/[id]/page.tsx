@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
+import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { notFound, redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -59,7 +60,6 @@ export default async function SubmissionResultPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
   const user = await getAuthUser()
   if (!user) redirect('/login')
   const admin = createAdminClient()
@@ -93,7 +93,12 @@ export default async function SubmissionResultPage({
       : { data: [] }
     submission = { ...ownSubmission, assignments: ownAssignment, submission_answers: answerSummary ?? [] }
   } else {
-    const { data: teacherVisibleSubmission } = await supabase
+    // Not the student's own — so this is a teacher reading someone else's
+    // answers. submissions has no co-teacher RLS policy (its teacher-side
+    // policy is scoped to assignments.created_by), which is why this page
+    // used to 404 for a co-teacher. The row is fetched with the service role
+    // and then authorized explicitly: owner, or an admin/manage co-teacher.
+    const { data: teacherVisibleSubmission } = await admin
       .from('submissions')
       .select(`
         id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
@@ -103,7 +108,9 @@ export default async function SubmissionResultPage({
       `)
       .eq('id', id)
       .maybeSingle()
-    submission = teacherVisibleSubmission
+    const mayRead = teacherVisibleSubmission != null
+      && await canManageAssignment(teacherVisibleSubmission.assignment_id, user.id)
+    submission = mayRead ? teacherVisibleSubmission : null
   }
 
   if (!submission) notFound()
@@ -128,7 +135,9 @@ export default async function SubmissionResultPage({
     const assignmentInfo = (submission as any).assignments
     studentName = (submission as any).users?.full_name ?? null
 
-    const { data: siblingSubs } = await supabase
+    // Service role for the same reason the submission above uses it, and
+    // reached only after canManageAssignment already allowed this viewer.
+    const { data: siblingSubs } = await admin
       .from('submissions')
       .select('id, student_id, status, total_score, max_score, attempt_number, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', submission.assignment_id)
@@ -136,7 +145,6 @@ export default async function SubmissionResultPage({
     const normalized = (siblingSubs ?? []).map((s: any) => ({ ...s, attempt_number: s.attempt_number ?? 1 }))
     const officialByStudent = officialSubmissionsByStudent(normalized, assignmentInfo.score_strategy)
 
-    const admin = createAdminClient()
     const studentIds = Array.from(officialByStudent.keys())
     const { data: profileRows } = studentIds.length > 0
       ? await admin
@@ -398,8 +406,13 @@ async function SubmissionAnswerDetails({
   submissionId: string
   isTeacherViewer: boolean
 }) {
-  const supabase = await createClient()
-  const { data: answers } = await supabase
+  // A student reads their own answers through RLS, because that is what
+  // enforces the show_results gating (can_current_user_view_submission_answers)
+  // — never swap that for the service role. A teacher reaches this component
+  // only after the page authorized them with canManageAssignment, and needs
+  // the service role because submission_answers has no co-teacher policy.
+  const reader = isTeacherViewer ? createAdminClient() : await createClient()
+  const { data: answers } = await reader
     .from('submission_answers')
     .select(`
       id, correct_answer, is_correct, max_score, option_order, order_index,

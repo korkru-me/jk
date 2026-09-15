@@ -317,6 +317,8 @@ export default async function ClassroomDetailPage({
   const PENDING_REVIEW_ROW_CAP = 1000
   let pendingReviewCount = 0
   let pendingReviewCapped = false
+  // How many hand-ins are waiting per งาน, keyed by assignment id.
+  let pendingReviewByAssignment: Record<string, number> = {}
   if (c.classroom_type === 'subject' && canManage && linkedAssignmentIds.length > 0) {
     const rosterIds = new Set(students.map(s => s.id))
     const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }, { data: pendingAnswerRows }] = await Promise.all([
@@ -343,12 +345,23 @@ export default async function ClassroomDetailPage({
     ])
 
     const pendingSubmissionIds = new Set<string>()
+    // Same rows, also split per งาน so the "งานที่มอบหมาย" tab can put the
+    // count on the งาน it belongs to instead of only on the overview total.
+    const pendingSubmissionIdsByAssignment = new Map<string, Set<string>>()
     for (const row of (pendingAnswerRows ?? []) as any[]) {
       if (!rosterIds.has(row.submissions?.student_id)) continue
       pendingSubmissionIds.add(row.submission_id as string)
+      const assignmentId = row.submissions?.assignment_id as string | undefined
+      if (!assignmentId) continue
+      let set = pendingSubmissionIdsByAssignment.get(assignmentId)
+      if (!set) { set = new Set<string>(); pendingSubmissionIdsByAssignment.set(assignmentId, set) }
+      set.add(row.submission_id as string)
     }
     pendingReviewCount = pendingSubmissionIds.size
     pendingReviewCapped = (pendingAnswerRows?.length ?? 0) >= PENDING_REVIEW_ROW_CAP
+    pendingReviewByAssignment = Object.fromEntries(
+      Array.from(pendingSubmissionIdsByAssignment, ([assignmentId, set]) => [assignmentId, set.size])
+    )
     classroomAssignments = (assignmentRows ?? []).map(a => ({
       ...a,
       display_order: displayOrderByAssignment.get(a.id) ?? null,
@@ -456,6 +469,7 @@ export default async function ClassroomDetailPage({
       posts={posts}
       pendingReviewCount={pendingReviewCount}
       pendingReviewCapped={pendingReviewCapped}
+      pendingReviewByAssignment={pendingReviewByAssignment}
       seenByPost={seenByPost}
       crossPostTargets={crossPostTargets}
     />
