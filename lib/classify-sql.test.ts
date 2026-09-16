@@ -96,6 +96,38 @@ describe('classify migrations', () => {
 })
 
 describe('education_research_question_max_score agrees with classifyCellCount', () => {
+  /**
+   * One row crossing two columns, keyed under every variation below, sat beside
+   * the cell each case is really about.
+   *
+   * Not decoration. Both sides floor their answer at 1 — `|| 1` here,
+   * `GREATEST(item_count, 1)` there — so a grid whose only gradable cell is the
+   * one the rule under test is meant to unkey scores 1 either way, and the case
+   * agrees no matter what the SQL does with it. Without the anchor, four of the
+   * five guards in that WHERE clause could each be deleted outright and this
+   * whole suite stayed green — only the bound on a column's option count failed
+   * anything. With it, each of those four turns exactly one case red.
+   *
+   * Two cells rather than one because one *is* the floor — a case has to reach
+   * 2 before 1 and 2 are different numbers. One row crossing two columns is the
+   * smallest shape that gets there, and it stays clear of everything the cases
+   * vary: no case names an anchor column in its answers, and the anchor row
+   * keys nothing but its own two columns, so it contributes exactly 2 every
+   * time and each case's own row is left as it was.
+   *
+   * Still unpinned: `jsonb_typeof(column_value->'options') = 'array'`. Deleting
+   * it changes nothing below, because a column carrying no options key then
+   * reaches `jsonb_array_length(NULL)` and the NULL comparison drops the cell
+   * anyway. Only a column whose options are present and not an array would tell
+   * the two apart, and no case here is that.
+   *
+   * The three cases with no grid to anchor — no columns, no rows, an empty
+   * config — stay at the floor. There is no cell to key, and 1 is the whole of
+   * what those assert.
+   */
+  const anchorColumns = [column('anchor1'), column('anchor2')]
+  const anchorRow = { id: 'anchor', text: 'anchor', answers: { anchor1: 0, anchor2: 1 } }
+
   const cases: Array<[string, unknown]> = [
     ['a full 3×2 grid', {
       columns: [column('origin'), column('monomer')],
@@ -113,21 +145,33 @@ describe('education_research_question_max_score agrees with classifyCellCount', 
       ],
     }],
     ['a key pointing past the end of its options', {
-      columns: [column('origin'), column('monomer')],
-      rows: [{ id: 'r1', text: 'a', answers: { origin: 7, monomer: 1 } }],
+      columns: [column('origin'), column('monomer'), ...anchorColumns],
+      rows: [anchorRow, { id: 'r1', text: 'a', answers: { origin: 7, monomer: 1 } }],
     }],
-    ['a fractional key', { columns: [column('origin')], rows: [{ id: 'r1', text: 'a', answers: { origin: 1.5 } }] }],
-    ['a negative key', { columns: [column('origin')], rows: [{ id: 'r1', text: 'a', answers: { origin: -1 } }] }],
-    ['a key stored as a string', { columns: [column('origin')], rows: [{ id: 'r1', text: 'a', answers: { origin: '1' } }] }],
+    ['a fractional key', {
+      columns: [column('origin'), ...anchorColumns],
+      rows: [anchorRow, { id: 'r1', text: 'a', answers: { origin: 1.5 } }],
+    }],
+    ['a negative key', {
+      columns: [column('origin'), ...anchorColumns],
+      rows: [anchorRow, { id: 'r1', text: 'a', answers: { origin: -1 } }],
+    }],
+    ['a key stored as a string', {
+      columns: [column('origin'), ...anchorColumns],
+      rows: [anchorRow, { id: 'r1', text: 'a', answers: { origin: '1' } }],
+    }],
     ['a column carrying no id', {
-      columns: [{ title: 'x', options: ['a', 'b'] }],
-      rows: [{ id: 'r1', text: 'a', answers: { origin: 0 } }],
+      columns: [{ title: 'x', options: ['a', 'b'] }, ...anchorColumns],
+      rows: [anchorRow, { id: 'r1', text: 'a', answers: { origin: 0 } }],
     }],
     ['a column whose options are missing', {
-      columns: [{ id: 'origin', title: 'x' }],
-      rows: [{ id: 'r1', text: 'a', answers: { origin: 0 } }],
+      columns: [{ id: 'origin', title: 'x' }, ...anchorColumns],
+      rows: [anchorRow, { id: 'r1', text: 'a', answers: { origin: 0 } }],
     }],
-    ['a wider column', { columns: [column('origin', 5)], rows: [{ id: 'r1', text: 'a', answers: { origin: 4 } }] }],
+    ['a wider column', {
+      columns: [column('origin', 5), ...anchorColumns],
+      rows: [anchorRow, { id: 'r1', text: 'a', answers: { origin: 4 } }],
+    }],
     ['no rows at all', { columns: [column('origin')], rows: [] }],
     ['an empty config', {}],
     ['rows with no columns key', { rows: [{ id: 'r1', text: 'a', answers: {} }] }],
