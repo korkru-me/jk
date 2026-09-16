@@ -201,11 +201,14 @@ describe('compareQuestions', () => {
       .map(id => diffs[Number(id)].difficulty))
       .toEqual(['easy', 'medium', 'hard', 'analytical'])
 
-    const types = ['classify', 'composite', 'mcq', 'essay']
+    // A new question type is appended to the Postgres enum, so it sorts last.
+    // lib/classify-sql.test.ts checks this hand-written order against the
+    // enum the database actually has — nothing in JavaScript can read it back.
+    const types = ['image_label', 'classify', 'composite', 'mcq', 'essay']
       .map((question_type, i) => row({ id: String(i), question_type }))
     expect(idsAfterSort(types, { key: 'type', dir: 'asc' })
       .map(id => types[Number(id)].question_type))
-      .toEqual(['mcq', 'essay', 'composite', 'classify'])
+      .toEqual(['mcq', 'essay', 'composite', 'classify', 'image_label'])
   })
 
   it('sorts Thai titles the way Thai is read, leading vowels and all', () => {

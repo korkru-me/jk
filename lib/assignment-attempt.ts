@@ -5,6 +5,11 @@ import {
   CLASSIFY_PREFIX, CLASSIFY_UNSET,
   classifyCellCount, classifyCorrectAnswer, parseClassifyGrid,
 } from '@/lib/classify'
+import {
+  IMAGE_LABEL_PREFIX,
+  imageLabelCorrectAnswer, imageLabelMarkerCount, isImageLabelMarkerCorrect,
+  parseImageLabelAnswer, parseImageLabelKey,
+} from '@/lib/image-label'
 import { scoreChoiceTicks } from '@/lib/choice-ticks'
 import type { Assignment, AnswerPart, Question, Variable, LogicRule } from '@/lib/types'
 
@@ -55,6 +60,10 @@ export function naturalMaxScore(
   // unkeyed cell is not gradable, so charging the student for it would repeat
   // the composite เติมคำ mistake. classifyCellCount owns that rule.
   if (questionType === 'classify') return classifyCellCount(extraData) || 1
+  // 1 คะแนนต่อจุด, counting only the points the teacher actually keyed — the
+  // same rule, and the same reason, as classify above. imageLabelMarkerCount
+  // owns it.
+  if (questionType === 'image_label') return imageLabelMarkerCount(extraData) || 1
   if (questionType === 'file_upload') return 1
   if (questionType === 'composite') {
     const parts: any[] = extraData?.parts ?? []
@@ -180,6 +189,18 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
       question_id: q.id,
       random_values: {},
       correct_answer: classifyCorrectAnswer(extraData),
+      max_score: naturalMaxScore(q.question_type, extraData, null),
+    }
+  }
+
+  // ติดป้ายบนรูป: the key is one entry per point, in the points' own order,
+  // carrying the accepted answers and how to compare them — see
+  // lib/image-label.ts, which builds it and decides which points count.
+  if (q.question_type === 'image_label') {
+    return {
+      question_id: q.id,
+      random_values: {},
+      correct_answer: imageLabelCorrectAnswer(extraData),
       max_score: naturalMaxScore(q.question_type, extraData, null),
     }
   }
@@ -621,6 +642,35 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
         gradable++
         if (studentGrid[r]?.[c] === key) earned++
       }
+    }
+
+    return {
+      id: a.id,
+      is_correct: gradable > 0 && earned === gradable,
+      score: scaleScore(earned, gradable, a.max_score),
+    }
+  }
+
+  // ติดป้ายบนรูป grading — one point per box whose text matches that point's
+  // frozen accepted answers. Points the key left unkeyed are skipped rather
+  // than counted wrong, matching how they were left out of max_score.
+  //
+  // Nothing here reads the live extra_data: the accepted answers, how to
+  // compare them and the denominator all come out of the frozen key. That is
+  // the CLS: rule rather than the FILL: one — a teacher who deletes a point
+  // after students have answered would otherwise shrink the denominator while
+  // `earned` still came from the wider frozen key, and scaleScore would hand
+  // out more than the question is worth.
+  if (correctAns.startsWith(IMAGE_LABEL_PREFIX)) {
+    const key = parseImageLabelKey(correctAns.slice(IMAGE_LABEL_PREFIX.length))
+    const studentAnswers = parseImageLabelAnswer(studentAns)
+
+    let gradable = 0
+    let earned = 0
+    for (let i = 0; i < key.length; i++) {
+      if (key[i].answers.length === 0) continue
+      gradable++
+      if (isImageLabelMarkerCorrect(studentAnswers[i] ?? '', key[i])) earned++
     }
 
     return {

@@ -17,6 +17,7 @@
 
 import type { Question } from '@/lib/types'
 import { classifyCellCount } from '@/lib/classify'
+import { imageLabelMarkerCount } from '@/lib/image-label'
 
 /** The columns a part count is read from — everything else about the row is irrelevant. */
 export type CountableQuestion = Pick<Question, 'question_type'> & {
@@ -62,6 +63,10 @@ export function subQuestionCount(q: CountableQuestion, groupPartCount?: number):
     // naturalMaxScore.
     case 'classify':
       return classifyCellCount(q.extra_data) || 1
+    // Points on the picture, counting only the ones the teacher keyed — the
+    // same number imageLabelMarkerCount gives naturalMaxScore.
+    case 'image_label':
+      return imageLabelMarkerCount(q.extra_data) || 1
     // ปรนัย choices and ไฟล์งาน attachments are not questions of their own.
     case 'mcq':
     case 'file_upload':
@@ -89,6 +94,8 @@ export function subQuestionUnit(questionType: string): string {
       return 'รายการเรียง'
     case 'classify':
       return 'ช่องจำแนก'
+    case 'image_label':
+      return 'จุด'
     default:
       return 'ข้อย่อย'
   }

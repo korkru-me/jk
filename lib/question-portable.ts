@@ -3,6 +3,7 @@ import type {
   TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig,
   CompositeConfig,
   ClassifyConfig,
+  ImageLabelConfig,
   MatchingConfig,
 } from '@/lib/types'
 
@@ -27,7 +28,7 @@ export interface PortableQuestion {
   mcq_options: MCQOption[] | null
   // Mirrors Question.extra_data — CompositeConfig included, so composite and
   // "ถูก-ผิดแบบชุด" questions survive an export/import round trip.
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig | ClassifyConfig | Record<string, never>
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig | ClassifyConfig | ImageLabelConfig | Record<string, never>
   solution_text: string | null
   solution_image_urls: string[]
   tags: string[] | null

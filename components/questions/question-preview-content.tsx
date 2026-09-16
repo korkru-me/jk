@@ -18,7 +18,7 @@ import { orderingDisplayOrder, orderingIsAnswered } from '@/lib/ordering-answer'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, SubmittedFile } from '@/lib/types'
+import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, ImageLabelConfig, SubmittedFile } from '@/lib/types'
 import { CLASSIFY_UNSET, classifyCorrectGrid } from '@/lib/classify'
 import { choiceListHint } from '@/lib/choice-list-hint'
 import { scoreChoiceTicks } from '@/lib/choice-ticks'
@@ -55,6 +55,8 @@ export interface QuestionPreviewProps {
   orderingConfig?: OrderingConfig
   compositeConfig?: CompositeConfig
   classifyConfig?: ClassifyConfig
+  /** No renderer reads this yet — เฟส 4 adds one. Here so the sample data can hold it. */
+  imageLabelConfig?: ImageLabelConfig
   partLabelStyle?: PartLabelStyle
   attachmentUrls?: string[]
   /** ค่าคลาดเคลื่อนระดับโจทย์ ใช้เมื่อข้อย่อยไม่ได้กำหนดของตัวเอง — กติกาเดียวกับ gradeAnswer */

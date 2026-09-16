@@ -1,6 +1,6 @@
 # ประเภทโจทย์ `image_label` (ติดป้ายบนรูป)
 
-อัปเดตล่าสุด: 17 กันยายน 2026 · สถานะ: **เฟส 0 เสร็จ — ยังไม่เขียนโค้ดสักบรรทัด**
+อัปเดตล่าสุด: 17 กันยายน 2026 · สถานะ: **เฟส 0–1 เสร็จ — ยังไม่แตะฐานข้อมูลและยังไม่มี UI**
 · เบรนช์ `feat/image-label-question-type` แตกจาก `master` ที่ `fe687a3`
 
 เอกสารนี้คือช่องทาง handoff ของงานนี้ตาม `AGENTS.md` แชตและ memory ของ agent ไม่ใช่ช่องทาง handoff
@@ -165,7 +165,7 @@ IMGL:[{"a":["จมูก"],"cs":false},{"a":["โพรงจมูก"],"cs":f
 | เฟส | งาน | ด่านที่ต้องผ่าน | สถานะ |
 |---|---|---|---|
 | 0 | ตัดสินใจ · ตรวจ `supabase migration list` · แตกเบรนช์ · เขียนเอกสารนี้ | local = remote ครบ | ✅ เสร็จ |
-| 1 | types + คะแนน + เทสต์ (TypeScript ล้วน ไม่แตะ DB ไม่แตะ UI) | `tsc` ✓ `npm test` ✓ | ⬜ |
+| 1 | types + คะแนน + เทสต์ (TypeScript ล้วน ไม่แตะ DB ไม่แตะ UI) | `tsc` ✓ `npm test` ✓ | ✅ เสร็จ |
 | 2 | migration **2 ไฟล์แยกกัน** + เทสต์ PGlite | SQL ให้เลขเดียวกับ TS | ⬜ |
 | 3 | `lib/exam-safe.ts` — `SafeImageLabelConfig` ไม่มีเฉลย | **ทดลองทำให้เฉลยหลุดแล้วต้องเห็นเทสต์ fail** | ⬜ |
 | 4 | ตัวเรนเดอร์นักเรียน **เดสก์ท็อป** × 3 โหมด | ตอบจริงบนหน้าสอบแล้วได้คะแนนตรง | ⬜ |
@@ -190,6 +190,72 @@ IMGL:[{"a":["จมูก"],"cs":false},{"a":["โพรงจมูก"],"cs":f
 `lib/question-duplicate.ts` (route map → `'image-label'`) · `lib/question-portable.ts` (union ของ `extra_data`) ·
 `app/(app)/questions/new/_data/sample-questions.ts` — **ใส่ใบงานระบบหายใจจริงเป็น fixture ตรงนี้
 แล้วเฟส 4–5 จะมีข้อมูลทดสอบใช้ก่อนที่ฟอร์มจะมีตัวตน**
+
+## สิ่งที่เฟส 1 ทำไปแล้ว
+
+- `lib/image-label.ts` (ใหม่) — รูปร่างเฉลย การนับจุด และกติกาเทียบคำตอบ ที่เดียว
+- `lib/image-label.test.ts` (ใหม่) — 31 เทสต์
+- `lib/types.ts` — `'image_label'` ใน `QuestionType` · `ImageLabelAnswerMode`/`ImageLabelMarker`/`ImageLabelConfig` · ต่อเข้า union ของ `extra_data`
+- `lib/assignment-attempt.ts` — `naturalMaxScore` · เฉลยตรึง `IMGL:` · สาขาการให้คะแนน
+- `lib/question-parts.ts` — นับ "จุด"
+- `lib/question-sort.ts` — ต่อท้าย `QUESTION_TYPE_ORDER`
+- เทสต์เดิมที่เพิ่มเคส: `assignment-attempt.test.ts` (13) · `question-parts.test.ts` (2) · `question-sort.test.ts` · `streak-completion.test.ts`
+
+**tsc บังคับให้เติม 3 จุดก่อนกำหนด ตรงตามที่เฟส 0 คาดไว้**:
+`lib/question-duplicate.ts` (route map → `'image-label'`) · `lib/question-portable.ts` (union) ·
+`app/(app)/questions/new/_data/sample-questions.ts`
+พร้อม `imageLabelConfig?` ใน `QuestionPreviewProps` เพื่อให้ตัวอย่างถือข้อมูลได้ — **ยังไม่มีตัวเรนเดอร์อ่านมัน**
+
+### เฉลยที่ตรึงออกมาหน้าตาแบบนี้
+
+```
+IMGL:[{"answers":["เซลล์ไฟฟ้า"],"exact":true},{"answers":["สวิตช์"],"exact":true}]
+```
+
+`exact` คำนวณครั้งเดียวตอนตรึง จากโหมดของข้อและ `case_sensitive` ของจุดนั้น
+**สาขาให้คะแนนไม่อ่าน `extra_data` เลยสักบรรทัด** — ทั้งเฉลย วิธีเทียบ และตัวหาร มาจากเฉลยที่ตรึงทั้งหมด
+ต่างจากสาขา `FILL:` ที่อ่าน `case_sensitive` และ `naturalMaxScore` สด ๆ ทุกครั้งที่ตรวจ
+
+### สองอย่างที่ตัดสินใจระหว่างทาง ต่างจากแผนเฟส 0
+
+1. **fixture เป็นวงจรไฟฟ้า ไม่ใช่ใบงานระบบหายใจ** — ในเรโปไม่มีรูปไดอะแกรมระบบหายใจ
+   และการวาดภาพกายวิภาคเองแล้ววาดผิดจะแย่กว่าไม่มีตัวอย่าง จึงวาด
+   `public/samples/simple-circuit.svg` เป็นแผนผังวงจรอย่างง่าย (เซลล์ไฟฟ้า สวิตช์ หลอดไฟ แอมมิเตอร์ สายไฟ)
+   ซึ่งวาดให้ถูกตามสัญลักษณ์มาตรฐานได้ และเข้ากับตัวอย่างฟิสิกส์อื่นในไฟล์เดียวกัน
+   **คุณสมบัติที่เฟส 4–5 ต้องใช้ยังครบ**: 5 จุด · คลังคำ 7 คำ (มีตัวลวง 2) · โหมด `drag` · พิกัดเป็น %
+   ตรวจด้วยตาแล้วว่า SVG เรนเดอร์ถูกต้อง
+
+2. **เพิ่มไฟล์ asset ในเฟสที่บอกว่า "TypeScript ล้วน"** — ตั้งใจ
+   `SAMPLE_QUESTIONS` เป็น `Record<QuestionType, …>` ปล่อยเป็นอาเรย์ว่างก็ผ่าน tsc
+   แต่ `app/exam-screen-lab/_lib/fixture.ts` อ่าน `SAMPLE_QUESTIONS[source][0].props` ตรง ๆ
+   อาเรย์ว่างคือกับดักที่รอเฟส 4 อยู่
+
+### สิ่งที่ตรวจแล้วว่าไม่ต้องแก้
+
+`isInstantCheckable` และ `isStreakEligible` ใน `lib/grading.ts` เป็น **denylist** (ตัด `essay` กับ `file_upload` ออก)
+`image_label` จึงกดตรวจทีละข้อได้และเข้าพูล "ถูกติดต่อกัน" ได้เองโดยไม่ต้องแก้อะไร
+ซึ่งถูกต้องสำหรับประเภทที่ตรวจอัตโนมัติล้วนและไม่มีสถานะรอครูตรวจ — ปักหมุดไว้ด้วยเทสต์แล้ว
+
+### ตรวจแล้ว
+
+`tsc` ✓ · `npm test` 1092 ✓ (เพิ่ม 46) · `lint:tokens` ไม่ regress ✓ · `npm run build` ✓
+
+**พิสูจน์ว่าเทสต์จับได้จริง** — ทดลองทำพังสองแบบแล้วดูว่าแดงตรงจุด:
+
+| ทดลองทำพัง | เทสต์ที่แดง |
+|---|---|
+| ให้ตัวหารมาจาก `extra_data` สด (ความผิดพลาดแบบ `FILL:`) | "stays within the question's worth after the teacher deletes a point" |
+| ตัดจุดที่ไม่มีเฉลยออกจากเฉลยที่ตรึง | 3 เทสต์ใน `imageLabelKey` รวมข้อที่คุมสัญญาเรื่องตำแหน่ง |
+
+restore กลับแล้วเขียวครบทั้งสองครั้ง
+
+**ยังไม่ได้ตรวจ**: ไม่มีอะไรแตะ Supabase, server action หรือ browser ในเฟสนี้ — ไม่มีให้ตรวจ
+
+### งานที่เฟส 1 ทิ้งไว้ให้เฟสหลัง
+
+- `lib/exam-screen-qa-fixture.test.ts` ยืนยันว่า fixture ของห้องทดลองครอบคลุมทุกประเภท
+  ตอนนี้ยังไม่มี `image_label` อยู่ในนั้น **เป็นงานของเฟส 4** พร้อมกับตัวเรนเดอร์
+- `lib/actions/questions.ts` ยังไม่ต้องแก้ เพราะยังไม่มีฟอร์มไหนเขียน `ImageLabelConfig` ลงไป — เฟส 6
 
 ### เฟส 2 — ทำไมต้องแยก 2 ไฟล์
 
@@ -270,7 +336,7 @@ Postgres ใช้ค่า enum ใหม่ในทรานแซกชั�
 - `git fetch origin` แล้ว `master` ตรงกับ `origin/master` (0/0) ไม่มี stash ไม่มี untracked
 - `supabase migration list --linked` — **115 migration local = remote ครบทุกตัว ไม่มี local-only**
   เป็นสถานะที่ปลอดภัยที่จะเพิ่ม migration ใหม่
-- ยังไม่ได้แก้ไฟล์โค้ดสักไฟล์ เอกสารนี้คือ commit เดียวของเฟส 0
+- เฟส 0 คือ commit `16e41fa` (เอกสารนี้ไฟล์เดียว) · เฟส 1 คือ commit ถัดไปบนเบรนช์เดียวกัน
 
 ## ความเสี่ยงที่ต้องรู้ก่อนทำต่อ
 
