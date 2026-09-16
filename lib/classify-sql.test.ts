@@ -17,6 +17,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { classifyCellCount } from './classify'
+import { QUESTION_TYPE_ORDER } from './question-sort'
 
 const MIGRATIONS = new URL('../supabase/migrations/', import.meta.url).pathname
 const read = (file: string) => readFileSync(MIGRATIONS + file, 'utf8')
@@ -80,10 +81,9 @@ describe('classify migrations', () => {
     // lib/question-sort.ts writes this order out by hand because nothing in
     // JavaScript can read it back; a sort by ประเภทโจทย์ disagrees with the
     // database if the two ever diverge.
-    expect(order).toEqual([
-      'mcq', 'written', 'matching', 'essay', 'true_false', 'fill_blank', 'ordering',
-      'file_upload', 'composite', 'classify',
-    ])
+    // Compared against the list itself, not a copy of it — a copy would only
+    // ever prove the test agrees with the test.
+    expect(order).toEqual(QUESTION_TYPE_ORDER.filter(type => type !== 'image_label'))
   })
 
   it('leaves every other question type scoring exactly as before', async () => {
