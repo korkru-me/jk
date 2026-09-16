@@ -2995,6 +2995,12 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
 // The header row hides itself there and each cell reprints its own column title
 // instead, because a radio group with no label is unanswerable.
 //
+// In table form every dimension cell carries a left rule (lg:border-l), so the
+// grid lines close around each column instead of only under each row. Without
+// it two 2-option dimensions sat side by side as four evenly spaced choices and
+// read as one ปรนัย with four options — the student has to see that each column
+// is its own question answered once.
+//
 // The answer is a row-major grid of chosen option positions, one entry per
 // cell, -1 where nothing is chosen — the shape lib/classify.ts freezes as the
 // 'CLS:' key and grades against. Rows, columns and options are rendered in the
@@ -3031,7 +3037,7 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
             รายการ
           </th>
           {columns.map(column => (
-            <th key={column.id} className="p-2 text-left align-bottom text-xs font-semibold text-muted-foreground">
+            <th key={column.id} className="p-2 text-left align-bottom text-xs font-semibold text-muted-foreground lg:border-l lg:pl-4">
               {column.title}
             </th>
           ))}
@@ -3055,7 +3061,7 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
               )}
             </th>
             {columns.map((column, c) => (
-              <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-t lg:p-2">
+              <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-l lg:border-t lg:p-2 lg:pl-4">
                 <span className="mb-1 block text-xs font-semibold text-muted-foreground lg:hidden">{column.title}</span>
                 <span className={choicesFitOneRow(column.options ?? []) ? 'flex flex-wrap gap-1.5' : 'flex flex-col gap-1.5'}>
                   {(column.options ?? []).map((option, oi) => (

@@ -1565,7 +1565,7 @@ export function QuestionPreviewContent({
               <tr>
                 <th className="w-px whitespace-nowrap p-2 text-left align-bottom text-xs font-semibold text-muted-foreground">รายการ</th>
                 {classifyColumns.map(column => (
-                  <th key={column.id} className="p-2 text-left align-bottom text-xs font-semibold text-muted-foreground">{column.title}</th>
+                  <th key={column.id} className="p-2 text-left align-bottom text-xs font-semibold text-muted-foreground lg:border-l lg:pl-4">{column.title}</th>
                 ))}
               </tr>
             </thead>
@@ -1580,7 +1580,7 @@ export function QuestionPreviewContent({
                     <PartImages urls={row.image_urls} />
                   </th>
                   {classifyColumns.map((column, c) => (
-                    <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-t lg:p-2">
+                    <td key={column.id} className="block p-0 pt-2 align-top lg:table-cell lg:border-l lg:border-t lg:p-2 lg:pl-4">
                       <span className="mb-1 block text-xs font-semibold text-muted-foreground lg:hidden">{column.title}</span>
                       <span className={choicesFitOneRow(column.options ?? []) ? 'flex flex-wrap gap-1.5' : 'flex flex-col gap-1.5'}>
                         {(column.options ?? []).map((option, oi) => {
