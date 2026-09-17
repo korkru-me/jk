@@ -11,6 +11,10 @@ import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Trophy, Rotate
 import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
 import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
+import {
+  IMAGE_LABEL_PREFIX,
+  isImageLabelMarkerCorrect, parseImageLabelAnswer, parseImageLabelKey,
+} from '@/lib/image-label'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
 import { evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStudent } from '@/lib/scoring'
@@ -911,6 +915,54 @@ function AnswerReview({
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
                 <span className="font-medium">{cell.correct}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // ─── ติดป้ายบนรูป — one line per keyed point, named after the point ──────
+  // Like the classify branch above, this reads the question's own config as
+  // well as the frozen key: the key knows what each point should say but not
+  // which place on the picture it is, and "จุดที่ 3" sends a teacher back to
+  // count dots. Points the teacher never keyed are skipped — they were left
+  // out of the score, so there is nothing to report about them.
+  if (correctAnswer.startsWith(IMAGE_LABEL_PREFIX)) {
+    const key = parseImageLabelKey(correctAnswer.slice(IMAGE_LABEL_PREFIX.length))
+    const answers = parseImageLabelAnswer(studentAnswer ?? '')
+    const config = (extraData ?? {}) as { markers?: Array<{ label?: string }> }
+    const markers = Array.isArray(config.markers) ? config.markers : []
+    const plain = (html: string) => html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+
+    const points = key.flatMap((marker, index) => {
+      if (marker.answers.length === 0) return []
+      const student = (answers[index] ?? '').trim()
+      return [{
+        key: String(index),
+        name: plain(markers[index]?.label ?? '') || `จุดที่ ${index + 1}`,
+        student: student || '—',
+        correct: marker.answers.join(' หรือ '),
+        ok: isImageLabelMarkerCorrect(answers[index] ?? '', marker),
+      }]
+    })
+
+    return (
+      <div className="mt-2 space-y-2 text-sm">
+        {points.map(point => (
+          <div key={point.key} className={`pl-3 border-l-2 space-y-0.5 ${point.ok ? 'border-success/30' : 'border-destructive/30'}`}>
+            <p className={`text-xs font-semibold ${point.ok ? 'text-success' : 'text-destructive'}`}>
+              {point.ok ? '✓' : '✗'} {point.name}
+            </p>
+            <div className="flex gap-2">
+              <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
+              <span className="font-medium">{point.student}</span>
+            </div>
+            {!point.ok && (
+              <div className="flex gap-2">
+                <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
+                <span className="font-medium">{point.correct}</span>
               </div>
             )}
           </div>

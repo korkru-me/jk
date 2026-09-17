@@ -4,6 +4,10 @@ import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
 import { gradeValue } from '@/lib/assignment-attempt'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { CLASSIFY_PREFIX, CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
+import {
+  IMAGE_LABEL_PREFIX,
+  isImageLabelMarkerCorrect, parseImageLabelAnswer, parseImageLabelKey,
+} from '@/lib/image-label'
 import type { AnswerPart, FillBlankItem } from '@/lib/types'
 
 /**
@@ -303,6 +307,35 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
         status: rowStatus(picked === key),
       })
     }))
+
+    return { ...base, rows }
+  }
+
+  // ─── ติดป้ายบนรูป (image_label) ──────────────────────────────────────────
+  // One line per point the teacher keyed, named after the point rather than
+  // numbered: a student reading "หลอดลม" knows which place on the picture went
+  // wrong, and "จุดที่ 3" tells them to go back and count dots. Points the key
+  // left unset are not shown at all — they were left out of the score too, so
+  // saying nothing about them is the honest line.
+  if (correctAns.startsWith(IMAGE_LABEL_PREFIX)) {
+    const key = parseImageLabelKey(correctAns.slice(IMAGE_LABEL_PREFIX.length))
+    const answers = parseImageLabelAnswer(studentAns)
+    const config = (question.extra_data ?? {}) as { markers?: Array<{ label?: string }> }
+    const markers = Array.isArray(config.markers) ? config.markers : []
+
+    const rows: FeedbackRow[] = []
+    key.forEach((marker, index) => {
+      if (marker.answers.length === 0) return
+      // The teacher's own name for the point where the question still has it,
+      // its number otherwise, so a question edited after submission still reads.
+      const name = stripTags(markers[index]?.label ?? '') || `จุดที่ ${index + 1}`
+      rows.push({
+        label: name,
+        student: blank(answers[index] ?? ''),
+        ...reveal(marker.answers.join(' หรือ ')),
+        status: rowStatus(isImageLabelMarkerCorrect(answers[index] ?? '', marker)),
+      })
+    })
 
     return { ...base, rows }
   }
