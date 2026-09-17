@@ -85,6 +85,8 @@ export function ImageLabelInput({
   const [hover, setHover] = useState<number | null>(null)
   const [, setMeasureTick] = useState(0)
 
+  // Only the wide layout measures anything: it is the only one that draws
+  // leader lines, and it is the only one in the document when it is on screen.
   const frameRef = useRef<HTMLDivElement | null>(null)
   const boxRefs = useRef<Array<HTMLElement | null>>([])
   const dotRefs = useRef<Array<HTMLElement | null>>([])
@@ -263,7 +265,12 @@ export function ImageLabelInput({
     return <p className="text-sm text-warning">โจทย์นี้ยังไม่มีรูปหรือจุดให้ตอบ — แจ้งครูผู้สอน</p>
   }
 
-  const renderBox = (entry: { marker: ImageLabelInputMarker; index: number; side: 'left' | 'right' }) => {
+  /**
+   * One answer box. `measured` is true only in the wide layout, whose boxes are
+   * the ones the leader lines are drawn from — the stacked layout renders the
+   * same boxes with no line to anchor and must not overwrite those refs.
+   */
+  const renderBox = (entry: { marker: ImageLabelInputMarker; index: number }, measured: boolean) => {
     const { marker, index } = entry
     const verdict = results?.[index]
     const answer = value[index] ?? ''
@@ -273,7 +280,7 @@ export function ImageLabelInput({
     return (
       <div key={marker.id || index} className="flex flex-col gap-1">
         <div
-          ref={el => { boxRefs.current[index] = el }}
+          ref={measured ? el => { boxRefs.current[index] = el } : undefined}
           className={cn(
             'flex min-h-11 items-center gap-2 rounded-lg border-2 bg-card px-2 py-1.5',
             verdict === true && 'border-success bg-success/10',
@@ -330,7 +337,11 @@ export function ImageLabelInput({
                 onPointerDown={event => startDrag(event, answer || null, answer ? index : null)}
                 onClick={() => tapSlot(index)}
                 className={cn(
-                  'h-auto min-w-0 flex-1 justify-start whitespace-normal px-1 py-1.5 text-left text-sm font-normal',
+                  // Wraps rather than truncates. A box in the wide layout's
+                  // margin is about 160px at the narrow end of that layout, and
+                  // "แอมมิเตอร์" does not fit — truncating hides which answer is
+                  // in the box, which is the one thing the box is for.
+                  'h-auto min-w-0 flex-1 justify-start whitespace-normal break-words px-1 py-1.5 text-left text-sm font-normal',
                   !locked && 'touch-none select-none',
                   !locked && answer && 'cursor-grab active:cursor-grabbing',
                   !answer && 'text-muted-foreground',
@@ -361,38 +372,59 @@ export function ImageLabelInput({
     )
   }
 
+  const picture = (measured: boolean) => (
+    <div className="relative self-start">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={imageUrl}
+        alt="รูปประกอบโจทย์"
+        onLoad={measured ? remeasure : undefined}
+        className="block w-full rounded-lg border object-contain"
+      />
+      {markers.map((marker, index) => (
+        <span
+          key={marker.id || index}
+          ref={measured ? el => { dotRefs.current[index] = el } : undefined}
+          style={{ left: `${marker.point.x}%`, top: `${marker.point.y}%` }}
+          className={cn(
+            'absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-card text-[11px] font-bold text-primary-foreground',
+            results?.[index] === true && 'bg-success',
+            results?.[index] === false && 'bg-destructive',
+            results?.[index] == null && 'bg-tint-1',
+          )}
+        >
+          {index + 1}
+        </span>
+      ))}
+    </div>
+  )
+
   return (
     <div className="space-y-4">
-      <div ref={frameRef} className="relative">
+      {/*
+        Two layouts, not one layout reflowing, because they are two different
+        ideas. Wide: boxes in the margins either side with a leader line into
+        the picture. Narrow: the picture at full width, answers as a numbered
+        list under it, and the number on each dot is the only thing pairing the
+        two — which is why every dot and box carries one in both layouts.
+
+        The breakpoint is xl, not the lg that ตารางจำแนก uses, and it was
+        measured rather than assumed. Three columns inside the exam page's
+        content area leave the picture 284px at 1024 and 184px at 812, with the
+        answer boxes down to 158px and 102px. A real teacher's diagram with
+        seven points on it is not readable at either. At 1200 the picture gets
+        367px and nothing is cramped, so the wide layout starts at the first
+        standard breakpoint above that.
+      */}
+      <div ref={frameRef} className="relative hidden xl:block">
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_minmax(0,1fr)] gap-3">
-          <div className="flex flex-col justify-around gap-2">{column('left').map(renderBox)}</div>
-
-          <div className="relative self-start">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt="รูปประกอบโจทย์"
-              onLoad={remeasure}
-              className="block w-full rounded-lg border object-contain"
-            />
-            {markers.map((marker, index) => (
-              <span
-                key={marker.id || index}
-                ref={el => { dotRefs.current[index] = el }}
-                style={{ left: `${marker.point.x}%`, top: `${marker.point.y}%` }}
-                className={cn(
-                  'absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-card text-[10px] font-bold text-primary-foreground',
-                  results?.[index] === true && 'bg-success',
-                  results?.[index] === false && 'bg-destructive',
-                  results?.[index] == null && 'bg-tint-1',
-                )}
-              >
-                {index + 1}
-              </span>
-            ))}
+          <div className="flex flex-col justify-around gap-2">
+            {column('left').map(entry => renderBox(entry, true))}
           </div>
-
-          <div className="flex flex-col justify-around gap-2">{column('right').map(renderBox)}</div>
+          {picture(true)}
+          <div className="flex flex-col justify-around gap-2">
+            {column('right').map(entry => renderBox(entry, true))}
+          </div>
         </div>
 
         <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true">
@@ -412,6 +444,15 @@ export function ImageLabelInput({
             )
           })}
         </svg>
+      </div>
+
+      <div className="space-y-3 xl:hidden">
+        {picture(false)}
+        {/* Marker order, not the wide layout's left-then-right order: this list
+            is read top to bottom against the numbers on the picture. */}
+        <div className="flex flex-col gap-2">
+          {markers.map((marker, index) => renderBox({ marker, index }, false))}
+        </div>
       </div>
 
       {mode === 'drag' && (
