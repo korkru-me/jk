@@ -63,10 +63,20 @@ function asConfig(extraData: unknown): ImageLabelConfig | null {
   return config
 }
 
-/** Anything unrecognised reads as 'typed', the mode that filters nothing out. */
+/**
+ * Anything unrecognised reads as 'typed', the mode that filters nothing out.
+ *
+ * Exported because the exam sanitiser has to reach the same verdict: it decides
+ * what a point offers the student, while this file decides what the point is
+ * keyed to. A question the two disagree about is one where the student is given
+ * a list the grader is not marking against.
+ */
+export function normalizeImageLabelMode(value: unknown): ImageLabelAnswerMode {
+  return value === 'dropdown' || value === 'drag' ? value : 'typed'
+}
+
 function readMode(config: ImageLabelConfig): ImageLabelAnswerMode {
-  const mode = config.answer_mode
-  return mode === 'dropdown' || mode === 'drag' ? mode : 'typed'
+  return normalizeImageLabelMode(config.answer_mode)
 }
 
 const cleanList = (value: unknown): string[] =>
