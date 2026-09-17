@@ -20,6 +20,8 @@ import { getBlankType, splitFillBlankHtml, extractBlankNumbers, acceptedAnswers,
 import { splitAnswerBlankHtml, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { Variable, MCQOption, AnswerPart, QuestionType, MatchingPair, MatchingConfig, TrueFalseConfig, FillBlankConfig, OrderingConfig, OrderingItem, CompositeConfig, CompositePart, ClassifyConfig, ImageLabelConfig, SubmittedFile } from '@/lib/types'
 import { CLASSIFY_UNSET, classifyCorrectGrid } from '@/lib/classify'
+import { imageLabelKey, isImageLabelMarkerCorrect, normalizeImageLabelMode } from '@/lib/image-label'
+import { ImageLabelInput } from '@/components/exam/image-label-input'
 import { choiceListHint } from '@/lib/choice-list-hint'
 import { scoreChoiceTicks } from '@/lib/choice-ticks'
 import { choicesFitOneRow } from '@/lib/choice-layout'
@@ -134,6 +136,7 @@ export function QuestionPreviewContent({
   orderingConfig,
   compositeConfig,
   classifyConfig,
+  imageLabelConfig,
   partLabelStyle,
   attachmentUrls = [],
   answerTolerance,
@@ -194,6 +197,18 @@ export function QuestionPreviewContent({
   const emptyClassifyGrid = () => classifyRows.map(() => classifyColumns.map(() => CLASSIFY_UNSET))
   const [classifyGrid, setClassifyGrid] = useState<number[][]>(emptyClassifyGrid)
   const [classifyChecked, setClassifyChecked] = useState(false)
+
+  // ติดป้ายบนรูป — one answer per point, in the points' own order, which is the
+  // same array the exam stores. The verdicts come from imageLabelKey, the same
+  // module the attempt freezes its key from, so the teacher trying the question
+  // is marked by the rule their students will be.
+  const imageLabelMarkers = imageLabelConfig?.markers ?? []
+  const imageLabelMode = normalizeImageLabelMode(imageLabelConfig?.answer_mode)
+  const imageLabelKeyed = imageLabelKey(imageLabelConfig)
+  const [imageLabelAnswers, setImageLabelAnswers] = useState<string[]>(() => imageLabelMarkers.map(() => ''))
+  const [imageLabelChecked, setImageLabelChecked] = useState(false)
+  const imageLabelResults = imageLabelKeyed.map((marker, index) =>
+    marker.answers.length === 0 ? null : isImageLabelMarkerCorrect(imageLabelAnswers[index] ?? '', marker))
 
   // essay / file_upload — ไม่มีการตรวจอัตโนมัติให้เก็บผล แต่ยังต้องรู้ว่าครู
   // ลองตอบไปหรือยัง ก่อนเปิดหน้าตรวจจำลอง และเอาคำตอบนั้นไปแสดงในหน้านั้น
@@ -1640,6 +1655,43 @@ export function QuestionPreviewContent({
                 {gradable > 0 && correct === gradable
                   ? `🎉 ถูกต้องทุกช่อง! ${correct}/${gradable} คะแนน`
                   : `✅ ถูก ${correct}/${gradable} ช่อง — ได้ ${correct} คะแนน`}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {questionType === 'image_label' && imageLabelMarkers.length > 0 && (
+        <div className="space-y-3">
+          <ImageLabelInput
+            imageUrl={imageLabelConfig?.image_url ?? ''}
+            mode={imageLabelMode}
+            markers={imageLabelMarkers}
+            bank={imageLabelConfig?.bank}
+            value={imageLabelAnswers}
+            onChange={setImageLabelAnswers}
+            results={imageLabelChecked ? imageLabelResults : undefined}
+            correctText={imageLabelChecked
+              ? imageLabelKeyed.map(marker => marker.answers[0])
+              : undefined}
+          />
+
+          {!imageLabelChecked ? (
+            <Button type="button" onClick={() => setImageLabelChecked(true)}>ตรวจคำตอบ</Button>
+          ) : (() => {
+            // Counted off the same key the attempt freezes, so what this says and
+            // what a submission scores cannot disagree.
+            const gradable = imageLabelKeyed.filter(marker => marker.answers.length > 0).length
+            const correct = imageLabelResults.filter(result => result === true).length
+            return (
+              <div className={`p-3 rounded-lg text-sm font-medium border ${
+                gradable > 0 && correct === gradable ? 'bg-success/10 text-success border-success/20' :
+                correct > 0 ? 'bg-flag/10 text-flag border-flag/20' :
+                'bg-destructive/10 text-destructive border-destructive/20'
+              }`}>
+                {gradable > 0 && correct === gradable
+                  ? `🎉 ถูกต้องทุกจุด! ${correct}/${gradable} คะแนน`
+                  : `✅ ถูก ${correct}/${gradable} จุด — ได้ ${correct} คะแนน`}
               </div>
             )
           })()}

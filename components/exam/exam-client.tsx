@@ -44,13 +44,16 @@ import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig } from '@/lib/types'
+import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig } from '@/lib/types'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
+import { normalizeImageLabelMode, parseImageLabelAnswer } from '@/lib/image-label'
+import { ImageLabelInput } from './image-label-input'
 import type {
   SafeAnswerPart,
   SafeCompositeConfig,
   SafeMatchingConfig,
   SafeClassifyConfig,
+  SafeImageLabelConfig,
   SafeExamAnswer,
   SafeFillBlankConfig,
   SafeOrderingConfig,
@@ -1104,6 +1107,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               ) : current.questions.question_type === 'classify' ? (
                 <ClassifyAnswerInput
                   config={current.questions.extra_data as ClassifyConfig | SafeClassifyConfig}
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
+              ) : current.questions.question_type === 'image_label' ? (
+                <ImageLabelAnswerInput
+                  config={current.questions.extra_data as ImageLabelConfig | SafeImageLabelConfig}
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={val => handleAnswerChange(current.id, val)}
                 />
@@ -3088,6 +3097,33 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
         ))}
       </tbody>
     </table>
+  )
+}
+
+// ─── ติดป้ายบนรูป ─────────────────────────────────────────────────────────────
+// The picture, the points on it and the boxes in the margins live in
+// ImageLabelInput; this only translates between that component's array of
+// answers and the single string the attempt stores. One string per point, in
+// the points' own order — the shape the 'IMGL:' branch of lib/assignment-attempt
+// grades against.
+function ImageLabelAnswerInput({ config, rawValue, onChange }: {
+  config: ImageLabelConfig | SafeImageLabelConfig | null
+  rawValue: string
+  onChange: (v: string) => void
+}) {
+  const markers = config?.markers ?? []
+  const stored = parseImageLabelAnswer(rawValue)
+  const answers = markers.map((_, index) => stored[index] ?? '')
+
+  return (
+    <ImageLabelInput
+      imageUrl={config?.image_url ?? ''}
+      mode={normalizeImageLabelMode(config?.answer_mode)}
+      markers={markers}
+      bank={config?.bank}
+      value={answers}
+      onChange={next => onChange(JSON.stringify(next))}
+    />
   )
 }
 
