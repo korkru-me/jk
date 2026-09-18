@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
@@ -489,13 +490,25 @@ export function ImageLabelInput({
         </div>
       )}
 
-      {drag && (
+      {/* The chip under the pointer, portalled to <body>.
+          `position: fixed` resolves against the viewport only while no ancestor
+          establishes a containing block. The preview dialog centres itself with
+          `translate: -50% -50%`, which does establish one, so the ghost was
+          offset by however far the dialog's own top-left sat from the viewport
+          — measured at exactly (101, 65) with the dialog open, constant
+          wherever the pointer went. Same fix as MatchingDragInput.
+          Worth knowing when this is debugged again: computed `transform` reads
+          `none` here. Tailwind writes the centring into the separate `translate`
+          property, so a check for a transformed ancestor finds nothing and the
+          cause looks like it is somewhere else. */}
+      {drag && typeof document !== 'undefined' && createPortal(
         <span
           style={{ left: drag.x, top: drag.y }}
-          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-tint-1 bg-card px-3 py-2 text-sm shadow-lg"
+          className="pointer-events-none fixed z-[60] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-tint-1 bg-card px-3 py-2 text-sm shadow-lg"
         >
           {drag.word}
-        </span>
+        </span>,
+        document.body,
       )}
     </div>
   )
