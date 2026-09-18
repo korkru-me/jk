@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, FileUp, Blocks, Table2 } from 'lucide-react'
+import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, ChevronRight, FileUp, Blocks, Table2, MapPin } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { SAMPLE_QUESTIONS } from './_data/sample-questions'
 import { SamplePreview } from './_components/sample-preview'
@@ -86,6 +86,15 @@ const QUESTION_TYPES = [
     desc: 'ตารางเดียว — แถวคือสิ่งที่ให้จำแนก คอลัมน์คือมิติการจำแนก นักเรียนเลือก 1 ตัวเลือกต่อช่อง',
     color: 'bg-tint-4/10 border-tint-4/20 text-tint-4',
     iconColor: 'text-tint-4',
+  },
+  {
+    href: '/questions/new/image-label',
+    type: 'image_label' as QuestionType,
+    icon: MapPin,
+    title: 'ติดป้ายบนรูป',
+    desc: 'รูปเดียว — ครูคลิกวางจุดบนรูป นักเรียนตอบว่าแต่ละจุดคืออะไร พิมพ์เอง เลือกจากรายการ หรือลากคำจากคลัง',
+    color: 'bg-flag/10 border-flag/20 text-flag',
+    iconColor: 'text-flag',
   },
   {
     href: '/questions/new/composite',

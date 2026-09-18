@@ -110,9 +110,9 @@ export interface SortableQuestion {
  * the two paths will disagree about where it sits.
  */
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'analytical']
-const QUESTION_TYPE_ORDER = [
+export const QUESTION_TYPE_ORDER = [
   'mcq', 'written', 'matching', 'essay', 'true_false', 'fill_blank', 'ordering',
-  'file_upload', 'composite', 'classify',
+  'file_upload', 'composite', 'classify', 'image_label',
 ]
 
 /** Position in an enum, with anything unrecognised sorted to the end. */

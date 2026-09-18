@@ -1,0 +1,30 @@
+-- New question type: "ติดป้ายบนรูป" (image_label) — one diagram, and answer
+-- boxes that point at places on it. The worksheet it comes from gives a
+-- student a drawing of the respiratory tract, seven boxes with leader lines
+-- running to seven organs, and a bank of nine words underneath: two more words
+-- than there are boxes, because the extras are the question.
+--
+-- What no existing type can express is the one thing the worksheet is built
+-- on: *this box points at this place on the picture*. `fill_blank` places its
+-- blanks with a `[___1]` marker inside the question text, `matching` keeps two
+-- columns in `mcq_options`, `composite` stacks its parts vertically. Not one
+-- of them has anywhere to put a coordinate, and adding one to any of them
+-- would change what every existing question of that type means.
+--
+-- No new columns, tables or buckets: the points live in `questions.extra_data`
+-- (see ImageLabelConfig in lib/types.ts), the diagram reuses the existing
+-- `question-images` bucket the way composite part images already do, and the
+-- frozen answer key is one more prefix on `submission_answers.correct_answer`
+-- ('IMGL:', alongside TF:, FILL:, ORDER:, MATCH:, COMP:, MCQ: and CLS:).
+--
+-- This file adds the enum value and nothing else, on purpose. Postgres refuses
+-- to *use* a value added by ALTER TYPE ... ADD VALUE inside the transaction
+-- that added it, and the CLI runs each migration file in one transaction — so
+-- the function that compares question_type against 'image_label' has to be the
+-- migration after this one, not part of it.
+--
+-- Adding a label rewrites no rows and changes no existing behaviour: until the
+-- ติดป้ายบนรูป form ships, nothing can write the value. It is also permanent —
+-- Postgres cannot drop a value from an enum — so this migration must never be
+-- reverted; undoing it would mean rebuilding the type.
+ALTER TYPE question_type ADD VALUE IF NOT EXISTS 'image_label';

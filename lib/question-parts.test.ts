@@ -58,12 +58,51 @@ describe('subQuestionCount', () => {
     expect(subQuestionCount(q('classify', { extra_data: partial }))).toBe(3)
   })
 
+  it('counts ติดป้ายบนรูป by the points the teacher keyed', () => {
+    expect(subQuestionCount(q('image_label', { extra_data: {
+        image_url: '/samples/simple-circuit.svg',
+        answer_mode: 'drag',
+        bank: ['เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ', 'โวลต์มิเตอร์'],
+        markers: [
+          { id: 'm1', point: { x: 18, y: 50 }, answers: ['เซลล์ไฟฟ้า'], case_sensitive: false },
+          { id: 'm2', point: { x: 51, y: 23 }, answers: ['สวิตช์'], case_sensitive: false },
+          { id: 'm3', point: { x: 83, y: 50 }, answers: ['หลอดไฟ'], case_sensitive: false },
+        ],
+      } }))).toBe(3)
+  })
+
+  it('leaves a ติดป้ายบนรูป point nobody could answer out of the count', () => {
+    // A point with no answer, and a point keyed to a word the bank does not
+    // offer, are both unanswerable — so neither is a ข้อย่อย, and the badge has
+    // to say the same number the งาน scores.
+    const unanswerable = {
+      ...{
+        image_url: '/samples/simple-circuit.svg',
+        answer_mode: 'drag',
+        bank: ['เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ', 'โวลต์มิเตอร์'],
+        markers: [
+          { id: 'm1', point: { x: 18, y: 50 }, answers: ['เซลล์ไฟฟ้า'], case_sensitive: false },
+          { id: 'm2', point: { x: 51, y: 23 }, answers: ['สวิตช์'], case_sensitive: false },
+          { id: 'm3', point: { x: 83, y: 50 }, answers: ['หลอดไฟ'], case_sensitive: false },
+        ],
+      },
+      markers: [
+        { id: 'm1', point: { x: 18, y: 50 }, answers: ['เซลล์ไฟฟ้า'], case_sensitive: false },
+        { id: 'm2', point: { x: 51, y: 23 }, answers: [], case_sensitive: false },
+        { id: 'm3', point: { x: 83, y: 50 }, answers: ['แอมมิเตอร์'], case_sensitive: false },
+      ],
+    }
+    expect(subQuestionCount(q('image_label', { extra_data: unanswerable }))).toBe(1)
+  })
+
   it('never goes below one, however empty the row is', () => {
     expect(subQuestionCount(q('fill_blank', { extra_data: {} }))).toBe(1)
     expect(subQuestionCount(q('composite', { extra_data: { parts: [] } }))).toBe(1)
     expect(subQuestionCount(q('matching'))).toBe(1)
     expect(subQuestionCount(q('classify', { extra_data: {} }))).toBe(1)
     expect(subQuestionCount(q('classify', { extra_data: { columns: [], rows: [] } }))).toBe(1)
+    expect(subQuestionCount(q('image_label', { extra_data: {} }))).toBe(1)
+    expect(subQuestionCount(q('image_label', { extra_data: { markers: [] } }))).toBe(1)
   })
 
   it('takes a group parent count over the parent row own (empty) shape', () => {
@@ -92,6 +131,16 @@ describe('subQuestionCount', () => {
           { id: 'r2', text: 'ยางรัดของ', answers: { c1: 1, c2: 0 } },
         ],
       } }),
+      q('image_label', { extra_data: {
+        image_url: '/samples/simple-circuit.svg',
+        answer_mode: 'drag',
+        bank: ['เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ', 'โวลต์มิเตอร์'],
+        markers: [
+          { id: 'm1', point: { x: 18, y: 50 }, answers: ['เซลล์ไฟฟ้า'], case_sensitive: false },
+          { id: 'm2', point: { x: 51, y: 23 }, answers: ['สวิตช์'], case_sensitive: false },
+          { id: 'm3', point: { x: 83, y: 50 }, answers: ['หลอดไฟ'], case_sensitive: false },
+        ],
+      } }),
     ]
     for (const question of cases) {
       expect(naturalMaxScore(
@@ -110,6 +159,16 @@ describe('subQuestionLabel', () => {
     expect(subQuestionLabel(q('fill_blank', { extra_data: { blanks: [{}, {}, {}] } }))).toBe('3 ช่องเติม')
     expect(subQuestionLabel(q('matching', { mcq_options: [{}, {}] }))).toBe('2 คู่จับคู่')
     expect(subQuestionLabel(q('ordering', { extra_data: { items: [{}, {}] } }))).toBe('2 รายการเรียง')
+    expect(subQuestionLabel(q('image_label', { extra_data: {
+        image_url: '/samples/simple-circuit.svg',
+        answer_mode: 'drag',
+        bank: ['เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ', 'โวลต์มิเตอร์'],
+        markers: [
+          { id: 'm1', point: { x: 18, y: 50 }, answers: ['เซลล์ไฟฟ้า'], case_sensitive: false },
+          { id: 'm2', point: { x: 51, y: 23 }, answers: ['สวิตช์'], case_sensitive: false },
+          { id: 'm3', point: { x: 83, y: 50 }, answers: ['หลอดไฟ'], case_sensitive: false },
+        ],
+      } }))).toBe('3 จุด')
     expect(subQuestionLabel(q('classify', { extra_data: {
         columns: [
           { id: 'c1', title: 'แหล่งกำเนิด', options: ['ธรรมชาติ', 'สังเคราะห์'] },

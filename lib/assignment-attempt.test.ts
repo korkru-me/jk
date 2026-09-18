@@ -965,6 +965,141 @@ describe('ตารางจำแนก, from attempt to grade', () => {
   })
 })
 
+describe('ติดป้ายบนรูป, from attempt to grade', () => {
+  const config = {
+    image_url: '/samples/simple-circuit.svg',
+    answer_mode: 'drag',
+    // One more word than there are points: the extra is the question.
+    bank: ['เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ', 'โวลต์มิเตอร์'],
+    markers: [
+      { id: 'm1', point: { x: 18, y: 50 }, answers: ['เซลล์ไฟฟ้า'], case_sensitive: false },
+      { id: 'm2', point: { x: 51, y: 23 }, answers: ['สวิตช์'], case_sensitive: false },
+      { id: 'm3', point: { x: 83, y: 50 }, answers: ['หลอดไฟ'], case_sensitive: false },
+    ],
+  }
+  const allRight = JSON.stringify(['เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ'])
+
+  function imageLabelQuestion(extra: unknown = config): Question {
+    return {
+      id: 'q1',
+      question_type: 'image_label',
+      answer_formula: '',
+      answer_parts: null,
+      variables: [],
+      logic_rules: [],
+      extra_data: extra,
+      mcq_options: null,
+    } as unknown as Question
+  }
+
+  const grade = (correct: string, student: string | null, extraData: unknown = config, maxScore = 3) =>
+    gradeAnswer(answer({ correct, student, questionType: 'image_label', extraData, maxScore }))
+
+  const frozen = (q: Question = imageLabelQuestion()) => buildAssignmentAttempt(assignment, [q])[0]
+
+  it('freezes one entry per point, carrying how to compare it', () => {
+    const skeleton = frozen()
+    expect(skeleton.correct_answer.startsWith('IMGL:')).toBe(true)
+    expect(JSON.parse(skeleton.correct_answer.slice(5))).toEqual([
+      { answers: ['เซลล์ไฟฟ้า'], exact: true },
+      { answers: ['สวิตช์'], exact: true },
+      { answers: ['หลอดไฟ'], exact: true },
+    ])
+    expect(skeleton.max_score).toBe(3)
+  })
+
+  it('is worth one point per keyed point on the picture', () => {
+    expect(naturalMaxScore('image_label', config, null)).toBe(3)
+  })
+
+  it('credits every box filled in right', () => {
+    expect(grade(frozen().correct_answer, allRight)).toMatchObject({ is_correct: true, score: 3 })
+  })
+
+  it('gives part marks for the boxes that are right', () => {
+    const student = JSON.stringify(['เซลล์ไฟฟ้า', 'โวลต์มิเตอร์', 'หลอดไฟ'])
+    expect(grade(frozen().correct_answer, student)).toMatchObject({ is_correct: false, score: 2 })
+  })
+
+  it('scores an untouched picture zero without calling it pending', () => {
+    // Nothing here is ever waiting on a teacher, unlike อัตนัย or a manual blank.
+    expect(grade(frozen().correct_answer, null)).toMatchObject({ is_correct: false, score: 0 })
+    expect(grade(frozen().correct_answer, '')).toMatchObject({ is_correct: false, score: 0 })
+    expect(grade(frozen().correct_answer, '["","",""]')).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('ignores an answer sent past the end of the key', () => {
+    const student = JSON.stringify(['เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ', 'โวลต์มิเตอร์'])
+    expect(grade(frozen().correct_answer, student)).toMatchObject({ is_correct: true, score: 3 })
+  })
+
+  it('does not charge for a point the teacher never keyed', () => {
+    // Left out of both the maximum and the grading, so a student who answers
+    // everything they were actually asked still scores full marks.
+    const partial = {
+      ...config,
+      markers: [...config.markers, { id: 'm4', point: { x: 50, y: 77 }, answers: [], case_sensitive: false }],
+    }
+    const skeleton = frozen(imageLabelQuestion(partial))
+    expect(skeleton.max_score).toBe(3)
+    expect(grade(skeleton.correct_answer, allRight, partial, 3)).toMatchObject({ is_correct: true, score: 3 })
+  })
+
+  it('does not charge for a point whose answer the bank no longer offers', () => {
+    const unreachable = {
+      ...config,
+      markers: [...config.markers, { id: 'm4', point: { x: 50, y: 77 }, answers: ['แอมมิเตอร์'], case_sensitive: false }],
+    }
+    const skeleton = frozen(imageLabelQuestion(unreachable))
+    expect(skeleton.max_score).toBe(3)
+    expect(grade(skeleton.correct_answer, allRight, unreachable, 3)).toMatchObject({ is_correct: true, score: 3 })
+  })
+
+  it('hands out an assignment\'s own ceiling in the points\' proportions', () => {
+    const worth6 = { ...assignment, question_points: { q1: 6 } }
+    const skeleton = buildAssignmentAttempt(worth6, [imageLabelQuestion()])[0]
+    expect(skeleton.max_score).toBe(6)
+    expect(grade(skeleton.correct_answer, allRight, config, 6)).toMatchObject({ is_correct: true, score: 6 })
+    expect(grade(skeleton.correct_answer, '["เซลล์ไฟฟ้า","","หลอดไฟ"]', config, 6)).toMatchObject({ is_correct: false, score: 4 })
+  })
+
+  it('stays within the question\'s worth after the teacher deletes a point', () => {
+    // The frozen key still has three points; the live config has two. Dividing
+    // by the live count would pay out more than the question is worth.
+    const skeleton = frozen()
+    const narrowed = { ...config, markers: config.markers.slice(0, 2) }
+    expect(grade(skeleton.correct_answer, allRight, narrowed, 3).score).toBe(3)
+  })
+
+  it('grades by the rule frozen at the time, not the one the question carries now', () => {
+    // What separates this branch from FILL:, which reads case_sensitive back
+    // out of the live extra_data every time it grades. A teacher who relaxes a
+    // point after students have answered must not retroactively change what
+    // their answers were judged by.
+    const strict = {
+      ...config,
+      answer_mode: 'typed',
+      bank: undefined,
+      markers: [{ id: 'm1', point: { x: 18, y: 50 }, answers: ['Alveolus'], case_sensitive: true }],
+    }
+    const skeleton = frozen(imageLabelQuestion(strict))
+    const relaxed = { ...strict, markers: [{ ...strict.markers[0], case_sensitive: false }] }
+    expect(grade(skeleton.correct_answer, '["alveolus"]', relaxed, 1)).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('survives a question whose config never came from the form', () => {
+    const skeleton = frozen(imageLabelQuestion({}))
+    expect(skeleton.correct_answer).toBe('IMGL:[]')
+    expect(skeleton.max_score).toBe(1)
+    expect(grade(skeleton.correct_answer, '["ปอด"]', {}, 1)).toMatchObject({ is_correct: false, score: 0 })
+  })
+
+  it('does not collide with another type\'s stored key', () => {
+    // 'IMGL:' has to be unmistakable, the way MCQ: and CLS: are.
+    expect(gradeAnswer(answer({ correct: 'IMGL:[]', student: 'CLS:[[0]]', questionType: 'image_label' })).is_correct).toBe(false)
+  })
+})
+
 describe('essay, from attempt to grade', () => {
   it('records no answer to compare against', () => {
     const [skeleton] = buildAssignmentAttempt(assignment, [essayQuestion()])

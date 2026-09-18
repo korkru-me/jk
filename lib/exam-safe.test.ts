@@ -219,6 +219,179 @@ describe('toSafeExamAnswer', () => {
     expect(config.rows).toEqual([])
   })
 
+  it('hands a ใบงานติดป้ายบนรูป to the student with no answer key in it', () => {
+    // Two different leaks in one type. `answers` is the key outright. `label`
+    // is the teacher's private name for a point, and a teacher naming the point
+    // over the trachea names it "หลอดลม" — the answer under a field name that
+    // does not admit to being one.
+    const labelled = serializedSafe('image_label', {
+      extra_data: {
+        image_url: 'https://example.test/breathing.png',
+        answer_mode: 'drag',
+        bank: ['จมูก', 'ปอด', 'กระบังลม'],
+        markers: [
+          {
+            id: 'm1', label: 'MARKER_LABEL_SECRET',
+            point: { x: 30, y: 12 }, box: { x: 4, y: 10 },
+            answers: ['IMAGE_ANSWER_SECRET'], case_sensitive: true,
+          },
+          {
+            id: 'm2', point: { x: 33, y: 60 },
+            answers: ['ปอด'], case_sensitive: false,
+            MARKER_EXTRA_SECRET: 'leak',
+          },
+        ],
+        IMAGE_CONFIG_SECRET: 'leak',
+      },
+    })
+
+    expect(labelled.json).not.toContain('MARKER_LABEL_SECRET')
+    expect(labelled.json).not.toContain('IMAGE_ANSWER_SECRET')
+    expect(labelled.json).not.toContain('MARKER_EXTRA_SECRET')
+    expect(labelled.json).not.toContain('IMAGE_CONFIG_SECRET')
+    expect(labelled.json).not.toContain('case_sensitive')
+
+    const config = labelled.safe.questions.extra_data as {
+      image_url: string
+      answer_mode: string
+      bank?: string[]
+      markers: Array<Record<string, unknown>>
+    }
+    // Everything the student needs to answer still arrives, in the order the
+    // frozen key was built from — a shuffle here would misalign every point.
+    expect(config.image_url).toBe('https://example.test/breathing.png')
+    expect(config.answer_mode).toBe('drag')
+    expect(config.bank).toEqual(['จมูก', 'ปอด', 'กระบังลม'])
+    expect(config.markers.map(marker => marker.id)).toEqual(['m1', 'm2'])
+    expect(config.markers[0].point).toEqual({ x: 30, y: 12 })
+    expect(config.markers[0].box).toEqual({ x: 4, y: 10 })
+    expect(config.markers[1].box).toBeUndefined()
+    for (const marker of config.markers) {
+      expect(Object.keys(marker)).not.toContain('answers')
+      expect(Object.keys(marker)).not.toContain('label')
+    }
+  })
+
+  it('never hands the word bank to a question that asks the student to write the words', () => {
+    // The same array is the thing you drag from in one mode and the whole
+    // answer vocabulary in another. A teacher who builds a drag question and
+    // then switches it to พิมพ์เอง leaves the bank behind in extra_data.
+    const typed = serializedSafe('image_label', {
+      extra_data: {
+        image_url: 'https://example.test/x.png',
+        answer_mode: 'typed',
+        bank: ['BANK_WORD_SECRET', 'ปอด'],
+        markers: [{ id: 'm1', point: { x: 10, y: 10 }, answers: ['ปอด'], case_sensitive: false }],
+      },
+    })
+    expect(typed.json).not.toContain('BANK_WORD_SECRET')
+    expect((typed.safe.questions.extra_data as { bank?: string[] }).bank).toBeUndefined()
+  })
+
+  it('gives a dropdown its bank only where a point actually falls back to it', () => {
+    const base = {
+      image_url: 'https://example.test/x.png',
+      answer_mode: 'dropdown',
+      bank: ['BANK_WORD_SECRET', 'ปอด'],
+    }
+
+    // Every point brought its own list, so nothing renders the bank; shipping
+    // it would be answer vocabulary for no one.
+    const selfSufficient = serializedSafe('image_label', {
+      extra_data: {
+        ...base,
+        markers: [{ id: 'm1', point: { x: 10, y: 10 }, options: ['หัวใจ', 'ตับ'], answers: ['ตับ'], case_sensitive: false }],
+      },
+    })
+    expect(selfSufficient.json).not.toContain('BANK_WORD_SECRET')
+    expect((selfSufficient.safe.questions.extra_data as { bank?: string[] }).bank).toBeUndefined()
+
+    // One point has no list of its own, so the bank is what it offers.
+    const fallsBack = serializedSafe('image_label', {
+      extra_data: {
+        ...base,
+        markers: [
+          { id: 'm1', point: { x: 10, y: 10 }, options: ['หัวใจ', 'ตับ'], answers: ['ตับ'], case_sensitive: false },
+          { id: 'm2', point: { x: 20, y: 20 }, answers: ['ปอด'], case_sensitive: false },
+        ],
+      },
+    })
+    const config = fallsBack.safe.questions.extra_data as { bank?: string[]; markers: Array<Record<string, unknown>> }
+    expect(config.bank).toEqual(['BANK_WORD_SECRET', 'ปอด'])
+    expect(config.markers[0].options).toEqual(['หัวใจ', 'ตับ'])
+    expect(config.markers[1].options).toBeUndefined()
+  })
+
+  it('strips a point option list from a mode that shows no lists', () => {
+    // A leftover two-item list on a typed question narrows writing an answer
+    // down to a coin flip for anyone who reads the payload.
+    for (const answer_mode of ['typed', 'drag']) {
+      const stale = serializedSafe('image_label', {
+        extra_data: {
+          image_url: 'https://example.test/x.png',
+          answer_mode,
+          bank: ['ปอด', 'ตับ'],
+          markers: [{
+            id: 'm1', point: { x: 10, y: 10 },
+            options: ['STALE_OPTION_SECRET', 'ปอด'],
+            answers: ['ปอด'], case_sensitive: false,
+          }],
+        },
+      })
+      expect(stale.json).not.toContain('STALE_OPTION_SECRET')
+    }
+  })
+
+  it('keeps a point the teacher never keyed, rather than sliding the rest along', () => {
+    // The student's answer is one string per point in the points' own order.
+    // Dropping the unkeyed one here would grade every later answer against the
+    // wrong point.
+    const partial = serializedSafe('image_label', {
+      extra_data: {
+        image_url: 'https://example.test/x.png',
+        answer_mode: 'typed',
+        markers: [
+          { id: 'm1', point: { x: 10, y: 10 }, answers: [], case_sensitive: false },
+          { id: 'm2', point: { x: 20, y: 20 }, answers: ['ปอด'], case_sensitive: false },
+        ],
+      },
+    })
+    expect((partial.safe.questions.extra_data as { markers: unknown[] }).markers).toHaveLength(2)
+  })
+
+  it('keeps a malformed ใบงานติดป้ายบนรูป from reaching the browser as junk', () => {
+    const junk = serializedSafe('image_label', {
+      extra_data: {
+        image_url: 42,
+        answer_mode: 'lasso',
+        bank: 'not-an-array',
+        markers: [
+          { id: 7, point: 'not-a-point', box: { x: 'a', y: 2 } },
+          'not-an-object',
+          // Outside the picture: a box drawn at 140% is one the student cannot
+          // reach. Imports and older forms can both produce it.
+          { id: 'm3', point: { x: 140, y: -20 } },
+        ],
+      },
+    })
+    const config = junk.safe.questions.extra_data as {
+      image_url: string
+      answer_mode: string
+      bank?: string[]
+      markers: Array<Record<string, unknown>>
+    }
+    expect(config.image_url).toBe('')
+    // An unreadable mode reads as typed — the same fallback lib/image-label.ts
+    // keys by, so the student is never offered a list the grader ignores.
+    expect(config.answer_mode).toBe('typed')
+    expect(config.bank).toBeUndefined()
+    expect(config.markers).toEqual([
+      { id: '', point: { x: 50, y: 50 } },
+      { id: '', point: { x: 50, y: 50 } },
+      { id: 'm3', point: { x: 100, y: 0 } },
+    ])
+  })
+
   it('shuffles ordering prompts and strips every composite answer key', () => {
     const ordering = serializedSafe('ordering', {
       extra_data: {

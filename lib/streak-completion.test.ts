@@ -19,7 +19,7 @@ function mcqPool(n: number): string[] {
 
 describe('streakEligibleCount', () => {
   it('counts every auto-gradable type', () => {
-    const pool = ['mcq', 'written', 'true_false', 'fill_blank', 'ordering', 'matching', 'composite', 'classify']
+    const pool = ['mcq', 'written', 'true_false', 'fill_blank', 'ordering', 'matching', 'composite', 'classify', 'image_label']
     expect(streakEligibleCount(pool)).toBe(pool.length)
   })
 

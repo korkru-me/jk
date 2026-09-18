@@ -1,6 +1,7 @@
 import type {
   CompositePartType,
   FileUploadConfig,
+  ImageLabelAnswerMode,
   MatchingAnswerMode,
   MathInputMode,
   OrderingItem,
@@ -11,6 +12,7 @@ import type {
 } from '@/lib/types'
 import type { PartLabelStyle } from '@/lib/part-labels'
 import { sanitizeMathInputModes } from '@/lib/math/input-mode'
+import { normalizeImageLabelMode } from '@/lib/image-label'
 
 export interface SafeTrueFalseStatement {
   id: string
@@ -106,6 +108,50 @@ export interface SafeClassifyConfig {
   row_label_style?: PartLabelStyle
 }
 
+/**
+ * A ใบงานติดป้ายบนรูป as the student may see it.
+ *
+ * Two things have to leave, and they leave for different reasons.
+ *
+ * `answers` is the key itself, so SafeImageLabelMarker has no such member at
+ * all — it cannot be forgotten, because there is nowhere for it to go. So does
+ * `label`, which is subtler and more dangerous for being so: it is the teacher's
+ * private name for a point, used to say *which* point a line on the grading
+ * screen is about, and a teacher naming the point over the trachea almost
+ * always names it "หลอดลม". It is the answer under a field name that does not
+ * say so.
+ *
+ * What stays is decided by the mode, not copied wholesale. A 'drag' question's
+ * `bank` is the thing the student drags from, so it must ship; the same array
+ * on a 'typed' question is the full answer vocabulary of a question that asks
+ * them to write the words from memory, so it must not. A point's own `options`
+ * ship only in 'dropdown', the only mode that puts a list in front of the
+ * student — a leftover two-item list on a typed question would turn writing an
+ * answer into a coin flip for anyone who reads the payload.
+ *
+ * Order is load-bearing and every marker is copied through, including the ones
+ * the teacher never keyed. The student's answer is one string per point in the
+ * points' own order, compared against a key frozen from this same config, so
+ * dropping or reordering a marker here slides every later answer onto the wrong
+ * point.
+ */
+export interface SafeImageLabelMarker {
+  id: string
+  /** Percentages of the displayed image, clamped to 0–100 — see ImageLabelMarker.point. */
+  point: { x: number; y: number }
+  box?: { x: number; y: number }
+  /** Present only in 'dropdown', and only when this point has a list of its own. */
+  options?: string[]
+}
+
+export interface SafeImageLabelConfig {
+  image_url: string
+  answer_mode: ImageLabelAnswerMode
+  /** Present only when the mode actually puts it in front of the student. */
+  bank?: string[]
+  markers: SafeImageLabelMarker[]
+}
+
 export interface SafeCompositeConfig {
   parts: SafeCompositePart[]
   part_label_style?: PartLabelStyle
@@ -120,6 +166,7 @@ export type SafeExamExtraData =
   | FileUploadConfig
   | SafeCompositeConfig
   | SafeClassifyConfig
+  | SafeImageLabelConfig
   | null
 
 export interface SafeAnswerPart {
@@ -198,6 +245,22 @@ function asStringArray(value: unknown): string[] | undefined {
   return Array.isArray(value) && value.every(item => typeof item === 'string')
     ? value
     : undefined
+}
+
+/**
+ * A `{ x, y }` pair of percentages, clamped into the picture.
+ *
+ * Clamped rather than trusted because these are read back out of jsonb: a file
+ * import, or a form from before the bounds existed, can carry a point at 140%,
+ * which renders a box the student cannot reach. A pair that is not two finite
+ * numbers is not a position at all and comes back undefined.
+ */
+function asPercentPoint(value: unknown): { x: number; y: number } | undefined {
+  const point = asRecord(value)
+  if (typeof point.x !== 'number' || typeof point.y !== 'number') return undefined
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return undefined
+  const clamp = (n: number) => Math.min(100, Math.max(0, n))
+  return { x: clamp(point.x), y: clamp(point.y) }
 }
 
 function shuffle<T>(items: T[], random: () => number): T[] {
@@ -355,6 +418,52 @@ function sanitizeExtraData(questionType: string, value: unknown, random: () => n
       columns,
       rows,
       ...(asOptionalString(extra.row_label_style) ? { row_label_style: extra.row_label_style as PartLabelStyle } : {}),
+    }
+  }
+
+  if (questionType === 'image_label') {
+    // The same verdict lib/image-label.ts keys the question by. Reaching it
+    // separately here is how a student ends up with a list the grader is not
+    // marking against.
+    const answerMode = normalizeImageLabelMode(extra.answer_mode)
+    const bank = asStringArray(extra.bank)
+
+    // Rebuilt field by field, like every other branch here: a marker is copied
+    // as an id, a position and — in one mode only — a list of choices. `answers`
+    // and `label` are left behind by construction rather than by a delete a
+    // later edit could drop.
+    const markers: SafeImageLabelMarker[] = Array.isArray(extra.markers)
+      ? extra.markers.map((rawMarker) => {
+          const marker = asRecord(rawMarker)
+          const box = asPercentPoint(marker.box)
+          const own = answerMode === 'dropdown' ? asStringArray(marker.options) : undefined
+          return {
+            id: asString(marker.id),
+            // A marker with an unreadable position is still a marker: dropping
+            // it would shift every later answer onto the wrong point. It gets
+            // the middle of the picture, where it is at least visible and can
+            // be answered.
+            point: asPercentPoint(marker.point) ?? { x: 50, y: 50 },
+            ...(box ? { box } : {}),
+            ...(own && own.length > 0 ? { options: own } : {}),
+          }
+        })
+      : []
+
+    // 'typed' is never given the bank — that question asks the student to write
+    // the words from memory, and the bank is the list of words. 'dropdown' gets
+    // it only where some point actually falls back to it; where every point
+    // brought its own list, the bank is answer vocabulary nothing renders.
+    const bankIsOffered = bank !== undefined && (
+      answerMode === 'drag'
+      || (answerMode === 'dropdown' && markers.some(marker => marker.options === undefined))
+    )
+
+    return {
+      image_url: asString(extra.image_url),
+      answer_mode: answerMode,
+      ...(bankIsOffered ? { bank } : {}),
+      markers,
     }
   }
 

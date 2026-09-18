@@ -28,6 +28,9 @@ export const EXAM_SCREEN_QA_CASES = [
   { slug: 'ordering', source: 'ordering', label: 'เรียงลำดับ' },
   { slug: 'composite', source: 'composite', label: 'โจทย์หลายรูปแบบในข้อเดียว' },
   { slug: 'classify', source: 'classify', label: 'ตารางจำแนกหลายมิติ' },
+  { slug: 'image-label-drag', source: 'image_label', label: 'ติดป้ายบนรูป — ลากคำจากคลัง' },
+  { slug: 'image-label-typed', source: 'image_label', label: 'ติดป้ายบนรูป — พิมพ์เอง' },
+  { slug: 'image-label-dropdown', source: 'image_label', label: 'ติดป้ายบนรูป — ดรอปดาวน์' },
   { slug: 'essay', source: 'essay', label: 'คำตอบยาวภาษาไทย' },
   { slug: 'file-upload', source: 'file_upload', label: 'แนบรูปหรือ PDF' },
 ] as const satisfies ReadonlyArray<{
@@ -119,6 +122,15 @@ function extraDataFor(
     return slug === 'true-false-group' ? TRUE_FALSE_GROUP_CONFIG : props.compositeConfig!
   }
   if (source === 'classify') return props.classifyConfig!
+  if (source === 'image_label') {
+    // One fixture, three answering modes — the same split จับคู่ uses for its two
+    // layouts. Every mode has to be looked at: what the student is offered
+    // differs by mode, and so does what the sanitiser is allowed to send.
+    const config = props.imageLabelConfig!
+    if (slug === 'image-label-typed') return { ...config, answer_mode: 'typed' as const, bank: undefined }
+    if (slug === 'image-label-dropdown') return { ...config, answer_mode: 'dropdown' as const }
+    return config
+  }
   return {}
 }
 

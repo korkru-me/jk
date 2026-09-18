@@ -239,6 +239,97 @@ describe('buildAnswerFeedback — the other question types', () => {
   })
 })
 
+describe('buildAnswerFeedback — ติดป้ายบนรูป', () => {
+  const config = {
+    image_url: '/x.png',
+    answer_mode: 'drag',
+    bank: ['จมูก', 'หลอดลม', 'ปอด', 'ถุงลม'],
+    markers: [
+      { id: 'm1', label: '<p>จมูก</p>', point: { x: 30, y: 12 }, answers: ['จมูก'], case_sensitive: false },
+      { id: 'm2', label: 'หลอดลม', point: { x: 50, y: 40 }, answers: ['หลอดลม', 'ท่อลม'], case_sensitive: false },
+      { id: 'm3', point: { x: 33, y: 60 }, answers: ['ปอด'], case_sensitive: false },
+    ],
+  }
+  const key = 'IMGL:' + JSON.stringify([
+    { answers: ['จมูก'], exact: true },
+    { answers: ['หลอดลม'], exact: true },
+    { answers: ['ปอด'], exact: true },
+  ])
+  const student = (...words: string[]) => JSON.stringify(words)
+
+  it('names every point after the point, not after its number', () => {
+    // "จุดที่ 3" sends a student back to count dots on the picture; the name
+    // the teacher gave the place is the only thing that locates it.
+    const feedback = check({ correct: key, student: student('จมูก', 'หลอดลม', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 3 })
+    expect(feedback.rows.map(row => row.label)).toEqual(['จมูก', 'หลอดลม', 'จุดที่ 3'])
+    expect(feedback.rows.every(row => row.status === 'correct')).toBe(true)
+    expect(feedback.verdict).toBe('correct')
+  })
+
+  it('falls back to the number for a point the teacher never named', () => {
+    // Not a failure: naming a point is optional, and "จุดที่ 3" is honest.
+    const feedback = check({ correct: key, student: student('จมูก', 'หลอดลม', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 3 })
+    expect(feedback.rows[2].label).toBe('จุดที่ 3')
+  })
+
+  it('still reads when the question was edited out from under the answer', () => {
+    // The frozen key knows what each point should say; the config knows where
+    // it is. Losing the config must not lose the verdict.
+    const feedback = check({ correct: key, student: student('จมูก', 'ถุงลม', 'ปอด'), questionType: 'image_label', extraData: {}, maxScore: 3 })
+    expect(feedback.rows.map(row => row.label)).toEqual(['จุดที่ 1', 'จุดที่ 2', 'จุดที่ 3'])
+    expect(feedback.rows[1]).toMatchObject({ student: 'ถุงลม', correct: 'หลอดลม', status: 'wrong' })
+  })
+
+  it('agrees with the score gradeAnswer banked', () => {
+    // A panel that disagrees with the score is worse than no panel.
+    const feedback = check({ correct: key, student: student('จมูก', 'ถุงลม', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 3 })
+    expect(feedback.rows.filter(row => row.status === 'correct')).toHaveLength(2)
+    expect(feedback.score).toBe(2)
+    expect(feedback.verdict).toBe('partial')
+  })
+
+  it('shows an unanswered point as a dash rather than an empty line', () => {
+    const feedback = check({ correct: key, student: student('จมูก', '', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 3 })
+    expect(feedback.rows[1]).toMatchObject({ student: '—', status: 'wrong' })
+  })
+
+  it('lists every answer the teacher was willing to accept', () => {
+    const twoWays = 'IMGL:' + JSON.stringify([
+      { answers: ['จมูก'], exact: true },
+      { answers: ['หลอดลม', 'ท่อลม'], exact: true },
+      { answers: ['ปอด'], exact: true },
+    ])
+    const feedback = check({ correct: twoWays, student: student('จมูก', 'ถุงลม', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 3 })
+    expect(feedback.rows[1].correct).toBe('หลอดลม หรือ ท่อลม')
+  })
+
+  it('withholds the เฉลย when the teacher does', () => {
+    const feedback = check({ correct: key, student: student('จมูก', 'ถุงลม', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 3, reveal: false })
+    expect(feedback.rows.every(row => row.correct === undefined)).toBe(true)
+  })
+
+  it('says nothing about a point the teacher never keyed', () => {
+    // It was left out of the score, so a line claiming a verdict for it would
+    // be inventing one.
+    const partialKey = 'IMGL:' + JSON.stringify([
+      { answers: ['จมูก'], exact: true },
+      { answers: [], exact: true },
+      { answers: ['ปอด'], exact: true },
+    ])
+    const feedback = check({ correct: partialKey, student: student('จมูก', 'อะไรก็ได้', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 2 })
+    expect(feedback.rows).toHaveLength(2)
+    expect(feedback.rows.map(row => row.label)).toEqual(['จมูก', 'จุดที่ 3'])
+  })
+
+  it('never puts the stored key on the screen', () => {
+    // The whole point of this phase: the panel showed the raw IMGL: string
+    // before it existed.
+    const feedback = check({ correct: key, student: student('จมูก', 'ถุงลม', 'ปอด'), questionType: 'image_label', extraData: config, maxScore: 3 })
+    expect(JSON.stringify(feedback)).not.toContain('IMGL:')
+    expect(JSON.stringify(feedback)).not.toContain('"exact"')
+  })
+})
+
 describe('buildAnswerFeedback — ตารางจำแนก', () => {
   const config = {
     columns: [

@@ -375,7 +375,7 @@ export interface QuestionCategory {
   created_at: string
 }
 
-export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering' | 'file_upload' | 'composite' | 'classify'
+export type QuestionType = 'mcq' | 'written' | 'matching' | 'essay' | 'true_false' | 'fill_blank' | 'ordering' | 'file_upload' | 'composite' | 'classify' | 'image_label'
 
 export type TrueFalseExplanationMode = 'none' | 'wrong_only' | 'always'
 
@@ -529,6 +529,65 @@ export interface ClassifyConfig {
   row_label_style?: PartLabelStyle
 }
 
+// ติดป้ายบนรูป — one diagram with answer boxes pointing at places on it, the
+// worksheet where a student names the parts of the respiratory tract. See
+// lib/image-label.ts, which owns the answer key, the point value and the
+// ข้อย่อย count so that the three cannot drift apart.
+
+/**
+ * How the student fills a box in. One mode for the whole question, not per
+ * point — the worksheet this comes from uses one all the way down, and a
+ * per-point mode doubles the form's complexity for a case nobody has asked
+ * for. All three modes produce the same answer (the box's text) and grade
+ * through the same rule, so a teacher can switch an existing question over
+ * without invalidating answers already given — the same promise
+ * MatchingAnswerMode makes.
+ */
+export type ImageLabelAnswerMode = 'typed' | 'dropdown' | 'drag'
+
+export interface ImageLabelMarker {
+  id: string
+  /**
+   * A short name for this point, used to say *which* point a line on the
+   * grading and results screens is about ("หลอดลม" rather than "จุดที่ 3").
+   * Never sent to the browser during an attempt: a teacher naming a point
+   * usually names it after its answer.
+   */
+  label?: string
+  /**
+   * Where the leader line lands on the picture, as a percentage of the
+   * image's displayed width and height (0–100) rather than pixels. The same
+   * image is 1600px wide on a laptop and 340px wide on a phone, so a pixel
+   * offset would put the point outside the picture on the smaller one.
+   */
+  point: { x: number; y: number }
+  /** Where the answer box sits, same units. undefined = laid out automatically in the margin. */
+  box?: { x: number; y: number }
+  /** Accepted correct value(s) — same shape and meaning as FillBlankItem.answers. */
+  answers: string[]
+  case_sensitive: boolean
+  /** Only used when answer_mode is 'dropdown'; absent = this point offers the question's `bank`. */
+  options?: string[]
+}
+
+export interface ImageLabelConfig {
+  /**
+   * The diagram itself. Deliberately not `questions.image_urls`, which every
+   * renderer prints above the answer area without looking at the question
+   * type — a diagram stored there would appear twice, once as an
+   * illustration and once as the thing being answered on.
+   */
+  image_url: string
+  answer_mode: ImageLabelAnswerMode
+  /**
+   * The word bank for 'drag' (and the default option list for 'dropdown').
+   * May hold more words than there are points: the worksheet this type comes
+   * from offers nine words for seven boxes, and the extras are the question.
+   */
+  bank?: string[]
+  markers: ImageLabelMarker[]
+}
+
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'analytical'
 export type Visibility = 'private' | 'school' | 'organization' | 'public' | 'pending'
 
@@ -670,7 +729,7 @@ export interface Question {
   rejected_reason: string | null
   image_urls: string[]
   requires_work_image: boolean
-  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig | ClassifyConfig | Record<string, never>
+  extra_data: TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | FileUploadConfig | CompositeConfig | MatchingConfig | ClassifyConfig | ImageLabelConfig | Record<string, never>
   parent_question_id: string | null
   group_id: string | null
   order_in_group: number | null

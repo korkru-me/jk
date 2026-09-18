@@ -13,6 +13,7 @@ import { RandomNumericForm } from '@/components/questions/random-numeric'
 import { CompositeForm } from '@/components/questions/composite-form'
 import { TrueFalseGroupForm } from '@/components/questions/true-false-group-form'
 import { ClassifyForm } from '@/components/questions/classify-form'
+import { ImageLabelForm } from '@/components/questions/image-label-form'
 import { isTrueFalseGroupQuestion } from '@/lib/true-false-group'
 import type { Question } from '@/lib/types'
 
@@ -59,6 +60,7 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
       {q.question_type === 'essay' && <EssayForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
       {q.question_type === 'file_upload' && <FileUploadForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
       {q.question_type === 'classify' && <ClassifyForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+      {q.question_type === 'image_label' && <ImageLabelForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
       {q.question_type === 'written' && <RandomNumericForm mode="edit" question={q} allTags={allTags} presets={presets} isOwner={isOwner} />}
       {q.question_type === 'composite' && (
         isTrueFalseGroupQuestion(q)

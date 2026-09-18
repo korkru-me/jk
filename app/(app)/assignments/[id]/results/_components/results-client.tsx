@@ -10,6 +10,7 @@ import { formatElapsed, summarizeStreakResults, type StreakAttemptStat } from '@
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSortDir, type SortableStudentProfile } from '@/lib/student-sort'
 import type { Question } from '@/lib/types'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
+import { IMAGE_LABEL_PREFIX, parseImageLabelAnswer, parseImageLabelKey } from '@/lib/image-label'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -118,6 +119,22 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
       if ((picked[r]?.[c] ?? CLASSIFY_UNSET) !== CLASSIFY_UNSET) answered++
     }))
     return gradable > 0 ? `ตอบ ${answered}/${gradable} ช่อง` : '—'
+  }
+
+  // ติดป้ายบนรูป: the words themselves would be a long line in a narrow table
+  // cell, so the column counts instead — the teacher opens the submission to
+  // see which point.
+  if (correctAnswer.startsWith(IMAGE_LABEL_PREFIX)) {
+    const key = parseImageLabelKey(correctAnswer.slice(IMAGE_LABEL_PREFIX.length))
+    const answers = parseImageLabelAnswer(studentAnswer)
+    let answered = 0
+    let gradable = 0
+    key.forEach((marker, index) => {
+      if (marker.answers.length === 0) return
+      gradable++
+      if ((answers[index] ?? '').trim() !== '') answered++
+    })
+    return gradable > 0 ? `ตอบ ${answered}/${gradable} จุด` : '—'
   }
 
   if (correctAnswer.startsWith('FILL') || correctAnswer.startsWith('[') || correctAnswer.startsWith('ORDER:') || correctAnswer.startsWith('COMP:') || correctAnswer.startsWith('MATCH:')) {

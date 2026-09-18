@@ -61,6 +61,7 @@ export const TYPE_LABEL: Record<string, string> = {
   file_upload: 'ไฟล์งาน',
   composite: 'โจทย์ผสม',
   classify: 'ตารางจำแนก',
+  image_label: 'ติดป้ายบนรูป',
 }
 
 /** Compact question-type names, for dense question lists. */
@@ -75,6 +76,7 @@ export const TYPE_SHORT: Record<string, string> = {
   file_upload: 'ไฟล์งาน',
   composite: 'ผสม',
   classify: 'ตารางจำแนก',
+  image_label: 'ป้ายบนรูป',
 }
 
 /**

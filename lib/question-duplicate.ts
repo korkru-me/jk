@@ -13,6 +13,7 @@ export const NEW_QUESTION_ROUTE_BY_TYPE: Record<QuestionType, string> = {
   file_upload: 'file-upload',
   composite: 'composite',
   classify: 'classify',
+  image_label: 'image-label',
 }
 
 export function storeDuplicateSeed(question: Question) {

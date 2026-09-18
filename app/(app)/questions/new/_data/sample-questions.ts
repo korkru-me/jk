@@ -250,6 +250,38 @@ export const SAMPLE_QUESTIONS: Record<QuestionType, SampleQuestion[]> = {
       },
     },
   ],
+  image_label: [
+    {
+      title: 'ระบุอุปกรณ์ในวงจรไฟฟ้าอย่างง่าย',
+      props: {
+        questionType: 'image_label',
+        questionText:
+          'พิจารณาแผนผังวงจรไฟฟ้าอย่างง่ายต่อไปนี้ ' +
+          'แล้วลากชื่ออุปกรณ์ไปใส่ในช่องที่ชี้ไปยังอุปกรณ์นั้น',
+        isRandom: false,
+        variables: [],
+        answerParts: [],
+        imageLabelConfig: {
+          image_url: '/samples/simple-circuit.svg',
+          answer_mode: 'drag',
+          // Seven words for five points: the two that fit nowhere are the
+          // question, the same way the ใบงานระบบหายใจ this type comes from
+          // offers nine words for seven boxes.
+          bank: [
+            'เซลล์ไฟฟ้า', 'สวิตช์', 'หลอดไฟ', 'แอมมิเตอร์', 'สายไฟ',
+            'โวลต์มิเตอร์', 'ตัวต้านทาน',
+          ],
+          markers: [
+            { id: 'm1', label: 'เซลล์ไฟฟ้า', point: { x: 17.5, y: 50 }, answers: ['เซลล์ไฟฟ้า'], case_sensitive: false },
+            { id: 'm2', label: 'สายไฟ', point: { x: 17.5, y: 35 }, answers: ['สายไฟ'], case_sensitive: false },
+            { id: 'm3', label: 'สวิตช์', point: { x: 51, y: 23 }, answers: ['สวิตช์'], case_sensitive: false },
+            { id: 'm4', label: 'หลอดไฟ', point: { x: 82.5, y: 50 }, answers: ['หลอดไฟ'], case_sensitive: false },
+            { id: 'm5', label: 'แอมมิเตอร์', point: { x: 50, y: 77 }, answers: ['แอมมิเตอร์'], case_sensitive: false },
+          ],
+        },
+      },
+    },
+  ],
   composite: [
     {
       title: 'การเคลื่อนที่ของรถทดลอง',
