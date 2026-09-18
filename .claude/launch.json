@@ -3,6 +3,11 @@
   "configurations": [
     {
       "name": "korkru-dev",
+      "port": 3000,
+      "url": "http://localhost:3000"
+    },
+    {
+      "name": "korkru-dev-start",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run",
