@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { ChevronDown, Maximize2, Minimize2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
@@ -36,6 +36,13 @@ export interface ImageLabelInputProps {
   results?: (boolean | null)[]
   /** What belonged in a box, shown beside a wrong one. */
   correctText?: (string | undefined)[]
+  /**
+   * The question's own wording, for the one line of it that โหมดดูรูปเต็มจอ
+   * keeps. Left out, the mode still works — it simply has no โจทย์ to show,
+   * which is the right answer for a caller that already shows the wording
+   * somewhere the mode does not cover.
+   */
+  heading?: ReactNode
 }
 
 /** Pointer travel that separates a tap from the start of a drag. */
@@ -43,6 +50,46 @@ const DRAG_THRESHOLD = 6
 
 /** A word that has been picked up, and where it came from (`null` = the bank). */
 interface Held { word: string; from: number | null }
+
+/** What a numbered point on the picture is currently saying. */
+export type ImageLabelMarkerState = 'idle' | 'active' | 'correct' | 'wrong'
+
+/**
+ * The number stamped on a point of the picture, in its four states.
+ *
+ * Shared with the teacher's PointCanvas (components/questions/image-label-form.tsx)
+ * because the two are one object seen from either side of the desk: a teacher
+ * placing a point has to see the badge the student will get there.
+ *
+ * **The resting state is deliberately thin, and that is the whole design.**
+ * These badges sit on top of the teacher's drawing, not beside it — on the
+ * sample circuit, point 4 lands dead centre of the lamp and point 5 on the "A"
+ * inside the ammeter — so a solid disc covers the exact detail the question is
+ * asking about. A translucent card ground and a hairline ring leave the drawing
+ * readable underneath while the number stays a number.
+ *
+ * The numeral is `foreground` rather than the tint it is ringed in: tint-1 on
+ * card measures about 3.9:1, and an 11px numeral needs 4.5 — the same trap
+ * docs/DESIGN_SYSTEM.md records for token colours laid over a /10 wash. The
+ * colour lives in the ring, where contrast is not what it is carrying.
+ *
+ * Pointing at a badge — or at the box it belongs to — fills it in solid. That
+ * is the one moment when covering the drawing is what the reader asked for, and
+ * it is what pairs a box with its place when two points sit close together. A
+ * checked point keeps its verdict colour instead: once an answer is marked, ถูก
+ * or ผิด is the only thing the badge is still for.
+ */
+export function imageLabelMarkerClass(state: ImageLabelMarkerState): string {
+  return cn(
+    'flex items-center justify-center rounded-full text-[11px] font-medium tabular-nums ring-1',
+    'transition-colors motion-reduce:transition-none',
+    state === 'idle'
+      && 'bg-card/70 text-foreground ring-tint-1/70 hover:bg-tint-1 hover:text-primary-foreground hover:ring-tint-1',
+    state === 'active' && 'bg-tint-1 text-primary-foreground ring-tint-1',
+    state === 'correct' && 'bg-success text-success-foreground ring-card',
+    state === 'wrong' && 'bg-destructive text-destructive-foreground ring-card',
+  )
+}
 
 /**
  * ติดป้ายบนรูป — one diagram with answer boxes pointing into it.
@@ -79,15 +126,31 @@ interface Held { word: string; from: number | null }
  */
 export function ImageLabelInput({
   imageUrl, mode, markers, bank = [], value, onChange,
-  disabled = false, results, correctText,
+  disabled = false, results, correctText, heading,
 }: ImageLabelInputProps) {
   const [held, setHeld] = useState<Held | null>(null)
   const [drag, setDrag] = useState<{ word: string; x: number; y: number } | null>(null)
   const [hover, setHover] = useState<number | null>(null)
+  // Which box and point are being pointed at, as one number rather than two
+  // hover states: they are a pair, and the badge, the leader line and the box
+  // all light up together whichever end the pointer arrived at.
+  const [pointed, setPointed] = useState<number | null>(null)
   const [, setMeasureTick] = useState(0)
+  // โหมดดูรูปเต็มจอ: the picture and the boxes, and nothing else on the screen.
+  const [expanded, setExpanded] = useState(false)
+  const [headingOpen, setHeadingOpen] = useState(false)
+  // The height the question occupied in the page before the mode took it over.
+  // Held so the page behind does not collapse and scroll itself somewhere else
+  // while nobody can see it happening.
+  const [reserved, setReserved] = useState<number | null>(null)
+  // The picture's own width ÷ height, read off the file once it has loaded.
+  // Only โหมดดูรูปเต็มจอ needs it, and only because a picture may have to be
+  // made *bigger* there — see the comment on `picture`.
+  const [aspect, setAspect] = useState<number | null>(null)
 
   // Only the wide layout measures anything: it is the only one that draws
   // leader lines, and it is the only one in the document when it is on screen.
+  const inlineRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const boxRefs = useRef<Array<HTMLElement | null>>([])
   const dotRefs = useRef<Array<HTMLElement | null>>([])
@@ -98,10 +161,41 @@ export function ImageLabelInput({
   const checked = !!results
   const locked = disabled || checked
 
+  // Guarded against the pointer having already moved on to another pair: a
+  // leave that fires after the next enter must not blank out the new one.
+  const releasePointed = (index: number) =>
+    setPointed(current => (current === index ? null : current))
+
+  function openExpanded() {
+    setReserved(inlineRef.current?.getBoundingClientRect().height ?? null)
+    setExpanded(true)
+  }
+
+  /**
+   * Escape closes it, and the page behind stops scrolling while it is open.
+   *
+   * Deliberately not the Fullscreen API: this exam page watches for the student
+   * leaving fullscreen (hooks/use-fullscreen-guard.ts) and counts tab switches,
+   * so a real fullscreen request here would look like the student had done
+   * something. An overlay inside the page hides the same chrome and tells the
+   * proctor nothing that is not true.
+   */
+  useEffect(() => {
+    if (!expanded) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpanded(false) }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [expanded])
+
   // Anything that can move an element has to force a re-measure: a resize, a
   // font swap, an answer that makes a box taller, or the picture arriving.
   const remeasure = useCallback(() => setMeasureTick(tick => tick + 1), [])
-  useLayoutEffect(remeasure, [remeasure, value, markers.length, results])
+  useLayoutEffect(remeasure, [remeasure, value, markers.length, results, expanded])
   useEffect(() => {
     const frame = frameRef.current
     if (!frame || typeof ResizeObserver === 'undefined') return
@@ -110,7 +204,9 @@ export function ImageLabelInput({
     for (const el of [...boxRefs.current, ...dotRefs.current]) if (el) observer.observe(el)
     window.addEventListener('resize', remeasure)
     return () => { observer.disconnect(); window.removeEventListener('resize', remeasure) }
-  }, [remeasure, markers.length])
+    // `expanded` re-attaches the observer: opening the mode renders the picture
+    // and the boxes as new elements, and the old ones it was watching are gone.
+  }, [remeasure, markers.length, expanded])
 
   // A drag left running past unmount would keep listening on window forever.
   useEffect(() => () => {
@@ -279,14 +375,28 @@ export function ImageLabelInput({
     const inHand = held?.from === index
 
     return (
-      <div key={marker.id || index} className="flex flex-col gap-1">
+      <div
+        key={marker.id || index}
+        // Focus as well as hover, so the keyboard route lights the same pair the
+        // mouse does. Capture, because what actually takes focus is the input or
+        // the button inside, not this wrapper.
+        onMouseEnter={() => setPointed(index)}
+        onMouseLeave={() => releasePointed(index)}
+        onFocusCapture={() => setPointed(index)}
+        onBlurCapture={() => releasePointed(index)}
+        className="flex flex-col gap-1"
+      >
         <div
           ref={measured ? el => { boxRefs.current[index] = el } : undefined}
           className={cn(
-            'flex min-h-11 items-center gap-2 rounded-lg border-2 bg-card px-2 py-1.5',
+            'flex min-h-11 items-center gap-2 rounded-lg border-2 bg-card px-2 py-1.5 transition-colors motion-reduce:transition-none',
             verdict === true && 'border-success bg-success/10',
             verdict === false && 'border-destructive bg-destructive/10',
-            verdict == null && (hover === index || inHand ? 'border-tint-1 bg-tint-1/10' : 'border-border'),
+            verdict == null && (
+              hover === index || inHand ? 'border-tint-1 bg-tint-1/10'
+                : pointed === index ? 'border-tint-1/50'
+                  : 'border-border'
+            ),
           )}
         >
           <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
@@ -373,34 +483,89 @@ export function ImageLabelInput({
     )
   }
 
-  const picture = (measured: boolean) => (
-    <div className="relative self-start">
+  /**
+   * `tall` is โหมดดูรูปเต็มจอ, and the height the picture may grow to there.
+   *
+   * Growing is the whole point of the mode — a 400px-wide diagram of a circuit
+   * is unreadable at 400px, and `max-height` alone would never have enlarged
+   * it, because no browser scales an image past its own size on a cap. So the
+   * *wrapper* is given a width — as much as there is, or as much as that height
+   * allows, whichever is smaller — and the picture fills it.
+   *
+   * It is sized rather than stretched to fill because the answer boxes have to
+   * stay on the same screen as the picture; a picture that took the whole
+   * window would have moved the scrolling rather than removed it.
+   *
+   * The width lands on the wrapper and not the picture because every point is
+   * placed as a percentage *of the wrapper*. Cap the picture instead and it
+   * letterboxes inside a box that is still full width — every number then sits
+   * beside the thing it is pointing at rather than on it.
+   */
+  const picture = (measured: boolean, tall: string | null) => (
+    <div
+      className={cn('relative self-start', tall && 'mx-auto')}
+      style={tall && aspect ? { width: `min(100%, calc(${tall} * ${aspect}))` } : undefined}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imageUrl}
         alt="รูปประกอบโจทย์"
-        onLoad={measured ? remeasure : undefined}
+        onLoad={event => {
+          const { naturalWidth, naturalHeight } = event.currentTarget
+          if (naturalWidth > 0 && naturalHeight > 0) setAspect(naturalWidth / naturalHeight)
+          if (measured) remeasure()
+        }}
         className="block w-full rounded-lg border object-contain"
       />
-      {markers.map((marker, index) => (
-        <span
-          key={marker.id || index}
-          ref={measured ? el => { dotRefs.current[index] = el } : undefined}
-          style={{ left: `${marker.point.x}%`, top: `${marker.point.y}%` }}
-          className={cn(
-            'absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-card text-[11px] font-bold text-primary-foreground',
-            results?.[index] === true && 'bg-success',
-            results?.[index] === false && 'bg-destructive',
-            results?.[index] == null && 'bg-tint-1',
-          )}
+      {!tall && (
+        <IconButton
+          type="button"
+          size="xs"
+          variant="outline"
+          label="ดูรูปเต็มจอ — เหลือแค่รูปกับช่องตอบ"
+          onClick={openExpanded}
+          className="absolute top-2 right-2 bg-card/85"
         >
-          {index + 1}
-        </span>
-      ))}
+          <Maximize2 size={14} />
+        </IconButton>
+      )}
+      {markers.map((marker, index) => {
+        const verdict = results?.[index]
+        const state: ImageLabelMarkerState =
+          verdict === true ? 'correct'
+            : verdict === false ? 'wrong'
+              : pointed === index || hover === index ? 'active'
+                : 'idle'
+        return (
+          <span
+            key={marker.id || index}
+            ref={measured ? el => { dotRefs.current[index] = el } : undefined}
+            // Hovering the badge lights its box too, which is the same pairing
+            // read from the picture's end. The CSS :hover in the shared class
+            // covers the teacher's canvas, where there is no box to light.
+            onMouseEnter={() => setPointed(index)}
+            onMouseLeave={() => releasePointed(index)}
+            style={{ left: `${marker.point.x}%`, top: `${marker.point.y}%` }}
+            className={cn(
+              'absolute size-5.5 -translate-x-1/2 -translate-y-1/2',
+              imageLabelMarkerClass(state),
+            )}
+          >
+            {index + 1}
+          </span>
+        )
+      })}
     </div>
   )
 
-  return (
+  /**
+   * Everything the question is made of, in one variable because it is rendered
+   * in one place at a time — in the page, or inside โหมดดูรูปเต็มจอ. Never both:
+   * the leader lines are measured through a single set of refs per point, and a
+   * second copy on screen would quietly take them over and draw the first
+   * copy's lines to wherever the second copy happens to be.
+   */
+  const body = (
     <div className="space-y-4">
       {/*
         Two layouts, not one layout reflowing, because they are two different
@@ -418,11 +583,19 @@ export function ImageLabelInput({
         standard breakpoint above that.
       */}
       <div ref={frameRef} className="relative hidden xl:block">
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_minmax(0,1fr)] gap-3">
+        {/* โหมดดูรูปเต็มจอ gives the middle column most of the width it can
+            reach: a box holding one Thai word needs about 150px and no more,
+            and every pixel past that is a pixel the diagram does not get. */}
+        <div className={cn(
+          'grid gap-3',
+          expanded
+            ? 'grid-cols-[minmax(150px,0.5fr)_minmax(0,3fr)_minmax(150px,0.5fr)]'
+            : 'grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_minmax(0,1fr)]',
+        )}>
           <div className="flex flex-col justify-around gap-2">
             {column('left').map(entry => renderBox(entry, true))}
           </div>
-          {picture(true)}
+          {picture(true, expanded ? '74vh' : null)}
           <div className="flex flex-col justify-around gap-2">
             {column('right').map(entry => renderBox(entry, true))}
           </div>
@@ -439,8 +612,13 @@ export function ImageLabelInput({
                 x1={from.x} y1={from.y} x2={to.x} y2={to.y}
                 // Stronger than the border token a box is drawn with: the line
                 // is what says which box asks about which place, so it has to
-                // be followable, not merely present.
-                className="stroke-muted-foreground/60" strokeWidth={1.5}
+                // be followable, not merely present. Pointing at either end
+                // pulls this one line out of a fan of them.
+                className={cn(
+                  'transition-colors motion-reduce:transition-none',
+                  pointed === index ? 'stroke-tint-1' : 'stroke-muted-foreground/60',
+                )}
+                strokeWidth={pointed === index ? 2 : 1.5}
               />
             )
           })}
@@ -448,7 +626,7 @@ export function ImageLabelInput({
       </div>
 
       <div className="space-y-3 xl:hidden">
-        {picture(false)}
+        {picture(false, expanded ? '56vh' : null)}
         {/* Marker order, not the wide layout's left-then-right order: this list
             is read top to bottom against the numbers on the picture. */}
         <div className="flex flex-col gap-2">
@@ -511,5 +689,71 @@ export function ImageLabelInput({
         document.body,
       )}
     </div>
+  )
+
+  return (
+    <>
+      {/* Holding the height open while the mode is on means the page behind it
+          does not shrink, and the browser does not clamp the scroll position of
+          a page nobody can see — which is how a student would come back out of
+          the mode looking at a different part of the exam. */}
+      <div ref={inlineRef} style={expanded && reserved ? { minHeight: reserved } : undefined}>
+        {!expanded && body}
+      </div>
+
+      {/* Portalled for the same reason as the drag ghost: `fixed` is only fixed
+          to the window while no ancestor has established a containing block,
+          and the question preview dialog does exactly that.
+          z-55 sits above โหมดโฟกัส (z-50) and below the dragged chip (z-60), so
+          a word being carried is still drawn on top of the picture it is being
+          carried to. */}
+      {expanded && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="ดูรูปเต็มจอ"
+          className="fixed inset-0 z-[55] flex flex-col bg-background"
+        >
+          <div className="flex shrink-0 items-center gap-3 border-b bg-card px-4 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                ดูรูปเต็มจอ
+              </p>
+              {/* One line of the โจทย์, because the wording is what a student
+                  needs to have in mind while answering and the whole of it is
+                  what would push the picture back down the screen. Opening it
+                  is one tap, and it closes again. */}
+              {heading && (
+                <div className={cn('text-sm', !headingOpen && 'line-clamp-1')}>{heading}</div>
+              )}
+            </div>
+            {heading && (
+              // The label goes away on a phone, where those 96px are most of
+              // what the one line of โจทย์ beside it has to live on.
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setHeadingOpen(open => !open)}
+                aria-expanded={headingOpen}
+                aria-label={headingOpen ? 'ย่อโจทย์' : 'อ่านโจทย์เต็ม'}
+                className="shrink-0"
+              >
+                <ChevronDown className={cn('transition-transform', headingOpen && 'rotate-180')} />
+                <span className="hidden sm:inline">{headingOpen ? 'ย่อโจทย์' : 'อ่านโจทย์เต็ม'}</span>
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(false)} className="shrink-0">
+              <Minimize2 /> ออก
+            </Button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto p-4">
+            <div className="mx-auto w-full max-w-7xl">{body}</div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
