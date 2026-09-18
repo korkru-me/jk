@@ -530,6 +530,86 @@ describe('text fidelity', () => {
   })
 })
 
+// ─── The เฉลย in brackets ────────────────────────────────────────────────────
+
+describe('the เฉลย a worksheet writes in brackets at the end of a ข้อ', () => {
+  it('reads it, takes it out of the ข้อ, and makes the ข้อ one the system marks', () => {
+    const result = parse(numbered(0, run('จงหาอัตราเร็วเชิงมุมเฉลี่ย (2.5)')))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('written')
+    expect(question.answers).toEqual([{ formula: '2.5', unit: '' }])
+    // Left in, it would print the เฉลย on the students' screens.
+    expect(question.html).toBe('<p>จงหาอัตราเร็วเชิงมุมเฉลี่ย</p>')
+    expect(question.title).not.toContain('2.5')
+  })
+
+  it('reads one for each sub-question', () => {
+    const result = parse([
+      numbered(0, run('วงล้อเริ่มหมุนจากหยุดนิ่ง')),
+      numbered(1, run('จงหาค่าความเร่งเชิงมุม (4 rad/s²)')),
+      numbered(1, run('จงหามุมที่กวาดไปได้ (200 rad)')),
+    ].join(''))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('written')
+    expect(question.parts.map(part => part.answers)).toEqual([
+      [{ formula: '4', unit: 'rad/s²' }],
+      [{ formula: '200', unit: 'rad' }],
+    ])
+    expect(question.parts.map(part => part.html)).toEqual([
+      '<p>จงหาค่าความเร่งเชิงมุม</p>',
+      '<p>จงหามุมที่กวาดไปได้</p>',
+    ])
+  })
+
+  it('does not ask whether answered sub-questions are really ตัวเลือก', () => {
+    // Two ก) ข) lines alone are ambiguous; two that each end in their own
+    // เฉลย are not — a ตัวเลือก never carries one.
+    const result = parse([
+      numbered(0, run('วงล้อเริ่มหมุนจากหยุดนิ่ง')),
+      numbered(1, run('จงหาความเร่ง (4 rad/s²)')),
+      numbered(1, run('จงหามุม (200 rad)')),
+    ].join(''))
+
+    expect(warningCodes(result.questions[0])).not.toContain('ambiguous-choices')
+  })
+
+  it('says so when one bracket holds two values', () => {
+    const result = parse(numbered(0, run('จงหาความเร่งเชิงมุม และจำนวนรอบ (-2pi/3, 225 รอบ)')))
+
+    const question = result.questions[0]
+    expect(question.answers).toEqual([
+      { formula: '-2*pi/3', unit: '' },
+      { formula: '225', unit: 'รอบ' },
+    ])
+    expect(warningCodes(question)).toContain('multi-answer')
+  })
+
+  it('leaves a ปรนัย alone', () => {
+    // A bracket after the last ตัวเลือก belongs to that ตัวเลือก; the เฉลย of a
+    // ปรนัย is the marked one.
+    const result = parse([
+      numbered(0, run('ข้อใดคือหน่วยของกำลังไฟฟ้า')),
+      plain(run('1) โวลต์')),
+      plain(run('2) '), run('วัตต์', { color: 'FF0000' })),
+      plain(run('3) แอมแปร์')),
+      plain(run('4) โอห์ม (SI)')),
+    ].join(''))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('mcq')
+    expect(question.answers).toEqual([])
+  })
+
+  it('leaves a ข้อ with no bracket as one the teacher marks', () => {
+    const result = parse(numbered(0, run('จงอธิบายหลักการทำงานของหม้อแปลงไฟฟ้า')))
+
+    expect(result.questions[0].type).toBe('essay')
+    expect(result.questions[0].answers).toEqual([])
+  })
+})
+
 // ─── Titles and cross-references ─────────────────────────────────────────────
 
 describe('titles and warnings about context', () => {

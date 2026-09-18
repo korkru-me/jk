@@ -14,7 +14,7 @@
 import { toPortableQuestion, type PortableQuestion } from '@/lib/question-portable'
 import type { QuestionFormData } from '@/lib/actions/questions'
 import type { AnswerPart, MCQOption, Question, QuestionType } from '@/lib/types'
-import type { DraftQuestion, DraftPart, DraftWarning } from './draft'
+import type { DraftAnswer, DraftQuestion, DraftPart, DraftWarning } from './draft'
 
 /** The types a Word worksheet can produce. The rest are authored in the app. */
 export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay'>
@@ -54,12 +54,47 @@ function withPartsInBody(html: string, parts: DraftPart[]): string {
   return html + lines.join('')
 }
 
+/**
+ * Sub-questions as answer boxes, one per เฉลย the file gave.
+ *
+ * A sub-question whose bracket held two values — "จงหาความเร็ว และความเร่ง
+ * (200 m/s, 10 m/s²)" — becomes two boxes, because that is what the โจทย์ asks
+ * for and what it is marked out of. They repeat the sub-question's own text,
+ * which the teacher can shorten on the form; a box with no label at all would
+ * leave a student guessing which value goes where.
+ *
+ * A sub-question the reader found no answer for still becomes a box with an
+ * empty formula. `validateForImport` then holds the โจทย์ back until the
+ * teacher fills it in, rather than letting it reach the คลัง unmarkable.
+ */
 function partsToAnswerParts(parts: DraftPart[]): AnswerPart[] {
-  return parts.map(part => ({
-    id: part.id,
-    sub_text: part.html,
-    formula: '',
-    unit: '',
+  return parts.flatMap(part => {
+    if (part.answers.length === 0) {
+      return [{ id: part.id, sub_text: part.html, formula: '', unit: '', tolerance: DEFAULT_TOLERANCE }]
+    }
+    return part.answers.map((answer, index) => ({
+      id: index === 0 ? part.id : `${part.id}-${index}`,
+      sub_text: part.html,
+      formula: answer.formula,
+      unit: answer.unit,
+      tolerance: DEFAULT_TOLERANCE,
+    }))
+  })
+}
+
+/**
+ * The same, for a โจทย์ that asks for two values without splitting into ก) ข).
+ *
+ * The โจทย์'s own words already say which is which and in what order, so the
+ * boxes are left unlabelled rather than given text nobody wrote. The โจทย์
+ * carries a warning saying they were split.
+ */
+function answersToAnswerParts(id: string, answers: DraftAnswer[]): AnswerPart[] {
+  return answers.map((answer, index) => ({
+    id: `${id}-answer-${index}`,
+    sub_text: '',
+    formula: answer.formula,
+    unit: answer.unit,
     tolerance: DEFAULT_TOLERANCE,
   }))
 }
@@ -85,6 +120,35 @@ function blankQuestion(): Question {
   }
 }
 
+/**
+ * Where a เฉลย read from the file lands on the โจทย์.
+ *
+ * `answer_formula` for the ordinary case of one value, and `answer_parts` as
+ * soon as there is more than one answer to keep apart — which is the same
+ * field the อัตนัย form fills in when a teacher builds a โจทย์ with ก) ข) by
+ * hand, so an imported โจทย์ is indistinguishable from a typed one afterwards.
+ */
+function answerFields(draft: DraftQuestion): Pick<Question, 'answer_formula' | 'answer_unit' | 'answer_parts'> {
+  if (draft.type !== 'written') {
+    return { answer_formula: '', answer_unit: null, answer_parts: null }
+  }
+
+  if (draft.parts.length > 0) {
+    return { answer_formula: '', answer_unit: null, answer_parts: partsToAnswerParts(draft.parts) }
+  }
+
+  if (draft.answers.length > 1) {
+    return { answer_formula: '', answer_unit: null, answer_parts: answersToAnswerParts(draft.id, draft.answers) }
+  }
+
+  const only = draft.answers[0]
+  return {
+    answer_formula: only?.formula ?? '',
+    answer_unit: only?.unit || null,
+    answer_parts: null,
+  }
+}
+
 export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string>): DraftEntry {
   const image_urls = draft.imageRelIds
     .map(relId => imageUrls.get(relId))
@@ -104,9 +168,7 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
       ? draft.html
       : withPartsInBody(draft.html, draft.parts),
     mcq_options: draft.type === 'mcq' ? mcq_options : null,
-    answer_parts: draft.type === 'written' && draft.parts.length > 0
-      ? partsToAnswerParts(draft.parts)
-      : null,
+    ...answerFields(draft),
     image_urls,
   }
 

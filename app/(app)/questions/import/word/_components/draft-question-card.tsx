@@ -226,6 +226,17 @@ export function DraftQuestionCard({
                 </fieldset>
               )}
 
+              {/* A โจทย์ with one answer has nowhere else to show it, and the
+                  เฉลย is the half of the reading most worth checking — it came
+                  out of a bracket the teacher can no longer see in the body. */}
+              {question.question_type === 'written' && (question.answer_parts?.length ?? 0) === 0 && (
+                <p className="border-l-2 border-border pl-3 text-xs">
+                  {question.answer_formula
+                    ? <span className="text-muted-foreground">เฉลย {question.answer_formula} {question.answer_unit ?? ''}</span>
+                    : <span className="text-warning">ยังไม่มีเฉลย</span>}
+                </p>
+              )}
+
               {(question.answer_parts?.length ?? 0) > 0 && (
                 <ol className="space-y-1 border-l-2 border-border pl-3">
                   {(question.answer_parts ?? []).map(part => (

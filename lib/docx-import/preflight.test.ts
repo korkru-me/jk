@@ -12,7 +12,7 @@ function question(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
       { id: 'c1', text: 'ก', isCorrect: true },
       { id: 'c2', text: 'ข', isCorrect: false },
     ],
-    parts: [], imageRelIds: [], mentionsPicture: false, warnings: [],
+    parts: [], answers: [], imageRelIds: [], mentionsPicture: false, warnings: [],
     ...overrides,
   }
 }
@@ -79,6 +79,26 @@ describe('reading a file against the format the teacher chose', () => {
     expect(check?.status).toBe('warn')
     expect(check?.detail).toContain('ข้อ 2')
     expect(report.needsAttention).toBe(1)
+  })
+
+  it('names the ข้อ whose เฉลย bracket was missing', () => {
+    const report = preflight(result([
+      question({ number: 1, type: 'written', choices: [] }),
+      question({ id: 'q-2', number: 2, type: 'essay', choices: [] }),
+    ]), PROFILE_BY_TYPE.written)
+
+    const check = checkFor(report, 'answer-bracket')
+    expect(check?.status).toBe('warn')
+    expect(check?.detail).toContain('ข้อ 2')
+  })
+
+  it('treats a ข้อ with no เฉลย as ordinary for the automatic reader', () => {
+    const report = preflight(result([
+      question({ number: 1, type: 'written', choices: [] }),
+      question({ id: 'q-2', number: 2, type: 'essay', choices: [] }),
+    ]), AUTO_PROFILE)
+
+    expect(checkFor(report, 'answer-bracket')?.status).toBe('pass')
   })
 
   it('only reports rules the chosen format actually has', () => {
