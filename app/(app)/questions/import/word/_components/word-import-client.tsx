@@ -17,7 +17,10 @@ import { parseDocx, isDisplayableImage, DocxImportError } from '@/lib/docx-impor
 import {
   draftToEntry, entryToPortable, liveWarnings, validateForImport, type DraftEntry,
 } from '@/lib/docx-import/to-question'
+import type { ImportProfile } from '@/lib/docx-import/profiles'
+import { preflight, type PreflightReport } from '@/lib/docx-import/preflight'
 import { DraftQuestionCard } from './draft-question-card'
+import { PreflightFailure, PreflightSummary } from './preflight-report'
 
 /** Loaded when a teacher actually picks a file: ~220 KB most visits never need. */
 async function browserSupabase() {
@@ -25,14 +28,20 @@ async function browserSupabase() {
   return createClient()
 }
 
-type Stage = 'pick' | 'reading' | 'review' | 'importing'
+/** `rejected` is a file that opened but held no โจทย์ the reader could find. */
+type Stage = 'pick' | 'reading' | 'review' | 'rejected' | 'importing'
 
 interface Props {
   allTags: string[]
   presets: React.ComponentProps<typeof RandomNumericForm>['presets']
+  /** Which kind of โจทย์ the teacher said this file holds. */
+  profile: ImportProfile
+  /** The format rules and example for that kind, rendered on the server and
+   *  shown beside the drop zone until a file is actually read. */
+  guide: React.ReactNode
 }
 
-export function WordImportClient({ allTags, presets }: Props) {
+export function WordImportClient({ allTags, presets, profile, guide }: Props) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const [, startTransition] = useTransition()
@@ -40,6 +49,7 @@ export function WordImportClient({ allTags, presets }: Props) {
   const [stage, setStage] = useState<Stage>('pick')
   const [fileName, setFileName] = useState('')
   const [entries, setEntries] = useState<DraftEntry[]>([])
+  const [report, setReport] = useState<PreflightReport | null>(null)
   const [preamble, setPreamble] = useState<string[]>([])
   const [floatingImages, setFloatingImages] = useState<Set<string>>(new Set())
   const [skippedImages, setSkippedImages] = useState(0)
@@ -76,6 +86,7 @@ export function WordImportClient({ allTags, presets }: Props) {
 
   const reset = useCallback(() => {
     setEntries([])
+    setReport(null)
     setPreamble([])
     setFloatingImages(new Set())
     setSkippedImages(0)
@@ -142,10 +153,13 @@ export function WordImportClient({ allTags, presets }: Props) {
     setProgress('กำลังอ่านไฟล์')
     try {
       const parsed = await parseDocx(new Uint8Array(await file.arrayBuffer()))
+      const checked = preflight(parsed, profile)
+      setReport(checked)
 
-      if (parsed.questions.length === 0) {
-        toast.error('อ่านไฟล์ได้ แต่ไม่พบข้อไหนเลย — ไฟล์ควรใส่เลขข้อด้วยรายการลำดับเลขของ Word')
-        setStage('pick')
+      // Nothing to review, so nothing is uploaded either: the pictures stay in
+      // the file until there is a โจทย์ to hang them on.
+      if (!checked.readable) {
+        setStage('rejected')
         setProgress('')
         return
       }
@@ -285,38 +299,20 @@ export function WordImportClient({ allTags, presets }: Props) {
 
   // ─── Picking a file ────────────────────────────────────────────────────────
 
-  if (stage === 'pick' || stage === 'reading') {
+  if (stage === 'pick' || stage === 'reading' || stage === 'rejected') {
     const busy = stage === 'reading'
     return (
-      <Card padding="2xl" edge="dashed">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <FileUp className="size-8 text-muted-foreground" aria-hidden />
-          <div>
-            <p className="text-sm font-medium text-foreground">ลากไฟล์ Word มาวาง หรือเลือกไฟล์</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              รองรับ .docx เท่านั้น · ตัวไฟล์อ่านในเครื่องของคุณ มีเฉพาะรูปที่ถูกอัปโหลดขึ้นระบบ
-            </p>
-          </div>
-
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="hidden"
-            onChange={event => {
-              const picked = event.target.files?.[0]
-              if (picked) void handleFile(picked)
-              if (inputRef.current) inputRef.current.value = ''
-            }}
-          />
-          <Button type="button" onClick={() => inputRef.current?.click()} disabled={busy}>
-            {busy
-              ? <><Loader2 className="animate-spin" aria-hidden /> {progress || `กำลังอ่าน ${fileName}`}</>
-              : 'เลือกไฟล์ Word'}
-          </Button>
-
-          <div
-            className="mt-2 w-full rounded-lg bg-muted p-3 text-left text-xs text-muted-foreground"
+      // The rules sit beside the drop zone rather than under it: a teacher is
+      // deciding what to upload while reading them, and this is the last screen
+      // where the file can still be fixed in Word instead of in the คลัง.
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="space-y-4 lg:sticky lg:top-0">
+          {stage === 'rejected' && report && (
+            <PreflightFailure profile={profile} report={report} fileName={fileName} />
+          )}
+          <Card
+            padding="2xl"
+            edge="dashed"
             onDragOver={event => event.preventDefault()}
             onDrop={event => {
               event.preventDefault()
@@ -324,16 +320,40 @@ export function WordImportClient({ allTags, presets }: Props) {
               if (dropped) void handleFile(dropped)
             }}
           >
-            <p className="font-medium text-foreground">จัดไฟล์แบบนี้แล้วระบบอ่านได้แม่นที่สุด</p>
-            <ul className="mt-1 list-inside list-disc space-y-0.5">
-              <li>ใส่เลขข้อด้วยปุ่มรายการลำดับเลขของ Word ไม่ต้องพิมพ์เลขเอง</li>
-              <li>ทำเครื่องหมายเฉลยปรนัยด้วย <span className="text-destructive">ตัวอักษรสีแดง</span> ปากกาเน้นข้อความ หรือตัวหนา</li>
-              <li>ตัวเลือกขึ้นต้นด้วย 1) 2) 3) 4) จะอยู่ในตารางหรือคนละบรรทัดก็ได้</li>
-              <li>เลขที่มีรากที่สองหรือเศษส่วน ระบบจะแปลงให้ แต่ควรตรวจอีกครั้ง</li>
-            </ul>
-          </div>
+            <div className="flex flex-col items-center gap-3 text-center">
+              <FileUp className="size-8 text-muted-foreground" aria-hidden />
+              <div>
+                <p className="text-sm font-medium text-foreground">ลากไฟล์ Word มาวาง หรือเลือกไฟล์</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ไฟล์ที่มีโจทย์{profile.label} · รองรับ .docx เท่านั้น
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ตัวไฟล์อ่านในเครื่องของคุณ มีเฉพาะรูปที่ถูกอัปโหลดขึ้นระบบ
+                </p>
+              </div>
+
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                onChange={event => {
+                  const picked = event.target.files?.[0]
+                  if (picked) void handleFile(picked)
+                  if (inputRef.current) inputRef.current.value = ''
+                }}
+              />
+              <Button type="button" onClick={() => inputRef.current?.click()} disabled={busy}>
+                {busy
+                  ? <><Loader2 className="animate-spin" aria-hidden /> {progress || `กำลังอ่าน ${fileName}`}</>
+                  : stage === 'rejected' ? 'เลือกไฟล์ใหม่' : 'เลือกไฟล์ Word'}
+              </Button>
+            </div>
+          </Card>
         </div>
-      </Card>
+
+        {guide}
+      </div>
     )
   }
 
@@ -357,6 +377,7 @@ export function WordImportClient({ allTags, presets }: Props) {
             {preamble.length > 0 && (
               <p className="text-xs text-muted-foreground">ข้ามส่วนหัวเอกสาร: {preamble.join(' · ')}</p>
             )}
+            {report && <PreflightSummary profile={profile} report={report} />}
             {skippedImages > 0 && (
               <p className="text-xs text-warning">
                 ข้ามรูป {skippedImages} รูปที่เป็นรูปแบบซึ่งเว็บแสดงไม่ได้ (EMF/WMF) ต้องแนบใหม่เอง

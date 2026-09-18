@@ -30,7 +30,7 @@ export function ImportChoice() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">จากไฟล์ Word (.docx)</p>
           <p className="mt-0.5 text-xs leading-relaxed opacity-75">
-            แบบฝึกหัดหรือข้อสอบที่พิมพ์ไว้แล้ว ระบบอ่านโจทย์ ตัวเลือก รูป และเฉลยที่ทำเครื่องหมายสีไว้ให้
+            แบบฝึกหัดหรือข้อสอบที่พิมพ์ไว้แล้ว — เลือกประเภทโจทย์ก่อน แล้วระบบจะบอกวิธีจัดไฟล์ให้อ่านได้แม่นที่สุด
           </p>
         </div>
         <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-40" aria-hidden />

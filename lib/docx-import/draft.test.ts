@@ -37,6 +37,16 @@ function plain(...content: string[]): string {
   return `<w:p>${content.join('')}</w:p>`
 }
 
+/** How a paper centres the heading of a section: `ตอนที่ 2 แสดงวิธีทำ`. */
+function centered(...content: string[]): string {
+  return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${content.join('')}</w:p>`
+}
+
+/** A paragraph carrying one of Word's own heading styles. */
+function styled(styleId: string, ...content: string[]): string {
+  return `<w:p><w:pPr><w:pStyle w:val="${styleId}"/></w:pPr>${content.join('')}</w:p>`
+}
+
 /** An inline picture, the way `w:drawing` nests one. */
 function image(relId: string): string {
   return `<w:r><w:drawing><wp:inline><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="${relId}"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`
@@ -110,6 +120,60 @@ describe('finding where one โจทย์ ends and the next begins', () => {
     ].join(''))
 
     expect(result.questions[0].html).toBe('<p>บรรทัดแรก</p><p>บรรทัดต่อ</p>')
+  })
+
+  it('leaves the heading of the next section out of the โจทย์ above it', () => {
+    // An exam in ตอนที่ 1 / ตอนที่ 2 is the ordinary shape of a Thai paper, and
+    // the heading sits between two โจทย์ — so without this it joins the one
+    // above, in its body and in its title.
+    const result = parse([
+      numbered(0, run('ข้อใดคือหน่วยของกำลังไฟฟ้า')),
+      centered(run('ตอนที่ 2 แสดงวิธีทำ', { bold: true })),
+      numbered(0, run('จงอธิบายหลักการทำงานของหม้อแปลงไฟฟ้า')),
+    ].join(''))
+
+    expect(result.questions[0].html).toBe('<p>ข้อใดคือหน่วยของกำลังไฟฟ้า</p>')
+    expect(result.questions[0].title).not.toContain('ตอนที่ 2')
+    // Set aside, not thrown away: the import screen lists what it skipped.
+    expect(result.preamble).toContain('ตอนที่ 2 แสดงวิธีทำ')
+  })
+
+  it('leaves a Word heading style out of the โจทย์ above it', () => {
+    const result = parse([
+      numbered(0, run('ข้อแรก')),
+      styled('Heading2', run('ตอนที่ 2')),
+      numbered(0, run('ข้อสอง')),
+    ].join(''))
+
+    expect(result.questions[0].html).toBe('<p>ข้อแรก</p>')
+    expect(result.preamble).toContain('ตอนที่ 2')
+  })
+
+  it('keeps a bold line that is part of the โจทย์', () => {
+    // Not centred, so it is an instruction inside the โจทย์ rather than a
+    // heading for what follows. Emphasis alone must not take a line away.
+    const result = parse([
+      numbered(0, run('คำนวณหาความเร่ง')),
+      plain(run('ให้แสดงวิธีทำโดยละเอียด', { bold: true })),
+      numbered(0, run('ข้อถัดไป')),
+    ].join(''))
+
+    expect(result.questions[0].html).toBe('<p>คำนวณหาความเร่ง</p><p><strong>ให้แสดงวิธีทำโดยละเอียด</strong></p>')
+    expect(result.preamble).not.toContain('ให้แสดงวิธีทำโดยละเอียด')
+  })
+
+  it('keeps a centred ตัวเลือก out of the headings', () => {
+    // A worksheet that centres its options must not lose the last one.
+    const result = parse([
+      numbered(0, run('ข้อใดถูก')),
+      centered(run('1) ก', { bold: true })),
+      centered(run('2) ข', { bold: true })),
+      centered(run('3) ค', { bold: true })),
+      centered(run('4) ง', { bold: true })),
+    ].join(''))
+
+    expect(result.questions[0].choices.map(choice => choice.text)).toEqual(['ก', 'ข', 'ค', 'ง'])
+    expect(result.preamble).toHaveLength(0)
   })
 
   it('falls back to typed numbers when the document has no numbering part', () => {
