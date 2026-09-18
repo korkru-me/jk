@@ -7,15 +7,18 @@ import { Card } from '@/components/ui/card'
 import { RichText } from '@/components/ui/rich-text'
 import { McqForm } from '@/components/questions/mcq-form'
 import { EssayForm } from '@/components/questions/essay-form'
+import { FillBlankForm } from '@/components/questions/fill-blank-form'
 import { RandomNumericForm } from '@/components/questions/random-numeric'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { applyFormPayload, changeType, type DraftEntry, type ImportableType } from '@/lib/docx-import/to-question'
 import type { DraftWarning } from '@/lib/docx-import'
+import type { FillBlankConfig } from '@/lib/types'
 
 /** Only the three a Word worksheet can produce; the rest are authored in the app. */
 const IMPORTABLE_TYPES: { value: ImportableType; hint: string }[] = [
   { value: 'mcq', hint: 'มีตัวเลือก ระบบตรวจให้' },
   { value: 'written', hint: 'ตอบเป็นตัวเลข ระบบตรวจให้' },
+  { value: 'fill_blank', hint: 'มีช่องเติมคำ ระบบตรวจให้' },
   { value: 'essay', hint: 'ครูตรวจเอง' },
 ]
 
@@ -46,6 +49,10 @@ export function DraftQuestionCard({
   onChange, onStartEdit, onCloseEdit, onMoveImage,
 }: Props) {
   const { question } = entry
+  // The ช่องว่าง live in `extra_data`, next to the `[___n]` markers in the body.
+  const blanks = question.question_type === 'fill_blank'
+    ? (question.extra_data as FillBlankConfig | undefined)?.blanks ?? []
+    : []
 
   /** Marks (or unmarks) one option correct, the same toggle the ปรนัย form has. */
   const toggleCorrect = (index: number) => onChange({
@@ -143,6 +150,9 @@ export function DraftQuestionCard({
                 {question.question_type === 'written' && (
                   <RandomNumericForm allTags={allTags} presets={presets} question={question} draft={draft} />
                 )}
+                {question.question_type === 'fill_blank' && (
+                  <FillBlankForm allTags={allTags} question={question} draft={draft} />
+                )}
                 {question.question_type === 'essay' && (
                   <EssayForm allTags={allTags} question={question} draft={draft} />
                 )}
@@ -224,6 +234,19 @@ export function DraftQuestionCard({
                     </label>
                   ))}
                 </fieldset>
+              )}
+
+              {question.question_type === 'fill_blank' && blanks.length > 0 && (
+                <ol className="space-y-1 border-l-2 border-border pl-3">
+                  {blanks.map((blank, index) => (
+                    <li key={blank.id ?? index} className="text-xs text-muted-foreground">
+                      ช่องที่ {index + 1}
+                      {blank.answer?.trim()
+                        ? <span className="ml-2 text-foreground">{blank.answer}</span>
+                        : <span className="ml-2 text-warning">ยังไม่มีคำตอบ</span>}
+                    </li>
+                  ))}
+                </ol>
               )}
 
               {/* A โจทย์ with one answer has nowhere else to show it, and the

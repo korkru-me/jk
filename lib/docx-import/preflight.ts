@@ -129,6 +129,21 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
       }
   }))
 
+  add(checkFor(profile, 'blank-answer', () => {
+    if (questions.length === 0) return null
+    const without = questions.filter(question => question.blanks.length === 0)
+    const total = questions.reduce((sum, question) => sum + question.blanks.length, 0)
+
+    if (without.length === 0) {
+      return { ruleId: 'blank-answer', status: 'pass', detail: `พบช่องเติมคำรวม ${total} ช่อง จาก ${questions.length} ข้อ` }
+    }
+    return {
+      ruleId: 'blank-answer',
+      status: 'fail',
+      detail: `ข้อ ${without.map(question => question.number).join(', ')} ไม่พบคำที่ทำเครื่องหมายไว้ — ข้อนั้นยังไม่มีช่องให้นักเรียนกรอก`,
+    }
+  }))
+
   add(checkFor(profile, 'equation', () => {
     const withMath = questions.filter(question =>
       question.warnings.some(warning => warning.code === 'equation'))

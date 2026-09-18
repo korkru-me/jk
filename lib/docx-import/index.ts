@@ -15,11 +15,11 @@
  */
 import { readZip, ZipError } from './zip'
 import { readDocument, DocxError } from './docx'
-import { buildDrafts, type DraftQuestion, type DraftResult } from './draft'
+import { buildDrafts, type DraftQuestion, type DraftResult, type ParseOptions } from './draft'
 
 export type {
   DraftQuestion, DraftChoice, DraftPart, DraftResult, DraftWarning,
-  DraftWarningCode, DraftQuestionType,
+  DraftWarningCode, DraftQuestionType, DraftBlank, ParseOptions,
 } from './draft'
 export { DocxError } from './docx'
 export { ZipError } from './zip'
@@ -77,7 +77,7 @@ export class DocxImportError extends Error {}
  * Only the four parts that matter are inflated. A worksheet's theme, fonts and
  * settings are most of the file and none of the meaning.
  */
-export async function parseDocx(bytes: Uint8Array): Promise<ParsedDocx> {
+export async function parseDocx(bytes: Uint8Array, options: ParseOptions = {}): Promise<ParsedDocx> {
   let parts: Map<string, Uint8Array>
   try {
     parts = await readZip(bytes, {
@@ -109,7 +109,7 @@ export async function parseDocx(bytes: Uint8Array): Promise<ParsedDocx> {
     throw new DocxImportError('อ่านเนื้อหาในไฟล์ Word ไม่ได้ ไฟล์อาจเสียหาย')
   }
 
-  const drafts = buildDrafts(document)
+  const drafts = buildDrafts(document, options)
 
   const media = new Map<string, DocxMedia>()
   for (const [relId, target] of document.rels) {

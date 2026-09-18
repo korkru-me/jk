@@ -19,6 +19,7 @@ function draft(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
     ],
     parts: [],
     answers: [],
+    blanks: [],
     imageRelIds: [],
     mentionsPicture: false,
     warnings: [],

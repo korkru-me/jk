@@ -152,7 +152,9 @@ export function WordImportClient({ allTags, presets, profile, guide }: Props) {
     setFileName(file.name)
     setProgress('กำลังอ่านไฟล์')
     try {
-      const parsed = await parseDocx(new Uint8Array(await file.arrayBuffer()))
+      // What the teacher chose on the way in decides how far the reader may
+      // go: marked words are only read as ช่องว่าง on a เติมคำ worksheet.
+      const parsed = await parseDocx(new Uint8Array(await file.arrayBuffer()), { expect: profile.type })
       const checked = preflight(parsed, profile)
       setReport(checked)
 

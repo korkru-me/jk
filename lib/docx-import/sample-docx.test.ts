@@ -15,7 +15,8 @@ import { packSampleDocx, sampleFileName } from './sample-docx'
  */
 async function parseSample(profile: ImportProfile) {
   const bytes = new Uint8Array(await packSampleDocx(profile))
-  return parseDocx(bytes)
+  // Read the way the screen for that profile reads it.
+  return parseDocx(bytes, { expect: profile.type })
 }
 
 const READY = IMPORT_PROFILES.filter(profile => profile.status === 'ready')
@@ -131,6 +132,21 @@ describe('generated sample worksheets', () => {
       expect(question.choices).toHaveLength(0)
       expect(question.type).not.toBe('mcq')
     }
+  })
+
+  it('reads the ช่องว่าง back out of the เติมคำ sample', async () => {
+    const parsed = await parseSample(PROFILE_BY_TYPE.fill_blank)
+
+    expect(parsed.questions.map(question => question.type)).toEqual(['fill_blank', 'fill_blank', 'fill_blank'])
+    expect(parsed.questions.map(question => question.blanks.map(blank => blank.answer))).toEqual([
+      ['นิวตัน'],
+      ['100', '0'],
+      ['เงิน', 'ทองแดง'],
+    ])
+    // The words are gone from the โจทย์ and numbered markers stand in their place.
+    expect(parsed.questions[1].html).toContain('[___1]')
+    expect(parsed.questions[1].html).toContain('[___2]')
+    expect(parsed.questions[1].html).not.toContain('100')
   })
 
   it('names the file after the type, without characters a filesystem refuses', async () => {
