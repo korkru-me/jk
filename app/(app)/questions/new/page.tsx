@@ -66,8 +66,8 @@ const QUESTION_TYPES = [
     icon: FileText,
     title: 'อัตนัย (บรรยาย)',
     desc: 'นักเรียนเขียนคำตอบอิสระ ครูตรวจและให้คะแนนเอง',
-    color: 'bg-tint-3/10 border-tint-3/20 text-tint-3',
-    iconColor: 'text-tint-3',
+    color: 'bg-tint-2/10 border-tint-2/20 text-tint-2',
+    iconColor: 'text-tint-2',
   },
   {
     href: '/questions/new/file-upload',

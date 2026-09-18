@@ -74,10 +74,24 @@ export interface DraftQuestion {
   warnings: DraftWarning[]
 }
 
+/** Where the question numbers came from — see `DraftResult.numbering`. */
+export type NumberingSource = 'list' | 'typed' | 'none'
+
 export interface DraftResult {
   questions: DraftQuestion[]
-  /** Headings and instructions found before the first โจทย์. */
+  /** Headings and instructions found outside any โจทย์: before the first one,
+   *  and the section headings that sit between them. */
   preamble: string[]
+  /**
+   * How the โจทย์ were told apart.
+   *
+   * `list` is a Word numbered list, which is the only form that survives
+   * editing. `typed` means the numbers were characters in the text and the
+   * fallback reader was used — it works, but a file like that breaks as soon
+   * as a teacher inserts a โจทย์ in the middle, so it is worth saying. `none`
+   * means neither was found, which is why nothing came out.
+   */
+  numbering: NumberingSource
   /** Pictures Word anchored to the page rather than to the run order. These
    *  are the ones that land on the wrong โจทย์, so a โจทย์ holding one it never
    *  mentions is worth asking about. */
@@ -629,6 +643,41 @@ function stripMarkerFromHtml(html: string): string {
   return html.replace(/^(<p>(?:<[^>]+>)*)[\s ]*\(?\s*(?:[0-9]{1,2}|[ก-ฮ]|[a-hA-H])\s*[.)\]]\s*/, '$1')
 }
 
+/** Longest a line can be and still read as a heading rather than as content. */
+const SECTION_HEADING_MAX = 80
+
+/**
+ * A paragraph that heads a section of the paper rather than belonging to a โจทย์.
+ *
+ * "ตอนที่ 2 แสดงวิธีทำ" sits between two โจทย์, so without this it lands at the
+ * end of the one above it — in its body *and* in its title. An exam split into
+ * ตอนที่ 1 / ตอนที่ 2 is the ordinary shape of a Thai paper and the whole reason
+ * the automatic reader exists, so this is the common case, not an edge one.
+ *
+ * Only ever asked of the last paragraphs of a โจทย์'s body, because that is the
+ * only place a heading for what comes *next* can be. What it matches is narrow
+ * for the same reason: a short line that is either styled as a Word heading, or
+ * centred and entirely bold. A line inside a โจทย์ is left-aligned, and nothing
+ * that matches is thrown away — it is reported as skipped, next to the ones
+ * found before the first โจทย์.
+ */
+function isSectionHeading(block: DocxBlock): block is DocxParagraph {
+  if (block.kind !== 'paragraph') return false
+  // A numbered paragraph is a โจทย์ or one of its ก) ข) parts.
+  if (block.numId) return false
+  if (block.inlines.some(inline => inline.kind === 'image')) return false
+
+  const text = plainText(block.inlines).trim()
+  if (!text || text.length > SECTION_HEADING_MAX) return false
+  // "1) วัตต์" is a ตัวเลือก, however it is styled.
+  if (matchMarker(text)) return false
+
+  if (/^heading/i.test(block.styleId ?? '')) return true
+
+  const words = block.inlines.filter(inline => inline.kind === 'text' && inline.text.trim())
+  return block.centered && words.length > 0 && words.every(inline => inline.kind === 'text' && inline.format.bold)
+}
+
 export function buildDrafts(document: DocxDocument): DraftResult {
   const list = findQuestionList(document)
   const typed = list ? new Set<number>() : findTypedNumbering(document.blocks)
@@ -651,7 +700,18 @@ export function buildDrafts(document: DocxDocument): DraftResult {
     const head = document.blocks[headIndex] as DocxParagraph
     const end = heads[position + 1] ?? document.blocks.length
     const body = document.blocks.slice(headIndex + 1, end)
-    return buildQuestion(head, body, position + 1, list ? document.numbering.get(list.numId) : undefined)
+
+    // Anything heading the *next* section is sitting at the end of this โจทย์.
+    // Taken off the body and reported with the document's other headings, so a
+    // line this reads wrongly is one the teacher can see was set aside.
+    let bodyEnd = body.length
+    while (bodyEnd > 0 && isSectionHeading(body[bodyEnd - 1])) bodyEnd--
+    for (const skipped of body.slice(bodyEnd)) {
+      const text = plainText((skipped as DocxParagraph).inlines).trim()
+      if (text) preamble.push(text)
+    }
+
+    return buildQuestion(head, body.slice(0, bodyEnd), position + 1, list ? document.numbering.get(list.numId) : undefined)
   })
 
   const floating = new Set<string>()
@@ -667,5 +727,7 @@ export function buildDrafts(document: DocxDocument): DraftResult {
     else for (const row of block.rows) for (const cell of row) noteFloating(cell)
   }
 
-  return { questions, preamble, floatingImageRelIds: [...floating] }
+  const numbering: NumberingSource = list ? 'list' : typed.size > 0 ? 'typed' : 'none'
+
+  return { questions, preamble, numbering, floatingImageRelIds: [...floating] }
 }

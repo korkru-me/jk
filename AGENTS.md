@@ -6,6 +6,7 @@
 - Read `docs/ARCHITECTURE.md`, `docs/DOMAIN.md`, and `docs/DATA_MODEL.md` before changing application or database behavior.
 - Read `docs/SECURITY.md` before touching authentication, authorization, uploads, exports, student data, or Supabase.
 - Read `docs/DESIGN_SYSTEM.md` before changing user-facing UI or copy.
+- Read `docs/WORD_IMPORT.md` before adding a question type, changing an existing one, or touching `lib/docx-import/` — it holds the per-type Word format spec, the decisions behind the import, and what a `.docx` provably cannot carry.
 - For matching files, also follow `.cursor/rules/typescript-react.mdc`, `.cursor/rules/supabase-security.mdc`, and `.cursor/rules/product-ui.mdc`.
 - If documentation conflicts with working code, treat code as current behavior, report the mismatch, and update the documentation with the same change.
 
@@ -27,6 +28,8 @@
 - Keep organization data isolated. Treat student profiles, guardians, health/family notes, answers, and survey data as sensitive.
 - Do not present mock data, pricing, compliance, security, analytics, or unfinished UI as production truth.
 - Preserve existing question and submission compatibility when extending question types or scoring.
+- A question type is not finished until the นำเข้าจาก Word path can carry it. Adding a value to `QuestionType`, or changing an existing type's shape, answer key, or `extra_data`, also means updating `lib/docx-import/` — the type registry, the parser, the warnings — together with the on-screen format guide, the generated sample `.docx`, and the test that parses that sample back. Do this as part of the same change rather than asking whether to, then say in the final report what the import reads now and what it still cannot. Where a type genuinely cannot survive a Word file — the coordinates of a label on a picture, for one — record that in `docs/WORD_IMPORT.md` and `docs/FEATURE_STATUS.md`, and show teachers "ยังไม่รองรับ" rather than an import that quietly drops half the โจทย์.
+- Ask rather than invent a Word convention. When it is not obvious how a teacher would write the new type in a worksheet — which text is the เฉลย, what an empty blank looks like, how a table's rows and columns are meant to be read — ask for a real sample file before writing the parser. A convention guessed wrong is one every teacher has to re-format their existing files to escape, which is exactly the burden this import was built to remove.
 
 ## Change workflow
 

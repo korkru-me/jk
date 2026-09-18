@@ -45,6 +45,9 @@ export interface DocxParagraph {
   /** List depth: 0 is the outer level, 1 the first nested one. */
   ilvl: number
   styleId: string | null
+  /** `w:jc` is `center`. A worksheet centres its section headings and almost
+   *  nothing else, which is how one is told from a line of a โจทย์. */
+  centered: boolean
 }
 
 export interface DocxTable {
@@ -244,6 +247,7 @@ function readParagraph(node: XmlNode): DocxParagraph {
     numId: (numPr ? firstChild(numPr, 'w:numId')?.attrs['w:val'] : null) ?? null,
     ilvl: Number.isFinite(parsedIlvl) ? parsedIlvl : 0,
     styleId: (pPr ? firstChild(pPr, 'w:pStyle')?.attrs['w:val'] : null) ?? null,
+    centered: (pPr ? firstChild(pPr, 'w:jc')?.attrs['w:val'] : null) === 'center',
   }
 }
 
