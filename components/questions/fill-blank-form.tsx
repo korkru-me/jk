@@ -14,6 +14,7 @@ import { QuestionImageUpload } from './question-image-upload'
 import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { getBlankType, numberedBlankMarker, countBlanks, extractBlankNumbers, nextBlankNumber, acceptedAnswers } from '@/lib/fill-blank'
 import type { Difficulty, Visibility, FillBlankConfig, FillBlankItem, FillBlankType, Question } from '@/lib/types'
@@ -24,6 +25,10 @@ interface FillBlankFormProps {
   mode?: 'create' | 'edit'
   question?: Question
   isOwner?: boolean
+  /** Present when the โจทย์ is being drafted rather than saved — the Word
+   *  import fills a whole worksheet before any of it is written.
+   *  See lib/question-draft-handoff.ts. */
+  draft?: QuestionDraftHandoff
 }
 
 // Local editable draft for a blank. Dropdown correctness is tracked by
@@ -65,7 +70,7 @@ const BLANK_TYPES: Array<{ value: FillBlankType; label: string; desc: string; ic
   { value: 'dropdown', label: 'ดรอปดาวน์', desc: 'นักเรียนเลือกคำตอบจากตัวเลือกที่ครูกำหนด ระบบตรวจให้อัตโนมัติ', icon: ChevronDownSquare, activeClass: 'bg-tint-1/10 border-tint-1 text-tint-1' },
 ]
 
-export function FillBlankForm({ allTags, mode = 'create', question, isOwner = true }: FillBlankFormProps) {
+export function FillBlankForm({ allTags, mode = 'create', question, isOwner = true, draft }: FillBlankFormProps) {
   const router = useRouter()
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
@@ -86,7 +91,8 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
   // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
   // back out — a picker here could only ever add.
   const [setIds, setSetIds] = useState<string[]>([])
-  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
+  // A แฟ้ม is chosen once for a whole imported file, not per โจทย์.
+  const setPicker = mode === 'create' && !draft ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
@@ -99,6 +105,8 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
 
   useEffect(() => {
     if (mode !== 'create' || question) return
+    // A draft arrives with its own content; a duplicate seed would overwrite it.
+    if (draft) return
     const seed = readDuplicateSeed('fill_blank')
     if (!seed) return
     setTitle(seed.title)
@@ -209,7 +217,8 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
-    if (!subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
+    // วิชา is asked once for the whole file on the import screen.
+    if (!draft && !subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
     if (!questionText.trim()) { toast.error('กรอกเนื้อหาโจทย์ด้วย'); return }
     if (blankCount === 0) { toast.error('ต้องมีช่องกรอกอย่างน้อย 1 ช่อง (ใส่ [___] ในข้อความ)'); return }
 
@@ -233,7 +242,6 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
       }
     }
 
-    setSaving(true)
     const payload = {
       title, subject, question_text: questionText, question_type: 'fill_blank' as const,
       difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
@@ -246,6 +254,11 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
       solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
+
+    // Draft mode hands the payload back instead of writing it.
+    if (draft) { draft.onSubmit(payload); return }
+
+    setSaving(true)
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
@@ -271,6 +284,8 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
         sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
+        showSharing={!draft}
+        showSubject={!draft}
         tags={tags} onTagsChange={setTags}
         {...setPicker}
       />
@@ -458,9 +473,9 @@ export function FillBlankForm({ allTags, mode = 'create', question, isOwner = tr
           fillBlankConfig={fillBlankConfig}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
+          {draft ? draft.submitLabel : saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => draft ? draft.onCancel() : router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

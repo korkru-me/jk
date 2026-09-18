@@ -13,11 +13,12 @@
  */
 import { toPortableQuestion, type PortableQuestion } from '@/lib/question-portable'
 import type { QuestionFormData } from '@/lib/actions/questions'
-import type { AnswerPart, MCQOption, Question, QuestionType } from '@/lib/types'
-import type { DraftAnswer, DraftQuestion, DraftPart, DraftWarning } from './draft'
+import type { AnswerPart, FillBlankConfig, FillBlankItem, MCQOption, Question, QuestionType } from '@/lib/types'
+import { acceptedAnswers, countBlanks } from '@/lib/fill-blank'
+import type { DraftAnswer, DraftBlank, DraftQuestion, DraftPart, DraftWarning } from './draft'
 
 /** The types a Word worksheet can produce. The rest are authored in the app. */
-export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay'>
+export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank'>
 
 export interface DraftEntry {
   id: string
@@ -121,6 +122,24 @@ function blankQuestion(): Question {
 }
 
 /**
+ * The ช่องว่าง the file gave, in the shape the เติมคำ form saves.
+ *
+ * Every one comes in as `fixed` — the system marks it against the word the
+ * teacher wrote — because a file that says what the answer is has already
+ * decided that. Case is ignored, which is what the form's own default does,
+ * and a teacher who wants a blank marked by hand switches it on the form.
+ */
+function blanksToConfig(blanks: DraftBlank[]): FillBlankItem[] {
+  return blanks.map((blank, index) => ({
+    id: index + 1,
+    type: 'fixed' as const,
+    answer: blank.answer,
+    answers: [blank.answer],
+    case_sensitive: false,
+  }))
+}
+
+/**
  * Where a เฉลย read from the file lands on the โจทย์.
  *
  * `answer_formula` for the ordinary case of one value, and `answer_parts` as
@@ -169,6 +188,7 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
       : withPartsInBody(draft.html, draft.parts),
     mcq_options: draft.type === 'mcq' ? mcq_options : null,
     ...answerFields(draft),
+    extra_data: draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
     image_urls,
   }
 
@@ -205,6 +225,7 @@ export function changeType(entry: DraftEntry, type: ImportableType): DraftEntry 
       mcq_options: type === 'mcq' ? (options.length > 0 ? options : null) : null,
       // Only อัตนัย grades against formulas; carrying them onto a type that
       // ignores them would leave an answer nothing reads.
+      extra_data: type === 'fill_blank' ? entry.question.extra_data : {},
       answer_parts: type === 'written' ? entry.question.answer_parts : null,
       answer_formula: type === 'written' ? entry.question.answer_formula : '',
       is_random: type === 'written' ? entry.question.is_random : false,
@@ -235,6 +256,7 @@ export function applyFormPayload(entry: DraftEntry, payload: QuestionFormData): 
       answer_tolerance: payload.answer_tolerance,
       answer_parts: payload.answer_parts.length > 0 ? payload.answer_parts : null,
       mcq_options: payload.mcq_options.length > 0 ? payload.mcq_options : null,
+      extra_data: payload.extra_data ?? entry.question.extra_data,
       solution_text: payload.solution_text || null,
       solution_image_urls: payload.solution_image_urls ?? [],
       tags: payload.tags.length > 0 ? payload.tags : null,
@@ -265,6 +287,21 @@ export function validateForImport({ question }: DraftEntry): string | null {
       return 'มีตัวเลือกที่ยังว่างอยู่'
     }
     if (!options.some(option => option.is_correct)) return 'ยังไม่ได้เลือกข้อที่ถูก'
+    return null
+  }
+
+  if (question.question_type === 'fill_blank') {
+    const blanks = (question.extra_data as FillBlankConfig | undefined)?.blanks ?? []
+    if (blanks.length === 0) return 'เติมคำต้องมีช่องกรอกอย่างน้อย 1 ช่อง'
+    // The markers in the โจทย์ and the cards under it are the same list: a
+    // โจทย์ with three [___n] and two answers marks the third blank wrong for
+    // every student.
+    if (countBlanks(question.question_text) !== blanks.length) {
+      return 'จำนวนช่องกรอกในโจทย์ไม่ตรงกับจำนวนคำตอบ — กด "แก้ไข" เพื่อดู'
+    }
+    if (blanks.some(blank => blank.type !== 'text' && !acceptedAnswers(blank).some(answer => answer.trim()))) {
+      return 'มีช่องกรอกที่ยังไม่มีคำตอบ'
+    }
     return null
   }
 

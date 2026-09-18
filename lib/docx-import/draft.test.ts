@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readDocument } from './docx'
-import { buildDrafts, type DraftQuestion } from './draft'
+import { buildDrafts, type DraftQuestion, type ParseOptions } from './draft'
 
 // ─── Building WordprocessingML by hand ───────────────────────────────────────
 //
@@ -73,13 +73,17 @@ const NUMBERING = `<w:numbering>
   <w:num w:numId="7"><w:abstractNumId w:val="1"/></w:num>
 </w:numbering>`
 
-function parse(body: string, options: { numbering?: string | null; rels?: string | null } = {}) {
+function parse(
+  body: string,
+  options: { numbering?: string | null; rels?: string | null } = {},
+  reader: ParseOptions = {},
+) {
   const document = readDocument({
     document: `<w:document><w:body>${body}</w:body></w:document>`,
     numbering: options.numbering === undefined ? NUMBERING : options.numbering,
     rels: options.rels ?? null,
   })
-  return buildDrafts(document)
+  return buildDrafts(document, reader)
 }
 
 const warningCodes = (question: DraftQuestion) => question.warnings.map(w => w.code)
@@ -607,6 +611,69 @@ describe('the เฉลย a worksheet writes in brackets at the end of a ข้
 
     expect(result.questions[0].type).toBe('essay')
     expect(result.questions[0].answers).toEqual([])
+  })
+})
+
+// ─── ช่องว่าง of a เติมคำ โจทย์ ───────────────────────────────────────────────
+
+describe('the ช่องว่าง a เติมคำ worksheet marks', () => {
+  const blanks = (body: string) => parse(body, {}, { expect: 'fill_blank' })
+
+  it('turns each marked word into a numbered ช่องว่าง', () => {
+    const result = blanks(numbered(0,
+      run('หน่วยของแรงในระบบเอสไอคือ '),
+      run('นิวตัน', { color: 'FF0000' }),
+    ))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('fill_blank')
+    expect(question.blanks).toEqual([{ answer: 'นิวตัน' }])
+    expect(question.html).toBe('<p>หน่วยของแรงในระบบเอสไอคือ [___1]</p>')
+    // The answer must not survive in the title either.
+    expect(question.title).not.toContain('นิวตัน')
+  })
+
+  it('numbers several ช่องว่าง in the order they are written', () => {
+    const result = blanks(numbered(0,
+      run('น้ำเดือดที่ '),
+      run('100', { color: 'FF0000' }),
+      run(' และแข็งตัวที่ '),
+      run('0', { color: 'FF0000' }),
+      run(' องศาเซลเซียส'),
+    ))
+
+    expect(result.questions[0].blanks).toEqual([{ answer: '100' }, { answer: '0' }])
+    expect(result.questions[0].html).toBe('<p>น้ำเดือดที่ [___1] และแข็งตัวที่ [___2] องศาเซลเซียส</p>')
+  })
+
+  it('keeps a phrase Word split into several runs as one ช่องว่าง', () => {
+    // Word breaks a phrase into runs on its own; three blanks where the
+    // teacher wrote one answer is a โจทย์ nobody can answer.
+    const result = blanks(numbered(0,
+      run('เมืองหลวงของไทยคือ '),
+      run('กรุงเทพ', { color: 'FF0000' }),
+      run(' ', { color: 'FF0000' }),
+      run('มหานคร', { color: 'FF0000' }),
+    ))
+
+    expect(result.questions[0].blanks).toEqual([{ answer: 'กรุงเทพ มหานคร' }])
+  })
+
+  it('reads nothing when the whole โจทย์ carries the same marking', () => {
+    // A sentence that is red from end to end is styled, not answered.
+    const result = blanks(numbered(0, run('ทุกคำในข้อนี้เป็นสีแดง', { color: 'FF0000' })))
+
+    expect(result.questions[0].blanks).toEqual([])
+    expect(result.questions[0].type).not.toBe('fill_blank')
+  })
+
+  it('leaves marked words alone unless the file was said to be เติมคำ', () => {
+    // On any other worksheet a bolded word in the โจทย์ is emphasis, and
+    // cutting it out would replace it with a blank nobody asked for.
+    const body = numbered(0, run('หน่วยของแรงคือ '), run('นิวตัน', { color: 'FF0000' }))
+
+    expect(parse(body).questions[0].blanks).toEqual([])
+    expect(parse(body).questions[0].html).toContain('นิวตัน')
   })
 })
 

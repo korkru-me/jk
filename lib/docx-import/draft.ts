@@ -20,10 +20,11 @@
  *   "ก) ... ข) ..." under a stem are usually two questions. Told apart by how
  *   many there are and whether they sit in a table, and flagged when close.
  */
+import type { QuestionType } from '@/lib/types'
 import type { DocxBlock, DocxDocument, DocxInline, DocxParagraph, NumberingLevel } from './docx'
 import { readAnswerKey, type DraftAnswer } from './answer-key'
 
-export type DraftQuestionType = 'mcq' | 'written' | 'essay'
+export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank'
 
 export type { DraftAnswer } from './answer-key'
 
@@ -63,6 +64,12 @@ export interface DraftWarning {
   message: string
 }
 
+/** One ช่องว่าง in a เติมคำ โจทย์, in the order it appears. */
+export interface DraftBlank {
+  /** The word the teacher marked, which the blank was cut out of. */
+  answer: string
+}
+
 export interface DraftQuestion {
   id: string
   /** Position in the document's own numbering, 1-based. */
@@ -76,6 +83,8 @@ export interface DraftQuestion {
   /** The เฉลย written in brackets at the end of the โจทย์ itself, already taken
    *  out of `html`. Sub-questions carry their own. */
   answers: DraftAnswer[]
+  /** For a เติมคำ โจทย์: what each `[___n]` in `html` should accept. */
+  blanks: DraftBlank[]
   /** Relationship ids, resolved to uploaded URLs by the caller. */
   imageRelIds: string[]
   /** Whether the โจทย์ talks about a picture ("ดังรูป"). Kept rather than
@@ -87,6 +96,18 @@ export interface DraftQuestion {
 
 /** Where the question numbers came from — see `DraftResult.numbering`. */
 export type NumberingSource = 'list' | 'typed' | 'none'
+
+export interface ParseOptions {
+  /**
+   * The kind of โจทย์ the teacher said this file holds, when they said.
+   *
+   * Reading a marked word as a ช่องว่าง is only safe once someone has said the
+   * file is เติมคำ: on any other worksheet a bolded number in the โจทย์ is
+   * emphasis, and cutting it out would replace the number with a blank nobody
+   * asked for. Everything else is read the same either way.
+   */
+  expect?: QuestionType | null
+}
 
 export interface DraftResult {
   questions: DraftQuestion[]
@@ -314,6 +335,112 @@ function correctByMarks(marks: MarkFlags[]): boolean[] {
   return marks.map(() => false)
 }
 
+/**
+ * The words a teacher marked, turned into the ช่องว่าง of a เติมคำ โจทย์.
+ *
+ * A เติมคำ worksheet is written as the finished sentence with the answers in it
+ * — "หน่วยของแรงในระบบเอสไอคือ นิวตัน" with นิวตัน in red — because that is the
+ * copy the teacher marks from. So the marked words are both where the blanks go
+ * and what they accept, and they have to come out of the sentence on the way in.
+ *
+ * Which signal counts is decided per โจทย์ by the same rule the ปรนัย key uses:
+ * the most deliberate one that covers some of the text but not all of it. A
+ * sentence that is bold from end to end is styled, not answered.
+ */
+const BLANK_SIGNALS: (keyof MarkFlags)[] = ['red', 'highlight', 'colored', 'bold', 'underline']
+
+function signalOf(inline: DocxInline): MarkFlags | null {
+  if (inline.kind !== 'text' || !inline.text.trim()) return null
+  const { format } = inline
+  return {
+    red: isRed(format.color),
+    colored: isDeliberateColour(format.color),
+    highlight: !!format.highlight,
+    bold: !!format.bold,
+    underline: !!format.underline,
+  }
+}
+
+/** The signal that singles out part of this โจทย์, or null when none does. */
+function blankSignal(paragraphs: DocxParagraph[]): keyof MarkFlags | null {
+  const flags = paragraphs
+    .flatMap(paragraph => paragraph.inlines.map(signalOf))
+    .filter((mark): mark is MarkFlags => mark !== null)
+  if (flags.length === 0) return null
+
+  for (const signal of BLANK_SIGNALS) {
+    const marked = flags.filter(mark => mark[signal]).length
+    if (marked > 0 && marked < flags.length) return signal
+  }
+  return null
+}
+
+interface BlankRead {
+  /** The โจทย์ with each marked run replaced by its `[___n]` marker. */
+  html: string
+  /** The same for a title, with the blanks shown as underscores. */
+  plain: string
+  blanks: DraftBlank[]
+}
+
+/**
+ * Replaces every run of marked words with a numbered marker.
+ *
+ * Runs that sit next to each other are one ช่องว่าง: Word splits a phrase into
+ * several runs of its own accord (a spell-check boundary is enough), and three
+ * blanks where the teacher wrote one answer would be unanswerable.
+ */
+function readBlanks(paragraphs: DocxParagraph[]): BlankRead {
+  const signal = blankSignal(paragraphs)
+  if (!signal) return { html: paragraphsToHtml(paragraphs, { keepEmphasis: true }), plain: '', blanks: [] }
+
+  const blanks: DraftBlank[] = []
+  const htmlParts: string[] = []
+  const plainParts: string[] = []
+
+  for (const paragraph of paragraphs) {
+    let html = ''
+    let plain = ''
+    let pending: DocxInline[] = []
+
+    const flush = () => {
+      if (pending.length === 0) return
+      const answer = plainText(pending).trim()
+      if (answer) {
+        blanks.push({ answer })
+        const marker = `[___${blanks.length}]`
+        html += marker
+        plain += '____'
+      }
+      pending = []
+    }
+
+    for (const inline of paragraph.inlines) {
+      const mark = signalOf(inline)
+      if (mark?.[signal]) { pending.push(inline); continue }
+      // Whitespace between two marked runs belongs to the answer, not between
+      // two blanks.
+      if (pending.length > 0 && inline.kind === 'text' && !inline.text.trim()) {
+        pending.push(inline)
+        continue
+      }
+      flush()
+      html += inlinesToHtml([inline], { keepEmphasis: true })
+      plain += plainText([inline])
+    }
+    flush()
+
+    htmlParts.push(`<p>${html}</p>`)
+    plainParts.push(plain)
+  }
+
+  return {
+    html: htmlParts.join(''),
+    plain: plainParts.join(' ').replace(/\s+/g, ' ').trim(),
+    blanks,
+  }
+}
+
 // ─── Splitting the document into questions ───────────────────────────────────
 
 /** `1)` `1.` `(1)` `ก)` `a.` — the way a choice or a sub-question is labelled. */
@@ -523,6 +650,7 @@ function buildQuestion(
   body: DocxBlock[],
   number: number,
   levels: Map<number, NumberingLevel> | undefined,
+  options: ParseOptions = {},
 ): DraftQuestion {
   const items: ChunkItem[] = []
 
@@ -605,10 +733,15 @@ function buildQuestion(
   const { relIds } = collectImages(allParagraphs)
   const fullText = paragraphsText(allParagraphs)
 
+  // Only read when the teacher said the file is เติมคำ — see `ParseOptions`.
+  const blanked = options.expect === 'fill_blank' && !treatAsChoices ? readBlanks(stemParagraphs) : null
+  const useBlanks = (blanked?.blanks.length ?? 0) > 0
+
   // A โจทย์ with ตัวเลือก is graded on the marked one; a bracket at the end of
-  // it is part of an option, not a เฉลย of its own.
-  const stem = treatAsChoices
-    ? { answers: [], html: paragraphsToHtml(stemParagraphs, { keepEmphasis: true }) }
+  // it is part of an option, not a เฉลย of its own. A เติมคำ โจทย์ is graded on
+  // its own ช่องว่าง, so it is not read for one either.
+  const stem = treatAsChoices || useBlanks
+    ? { answers: [], html: blanked?.html ?? paragraphsToHtml(stemParagraphs, { keepEmphasis: true }) }
     : readAnswerKey(paragraphsToHtml(stemParagraphs, { keepEmphasis: true }))
 
   const answerCounts = [stem.answers.length, ...parts.map(part => part.answers.length)]
@@ -616,7 +749,7 @@ function buildQuestion(
   // Titled by the โจทย์ as it now reads, so an imported ข้อ is not named after
   // its own answer. Taken off the readable text rather than off the HTML,
   // because a formula reads as "15√2" there and as TeX in the markup.
-  const stemPlain = paragraphsText(stemParagraphs)
+  const stemPlain = useBlanks ? (blanked?.plain ?? '') : paragraphsText(stemParagraphs)
   const stemText = stem.answers.length > 0
     ? stemPlain.replace(/\s*\([^()]*\)\s*$/, '').trim()
     : stemPlain
@@ -662,12 +795,13 @@ function buildQuestion(
     // Without ตัวเลือก and without a เฉลย there is nothing to grade against, so
     // the โจทย์ comes in as one the teacher marks by hand. Switching it to
     // อัตนัย and typing the answer is one control on the import screen.
-    type: treatAsChoices ? 'mcq' : hasAnswers ? 'written' : 'essay',
+    type: treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
     title: buildTitle(stemText, number),
     html: stem.html,
     choices,
     parts,
     answers: stem.answers,
+    blanks: blanked?.blanks ?? [],
     imageRelIds: relIds,
     mentionsPicture: MENTIONS_PICTURE.test(fullText),
     warnings,
@@ -720,7 +854,7 @@ function isSectionHeading(block: DocxBlock): block is DocxParagraph {
   return block.centered && words.length > 0 && words.every(inline => inline.kind === 'text' && inline.format.bold)
 }
 
-export function buildDrafts(document: DocxDocument): DraftResult {
+export function buildDrafts(document: DocxDocument, options: ParseOptions = {}): DraftResult {
   const list = findQuestionList(document)
   const typed = list ? new Set<number>() : findTypedNumbering(document.blocks)
 
@@ -753,7 +887,7 @@ export function buildDrafts(document: DocxDocument): DraftResult {
       if (text) preamble.push(text)
     }
 
-    return buildQuestion(head, body.slice(0, bodyEnd), position + 1, list ? document.numbering.get(list.numId) : undefined)
+    return buildQuestion(head, body.slice(0, bodyEnd), position + 1, list ? document.numbering.get(list.numId) : undefined, options)
   })
 
   const floating = new Set<string>()
