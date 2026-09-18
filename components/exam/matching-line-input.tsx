@@ -38,9 +38,12 @@ interface Point { x: number; y: number }
  *
  * Only the connector dots carry `touch-action: none`, so dragging from a dot
  * never scrolls while the rest of the question scrolls normally — a student
- * must be able to scroll past a question they are working on. Tapping a prompt
- * and then an option connects them without any dragging at all, which is also
- * the keyboard route.
+ * must be able to scroll past a question they are working on. Tapping a
+ * prompt row and then an option connects them without any dragging at all,
+ * which is also the keyboard route (the dot stays the only focusable control
+ * on the left; a tap or a keyboard activation on it bubbles up to the row's
+ * click handler, so the row's whole card area, not just the small dot, is a
+ * valid tap target).
  */
 export function MatchingLineInput({
   prompts, options, placement, onChange,
@@ -56,6 +59,10 @@ export function MatchingLineInput({
   const rightRefs = useRef<Array<HTMLElement | null>>([])
   const startRef = useRef<{ from: number; x: number; y: number; moved: boolean } | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
+  // Set when a pointer gesture ends as a real drag, so the click event the
+  // browser fires right after (bubbling from the dot to the row) is ignored
+  // instead of re-toggling the selection it just made via connect().
+  const justDraggedRef = useRef(false)
 
   const optionIndex = new Map(options.map((o, i) => [o.id, i]))
   const checked = !!results
@@ -109,6 +116,17 @@ export function MatchingLineInput({
     onChange(next)
   }
 
+  /** Tapping (or clicking) a prompt row: pick it up, put it down, or drop its line. */
+  function activatePrompt(i: number) {
+    if (disabled) return
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false
+      return
+    }
+    if (placement[i] != null) disconnect(i)
+    else setSelected(prev => (prev === i ? null : i))
+  }
+
   /** Which option row is under the pointer, read from the document. */
   function optionAt(x: number, y: number): number {
     if (typeof document === 'undefined') return -1
@@ -149,10 +167,12 @@ export function MatchingLineInput({
       endGesture()
       if (!start) return
       if (!start.moved) {
-        // A tap on the dot picks the prompt up (or puts it down again).
-        setSelected(prev => (prev === start.from ? null : start.from))
+        // No movement: let the browser's own click event (which bubbles from
+        // the dot up to the row) drive the tap-to-select behaviour, so a tap
+        // anywhere in the row and a tap on just the dot behave identically.
         return
       }
+      justDraggedRef.current = true
       if (target >= 0) connect(start.from, target)
     }
 
@@ -222,8 +242,10 @@ export function MatchingLineInput({
               <div
                 key={i}
                 ref={el => { leftRefs.current[i] = el }}
+                onClick={() => activatePrompt(i)}
                 className={cn(
                   'relative flex items-center gap-2 rounded-xl border bg-card p-2.5 transition-colors',
+                  !disabled && 'cursor-pointer',
                   verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'
                     : isSelected ? 'border-primary bg-primary/10'
@@ -253,7 +275,6 @@ export function MatchingLineInput({
                   }
                   aria-pressed={isSelected}
                   onPointerDown={e => onDotPointerDown(e, i)}
-                  onClick={() => { if (connected && !drag) disconnect(i) }}
                   className={cn(
                     'absolute -right-2 top-1/2 h-4 w-4 min-w-0 -translate-y-1/2 touch-none rounded-full border-2 p-0 transition-colors',
                     !disabled && 'cursor-grab',
