@@ -23,6 +23,9 @@ const DRAG_THRESHOLD = 6
 
 interface Point { x: number; y: number }
 
+/** A picked-up but not-yet-connected row, from either column. */
+interface Selection { side: 'left' | 'right'; index: number }
+
 /**
  * Matching answered by drawing a line between two columns.
  *
@@ -38,18 +41,19 @@ interface Point { x: number; y: number }
  *
  * Only the connector dots carry `touch-action: none`, so dragging from a dot
  * never scrolls while the rest of the question scrolls normally — a student
- * must be able to scroll past a question they are working on. Tapping a
- * prompt row and then an option connects them without any dragging at all,
- * which is also the keyboard route (the dot stays the only focusable control
- * on the left; a tap or a keyboard activation on it bubbles up to the row's
- * click handler, so the row's whole card area, not just the small dot, is a
- * valid tap target).
+ * must be able to scroll past a question they are working on. Tapping either
+ * column first, then the other, connects them without any dragging at all —
+ * whichever row is tapped second completes the pair — which is also the
+ * keyboard route (the left dot stays the only focusable control on that
+ * side; a tap or a keyboard activation on it bubbles up to the row's click
+ * handler, so the row's whole card area, not just the small dot, is a valid
+ * tap target).
  */
 export function MatchingLineInput({
   prompts, options, placement, onChange,
   disabled = false, results, correctText,
 }: MatchingLineInputProps) {
-  const [selected, setSelected] = useState<number | null>(null)
+  const [selected, setSelected] = useState<Selection | null>(null)
   const [drag, setDrag] = useState<{ from: number; at: Point } | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   const [, setMeasureTick] = useState(0)
@@ -116,15 +120,31 @@ export function MatchingLineInput({
     onChange(next)
   }
 
-  /** Tapping (or clicking) a prompt row: pick it up, put it down, or drop its line. */
+  /**
+   * Tapping (or clicking) a prompt row: finish a connection started from an
+   * option, pick this prompt up, put it down, or drop its line. Either
+   * column can be tapped first — completing a pending selection from the
+   * other side always wins over toggling this row's own selection.
+   */
   function activatePrompt(i: number) {
     if (disabled) return
     if (justDraggedRef.current) {
       justDraggedRef.current = false
       return
     }
-    if (placement[i] != null) disconnect(i)
-    else setSelected(prev => (prev === i ? null : i))
+    if (selected?.side === 'right') { connect(i, selected.index); return }
+    if (placement[i] != null) { disconnect(i); return }
+    setSelected(prev => (prev?.side === 'left' && prev.index === i ? null : { side: 'left', index: i }))
+  }
+
+  /** The option-column mirror of {@link activatePrompt}. */
+  function activateOption(j: number) {
+    if (disabled) return
+    if (selected?.side === 'left') { connect(selected.index, j); return }
+    const id = options[j]?.id
+    const owner = id ? placement.indexOf(id) : -1
+    if (owner >= 0) { disconnect(owner); return }
+    setSelected(prev => (prev?.side === 'right' && prev.index === j ? null : { side: 'right', index: j }))
   }
 
   /** Which option row is under the pointer, read from the document. */
@@ -207,7 +227,7 @@ export function MatchingLineInput({
       <p className="text-sm font-medium">โยงเส้นจับคู่ให้ถูกต้อง:</p>
       <p className="text-xs text-muted-foreground">
         กดค้างที่จุดวงกลมด้านขวาของรายการฝั่งซ้าย แล้วลากไปปล่อยที่รายการฝั่งขวา
-        หรือแตะรายการฝั่งซ้ายหนึ่งครั้งแล้วแตะฝั่งขวาก็ได้
+        หรือแตะรายการฝั่งใดก่อนก็ได้ แล้วแตะอีกฝั่งให้ครบคู่
       </p>
 
       <div ref={boxRef} className="relative grid grid-cols-2 gap-x-8 gap-y-2 sm:gap-x-16">
@@ -236,7 +256,7 @@ export function MatchingLineInput({
         <div className="col-start-1 space-y-2">
           {prompts.map((prompt, i) => {
             const verdict = results?.[i]
-            const isSelected = selected === i
+            const isSelected = selected?.side === 'left' && selected.index === i
             const connected = placement[i] != null
             return (
               <div
@@ -294,6 +314,7 @@ export function MatchingLineInput({
             const takenBy = placement.indexOf(option.id)
             const verdict = takenBy >= 0 ? results?.[takenBy] : undefined
             const isHovered = hover === j && drag !== null
+            const isSelected = selected?.side === 'right' && selected.index === j
             return (
               <Button
                 key={option.id}
@@ -302,12 +323,14 @@ export function MatchingLineInput({
                 disabled={disabled}
                 ref={el => { rightRefs.current[j] = el as HTMLElement | null }}
                 aria-label={`ตัวเลือก ${option.text}`}
-                onClick={() => { if (selected !== null) connect(selected, j) }}
+                aria-pressed={isSelected}
+                onClick={() => activateOption(j)}
                 className={cn(
                   'relative flex h-auto w-full items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors',
                   isHovered ? 'border-primary bg-primary/10'
                     : verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'
+                    : isSelected ? 'border-primary bg-primary/10'
                     : takenBy >= 0 ? 'border-primary/40'
                     : 'border-border bg-card'
                 )}
@@ -318,7 +341,7 @@ export function MatchingLineInput({
                     'absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2',
                     verdict === true ? 'border-success bg-success'
                       : verdict === false ? 'border-destructive bg-destructive'
-                      : takenBy >= 0 ? 'border-primary bg-primary'
+                      : takenBy >= 0 || isSelected ? 'border-primary bg-primary'
                       : 'border-border bg-card'
                   )}
                 />
