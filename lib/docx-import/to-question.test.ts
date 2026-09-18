@@ -18,6 +18,7 @@ function draft(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
       { id: 'c1', text: 'ข', isCorrect: true },
     ],
     parts: [],
+    answers: [],
     imageRelIds: [],
     mentionsPicture: false,
     warnings: [],
@@ -65,8 +66,8 @@ describe('draftToEntry', () => {
       choices: [],
       html: '<p>วางวัตถุบนพื้นเอียง</p>',
       parts: [
-        { id: 'p0', label: 'ก', html: '<p>ถ้าพื้นลื่น</p>' },
-        { id: 'p1', label: 'ข', html: '<p>ถ้าพื้นฝืด</p>' },
+        { id: 'p0', label: 'ก', html: '<p>ถ้าพื้นลื่น</p>', answers: [] },
+        { id: 'p1', label: 'ข', html: '<p>ถ้าพื้นฝืด</p>', answers: [] },
       ],
     }).question
     expect(built.question_text).toBe('<p>วางวัตถุบนพื้นเอียง</p><p>ก) ถ้าพื้นลื่น</p><p>ข) ถ้าพื้นฝืด</p>')
@@ -78,8 +79,8 @@ describe('draftToEntry', () => {
       type: 'written',
       choices: [],
       parts: [
-        { id: 'p0', label: 'ก', html: '<p>ตอนหนึ่ง</p>' },
-        { id: 'p1', label: 'ข', html: '<p>ตอนสอง</p>' },
+        { id: 'p0', label: 'ก', html: '<p>ตอนหนึ่ง</p>', answers: [] },
+        { id: 'p1', label: 'ข', html: '<p>ตอนสอง</p>', answers: [] },
       ],
     }).question
     expect(built.question_text).toBe('<p>คำถาม</p>')

@@ -21,8 +21,11 @@
  *   many there are and whether they sit in a table, and flagged when close.
  */
 import type { DocxBlock, DocxDocument, DocxInline, DocxParagraph, NumberingLevel } from './docx'
+import { readAnswerKey, type DraftAnswer } from './answer-key'
 
 export type DraftQuestionType = 'mcq' | 'written' | 'essay'
+
+export type { DraftAnswer } from './answer-key'
 
 export interface DraftChoice {
   id: string
@@ -39,6 +42,10 @@ export interface DraftPart {
   /** The ก/ข/ค (or 1/2/3) Word prints in front of this sub-question. */
   label: string
   html: string
+  /** Read out of the bracket this sub-question ended with, and taken out of
+   *  `html` — a โจทย์ that still carries its own เฉลย is one that shows it to
+   *  the class. */
+  answers: DraftAnswer[]
 }
 
 export type DraftWarningCode =
@@ -49,6 +56,7 @@ export type DraftWarningCode =
   | 'image-unreferenced'
   | 'refers-to-previous'
   | 'ambiguous-choices'
+  | 'multi-answer'
 
 export interface DraftWarning {
   code: DraftWarningCode
@@ -65,6 +73,9 @@ export interface DraftQuestion {
   html: string
   choices: DraftChoice[]
   parts: DraftPart[]
+  /** The เฉลย written in brackets at the end of the โจทย์ itself, already taken
+   *  out of `html`. Sub-questions carry their own. */
+  answers: DraftAnswer[]
   /** Relationship ids, resolved to uploaded URLs by the caller. */
   imageRelIds: string[]
   /** Whether the โจทย์ talks about a picture ("ดังรูป"). Kept rather than
@@ -567,16 +578,21 @@ function buildQuestion(
     if (item.kind === 'sub') {
       const ordinal = (ordinals.get(item.paragraph.ilvl) ?? 0) + 1
       ordinals.set(item.paragraph.ilvl, ordinal)
+      const read = readAnswerKey(paragraphsToHtml([item.paragraph], { keepEmphasis: true }))
       parts.push({
         id: `part-${number}-${partIndex++}`,
         label: levelLabel(levels?.get(item.paragraph.ilvl), ordinal),
-        html: paragraphsToHtml([item.paragraph], { keepEmphasis: true }),
+        html: read.html,
+        answers: read.answers,
       })
     } else if (item.kind === 'marker' && !treatAsChoices) {
+      const read = readAnswerKey(
+        stripMarkerFromHtml(paragraphsToHtml(item.item.paragraphs, { keepEmphasis: true })))
       parts.push({
         id: `part-${number}-${partIndex++}`,
         label: item.item.marker,
-        html: stripMarkerFromHtml(paragraphsToHtml(item.item.paragraphs, { keepEmphasis: true })),
+        html: read.html,
+        answers: read.answers,
       })
     }
   }
@@ -587,10 +603,32 @@ function buildQuestion(
     ...items.flatMap(item => item.kind === 'sub' ? [item.paragraph] : []),
   ]
   const { relIds } = collectImages(allParagraphs)
-  const stemText = paragraphsText(stemParagraphs)
   const fullText = paragraphsText(allParagraphs)
 
+  // A โจทย์ with ตัวเลือก is graded on the marked one; a bracket at the end of
+  // it is part of an option, not a เฉลย of its own.
+  const stem = treatAsChoices
+    ? { answers: [], html: paragraphsToHtml(stemParagraphs, { keepEmphasis: true }) }
+    : readAnswerKey(paragraphsToHtml(stemParagraphs, { keepEmphasis: true }))
+
+  const answerCounts = [stem.answers.length, ...parts.map(part => part.answers.length)]
+  const hasAnswers = answerCounts.some(count => count > 0)
+  // Titled by the โจทย์ as it now reads, so an imported ข้อ is not named after
+  // its own answer. Taken off the readable text rather than off the HTML,
+  // because a formula reads as "15√2" there and as TeX in the markup.
+  const stemPlain = paragraphsText(stemParagraphs)
+  const stemText = stem.answers.length > 0
+    ? stemPlain.replace(/\s*\([^()]*\)\s*$/, '').trim()
+    : stemPlain
+
   const warnings: DraftWarning[] = []
+
+  if (answerCounts.some(count => count > 1)) {
+    warnings.push({
+      code: 'multi-answer',
+      message: 'ข้อนี้มีเฉลยหลายค่าในวงเล็บเดียว ระบบแยกเป็นช่องกรอกให้แล้ว — ตรวจว่าเรียงตรงกับที่โจทย์ถาม',
+    })
+  }
 
   if (hasStructuredMath(allParagraphs)) {
     warnings.push({
@@ -599,7 +637,10 @@ function buildQuestion(
     })
   }
 
-  if (markerItems.length > 0 && markerItems.length <= 3) {
+  // Two or three ก) ข) lines could be ตัวเลือก or sub-questions — unless each
+  // one ends in its own เฉลย, which a ตัวเลือก never does.
+  const partsAnswered = parts.some(part => part.answers.length > 0)
+  if (markerItems.length > 0 && markerItems.length <= 3 && !partsAnswered) {
     warnings.push({
       code: 'ambiguous-choices',
       message: treatAsChoices
@@ -618,14 +659,15 @@ function buildQuestion(
   return {
     id: `q-${number}`,
     number,
-    // Without choices there is no key to grade against, so the โจทย์ comes in
-    // as one the teacher marks by hand. Switching it to อัตนัย and typing the
-    // answer is one control on the import screen.
-    type: treatAsChoices ? 'mcq' : 'essay',
+    // Without ตัวเลือก and without a เฉลย there is nothing to grade against, so
+    // the โจทย์ comes in as one the teacher marks by hand. Switching it to
+    // อัตนัย and typing the answer is one control on the import screen.
+    type: treatAsChoices ? 'mcq' : hasAnswers ? 'written' : 'essay',
     title: buildTitle(stemText, number),
-    html: paragraphsToHtml(stemParagraphs, { keepEmphasis: true }),
+    html: stem.html,
     choices,
     parts,
+    answers: stem.answers,
     imageRelIds: relIds,
     mentionsPicture: MENTIONS_PICTURE.test(fullText),
     warnings,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseDocx } from './index'
-import { IMPORT_PROFILES, PROFILE_BY_TYPE, sampleLineText, type ImportProfile } from './profiles'
+import { AUTO_PROFILE, IMPORT_PROFILES, PROFILE_BY_TYPE, sampleLineText, type ImportProfile } from './profiles'
 import { packSampleDocx, sampleFileName } from './sample-docx'
 
 /**
@@ -93,6 +93,36 @@ describe('generated sample worksheets', () => {
     // Word draws these from the list definition the generator writes; if that
     // format is lost they come back as "1" and "2", or as separate โจทย์.
     expect(withParts!.parts.map(part => part.label)).toEqual(['ก', 'ข'])
+  })
+
+  it('reads the เฉลย back out of the เติมคำตอบตัวเลข sample', async () => {
+    const parsed = await parseSample(PROFILE_BY_TYPE.written)
+
+    // Every โจทย์ in that example is one the system can mark, which is the
+    // whole claim the example makes.
+    expect(parsed.questions.map(question => question.type)).toEqual(['written', 'written', 'written'])
+
+    const withParts = parsed.questions[0]
+    expect(withParts.parts.map(part => part.answers)).toEqual([
+      [{ formula: '4', unit: 'm/s²' }],
+      [{ formula: '16', unit: 'm/s' }],
+    ])
+    // Taken out of the โจทย์ as well as read off it.
+    expect(withParts.parts.every(part => !part.html.includes('('))).toBe(true)
+
+    expect(parsed.questions[1].answers).toEqual([{ formula: '14*pi', unit: '' }])
+    expect(parsed.questions[2].answers).toEqual([
+      { formula: '-2*pi/3', unit: '' },
+      { formula: '225', unit: 'รอบ' },
+    ])
+  })
+
+  it('reads the เฉลย in the mixed sample without disturbing its ปรนัย', async () => {
+    const parsed = await parseSample(AUTO_PROFILE)
+
+    expect(parsed.questions.map(question => question.type)).toEqual(['mcq', 'written', 'essay'])
+    expect(parsed.questions[1].answers).toEqual([{ formula: '0.6', unit: 'A' }])
+    expect(parsed.questions[0].choices.filter(choice => choice.isCorrect)).toHaveLength(1)
   })
 
   it('reads the บรรยาย sample as โจทย์ with no choices', async () => {
