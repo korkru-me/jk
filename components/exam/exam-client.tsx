@@ -1,6 +1,6 @@
 'use client'
 
-import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { checkAnswer, drawNextStreakQuestion, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
@@ -1115,6 +1115,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   config={current.questions.extra_data as ImageLabelConfig | SafeImageLabelConfig}
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={val => handleAnswerChange(current.id, val)}
+                  // โหมดดูรูปเต็มจอ hides this Card along with the rest of the
+                  // page, so the wording has to travel with the picture.
+                  heading={<QuestionText text={currentQuestionText} />}
                 />
               ) : current.questions.question_type === 'composite' ? (
                 <CompositeAnswerInput
@@ -3106,10 +3109,11 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
 // answers and the single string the attempt stores. One string per point, in
 // the points' own order — the shape the 'IMGL:' branch of lib/assignment-attempt
 // grades against.
-function ImageLabelAnswerInput({ config, rawValue, onChange }: {
+function ImageLabelAnswerInput({ config, rawValue, onChange, heading }: {
   config: ImageLabelConfig | SafeImageLabelConfig | null
   rawValue: string
   onChange: (v: string) => void
+  heading?: ReactNode
 }) {
   const markers = config?.markers ?? []
   const stored = parseImageLabelAnswer(rawValue)
@@ -3123,6 +3127,7 @@ function ImageLabelAnswerInput({ config, rawValue, onChange }: {
       bank={config?.bank}
       value={answers}
       onChange={next => onChange(JSON.stringify(next))}
+      heading={heading}
     />
   )
 }

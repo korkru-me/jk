@@ -1670,6 +1670,9 @@ export function QuestionPreviewContent({
             bank={imageLabelConfig?.bank}
             value={imageLabelAnswers}
             onChange={setImageLabelAnswers}
+            // The teacher checking a diagram is the reader who most needs the
+            // big picture, so the preview offers the same mode the student gets.
+            heading={<RenderText text={renderedText} />}
             results={imageLabelChecked ? imageLabelResults : undefined}
             correctText={imageLabelChecked
               ? imageLabelKeyed.map(marker => marker.answers[0])

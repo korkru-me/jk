@@ -17,6 +17,7 @@ import { QuestionPreview } from './question-preview'
 import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { imageLabelMarkerCount, normalizeImageLabelMode } from '@/lib/image-label'
+import { imageLabelMarkerClass } from '@/components/exam/image-label-input'
 import { cn } from '@/lib/utils'
 import type {
   Difficulty, Visibility, Question,
@@ -136,8 +137,16 @@ function PointCanvas({ imageUrl, markers, selected, onAdd, onMove, onSelect }: {
           aria-label={`จุดที่ ${index + 1}${marker.label ? ` — ${marker.label}` : ''}`}
           style={{ left: `${marker.x}%`, top: `${marker.y}%` }}
           className={cn(
-            'absolute size-7 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border-2 p-0 text-[11px] font-bold active:cursor-grabbing',
-            selected === marker.id ? 'border-foreground ring-2 ring-primary/40' : 'border-card bg-tint-1 hover:bg-tint-1/90',
+            // Same badge the student will see (imageLabelMarkerClass), so what
+            // a point looks like over the drawing is not something the teacher
+            // finds out afterwards. One step wider than the student's, because
+            // this one is dragged: a grab target, not only a label.
+            'absolute size-7 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none border-0 p-0 active:cursor-grabbing',
+            imageLabelMarkerClass(selected === marker.id ? 'active' : 'idle'),
+            // The picked point is the one the card below is editing, so it is
+            // filled in and ringed a second time in primary — the ring the rest
+            // of this form marks a selection with.
+            selected === marker.id && 'outline-2 outline-offset-1 outline-primary/50',
           )}
         >
           {index + 1}
