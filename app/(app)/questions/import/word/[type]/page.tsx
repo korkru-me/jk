@@ -75,7 +75,7 @@ function Layout({
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">นำเข้าโจทย์{profile.label}</h1>
+          <h1 className="text-2xl font-bold text-foreground">นำเข้า{profile.noun}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             ก่อคลังโจทย์โดยครู — เอาแบบฝึกหัดหรือข้อสอบที่มีอยู่แล้วเข้าคลัง โดยไม่ต้องพิมพ์ใหม่
           </p>

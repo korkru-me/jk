@@ -58,7 +58,17 @@ export interface ImportProfile {
   slug: string
   /** The type this profile produces, or null for the reader that decides per โจทย์. */
   type: QuestionType | null
+  /** The name on the card. */
   label: string
+  /**
+   * The same thing named inside a sentence: "นำเข้า<noun>", "ไฟล์ที่มี<noun>".
+   *
+   * Separate from `label` because a card title and a phrase read differently —
+   * "โจทย์ผสม (หลายชนิดในข้อเดียว)" is a good card and "นำเข้าโจทย์โจทย์ผสม" is
+   * not — and because the automatic reader is not a ประเภทโจทย์ at all, so
+   * every sentence about it has to avoid calling it one.
+   */
+  noun: string
   /** One line, for the card on the chooser. */
   blurb: string
   status: ImportProfileStatus
@@ -116,6 +126,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'mcq',
     type: 'mcq',
     label: 'ปรนัย (เลือกตอบ)',
+    noun: 'โจทย์ปรนัย',
     blurb: 'ทั้งไฟล์เป็นข้อเลือกตอบ ระบบอ่านตัวเลือกและเฉลยที่ทำเครื่องหมายสีไว้',
     status: 'ready',
     rules: [
@@ -148,7 +159,8 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'random',
     type: 'written',
     label: 'เติมคำตอบตัวเลข',
-    blurb: 'โจทย์คำนวณที่ตอบเป็นตัวเลข ระบบอ่านทั้งตัวโจทย์ ข้อย่อย และเฉลยที่เขียนไว้ในวงเล็บ',
+    noun: 'โจทย์เติมคำตอบตัวเลข',
+    blurb: 'โจทย์คำนวณที่ตอบเป็นตัวเลข ระบบอ่านทั้งตัวโจทย์ ข้อย่อย และเฉลยที่ทำเครื่องหมายไว้ท้ายข้อ',
     status: 'ready',
     rules: [
       NUMBERING,
@@ -179,6 +191,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'essay',
     type: 'essay',
     label: 'อัตนัย (บรรยาย)',
+    noun: 'โจทย์อัตนัย (บรรยาย)',
     blurb: 'ข้อเขียนตอบอิสระที่ครูตรวจเอง ไม่ต้องมีเฉลยในไฟล์',
     status: 'ready',
     rules: [NUMBERING, EQUATION],
@@ -195,6 +208,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'fill-blank',
     type: 'fill_blank',
     label: 'เติมคำในช่องว่าง',
+    noun: 'โจทย์เติมคำในช่องว่าง',
     blurb: 'ข้อความที่เว้นช่องให้นักเรียนเติมคำ — เขียนประโยคเต็มแล้วทำสีคำที่เป็นคำตอบ',
     status: 'ready',
     rules: [
@@ -225,6 +239,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'true-false',
     type: 'true_false',
     label: 'ถูก-ผิด',
+    noun: 'โจทย์ถูก-ผิด',
     blurb: 'ข้อความหลายบรรทัดให้นักเรียนตัดสินว่าถูกหรือผิด',
     status: 'planned',
     rules: [
@@ -246,6 +261,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'matching',
     type: 'matching',
     label: 'จับคู่',
+    noun: 'โจทย์จับคู่',
     blurb: 'สองรายการที่สัมพันธ์กัน ให้นักเรียนโยงเส้นจับคู่',
     status: 'planned',
     rules: [
@@ -267,6 +283,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'ordering',
     type: 'ordering',
     label: 'เรียงลำดับ',
+    noun: 'โจทย์เรียงลำดับ',
     blurb: 'ขั้นตอนหรือเหตุการณ์ที่ต้องเรียงให้ถูกลำดับ',
     status: 'planned',
     rules: [
@@ -289,6 +306,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'classify',
     type: 'classify',
     label: 'ตารางจำแนก',
+    noun: 'โจทย์ตารางจำแนก',
     blurb: 'ตารางเดียว แถวคือสิ่งที่ให้จำแนก คอลัมน์คือมิติการจำแนก',
     status: 'planned',
     rules: [
@@ -309,6 +327,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'image-label',
     type: 'image_label',
     label: 'ติดป้ายบนรูป',
+    noun: 'โจทย์ติดป้ายบนรูป',
     blurb: 'รูปเดียวที่นักเรียนตอบว่าแต่ละจุดคืออะไร',
     status: 'planned',
     rules: [
@@ -331,8 +350,9 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
   composite: {
     slug: 'composite',
     type: 'composite',
-    label: 'โจทย์ผสม (หลายรูปแบบ)',
-    blurb: 'โจทย์หลักเดียว แต่ข้อย่อยเป็นคนละชนิดกันได้',
+    label: 'โจทย์ผสม (หลายชนิดในข้อเดียว)',
+    noun: 'โจทย์ผสม',
+    blurb: 'โจทย์ข้อเดียวที่มีคำถามย่อยหลายชนิด เช่น ถูก-ผิด กับ เติมคำ อยู่ในข้อเดียวกัน',
     status: 'planned',
     rules: [
       NUMBERING,
@@ -352,6 +372,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     slug: 'file-upload',
     type: 'file_upload',
     label: 'ส่งไฟล์งาน',
+    noun: 'โจทย์ส่งไฟล์งาน',
     blurb: 'คำสั่งงานที่นักเรียนส่งเป็นไฟล์กลับมา',
     status: 'planned',
     rules: [
@@ -378,8 +399,12 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
 export const AUTO_PROFILE: ImportProfile = {
   slug: 'auto',
   type: null,
-  label: 'อ่านอัตโนมัติ (หลายประเภทในไฟล์เดียว)',
-  blurb: 'ไฟล์ที่มีทั้งปรนัยและข้อเขียนปนกัน ระบบเดาชนิดให้ทีละข้อ แล้วครูแก้ได้ก่อนนำเข้า',
+  label: 'อ่านอัตโนมัติ (คละชนิดในไฟล์เดียว)',
+  // Never "โจทย์อ่านอัตโนมัติ": this is a way of reading a file, not a kind of
+  // โจทย์, and a name that implies otherwise is what made it read like
+  // โจทย์ผสม on the chooser.
+  noun: 'โจทย์คละชนิด',
+  blurb: 'ข้อสอบชุดเดียวที่มีหลายข้อคนละชนิดกัน เช่น ตอนที่ 1 ปรนัย ตอนที่ 2 ข้อเขียน ระบบแยกชนิดให้ทีละข้อ ครูแก้ได้ก่อนนำเข้า',
   status: 'ready',
   rules: [
     NUMBERING,
