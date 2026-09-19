@@ -614,6 +614,104 @@ describe('the เฉลย a worksheet writes in brackets at the end of a ข้
   })
 })
 
+describe('the เฉลย a teacher marks at the end of a ข้อ', () => {
+  it('reads a marked value and takes it out of the ข้อ', () => {
+    const result = parse(numbered(0,
+      run('จงหาอัตราเร็วเชิงมุมเฉลี่ย '),
+      run('2.5', { color: 'FF0000' }),
+    ))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('written')
+    expect(question.answers).toEqual([{ formula: '2.5', unit: '' }])
+    expect(question.html).toBe('<p>จงหาอัตราเร็วเชิงมุมเฉลี่ย</p>')
+    expect(question.title).not.toContain('2.5')
+  })
+
+  it('takes the brackets around a marked เฉลย with it', () => {
+    const result = parse(numbered(0,
+      run('จงหาความเร่งเชิงมุม ('),
+      run('4 rad/s', { color: 'FF0000' }),
+      run(')'),
+    ))
+
+    expect(result.questions[0].answers).toEqual([{ formula: '4', unit: 'rad/s' }])
+    expect(result.questions[0].html).toBe('<p>จงหาความเร่งเชิงมุม</p>')
+  })
+
+  it('reads a highlighted or bold เฉลย the same way', () => {
+    expect(parse(numbered(0, run('จงหาระยะทาง '), run('120 เมตร', { highlight: 'yellow' })))
+      .questions[0].answers).toEqual([{ formula: '120', unit: 'เมตร' }])
+    expect(parse(numbered(0, run('จงหาระยะทาง '), run('120 เมตร', { bold: true })))
+      .questions[0].answers).toEqual([{ formula: '120', unit: 'เมตร' }])
+  })
+
+  it('splits a marked pair into two answers', () => {
+    const result = parse(numbered(0,
+      run('จงหาความเร่งเชิงมุม และจำนวนรอบ '),
+      run('-2pi/3, 225 รอบ', { color: 'FF0000' }),
+    ))
+
+    expect(result.questions[0].answers).toEqual([
+      { formula: '-2*pi/3', unit: '' },
+      { formula: '225', unit: 'รอบ' },
+    ])
+    expect(warningCodes(result.questions[0])).toContain('multi-answer')
+  })
+
+  it('leaves a marked number inside the ข้อ alone', () => {
+    // The numbers in the middle of a โจทย์ are the ones it gives you. A
+    // worksheet that emphasises them must not have its givens read as its key.
+    const result = parse(numbered(0,
+      run('วัตถุมวล '),
+      run('5', { color: 'FF0000' }),
+      run(' กิโลกรัม จงหาความเร่ง'),
+    ))
+
+    expect(result.questions[0].answers).toEqual([])
+    expect(result.questions[0].type).toBe('essay')
+    expect(result.questions[0].html).toContain('5')
+  })
+
+  it('still reads the bracket of a worksheet that marked nothing', () => {
+    // The files teachers already have were written before the marking
+    // convention; they keep importing exactly as they did.
+    const result = parse(numbered(0, run('จงหาอัตราเร็วเชิงมุมเฉลี่ย (2.5)')))
+
+    expect(result.questions[0].answers).toEqual([{ formula: '2.5', unit: '' }])
+    expect(result.questions[0].html).toBe('<p>จงหาอัตราเร็วเชิงมุมเฉลี่ย</p>')
+  })
+
+  it('reads a marked เฉลย on a sub-question', () => {
+    const result = parse([
+      numbered(0, run('วงล้อเริ่มหมุนจากหยุดนิ่ง')),
+      numbered(1, run('จงหาความเร่งเชิงมุม '), run('4 rad/s', { color: 'FF0000' })),
+      numbered(1, run('จงหามุมที่กวาดไปได้ '), run('200 rad', { color: 'FF0000' })),
+    ].join(''))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('written')
+    expect(question.parts.map(part => part.answers)).toEqual([
+      [{ formula: '4', unit: 'rad/s' }],
+      [{ formula: '200', unit: 'rad' }],
+    ])
+    expect(question.parts[0].html).toBe('<p>จงหาความเร่งเชิงมุม</p>')
+  })
+
+  it('does not read the marked ตัวเลือก of a ปรนัย as a value', () => {
+    const result = parse([
+      numbered(0, run('ข้อใดคือหน่วยของกำลังไฟฟ้า')),
+      plain(run('1) โวลต์')),
+      plain(run('2) '), run('วัตต์', { color: 'FF0000' })),
+      plain(run('3) แอมแปร์')),
+      plain(run('4) โอห์ม')),
+    ].join(''))
+
+    expect(result.questions[0].type).toBe('mcq')
+    expect(result.questions[0].answers).toEqual([])
+  })
+})
+
 // ─── ช่องว่าง of a เติมคำ โจทย์ ───────────────────────────────────────────────
 
 describe('the ช่องว่าง a เติมคำ worksheet marks', () => {

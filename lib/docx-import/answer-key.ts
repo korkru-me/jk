@@ -54,7 +54,8 @@ const NOT_UNITS = new Set(['คะแนน', 'คะเเนน', 'ข้อ',
 /** Longest a bracket can be and still be an answer rather than an aside. */
 const MAX_LENGTH = 80
 
-function flatten(inner: string): string {
+/** Readable text of a fragment of a โจทย์, with `<sup>2</sup>` kept as ². */
+export function flattenAnswerText(inner: string): string {
   return inner
     .replace(/<sup>([0-9]+)<\/sup>/g, (_, digits: string) =>
       [...digits].map(digit => SUPERSCRIPT[digit] ?? digit).join(''))
@@ -138,6 +139,32 @@ function parsePiece(piece: string): DraftAnswer | null {
 }
 
 /**
+ * Reads one written เฉลย: a value, or several separated by commas.
+ *
+ * Shared by both ways a worksheet gives an answer — marked in colour, which is
+ * the convention every question type uses, and written in brackets, which is
+ * how the worksheets that predate it are typed. Returns null for text that is
+ * not an answer at all, so a caller can leave the โจทย์ as it found it.
+ */
+export function parseAnswerList(text: string): DraftAnswer[] | null {
+  const inner = text.replace(/\s+/g, ' ').trim()
+  if (!inner || inner.length > MAX_LENGTH) return null
+
+  const pieces = inner.split(/[,;]/).map(piece => piece.trim()).filter(Boolean)
+  if (pieces.length === 0) return null
+
+  const answers: DraftAnswer[] = []
+  for (const piece of pieces) {
+    const answer = parsePiece(piece)
+    // All or nothing: half a key read out of "(4 rad/s², ดูวิธีทำท้ายเล่ม)"
+    // would leave the โจทย์ with an answer it does not have.
+    if (!answer) return null
+    answers.push(answer)
+  }
+  return answers
+}
+
+/**
  * Reads the เฉลย out of one โจทย์ or sub-question.
  *
  * Returns the โจทย์ unchanged, with no answers, whenever the bracket is not one
@@ -152,20 +179,8 @@ export function readAnswerKey(html: string): AnswerKeyRead {
   // the โจทย์.
   if (html.slice(0, match.index).trimEnd().endsWith('(')) return { answers: [], html }
 
-  const inner = flatten(match[1])
-  if (!inner || inner.length > MAX_LENGTH) return { answers: [], html }
-
-  const pieces = inner.split(/[,;]/).map(piece => piece.trim()).filter(Boolean)
-  if (pieces.length === 0) return { answers: [], html }
-
-  const answers: DraftAnswer[] = []
-  for (const piece of pieces) {
-    const answer = parsePiece(piece)
-    // All or nothing: half a key read out of "(4 rad/s², ดูวิธีทำท้ายเล่ม)"
-    // would leave the โจทย์ with an answer it does not have.
-    if (!answer) return { answers: [], html }
-    answers.push(answer)
-  }
+  const answers = parseAnswerList(flattenAnswerText(match[1]))
+  if (!answers) return { answers: [], html }
 
   return { answers, html: html.slice(0, match.index) + html.slice(match.index + match[0].length) }
 }

@@ -107,23 +107,23 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
 
   // A โจทย์ that came back as `essay` is one no เฉลย was found for: either the
   // bracket is missing or it held something that is not an answer.
-  add(checkFor(profile, 'answer-bracket', () => {
+  add(checkFor(profile, 'answer-position', () => {
     if (questions.length === 0) return null
     const read = questions.filter(question => question.type === 'written')
     const unread = questions.filter(question => question.type === 'essay')
 
     if (unread.length === 0) {
-      return { ruleId: 'answer-bracket', status: 'pass', detail: `อ่านเฉลยได้ครบทั้ง ${read.length} ข้อ` }
+      return { ruleId: 'answer-position', status: 'pass', detail: `อ่านเฉลยได้ครบทั้ง ${read.length} ข้อ` }
     }
     const numbers = unread.map(question => question.number).join(', ')
     return profile.type === 'written'
       ? {
-        ruleId: 'answer-bracket',
+        ruleId: 'answer-position',
         status: 'warn',
-        detail: `ข้อ ${numbers} ไม่พบเฉลยในวงเล็บ — จะเข้ามาเป็นบรรยายให้ครูตรวจเอง หรือพิมพ์เฉลยเองบนการ์ดก็ได้`,
+        detail: `ข้อ ${numbers} ไม่พบเฉลย — ตรวจว่าทำเครื่องหมายไว้ท้ายข้อแล้ว หรือปล่อยให้เข้ามาเป็นบรรยายให้ครูตรวจเอง`,
       }
       : {
-        ruleId: 'answer-bracket',
+        ruleId: 'answer-position',
         status: 'pass',
         detail: `อ่านเฉลยได้ ${read.length} ข้อ · อีก ${unread.length} ข้อเป็นข้อเขียนที่ครูตรวจเอง`,
       }
