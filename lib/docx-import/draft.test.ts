@@ -792,10 +792,16 @@ describe('the ช่องว่าง a เติมคำ worksheet marks', ()
   })
 
   it('leaves dots alone unless the file was said to be เติมคำ', () => {
-    const result = parse(numbered(0, run('จงอธิบาย .......... ตามความเข้าใจ')))
+    // เติมคำตอบตัวเลข, ปรนัย and บรรยาย all keep their dots: on those
+    // worksheets "..." is an ellipsis, and a เติมคำตอบตัวเลข โจทย์ in
+    // particular is answered with one value, not with gaps in its sentence.
+    const body = numbered(0, run('จงอธิบาย .......... ตามความเข้าใจ'))
 
-    expect(result.questions[0].blanks).toEqual([])
-    expect(result.questions[0].html).toContain('..........')
+    for (const expected of ['written', 'mcq', 'essay', undefined] as const) {
+      const question = parse(body, {}, { expect: expected }).questions[0]
+      expect(question.blanks, String(expected)).toEqual([])
+      expect(question.html, String(expected)).toContain('..........')
+    }
   })
 
   it('reads nothing when the whole โจทย์ carries the same marking', () => {
