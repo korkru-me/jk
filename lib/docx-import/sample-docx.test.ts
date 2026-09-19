@@ -137,16 +137,20 @@ describe('generated sample worksheets', () => {
   it('reads the ช่องว่าง back out of the เติมคำ sample', async () => {
     const parsed = await parseSample(PROFILE_BY_TYPE.fill_blank)
 
-    expect(parsed.questions.map(question => question.type)).toEqual(['fill_blank', 'fill_blank', 'fill_blank'])
+    expect(parsed.questions.every(question => question.type === 'fill_blank')).toBe(true)
     expect(parsed.questions.map(question => question.blanks.map(blank => blank.answer))).toEqual([
       ['นิวตัน'],
+      // A row of dots is a gap the file left empty: a blank, with no answer.
+      [''],
       ['100', '0'],
       ['เงิน', 'ทองแดง'],
     ])
     // The words are gone from the โจทย์ and numbered markers stand in their place.
+    expect(parsed.questions[2].html).toContain('[___1]')
+    expect(parsed.questions[2].html).toContain('[___2]')
+    expect(parsed.questions[2].html).not.toContain('100')
     expect(parsed.questions[1].html).toContain('[___1]')
-    expect(parsed.questions[1].html).toContain('[___2]')
-    expect(parsed.questions[1].html).not.toContain('100')
+    expect(parsed.questions[1].html).not.toContain('..........')
   })
 
   it('names the file after the type, without characters a filesystem refuses', async () => {
