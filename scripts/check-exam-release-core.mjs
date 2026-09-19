@@ -3,11 +3,19 @@
  * remains a CI/local command and is intentionally not represented by a stale
  * boolean in a committed manifest.
  */
-export function inspectExamReleaseReadiness({ stagingReady, sebPlatformsReady, externalUatReady }) {
+export function inspectExamReleaseReadiness({
+  stagingReady,
+  releaseCandidateReady,
+  sebPlatformsReady,
+  externalUatReady,
+}) {
   const checks = [
     stagingReady
       ? { status: 'pass', field: 'authenticated staging', message: 'staging isolation preflight ผ่าน' }
       : { status: 'blocker', field: 'authenticated staging', message: 'ยังไม่มี staging แยกที่ผ่าน isolation preflight' },
+    releaseCandidateReady
+      ? { status: 'pass', field: 'release candidate', message: 'code, staging build, UAT run และ SEB config ผูกเป็น candidate เดียวกัน' }
+      : { status: 'blocker', field: 'release candidate', message: 'ยังไม่ได้ล็อก revision/build หรือหลักฐานมาจากคนละ candidate' },
     sebPlatformsReady
       ? { status: 'pass', field: 'SEB platforms', message: 'ทุก platform ผ่าน production-config evidence gate' }
       : { status: 'blocker', field: 'SEB platforms', message: 'หลักฐาน BEK, staging mock exam หรือ physical UAT ยังไม่ครบทุก platform' },

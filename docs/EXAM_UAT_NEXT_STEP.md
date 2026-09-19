@@ -14,12 +14,13 @@ npm run next:exam-uat
 
 1. ซ่อม manifest ถ้ารูปแบบผิด
 2. สร้าง staging แยกและผ่าน isolation guard
-3. iPhone → iPad → Mac → Windows responsive UAT
-4. authenticated exam บน staging
-5. recovery/proctor drill
-6. SEB production-config gate: macOS → iPadOS → iOS → Windows
-7. ล้างข้อมูล QA เป็นขั้นตอนสุดท้าย
-8. รัน release gate และ regression/build จาก release candidate เดียวกัน
+3. ล็อก Git revision + staging build + SEB config เป็น release candidate เดียว
+4. iPhone → iPad → Mac → Windows responsive UAT
+5. authenticated exam บน staging
+6. recovery/proctor drill
+7. SEB production-config gate: macOS → iPadOS → iOS → Windows
+8. ล้างข้อมูล QA เป็นขั้นตอนสุดท้าย
+9. รัน release gate และ regression/build จาก release candidate เดียวกัน
 
 ถ้าทดสอบแล้วพบปัญหา ให้ตั้ง suite เป็น `failed` พร้อมวัน/รุ่นที่ไม่เป็นความลับ แก้โค้ดและทดสอบ suite เดิมซ้ำก่อนเดินต่อ ตัวบอกขั้นตอนจะไม่ข้าม suite ที่ยังไม่เป็น `passed`
 

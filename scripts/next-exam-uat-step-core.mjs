@@ -1,5 +1,6 @@
 import { inspectExamUatEvidence } from './check-exam-uat-evidence-core.mjs'
 import { inspectSebPlatformEvidence } from './check-seb-platform-evidence-core.mjs'
+import { inspectExamReleaseCandidate } from './check-exam-release-candidate-core.mjs'
 
 const RESPONSIVE_STEPS = [
   ['iphone-responsive', 'ทดสอบหน้าข้อสอบบน iPhone จริง'],
@@ -36,7 +37,7 @@ function step(id, title, instruction) {
 }
 
 /** Return exactly one safe next action so a long UAT run stays sequential. */
-export function nextExamUatStep({ stagingReady, uatManifest, sebManifest }) {
+export function nextExamUatStep({ stagingReady, candidateManifest, uatManifest, sebManifest }) {
   const uatInspection = inspectExamUatEvidence(uatManifest)
   if (hasShapeBlocker(uatInspection)) {
     return step(
@@ -55,11 +56,34 @@ export function nextExamUatStep({ stagingReady, uatManifest, sebManifest }) {
     )
   }
 
+  const candidateInspection = inspectExamReleaseCandidate(candidateManifest, {
+    uatRunId: uatManifest?.runId,
+    sebConfigId: sebManifest?.configId,
+  })
+  const candidateShapeBroken = candidateInspection.checks.some(check => check.status === 'blocker'
+    && !check.field.endsWith(' release gate'))
+  if (candidateShapeBroken) {
+    return step(
+      'repair-release-candidate',
+      'ซ่อมไฟล์ release candidate ก่อน',
+      'รัน npm run check:exam-candidate แล้วแก้เฉพาะรูปแบบ/การเชื่อม id ห้ามใส่ URL, credential หรือ key',
+    )
+  }
+
   if (!stagingReady) {
     return step(
       'prepare-staging',
       'สร้าง staging แยกจาก production',
       'ตั้ง Vercel Preview และ Supabase project สำหรับ QA แล้วให้ npm run check:exam-staging ผ่านก่อนสร้างบัญชีจำลอง',
+    )
+  }
+
+
+  if (!candidateInspection.ready) {
+    return step(
+      'lock-release-candidate',
+      'ล็อก code และ staging build ที่จะใช้ทดสอบ',
+      'บันทึก Git revision, staging build id และเวลา ISO ใน config/exam-release-candidate.json แล้วห้ามเปลี่ยน code/config ระหว่าง UAT',
     )
   }
 

@@ -10,6 +10,7 @@ import {
 const QA_ENV_URL = new URL('../.env.qa.local', import.meta.url)
 const UAT_MANIFEST_URL = new URL('../config/exam-uat-evidence.json', import.meta.url)
 const SEB_MANIFEST_URL = new URL('../config/seb-platform-evidence.json', import.meta.url)
+const CANDIDATE_MANIFEST_URL = new URL('../config/exam-release-candidate.json', import.meta.url)
 
 async function readQaEnvironment() {
   try {
@@ -31,14 +32,16 @@ async function readJson(url) {
   }
 }
 
-const [staging, uatManifest, sebManifest] = await Promise.all([
+const [staging, candidateManifest, uatManifest, sebManifest] = await Promise.all([
   readQaEnvironment(),
+  readJson(CANDIDATE_MANIFEST_URL),
   readJson(UAT_MANIFEST_URL),
   readJson(SEB_MANIFEST_URL),
 ])
 
 console.log(formatNextExamUatStep(nextExamUatStep({
   stagingReady: staging.ready,
+  candidateManifest,
   uatManifest,
   sebManifest,
 })))

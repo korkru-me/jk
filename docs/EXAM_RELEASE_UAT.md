@@ -8,6 +8,8 @@
 
 หากจำไม่ได้ว่าต้องทำอะไรต่อ ให้รัน `npm run next:exam-uat` ระบบจะบอกทีละหนึ่งขั้นตามลำดับใน `docs/EXAM_UAT_NEXT_STEP.md`
 
+หลัง staging พร้อม ต้องล็อก code revision, staging build และ SEB config ตาม `docs/EXAM_RELEASE_CANDIDATE.md` ให้ `npm run check:exam-candidate` ผ่านก่อนเริ่มเก็บผล UAT
+
 ## 1. สร้าง staging แยกก่อน
 
 - ใช้ Vercel Preview/โดเมน HTTPS ที่ไม่ใช่ production
@@ -55,6 +57,7 @@
 
 - `npm test`, `npx tsc --noEmit`, `npm run lint:tokens` และ `npm run build` ผ่านจาก commit เดียวกัน
 - `npm run check:exam-staging` ผ่าน
+- `npm run check:exam-candidate` ผ่าน
 - `npm run check:exam-uat` ผ่าน
 - `npm run check:seb-platforms` ผ่าน
 - `npm run check:exam-release` ผ่าน

@@ -44,31 +44,59 @@ function sebManifest(ready = true) {
   }
 }
 
+function candidateManifest(ready = true) {
+  return {
+    schemaVersion: 1,
+    candidateId: 'release-2026-09',
+    sourceRevision: ready ? 'a'.repeat(40) : 'pending',
+    stagingBuild: ready ? 'staging-build-123' : 'pending',
+    sebConfigId: 'production-v1',
+    lockedAt: ready ? '2026-09-20T09:00:00.000Z' : null,
+  }
+}
+
+function context(overrides = {}) {
+  return {
+    stagingReady: true,
+    candidateManifest: candidateManifest(),
+    uatManifest: uatManifest(),
+    sebManifest: sebManifest(),
+    ...overrides,
+  }
+}
+
 describe('next exam UAT step', () => {
   it('repairs malformed evidence before directing a test', () => {
-    expect(nextExamUatStep({
-      stagingReady: true,
+    expect(nextExamUatStep(context({
       uatManifest: {},
-      sebManifest: sebManifest(),
-    }).id).toBe('repair-uat-evidence')
+    })).id).toBe('repair-uat-evidence')
   })
 
   it('requires isolated staging before any external UAT', () => {
-    expect(nextExamUatStep({
+    expect(nextExamUatStep(context({
       stagingReady: false,
+      candidateManifest: candidateManifest(false),
       uatManifest: uatManifest('pending'),
       sebManifest: sebManifest(false),
-    }).id).toBe('prepare-staging')
+    })).id).toBe('prepare-staging')
+  })
+
+  it('locks the release candidate after staging and before device UAT', () => {
+    expect(nextExamUatStep(context({
+      candidateManifest: candidateManifest(false),
+      uatManifest: uatManifest('pending'),
+      sebManifest: sebManifest(false),
+    }))).toEqual(expect.objectContaining({ id: 'lock-release-candidate' }))
   })
 
   it('walks responsive suites in a stable device order', () => {
     const manifest = uatManifest('pending')
-    expect(nextExamUatStep({ stagingReady: true, uatManifest: manifest, sebManifest: sebManifest(false) }).id)
+    expect(nextExamUatStep(context({ uatManifest: manifest, sebManifest: sebManifest(false) })).id)
       .toBe('iphone-responsive')
     manifest.suites[0].status = 'passed'
     manifest.suites[0].testedAt = '2026-09-20T10:00:00.000Z'
     manifest.suites[0].testedVersion = 'ios-tested'
-    expect(nextExamUatStep({ stagingReady: true, uatManifest: manifest, sebManifest: sebManifest(false) }).id)
+    expect(nextExamUatStep(context({ uatManifest: manifest, sebManifest: sebManifest(false) })).id)
       .toBe('ipad-responsive')
   })
 
@@ -77,7 +105,7 @@ describe('next exam UAT step', () => {
     manifest.suites.find(row => row.id === 'authenticated-exam').status = 'pending'
     manifest.suites.find(row => row.id === 'authenticated-exam').testedAt = null
     manifest.suites.find(row => row.id === 'authenticated-exam').testedVersion = 'record during final UAT'
-    expect(nextExamUatStep({ stagingReady: true, uatManifest: manifest, sebManifest: sebManifest(false) }).id)
+    expect(nextExamUatStep(context({ uatManifest: manifest, sebManifest: sebManifest(false) })).id)
       .toBe('authenticated-exam')
 
     manifest.suites.find(row => row.id === 'authenticated-exam').status = 'passed'
@@ -86,7 +114,7 @@ describe('next exam UAT step', () => {
     manifest.suites.find(row => row.id === 'recovery-proctor').status = 'pending'
     manifest.suites.find(row => row.id === 'recovery-proctor').testedAt = null
     manifest.suites.find(row => row.id === 'recovery-proctor').testedVersion = 'record during final UAT'
-    expect(nextExamUatStep({ stagingReady: true, uatManifest: manifest, sebManifest: sebManifest(false) }).id)
+    expect(nextExamUatStep(context({ uatManifest: manifest, sebManifest: sebManifest(false) })).id)
       .toBe('recovery-proctor')
   })
 
@@ -95,18 +123,14 @@ describe('next exam UAT step', () => {
     manifest.suites.find(row => row.id === 'qa-data-cleanup').status = 'pending'
     manifest.suites.find(row => row.id === 'qa-data-cleanup').testedAt = null
     manifest.suites.find(row => row.id === 'qa-data-cleanup').testedVersion = 'record during final UAT'
-    expect(nextExamUatStep({ stagingReady: true, uatManifest: manifest, sebManifest: sebManifest(false) }).id)
+    expect(nextExamUatStep(context({ uatManifest: manifest, sebManifest: sebManifest(false) })).id)
       .toBe('seb-macos')
-    expect(nextExamUatStep({ stagingReady: true, uatManifest: manifest, sebManifest: sebManifest() }).id)
+    expect(nextExamUatStep(context({ uatManifest: manifest, sebManifest: sebManifest() })).id)
       .toBe('qa-data-cleanup')
   })
 
   it('reports completion only after all evidence is ready', () => {
-    const result = nextExamUatStep({
-      stagingReady: true,
-      uatManifest: uatManifest(),
-      sebManifest: sebManifest(),
-    })
+    const result = nextExamUatStep(context())
     expect(result.complete).toBe(true)
     expect(result.id).toBe('complete')
   })

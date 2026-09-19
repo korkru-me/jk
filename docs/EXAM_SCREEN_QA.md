@@ -155,6 +155,16 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ผลตรวจเฟส 10: 102 test files / 1,342 tests, TypeScript และ design-token lint ผ่าน; `next:exam-uat` รายงานขั้นแรกว่า “สร้าง staging แยกจาก production” ตรงตามสถานะจริงและไม่พิมพ์ค่าจาก environment/manifests
 
+### เฟส 11 — ผูกหลักฐานกับ release candidate เดียว
+
+สถานะ: **agent-only tooling ผ่าน · candidate จริงยังรอ staging build**
+
+เพิ่ม `config/exam-release-candidate.json` และ `npm run check:exam-candidate` เพื่อล็อก Git revision 40 ตัว, staging build id, SEB config id และเวลา ISO พร้อมตรวจว่า candidate id ตรงกับ UAT run และ config id ตรงกับ SEB platform evidence โดยไม่ยอมรับ URL, key-like build id, free text หรือ field เพิ่มเติม รายละเอียดอยู่ใน `docs/EXAM_RELEASE_CANDIDATE.md`
+
+รวม candidate gate เข้า `check:exam-release` และ `next:exam-uat` แล้ว ลำดับจึงเป็น staging พร้อม → ล็อก candidate → เริ่ม UAT หากแก้ code/config ระหว่างทางต้องสร้าง candidate ใหม่และทดสอบ suite ที่ได้รับผลกระทบซ้ำ ปัจจุบัน release checker รายงาน external blockers 4 กลุ่มตามจริง: staging, candidate, SEB platforms และ external UAT
+
+ผลตรวจเฟส 11: 103 test files / 1,348 tests, TypeScript และ design-token lint ผ่าน; candidate checker จงใจรายงาน revision/build/time 3 blockers และไม่พิมพ์ค่า candidate/config ส่วน next-step planner ยังคงชี้ staging เป็นงานแรก
+
 ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) แต่ Windows ยังเป็น pending production release gate จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
 
 ## หลักฐานที่เก็บได้

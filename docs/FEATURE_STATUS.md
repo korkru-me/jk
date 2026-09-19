@@ -35,6 +35,10 @@ Regression หลังเฟส 9 ผ่าน 101 test files / 1,333 tests, Ty
 
 Regression หลังเฟส 10 ผ่าน 102 test files / 1,342 tests, TypeScript และ token lint; next-step planner ปัจจุบันชี้ไปการสร้าง staging แยก ซึ่งเป็น blocker แรกจริง
 
+เฟส 11 เพิ่ม fixed-schema release candidate gate ผูก UAT run กับ Git revision, staging build และ SEB config เดียวกัน ป้องกันการรวมผลผ่านจากคนละ build/config; `check:exam-candidate`, `check:exam-release` และ `next:exam-uat` ใช้กติกาเดียวกัน สถานะ candidate ยัง pending เพราะยังไม่มี staging build จริง
+
+Regression หลังเฟส 11 ผ่าน 103 test files / 1,348 tests, TypeScript และ token lint; candidate checker รายงาน pending revision/build/time ตาม external state จริง
+
 ## MVP core
 
 ### Authentication — บางส่วน
