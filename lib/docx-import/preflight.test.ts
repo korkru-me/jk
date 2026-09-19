@@ -87,7 +87,7 @@ describe('reading a file against the format the teacher chose', () => {
       question({ id: 'q-2', number: 2, type: 'essay', choices: [] }),
     ]), PROFILE_BY_TYPE.written)
 
-    const check = checkFor(report, 'answer-bracket')
+    const check = checkFor(report, 'answer-position')
     expect(check?.status).toBe('warn')
     expect(check?.detail).toContain('ข้อ 2')
   })
@@ -98,7 +98,7 @@ describe('reading a file against the format the teacher chose', () => {
       question({ id: 'q-2', number: 2, type: 'essay', choices: [] }),
     ]), AUTO_PROFILE)
 
-    expect(checkFor(report, 'answer-bracket')?.status).toBe('pass')
+    expect(checkFor(report, 'answer-position')?.status).toBe('pass')
   })
 
   it('only reports rules the chosen format actually has', () => {

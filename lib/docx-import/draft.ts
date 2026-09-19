@@ -22,7 +22,7 @@
  */
 import type { QuestionType } from '@/lib/types'
 import type { DocxBlock, DocxDocument, DocxInline, DocxParagraph, NumberingLevel } from './docx'
-import { readAnswerKey, type DraftAnswer } from './answer-key'
+import { flattenAnswerText, parseAnswerList, readAnswerKey, type DraftAnswer } from './answer-key'
 
 export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank'
 
@@ -441,6 +441,98 @@ function readBlanks(paragraphs: DocxParagraph[]): BlankRead {
   }
 }
 
+/** What may sit after a marked เฉลย and still leave it at the end of the โจทย์. */
+const TRAILING_PUNCTUATION = /^[\s()（）.·]*$/
+
+interface MarkedAnswerRead {
+  answers: DraftAnswer[]
+  /** The โจทย์ with the marked เฉลย taken out. */
+  html: string
+  /** The same as readable text, for the title. */
+  plain: string
+}
+
+/** Brackets a teacher may have marked along with the value inside them. */
+function withoutBrackets(text: string): string {
+  const trimmed = text.trim()
+  return /^[(（].*[)）]$/.test(trimmed) ? trimmed.slice(1, -1).trim() : trimmed
+}
+
+/**
+ * The เฉลย a teacher marked at the end of a โจทย์.
+ *
+ * One marking convention for the whole product: the เฉลย of a ปรนัย, of a
+ * เติมคำ and of a calculation are all the word written in red, in highlighter,
+ * or in bold. A teacher learns it once.
+ *
+ * Only a mark at the *end* counts. Numbers inside the โจทย์ are the ones it
+ * gives you, and a worksheet that emphasises them would otherwise have its
+ * givens read as its answers. Brackets around the value are optional and are
+ * dropped either way, so the worksheets that wrote "(2.5)" before this
+ * convention existed keep working — `readAnswerKey` still reads those.
+ */
+function readMarkedAnswer(paragraphs: DocxParagraph[]): MarkedAnswerRead | null {
+  const signal = blankSignal(paragraphs)
+  if (!signal) return null
+
+  const lastIndex = paragraphs.length - 1
+  const last = paragraphs[lastIndex]
+  if (!last) return null
+
+  const inlines = last.inlines
+  let end = inlines.length
+  while (end > 0) {
+    const inline = inlines[end - 1]
+    if (signalOf(inline)?.[signal]) break
+    // Only whitespace and brackets may follow the เฉลย; anything else means
+    // the mark is inside the โจทย์ rather than at the end of it.
+    if (inline.kind === 'text' && TRAILING_PUNCTUATION.test(inline.text)) { end -= 1; continue }
+    return null
+  }
+  if (end === 0) return null
+
+  let start = end
+  while (start > 0) {
+    const inline = inlines[start - 1]
+    if (signalOf(inline)?.[signal]) { start -= 1; continue }
+    // Word splits a phrase on its own; the space inside one belongs to it.
+    if (start < end && inline.kind === 'text' && !inline.text.trim()) { start -= 1; continue }
+    break
+  }
+
+  const answers = parseAnswerList(withoutBrackets(flattenAnswerText(plainText(inlines.slice(start, end)))))
+  if (!answers) return null
+
+  // Whatever is left of the last line, minus the punctuation the เฉลย sat in —
+  // including the opening bracket, which Word usually leaves at the tail of the
+  // run before it rather than in one of its own.
+  let kept = inlines.slice(0, start)
+  while (kept.length > 0) {
+    const inline = kept[kept.length - 1]
+    if (inline.kind !== 'text') break
+    if (TRAILING_PUNCTUATION.test(inline.text)) { kept = kept.slice(0, -1); continue }
+    const trimmed = inline.text.replace(/[\s(（]+$/, '')
+    if (trimmed !== inline.text) kept = [...kept.slice(0, -1), { ...inline, text: trimmed }]
+    break
+  }
+
+  const rewritten = paragraphs.map((paragraph, index) =>
+    index === lastIndex ? { ...paragraph, inlines: kept } : paragraph)
+
+  return {
+    answers,
+    html: paragraphsToHtml(rewritten, { keepEmphasis: true }),
+    plain: paragraphsText(rewritten),
+  }
+}
+
+/** A sub-question's เฉลย, marked or bracketed, whichever the file used. */
+function readPartAnswer(paragraphs: DocxParagraph[]): { html: string; answers: DraftAnswer[] } {
+  const marked = readMarkedAnswer(paragraphs)
+  if (marked) return { html: marked.html, answers: marked.answers }
+  return readAnswerKey(paragraphsToHtml(paragraphs, { keepEmphasis: true }))
+}
+
 // ─── Splitting the document into questions ───────────────────────────────────
 
 /** `1)` `1.` `(1)` `ก)` `a.` — the way a choice or a sub-question is labelled. */
@@ -706,7 +798,7 @@ function buildQuestion(
     if (item.kind === 'sub') {
       const ordinal = (ordinals.get(item.paragraph.ilvl) ?? 0) + 1
       ordinals.set(item.paragraph.ilvl, ordinal)
-      const read = readAnswerKey(paragraphsToHtml([item.paragraph], { keepEmphasis: true }))
+      const read = readPartAnswer([item.paragraph])
       parts.push({
         id: `part-${number}-${partIndex++}`,
         label: levelLabel(levels?.get(item.paragraph.ilvl), ordinal),
@@ -714,12 +806,12 @@ function buildQuestion(
         answers: read.answers,
       })
     } else if (item.kind === 'marker' && !treatAsChoices) {
-      const read = readAnswerKey(
-        stripMarkerFromHtml(paragraphsToHtml(item.item.paragraphs, { keepEmphasis: true })))
+      const read = readPartAnswer(item.item.paragraphs)
       parts.push({
         id: `part-${number}-${partIndex++}`,
+        // The ก) the app draws as a label of its own is not part of the text.
+        html: stripMarkerFromHtml(read.html),
         label: item.item.marker,
-        html: read.html,
         answers: read.answers,
       })
     }
@@ -740,17 +832,20 @@ function buildQuestion(
   // A โจทย์ with ตัวเลือก is graded on the marked one; a bracket at the end of
   // it is part of an option, not a เฉลย of its own. A เติมคำ โจทย์ is graded on
   // its own ช่องว่าง, so it is not read for one either.
+  const markedStem = treatAsChoices || useBlanks ? null : readMarkedAnswer(stemParagraphs)
   const stem = treatAsChoices || useBlanks
     ? { answers: [], html: blanked?.html ?? paragraphsToHtml(stemParagraphs, { keepEmphasis: true }) }
-    : readAnswerKey(paragraphsToHtml(stemParagraphs, { keepEmphasis: true }))
+    : markedStem ?? readAnswerKey(paragraphsToHtml(stemParagraphs, { keepEmphasis: true }))
 
   const answerCounts = [stem.answers.length, ...parts.map(part => part.answers.length)]
   const hasAnswers = answerCounts.some(count => count > 0)
   // Titled by the โจทย์ as it now reads, so an imported ข้อ is not named after
   // its own answer. Taken off the readable text rather than off the HTML,
   // because a formula reads as "15√2" there and as TeX in the markup.
-  const stemPlain = useBlanks ? (blanked?.plain ?? '') : paragraphsText(stemParagraphs)
-  const stemText = stem.answers.length > 0
+  const stemPlain = useBlanks
+    ? (blanked?.plain ?? '')
+    : markedStem?.plain ?? paragraphsText(stemParagraphs)
+  const stemText = !markedStem && stem.answers.length > 0
     ? stemPlain.replace(/\s*\([^()]*\)\s*$/, '').trim()
     : stemPlain
 
@@ -759,7 +854,7 @@ function buildQuestion(
   if (answerCounts.some(count => count > 1)) {
     warnings.push({
       code: 'multi-answer',
-      message: 'ข้อนี้มีเฉลยหลายค่าในวงเล็บเดียว ระบบแยกเป็นช่องกรอกให้แล้ว — ตรวจว่าเรียงตรงกับที่โจทย์ถาม',
+      message: 'ข้อนี้มีเฉลยหลายค่า ระบบแยกเป็นช่องกรอกให้แล้ว — ตรวจว่าเรียงตรงกับที่โจทย์ถาม',
     })
   }
 
