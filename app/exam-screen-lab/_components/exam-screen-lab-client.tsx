@@ -28,7 +28,7 @@ export function ExamScreenLabClient({
   useAppViewport()
 
   return (
-    <div className="h-[var(--app-height,100dvh)] overflow-y-auto overscroll-contain bg-muted/30 p-3 sm:p-6">
+    <main className="h-[var(--app-height,100dvh)] overflow-y-auto overscroll-contain bg-muted/30 p-3 sm:p-6">
       <ExamClient
         submissionId={submissionId}
         storageOwnerId="qa-synthetic-student"
@@ -54,6 +54,6 @@ export function ExamScreenLabClient({
         previewReturnHref={`/exam-screen-lab?perPage=${questionsPerPage}`}
         previewEditWarning="ห้องทดลองเฉพาะเครื่องนักพัฒนา • ไม่บันทึกคำตอบ รูป หรือไฟล์ขึ้นระบบ"
       />
-    </div>
+    </main>
   )
 }

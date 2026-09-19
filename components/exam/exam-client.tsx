@@ -1114,6 +1114,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   onChange={files => handleFileSubmissionChange(current.id, files)}
                   localOnly={previewMode}
                 />
+              ) : current.questions.question_type === 'essay' ? (
+                <EssayAnswerInput
+                  rawValue={localAnswers[current.id] ?? ''}
+                  onChange={val => handleAnswerChange(current.id, val)}
+                />
               ) : current.questions.question_type === 'classify' ? (
                 <ClassifyAnswerInput
                   config={current.questions.extra_data as ClassifyConfig | SafeClassifyConfig}
@@ -1272,7 +1277,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       </div>
 
       {/* RIGHT: Nav panel */}
-      <div className={`shrink-0 flex flex-col gap-3 ${focusMode ? 'w-60' : 'hidden md:flex w-56'}`}>
+      <div className={`hidden shrink-0 flex-col gap-3 md:flex ${focusMode ? 'w-60' : 'w-56'}`}>
 
         {/* Timer */}
         {secondsLeft !== null && (
@@ -1520,7 +1525,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           {previewBanner(false)}
           {/* Focus header */}
           <div className="shrink-0 border-b bg-card">
-            <div className="flex items-center gap-4 px-6 py-3">
+            <div className="flex items-center gap-2 px-3 py-2 sm:gap-4 sm:px-6 sm:py-3">
               <div className="flex-1 flex items-center gap-3 min-w-0">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">
                   โหมดโฟกัส
@@ -1541,8 +1546,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     size="sm"
                     onClick={toggleScratchpad}
                     aria-pressed={showScratchpad}
+                    aria-label="กระดาษทด"
+                    className="size-11 px-0 sm:size-auto sm:px-2.5"
                   >
-                    <NotebookPen /> กระดาษทด
+                    <NotebookPen /> <span className="hidden sm:inline">กระดาษทด</span>
                   </Button>
                 )}
                 {config.calculatorEnabled && (
@@ -1552,12 +1559,21 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     size="sm"
                     onClick={toggleCalculator}
                     aria-pressed={showCalculator}
+                    aria-label="เครื่องคิดเลข"
+                    className="size-11 px-0 sm:size-auto sm:px-2.5"
                   >
-                    <CalculatorIcon /> เครื่องคิดเลข
+                    <CalculatorIcon /> <span className="hidden sm:inline">เครื่องคิดเลข</span>
                   </Button>
                 )}
-                <Button type="button" variant="outline" size="sm" onClick={() => setFocusMode(false)}>
-                  <Minimize2 /> ออก
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFocusMode(false)}
+                  aria-label="ออกจากโหมดโฟกัส"
+                  className="size-11 px-0 sm:size-auto sm:px-2.5"
+                >
+                  <Minimize2 /> <span className="hidden sm:inline">ออก</span>
                 </Button>
               </div>
             </div>
@@ -1570,7 +1586,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             </div>
           </div>
 
-          <div className="flex-1 overflow-hidden p-6 max-w-6xl mx-auto w-full">
+          <div className="mx-auto w-full max-w-6xl flex-1 overflow-hidden p-3 sm:p-6">
             {examBody}
           </div>
         </div>
@@ -1983,8 +1999,8 @@ function ExamToolbar({
             <WifiOff size={11} /> รอซิงก์ {pendingSync}
           </span>
         ) : isOnline ? (
-          <span className="text-success flex items-center gap-1">
-            <Wifi size={11} /> บันทึกอัตโนมัติ
+          <span className="flex items-center gap-1 text-foreground">
+            <Wifi size={11} className="text-success" /> บันทึกอัตโนมัติ
           </span>
         ) : (
           <span className="text-warning flex items-center gap-1">
@@ -2199,7 +2215,7 @@ function WorkProofSlot({
         <Paperclip className="size-3.5 text-primary" aria-hidden="true" />
         <p className="text-xs font-semibold">วิธีทำ{partCount > 1 ? ` · ${label}` : ''}</p>
         {required && (
-          <Badge variant="outline" className="ml-auto text-[10px] text-warning">ต้องแนบ</Badge>
+          <Badge variant="outline" className="ml-auto border-warning text-[10px] text-foreground">ต้องแนบ</Badge>
         )}
       </div>
 
@@ -2266,7 +2282,7 @@ function WorkProofSlot({
       </div>
 
       {required && !artifact && !workImage && localOnly && (
-        <p className="mt-2 text-[10px] text-warning">ต้องแนบวิธีทำก่อนจำลองการส่ง</p>
+        <p className="mt-2 text-[10px] font-medium text-foreground">ต้องแนบวิธีทำก่อนจำลองการส่ง</p>
       )}
     </div>
   )
@@ -3139,6 +3155,30 @@ function ImageLabelAnswerInput({ config, rawValue, onChange, heading }: {
       onChange={next => onChange(JSON.stringify(next))}
       heading={heading}
     />
+  )
+}
+
+// ─── Essay ────────────────────────────────────────────────────────────────────
+
+function EssayAnswerInput({ rawValue, onChange }: {
+  rawValue: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">คำตอบ</p>
+      <Textarea
+        value={rawValue}
+        onChange={event => onChange(event.target.value)}
+        rows={8}
+        placeholder="พิมพ์คำตอบเป็นข้อความ..."
+        aria-label="คำตอบเรียงความ"
+        className="min-h-48 resize-y leading-relaxed"
+      />
+      <p className="text-right text-[10px] text-muted-foreground" aria-live="polite">
+        {rawValue.length.toLocaleString('th-TH')} ตัวอักษร
+      </p>
+    </div>
   )
 }
 

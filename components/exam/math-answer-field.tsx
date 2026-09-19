@@ -154,7 +154,6 @@ export function MathAnswerField({
           spellCheck={false}
           aria-label={ariaLabel}
           aria-controls={active ? panelId : undefined}
-          aria-expanded={active}
           placeholder={placeholder}
           value={value}
           {...caret.inputProps}
@@ -181,7 +180,7 @@ export function MathAnswerField({
         </Button>
       </span>
 
-      <span className="flex items-center gap-1 text-[11px] text-muted-foreground" aria-label="หน่วยมุม">
+      <span className="flex items-center gap-1 text-[11px] text-muted-foreground" role="group" aria-label="หน่วยมุม">
         <span className="mr-0.5">มุม</span>
         {(['deg', 'rad'] as const).map(option => (
           <Button

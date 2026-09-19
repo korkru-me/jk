@@ -138,7 +138,7 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
           disabled={uploading}
           className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
             required
-              ? 'border-warning text-warning bg-warning/8'
+              ? 'border-warning bg-warning/8 text-foreground'
               : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
           }`}
           aria-label="แนบรูปวิธีทำจากกล้องหรือเครื่อง"
@@ -148,7 +148,7 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
         </button>
       )}
       {required && !value && !localOnly && (
-        <p className="text-[10px] text-warning">ต้องแนบรูปวิธีทำก่อนส่งคำตอบ</p>
+        <p className="text-[10px] font-medium text-foreground">ต้องแนบรูปวิธีทำก่อนส่งคำตอบ</p>
       )}
       {localOnly && (
         <p className="text-[10px] text-muted-foreground">ตัวอย่าง — ไฟล์อยู่ในเครื่องคุณ ไม่ถูกอัปโหลด</p>
