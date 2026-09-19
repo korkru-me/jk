@@ -144,6 +144,44 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
     }
   }))
 
+  add(checkFor(profile, 'order-items', () => {
+    if (questions.length === 0) return null
+    const without = questions.filter(question => question.orderItems.length < 2)
+    const total = questions.reduce((sum, question) => sum + question.orderItems.length, 0)
+
+    if (without.length === 0) {
+      return { ruleId: 'order-items', status: 'pass', detail: `พบรายการที่ต้องเรียงรวม ${total} รายการ จาก ${questions.length} ข้อ` }
+    }
+    return {
+      ruleId: 'order-items',
+      status: 'fail',
+      detail: `ข้อ ${without.map(question => question.number).join(', ')} ไม่พบรายการที่ต้องเรียง — ตรวจว่าพิมพ์บรรทัดละรายการ ขึ้นต้นด้วย 1. 2. 3. 4.`,
+    }
+  }))
+
+  // Only the ข้อ that offered orders to pick between can be missing a key. A
+  // worksheet that lists its steps in the right order has already answered.
+  add(checkFor(profile, 'order-key', () => {
+    const offered = questions.filter(question => question.orderChoices.length > 0)
+    if (offered.length === 0) {
+      if (questions.length === 0) return null
+      return {
+        ruleId: 'order-key',
+        status: 'pass',
+        detail: `ไม่มีข้อไหนมีตัวเลือกลำดับ — ถือว่าลำดับที่พิมพ์ในไฟล์คือลำดับที่ถูก ทั้ง ${questions.length} ข้อ`,
+      }
+    }
+    const unmarked = offered.filter(question => !question.orderChoices.some(choice => choice.isCorrect))
+    if (unmarked.length === 0) {
+      return { ruleId: 'order-key', status: 'pass', detail: `อ่านลำดับที่ถูกได้ครบทั้ง ${offered.length} ข้อ` }
+    }
+    return {
+      ruleId: 'order-key',
+      status: 'warn',
+      detail: `ข้อ ${unmarked.map(question => question.number).join(', ')} ไม่พบเครื่องหมายเฉลย — เลือกลำดับที่ถูกบนการ์ดได้เลย`,
+    }
+  }))
+
   add(checkFor(profile, 'statements', () => {
     if (questions.length === 0) return null
     const without = questions.filter(question => question.statements.length === 0)
@@ -184,10 +222,13 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
     }
   }))
 
-  // Matches the card-level rule: an mcq with no key cannot be imported, and
-  // anything else the teacher is only asked to look at.
+  // Matches the card-level rule: an mcq with no key, and a เรียงลำดับ ข้อ whose
+  // paper offered orders without marking one, cannot be imported. Anything
+  // else the teacher is only asked to look at.
   const needsAttention = questions.filter(question =>
-    (isMcq(question) && !hasKey(question)) || question.warnings.length > 0).length
+    (isMcq(question) && !hasKey(question))
+    || (question.orderChoices.length > 0 && !question.orderChoices.some(choice => choice.isCorrect))
+    || question.warnings.length > 0).length
 
   return {
     readable: questions.length > 0,

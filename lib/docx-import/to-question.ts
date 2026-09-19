@@ -13,12 +13,30 @@
  */
 import { toPortableQuestion, type PortableQuestion } from '@/lib/question-portable'
 import type { QuestionFormData } from '@/lib/actions/questions'
-import type { AnswerPart, FillBlankConfig, FillBlankItem, MCQOption, Question, QuestionType, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
+import type { AnswerPart, FillBlankConfig, FillBlankItem, MCQOption, OrderingConfig, OrderingItem, Question, QuestionType, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
 import { acceptedAnswers, countBlanks } from '@/lib/fill-blank'
-import type { DraftAnswer, DraftBlank, DraftQuestion, DraftPart, DraftStatement, DraftWarning } from './draft'
+import { applyOrder } from './draft'
+import type { DraftAnswer, DraftBlank, DraftOrderChoice, DraftQuestion, DraftPart, DraftStatement, DraftWarning } from './draft'
 
 /** The types a Word worksheet can produce. The rest are authored in the app. */
-export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false'>
+export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering'>
+
+/**
+ * What an exam paper says about a เรียงลำดับ ข้อ that the โจทย์ itself must not
+ * carry: the fragments in the scrambled order the page printed them, and the
+ * "2-1-4-3" options it offered.
+ *
+ * Kept on the import screen rather than on the `Question`, because none of it
+ * is part of the โจทย์ — the โจทย์ is the list in the right order, and the
+ * student is shown a shuffle of it. It is here so that ticking the right
+ * option on the card can rebuild that list from the same starting point every
+ * time, however many times the teacher changes their mind.
+ */
+export interface DraftOrdering {
+  /** Document order, with the ids `extra_data` will carry. */
+  items: OrderingItem[]
+  choices: DraftOrderChoice[]
+}
 
 export interface DraftEntry {
   id: string
@@ -33,6 +51,10 @@ export interface DraftEntry {
   warnings: DraftWarning[]
   /** Kept while the โจทย์ is not an mcq, so switching back restores them. */
   parkedOptions: MCQOption[]
+  /** The paper's own scaffolding for a เรียงลำดับ ข้อ, or null when the file
+   *  said nothing about one. Cleared once the teacher has edited the โจทย์ in
+   *  the form: from then on the list is theirs, not the page's. */
+  ordering: DraftOrdering | null
   question: Question
 }
 
@@ -183,6 +205,52 @@ function trueFalseFields(draft: DraftQuestion): { question_text: string; extra_d
 }
 
 /**
+ * The list to put in order, in the order the file says is right.
+ *
+ * A worksheet writes the steps in that order already and the answer is the
+ * list itself. An exam paper prints them scrambled and marks one of its
+ * "2-1-4-3" options instead, so the marked one is applied here — the โจทย์
+ * stored is the sorted list either way, and the options never leave this
+ * screen.
+ *
+ * Nothing is marked in an exam paper handed out to students, which is most of
+ * the files teachers already have. Those arrive in the page's own order with
+ * the options offered on the card; `validateForImport` holds the ข้อ back
+ * until one is ticked, rather than letting a scrambled list reach the คลัง as
+ * though it were the answer.
+ */
+function orderedItems(ordering: DraftOrdering): OrderingItem[] {
+  const correct = ordering.choices.find(choice => choice.isCorrect)
+  // An order that does not arrange the list leaves it alone rather than
+  // dropping the items it failed to place.
+  return correct ? applyOrder(ordering.items, correct.order) : ordering.items
+}
+
+function orderingOf(draft: DraftQuestion): DraftOrdering {
+  return {
+    items: draft.orderItems.map((text, index) => ({ id: `${draft.id}-i${index}`, text })),
+    choices: draft.orderChoices,
+  }
+}
+
+/** Ticks one of the orders the paper offered, and rebuilds the list from it. */
+export function pickOrder(entry: DraftEntry, index: number): DraftEntry {
+  if (!entry.ordering) return entry
+  const ordering: DraftOrdering = {
+    ...entry.ordering,
+    // One order is right, so ticking a second one unticks the first — unlike
+    // an mcq, where a teacher marking two keys is answering a different
+    // question about the โจทย์ and is only warned.
+    choices: entry.ordering.choices.map((choice, at) => ({ ...choice, isCorrect: at === index })),
+  }
+  return {
+    ...entry,
+    ordering,
+    question: { ...entry.question, extra_data: { items: orderedItems(ordering) } },
+  }
+}
+
+/**
  * Where a เฉลย read from the file lands on the โจทย์.
  *
  * `answer_formula` for the ordinary case of one value, and `answer_parts` as
@@ -222,6 +290,7 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
   }))
 
   const trueFalse = draft.type === 'true_false' ? trueFalseFields(draft) : null
+  const ordering = draft.type === 'ordering' ? orderingOf(draft) : null
 
   const question: Question = {
     ...blankQuestion(),
@@ -237,7 +306,8 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
     ...answerFields(draft),
     extra_data: trueFalse
       ? trueFalse.extra_data
-      : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
+      : ordering ? { items: orderedItems(ordering) }
+        : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
     image_urls,
   }
 
@@ -249,6 +319,7 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
     mentionsPicture: draft.mentionsPicture,
     warnings: draft.warnings,
     parkedOptions: draft.type === 'mcq' ? [] : mcq_options,
+    ordering,
     question,
   }
 }
@@ -274,7 +345,9 @@ export function changeType(entry: DraftEntry, type: ImportableType): DraftEntry 
       mcq_options: type === 'mcq' ? (options.length > 0 ? options : null) : null,
       // Only อัตนัย grades against formulas; carrying them onto a type that
       // ignores them would leave an answer nothing reads.
-      extra_data: type === 'fill_blank' || type === 'true_false' ? entry.question.extra_data : {},
+      extra_data: type === 'fill_blank' || type === 'true_false' || type === 'ordering'
+        ? entry.question.extra_data
+        : {},
       answer_parts: type === 'written' ? entry.question.answer_parts : null,
       answer_formula: type === 'written' ? entry.question.answer_formula : '',
       is_random: type === 'written' ? entry.question.is_random : false,
@@ -289,6 +362,10 @@ export function applyFormPayload(entry: DraftEntry, payload: QuestionFormData): 
   return {
     ...entry,
     reviewed: true,
+    // The list is now whatever the teacher arranged in the form. Leaving the
+    // paper's options on the card would offer to undo that edit in one click,
+    // and they are only a way of finding the order in the first place.
+    ordering: null,
     question: {
       ...entry.question,
       title: payload.title,
@@ -323,7 +400,8 @@ export function applyFormPayload(entry: DraftEntry, payload: QuestionFormData): 
  * into each attempt, and an อัตนัย with no formula freezes the evaluator's
  * failure text. Both mark every student wrong, silently.
  */
-export function validateForImport({ question }: DraftEntry): string | null {
+export function validateForImport(entry: DraftEntry): string | null {
+  const { question, ordering } = entry
   const bodyText = question.question_text.replace(/<[^>]*>/g, '').trim()
 
   if (!question.title.trim()) return 'ยังไม่มีชื่อโจทย์'
@@ -342,6 +420,19 @@ export function validateForImport({ question }: DraftEntry): string | null {
   if (question.question_type === 'true_false') {
     const bodyText = question.question_text.replace(/<[^>]*>/g, '').trim()
     if (!bodyText) return 'ถูก-ผิดต้องมีข้อความอย่างน้อย 1 ข้อ'
+    return null
+  }
+
+  if (question.question_type === 'ordering') {
+    const items = (question.extra_data as OrderingConfig | undefined)?.items ?? []
+    if (items.length < 2) return 'เรียงลำดับต้องมีรายการอย่างน้อย 2 รายการ'
+    if (items.some(item => !item.text.trim() && !item.image_url)) return 'มีรายการที่ยังว่างอยู่'
+    // The page printed the fragments scrambled on purpose. Importing that
+    // order because nobody ticked one would freeze the wrong answer into
+    // every attempt and mark the whole class wrong on it, silently.
+    if (ordering && ordering.choices.length > 0 && !ordering.choices.some(choice => choice.isCorrect)) {
+      return 'ยังไม่ได้เลือกลำดับที่ถูก — เลือกบนการ์ดได้เลย'
+    }
     return null
   }
 
@@ -383,8 +474,23 @@ export function validateForImport({ question }: DraftEntry): string | null {
  * what the *file* said, which no edit here changes.
  */
 export function liveWarnings(entry: DraftEntry, floatingImageUrls: ReadonlySet<string>): DraftWarning[] {
-  const { mentionsPicture, question } = entry
+  const { mentionsPicture, ordering, question } = entry
   const warnings: DraftWarning[] = []
+
+  if (question.question_type === 'ordering' && ordering && ordering.choices.length > 0) {
+    const marked = ordering.choices.filter(choice => choice.isCorrect).length
+    if (marked === 0) {
+      warnings.push({
+        code: 'no-correct-order',
+        message: 'ไม่พบเครื่องหมายเฉลยในไฟล์ — เลือกลำดับที่ถูกก่อนนำเข้า (รายการตอนนี้เรียงตามที่พิมพ์ไว้ในข้อสอบ ซึ่งเป็นลำดับที่สลับไว้)',
+      })
+    } else if (marked > 1) {
+      warnings.push({
+        code: 'multiple-correct-choices',
+        message: `ไฟล์ทำเครื่องหมายไว้ ${marked} ลำดับ — ระบบใช้ลำดับแรก เลือกใหม่บนการ์ดได้`,
+      })
+    }
+  }
 
   if (question.question_type === 'mcq') {
     const correctCount = (question.mcq_options ?? []).filter(option => option.is_correct).length

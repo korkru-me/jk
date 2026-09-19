@@ -166,6 +166,36 @@ describe('generated sample worksheets', () => {
     expect(question.warnings).toEqual([])
   })
 
+  it('reads the เรียงลำดับ sample as both shapes a real paper uses', async () => {
+    const parsed = await parseSample(PROFILE_BY_TYPE.ordering)
+
+    expect(parsed.questions.map(question => question.type)).toEqual(['ordering', 'ordering'])
+
+    // ข้อ 1 is the exam-paper shape: fragments printed scrambled, with the
+    // orders to choose between underneath and one of them marked.
+    const exam = parsed.questions[0]
+    expect(exam.orderItems).toHaveLength(4)
+    expect(exam.orderChoices.map(choice => choice.order)).toEqual([
+      [2, 1, 4, 3], [2, 1, 3, 4], [4, 1, 2, 3], [4, 2, 3, 1],
+    ])
+    expect(exam.orderChoices.filter(choice => choice.isCorrect)).toEqual([
+      { order: [2, 1, 4, 3], isCorrect: true },
+    ])
+    // None of that scaffolding reaches the โจทย์ the student is shown.
+    expect(exam.html).not.toContain('-')
+    expect(exam.html).not.toContain('ภูมิปัญญา')
+
+    // ข้อ 2 is the worksheet shape: the steps written in the right order, no
+    // options, nothing to mark.
+    const worksheet = parsed.questions[1]
+    expect(worksheet.orderChoices).toEqual([])
+    expect(worksheet.orderItems).toEqual([
+      'ตั้งปัญหา', 'ตั้งสมมติฐาน', 'ออกแบบและทำการทดลอง', 'สรุปผลการทดลอง',
+    ])
+
+    expect(parsed.questions.flatMap(question => question.warnings)).toEqual([])
+  })
+
   it('names the file after the type, without characters a filesystem refuses', async () => {
     for (const profile of READY) {
       const name = sampleFileName(profile)

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   draftToEntry, changeType, applyFormPayload, validateForImport, liveWarnings, entryToPortable,
-  type DraftEntry,
+  pickOrder, type DraftEntry,
 } from './to-question'
 import type { DraftQuestion } from './draft'
 import type { QuestionFormData } from '@/lib/actions/questions'
@@ -21,6 +21,8 @@ function draft(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
     answers: [],
     blanks: [],
     statements: [],
+    orderItems: [],
+    orderChoices: [],
     imageRelIds: [],
     mentionsPicture: false,
     warnings: [],
@@ -323,5 +325,100 @@ describe('liveWarnings — the answer key', () => {
 
   it('says nothing about an answer key for a type that has none', () => {
     expect(codes(changeType(entry(), 'essay'))).toEqual([])
+  })
+})
+
+describe('a เรียงลำดับ โจทย์ read off an exam paper', () => {
+  const fragments = ['หนึ่ง', 'สอง', 'สาม', 'สี่']
+
+  const paper = (marked: number | null) => draft({
+    id: 'q-1',
+    type: 'ordering',
+    html: '<p>การเรียงประโยคในข้อใดถูกต้อง</p>',
+    choices: [],
+    orderItems: fragments,
+    orderChoices: [
+      { order: [2, 1, 4, 3], isCorrect: marked === 0 },
+      { order: [2, 1, 3, 4], isCorrect: marked === 1 },
+      { order: [4, 1, 2, 3], isCorrect: marked === 2 },
+    ],
+  })
+
+  const textsOf = (entry: DraftEntry) =>
+    ((entry.question.extra_data as { items?: { text: string }[] }).items ?? []).map(item => item.text)
+
+  it('stores the list in the order the marked option claims', () => {
+    const entry = draftToEntry(paper(0), new Map())
+
+    expect(entry.question.question_type).toBe('ordering')
+    expect(textsOf(entry)).toEqual(['สอง', 'หนึ่ง', 'สี่', 'สาม'])
+    // The permutations are scaffolding from the page; the โจทย์ is the list.
+    expect(entry.question.mcq_options).toBeNull()
+    expect(entry.question.question_text).toBe('<p>การเรียงประโยคในข้อใดถูกต้อง</p>')
+  })
+
+  it('holds back a ข้อ whose paper marked no order, rather than freezing the scramble', () => {
+    const entry = draftToEntry(paper(null), new Map())
+
+    expect(textsOf(entry)).toEqual(fragments)
+    expect(validateForImport(entry)).toContain('ยังไม่ได้เลือกลำดับที่ถูก')
+    expect(liveWarnings(entry, new Set()).map(warning => warning.code)).toContain('no-correct-order')
+  })
+
+  it('rebuilds the list from the page every time the teacher changes their mind', () => {
+    // Always from the order the page printed, so ticking twice cannot compose
+    // two permutations into a third that nobody offered.
+    const entry = draftToEntry(paper(null), new Map())
+    const first = pickOrder(entry, 2)
+    expect(textsOf(first)).toEqual(['สี่', 'หนึ่ง', 'สอง', 'สาม'])
+
+    const second = pickOrder(first, 0)
+    expect(textsOf(second)).toEqual(['สอง', 'หนึ่ง', 'สี่', 'สาม'])
+    expect(second.ordering?.choices.filter(choice => choice.isCorrect)).toHaveLength(1)
+    expect(validateForImport(second)).toBeNull()
+  })
+
+  it('takes the list as written when the file offered no orders at all', () => {
+    const entry = draftToEntry(draft({
+      type: 'ordering', choices: [], orderItems: fragments, orderChoices: [],
+    }), new Map())
+
+    expect(textsOf(entry)).toEqual(fragments)
+    expect(validateForImport(entry)).toBeNull()
+    expect(liveWarnings(entry, new Set())).toEqual([])
+  })
+
+  it('stops offering the paper orders once the teacher has arranged the list', () => {
+    // From here the list is theirs. A live radio would offer to undo that in
+    // one click, and it only ever existed to find the order in the first place.
+    const entry = pickOrder(draftToEntry(paper(null), new Map()), 0)
+    const arranged: QuestionFormData = {
+      title: 'เรียงประโยค', subject: 'ภาษาไทย', question_text: '<p>การเรียงประโยคในข้อใดถูกต้อง</p>',
+      question_type: 'ordering', difficulty: 'medium', visibility: 'private',
+      category_id: '', grade_level: '', is_random: false, variables: [], logic_rules: [],
+      answer_parts: [], answer_formula: '', answer_unit: '', answer_tolerance: 0, mcq_options: [],
+      extra_data: { items: [{ id: 'a', text: 'สาม' }, { id: 'b', text: 'สี่' }] },
+      solution_text: '', solution_image_urls: [], tags: [], image_urls: [],
+    }
+    const edited = applyFormPayload(entry, arranged)
+
+    expect(edited.ordering).toBeNull()
+    expect(textsOf(edited)).toEqual(['สาม', 'สี่'])
+    expect(liveWarnings(edited, new Set())).toEqual([])
+  })
+
+  it('refuses a list with nothing to arrange', () => {
+    const entry = draftToEntry(draft({
+      type: 'ordering', choices: [], orderItems: ['เดียว'], orderChoices: [],
+    }), new Map())
+    expect(validateForImport(entry)).toContain('อย่างน้อย 2 รายการ')
+  })
+
+  it('carries the list through to the คลัง in extra_data', () => {
+    const portable = entryToPortable(draftToEntry(paper(0), new Map()), 'ภาษาไทย')
+
+    expect(portable.question_type).toBe('ordering')
+    expect((portable.extra_data as { items: { text: string }[] }).items.map(item => item.text))
+      .toEqual(['สอง', 'หนึ่ง', 'สี่', 'สาม'])
   })
 })

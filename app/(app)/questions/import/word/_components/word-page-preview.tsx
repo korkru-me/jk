@@ -39,12 +39,17 @@ export function WordPagePreview({ profile }: { profile: ImportProfile }) {
             )
           }
 
+          // The orders a เรียงลำดับ ข้อ offers sit a line below the list they
+          // reorder, which is how the printed page separates two groups that
+          // are both numbered 1. 2. 3. 4.
+          const afterItems = line.kind === 'choice' && lines[index - 1]?.line.kind === 'item'
+
           return (
             <p
               key={index}
               className={`flex gap-2 text-sm text-foreground ${
                 line.kind === 'question' ? 'mt-3 first:mt-0' : 'ms-6'
-              }`}
+              } ${afterItems ? 'mt-3' : ''}`}
             >
               <span className="shrink-0 tabular-nums text-muted-foreground">{marker}</span>
               <span className="min-w-0">{text}</span>

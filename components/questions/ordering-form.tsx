@@ -17,12 +17,17 @@ import { createQuestion, updateQuestion } from '@/lib/actions/questions'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, OrderingConfig, OrderingItem, Question } from '@/lib/types'
 import { questionsReturnTo } from '@/lib/question-return'
+import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 
 interface OrderingFormProps {
   allTags: string[]
   mode?: 'create' | 'edit'
   question?: Question
   isOwner?: boolean
+  /** Present when the โจทย์ is being drafted rather than saved — the Word
+   *  import mounts this form to edit a โจทย์ it has not written yet.
+   *  See lib/question-draft-handoff.ts. */
+  draft?: QuestionDraftHandoff
 }
 
 function newItem(): OrderingItem {
@@ -38,7 +43,7 @@ function SingleImageUpload({ value, onChange }: { value?: string; onChange: (url
   )
 }
 
-export function OrderingForm({ allTags, mode = 'create', question, isOwner = true }: OrderingFormProps) {
+export function OrderingForm({ allTags, mode = 'create', question, isOwner = true, draft }: OrderingFormProps) {
   const router = useRouter()
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
@@ -59,7 +64,8 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
   // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
   // back out — a picker here could only ever add.
   const [setIds, setSetIds] = useState<string[]>([])
-  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
+  // A แฟ้ม is chosen once for a whole imported file, not per โจทย์.
+  const setPicker = mode === 'create' && !draft ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
@@ -71,6 +77,8 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
 
   useEffect(() => {
     if (mode !== 'create' || question) return
+    // A draft arrives with its own content; a duplicate seed would overwrite it.
+    if (draft) return
     const seed = readDuplicateSeed('ordering')
     if (!seed) return
     setTitle(seed.title)
@@ -117,7 +125,8 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
-    if (!subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
+    // วิชา is asked once for the whole file on the import screen.
+    if (!draft && !subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
     const plainText = questionText.replace(/<[^>]*>/g, '').trim()
     if (!plainText) { toast.error('กรอกคำสั่ง/บริบทด้วย'); return }
     if (items.length < 2) { toast.error('ต้องมีรายการอย่างน้อย 2 รายการ'); return }
@@ -159,6 +168,8 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
         sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
+        showSharing={!draft}
+        showSubject={!draft}
         tags={tags} onTagsChange={setTags}
         {...setPicker}
       />
@@ -268,9 +279,9 @@ export function OrderingForm({ allTags, mode = 'create', question, isOwner = tru
           orderingConfig={orderingConfig}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
+          {draft ? draft.submitLabel : saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => draft ? draft.onCancel() : router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

@@ -102,6 +102,9 @@ export function WordTypeChoice({ selfHref }: { selfHref: string }) {
         </div>
       </div>
 
+      {/* Gone entirely once the last type ships, rather than an empty heading
+          promising work that is finished. */}
+      {planned.length > 0 && (
       <div className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">ยังนำเข้าไม่ได้ กำลังทำอยู่</h2>
@@ -115,6 +118,7 @@ export function WordTypeChoice({ selfHref }: { selfHref: string }) {
           ))}
         </div>
       </div>
+      )}
     </div>
   )
 }

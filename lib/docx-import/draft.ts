@@ -24,7 +24,7 @@ import type { QuestionType } from '@/lib/types'
 import type { DocxBlock, DocxDocument, DocxInline, DocxParagraph, NumberingLevel } from './docx'
 import { flattenAnswerText, parseAnswerList, readAnswerKey, type DraftAnswer } from './answer-key'
 
-export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false'
+export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering'
 
 export type { DraftAnswer } from './answer-key'
 
@@ -59,6 +59,8 @@ export type DraftWarningCode =
   | 'ambiguous-choices'
   | 'multi-answer'
   | 'unmarked-statement'
+  | 'no-correct-order'
+  | 'order-item-image'
 
 export interface DraftWarning {
   code: DraftWarningCode
@@ -81,6 +83,21 @@ export interface DraftBlank {
   answer: string
 }
 
+/**
+ * One order a paper offers as an answer — the "2-1-4-3" of an exam ข้อ.
+ *
+ * On paper a เรียงลำดับ โจทย์ is written as a ปรนัย one: the fragments are
+ * printed scrambled and the student picks the permutation that puts them
+ * right. The web asks for the order itself, so these are read only to find out
+ * what the right order *is*, and never reach the student.
+ */
+export interface DraftOrderChoice {
+  /** 1-based positions into `DraftQuestion.orderItems`, in this option's order. */
+  order: number[]
+  /** Marked in red, highlighter or bold — the same key as everywhere else. */
+  isCorrect: boolean
+}
+
 export interface DraftQuestion {
   id: string
   /** Position in the document's own numbering, 1-based. */
@@ -99,6 +116,13 @@ export interface DraftQuestion {
   /** For a ถูก-ผิด โจทย์: the statements to judge. `html` is then the lead-in
    *  they are all judged against, which is not itself judged. */
   statements: DraftStatement[]
+  /** For a เรียงลำดับ โจทย์: the lines to be put in order, as plain text, in
+   *  the order the page prints them — which is the correct order only when
+   *  `orderChoices` is empty. `html` is then the คำสั่ง and nothing else. */
+  orderItems: string[]
+  /** The orders an exam paper offered to choose between. Empty for a worksheet
+   *  that simply lists the steps already in order. */
+  orderChoices: DraftOrderChoice[]
   /** Relationship ids, resolved to uploaded URLs by the caller. */
   imageRelIds: string[]
   /** Whether the โจทย์ talks about a picture ("ดังรูป"). Kept rather than
@@ -118,7 +142,10 @@ export interface ParseOptions {
    * Reading a marked word as a ช่องว่าง is only safe once someone has said the
    * file is เติมคำ: on any other worksheet a bolded number in the โจทย์ is
    * emphasis, and cutting it out would replace the number with a blank nobody
-   * asked for. Everything else is read the same either way.
+   * asked for. เรียงลำดับ needs the same permission for the opposite reason —
+   * its "1) 2) 3) 4)" lines are indistinguishable from ตัวเลือก on the page,
+   * and only the teacher knows which the file holds. Everything else is read
+   * the same either way.
    */
   expect?: QuestionType | null
 }
@@ -835,6 +862,194 @@ function looksLikeChoices(markers: MarkerItem[]): boolean {
   return markers.length >= 3 && markers.every(marker => /^[0-9]+$/.test(marker.marker))
 }
 
+// ─── เรียงลำดับ: a list to put in order, and the order that is right ─────────
+//
+// On paper this type is written as a ปรนัย โจทย์, because paper cannot be
+// dragged: the fragments are printed scrambled and numbered, and underneath
+// them sit four permutations — "2-1-4-3", "2-1-3-4" — for the student to
+// choose between. The web asks for the order directly, so the permutations are
+// read to find out which order is right and are then thrown away; carrying
+// them into the โจทย์ would print "2-1-4-3" under a drag list, where it means
+// nothing.
+//
+// A worksheet that simply lists the steps in the right order and asks the
+// student to reorder a shuffled copy is the other shape this reads, and the
+// two are told apart by the lines themselves: "2-1-4-3" is not a step anyone
+// is asked to put in order.
+
+/** One number of an order, with the separators a paper writes between them. */
+const ORDER_NUMBER = '[0-9]{1,2}'
+const ORDER_GAP = '[\\s\\u00a0]*[-–—,/>→][\\s\\u00a0]*'
+/** `2-1-4-3` — two or more numbers joined by dashes. A separator is required:
+ *  without one, a line that reads "123" would be an order of 12 then 3. */
+const ORDER_OPTION = new RegExp(`${ORDER_NUMBER}(?:${ORDER_GAP}${ORDER_NUMBER})+`, 'g')
+/** The whole line, when it is nothing but orders — "2-1-4-3    2. 2-1-3-4" is
+ *  two options laid out in columns, which Word writes as one tabbed line. */
+const ORDER_LINE = new RegExp(
+  `^[\\s\\u00a0]*${ORDER_NUMBER}(?:${ORDER_GAP}${ORDER_NUMBER})+`
+  // Each further column, with or without a "2." of its own in front of it.
+  + `(?:[\\s\\u00a0]*(?:\\(?${ORDER_NUMBER}[.)][\\s\\u00a0]*)?${ORDER_NUMBER}(?:${ORDER_GAP}${ORDER_NUMBER})+)*`
+  + `[\\s\\u00a0]*$`,
+)
+
+interface OrderOption {
+  order: number[]
+  /** Where it sits in the line, so the mark on *this* option can be read even
+   *  when a tab put four of them on one line. */
+  start: number
+  end: number
+}
+
+/** Every order written on this line, or none when the line is a step. */
+function readOrderOptions(text: string): OrderOption[] {
+  if (!ORDER_LINE.test(text)) return []
+  const found: OrderOption[] = []
+  for (const match of text.matchAll(ORDER_OPTION)) {
+    const order = match[0].split(/[^0-9]+/).filter(Boolean).map(Number)
+    found.push({ order, start: match.index, end: match.index + match[0].length })
+  }
+  return found
+}
+
+/** Whether an order actually arranges the items — each one once, none missing. */
+function isCompleteOrder(order: number[], count: number): boolean {
+  if (count < 2 || order.length !== count) return false
+  return new Set(order).size === count && order.every(value => value >= 1 && value <= count)
+}
+
+/**
+ * The line's text, with the formatting that carries the เฉลย kept per character.
+ *
+ * Reading marks per paragraph is enough everywhere else, because everywhere
+ * else one paragraph is one thing to mark. Four options separated by tabs are
+ * four things on one paragraph, and the only record of which one the teacher
+ * coloured is where in the line the colour starts.
+ */
+function markedCharacters(paragraphs: DocxParagraph[]): { text: string; marks: (MarkFlags | null)[] } {
+  let text = ''
+  const marks: (MarkFlags | null)[] = []
+  const push = (value: string, mark: MarkFlags | null) => {
+    text += value
+    for (let at = 0; at < value.length; at++) marks.push(mark)
+  }
+
+  paragraphs.forEach((paragraph, index) => {
+    if (index > 0) push(' ', null)
+    for (const inline of paragraph.inlines) {
+      if (inline.kind === 'text') push(inline.text, signalOf(inline))
+      else if (inline.kind === 'math') push(inline.plain, null)
+      else if (inline.kind === 'break' || inline.kind === 'tab') push(' ', null)
+    }
+  })
+
+  return { text, marks }
+}
+
+function mergeMarks(marks: (MarkFlags | null)[]): MarkFlags {
+  const merged: MarkFlags = { ...NO_MARKS }
+  for (const mark of marks) {
+    if (!mark) continue
+    for (const key of Object.keys(merged) as (keyof MarkFlags)[]) {
+      if (mark[key]) merged[key] = true
+    }
+  }
+  return merged
+}
+
+interface OrderLine {
+  /** Plain text with the `1)` Word or the teacher printed in front taken off. */
+  text: string
+  /** The same text, with per-character marks, for lines holding several orders. */
+  marked: { text: string; marks: (MarkFlags | null)[] }
+  paragraphs: DocxParagraph[]
+}
+
+export interface OrderingRead {
+  items: string[]
+  choices: DraftOrderChoice[]
+  /** Paragraphs the orders were written on that carry no number of their own,
+   *  so the คำสั่ง can drop them. A line reading "2-1-4-3" left in the โจทย์
+   *  is the paper's own scaffolding printed under a drag list. */
+  consumed: DocxParagraph[]
+}
+
+/**
+ * Reads the labelled lines of one ข้อ as a list to put in order.
+ *
+ * Returns null when there is nothing to order, so the โจทย์ falls back to
+ * whatever it would otherwise have been read as — a file the teacher filed
+ * under เรียงลำดับ can still hold a บรรยาย ข้อ, and inventing an empty list for
+ * it helps nobody.
+ */
+function readOrdering(chunks: ChunkItem[]): OrderingRead | null {
+  const lines: OrderLine[] = chunks.flatMap(chunk => {
+    const paragraphs = chunk.kind === 'marker' ? chunk.item.paragraphs
+      : chunk.kind === 'sub' ? [chunk.paragraph]
+        : null
+    if (!paragraphs) return []
+
+    const marked = markedCharacters(paragraphs)
+    const marker = CHOICE_MARKER.exec(marked.text)
+    // The label belongs to the list, not to the step: "1) ตั้งปัญหา" is the
+    // step ตั้งปัญหา, and Word prints its own number for a ก) ข) sub-list.
+    const offset = chunk.kind === 'marker' && marker ? marker[0].length : 0
+    return [{
+      text: chunk.kind === 'marker'
+        ? stripMarker(paragraphsToPlain(paragraphs))
+        : paragraphsToPlain(paragraphs),
+      marked: { text: marked.text.slice(offset), marks: marked.marks.slice(offset) },
+      paragraphs,
+    }]
+  })
+
+  if (lines.length < 2) return null
+
+  // A paper that sets its orders in two columns often leaves the second one
+  // without a number of its own, and then the line carries no marker at all
+  // and would otherwise have joined the คำสั่ง. Pure digits and dashes is not
+  // something a คำสั่ง says, so such a line is read here and taken out below.
+  const loose: OrderLine[] = chunks.flatMap(chunk => {
+    if (chunk.kind !== 'stem') return []
+    const marked = markedCharacters([chunk.paragraph])
+    if (readOrderOptions(marked.text).length === 0) return []
+    return [{ text: paragraphsToPlain([chunk.paragraph]), marked, paragraphs: [chunk.paragraph] }]
+  })
+
+  // Classified off the same text the marks are indexed against, so a line can
+  // never be an option by one reading and a step by the other.
+  const read = [...lines, ...loose].map(line => ({ line, options: readOrderOptions(line.marked.text) }))
+  const steps = read.filter(({ options }) => options.length === 0).map(({ line }) => line)
+  const offered = read.flatMap(({ line, options }) => options.map(option => ({ line, option })))
+
+  // Both halves have to be there before a line of digits is read as a เฉลย
+  // rather than as a step. One "1-2" inside a list of five steps is part of a
+  // step; four of them under four fragments is the ปรนัย an exam paper writes.
+  const isExamPaper = offered.length >= 2 && steps.length >= 2
+    && offered.every(({ option }) => isCompleteOrder(option.order, steps.length))
+
+  if (!isExamPaper) {
+    // Nothing offered an order, so the list is already in the one that is
+    // right — which is what a worksheet means by writing the steps down. An
+    // unnumbered line stays in the คำสั่ง it came from.
+    return { items: lines.map(line => line.text), choices: [], consumed: [] }
+  }
+
+  const correct = correctByMarks(offered.map(({ line, option }) =>
+    mergeMarks(line.marked.marks.slice(option.start, option.end))))
+
+  return {
+    items: steps.map(line => line.text),
+    choices: offered.map(({ option }, index) => ({ order: option.order, isCorrect: correct[index] })),
+    consumed: loose.flatMap(line => line.paragraphs),
+  }
+}
+
+/** Puts the items in the order an option claims, or leaves them as they are. */
+export function applyOrder<T>(items: T[], order: number[]): T[] {
+  if (!isCompleteOrder(order, items.length)) return items
+  return order.map(position => items[position - 1])
+}
+
 function collectImages(paragraphs: DocxParagraph[]): { relIds: string[] } {
   const relIds: string[] = []
   for (const paragraph of paragraphs) {
@@ -949,9 +1164,14 @@ function buildQuestion(
   }
 
   const markerItems = items.flatMap(item => item.kind === 'marker' ? [item.item] : [])
-  const treatAsChoices = looksLikeChoices(markerItems)
+  // Only when the teacher said so — see `ParseOptions`. A เรียงลำดับ ข้อ and a
+  // ปรนัย one are the same four numbered lines on the page.
+  const ordering = options.expect === 'ordering' ? readOrdering(items) : null
+  const treatAsChoices = !ordering && looksLikeChoices(markerItems)
 
-  const stemParagraphs = [head, ...items.flatMap(item => item.kind === 'stem' ? [item.paragraph] : [])]
+  const orderLines = new Set(ordering?.consumed ?? [])
+  const stemParagraphs = [head, ...items.flatMap(item =>
+    item.kind === 'stem' && !orderLines.has(item.paragraph) ? [item.paragraph] : [])]
   const choices: DraftChoice[] = []
   const parts: DraftPart[] = []
 
@@ -972,7 +1192,9 @@ function buildQuestion(
   // Ordinals are counted per list level, which is how Word numbers them: a
   // second level restarts at ก inside every question.
   const ordinals = new Map<number, number>()
-  for (const item of items) {
+  // Those same lines are the list to put in order; reading them twice would
+  // print every step under the คำสั่ง as well (`withPartsInBody`).
+  for (const item of ordering ? [] : items) {
     if (item.kind === 'sub') {
       const ordinal = (ordinals.get(item.paragraph.ilvl) ?? 0) + 1
       ordinals.set(item.paragraph.ilvl, ordinal)
@@ -1010,9 +1232,13 @@ function buildQuestion(
   // A โจทย์ with ตัวเลือก is graded on the marked one; a bracket at the end of
   // it is part of an option, not a เฉลย of its own. A เติมคำ โจทย์ is graded on
   // its own ช่องว่าง, so it is not read for one either.
+  // A เรียงลำดับ โจทย์ is graded on the order of its list, so its คำสั่ง is not
+  // read for a เฉลย either — and the one number a paper marks there is an
+  // option, which `readOrdering` has already taken.
   const isTrueFalse = statements.length > 0
-  const markedStem = treatAsChoices || useBlanks || isTrueFalse ? null : readMarkedAnswer(stemParagraphs)
-  const stem = treatAsChoices || useBlanks || isTrueFalse
+  const gradedElsewhere = treatAsChoices || useBlanks || isTrueFalse || !!ordering
+  const markedStem = gradedElsewhere ? null : readMarkedAnswer(stemParagraphs)
+  const stem = gradedElsewhere
     ? {
       answers: [],
       html: isTrueFalse
@@ -1069,10 +1295,23 @@ function buildQuestion(
     })
   }
 
+  // A picture sitting on one of the lines to order cannot be told apart, in
+  // the file, from a picture sitting under the คำสั่ง — Word anchors both to a
+  // paragraph and the โจทย์ owns the paragraphs either way. It arrives as a
+  // picture of the whole ข้อ, and the teacher moves it onto the item itself in
+  // the form, which is said here rather than left to be discovered.
+  if (ordering && collectImages(markerItems.flatMap(item => item.paragraphs)
+    .concat(items.flatMap(item => item.kind === 'sub' ? [item.paragraph] : []))).relIds.length > 0) {
+    warnings.push({
+      code: 'order-item-image',
+      message: 'มีรูปอยู่ในรายการที่ต้องเรียง — รูปเข้ามาเป็นรูปของทั้งข้อ ถ้าต้องการให้อยู่ในรายการใดรายการหนึ่ง ใส่เองในฟอร์ม',
+    })
+  }
+
   // Two or three ก) ข) lines could be ตัวเลือก or sub-questions — unless each
   // one ends in its own เฉลย, which a ตัวเลือก never does.
   const partsAnswered = parts.some(part => part.answers.length > 0)
-  if (markerItems.length > 0 && markerItems.length <= 3 && !partsAnswered) {
+  if (!ordering && markerItems.length > 0 && markerItems.length <= 3 && !partsAnswered) {
     warnings.push({
       code: 'ambiguous-choices',
       message: treatAsChoices
@@ -1096,7 +1335,8 @@ function buildQuestion(
     // อัตนัย and typing the answer is one control on the import screen.
     type: statements.length > 0
       ? 'true_false'
-      : treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
+      : ordering ? 'ordering'
+        : treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
     title: buildTitle(stemText, number),
     html: stem.html,
     choices,
@@ -1104,6 +1344,8 @@ function buildQuestion(
     answers: stem.answers,
     blanks: blanked?.blanks ?? [],
     statements,
+    orderItems: ordering?.items ?? [],
+    orderChoices: ordering?.choices ?? [],
     imageRelIds: relIds,
     mentionsPicture: MENTIONS_PICTURE.test(fullText),
     warnings,

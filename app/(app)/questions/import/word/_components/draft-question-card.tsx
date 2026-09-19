@@ -9,18 +9,20 @@ import { McqForm } from '@/components/questions/mcq-form'
 import { EssayForm } from '@/components/questions/essay-form'
 import { FillBlankForm } from '@/components/questions/fill-blank-form'
 import { TrueFalseForm } from '@/components/questions/true-false-form'
+import { OrderingForm } from '@/components/questions/ordering-form'
 import { RandomNumericForm } from '@/components/questions/random-numeric'
 import { TYPE_LABEL } from '@/lib/question-display'
-import { applyFormPayload, changeType, type DraftEntry, type ImportableType } from '@/lib/docx-import/to-question'
+import { applyFormPayload, changeType, pickOrder, type DraftEntry, type ImportableType } from '@/lib/docx-import/to-question'
 import type { DraftWarning } from '@/lib/docx-import'
-import type { FillBlankConfig, TrueFalseConfig } from '@/lib/types'
+import type { FillBlankConfig, OrderingConfig, TrueFalseConfig } from '@/lib/types'
 
-/** Only the three a Word worksheet can produce; the rest are authored in the app. */
+/** Only the ones a Word worksheet can produce; the rest are authored in the app. */
 const IMPORTABLE_TYPES: { value: ImportableType; hint: string }[] = [
   { value: 'mcq', hint: 'มีตัวเลือก ระบบตรวจให้' },
   { value: 'true_false', hint: 'ตัดสินถูกหรือผิด ระบบตรวจให้' },
   { value: 'written', hint: 'ตอบเป็นตัวเลข ระบบตรวจให้' },
   { value: 'fill_blank', hint: 'มีช่องเติมคำ ระบบตรวจให้' },
+  { value: 'ordering', hint: 'ลากเรียงให้ถูกลำดับ ระบบตรวจให้' },
   { value: 'essay', hint: 'ครูตรวจเอง' },
 ]
 
@@ -67,6 +69,14 @@ export function DraftQuestionCard({
       ...(trueFalse.statements ?? []).map(statement => ({ text: statement.text, correct: statement.correct_answer })),
     ]
     : []
+
+  // The list as it now stands, which is the โจทย์ itself. The orders the paper
+  // offered live on the entry instead — they are how the right one was found,
+  // not part of what a student is asked.
+  const orderItems = question.question_type === 'ordering'
+    ? (question.extra_data as OrderingConfig | undefined)?.items ?? []
+    : []
+  const orderChoices = question.question_type === 'ordering' ? entry.ordering?.choices ?? [] : []
 
   /** Marks (or unmarks) one option correct, the same toggle the ปรนัย form has. */
   const toggleCorrect = (index: number) => onChange({
@@ -170,6 +180,9 @@ export function DraftQuestionCard({
                 {question.question_type === 'true_false' && (
                   <TrueFalseForm allTags={allTags} question={question} draft={draft} />
                 )}
+                {question.question_type === 'ordering' && (
+                  <OrderingForm allTags={allTags} question={question} draft={draft} />
+                )}
                 {question.question_type === 'essay' && (
                   <EssayForm allTags={allTags} question={question} draft={draft} />
                 )}
@@ -264,6 +277,54 @@ export function DraftQuestionCard({
                     </li>
                   ))}
                 </ol>
+              )}
+
+              {orderItems.length > 0 && (
+                <ol className="space-y-1 border-l-2 border-border pl-3">
+                  {orderItems.map((item, index) => (
+                    <li key={item.id} className="flex gap-2 text-sm text-foreground">
+                      <span className="w-5 shrink-0 tabular-nums text-xs text-muted-foreground">{index + 1}.</span>
+                      <span className="min-w-0">{item.text}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {orderChoices.length > 0 && (
+                <fieldset className="space-y-1.5">
+                  {/* An exam paper handed to students carries no เฉลย, which is
+                      most of the files a teacher already has. Picking the right
+                      order here is the one edit those files need on every ข้อ,
+                      so it stays one click — the same reason the ปรนัย key is
+                      tickable without opening the form. */}
+                  <legend className="mb-1 text-xs font-medium text-muted-foreground">
+                    ลำดับที่ถูกตามตัวเลือกในข้อสอบ — เลือกแล้วรายการด้านบนจะเรียงตามนั้น
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    {orderChoices.map((choice, index) => (
+                      <label
+                        key={index}
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm ${
+                          choice.isCorrect
+                            ? 'border-success bg-success/10 font-medium text-success'
+                            : 'border-border text-foreground'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`order-${entry.id}`}
+                          checked={choice.isCorrect}
+                          onChange={() => onChange(pickOrder(entry, index))}
+                          className="size-4 shrink-0 accent-primary"
+                        />
+                        <span className="tabular-nums">{choice.order.join('-')}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    ตัวเลือกพวกนี้ไม่ถูกนำเข้าไปด้วย — บนเว็บนักเรียนลากเรียงเอง ระบบสลับรายการให้ใหม่ทุกครั้ง
+                  </p>
+                </fieldset>
               )}
 
               {question.question_type === 'fill_blank' && blanks.length > 0 && (

@@ -949,3 +949,214 @@ describe('titles and warnings about context', () => {
     expect(warningCodes(result.questions[1])).toContain('refers-to-previous')
   })
 })
+
+// ─── รายการของ โจทย์เรียงลำดับ ───────────────────────────────────────────────
+
+describe('the list a เรียงลำดับ worksheet asks to be put in order', () => {
+  const ordering = (body: string, options: Parameters<typeof parse>[1] = {}) =>
+    parse(body, options, { expect: 'ordering' })
+
+  /** The shape of the real thing: four scrambled fragments, then the orders. */
+  const sentenceExam = [
+    numbered(0, run('การเรียงประโยคในข้อใดถูกต้อง')),
+    plain(run('1. เป็นการแสดงออกให้เห็นถึงภูมิปัญญา')),
+    plain(run('2. การที่มนุษย์รู้จักคิดและทอผ้าขึ้นมาได้นั้น')),
+    plain(run('3. ตลอดจนการสร้างสรรค์ลวดลายบนผืนผ้า')),
+    plain(run('4. ในการเลือกสรรวัสดุ วิธีการที่เหมาะสม')),
+  ].join('')
+
+  it('reads the fragments and the order the marked option claims', () => {
+    const question = ordering(sentenceExam + [
+      plain(run('1. '), run('2-1-4-3', { color: 'FF0000' })),
+      plain(run('2. 2-1-3-4')),
+      plain(run('3. 4-1-2-3')),
+      plain(run('4. 4-2-3-1')),
+    ].join('')).questions[0]
+
+    expect(question.type).toBe('ordering')
+    // In the order the page printed them; the เฉลย is the permutation.
+    expect(question.orderItems).toEqual([
+      'เป็นการแสดงออกให้เห็นถึงภูมิปัญญา',
+      'การที่มนุษย์รู้จักคิดและทอผ้าขึ้นมาได้นั้น',
+      'ตลอดจนการสร้างสรรค์ลวดลายบนผืนผ้า',
+      'ในการเลือกสรรวัสดุ วิธีการที่เหมาะสม',
+    ])
+    expect(question.orderChoices).toEqual([
+      { order: [2, 1, 4, 3], isCorrect: true },
+      { order: [2, 1, 3, 4], isCorrect: false },
+      { order: [4, 1, 2, 3], isCorrect: false },
+      { order: [4, 2, 3, 1], isCorrect: false },
+    ])
+  })
+
+  it('keeps the fragments and the orders out of the โจทย์ itself', () => {
+    // "2-1-4-3" under a drag list is scaffolding from the paper and means
+    // nothing on screen; the fragments become the list, not the wording.
+    const question = ordering(sentenceExam + [
+      plain(run('1. '), run('2-1-4-3', { color: 'FF0000' })),
+      plain(run('2. 2-1-3-4')),
+      plain(run('3. 4-1-2-3')),
+      plain(run('4. 4-2-3-1')),
+    ].join('')).questions[0]
+
+    expect(question.html).toBe('<p>การเรียงประโยคในข้อใดถูกต้อง</p>')
+    expect(question.title).toBe('การเรียงประโยคในข้อใดถูกต้อง')
+    expect(question.choices).toEqual([])
+    expect(question.parts).toEqual([])
+  })
+
+  it('reads an exam paper handed out with no เฉลย on it, and marks nothing', () => {
+    // Which is most of the files a teacher already has. The order is then
+    // decided on the import screen, not guessed at here.
+    const question = ordering(sentenceExam + [
+      plain(run('1. 2-1-4-3')),
+      plain(run('2. 2-1-3-4')),
+      plain(run('3. 4-1-2-3')),
+      plain(run('4. 4-2-3-1')),
+    ].join('')).questions[0]
+
+    expect(question.orderItems).toHaveLength(4)
+    expect(question.orderChoices.some(choice => choice.isCorrect)).toBe(false)
+  })
+
+  it('reads four orders laid out two to a line, and which one is marked', () => {
+    // Word sets the two columns of a paper with tabs as often as with a table,
+    // and then one paragraph carries four things to mark.
+    const question = ordering(sentenceExam + [
+      plain(run('1. 2-1-4-3'), '<w:r><w:tab/></w:r>', run('2. '), run('2-1-3-4', { highlight: 'yellow' })),
+      plain(run('3. 4-1-2-3'), '<w:r><w:tab/></w:r>', run('4. 4-2-3-1')),
+    ].join('')).questions[0]
+
+    expect(question.orderChoices.map(choice => choice.order)).toEqual([
+      [2, 1, 4, 3], [2, 1, 3, 4], [4, 1, 2, 3], [4, 2, 3, 1],
+    ])
+    expect(question.orderChoices.map(choice => choice.isCorrect)).toEqual([false, true, false, false])
+  })
+
+  it('reads orders set in a two-column table', () => {
+    const question = ordering(sentenceExam + choiceTable([
+      [run('1. 2-1-4-3'), run('2. ') + run('2-1-3-4', { bold: true })],
+      [run('3. 4-1-2-3'), run('4. 4-2-3-1')],
+    ])).questions[0]
+
+    expect(question.orderChoices).toHaveLength(4)
+    expect(question.orderChoices.findIndex(choice => choice.isCorrect)).toBe(1)
+  })
+
+  it('takes a worksheet that already lists the steps in order as the answer', () => {
+    // No orders offered means the file is not asking which one is right — it
+    // is written right, and the shuffle happens on the student's screen.
+    const question = ordering([
+      numbered(0, run('จงเรียงขั้นตอนของกระบวนการทางวิทยาศาสตร์')),
+      numbered(1, run('ตั้งปัญหา')),
+      numbered(1, run('ตั้งสมมติฐาน')),
+      numbered(1, run('ออกแบบและทำการทดลอง')),
+      numbered(1, run('สรุปผลการทดลอง')),
+    ].join('')).questions[0]
+
+    expect(question.type).toBe('ordering')
+    expect(question.orderItems).toEqual(['ตั้งปัญหา', 'ตั้งสมมติฐาน', 'ออกแบบและทำการทดลอง', 'สรุปผลการทดลอง'])
+    expect(question.orderChoices).toEqual([])
+  })
+
+  it('leaves the numbered lines alone unless the file was said to be เรียงลำดับ', () => {
+    // On the page a เรียงลำดับ ข้อ and a ปรนัย one are the same four numbered
+    // lines. Only the teacher knows which, which is why they are asked first.
+    for (const expected of ['mcq', undefined] as const) {
+      const question = parse(sentenceExam, {}, { expect: expected }).questions[0]
+      expect(question.orderItems, String(expected)).toEqual([])
+      expect(question.type, String(expected)).toBe('mcq')
+      expect(question.choices, String(expected)).toHaveLength(4)
+    }
+  })
+
+  it('treats a line of digits that does not arrange the list as a step', () => {
+    // "1-2" inside a list of five steps is part of a step. Only a complete
+    // rearrangement of the list is read as an order to choose between.
+    const question = ordering([
+      numbered(0, run('จงเรียงเหตุการณ์ตามปีที่เกิด')),
+      plain(run('1. สงครามโลกครั้งที่ 1-2')),
+      plain(run('2. การปฏิวัติอุตสาหกรรม')),
+      plain(run('3. การปฏิวัติฝรั่งเศส')),
+    ].join('')).questions[0]
+
+    expect(question.orderChoices).toEqual([])
+    expect(question.orderItems).toEqual([
+      'สงครามโลกครั้งที่ 1-2', 'การปฏิวัติอุตสาหกรรม', 'การปฏิวัติฝรั่งเศส',
+    ])
+  })
+
+  it('keeps option-shaped lines as steps when they do not rearrange the list', () => {
+    // Two numbers cannot arrange three lines, so nothing here is an เฉลย.
+    // They stay as the lines they look like and the teacher sees exactly what
+    // the file said, rather than a list quietly two items short.
+    const question = ordering([
+      numbered(0, run('จงเรียงช่วงเวลาต่อไปนี้')),
+      plain(run('1. ยุคหิน')),
+      plain(run('2. ยุคสำริด')),
+      plain(run('3. ยุคเหล็ก')),
+      plain(run('4. 1-2')),
+      plain(run('5. 2-1')),
+    ].join('')).questions[0]
+
+    expect(question.orderChoices).toEqual([])
+    expect(question.orderItems).toEqual(['ยุคหิน', 'ยุคสำริด', 'ยุคเหล็ก', '1-2', '2-1'])
+  })
+
+  it('says when a picture sits on one of the lines to order', () => {
+    // It comes in as a picture of the whole ข้อ: Word anchors it to the
+    // paragraph, and nothing in the file says the item owns it.
+    const question = ordering([
+      numbered(0, run('จงเรียงภาพตามลำดับการเจริญเติบโต')),
+      plain(run('1. ระยะไข่ '), image('rId4')),
+      plain(run('2. ระยะตัวหนอน')),
+    ].join(''), {
+      rels: `<Relationships><Relationship Id="rId4" Target="media/image1.png"/></Relationships>`,
+    }).questions[0]
+
+    expect(warningCodes(question)).toContain('order-item-image')
+    expect(question.imageRelIds).toEqual(['rId4'])
+  })
+
+  it('falls back to reading the ข้อ normally when there is no list in it', () => {
+    // A file filed under เรียงลำดับ can still hold a บรรยาย ข้อ, and an empty
+    // list invented for it would be a โจทย์ nobody can answer.
+    const question = ordering(numbered(0, run('จงอธิบายวัฏจักรของน้ำ'))).questions[0]
+
+    expect(question.orderItems).toEqual([])
+    expect(question.type).toBe('essay')
+  })
+})
+
+describe('เรียงลำดับ: orders written in columns without their own numbers', () => {
+  it('reads two orders on one tabbed line even when neither is labelled', () => {
+    const question = parse([
+      numbered(0, run('จงเรียงประโยคให้ถูกต้อง')),
+      plain(run('1. ประโยคหนึ่ง')),
+      plain(run('2. ประโยคสอง')),
+      plain(run('3. ประโยคสาม')),
+      plain(run('1-2-3'), '<w:r><w:tab/></w:r>', run('3-2-1', { color: 'C00000' })),
+    ].join(''), {}, { expect: 'ordering' }).questions[0]
+
+    expect(question.orderChoices).toEqual([
+      { order: [1, 2, 3], isCorrect: false },
+      { order: [3, 2, 1], isCorrect: true },
+    ])
+    expect(question.orderItems).toEqual(['ประโยคหนึ่ง', 'ประโยคสอง', 'ประโยคสาม'])
+    // The line carried no number, so nothing else would have taken it out of
+    // the คำสั่ง — and "1-2-3" printed above a drag list means nothing.
+    expect(question.html).toBe('<p>จงเรียงประโยคให้ถูกต้อง</p>')
+  })
+
+  it('leaves an unnumbered line in the คำสั่ง when it is not read as an order', () => {
+    const question = parse([
+      numbered(0, run('จงเรียงเหตุการณ์')),
+      plain(run('ช่วง 1-2 ปีแรก')),
+      plain(run('1. เหตุการณ์หนึ่ง')),
+      plain(run('2. เหตุการณ์สอง')),
+    ].join(''), {}, { expect: 'ordering' }).questions[0]
+
+    expect(question.orderChoices).toEqual([])
+    expect(question.html).toContain('ช่วง 1-2 ปีแรก')
+  })
+})
