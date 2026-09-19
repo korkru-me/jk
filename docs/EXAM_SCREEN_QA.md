@@ -109,9 +109,13 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ### เฟส 6 — เส้นทางเดิมใน SEB
 
-สถานะ: รอเฟส 5 และ staging
+สถานะ: **agent-only evidence gate ผ่าน · native staging flow รอ staging และอุปกรณ์จริงหลังเฟส 8**
 
-ผู้ใช้ช่วยเปิดไฟล์ staging `.seb` ที่ตรงกับ build ของ Mac/iPad/iPhone แล้วทำ happy path เดิม ตรวจ CK+BEK, submit commit และ quit link โดยไม่ส่ง Key หรือรหัสในแชต/เอกสาร
+เพิ่ม manifest ที่ไม่เก็บ secret และ `npm run check:seb-platforms` เพื่อกันการประกาศรองรับจากผล native lab อย่างเดียว ตัวตรวจบังคับ Windows/macOS/iPadOS/iOS ให้ครบ native core, production-BEK verification, staging mock exam และ physical UAT ของ config/build เดียวกัน และปฏิเสธ field ที่เสี่ยงเก็บ key/password/token/hash มี unit tests ครอบคลุม รายละเอียดอยู่ใน `docs/SEB_PLATFORM_MATRIX.md`
+
+สถานะจริงจงใจเป็น `NOT READY`: native core เคยผ่านแล้ว แต่ repository ยืนยัน secret ใน Vercel ไม่ได้และยังไม่มี staging mock exam/physical UAT รอบสุดท้าย จึงไม่ส่ง Key/รหัสเข้าระบบหรืออ้างว่าผ่านแทนผู้ใช้
+
+ผลตรวจรอบเฟส: platform-evidence tests 4 ข้อและชุดรวม 98 files / 1,318 tests ผ่าน, TypeScript กับ token lint ผ่าน; ตัวตรวจรายงาน 4 release blockers ตรงตามหลักฐานจริงโดยไม่พิมพ์ CK/BEK
 
 ### เฟส 7 — การกู้คืนและห้องคุมสอบ
 

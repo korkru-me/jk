@@ -19,6 +19,8 @@ Responsive QA เฟส Mac ผ่านในขอบเขต agent-only แ�
 
 Authenticated exam QA มี staging isolation guard แล้ว: `npm run check:exam-staging` อ่านเฉพาะ `.env.qa.local` แบบ read-only, ไม่พิมพ์ค่าที่ตั้ง และบล็อก production deployment หรือ site/Supabase project ที่ซ้ำ production แต่ยังไม่มี staging แยก จึงยังไม่ทำ login/autosave/upload/submit E2E และไม่สร้างข้อมูล QA ในฐาน production
 
+SEB platform evidence มี manifest แบบไม่เก็บ secret และ `npm run check:seb-platforms` แล้ว ตัวตรวจจะไม่ให้สถานะพร้อม production จน Windows/macOS/iPadOS/iOS ครบ native core + production-BEK verification + staging mock exam + physical UAT ของ config/build เดียวกัน ปัจจุบัน native core ผ่าน แต่ release gate อื่นยัง pending/unverified จึงจงใจรายงาน NOT READY
+
 ## MVP core
 
 ### Authentication — บางส่วน
