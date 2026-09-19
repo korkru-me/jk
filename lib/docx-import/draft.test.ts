@@ -42,6 +42,12 @@ function centered(...content: string[]): string {
   return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${content.join('')}</w:p>`
 }
 
+/** A character Word stores as a symbol, which is how a ✓ is typed. */
+function sym(font: string, char: string, color?: string): string {
+  const rPr = color ? `<w:rPr><w:color w:val="${color}"/></w:rPr>` : ''
+  return `<w:r>${rPr}<w:sym w:font="${font}" w:char="${char}"/></w:r>`
+}
+
 /** A paragraph carrying one of Word's own heading styles. */
 function styled(styleId: string, ...content: string[]): string {
   return `<w:p><w:pPr><w:pStyle w:val="${styleId}"/></w:pPr>${content.join('')}</w:p>`
@@ -709,6 +715,85 @@ describe('the เฉลย a teacher marks at the end of a ข้อ', () => {
 
     expect(result.questions[0].type).toBe('mcq')
     expect(result.questions[0].answers).toEqual([])
+  })
+})
+
+describe('the ✓ and x of a ถูก-ผิด worksheet', () => {
+  const tf = (body: string) => parse(body, { numbering: null }, { expect: 'true_false' })
+
+  it('reads the statements under a ข้อ, with what the teacher ticked', () => {
+    const result = tf([
+      plain(run('8. พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ (1 คะแนน)')),
+      plain(run('8.1 ……… '), run('x', { color: 'EE0000' }), run(' …… วัตถุที่ตกแบบเสรีมีความเร่งเพิ่มขึ้นเรื่อย ๆ (0.25 คะแนน)')),
+      plain(run('8.2 ……… '), sym('Wingdings', 'F0FC', 'EE0000'), run(' …… ความเร็วเพิ่มขึ้นเท่ากันทุกวินาที (0.25 คะแนน)')),
+      plain(run('8.3 ……… '), sym('Wingdings', 'F0FC', 'EE0000'), run(' …… ระยะทางในแต่ละวินาทีเพิ่มขึ้น (0.25 คะแนน)')),
+    ].join(''))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('true_false')
+    expect(question.statements.map(statement => statement.isTrue)).toEqual([false, true, true])
+    expect(question.statements.map(statement => statement.score)).toEqual([0.25, 0.25, 0.25])
+  })
+
+  it('strips the number, the dotted box, the tick and the score from a statement', () => {
+    const result = tf([
+      plain(run('8. พิจารณาข้อความต่อไปนี้')),
+      plain(run('8.1 ……… '), run('x', { color: 'EE0000' }), run(' …… เสียงเดินทางในสุญญากาศได้ (0.25 คะแนน)')),
+      plain(run('8.2 ……… '), sym('Wingdings', 'F0FC'), run(' …… แรงเสียดทานต้านการเคลื่อนที่ (0.25 คะแนน)')),
+    ].join(''))
+
+    expect(result.questions[0].statements.map(statement => statement.html)).toEqual([
+      '<p>เสียงเดินทางในสุญญากาศได้</p>',
+      '<p>แรงเสียดทานต้านการเคลื่อนที่</p>',
+    ])
+  })
+
+  it('keeps the lead-in as the โจทย์, without its number or its total', () => {
+    const result = tf([
+      plain(run('8. พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ (1 คะแนน)')),
+      plain(run('8.1 ……… '), run('x'), run(' …… ข้อความหนึ่ง (0.25 คะแนน)')),
+      plain(run('8.2 ……… '), sym('Wingdings', 'F0FC'), run(' …… ข้อความสอง (0.25 คะแนน)')),
+    ].join(''))
+
+    expect(result.questions[0].html).toBe('<p>พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ</p>')
+    expect(result.questions[0].title).not.toContain('คะแนน')
+  })
+
+  it('reads a page torn out of the middle of an exam', () => {
+    // An answer key passed between teachers starts at ข้อ 8, not ข้อ 1. The
+    // sub-numbering under it is the proof that "8." is a โจทย์ number.
+    const result = tf([
+      plain(run('8. พิจารณาข้อความต่อไปนี้')),
+      plain(run('8.1 ……… '), run('x'), run(' …… ข้อความหนึ่ง')),
+      plain(run('8.2 ……… '), sym('Wingdings', 'F0FC'), run(' …… ข้อความสอง')),
+    ].join(''))
+
+    expect(result.questions).toHaveLength(1)
+    expect(result.questions[0].statements).toHaveLength(2)
+  })
+
+  it('says which statements were left unticked, and calls them ผิด', () => {
+    const result = tf([
+      plain(run('8. พิจารณาข้อความต่อไปนี้')),
+      plain(run('8.1 ……… '), sym('Wingdings', 'F0FC'), run(' …… ข้อความหนึ่ง')),
+      plain(run('8.2 ……… …… ข้อความสอง')),
+    ].join(''))
+
+    expect(result.questions[0].statements.map(statement => statement.isTrue)).toEqual([true, null])
+    expect(warningCodes(result.questions[0])).toContain('unmarked-statement')
+  })
+
+  it('leaves sub-numbered lines alone unless the file was said to be ถูก-ผิด', () => {
+    const body = [
+      plain(run('8. พิจารณาข้อความต่อไปนี้')),
+      plain(run('8.1 ……… '), run('x'), run(' …… ข้อความหนึ่ง')),
+      plain(run('8.2 ……… '), sym('Wingdings', 'F0FC'), run(' …… ข้อความสอง')),
+    ].join('')
+
+    for (const expected of ['mcq', 'written', undefined] as const) {
+      const question = parse(body, { numbering: null }, { expect: expected }).questions[0]
+      expect(question?.statements ?? [], String(expected)).toEqual([])
+    }
   })
 })
 

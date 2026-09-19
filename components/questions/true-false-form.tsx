@@ -18,8 +18,13 @@ import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
 import type { ChoiceScoring, Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement, TrueFalseAnswerMode, TrueFalseSelectTarget, Question } from '@/lib/types'
 import { questionsReturnTo } from '@/lib/question-return'
+import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 
 interface TrueFalseFormProps {
+  /** Present when the โจทย์ is being drafted rather than saved — the Word
+   *  import fills a whole worksheet before any of it is written.
+   *  See lib/question-draft-handoff.ts. */
+  draft?: QuestionDraftHandoff
   allTags: string[]
   mode?: 'create' | 'edit'
   question?: Question
@@ -89,7 +94,7 @@ function TrueFalseMainItem({
   )
 }
 
-export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = true }: TrueFalseFormProps) {
+export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = true, draft }: TrueFalseFormProps) {
   const router = useRouter()
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
@@ -110,9 +115,12 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
   // existing โจทย์ are changed from the แฟ้ม itself, where it can also be taken
   // back out — a picker here could only ever add.
   const [setIds, setSetIds] = useState<string[]>([])
-  const setPicker = mode === 'create' ? { setIds, onSetIdsChange: setSetIds } : {}
+  // A แฟ้ม is chosen once for a whole imported file, not per โจทย์.
+  const setPicker = mode === 'create' && !draft ? { setIds, onSetIdsChange: setSetIds } : {}
 
   const [questionText, setQuestionText] = useState(question?.question_text ?? '')
+  // Optional situation the statements are judged against. Empty for most โจทย์.
+  const [prompt, setPrompt] = useState(existingConfig?.prompt ?? '')
   const [imageUrls, setImageUrls] = useState<string[]>(question?.image_urls ?? [])
   const [correctAnswer, setCorrectAnswer] = useState<boolean>(existingConfig?.correct_answer ?? true)
   const [statements, setStatements] = useState<TrueFalseStatement[]>(existingConfig?.statements ?? [])
@@ -128,6 +136,8 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
 
   useEffect(() => {
     if (mode !== 'create' || question) return
+    // A draft arrives with its own content; a duplicate seed would overwrite it.
+    if (draft) return
     const seed = readDuplicateSeed('true_false')
     if (!seed) return
     setTitle(seed.title)
@@ -143,6 +153,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
     const config = (seed.extra_data ?? {}) as TrueFalseConfig
     setCorrectAnswer(config.correct_answer ?? true)
     setStatements(config.statements ?? [])
+    setPrompt(config.prompt ?? '')
     setExplanationMode(config.explanation_mode ?? 'none')
     setScoreAnswer(config.score_answer ?? 1)
     setScoreExplanation(config.score_explanation ?? 1)
@@ -165,6 +176,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
   }
 
   const trueFalseConfig: TrueFalseConfig = {
+    prompt: prompt.replace(/<[^>]*>/g, '').trim() ? prompt : undefined,
     correct_answer: correctAnswer,
     explanation_mode: explanationMode,
     score_answer: scoreAnswer,
@@ -179,7 +191,8 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('กรอกชื่อโจทย์ด้วย'); return }
-    if (!subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
+    // วิชา is asked once for the whole file on the import screen.
+    if (!draft && !subject.trim()) { toast.error('กรุณาเลือกวิชา'); return }
     const plainText = questionText.replace(/<[^>]*>/g, '').trim()
     if (!plainText) { toast.error('กรอกเนื้อหาข้อความด้วย'); return }
     const emptyIdx = statements.findIndex(s => !s.text.replace(/<[^>]*>/g, '').trim())
@@ -191,7 +204,6 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
       toast.error('คะแนนส่วนเหตุผลต้องมากกว่า 0'); return
     }
 
-    setSaving(true)
     const payload = {
       title, subject, question_text: questionText, question_type: 'true_false' as const,
       difficulty, visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds, team_edit_allowed: teamEditAllowed, category_id: question?.category_id ?? '',
@@ -204,6 +216,11 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
       solution_text: solutionText, solution_image_urls: solutionImageUrls, tags, set_ids: setIds, image_urls: imageUrls,
       redirect_to: returnTo,
     }
+
+    // Draft mode hands the payload back instead of writing it.
+    if (draft) { draft.onSubmit(payload); return }
+
+    setSaving(true)
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
@@ -226,6 +243,8 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
         sharedOrgIds={sharedOrgIds} onSharedOrgIdsChange={setSharedOrgIds}
         teamEditAllowed={teamEditAllowed} onTeamEditAllowedChange={setTeamEditAllowed}
         canEditSharing={isOwner}
+        showSharing={!draft}
+        showSubject={!draft}
         tags={tags} onTagsChange={setTags}
         {...setPicker}
       />
@@ -236,6 +255,21 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
           {statements.length > 0 && <LabelStyleToggle value={labelStyle} onChange={setLabelStyle} />}
         </div>
         <p className="text-xs text-muted-foreground">พิมพ์ข้อความที่นักเรียนจะต้องตัดสินว่าถูกหรือผิด — กดเพิ่มข้อย่อยได้ถ้าอยากให้มีหลายข้อความในโจทย์เดียว</p>
+
+        {/* Not one of the statements: the situation they are all judged
+            against. Nothing here is marked true or false. */}
+        <div className="space-y-1.5">
+          <Label>คำสั่งนำ / สถานการณ์ (ไม่บังคับ)</Label>
+          <p className="text-xs text-muted-foreground">
+            เงื่อนไขที่ใช้กับทุกข้อความข้างล่าง เช่น &ldquo;พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ&rdquo; — นักเรียนเห็นก่อนข้อความแรก และไม่ต้องตัดสินถูก-ผิดกับบรรทัดนี้
+          </p>
+          <RichTextEditor
+            value={prompt}
+            onChange={setPrompt}
+            placeholder="เว้นว่างไว้ได้ ถ้าข้อความแต่ละข้อยืนได้ด้วยตัวเอง"
+            rows={2}
+          />
+        </div>
 
         <div className="space-y-2 bg-muted border border-border rounded-xl p-3">
           <Label className="text-xs text-muted-foreground">โหมดการตอบ</Label>
@@ -450,9 +484,9 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
           trueFalseConfig={trueFalseConfig}
         />
         <Button type="submit" disabled={saving}>
-          {saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
+          {draft ? draft.submitLabel : saving ? 'กำลังบันทึก...' : mode === 'edit' ? 'อัปเดตโจทย์' : 'บันทึกโจทย์'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
+        <Button type="button" variant="outline" onClick={() => draft ? draft.onCancel() : router.push(mode === 'edit' ? returnTo : '/questions/new')} disabled={saving}>
           ยกเลิก
         </Button>
       </div>

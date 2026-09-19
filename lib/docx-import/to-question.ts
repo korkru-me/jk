@@ -13,12 +13,12 @@
  */
 import { toPortableQuestion, type PortableQuestion } from '@/lib/question-portable'
 import type { QuestionFormData } from '@/lib/actions/questions'
-import type { AnswerPart, FillBlankConfig, FillBlankItem, MCQOption, Question, QuestionType } from '@/lib/types'
+import type { AnswerPart, FillBlankConfig, FillBlankItem, MCQOption, Question, QuestionType, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
 import { acceptedAnswers, countBlanks } from '@/lib/fill-blank'
-import type { DraftAnswer, DraftBlank, DraftQuestion, DraftPart, DraftWarning } from './draft'
+import type { DraftAnswer, DraftBlank, DraftQuestion, DraftPart, DraftStatement, DraftWarning } from './draft'
 
 /** The types a Word worksheet can produce. The rest are authored in the app. */
-export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank'>
+export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false'>
 
 export interface DraftEntry {
   id: string
@@ -146,6 +146,43 @@ function blanksToConfig(blanks: DraftBlank[]): FillBlankItem[] {
 }
 
 /**
+ * A ถูก-ผิด โจทย์ in the shape its own form saves.
+ *
+ * The app keeps the first statement in `question_text` and the rest in
+ * `statements`, so that is how they are handed over. The lead-in goes to
+ * `prompt`, which exists for exactly this: a line every statement is judged
+ * against and none of them is.
+ *
+ * `score_answer` is what the file says a statement is worth — a Thai paper
+ * writes "(0.25 คะแนน)" beside each — and falls back to the form's own default
+ * of 1 when it says nothing.
+ */
+function trueFalseFields(draft: DraftQuestion): { question_text: string; extra_data: TrueFalseConfig } {
+  const [first, ...rest] = draft.statements
+  const scores = draft.statements.map(statement => statement.score).filter((score): score is number => score !== null)
+
+  const statements: TrueFalseStatement[] = rest.map((statement, index) => ({
+    id: `${draft.id}-s${index + 1}`,
+    text: statement.html,
+    correct_answer: statement.isTrue === true,
+  }))
+
+  return {
+    question_text: first?.html ?? '',
+    extra_data: {
+      // An empty lead-in is left out: most ถูก-ผิด โจทย์ do not have one, and
+      // an empty paragraph would print as a blank line above the statements.
+      ...(draft.html.replace(/<[^>]*>/g, '').trim() ? { prompt: draft.html } : {}),
+      correct_answer: first?.isTrue === true,
+      explanation_mode: 'none' as const,
+      score_answer: scores.length > 0 ? scores[0] : 1,
+      score_explanation: 0,
+      ...(statements.length > 0 ? { statements } : {}),
+    },
+  }
+}
+
+/**
  * Where a เฉลย read from the file lands on the โจทย์.
  *
  * `answer_formula` for the ordinary case of one value, and `answer_parts` as
@@ -184,17 +221,23 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
     is_correct: choice.isCorrect,
   }))
 
+  const trueFalse = draft.type === 'true_false' ? trueFalseFields(draft) : null
+
   const question: Question = {
     ...blankQuestion(),
     id: draft.id,
     title: draft.title,
     question_type: draft.type,
-    question_text: draft.type === 'written'
-      ? draft.html
-      : withPartsInBody(draft.html, draft.parts),
+    question_text: trueFalse
+      ? trueFalse.question_text
+      : draft.type === 'written'
+        ? draft.html
+        : withPartsInBody(draft.html, draft.parts),
     mcq_options: draft.type === 'mcq' ? mcq_options : null,
     ...answerFields(draft),
-    extra_data: draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
+    extra_data: trueFalse
+      ? trueFalse.extra_data
+      : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
     image_urls,
   }
 
@@ -231,7 +274,7 @@ export function changeType(entry: DraftEntry, type: ImportableType): DraftEntry 
       mcq_options: type === 'mcq' ? (options.length > 0 ? options : null) : null,
       // Only อัตนัย grades against formulas; carrying them onto a type that
       // ignores them would leave an answer nothing reads.
-      extra_data: type === 'fill_blank' ? entry.question.extra_data : {},
+      extra_data: type === 'fill_blank' || type === 'true_false' ? entry.question.extra_data : {},
       answer_parts: type === 'written' ? entry.question.answer_parts : null,
       answer_formula: type === 'written' ? entry.question.answer_formula : '',
       is_random: type === 'written' ? entry.question.is_random : false,
@@ -293,6 +336,12 @@ export function validateForImport({ question }: DraftEntry): string | null {
       return 'มีตัวเลือกที่ยังว่างอยู่'
     }
     if (!options.some(option => option.is_correct)) return 'ยังไม่ได้เลือกข้อที่ถูก'
+    return null
+  }
+
+  if (question.question_type === 'true_false') {
+    const bodyText = question.question_text.replace(/<[^>]*>/g, '').trim()
+    if (!bodyText) return 'ถูก-ผิดต้องมีข้อความอย่างน้อย 1 ข้อ'
     return null
   }
 

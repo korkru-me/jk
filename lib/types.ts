@@ -401,6 +401,16 @@ export interface TrueFalseStatement {
 }
 
 export interface TrueFalseConfig {
+  /**
+   * The situation the statements are judged against — "พิจารณาการปล่อยวัตถุใน
+   * แนวดิ่ง โดยไม่คิดแรงต้านอากาศ". Optional, and undefined on every โจทย์ that
+   * predates it, which renders exactly as before.
+   *
+   * It lives here rather than in `question_text` because that field is the
+   * first statement, not a prompt: a lead-in written there would be one of the
+   * things the student has to mark true or false.
+   */
+  prompt?: string           // rich text (HTML)
   correct_answer: boolean   // the main statement's (question_text) answer
   explanation_mode: TrueFalseExplanationMode
   score_answer: number      // points per statement

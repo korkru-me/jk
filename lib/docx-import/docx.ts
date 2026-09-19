@@ -145,6 +145,43 @@ function collectAlternateContent(node: XmlNode, out: DocxInline[]): void {
   if (preferred) walkInlines(preferred, out)
 }
 
+/**
+ * A character Word stores as a symbol rather than as text.
+ *
+ * A ✓ typed from the Insert Symbol menu is not in `w:t` at all: it is a
+ * `w:sym` naming a font and a code point in that font's private-use range.
+ * Ignoring it loses the one mark that matters most on an answer key — a
+ * ถูก-ผิด worksheet whose ticks vanish reads as a worksheet with no answers.
+ *
+ * Only the marks an exam actually uses are mapped. Anything else falls back to
+ * the character the code point would be in Unicode, which is usually a shape
+ * near enough to read, and never nothing.
+ */
+const WINGDINGS: Record<string, string> = {
+  F0FC: '✓', F0FD: '☑', F0FB: '✗', F0FE: '☒', F0A8: '☐',
+  F0A3: '✗', F0B7: '•', F0A7: '■',
+}
+
+/** Wingdings 2 and Webdings share the same habit with different code points. */
+const WINGDINGS_2: Record<string, string> = {
+  F050: '✓', F052: '✗', F054: '☑', F056: '☒',
+}
+
+function symbolCharacter(font: string | undefined, char: string | undefined): string | null {
+  if (!char) return null
+  const code = char.toUpperCase()
+  const table = /wingdings\s*2/i.test(font ?? '') ? WINGDINGS_2 : WINGDINGS
+  if (table[code]) return table[code]
+
+  // The private-use block maps back to Latin-1 for every symbol font, which is
+  // where "ü" for ✓ comes from. Better an approximate character than none.
+  const value = parseInt(code, 16)
+  if (Number.isFinite(value) && value >= 0xf000 && value <= 0xf0ff) {
+    return String.fromCharCode(value - 0xf000)
+  }
+  return Number.isFinite(value) ? String.fromCharCode(value) : null
+}
+
 function collectRun(run: XmlNode, out: DocxInline[]): void {
   const format = readRunFormat(firstChild(run, 'w:rPr'))
 
@@ -169,6 +206,11 @@ function collectRun(run: XmlNode, out: DocxInline[]): void {
       case 'w:noBreakHyphen':
         out.push({ kind: 'text', text: '-', format })
         break
+      case 'w:sym': {
+        const symbol = symbolCharacter(child.attrs['w:font'], child.attrs['w:char'])
+        if (symbol) out.push({ kind: 'text', text: symbol, format })
+        break
+      }
       case 'w:drawing':
         collectDrawing(child, out)
         break

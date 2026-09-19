@@ -130,6 +130,40 @@ describe('toSafeExamAnswer', () => {
     ])
   })
 
+  it('carries the ถูก-ผิด lead-in to the student, without its answers', () => {
+    // The situation the statements are judged against is the โจทย์, not the
+    // key: a student who cannot read "โดยไม่คิดแรงต้านอากาศ" is answering a
+    // different question from the one the teacher set.
+    const tf = serializedSafe('true_false', {
+      extra_data: {
+        prompt: '<p>พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ</p>',
+        correct_answer: true,
+        explanation_mode: 'none',
+        score_answer: 0.25,
+        score_explanation: 0,
+        statements: [{ id: 's1', text: 'ข้อความ', correct_answer: false }],
+      },
+    })
+
+    expect(tf.safe.questions.extra_data).toMatchObject({
+      prompt: '<p>พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ</p>',
+    })
+    expect(tf.json).not.toContain('correct_answer')
+  })
+
+  it('leaves a ถูก-ผิด โจทย์ without a lead-in exactly as it was', () => {
+    const tf = serializedSafe('true_false', {
+      extra_data: {
+        correct_answer: true,
+        explanation_mode: 'none',
+        score_answer: 1,
+        score_explanation: 0,
+      },
+    })
+
+    expect(tf.json).not.toContain('prompt')
+  })
+
   it('removes nested true/false and fill-blank answer keys', () => {
     const tf = serializedSafe('true_false', {
       extra_data: {

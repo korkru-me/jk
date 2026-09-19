@@ -144,6 +144,35 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
     }
   }))
 
+  add(checkFor(profile, 'statements', () => {
+    if (questions.length === 0) return null
+    const without = questions.filter(question => question.statements.length === 0)
+    const total = questions.reduce((sum, question) => sum + question.statements.length, 0)
+
+    if (without.length === 0) {
+      return { ruleId: 'statements', status: 'pass', detail: `พบข้อความให้ตัดสินรวม ${total} ข้อความ จาก ${questions.length} ข้อ` }
+    }
+    return {
+      ruleId: 'statements',
+      status: 'fail',
+      detail: `ข้อ ${without.map(question => question.number).join(', ')} ไม่พบข้อความย่อย — ตรวจว่าเขียนเป็น 8.1 8.2 ใต้ข้อหลัก หรือใช้รายการย่อยของ Word`,
+    }
+  }))
+
+  add(checkFor(profile, 'tick', () => {
+    const marked = questions.flatMap(question => question.statements)
+    if (marked.length === 0) return null
+    const unmarked = marked.filter(statement => statement.isTrue === null)
+    if (unmarked.length === 0) {
+      return { ruleId: 'tick', status: 'pass', detail: `อ่านเฉลย ✓/x ได้ครบทั้ง ${marked.length} ข้อความ` }
+    }
+    return {
+      ruleId: 'tick',
+      status: 'warn',
+      detail: `มี ${unmarked.length} ข้อความที่ไม่พบ ✓ หรือ x — ระบบจะถือว่าผิด แก้ได้บนการ์ด`,
+    }
+  }))
+
   add(checkFor(profile, 'equation', () => {
     const withMath = questions.filter(question =>
       question.warnings.some(warning => warning.code === 'equation'))

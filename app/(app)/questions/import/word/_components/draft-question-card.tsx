@@ -8,15 +8,17 @@ import { RichText } from '@/components/ui/rich-text'
 import { McqForm } from '@/components/questions/mcq-form'
 import { EssayForm } from '@/components/questions/essay-form'
 import { FillBlankForm } from '@/components/questions/fill-blank-form'
+import { TrueFalseForm } from '@/components/questions/true-false-form'
 import { RandomNumericForm } from '@/components/questions/random-numeric'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { applyFormPayload, changeType, type DraftEntry, type ImportableType } from '@/lib/docx-import/to-question'
 import type { DraftWarning } from '@/lib/docx-import'
-import type { FillBlankConfig } from '@/lib/types'
+import type { FillBlankConfig, TrueFalseConfig } from '@/lib/types'
 
 /** Only the three a Word worksheet can produce; the rest are authored in the app. */
 const IMPORTABLE_TYPES: { value: ImportableType; hint: string }[] = [
   { value: 'mcq', hint: 'มีตัวเลือก ระบบตรวจให้' },
+  { value: 'true_false', hint: 'ตัดสินถูกหรือผิด ระบบตรวจให้' },
   { value: 'written', hint: 'ตอบเป็นตัวเลข ระบบตรวจให้' },
   { value: 'fill_blank', hint: 'มีช่องเติมคำ ระบบตรวจให้' },
   { value: 'essay', hint: 'ครูตรวจเอง' },
@@ -52,6 +54,18 @@ export function DraftQuestionCard({
   // The ช่องว่าง live in `extra_data`, next to the `[___n]` markers in the body.
   const blanks = question.question_type === 'fill_blank'
     ? (question.extra_data as FillBlankConfig | undefined)?.blanks ?? []
+    : []
+
+  // A ถูก-ผิด โจทย์ keeps its first statement in the body and the rest in
+  // `extra_data`; the card shows them as one list, which is how they read.
+  const trueFalse = question.question_type === 'true_false'
+    ? (question.extra_data as TrueFalseConfig | undefined) ?? null
+    : null
+  const tfStatements = trueFalse
+    ? [
+      { text: question.question_text, correct: trueFalse.correct_answer },
+      ...(trueFalse.statements ?? []).map(statement => ({ text: statement.text, correct: statement.correct_answer })),
+    ]
     : []
 
   /** Marks (or unmarks) one option correct, the same toggle the ปรนัย form has. */
@@ -153,6 +167,9 @@ export function DraftQuestionCard({
                 {question.question_type === 'fill_blank' && (
                   <FillBlankForm allTags={allTags} question={question} draft={draft} />
                 )}
+                {question.question_type === 'true_false' && (
+                  <TrueFalseForm allTags={allTags} question={question} draft={draft} />
+                )}
                 {question.question_type === 'essay' && (
                   <EssayForm allTags={allTags} question={question} draft={draft} />
                 )}
@@ -161,7 +178,7 @@ export function DraftQuestionCard({
           ) : (
             <>
               <div className="text-sm text-foreground">
-                <RichText text={question.question_text} />
+                <RichText text={trueFalse?.prompt ?? question.question_text} />
               </div>
 
               {question.image_urls.length > 0 && (
@@ -234,6 +251,19 @@ export function DraftQuestionCard({
                     </label>
                   ))}
                 </fieldset>
+              )}
+
+              {trueFalse && (
+                <ol className="space-y-1 border-l-2 border-border pl-3">
+                  {tfStatements.map((statement, index) => (
+                    <li key={index} className="flex gap-2 text-sm text-foreground">
+                      <span className={`shrink-0 text-xs font-medium ${statement.correct ? 'text-success' : 'text-destructive'}`}>
+                        {statement.correct ? '✓ ถูก' : '✗ ผิด'}
+                      </span>
+                      <RichText text={statement.text} />
+                    </li>
+                  ))}
+                </ol>
               )}
 
               {question.question_type === 'fill_blank' && blanks.length > 0 && (

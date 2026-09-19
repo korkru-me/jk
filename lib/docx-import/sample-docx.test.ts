@@ -153,6 +153,19 @@ describe('generated sample worksheets', () => {
     expect(parsed.questions[1].html).not.toContain('..........')
   })
 
+  it('reads the ✓ and x back out of the ถูก-ผิด sample', async () => {
+    const parsed = await parseSample(PROFILE_BY_TYPE.true_false)
+
+    expect(parsed.questions).toHaveLength(1)
+    const question = parsed.questions[0]
+    expect(question.type).toBe('true_false')
+    // The ✓ in that file is a Wingdings symbol, not text: this is the check
+    // that `docx.ts` still reads `w:sym`.
+    expect(question.statements.map(statement => statement.isTrue)).toEqual([false, true, true, false])
+    expect(question.statements.every(statement => statement.score === 0.25)).toBe(true)
+    expect(question.warnings).toEqual([])
+  })
+
   it('names the file after the type, without characters a filesystem refuses', async () => {
     for (const profile of READY) {
       const name = sampleFileName(profile)

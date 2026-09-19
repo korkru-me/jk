@@ -24,7 +24,7 @@ import type { QuestionType } from '@/lib/types'
 import type { DocxBlock, DocxDocument, DocxInline, DocxParagraph, NumberingLevel } from './docx'
 import { flattenAnswerText, parseAnswerList, readAnswerKey, type DraftAnswer } from './answer-key'
 
-export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank'
+export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false'
 
 export type { DraftAnswer } from './answer-key'
 
@@ -58,10 +58,21 @@ export type DraftWarningCode =
   | 'refers-to-previous'
   | 'ambiguous-choices'
   | 'multi-answer'
+  | 'unmarked-statement'
 
 export interface DraftWarning {
   code: DraftWarningCode
   message: string
+}
+
+/** One statement of a ถูก-ผิด โจทย์, in the order it is written. */
+export interface DraftStatement {
+  /** The statement itself, with its number, its dotted box and its mark gone. */
+  html: string
+  /** What the teacher marked: ✓ true, ✗ or x false, null if nothing was marked. */
+  isTrue: boolean | null
+  /** Points the file gives this statement — "(0.25 คะแนน)" — if it says. */
+  score: number | null
 }
 
 /** One ช่องว่าง in a เติมคำ โจทย์, in the order it appears. */
@@ -85,6 +96,9 @@ export interface DraftQuestion {
   answers: DraftAnswer[]
   /** For a เติมคำ โจทย์: what each `[___n]` in `html` should accept. */
   blanks: DraftBlank[]
+  /** For a ถูก-ผิด โจทย์: the statements to judge. `html` is then the lead-in
+   *  they are all judged against, which is not itself judged. */
+  statements: DraftStatement[]
   /** Relationship ids, resolved to uploaded URLs by the caller. */
   imageRelIds: string[]
   /** Whether the โจทย์ talks about a picture ("ดังรูป"). Kept rather than
@@ -573,6 +587,67 @@ function readPartAnswer(paragraphs: DocxParagraph[]): { html: string; answers: D
   return readAnswerKey(paragraphsToHtml(paragraphs, { keepEmphasis: true }))
 }
 
+/**
+ * The statements of a ถูก-ผิด โจทย์, read off an answer key.
+ *
+ * A Thai paper writes them as "8.1 ……… ✓ …… ข้อความ (0.25 คะแนน)": the number
+ * ties the statement to its โจทย์, the dots are the boxes to tick on paper, the
+ * ✓ or x is the เฉลย, and the bracket at the end is what the statement is
+ * worth. All four are the teacher's marking apparatus and none of them belong
+ * in the statement a student reads, so all four come out.
+ *
+ * ✓ arrives here as a character only because `docx.ts` reads `w:sym`: it is
+ * inserted from Word's symbol menu and is not text in the file at all.
+ */
+const STATEMENT_NUMBER = /^[\s ]*(\d{1,2})\s*\.\s*(\d{1,2})[\s.)]*/
+const TICK_TRUE = /[✓✔☑]/
+const TICK_FALSE = /[✗✘☒×]|(?:^|[\s…])[xX](?=$|[\s…])/
+/** The dotted or underscored box a statement is ticked in. */
+const TICK_BOX = /[…._\u2026]{2,}/g
+/** "(0.25 คะแนน)" — what the statement is worth, not part of it. */
+const SCORE_TAIL = /\s*\(\s*([0-9]+(?:\.[0-9]+)?)\s*คะแนน\s*\)\s*$/
+
+/**
+ * The lead-in of a ถูก-ผิด โจทย์, without the apparatus around it.
+ *
+ * The typed "8." is the โจทย์'s number on paper — the app draws its own — and
+ * "(1 คะแนน)" is the total the statements already add up to. Neither is part
+ * of the situation a student reads.
+ */
+function leadInHtml(html: string): string {
+  return html
+    .replace(/^(<p>(?:<[^>]+>)*)[\s ]*[0-9]{1,2}\s*[.)]\s*/, '$1')
+    .replace(/\s*\(\s*[0-9]+(?:\.[0-9]+)?\s*คะแนน\s*\)\s*(?=(?:<\/[a-z]+>\s*)*$)/, '')
+}
+
+/** True when this paragraph is statement `m` of โจทย์ `number`. */
+function statementOf(paragraph: DocxParagraph, number: number): number | null {
+  const match = STATEMENT_NUMBER.exec(plainText(paragraph.inlines))
+  if (!match) return null
+  if (parseInt(match[1], 10) !== number) return null
+  return parseInt(match[2], 10)
+}
+
+function readStatement(paragraph: DocxParagraph): DraftStatement {
+  const text = plainText(paragraph.inlines)
+  const marked = TICK_TRUE.test(text) ? true : TICK_FALSE.test(text) ? false : null
+
+  const scoreMatch = SCORE_TAIL.exec(text.trim())
+  const score = scoreMatch ? parseFloat(scoreMatch[1]) : null
+
+  const body = text
+    .replace(STATEMENT_NUMBER, '')
+    .replace(TICK_BOX, ' ')
+    .replace(/[✓✔☑✗✘☒×]/g, ' ')
+    // A lone x is the mark; an x inside a word (or a variable) is not.
+    .replace(/(^|\s)[xX](?=\s|$)/g, ' ')
+    .replace(SCORE_TAIL, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return { html: `<p>${escapeHtml(body)}</p>`, isTrue: marked, score }
+}
+
 // ─── Splitting the document into questions ───────────────────────────────────
 
 /** `1)` `1.` `(1)` `ก)` `a.` — the way a choice or a sub-question is labelled. */
@@ -661,6 +736,46 @@ function findTypedNumbering(blocks: DocxBlock[]): Set<number> {
     expected++
   }
   return accepted.size >= 2 ? accepted : new Set<number>()
+}
+
+/**
+ * "8." followed by "8.1" "8.2" — a โจทย์ that numbers its own sub-items.
+ *
+ * The plain typed-number reader only trusts a run that counts from 1, because
+ * a stray "3." in a sentence is otherwise enough to split a document. Sub-
+ * numbering carries its own proof: the children repeat the parent's number and
+ * count up from one under it, which nothing accidental does. That lets a page
+ * torn out of the middle of an exam — starting at ข้อ 8, as answer keys handed
+ * round between teachers usually are — be read at all.
+ */
+function findSubNumberedHeads(blocks: DocxBlock[]): Set<number> {
+  const heads = new Set<number>()
+
+  blocks.forEach((block, index) => {
+    if (block.kind !== 'paragraph') return
+    const match = /^[\s ]*([0-9]{1,2})\s*[.)]\s*\S/.exec(plainText(block.inlines))
+    if (!match) return
+    // Not a head if it is itself a sub-item: "8.1" reads as "8." to the above.
+    if (statementOf(block, parseInt(match[1], 10)) !== null) return
+
+    const number = parseInt(match[1], 10)
+    let expected = 1
+    for (let at = index + 1; at < blocks.length; at++) {
+      const next = blocks[at]
+      if (next.kind !== 'paragraph') continue
+      const position = statementOf(next, number)
+      if (position === null) {
+        // Another head ends the run; anything else is just prose in between.
+        if (/^[\s ]*([0-9]{1,2})\s*[.)]\s*\S/.test(plainText(next.inlines))) break
+        continue
+      }
+      if (position !== expected) break
+      expected++
+    }
+    if (expected > 2) heads.add(index)
+  })
+
+  return heads
 }
 
 // ─── Chunk analysis ──────────────────────────────────────────────────────────
@@ -784,6 +899,29 @@ function buildQuestion(
   levels: Map<number, NumberingLevel> | undefined,
   options: ParseOptions = {},
 ): DraftQuestion {
+  // Statements are taken out first, so nothing downstream mistakes "8.1" for
+  // a ตัวเลือก or a sub-question — which is exactly what it looks like to the
+  // marker reader that runs below.
+  const statements: DraftStatement[] = []
+  if (options.expect === 'true_false') {
+    // Matched against the number the file writes, not the โจทย์'s position:
+    // an answer key torn out of a longer exam starts at ข้อ 8 and its
+    // statements are 8.1, 8.2 — not 1.1.
+    const typed = /^[\s ]*([0-9]{1,2})\s*[.)]/.exec(plainText(head.inlines))
+    const parent = typed ? parseInt(typed[1], 10) : number
+
+    body = body.filter(block => {
+      if (block.kind !== 'paragraph') return true
+      // Either numbered by hand as "8.1", or by Word as a deeper level of the
+      // list the โจทย์ itself is numbered with. Worksheets use both.
+      const typedStatement = statementOf(block, parent) !== null
+      const listStatement = !!head.numId && block.numId === head.numId && block.ilvl > head.ilvl
+      if (!typedStatement && !listStatement) return true
+      statements.push(readStatement(block))
+      return false
+    })
+  }
+
   const items: ChunkItem[] = []
 
   for (const block of body) {
@@ -872,9 +1010,15 @@ function buildQuestion(
   // A โจทย์ with ตัวเลือก is graded on the marked one; a bracket at the end of
   // it is part of an option, not a เฉลย of its own. A เติมคำ โจทย์ is graded on
   // its own ช่องว่าง, so it is not read for one either.
-  const markedStem = treatAsChoices || useBlanks ? null : readMarkedAnswer(stemParagraphs)
-  const stem = treatAsChoices || useBlanks
-    ? { answers: [], html: blanked?.html ?? paragraphsToHtml(stemParagraphs, { keepEmphasis: true }) }
+  const isTrueFalse = statements.length > 0
+  const markedStem = treatAsChoices || useBlanks || isTrueFalse ? null : readMarkedAnswer(stemParagraphs)
+  const stem = treatAsChoices || useBlanks || isTrueFalse
+    ? {
+      answers: [],
+      html: isTrueFalse
+        ? leadInHtml(paragraphsToHtml(stemParagraphs, { keepEmphasis: true }))
+        : blanked?.html ?? paragraphsToHtml(stemParagraphs, { keepEmphasis: true }),
+    }
     : markedStem ?? readAnswerKey(paragraphsToHtml(stemParagraphs, { keepEmphasis: true }))
 
   const answerCounts = [stem.answers.length, ...parts.map(part => part.answers.length)]
@@ -884,12 +1028,32 @@ function buildQuestion(
   // because a formula reads as "15√2" there and as TeX in the markup.
   const stemPlain = useBlanks
     ? (blanked?.plain ?? '')
-    : markedStem?.plain ?? paragraphsText(stemParagraphs)
+    : isTrueFalse
+      // Titled by the lead-in as the โจทย์ now reads it: without the number the
+      // app draws itself, and without the total the statements add up to.
+      ? paragraphsText(stemParagraphs)
+        .replace(/^[\s ]*[0-9]{1,2}\s*[.)]\s*/, '')
+        .replace(/\s*\(\s*[0-9]+(?:\.[0-9]+)?\s*คะแนน\s*\)\s*$/, '')
+        .trim()
+      : markedStem?.plain ?? paragraphsText(stemParagraphs)
   const stemText = !markedStem && stem.answers.length > 0
     ? stemPlain.replace(/\s*\([^()]*\)\s*$/, '').trim()
     : stemPlain
 
   const warnings: DraftWarning[] = []
+
+  const unmarked = statements
+    .map((statement, index) => ({ statement, position: index + 1 }))
+    .filter(({ statement }) => statement.isTrue === null)
+  if (unmarked.length > 0) {
+    // Unmarked becomes ผิด, which is the convention of the paper it came from
+    // — but a statement the teacher merely forgot would mark every student
+    // wrong on it, so it is said out loud rather than assumed.
+    warnings.push({
+      code: 'unmarked-statement',
+      message: `ข้อความที่ ${unmarked.map(item => item.position).join(', ')} ไม่พบเครื่องหมาย ✓ หรือ x — ระบบจะถือว่าผิด ตรวจก่อนนำเข้า`,
+    })
+  }
 
   if (answerCounts.some(count => count > 1)) {
     warnings.push({
@@ -930,13 +1094,16 @@ function buildQuestion(
     // Without ตัวเลือก and without a เฉลย there is nothing to grade against, so
     // the โจทย์ comes in as one the teacher marks by hand. Switching it to
     // อัตนัย and typing the answer is one control on the import screen.
-    type: treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
+    type: statements.length > 0
+      ? 'true_false'
+      : treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
     title: buildTitle(stemText, number),
     html: stem.html,
     choices,
     parts,
     answers: stem.answers,
     blanks: blanked?.blanks ?? [],
+    statements,
     imageRelIds: relIds,
     mentionsPicture: MENTIONS_PICTURE.test(fullText),
     warnings,
@@ -991,7 +1158,12 @@ function isSectionHeading(block: DocxBlock): block is DocxParagraph {
 
 export function buildDrafts(document: DocxDocument, options: ParseOptions = {}): DraftResult {
   const list = findQuestionList(document)
-  const typed = list ? new Set<number>() : findTypedNumbering(document.blocks)
+  const typed = list
+    ? new Set<number>()
+    : (() => {
+      const counted = findTypedNumbering(document.blocks)
+      return counted.size > 0 ? counted : findSubNumberedHeads(document.blocks)
+    })()
 
   const isHead = (block: DocxBlock, index: number): block is DocxParagraph => {
     if (block.kind !== 'paragraph') return false

@@ -1017,6 +1017,16 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 </div>
               </div>
 
+              {/* The lead-in of a ถูก-ผิด โจทย์ governs every statement under it,
+                  so it is read first — and it is not one of the things being
+                  judged, which is why it is not in `question_text`. */}
+              {current.questions.question_type === 'true_false'
+                && (current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig | null)?.prompt && (
+                <QuestionText
+                  text={(current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig).prompt as string}
+                />
+              )}
+
               {current.questions.question_type !== 'fill_blank' && !mainInlineBlank && (
                 <QuestionText text={currentQuestionText} />
               )}
