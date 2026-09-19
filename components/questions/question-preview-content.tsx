@@ -396,6 +396,7 @@ export function QuestionPreviewContent({
   // (เติมคำตอบตัวเลขที่มีรูปวิธีทำ, ส่งไฟล์งาน) — ทั้งสองแบบมีปุ่มนี้
   const fillBlanks = fillBlankConfig?.blanks ?? []
   const fillTypes = fillBlanks.map(b => getBlankType(fillBlankConfig, b))
+  const trueFalsePrompt = questionType === 'true_false' ? trueFalseConfig?.prompt : undefined
   const tfItems = trueFalseConfig
     ? [{ text: '', correct_answer: trueFalseConfig.correct_answer }, ...(trueFalseConfig.statements ?? [])]
     : []
@@ -702,6 +703,9 @@ export function QuestionPreviewContent({
           🔄 โจทย์ใหม่
         </button>
       </div>
+
+      {/* The situation a ถูก-ผิด โจทย์ sets up, above the statements it governs */}
+      {trueFalsePrompt && <RenderText text={trueFalsePrompt} />}
 
       {/* Question text — fill_blank and single-part written-with-inline-blank render their own copy below, interleaved with the input(s) */}
       {questionType !== 'fill_blank' && mainBlankCount === 0 && <RenderText text={renderedText} />}

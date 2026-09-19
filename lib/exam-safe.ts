@@ -20,6 +20,8 @@ export interface SafeTrueFalseStatement {
 }
 
 export interface SafeTrueFalseConfig {
+  /** The lead-in. Safe to send: it is the โจทย์, not the key. */
+  prompt?: string
   explanation_mode: TrueFalseExplanationMode
   score_answer: number
   score_explanation: number
@@ -310,6 +312,7 @@ function sanitizeExtraData(questionType: string, value: unknown, random: () => n
       ? extra.statements.map(sanitizeTrueFalseStatement)
       : undefined
     return {
+      ...(asOptionalString(extra.prompt) ? { prompt: asOptionalString(extra.prompt) } : {}),
       explanation_mode: extra.explanation_mode === 'wrong_only' || extra.explanation_mode === 'always'
         ? extra.explanation_mode
         : 'none',
