@@ -101,7 +101,8 @@ describe('import profiles', () => {
   it('keeps โจทย์ผสม and the automatic reader plainly apart', () => {
     // One is many kinds inside a single ข้อ, the other many ข้อ inside a single
     // file. They were worded almost identically and teachers could not tell
-    // which was which.
+    // which was which. โจทย์ผสม is no longer offered, but the wording stays
+    // apart so that turning it back on cannot bring the confusion back.
     const composite = PROFILE_BY_TYPE.composite
     expect(composite.label).toContain('ข้อเดียว')
     expect(AUTO_PROFILE.label).toContain('ไฟล์เดียว')

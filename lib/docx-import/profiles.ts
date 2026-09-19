@@ -362,18 +362,20 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     label: 'โจทย์ผสม (หลายชนิดในข้อเดียว)',
     noun: 'โจทย์ผสม',
     blurb: 'โจทย์ข้อเดียวที่มีคำถามย่อยหลายชนิด เช่น ถูก-ผิด กับ เติมคำ อยู่ในข้อเดียวกัน',
-    status: 'planned',
-    rules: [
-      NUMBERING,
-      { id: 'stem', text: 'สถานการณ์หลักอยู่ย่อหน้าแรกของข้อ' },
-      { id: 'sub-questions', text: 'ข้อย่อย ก) ข) ค) ใช้รายการย่อยของ Word และทำเครื่องหมายเฉลยตามกติกาของชนิดนั้น ๆ' },
-    ],
+    // Not shown on the chooser. A โจทย์ผสม is several kinds nested inside one
+    // ข้อ, and a Word file has no way to say which kind each sub-question is —
+    // ก) could be ถูก-ผิด, เติมคำ, ปรนัย or a calculation, and only the teacher
+    // knows which. They would have to choose for every sub-question anyway,
+    // which is the form's job and is where it is already done.
+    status: 'not-applicable',
+    notApplicableReason: 'ไฟล์ Word บอกไม่ได้ว่าข้อย่อยแต่ละอันเป็นชนิดไหน ครูต้องเลือกเองทุกข้อย่อยอยู่ดี — ประกอบในฟอร์มตรงกว่า',
+    rules: [NUMBERING],
     sample: [
       line('question', t('จากกราฟความเร็ว-เวลาที่กำหนดให้')),
       line('part', t('ช่วงใดที่วัตถุมีความเร่งเป็นศูนย์')),
       line('part', t('จงหาระยะทางทั้งหมดใน 10 วินาทีแรก')),
     ],
-    limits: ['ข้อย่อยที่เป็นตารางจำแนกหรือติดป้ายบนรูปยังทำในโจทย์ผสมไม่ได้'],
+    limits: [],
     createHref: '/questions/new/composite',
   },
 
