@@ -39,6 +39,8 @@ Regression หลังเฟส 10 ผ่าน 102 test files / 1,342 tests, T
 
 Regression หลังเฟส 11 ผ่าน 103 test files / 1,348 tests, TypeScript และ token lint; candidate checker รายงาน pending revision/build/time ตาม external state จริง
 
+Staging เฟส 2A สำรวจแบบ read-only แล้วและบันทึกใน `docs/STAGING_PHASE_2A_AUDIT.md`: Supabase migration local/remote ตรงกัน 117 รายการ, ยังไม่มี branch/deployment/database Staging และ Vercel CLI ยังไม่ link จุดสำคัญคือ fresh Supabase project ยังสร้างจาก migration folder อย่างเดียวไม่ได้ เพราะ history เริ่มที่ `002`, อาศัย `supabase/schema.sql`, `question-images` เคยสร้างจาก Dashboard และ config ชี้ `seed.sql` ที่ไม่มีอยู่ จึงห้าม `db push` ไปโปรเจกต์ใหม่จนกว่าเฟส 2B จะทำ bootstrap/runtime isolation guard แบบ versioned ก่อน เฟสนี้ไม่ได้แก้ Production, deploy, สร้างบัญชี หรือคัดลอกข้อมูลจริง
+
 ## MVP core
 
 ### Authentication — บางส่วน

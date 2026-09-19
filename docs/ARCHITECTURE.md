@@ -13,6 +13,14 @@
 - Next.js Server Components เป็นค่าเริ่มต้น และ Client Components เฉพาะส่วนโต้ตอบ
 - Server Actions ใน `lib/actions/` สำหรับ mutation หลัก
 
+## Deployment environments
+
+- Production ใช้ Vercel + Supabase project ที่แยกจาก environment อื่น และ Git migration ledger ตรงกับฐานที่ link อยู่ ณ 20 กันยายน 2026
+- Staging ยังไม่มี deployment/database จริง ณ วันเดียวกัน ห้ามใช้ Production เป็นพื้นที่ authenticated QA
+- แผน Staging ใช้ Vercel Preview ของ branch `staging` กับ Supabase project แยก และใช้ข้อมูล QA สังเคราะห์เท่านั้น
+- migration folder ไม่สามารถ bootstrap fresh project ได้เอง เพราะ migration เริ่มที่ `002`, อาศัย `supabase/schema.sql` และมี bucket ที่เคยสร้างนอก migration จึงต้องผ่าน bootstrap guard ในเฟส 2B ก่อนสร้าง Staging
+- inventory, blockers และ data-separation plan อยู่ใน `docs/STAGING_PHASE_2A_AUDIT.md`
+
 ## โครงสร้าง repository
 
 - `app/` — routes, layouts และ server-side page composition

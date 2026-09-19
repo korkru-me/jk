@@ -12,6 +12,7 @@
 
 ## 1. สร้าง staging แยกก่อน
 
+- อ่าน inventory และ blocker ใน `docs/STAGING_PHASE_2A_AUDIT.md`; ห้าม `supabase db push` ไป fresh project จนกว่า bootstrap guard เฟส 2B จะเสร็จ
 - ใช้ Vercel Preview/โดเมน HTTPS ที่ไม่ใช่ production
 - ใช้ Supabase project ใหม่ที่ไม่ใช่ production
 - สร้างเฉพาะบัญชีครู/นักเรียนและข้อสอบจำลอง ห้ามคัดลอกข้อมูลนักเรียนจริง
