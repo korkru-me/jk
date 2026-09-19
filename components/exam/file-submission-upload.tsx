@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { FileUp, FileText, Loader2, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 import type { SubmittedFile } from '@/lib/types'
@@ -137,13 +138,20 @@ export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmiss
           {value.map((f) => (
             <div key={f.url} className="relative group">
               {isImageType(f.type) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={f.url}
-                  alt={f.name}
-                  className="w-24 h-24 rounded-lg object-cover border cursor-pointer"
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={`เปิดไฟล์ ${f.name}`}
                   onClick={() => window.open(f.url, '_blank')}
-                />
+                  className="block h-auto w-auto rounded-lg p-0"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={f.url}
+                    alt=""
+                    className="h-24 w-24 cursor-pointer rounded-lg border object-cover"
+                  />
+                </Button>
               ) : (
                 <a
                   href={f.url}
@@ -158,7 +166,8 @@ export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmiss
               <button
                 type="button"
                 onClick={() => removeFile(f.url)}
-                className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                aria-label={`นำไฟล์ ${f.name} ออก`}
               >
                 <X className="w-3 h-3" />
               </button>

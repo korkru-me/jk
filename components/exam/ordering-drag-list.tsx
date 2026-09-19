@@ -209,7 +209,7 @@ export function OrderingDragList({
 
               {item.image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.image_url} alt="" loading="lazy" decoding="async"
+                <img src={item.image_url} alt="" loading="lazy" decoding="async" draggable={false}
                   className="h-10 w-10 shrink-0 rounded border border-border object-contain" />
               )}
               <span className="min-w-0 flex-1 text-sm">

@@ -90,7 +90,9 @@
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --success: oklch(0.596 0.145 163.225);
-  --success-foreground: oklch(0.985 0 0);
+  /* The medium success green does not carry small white button text at AA;
+     the dark foreground clears contrast while matching the dark theme token. */
+  --success-foreground: oklch(0.145 0 0);
   --warning: oklch(0.666 0.179 58.318);
   --warning-foreground: oklch(0.985 0 0);
   /* Content a teacher reported as wrong — distinct from warning, which is

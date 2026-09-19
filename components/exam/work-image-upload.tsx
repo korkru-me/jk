@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Camera, Loader2, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 
@@ -115,13 +116,20 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
       />
       {value ? (
         <div className="relative inline-block group">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={value}
-            alt="รูปวิธีทำ"
-            className="w-28 h-28 rounded-lg object-cover border cursor-pointer"
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="เปิดรูปวิธีทำขนาดเต็ม"
             onClick={() => window.open(value, '_blank')}
-          />
+            className="block h-auto w-auto rounded-lg p-0"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={value}
+              alt=""
+              className="h-28 w-28 cursor-pointer rounded-lg border object-cover"
+            />
+          </Button>
           <button
             type="button"
             onClick={handleRemove}

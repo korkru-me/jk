@@ -1,6 +1,6 @@
 'use client'
 
-import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { checkAnswer, drawNextStreakQuestion, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
@@ -304,6 +304,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [eliminated, setEliminated] = useState<Record<string, Set<number>>>({})
   const [focusMode, setFocusMode] = useState(false)
   const [showQuestionNavigator, setShowQuestionNavigator] = useState(false)
+  const [navigationRequest, setNavigationRequest] = useState(0)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitCountdown, setSubmitCountdown] = useState(0)
   const [activeMathField, setActiveMathField] = useState<string | null>(null)
@@ -319,9 +320,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const questionNavigatorCloseRef = useRef<HTMLButtonElement | null>(null)
   const submitDialogRef = useRef<HTMLDivElement | null>(null)
   const submitCancelRef = useRef<HTMLButtonElement | null>(null)
+  const fullscreenDialogRef = useRef<HTMLDivElement | null>(null)
+  const fullscreenActionRef = useRef<HTMLButtonElement | null>(null)
+  const pendingQuestionFocusRef = useRef(false)
+  const previousPageStartRef = useRef(0)
+  const focusModeTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const focusModeExitRef = useRef<HTMLButtonElement | null>(null)
+  const focusModeHasOpenedRef = useRef(false)
+  const { showFullscreenWarning, requestFullscreen } = useFullscreenGuard(config.isFullscreenEnforced)
 
   useEffect(() => {
-    if (!showQuestionNavigator) return
+    if (!showQuestionNavigator || showFullscreenWarning) return
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const frame = window.requestAnimationFrame(() => questionNavigatorCloseRef.current?.focus())
     const onKeyDown = (event: KeyboardEvent) => {
@@ -338,10 +347,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       document.removeEventListener('keydown', onKeyDown)
       if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0) previousFocus.focus()
     }
-  }, [showQuestionNavigator])
+  }, [showFullscreenWarning, showQuestionNavigator])
 
   useEffect(() => {
-    if (!showSubmitConfirm) return
+    if (!showSubmitConfirm || showFullscreenWarning) return
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const frame = window.requestAnimationFrame(() => submitCancelRef.current?.focus())
     const onKeyDown = (event: KeyboardEvent) => {
@@ -358,15 +367,83 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       document.removeEventListener('keydown', onKeyDown)
       if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0) previousFocus.focus()
     }
-  }, [showSubmitConfirm])
+  }, [showFullscreenWarning, showSubmitConfirm])
+
+  useEffect(() => {
+    if (!showFullscreenWarning) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const frame = window.requestAnimationFrame(() => fullscreenActionRef.current?.focus())
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        // The warning describes a condition that is still active, so Escape
+        // must not dismiss it and leave the student interacting behind it.
+        event.preventDefault()
+        return
+      }
+      keepKeyboardFocusInside(event, fullscreenDialogRef.current)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', onKeyDown)
+      if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0) previousFocus.focus()
+    }
+  }, [showFullscreenWarning])
+
+  const openLayerStateRef = useRef({
+    questionNavigator: showQuestionNavigator,
+    submit: showSubmitConfirm,
+    calculator: showCalculator,
+    scratchpad: showScratchpad,
+    mathKeypad: activeMathField !== null,
+    fullscreen: showFullscreenWarning,
+  })
+  openLayerStateRef.current = {
+    questionNavigator: showQuestionNavigator,
+    submit: showSubmitConfirm,
+    calculator: showCalculator,
+    scratchpad: showScratchpad,
+    mathKeypad: activeMathField !== null,
+    fullscreen: showFullscreenWarning,
+  }
+
+  useEffect(() => {
+    if (!focusMode) {
+      if (!focusModeHasOpenedRef.current) return
+      focusModeHasOpenedRef.current = false
+      const frame = window.requestAnimationFrame(() => focusModeTriggerRef.current?.focus())
+      return () => window.cancelAnimationFrame(frame)
+    }
+
+    focusModeHasOpenedRef.current = true
+    const frame = window.requestAnimationFrame(() => focusModeExitRef.current?.focus())
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      const layer = openLayerStateRef.current
+      if (
+        layer.questionNavigator || layer.submit || layer.calculator
+        || layer.scratchpad || layer.mathKeypad || layer.fullscreen
+      ) return
+      event.preventDefault()
+      setFocusMode(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [focusMode])
 
   const navigateTo = useCallback((index: number) => {
-    setCurrentIndex(index)
+    const nextIndex = Math.min(Math.max(0, index), answers.length - 1)
+    pendingQuestionFocusRef.current = true
+    setCurrentIndex(nextIndex)
+    setNavigationRequest(request => request + 1)
     setActiveMathField(null)
     setCalculatorTarget(null)
     setScratchpadTarget(null)
     setLoadAttachedNonce(0)
-  }, [])
+  }, [answers.length])
 
   // In a streak run the ข้อ in hand is always the newest row, and a drawn ข้อ
   // arrives by refreshing the route. Without this the refresh would land the
@@ -378,7 +455,6 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
-  const { showFullscreenWarning, requestFullscreen } = useFullscreenGuard(config.isFullscreenEnforced)
   const { status: proctorStatus, activeConnectionCount: proctorActiveConnectionCount } = useExamProctor({
     enabled: config.proctoringEnabled && !previewMode,
     submissionId,
@@ -624,6 +700,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     label: string,
   ) => {
     const questionNumber = answers.findIndex(answer => answer.id === answerId) + 1
+    setShowCalculator(false)
+    setShowScratchpad(false)
     setActiveMathField(fieldId)
     setCalculatorTarget({
       answerId,
@@ -1036,17 +1114,26 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     ? workArtifacts[`${scratchpadAnswer.id}:${scratchpadArtifactPartKey}`] ?? null
     : null
 
-  // With several questions on a screen, moving the focus is not visible on its
-  // own — tapping ข้อ 4 in the นำทาง grid while it is already on the page would
-  // look like nothing happened. Bring the focused question into view instead.
-  // A single-question page has nowhere to scroll to, so it is left alone.
+  // Navigation is a page change as well as a state change. Reset the question
+  // scroller when a new page replaces the old one; when several questions
+  // share a page, bring the chosen question into view. Programmatic focus lets
+  // keyboard and screen-reader users continue at the new question instead of
+  // being stranded on the navigation control they just activated.
   useEffect(() => {
-    if (perPage === 1) return
-    document.getElementById(`exam-q-${currentIndex}`)?.scrollIntoView({
-      behavior: 'smooth',
+    const pageChanged = previousPageStartRef.current !== pageStart
+    previousPageStartRef.current = pageStart
+    if (!pendingQuestionFocusRef.current) return
+    pendingQuestionFocusRef.current = false
+
+    const target = document.getElementById(`exam-q-${currentIndex}`)
+    if (!target) return
+    target.focus({ preventScroll: true })
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    target.scrollIntoView({
+      behavior: pageChanged || reducedMotion ? 'auto' : 'smooth',
       block: 'start',
     })
-  }, [currentIndex, perPage])
+  }, [currentIndex, navigationRequest, pageStart])
 
   // ── Preview banner (shared between normal + focus mode) ───────────────────────
 
@@ -1097,7 +1184,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             && countAnswerBlanks(currentQuestionText) > 0
 
           return (
-            <div key={current.id} id={`exam-q-${questionIndex}`} className="flex flex-col gap-3 scroll-mt-2">
+            <div
+              key={current.id}
+              id={`exam-q-${questionIndex}`}
+              role="region"
+              aria-label={`ข้อ ${questionIndex + 1} จาก ${answers.length}`}
+              tabIndex={-1}
+              className="flex flex-col gap-3 rounded-2xl scroll-mt-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
             {/* Question card */}
             <Card padding="lg" className="space-y-4">
               <div className="flex items-center gap-2 flex-wrap">
@@ -1514,17 +1608,26 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Fullscreen warning overlay ─────────────────────────────────────── */}
       {config.isFullscreenEnforced && showFullscreenWarning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
-          <Card padding="2xl" elevation="xl" className="text-center max-w-md">
+        <div className="fixed inset-x-0 top-0 z-[100] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay px-4 backdrop-blur-sm">
+          <Card
+            ref={fullscreenDialogRef}
+            padding="2xl"
+            elevation="xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fullscreen-warning-title"
+            className="max-h-[calc(var(--app-height,100dvh)-2rem)] max-w-md overflow-y-auto overscroll-contain text-center"
+          >
             <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-5">
               <ShieldAlert size={40} className="text-destructive" />
             </div>
-            <h2 className="text-2xl font-black text-foreground mb-2">ออกจากโหมดเต็มจอ</h2>
+            <h2 id="fullscreen-warning-title" className="text-2xl font-black text-foreground mb-2">ออกจากโหมดเต็มจอ</h2>
             <p className="text-muted-foreground text-sm mb-6">
               ระบบตรวจจับว่าคุณออกจากโหมดเต็มจอ<br />
               กรุณากลับสู่โหมดเต็มจอเพื่อทำข้อสอบต่อ
             </p>
             <Button
+              ref={fullscreenActionRef}
               onClick={enterFullscreen}
               variant="destructive"
               size="lg"
@@ -1590,6 +1693,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             timerUrgent={timerUrgent}
             timerDanger={timerDanger}
             onOpenNavigator={() => setShowQuestionNavigator(true)}
+            focusModeButtonRef={focusModeTriggerRef}
           />
           {/* Progress bar */}
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -1669,6 +1773,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   </Button>
                 )}
                 <Button
+                  ref={focusModeExitRef}
                   type="button"
                   variant="outline"
                   size="sm"
@@ -1698,7 +1803,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       {/* Compact screens hide the persistent right navigator. This sheet
           keeps direct access to unanswered and flagged questions without
           squeezing the question itself into a narrow column. */}
-      {showQuestionNavigator && !previewResult && (
+      {showQuestionNavigator && !showFullscreenWarning && !previewResult && (
         <div
           className="fixed inset-x-0 top-0 z-[90] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay p-3 backdrop-blur-sm"
           role="presentation"
@@ -1793,7 +1898,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       )}
 
       {/* ── Submit confirmation dialog ──────────────────────────────────────── */}
-      {showSubmitConfirm && (
+      {showSubmitConfirm && !showFullscreenWarning && (
         <div className="fixed inset-x-0 top-0 z-[90] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay p-3 backdrop-blur-sm">
           <Card
             ref={submitDialogRef}
@@ -1855,9 +1960,13 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 กลับไปตรวจ
               </Button>
               <Button
-                className="min-h-10 flex-1 bg-success hover:bg-success/90 text-success-foreground border-0 transition-all pointer-coarse:min-h-11"
-                onClick={() => { setShowSubmitConfirm(false); handleSubmit() }}
-                disabled={submitting || submitCountdown > 0}
+                className="min-h-10 flex-1 border-0 bg-success text-success-foreground transition-all hover:bg-success/90 aria-disabled:pointer-events-none aria-disabled:opacity-50 pointer-coarse:min-h-11"
+                onClick={() => {
+                  if (submitting || submitCountdown > 0) return
+                  setShowSubmitConfirm(false)
+                  handleSubmit()
+                }}
+                aria-disabled={submitting || submitCountdown > 0}
               >
                 {submitCountdown > 0
                   ? `รอ ${submitCountdown} วินาที...`
@@ -2083,7 +2192,7 @@ function PreviewResultSummary({
         <p className="text-4xl font-black">{totalScore}/{totalMax}</p>
         <p className="text-muted-foreground mt-1 text-sm">คะแนนที่จะได้ (ตัวอย่าง — ไม่บันทึกจริง)</p>
         <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1 text-success">
+          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">
             <CheckCircle2 size={13} /> ถูก {correctCount} ข้อ
           </span>
           <span className="flex items-center gap-1 text-destructive">
@@ -2145,7 +2254,7 @@ function ExamToolbar({
   proctorStatus,
   proctorActiveConnectionCount,
   config, calculatorOpen, onToggleCalculator, scratchpadOpen, onToggleScratchpad, onFocusMode,
-  timeLabel, timerUrgent, timerDanger, onOpenNavigator,
+  timeLabel, timerUrgent, timerDanger, onOpenNavigator, focusModeButtonRef,
 }: {
   saving: boolean
   isOnline: boolean
@@ -2163,6 +2272,7 @@ function ExamToolbar({
   timerUrgent: boolean
   timerDanger: boolean
   onOpenNavigator: () => void
+  focusModeButtonRef: RefObject<HTMLButtonElement | null>
 }) {
   return (
     <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
@@ -2171,15 +2281,15 @@ function ExamToolbar({
         {saving ? (
           <span className="text-muted-foreground animate-pulse">บันทึก...</span>
         ) : pendingSync > 0 ? (
-          <span className="text-warning flex items-center gap-1">
+          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
             <WifiOff size={11} /> รอซิงก์ {pendingSync}
           </span>
         ) : isOnline ? (
-          <span className="flex items-center gap-1 text-success">
+          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">
             <Wifi size={11} /> บันทึกอัตโนมัติ
           </span>
         ) : (
-          <span className="text-warning flex items-center gap-1">
+          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
             <WifiOff size={11} /> ออฟไลน์
           </span>
         )}
@@ -2190,7 +2300,9 @@ function ExamToolbar({
         )}
         {config.proctoringEnabled && (
           <span className={`flex items-center gap-1 ${
-            proctorStatus === 'connected' ? 'text-success' : 'text-warning'
+            proctorStatus === 'connected'
+              ? 'text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]'
+              : 'text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]'
           }`}>
             <ShieldAlert size={11} />
             {proctorStatus === 'connected'
@@ -2256,7 +2368,15 @@ function ExamToolbar({
             <span className="hidden sm:inline">เครื่องคิดเลข</span>
           </Button>
         )}
-        <Button type="button" variant="outline" size="sm" onClick={onFocusMode} aria-label="โฟกัส" className="h-10 min-w-10 px-2 pointer-coarse:h-11 pointer-coarse:min-w-11">
+        <Button
+          ref={focusModeButtonRef}
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onFocusMode}
+          aria-label="โฟกัส"
+          className="h-10 min-w-10 px-2 pointer-coarse:h-11 pointer-coarse:min-w-11"
+        >
           <Maximize2 />
           <span className="hidden sm:inline">โฟกัส</span>
         </Button>
@@ -2300,7 +2420,7 @@ function MCQInput({
                 : isSelected
                 ? 'border-primary bg-primary/8 dark:bg-primary/10'
                 : 'border-border hover:border-primary/20 dark:hover:border-primary'
-            }`}
+            } focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50`}
           >
             <label className="flex items-center gap-3 p-3 cursor-pointer flex-1 min-w-0">
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
@@ -3394,9 +3514,9 @@ function FileUploadAnswerInput({ rawValue, onChange, localOnly }: {
       <p className="text-sm font-medium">แนบไฟล์คำตอบ (รูปภาพหรือ PDF)</p>
       <FileSubmissionUpload value={files} onChange={onChange} localOnly={localOnly} />
       {files.length === 0 ? (
-        <p className="text-xs text-warning">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
+        <p className="text-xs text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
       ) : (
-        <p className="text-xs text-success">✓ แนบไฟล์แล้ว {files.length} ไฟล์</p>
+        <p className="text-xs text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">✓ แนบไฟล์แล้ว {files.length} ไฟล์</p>
       )}
     </div>
   )

@@ -15,7 +15,7 @@
 
 ชุดเครื่องมือพัฒนาอัปเกรดเป็น Next.js 16.3.5 แล้วเมื่อ 20 กันยายน 2026 เพื่อเปิดใช้ runtime verification ผ่าน `/_next/mcp` ร่วมกับ `agent-browser` 0.38.1 ก่อนทำ responsive QA ของหน้าข้อสอบ ตรวจ baseline และหลังอัปเกรดแล้วว่า 1,302 tests, TypeScript, design-token lint และ production build ผ่าน; MCP รายงาน compilation issues ว่างและ browser session ของ `/exam-screen-lab` ไม่มี config/runtime error การอัปเกรดนี้ไม่เปลี่ยน schema, environment หรือ production deployment ส่วน `npm audit` ลดจาก 57 เหลือ 54 รายการและไม่พบ Next.js critical เดิมแล้ว แต่ยังมี high severity ใน TipTap และ dependency อื่น จึงยังไม่ใช่หลักฐานว่าพร้อมเปิด production
 
-Responsive QA เฟส iPad ผ่านในขอบเขต agent-only แล้ว: หน้าข้อสอบใช้ navigator แบบ dialog บน iPad แนวตั้ง/Split View, รักษา navigator ข้างบนจอกว้าง, รองรับความสูง viewport/safe-area ของ overlay และขยายจุดสัมผัส/พฤติกรรมลากสำหรับนิ้วกับปากกา ผลนี้ยังไม่แทน Safari/SEB, คีย์บอร์ด, กล้อง, นิ้ว และ Apple Pencil บนอุปกรณ์จริง ซึ่งรอทดสอบรวมหลังเฟส 8
+Responsive QA เฟส Mac ผ่านในขอบเขต agent-only แล้วต่อจาก iPhone/iPad: fixture 16 กรณีไม่ล้นในหน้าต่าง 900×600 ถึง 1728×1117, keyboard/focus/Escape, mouse pointer drag, local-only file preview และ overlay สำคัญผ่าน แก้ focus return, Escape ของ Excalidraw และ contrast ของสถานะสำเร็จแล้ว ผลนี้ยังไม่แทน Safari/SEB, native file picker หรือ trackpad บน Mac จริง ซึ่งรอทดสอบรวมหลังเฟส 8
 
 ## MVP core
 

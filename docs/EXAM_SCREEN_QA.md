@@ -1,6 +1,6 @@
 # แผนตรวจหน้าข้อสอบจริงตามขนาดจอ
 
-อัปเดต: 20 กันยายน 2026 · **เฟส 3 ผ่านในขอบเขต agent-only · physical-device UAT รอรวมหลังเฟส 8**
+อัปเดต: 20 กันยายน 2026 · **เฟส 4 ผ่านในขอบเขต agent-only · physical-device UAT รอรวมหลังเฟส 8**
 
 เอกสารนี้เป็นแผนตรวจหน้าข้อสอบ KorKru บน iPhone, iPad และ Mac ก่อนกลับไปทดสอบ SEB บน Windows ตามลำดับที่ผู้ใช้เลือก ไม่ได้เปลี่ยน Windows ให้เป็น “ผ่าน” และไม่ได้ใช้ผลจาก Apple อนุมานแทน Windows
 
@@ -89,9 +89,13 @@ Agent ตรวจ 512×1024, 768×1024, 1024×1366 และ 1366×1024 แล�
 
 ### เฟส 4 — Mac
 
-สถานะ: รอ
+สถานะ: **ผ่านในขอบเขต agent-only**; เลื่อน Safari/SEB และ native-device UAT ไปรวมหลังเฟส 8 จึงยังไม่ถือว่า Mac จริงผ่าน release gate
 
-ผู้ใช้ช่วยตรวจหน้าต่างเล็ก/ใหญ่ keyboard navigation, scroll, drag, file picker, focus mode และ modal Agent แก้เฉพาะปัญหาที่ทำซ้ำได้แล้ว rerun regression
+Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 และ 1728×1117 ครบ fixture 16 กรณีโดยไม่พบ overflow/control หลุดขอบ ทดสอบ keyboard, focus trap/return, Escape, mouse pointer drag, file preview local-only, โหมดโฟกัส เครื่องคิดเลข แป้นคณิตศาสตร์ และกระดาษทด แก้โฟกัสเริ่มต้นของโหมดโฟกัส, Escape ที่ Excalidraw เคยรับไปก่อน, การนำทางข้อด้วย screen reader/keyboard, accessibility ของ preview ไฟล์ และ contrast ของสถานะ/ปุ่มสำเร็จ Next MCP กับ browser runtime ไม่มี error; axe เหลือเฉพาะลายน้ำตกแต่งที่ถูก `aria-hidden` รายละเอียดอยู่ใน `docs/EXAM_SCREEN_QA_MAC.md`
+
+ผลตรวจรอบปิดเฟส: 96 test files / 1,310 tests, TypeScript, token lint และ production build 63 static pages ผ่านทั้งหมด ไม่มี migration, environment, database, storage หรือ deployment เปลี่ยน
+
+สิ่งที่จงใจรอหลังเฟส 8: Safari/WebKit จริง, browser zoom/native fullscreen, native file picker, trackpad gesture และ SEB บน Mac จริง
 
 ### เฟส 5 — เส้นทางนักเรียนจริงใน browser ปกติ
 
