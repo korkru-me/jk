@@ -757,6 +757,47 @@ describe('the ช่องว่าง a เติมคำ worksheet marks', ()
     expect(result.questions[0].blanks).toEqual([{ answer: 'กรุงเทพ มหานคร' }])
   })
 
+  it('reads a row of dots as a ช่องว่าง, which is how Thai worksheets leave one', () => {
+    const result = blanks(numbered(0, run('ดาวเคราะห์ที่อยู่ใกล้ดวงอาทิตย์ที่สุดคือ ..........')))
+
+    const question = result.questions[0]
+    expect(question.type).toBe('fill_blank')
+    // The file left the gap empty, so there is no answer to mark against.
+    expect(question.blanks).toEqual([{ answer: '' }])
+    expect(question.html).toBe('<p>ดาวเคราะห์ที่อยู่ใกล้ดวงอาทิตย์ที่สุดคือ [___1]</p>')
+  })
+
+  it('reads underscores and ellipses the same way', () => {
+    expect(blanks(numbered(0, run('เมืองหลวงของไทยคือ ______'))).questions[0].blanks).toEqual([{ answer: '' }])
+    expect(blanks(numbered(0, run('เมืองหลวงของไทยคือ ……'))).questions[0].blanks).toEqual([{ answer: '' }])
+  })
+
+  it('numbers several gaps in one ข้อ', () => {
+    const result = blanks(numbered(0, run('น้ำเดือดที่ ...... องศา และแข็งตัวที่ ...... องศา')))
+
+    expect(result.questions[0].blanks).toHaveLength(2)
+    expect(result.questions[0].html).toBe('<p>น้ำเดือดที่ [___1] องศา และแข็งตัวที่ [___2] องศา</p>')
+  })
+
+  it('prefers the marked word when the ข้อ has both', () => {
+    // A worksheet that wrote the answer over the gap says what the answer is;
+    // the gap on its own does not.
+    const result = blanks(numbered(0,
+      run('หน่วยของแรงคือ '),
+      run('นิวตัน', { color: 'FF0000' }),
+      run(' และหน่วยของงานคือ ......'),
+    ))
+
+    expect(result.questions[0].blanks).toEqual([{ answer: 'นิวตัน' }])
+  })
+
+  it('leaves dots alone unless the file was said to be เติมคำ', () => {
+    const result = parse(numbered(0, run('จงอธิบาย .......... ตามความเข้าใจ')))
+
+    expect(result.questions[0].blanks).toEqual([])
+    expect(result.questions[0].html).toContain('..........')
+  })
+
   it('reads nothing when the whole โจทย์ carries the same marking', () => {
     // A sentence that is red from end to end is styled, not answered.
     const result = blanks(numbered(0, run('ทุกคำในข้อนี้เป็นสีแดง', { color: 'FF0000' })))

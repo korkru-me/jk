@@ -243,7 +243,9 @@ export function DraftQuestionCard({
                       ช่องที่ {index + 1}
                       {blank.answer?.trim()
                         ? <span className="ml-2 text-foreground">{blank.answer}</span>
-                        : <span className="ml-2 text-warning">ยังไม่มีคำตอบ</span>}
+                        // Not a problem to fix: the file left the gap empty, so
+                        // the โจทย์ is imported for the teacher to mark.
+                        : <span className="ml-2">ครูตรวจเอง</span>}
                     </li>
                   ))}
                 </ol>

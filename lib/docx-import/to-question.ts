@@ -130,13 +130,19 @@ function blankQuestion(): Question {
  * and a teacher who wants a blank marked by hand switches it on the form.
  */
 function blanksToConfig(blanks: DraftBlank[]): FillBlankItem[] {
-  return blanks.map((blank, index) => ({
-    id: index + 1,
-    type: 'fixed' as const,
-    answer: blank.answer,
-    answers: [blank.answer],
-    case_sensitive: false,
-  }))
+  return blanks.map((blank, index) => {
+    // A gap the file left empty — a row of dots or underscores — gives no
+    // answer to mark against, so it comes in as one the teacher marks. Typing
+    // an answer on the form turns it into one the system marks.
+    const known = blank.answer.trim().length > 0
+    return {
+      id: index + 1,
+      type: known ? ('fixed' as const) : ('text' as const),
+      answer: blank.answer,
+      answers: known ? [blank.answer] : [],
+      case_sensitive: false,
+    }
+  })
 }
 
 /**

@@ -390,9 +390,49 @@ interface BlankRead {
  * several runs of its own accord (a spell-check boundary is enough), and three
  * blanks where the teacher wrote one answer would be unanswerable.
  */
+/**
+ * The gap a worksheet leaves when it does not write the answer down.
+ *
+ * Underscores are the western habit and rows of dots the Thai one; both mean
+ * the same thing on the page, so both are read. What they cannot carry is the
+ * answer — the file simply does not say — so those blanks arrive for the
+ * teacher to mark, and they can type the answers in afterwards to have the
+ * system mark them instead.
+ */
+const BLANK_PLACEHOLDER = /(?:_{3,}|\.{3,}|\u2026+|·{3,})/g
+
+function readPlaceholderBlanks(paragraphs: DocxParagraph[]): BlankRead | null {
+  const blanks: DraftBlank[] = []
+  const htmlParts: string[] = []
+  const plainParts: string[] = []
+
+  for (const paragraph of paragraphs) {
+    const replace = (text: string) => text.replace(BLANK_PLACEHOLDER, () => {
+      blanks.push({ answer: '' })
+      return `[___${blanks.length}]`
+    })
+    // Run over the readable text, not the markup: a placeholder never spans
+    // two runs in a way that matters, and this keeps tags out of the match.
+    htmlParts.push(`<p>${replace(inlinesToHtml(paragraph.inlines, { keepEmphasis: true }))}</p>`)
+    plainParts.push(plainText(paragraph.inlines).replace(BLANK_PLACEHOLDER, '____'))
+  }
+
+  if (blanks.length === 0) return null
+  return {
+    html: htmlParts.join(''),
+    plain: plainParts.join(' ').replace(/\s+/g, ' ').trim(),
+    blanks,
+  }
+}
+
 function readBlanks(paragraphs: DocxParagraph[]): BlankRead {
   const signal = blankSignal(paragraphs)
-  if (!signal) return { html: paragraphsToHtml(paragraphs, { keepEmphasis: true }), plain: '', blanks: [] }
+  // Marked words first: they say where the blank goes *and* what it accepts.
+  // A worksheet that only leaves a gap says the first and not the second.
+  if (!signal) {
+    return readPlaceholderBlanks(paragraphs)
+      ?? { html: paragraphsToHtml(paragraphs, { keepEmphasis: true }), plain: '', blanks: [] }
+  }
 
   const blanks: DraftBlank[] = []
   const htmlParts: string[] = []
