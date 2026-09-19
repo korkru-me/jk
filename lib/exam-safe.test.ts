@@ -130,6 +130,48 @@ describe('toSafeExamAnswer', () => {
     ])
   })
 
+  it('offers the จับคู่ distractors as ordinary choices, and never says which they are', () => {
+    // A ตัวเลือกลวง only works while it looks like every other choice. It has
+    // to reach the student (or the โจทย์ is easier than the paper it came
+    // from) while `extra_data` must not carry the list that names them.
+    const { safe, json } = serializedSafe('matching', {
+      mcq_options: [
+        { left_text: 'แรง', right_text: 'นิวตัน' },
+        { left_text: 'งาน', right_text: 'จูล' },
+      ],
+      extra_data: { answer_mode: 'slots', distractors: [{ text: 'วัตต์' }, { text: 'โอห์ม' }] },
+      answer_parts: null,
+    })
+
+    expect(safe.questions.matching_options?.map(option => option.right_text))
+      .toEqual(['นิวตัน', 'จูล', 'วัตต์', 'โอห์ม'])
+    // 'slots' is the default, so the sanitizer says nothing at all — and what
+    // it says nothing about includes which choices were decoys.
+    expect(safe.questions.extra_data).toEqual({})
+    expect(json).not.toContain('distractors')
+  })
+
+  it('reads the shuffled order against the choices, distractors included', () => {
+    const row = rawAnswer('matching', {
+      mcq_options: [
+        { left_text: 'แรง', right_text: 'นิวตัน' },
+        { left_text: 'งาน', right_text: 'จูล' },
+      ],
+      extra_data: { answer_mode: 'slots', distractors: [{ text: 'วัตต์' }] },
+      answer_parts: null,
+    }) as unknown as { option_order: number[] }
+    row.option_order = [2, 0, 1]
+
+    const safe = toSafeExamAnswer(row as unknown as Parameters<typeof toSafeExamAnswer>[0], () => 0)
+    expect(safe?.questions.matching_options?.map(option => option.right_text))
+      .toEqual(['วัตต์', 'นิวตัน', 'จูล'])
+    // The prompts are never shuffled — only the column the student picks from.
+    expect(safe?.questions.mcq_options).toEqual([
+      { left_text: 'แรง', left_image: undefined },
+      { left_text: 'งาน', left_image: undefined },
+    ])
+  })
+
   it('carries the ถูก-ผิด lead-in to the student, without its answers', () => {
     // The situation the statements are judged against is the โจทย์, not the
     // key: a student who cannot read "โดยไม่คิดแรงต้านอากาศ" is answering a

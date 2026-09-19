@@ -1144,3 +1144,54 @@ describe('essay, from attempt to grade', () => {
     }
   })
 })
+
+describe('the จับคู่ column an attempt freezes', () => {
+  const pairs = [
+    { left_text: 'แรง', right_text: 'นิวตัน' },
+    { left_text: 'งาน', right_text: 'จูล' },
+    { left_text: 'กำลัง', right_text: 'วัตต์' },
+  ]
+
+  const matchingQuestion = (extra: Record<string, unknown>) => ({
+    id: 'q-1',
+    question_type: 'matching',
+    mcq_options: pairs,
+    extra_data: extra,
+    variables: [],
+    logic_rules: [],
+    answer_parts: null,
+    answer_formula: '',
+    answer_unit: null,
+    answer_tolerance: 0,
+  } as unknown as Parameters<typeof buildAttemptQuestion>[0])
+
+  it('shuffles the pairs together with the distractors, as one column', () => {
+    // `option_order` is what every screen resolves a student's chips through.
+    // Leaving the distractors out of it would either hide them or pin them to
+    // the end of the list, where they are no longer decoys.
+    const built = buildAttemptQuestion(
+      matchingQuestion({ answer_mode: 'slots', distractors: [{ text: 'โอห์ม' }, { text: 'แอมแปร์' }] }),
+      { orderIndex: 0, shuffleOptions: false },
+    )
+    expect([...(built.option_order ?? [])].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it('shuffles only the pairs when the โจทย์ has no distractors', () => {
+    const built = buildAttemptQuestion(
+      matchingQuestion({ answer_mode: 'slots' }),
+      { orderIndex: 0, shuffleOptions: false },
+    )
+    expect([...(built.option_order ?? [])].sort((a, b) => a - b)).toEqual([0, 1, 2])
+  })
+
+  it('leaves the โจทย์ marked out of its pairs, not out of its choices', () => {
+    // A distractor is not a mark anyone can earn, so adding one must not make
+    // the ข้อ worth more.
+    const withSpares = buildAttemptQuestion(
+      matchingQuestion({ distractors: [{ text: 'โอห์ม' }] }),
+      { orderIndex: 0, shuffleOptions: false },
+    )
+    expect(withSpares.max_score).toBe(pairs.length)
+    expect(withSpares.correct_answer).toBe('MATCH:' + JSON.stringify(['นิวตัน', 'จูล', 'วัตต์']))
+  })
+})

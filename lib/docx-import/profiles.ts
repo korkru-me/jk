@@ -54,9 +54,14 @@ export interface SampleSpan {
 export interface SampleLine {
   /** `question` is a numbered item; `part` is one level deeper. `item` is one
    *  line of a เรียงลำดับ list, which is numbered like a `choice` and is not
-   *  one — the difference is the whole reading of that type. */
-  kind: 'heading' | 'question' | 'choice' | 'part' | 'item'
+   *  one — the difference is the whole reading of that type. `pair` is one row
+   *  of a จับคู่ table, which is the only sample line with two cells. */
+  kind: 'heading' | 'question' | 'choice' | 'part' | 'item' | 'pair'
+  /** The line, or for a `pair` its left-hand cell. */
   spans: SampleSpan[]
+  /** A `pair`'s right-hand cell. An empty array is a choice with no ข้อ beside
+   *  it, which is how a worksheet writes a ตัวเลือกลวง. */
+  right?: SampleSpan[]
 }
 
 export interface ImportProfile {
@@ -129,6 +134,8 @@ const EMF_LIMIT = 'รูปที่ Word เก็บเป็น EMF/WMF (ม
 const t = (text: string): SampleSpan => ({ text })
 const key = (text: string): SampleSpan => ({ text, answer: true })
 const line = (kind: SampleLine['kind'], ...spans: SampleSpan[]): SampleLine => ({ kind, spans })
+/** One row of a จับคู่ table: the ข้อ on the left, the ตัวเลือก on the right. */
+const pair = (left: SampleSpan[], right: SampleSpan[]): SampleLine => ({ kind: 'pair', spans: left, right })
 
 // ─── One profile per question type ───────────────────────────────────────────
 
@@ -281,20 +288,53 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     type: 'matching',
     label: 'จับคู่',
     noun: 'โจทย์จับคู่',
-    blurb: 'สองรายการที่สัมพันธ์กัน ให้นักเรียนโยงเส้นจับคู่',
-    status: 'planned',
+    blurb: 'ตาราง 2 คอลัมน์ เขียนตัวอักษรของคำตอบลงในช่องว่างหน้าข้อความ — แบบเดียวกับใบงานที่ใช้อยู่',
+    status: 'ready',
     rules: [
       NUMBERING,
-      { id: 'two-columns', text: 'ใช้ตาราง 2 คอลัมน์ ซ้ายคือโจทย์ ขวาคือคำตอบของแถวนั้น' },
-      { id: 'row-alignment', text: 'คู่ที่ถูกต้องต้องอยู่แถวเดียวกัน ระบบจะสลับฝั่งขวาให้นักเรียนเอง' },
+      {
+        id: 'match-table',
+        text: 'ใช้ตาราง 2 คอลัมน์ · คอลัมน์ซ้ายคือข้อความที่ต้องจับคู่ · คอลัมน์ขวาคือตัวเลือก',
+      },
+      {
+        id: 'match-labels',
+        text: 'ใส่ตัวอักษร ก. ข. ค. ไว้หน้าตัวเลือกฝั่งขวาทุกตัว — เฉลยชี้ถึงตัวอักษรพวกนี้',
+      },
+      ANSWER_MARK,
+      {
+        id: 'match-key',
+        text: 'เขียนตัวอักษรของตัวเลือกที่ถูกลงในช่องว่างหน้าข้อความฝั่งซ้าย เช่น "๒. ………ซ………. ที่มาของนิทาน" · ตัวอักษรที่เขียนไว้กลางจุดไข่ปลาระบบอ่านออกแม้ไม่ได้ทำสี · ข้อไหนยังไม่รู้เฉลยจะเว้นไว้ก็ได้ แล้วมาจับคู่ในเว็บทีหลัง',
+      },
+      {
+        id: 'match-distractor',
+        text: 'ตัวเลือกฝั่งขวาที่ไม่มีคู่ (แถวที่ช่องซ้ายเว้นว่าง) เข้ามาเป็น "ตัวเลือกลวง" ให้อัตโนมัติ',
+      },
+      {
+        id: 'match-mode',
+        text: 'เขียนคำว่า "โยงเส้น" ไว้ในคำชี้แจง ระบบจะตั้งวิธีตอบเป็นโยงเส้นให้ · ไม่เขียนก็จะเป็นแบบลากตัวเลือกมาวางในช่อง',
+      },
     ],
     sample: [
-      line('question', t('จงจับคู่ปริมาณกับหน่วยในระบบเอสไอให้ถูกต้อง')),
-      line('part', t('แรง — นิวตัน')),
-      line('part', t('งาน — จูล')),
-      line('part', t('กำลัง — วัตต์')),
+      line('heading', t('แบบทดสอบ ตอนที่ 4 จับคู่')),
+      line('question', t('คำชี้แจง จงนำตัวอักษรหน้าตัวเลือกมาเขียนในช่องว่างหน้าข้อความที่สัมพันธ์กัน')),
+      pair([t('……'), key('ค'), t('…… หน่วยของแรง')], [t('จูล')]),
+      pair([t('……'), key('ก'), t('…… หน่วยของงาน')], [t('วัตต์')]),
+      pair([t('……'), key('ข'), t('…… หน่วยของกำลัง')], [t('นิวตัน')]),
+      pair([t('……'), key('จ'), t('…… หน่วยของกระแสไฟฟ้า')], [t('โอห์ม')]),
+      // A choice with no ข้อ beside it: the ตัวเลือกลวง that stops the last
+      // pair being had by elimination.
+      pair([], [t('แอมแปร์')]),
+      line('question', t('จงโยงเส้นจับคู่คำกับความหมายให้ถูกต้อง')),
+      pair([t('……'), key('ข'), t('…… วัฏจักรน้ำ')], [t('การเปลี่ยนของเหลวเป็นไอ')]),
+      pair([t('……'), key('ก'), t('…… การระเหย')], [t('การหมุนเวียนของน้ำในธรรมชาติ')]),
+      pair([t('……'), key('ค'), t('…… การควบแน่น')], [t('การเปลี่ยนไอเป็นของเหลว')]),
     ],
-    limits: ['ตัวเลือกลวง (ฝั่งขวาที่ไม่มีคู่) ต้องเพิ่มเองในเว็บ'],
+    limits: [
+      'แถวในตารางไม่ใช่เฉลย — ใบงานจริงตั้งใจสลับซ้าย-ขวาไว้ ระบบจึงอ่านเฉพาะตัวอักษรที่เขียนไว้ในช่องว่างเท่านั้น',
+      'ข้อที่ไฟล์ไม่ได้บอกเฉลย จะถูกจับคู่เรียงตามลำดับไว้ก่อน ซึ่งยังไม่ใช่เฉลย และจะยังนำเข้าไม่ได้จนกว่าจะกด "แก้ไข" จับคู่ให้ครบ',
+      'ฟอร์มจับคู่รับได้สูงสุด 12 คู่ และตัวเลือกลวง 6 ตัว',
+      EMF_LIMIT,
+    ],
     createHref: '/questions/new/matching',
   },
 
@@ -511,15 +551,22 @@ export function findProfile(slug: string): ImportProfile | null {
   return IMPORT_PROFILES.find(profile => profile.slug === slug) ?? null
 }
 
-/** Plain text of one sample line — for titles, tests and the .docx generator. */
+/** Plain text of one sample line — for titles, tests and the .docx generator.
+ *  A จับคู่ row reads as both of its cells, which is how it reads on the page. */
 export function sampleLineText(line: SampleLine): string {
-  return line.spans.map(span => span.text).join('')
+  const left = line.spans.map(span => span.text).join('')
+  const right = (line.right ?? []).map(span => span.text).join('')
+  return right ? `${left} ${right}`.trim() : left
 }
 
 export interface NumberedSampleLine {
   line: SampleLine
-  /** What is printed in front of this line: `2.`, `3)`, `ข)`, or nothing. */
+  /** What is printed in front of this line: `2.`, `3)`, `ข)`, or nothing. For
+   *  a `pair` this is the left-hand cell's number. */
   marker: string
+  /** A `pair`'s right-hand label — `ก.` `ข.` `ค.` — which is what a จับคู่
+   *  เฉลย points at, and therefore the one marker that carries meaning. */
+  rightMarker?: string
 }
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
@@ -541,6 +588,8 @@ export function numberSampleLines(sample: SampleLine[]): NumberedSampleLine[] {
   let choice = 0
   let part = 0
   let item = 0
+  let prompt = 0
+  let option = 0
 
   return sample.map(line => {
     if (line.kind === 'question') {
@@ -548,7 +597,18 @@ export function numberSampleLines(sample: SampleLine[]): NumberedSampleLine[] {
       choice = 0
       part = 0
       item = 0
+      prompt = 0
+      option = 0
       return { line, marker: `${question}.` }
+    }
+    // The two columns of a จับคู่ are numbered apart: the ข้อ count down the
+    // left, and the choices carry the ก. ข. ค. the เฉลย refers to. A row with
+    // no ข้อ in it still consumes a letter, because that is the shape of a
+    // ตัวเลือกลวง on the page.
+    if (line.kind === 'pair') {
+      const left = line.spans.length > 0 ? `${(prompt += 1)}.` : ''
+      option += 1
+      return { line, marker: left, rightMarker: `${PART_LABELS[option - 1] ?? option}.` }
     }
     if (line.kind === 'choice') {
       choice += 1

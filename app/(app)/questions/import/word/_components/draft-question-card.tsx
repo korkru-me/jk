@@ -10,11 +10,12 @@ import { EssayForm } from '@/components/questions/essay-form'
 import { FillBlankForm } from '@/components/questions/fill-blank-form'
 import { TrueFalseForm } from '@/components/questions/true-false-form'
 import { OrderingForm } from '@/components/questions/ordering-form'
+import { MatchingForm } from '@/components/questions/matching-form'
 import { RandomNumericForm } from '@/components/questions/random-numeric'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { applyFormPayload, changeType, pickOrder, type DraftEntry, type ImportableType } from '@/lib/docx-import/to-question'
 import type { DraftWarning } from '@/lib/docx-import'
-import type { FillBlankConfig, OrderingConfig, TrueFalseConfig } from '@/lib/types'
+import type { FillBlankConfig, MatchingConfig, MatchingPair, OrderingConfig, TrueFalseConfig } from '@/lib/types'
 
 /** Only the ones a Word worksheet can produce; the rest are authored in the app. */
 const IMPORTABLE_TYPES: { value: ImportableType; hint: string }[] = [
@@ -23,6 +24,7 @@ const IMPORTABLE_TYPES: { value: ImportableType; hint: string }[] = [
   { value: 'written', hint: 'ตอบเป็นตัวเลข ระบบตรวจให้' },
   { value: 'fill_blank', hint: 'มีช่องเติมคำ ระบบตรวจให้' },
   { value: 'ordering', hint: 'ลากเรียงให้ถูกลำดับ ระบบตรวจให้' },
+  { value: 'matching', hint: 'จับคู่สองคอลัมน์ ระบบตรวจให้' },
   { value: 'essay', hint: 'ครูตรวจเอง' },
 ]
 
@@ -77,6 +79,18 @@ export function DraftQuestionCard({
     ? (question.extra_data as OrderingConfig | undefined)?.items ?? []
     : []
   const orderChoices = question.question_type === 'ordering' ? entry.ordering?.choices ?? [] : []
+
+  // A จับคู่ keeps its pairs where this type has always kept them, and the
+  // choices that belong to no pair beside them in `extra_data`.
+  const matchPairs = question.question_type === 'matching'
+    ? (question.mcq_options ?? []) as unknown as MatchingPair[]
+    : []
+  const matchDistractors = question.question_type === 'matching'
+    ? (question.extra_data as MatchingConfig | undefined)?.distractors ?? []
+    : []
+  /** Which pairs the file actually stated; the rest are placeholders. A
+   *  worksheet's answered ข้อ are scattered, so this is per pair. */
+  const pairKeyed = (index: number) => entry.matching?.keyed[index] ?? true
 
   /** Marks (or unmarks) one option correct, the same toggle the ปรนัย form has. */
   const toggleCorrect = (index: number) => onChange({
@@ -183,6 +197,9 @@ export function DraftQuestionCard({
                 {question.question_type === 'ordering' && (
                   <OrderingForm allTags={allTags} question={question} draft={draft} />
                 )}
+                {question.question_type === 'matching' && (
+                  <MatchingForm allTags={allTags} question={question} draft={draft} />
+                )}
                 {question.question_type === 'essay' && (
                   <EssayForm allTags={allTags} question={question} draft={draft} />
                 )}
@@ -276,6 +293,30 @@ export function DraftQuestionCard({
                       <RichText text={statement.text} />
                     </li>
                   ))}
+                </ol>
+              )}
+
+              {matchPairs.length > 0 && (
+                <ol className="space-y-1 border-l-2 border-border pl-3">
+                  {matchPairs.map((pair, index) => (
+                    <li key={index} className="flex flex-wrap items-baseline gap-x-2 text-sm text-foreground">
+                      <span className="w-5 shrink-0 tabular-nums text-xs text-muted-foreground">{index + 1}.</span>
+                      <span className="min-w-0">{pair.left_text || (pair.left_image ? '(รูป)' : '')}</span>
+                      <span className="text-muted-foreground">↔</span>
+                      {/* A pair the file never stated is the next unclaimed
+                          choice standing in, not an answer — so it is not
+                          dressed up as one. */}
+                      <span className={`min-w-0 ${pairKeyed(index) ? 'font-medium text-success' : 'text-warning'}`}>
+                        {pair.right_text || (pair.right_image ? '(รูป)' : '')}
+                        {!pairKeyed(index) && <span className="ms-1 text-xs">· ยังไม่ใช่เฉลย</span>}
+                      </span>
+                    </li>
+                  ))}
+                  {matchDistractors.length > 0 && (
+                    <li className="text-xs text-muted-foreground">
+                      ตัวเลือกลวง (ไม่มีคู่): {matchDistractors.map(d => d.text || '(รูป)').join(' · ')}
+                    </li>
+                  )}
                 </ol>
               )}
 

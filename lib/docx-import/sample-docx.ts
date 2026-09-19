@@ -12,8 +12,10 @@
  * Server only — `docx` is a large dependency and nothing here belongs in a
  * browser bundle.
  */
-import { AlignmentType, Document, LevelFormat, Packer, Paragraph, TextRun } from 'docx'
-import { numberSampleLines, type ImportProfile, type SampleLine, type SampleSpan } from './profiles'
+import {
+  AlignmentType, Document, LevelFormat, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType,
+} from 'docx'
+import { numberSampleLines, type ImportProfile, type NumberedSampleLine, type SampleLine, type SampleSpan } from './profiles'
 
 /** What Thai school paperwork is set in; Word substitutes if it is missing. */
 const DOC_FONT = 'TH SarabunPSK'
@@ -82,9 +84,55 @@ function paragraphFor(line: SampleLine, marker: string): Paragraph {
   })
 }
 
+/**
+ * One row of a จับคู่ table: the ข้อ on the left, the ตัวเลือก on the right.
+ *
+ * Written as a real Word table because that is the only thing the reader
+ * accepts, and rightly: which cell sits beside which is the whole โจทย์, and a
+ * worksheet that lays its two columns out with tab stops loses that the moment
+ * the text is extracted.
+ */
+function pairRow({ line, marker, rightMarker }: NumberedSampleLine): TableRow {
+  const cell = (label: string, spans: SampleSpan[]) => new TableCell({
+    width: { size: 50, type: WidthType.PERCENTAGE },
+    children: [new Paragraph({
+      children: spans.length === 0 && !label
+        ? []
+        : [new TextRun({ text: label ? `${label} ` : '', font: DOC_FONT, size: BODY_SIZE }), ...runsOf(spans)],
+    })],
+  })
+
+  return new TableRow({
+    children: [cell(marker, line.spans), cell(rightMarker ?? '', line.right ?? [])],
+  })
+}
+
+/** Consecutive จับคู่ rows become one table; everything else stays a paragraph. */
+function bodyOf(lines: NumberedSampleLine[]): (Paragraph | Table)[] {
+  const out: (Paragraph | Table)[] = []
+  let rows: NumberedSampleLine[] = []
+
+  const flush = () => {
+    if (rows.length === 0) return
+    out.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: rows.map(pairRow),
+    }))
+    rows = []
+  }
+
+  for (const entry of lines) {
+    if (entry.line.kind === 'pair') { rows.push(entry); continue }
+    flush()
+    out.push(paragraphFor(entry.line, entry.marker))
+  }
+  flush()
+
+  return out
+}
+
 export function buildSampleDocument(profile: ImportProfile): Document {
-  const children = numberSampleLines(profile.sample)
-    .map(({ line, marker }) => paragraphFor(line, marker))
+  const children = bodyOf(numberSampleLines(profile.sample))
 
   return new Document({
     title: `ตัวอย่างไฟล์นำเข้า ${profile.label}`,

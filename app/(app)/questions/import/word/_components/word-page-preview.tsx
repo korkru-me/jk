@@ -1,5 +1,18 @@
 import { Card } from '@/components/ui/card'
-import { numberSampleLines, type ImportProfile } from '@/lib/docx-import/profiles'
+import { numberSampleLines, type ImportProfile, type SampleSpan } from '@/lib/docx-import/profiles'
+
+/** The เฉลย a teacher marks shows as the red it is written in. */
+function Spans({ spans }: { spans: SampleSpan[] }) {
+  return (
+    <>
+      {spans.map((span, at) => (
+        <span key={at} className={span.answer ? 'font-semibold text-destructive' : undefined}>
+          {span.text}
+        </span>
+      ))}
+    </>
+  )
+}
 
 /**
  * What a correctly laid-out worksheet looks like, drawn as a page.
@@ -20,16 +33,32 @@ export function WordPagePreview({ profile }: { profile: ImportProfile }) {
   return (
     <div className="space-y-2">
       <Card padding="lg" elevation="sm" className="space-y-2 leading-relaxed">
-        {lines.map(({ line, marker }, index) => {
-          const text = (
-            <>
-              {line.spans.map((span, at) => (
-                <span key={at} className={span.answer ? 'font-semibold text-destructive' : undefined}>
-                  {span.text}
-                </span>
-              ))}
-            </>
-          )
+        {lines.map(({ line, marker, rightMarker }, index) => {
+          const text = <Spans spans={line.spans} />
+
+          // A จับคู่ is a two-column table, and a picture of it that is not one
+          // teaches the wrong thing: the rows are what the reader reads.
+          if (line.kind === 'pair') {
+            const first = lines[index - 1]?.line.kind !== 'pair'
+            const last = lines[index + 1]?.line.kind !== 'pair'
+            return (
+              <div
+                key={index}
+                className={`ms-6 grid grid-cols-2 border-x border-t border-border text-sm text-foreground ${
+                  first ? 'mt-2' : ''
+                } ${last ? 'border-b' : ''}`}
+              >
+                <p className="flex gap-2 border-e border-border px-2 py-1">
+                  <span className="shrink-0 tabular-nums text-muted-foreground">{marker}</span>
+                  <span className="min-w-0">{text}</span>
+                </p>
+                <p className="flex gap-2 px-2 py-1">
+                  <span className="shrink-0 text-muted-foreground">{rightMarker}</span>
+                  <span className="min-w-0"><Spans spans={line.right ?? []} /></span>
+                </p>
+              </div>
+            )
+          }
 
           if (line.kind === 'heading') {
             return (

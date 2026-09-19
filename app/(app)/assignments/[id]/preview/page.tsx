@@ -4,7 +4,8 @@ import { notFound, redirect } from 'next/navigation'
 import { ExamClient } from '@/components/exam/exam-client'
 import { buildAssignmentAttempt } from '@/lib/assignment-attempt'
 import { parseSections } from '@/lib/question-set-sections'
-import type { Assignment, MCQOption, Question, MatchingPair } from '@/lib/types'
+import { matchingChoices } from '@/lib/matching-choices'
+import type { Assignment, MCQOption, Question, MatchingConfig, MatchingPair } from '@/lib/types'
 
 export const metadata = { title: 'ตัวอย่างมุมมองนักเรียน — KorKru' }
 
@@ -82,14 +83,17 @@ export default async function AssignmentPreviewPage({
         : null
 
     // Matching splits its two columns apart the same way the exam route does,
-    // so the preview shows a pairing exercise rather than the answer key.
+    // so the preview shows a pairing exercise rather than the answer key. The
+    // right-hand column is the pairs plus the distractors, which is the list
+    // `option_order` was shuffled over.
     const pairs = (q.mcq_options ?? []) as unknown as MatchingPair[]
+    const choices = matchingChoices(pairs, q.extra_data as MatchingConfig | undefined)
     const matching = q.question_type === 'matching'
       ? {
           prompts: pairs.map(p => ({ left_text: p.left_text, left_image: p.left_image })),
           options: optionPositions
-            .filter(i => pairs[i])
-            .map(i => ({ right_text: pairs[i].right_text, right_image: pairs[i].right_image })),
+            .filter(i => choices[i])
+            .map(i => ({ right_text: choices[i].right_text, right_image: choices[i].right_image })),
         }
       : null
 

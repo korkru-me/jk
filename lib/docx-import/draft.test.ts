@@ -1160,3 +1160,161 @@ describe('เรียงลำดับ: orders written in columns without thei
     expect(question.html).toContain('ช่วง 1-2 ปีแรก')
   })
 })
+
+// ─── ตาราง 2 คอลัมน์ของ โจทย์จับคู่ ─────────────────────────────────────────
+
+describe('the two columns a จับคู่ worksheet asks to be joined', () => {
+  const matching = (body: string, options: Parameters<typeof parse>[1] = {}) =>
+    parse(body, options, { expect: 'matching' })
+
+  /** The shape of a real worksheet: a letter written into the dots is the เฉลย. */
+  const worksheet = [
+    numbered(0, run('คำชี้แจง จงนำตัวอักษรหน้าตัวเลือกมาเขียนในช่องว่างหน้าข้อความที่สัมพันธ์กัน')),
+    choiceTable([
+      [run('๑. ……') + run('ค', { color: 'EE0000' }) + run('…… หน่วยของแรง'), run('ก. จูล')],
+      [run('๒. ……') + run('ก', { color: 'EE0000' }) + run('…… หน่วยของงาน'), run('ข. วัตต์')],
+      [run('๓. ……') + run('ข', { color: 'EE0000' }) + run('…… หน่วยของกำลัง'), run('ค. นิวตัน')],
+    ]),
+  ].join('')
+
+  it('pairs each ข้อ with the choice its marked letter points at', () => {
+    // Not with the choice printed beside it: a worksheet sets the two columns
+    // deliberately out of step, so reading the rows as pairs would be an
+    // answer key that is wrong on nearly every line.
+    const question = matching(worksheet).questions[0]
+
+    expect(question.type).toBe('matching')
+    expect(question.matching?.pairs.map(pair => [pair.leftText, pair.rightText])).toEqual([
+      ['หน่วยของแรง', 'นิวตัน'],
+      ['หน่วยของงาน', 'จูล'],
+      ['หน่วยของกำลัง', 'วัตต์'],
+    ])
+    expect(question.matching?.keyedCount).toBe(3)
+    expect(question.matching?.distractors).toEqual([])
+  })
+
+  it('keeps the table out of the คำชี้แจง and titles the ข้อ by it', () => {
+    const question = matching(worksheet).questions[0]
+
+    expect(question.html).toBe('<p>คำชี้แจง จงนำตัวอักษรหน้าตัวเลือกมาเขียนในช่องว่างหน้าข้อความที่สัมพันธ์กัน</p>')
+    expect(question.html).not.toContain('นิวตัน')
+    expect(question.choices).toEqual([])
+    expect(question.parts).toEqual([])
+  })
+
+  it('reads a letter written between the dots even when it was not coloured', () => {
+    // A teacher who typed the key in black should not have to redo the file:
+    // nothing but an answer is ever written in the middle of a row of dots.
+    const question = matching([
+      numbered(0, run('จงจับคู่')),
+      choiceTable([
+        [run('๑. ………ข………. หน่วยของแรง'), run('ก. จูล')],
+        [run('๒. ………ก………. หน่วยของงาน'), run('ข. นิวตัน')],
+      ]),
+    ].join('')).questions[0]
+
+    expect(question.matching?.keyedCount).toBe(2)
+    expect(question.matching?.pairs.map(pair => pair.rightText)).toEqual(['นิวตัน', 'จูล'])
+  })
+
+  it('takes a choice with no ข้อ beside it as a ตัวเลือกลวง', () => {
+    // Twelve choices against ten ข้อ is the normal shape of a printed
+    // worksheet: the spare ones stop the last ข้อ being had by elimination.
+    const question = matching([
+      numbered(0, run('จงจับคู่')),
+      choiceTable([
+        [run('๑. ……') + run('ข', { color: 'EE0000' }) + run('…… หน่วยของแรง'), run('ก. จูล')],
+        [run('๒. ……') + run('ก', { color: 'EE0000' }) + run('…… หน่วยของงาน'), run('ข. นิวตัน')],
+        [run(''), run('ค. วัตต์')],
+        [run(''), run('ง. โอห์ม')],
+      ]),
+    ].join('')).questions[0]
+
+    expect(question.matching?.pairs).toHaveLength(2)
+    expect(question.matching?.distractors.map(distractor => distractor.text)).toEqual(['วัตต์', 'โอห์ม'])
+  })
+
+  it('lines the rest up in printed order and says they are not the เฉลย', () => {
+    // A worksheet handed to students has most blanks empty. `MatchingPair` has
+    // no way to hold a ข้อ with no partner, so the leftovers stand in — and
+    // `to-question.ts` refuses to import the ข้อ until the teacher settles it.
+    const question = matching([
+      numbered(0, run('จงจับคู่')),
+      choiceTable([
+        [run('๑. …………. หน่วยของแรง'), run('ก. จูล')],
+        [run('๒. ……') + run('ก', { color: 'EE0000' }) + run('…… หน่วยของงาน'), run('ข. นิวตัน')],
+        [run('๓. …………. หน่วยของกำลัง'), run('ค. วัตต์')],
+      ]),
+    ].join('')).questions[0]
+
+    expect(question.matching?.keyedCount).toBe(1)
+    expect(question.matching?.pairs.map(pair => [pair.rightText, pair.keyed])).toEqual([
+      ['นิวตัน', false],
+      ['จูล', true],
+      ['วัตต์', false],
+    ])
+  })
+
+  it('reads the pictures in the cells as the pair’s own', () => {
+    const question = matching([
+      numbered(0, run('จงโยงเส้นจับคู่รูปกับคำ')),
+      choiceTable([
+        [image('rId5'), run('ก. กบ')],
+        [image('rId6'), run('ข. นก')],
+      ]),
+    ].join(''), {
+      rels: `<Relationships><Relationship Id="rId5" Target="media/image1.png"/><Relationship Id="rId6" Target="media/image2.png"/></Relationships>`,
+    }).questions[0]
+
+    expect(question.matching?.pairs.map(pair => pair.leftRelId)).toEqual(['rId5', 'rId6'])
+  })
+
+  it('reads "โยงเส้น" in the คำชี้แจง as the line-drawing layout', () => {
+    const lines = matching([
+      numbered(0, run('จงโยงเส้นจับคู่คำต่อไปนี้')),
+      choiceTable([
+        [run('๑. ……') + run('ข', { color: 'EE0000' }) + run('…… เมฆ'), run('ก. หยดน้ำ')],
+        [run('๒. ……') + run('ก', { color: 'EE0000' }) + run('…… ฝน'), run('ข. ไอน้ำรวมตัว')],
+      ]),
+    ].join('')).questions[0]
+    expect(lines.matching?.answerMode).toBe('lines')
+
+    const slots = matching(worksheet).questions[0]
+    expect(slots.matching?.answerMode).toBe('slots')
+  })
+
+  it('leaves the table alone unless the file was said to be จับคู่', () => {
+    // A two-column table of "ก. …" cells is exactly how a ปรนัย worksheet fits
+    // four choices onto two lines, so only the teacher knows which it is.
+    for (const expected of ['mcq', undefined] as const) {
+      const question = parse(worksheet, {}, { expect: expected }).questions[0]
+      expect(question.matching, String(expected)).toBeNull()
+      expect(question.type, String(expected)).toBe('mcq')
+    }
+  })
+
+  it('falls back to reading the ข้อ normally when it holds no table', () => {
+    const question = matching(numbered(0, run('จงอธิบายวัฏจักรของน้ำ'))).questions[0]
+    expect(question.matching).toBeNull()
+    expect(question.type).toBe('essay')
+  })
+})
+
+describe('เลขข้อที่พิมพ์เป็นเลขไทย', () => {
+  it('reads ๑. ๒. ๓. as the labels they are', () => {
+    // Thai worksheets are set in Thai fonts and number their ข้อ ๑ ๒ ๓ as
+    // readily as 1 2 3. To the reader those used to be invisible, so a whole
+    // column of them fell into the โจทย์ text.
+    const result = parse([
+      numbered(0, run('จงเลือกคำตอบที่ถูกต้อง')),
+      plain(run('๑. นิวตัน')),
+      plain(run('๒. จูล')),
+      plain(run('๓. วัตต์')),
+      plain(run('๔. โอห์ม')),
+    ].join(''))
+
+    expect(result.questions[0].type).toBe('mcq')
+    expect(result.questions[0].choices.map(choice => choice.text))
+      .toEqual(['นิวตัน', 'จูล', 'วัตต์', 'โอห์ม'])
+  })
+})

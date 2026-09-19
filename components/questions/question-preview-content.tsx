@@ -12,6 +12,7 @@ import { FileSubmissionUpload } from '@/components/exam/file-submission-upload'
 import { TeacherGradingPreview, type GradingRow } from './teacher-grading-preview'
 import { MatchingDragInput } from '@/components/exam/matching-drag-input'
 import { MatchingLineInput } from '@/components/exam/matching-line-input'
+import { matchingChoices } from '@/lib/matching-choices'
 import { OrderingDragList } from '@/components/exam/ordering-drag-list'
 import { orderingDisplayOrder, orderingIsAnswered } from '@/lib/ordering-answer'
 
@@ -143,7 +144,11 @@ export function QuestionPreviewContent({
 }: QuestionPreviewProps) {
   const labels = partLabels(partLabelStyle)
   const [values, setValues] = useState<Record<string, number>>(() => randomizeVariables(variables))
-  const [shuffledRight, setShuffledRight] = useState<number[]>(() => matchingPairs.length > 0 ? shuffleIndices(matchingPairs.length) : [])
+  // Pairs plus the distractors that belong to no pair — the same list the
+  // exam shuffles, so the teacher's preview offers exactly what a student is
+  // offered rather than a bank with the decoys quietly missing.
+  const matchingBank = matchingChoices(matchingPairs, matchingConfig)
+  const [shuffledRight, setShuffledRight] = useState<number[]>(() => matchingBank.length > 0 ? shuffleIndices(matchingBank.length) : [])
 
   // written
   const [writtenInputs, setWrittenInputs] = useState<string[]>(() => answerParts.map(() => ''))
@@ -251,7 +256,7 @@ export function QuestionPreviewContent({
     setEssayText('')
     releaseLocalFiles()
     setValues(randomizeVariables(variables))
-    setShuffledRight(matchingPairs.length > 0 ? shuffleIndices(matchingPairs.length) : [])
+    setShuffledRight(matchingBank.length > 0 ? shuffleIndices(matchingBank.length) : [])
     setWrittenInputs(answerParts.map(() => ''))
     setWrittenResults(answerParts.map(() => null))
     setWrittenChecked(false)
@@ -370,18 +375,19 @@ export function QuestionPreviewContent({
   // shuffledRight is seeded once at mount; if the pair list changed underneath
   // it (the authoring form previews as the teacher edits), fall back to the
   // unshuffled order rather than indexing past the end.
-  const rightOrder = shuffledRight.length === matchingPairs.length
+  const rightOrder = shuffledRight.length === matchingBank.length
     ? shuffledRight
-    : matchingPairs.map((_, i) => i)
+    : matchingBank.map((_, i) => i)
 
   /** The right-hand column as draggable chips, in the order it is shown. */
-  const matchingOptions = rightOrder.map((pairIdx, j) => ({
+  const matchingOptions = rightOrder.map((choiceIdx, j) => ({
     id: String(j),
-    text: matchingPairs[pairIdx]?.right_text || `คำตรงกัน ${j + 1}`,
-    imageUrl: matchingPairs[pairIdx]?.right_image,
+    text: matchingBank[choiceIdx]?.right_text || `คำตรงกัน ${j + 1}`,
+    imageUrl: matchingBank[choiceIdx]?.right_image,
   }))
 
-  /** Prompt i is right when the chip it holds came from prompt i's own pair. */
+  /** Prompt i is right when the chip it holds came from prompt i's own pair.
+   *  A distractor sits past the last pair, so it can never satisfy this. */
   const matchingCorrect = (i: number) => {
     const sel = matchingSelections[i]
     return sel !== null && sel !== undefined && rightOrder[Number(sel)] === i

@@ -660,9 +660,28 @@ export interface MCQOption {
 // answers already given.
 export type MatchingAnswerMode = 'slots' | 'lines'
 
+/**
+ * A right-hand choice that belongs to no prompt — the ฏ. and ฐ. at the bottom
+ * of a worksheet's second column.
+ *
+ * Printed worksheets almost always offer more choices than there are ข้อ,
+ * because a matching exercise where the last pair can be deduced by
+ * elimination is not really ten questions. They carry no answer of their own:
+ * a student who picks one is simply wrong, which needs no grading rule because
+ * `MATCH:` compares the chosen `right_text` and a distractor's text matches no
+ * pair's.
+ */
+export interface MatchingDistractor {
+  text: string
+  image?: string
+}
+
 export interface MatchingConfig {
   /** undefined = 'slots', which is how every matching question behaved before. */
   answer_mode?: MatchingAnswerMode
+  /** Extra choices with no prompt. undefined/empty = every choice has a pair,
+   *  which is how every matching question behaved before. */
+  distractors?: MatchingDistractor[]
 }
 
 export interface MatchingPair {

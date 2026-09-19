@@ -3,6 +3,8 @@ import type {
   FileUploadConfig,
   ImageLabelAnswerMode,
   MatchingAnswerMode,
+  MatchingConfig,
+  MatchingPair,
   MathInputMode,
   OrderingItem,
   PythagoreanGroup,
@@ -13,6 +15,7 @@ import type {
 import type { PartLabelStyle } from '@/lib/part-labels'
 import { sanitizeMathInputModes } from '@/lib/math/input-mode'
 import { normalizeImageLabelMode } from '@/lib/image-label'
+import { matchingChoices } from '@/lib/matching-choices'
 
 export interface SafeTrueFalseStatement {
   id: string
@@ -520,13 +523,21 @@ export function toSafeExamAnswer(row: RawExamAnswer, random: () => number = Math
         left_image: asOptionalString(pair.left_image),
       }
     })
-    const positions = row.option_order ?? rawOptions.map((_, index) => index)
+    // Pairs first, then the distractors that belong to no pair — the one list
+    // `option_order` indexes into. The student is given no way to tell the two
+    // apart: `sanitizeExtraData` below is an allowlist that never carries
+    // `distractors` through, so a decoy arrives as an ordinary choice.
+    const choices = matchingChoices(
+      rawOptions as unknown as MatchingPair[],
+      asRecord(question.extra_data) as MatchingConfig,
+    )
+    const positions = row.option_order ?? choices.map((_, index) => index)
     matchingOptions = positions.flatMap((index) => {
-      const pair = asRecord(rawOptions[index])
-      if (!rawOptions[index]) return []
+      const choice = choices[index]
+      if (!choice) return []
       return [{
-        right_text: asString(pair.right_text),
-        right_image: asOptionalString(pair.right_image),
+        right_text: choice.right_text,
+        right_image: choice.right_image,
       }]
     })
   }

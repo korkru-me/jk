@@ -23,6 +23,7 @@ function draft(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
     statements: [],
     orderItems: [],
     orderChoices: [],
+    matching: null,
     imageRelIds: [],
     mentionsPicture: false,
     warnings: [],
@@ -420,5 +421,89 @@ describe('a เรียงลำดับ โจทย์ read off an exam pape
     expect(portable.question_type).toBe('ordering')
     expect((portable.extra_data as { items: { text: string }[] }).items.map(item => item.text))
       .toEqual(['สอง', 'หนึ่ง', 'สี่', 'สาม'])
+  })
+})
+
+describe('a จับคู่ โจทย์ read off a worksheet', () => {
+  const matchingDraft = (keyed: boolean[]) => draft({
+    type: 'matching',
+    choices: [],
+    html: '<p>จงจับคู่ให้ถูกต้อง</p>',
+    imageRelIds: ['rId5'],
+    matching: {
+      answerMode: 'slots',
+      keyedCount: keyed.filter(Boolean).length,
+      pairs: keyed.map((isKeyed, index) => ({
+        leftText: `ข้อ ${index + 1}`,
+        rightText: `ตอบ ${index + 1}`,
+        keyed: isKeyed,
+        ...(index === 0 ? { leftRelId: 'rId5' } : {}),
+      })),
+      distractors: [{ text: 'ตัวลวง' }, { text: 'รูปลวง', relId: 'rId6' }],
+    },
+  })
+
+  const urls = new Map([['rId5', 'https://x.test/a.png'], ['rId6', 'https://x.test/b.png']])
+
+  it('stores the pairs where this type keeps them, and the spares beside them', () => {
+    const entry = draftToEntry(matchingDraft([true, true]), urls)
+
+    expect(entry.question.question_type).toBe('matching')
+    expect(entry.question.mcq_options).toEqual([
+      { left_text: 'ข้อ 1', right_text: 'ตอบ 1', left_image: 'https://x.test/a.png' },
+      { left_text: 'ข้อ 2', right_text: 'ตอบ 2' },
+    ])
+    expect(entry.question.extra_data).toEqual({
+      answer_mode: 'slots',
+      distractors: [{ text: 'ตัวลวง' }, { text: 'รูปลวง', image: 'https://x.test/b.png' }],
+    })
+    expect(validateForImport(entry)).toBeNull()
+  })
+
+  it('keeps a cell’s picture on its pair rather than on the whole ข้อ', () => {
+    // Repeating it under the คำชี้แจง would print the exercise's left-hand
+    // column above the exercise.
+    const entry = draftToEntry(matchingDraft([true, true]), urls)
+    expect(entry.question.image_urls).toEqual([])
+  })
+
+  it('refuses a ข้อ whose pairing the file only partly stated', () => {
+    const entry = draftToEntry(matchingDraft([false, true, false]), urls)
+
+    expect(validateForImport(entry)).toContain('ยังจับคู่ไม่ครบ')
+    expect(liveWarnings(entry, new Set()).map(warning => warning.message)).toEqual([
+      'อ่านเฉลยได้ 1 จาก 3 คู่ — อีก 2 คู่จับไว้ตามลำดับที่เหลือ ยังไม่ใช่เฉลย',
+    ])
+  })
+
+  it('says plainly when the file stated no pairing at all', () => {
+    const entry = draftToEntry(matchingDraft([false, false]), urls)
+    expect(liveWarnings(entry, new Set())[0].message).toContain('ไฟล์ไม่ได้บอกว่าข้อไหนคู่กับอะไร')
+  })
+
+  it('stops holding the ข้อ back once the teacher has paired it in the form', () => {
+    const entry = draftToEntry(matchingDraft([false, false]), urls)
+    const paired: QuestionFormData = {
+      title: 'จับคู่หน่วย', subject: 'ฟิสิกส์', question_text: '<p>จงจับคู่</p>',
+      question_type: 'matching', difficulty: 'medium', visibility: 'private',
+      category_id: '', grade_level: '', is_random: false, variables: [], logic_rules: [],
+      answer_parts: [], answer_formula: '', answer_unit: '', answer_tolerance: 0,
+      mcq_options: [
+        { text: '', is_correct: false },
+      ],
+      extra_data: { answer_mode: 'slots' },
+      solution_text: '', solution_image_urls: [], tags: [], image_urls: [],
+    }
+    const edited = applyFormPayload(entry, paired)
+
+    expect(edited.matching).toBeNull()
+    expect(liveWarnings(edited, new Set())).toEqual([])
+  })
+
+  it('carries the pairs and the spares through to the คลัง', () => {
+    const portable = entryToPortable(draftToEntry(matchingDraft([true, true]), urls), 'ฟิสิกส์')
+    expect(portable.question_type).toBe('matching')
+    expect(portable.mcq_options).toHaveLength(2)
+    expect((portable.extra_data as { distractors?: unknown[] }).distractors).toHaveLength(2)
   })
 })
