@@ -1,6 +1,6 @@
 # แผนตรวจหน้าข้อสอบจริงตามขนาดจอ
 
-อัปเดต: 20 กันยายน 2026 · **เฟส 4 ผ่านในขอบเขต agent-only · physical-device UAT รอรวมหลังเฟส 8**
+อัปเดต: 20 กันยายน 2026 · **เฟส agent-only 1–8 จบ · release gate ยังรอ staging และ physical-device UAT**
 
 เอกสารนี้เป็นแผนตรวจหน้าข้อสอบ KorKru บน iPhone, iPad และ Mac ก่อนกลับไปทดสอบ SEB บน Windows ตามลำดับที่ผู้ใช้เลือก ไม่ได้เปลี่ยน Windows ให้เป็น “ผ่าน” และไม่ได้ใช้ผลจาก Apple อนุมานแทน Windows
 
@@ -127,9 +127,13 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ### เฟส 8 — regression และปิดหลักฐาน
 
-สถานะ: รอ
+สถานะ: **ผ่านในขอบเขต agent-only · external release gate ยัง NOT READY**
 
-Agent รันชุดตรวจทั้งหมด, ตรวจสิทธิ์/ข้อมูลค้าง, สรุปผลแยกอุปกรณ์และ build, ระบุสิ่งที่ยังไม่ผ่าน และอัปเดตเอกสาร release ผู้ใช้ช่วยยืนยันเฉพาะผลบนอุปกรณ์จริง
+เพิ่ม `npm run check:exam-release` รวม staging-isolation และ SEB-platform evidence แบบ read-only/no-secret พร้อม runbook `docs/EXAM_RELEASE_UAT.md` ที่รวบ physical responsive UAT, authenticated staging, recovery/proctor และ production-config SEB ไว้เป็นลำดับเดียว Agent รัน regression, runtime smoke และ production build จาก commit เดียวกัน ส่วนผู้ใช้ช่วยเฉพาะขั้นที่ต้องใช้อุปกรณ์/บัญชีจริงหลังงาน agent จบ
+
+ตัวตรวจต้องรายงาน `NOT READY` ในเครื่องปัจจุบัน เพราะยังไม่มี staging แยกและหลักฐาน production BEK + staging mock exam + physical UAT ยัง pending นี่เป็นผลที่ถูกต้อง ไม่ใช่ข้อผิดพลาด และห้ามเปลี่ยนสถานะให้ผ่านจากผล native lab เดิม
+
+ผลตรวจปิดเฟส: 100 test files / 1,326 tests ผ่าน, TypeScript และ design-token lint ผ่าน, production build สร้าง 63 static pages สำเร็จ, Next.js MCP ไม่พบ config/session/compilation issue และ browser smoke หลัง restart ไม่พบ runtime error; release checker รายงาน external blockers 2 กลุ่มตรงตามสถานะจริง (staging และ SEB platform evidence)
 
 ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) แต่ Windows ยังเป็น pending production release gate จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
 

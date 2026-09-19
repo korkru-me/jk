@@ -23,6 +23,10 @@ SEB platform evidence มี manifest แบบไม่เก็บ secret แ�
 
 Recovery/proctor QA เฟส 7 ผ่านในขอบเขต agent-only แล้ว: stale answer backup จาก attempt เก่าไม่ถูก replay, timer ยึดเวลาเริ่มจริงหลัง reload/throttle/clone, คิว proctor ไม่ปล่อย signal ที่เกิดระหว่าง request ค้างรอ heartbeat และ logic ของ retry/Realtime fallback/review alert มี unit test รองรับ การตัด Wi‑Fi, upload, resume, หลายบัญชีและหน้าคุมสอบจริงยังรอ staging แยกหลังเฟส 8 จึงยังไม่ใช่ production release gate
 
+เฟส agent-only 1–8 ของ responsive exam QA ปิดแล้วและมี `npm run check:exam-release` เป็น fail-closed gate รวม staging isolation กับ SEB platform evidence รวมถึง `docs/EXAM_RELEASE_UAT.md` เป็นรายการทดสอบจริงชุดเดียว สถานะ release ปัจจุบันยังจงใจเป็น NOT READY เพราะ staging และ external device evidence ยังไม่ครบ ไม่ได้ deploy หรือสร้างข้อมูล QA/บัญชีจริงในเฟสนี้
+
+Regression ปิดเฟสผ่าน 100 test files / 1,326 tests, TypeScript, token lint, production build 63 static pages และ Next.js MCP/browser runtime smoke โดยไม่พบ compilation/runtime error; ตัวเลขนี้ยืนยัน commit ฝั่งโค้ดเท่านั้น ไม่ยกเลิก external release blockers
+
 ## MVP core
 
 ### Authentication — บางส่วน
