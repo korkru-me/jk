@@ -11,11 +11,12 @@ import { FillBlankForm } from '@/components/questions/fill-blank-form'
 import { TrueFalseForm } from '@/components/questions/true-false-form'
 import { OrderingForm } from '@/components/questions/ordering-form'
 import { MatchingForm } from '@/components/questions/matching-form'
+import { ImageLabelForm } from '@/components/questions/image-label-form'
 import { RandomNumericForm } from '@/components/questions/random-numeric'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { applyFormPayload, changeType, pickOrder, type DraftEntry, type ImportableType } from '@/lib/docx-import/to-question'
 import type { DraftWarning } from '@/lib/docx-import'
-import type { FillBlankConfig, MatchingConfig, MatchingPair, OrderingConfig, TrueFalseConfig } from '@/lib/types'
+import type { FillBlankConfig, ImageLabelConfig, MatchingConfig, MatchingPair, OrderingConfig, TrueFalseConfig } from '@/lib/types'
 
 /** Only the ones a Word worksheet can produce; the rest are authored in the app. */
 const IMPORTABLE_TYPES: { value: ImportableType; hint: string }[] = [
@@ -25,6 +26,7 @@ const IMPORTABLE_TYPES: { value: ImportableType; hint: string }[] = [
   { value: 'fill_blank', hint: 'มีช่องเติมคำ ระบบตรวจให้' },
   { value: 'ordering', hint: 'ลากเรียงให้ถูกลำดับ ระบบตรวจให้' },
   { value: 'matching', hint: 'จับคู่สองคอลัมน์ ระบบตรวจให้' },
+  { value: 'image_label', hint: 'เติมคำลงจุดบนรูป ระบบตรวจให้' },
   { value: 'essay', hint: 'ครูตรวจเอง' },
 ]
 
@@ -91,6 +93,13 @@ export function DraftQuestionCard({
   /** Which pairs the file actually stated; the rest are placeholders. A
    *  worksheet's answered ข้อ are scattered, so this is per pair. */
   const pairKeyed = (index: number) => entry.matching?.keyed[index] ?? true
+
+  // A เติมคำในรูป keeps the diagram it is answered on in `extra_data`, not in
+  // `image_urls` — which is why the card draws it itself rather than letting
+  // the picture strip below show it.
+  const imageLabel = question.question_type === 'image_label'
+    ? (question.extra_data as ImageLabelConfig | undefined) ?? null
+    : null
 
   /** Marks (or unmarks) one option correct, the same toggle the ปรนัย form has. */
   const toggleCorrect = (index: number) => onChange({
@@ -199,6 +208,9 @@ export function DraftQuestionCard({
                 )}
                 {question.question_type === 'matching' && (
                   <MatchingForm allTags={allTags} question={question} draft={draft} />
+                )}
+                {question.question_type === 'image_label' && (
+                  <ImageLabelForm allTags={allTags} question={question} draft={draft} />
                 )}
                 {question.question_type === 'essay' && (
                   <EssayForm allTags={allTags} question={question} draft={draft} />
@@ -366,6 +378,40 @@ export function DraftQuestionCard({
                     ตัวเลือกพวกนี้ไม่ถูกนำเข้าไปด้วย — บนเว็บนักเรียนลากเรียงเอง ระบบสลับรายการให้ใหม่ทุกครั้ง
                   </p>
                 </fieldset>
+              )}
+
+              {/* The diagram, with the points where they currently stand —
+                  which is a layout, not the teacher's placement. Shown rather
+                  than described because "8 จุด" says nothing about whether the
+                  จุด are in the right places, and looking is the whole of what
+                  this type asks of the teacher before it may be imported. */}
+              {imageLabel?.image_url && (
+                <div className="relative w-full max-w-sm overflow-hidden rounded-lg border border-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imageLabel.image_url} alt={`รูปของข้อ ${entry.number}`} className="block w-full" />
+                  {(imageLabel.markers ?? []).map((marker, index) => (
+                    <span
+                      key={marker.id}
+                      style={{ left: `${marker.point.x}%`, top: `${marker.point.y}%` }}
+                      className="absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-tint-1 text-[10px] font-bold text-primary-foreground"
+                    >
+                      {index + 1}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {imageLabel && (imageLabel.markers ?? []).length > 0 && (
+                <ol className="space-y-1 border-l-2 border-border pl-3">
+                  {(imageLabel.markers ?? []).map((marker, index) => (
+                    <li key={marker.id} className="text-xs text-muted-foreground">
+                      จุดที่ {index + 1}
+                      {marker.answers.some(answer => answer.trim())
+                        ? <span className="ml-2 text-foreground">{marker.answers.join(' / ')}</span>
+                        : <span className="ml-2 text-warning">ยังไม่มีเฉลย</span>}
+                    </li>
+                  ))}
+                </ol>
               )}
 
               {question.question_type === 'fill_blank' && blanks.length > 0 && (

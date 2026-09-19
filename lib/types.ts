@@ -539,7 +539,7 @@ export interface ClassifyConfig {
   row_label_style?: PartLabelStyle
 }
 
-// ติดป้ายบนรูป — one diagram with answer boxes pointing at places on it, the
+// เติมคำในรูป — one diagram with answer boxes pointing at places on it, the
 // worksheet where a student names the parts of the respiratory tract. See
 // lib/image-label.ts, which owns the answer key, the point value and the
 // ข้อย่อย count so that the three cannot drift apart.

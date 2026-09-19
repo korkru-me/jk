@@ -51,14 +51,31 @@ export interface SampleSpan {
   answer?: boolean
 }
 
+/**
+ * One answer box standing on a `picture` line's diagram.
+ *
+ * Carries its own place on the picture, as a percentage of the picture's width
+ * and height, so that the page drawn on screen and the .docx handed over put
+ * the boxes in the same spots. They were two lists once, briefly, and two
+ * lists is how the example and the file it is supposed to depict drift apart.
+ */
+export interface SampleBox extends SampleSpan {
+  /** Top-left corner, 0–100 of the picture's own width and height. */
+  x: number
+  y: number
+}
+
 export interface SampleLine {
   /** `question` is a numbered item; `part` is one level deeper. `item` is one
    *  line of a เรียงลำดับ list, which is numbered like a `choice` and is not
    *  one — the difference is the whole reading of that type. `pair` is one row
    *  of a จับคู่ table, which is the only sample line with two cells. */
-  kind: 'heading' | 'question' | 'choice' | 'part' | 'item' | 'pair'
-  /** The line, or for a `pair` its left-hand cell. */
+  kind: 'heading' | 'question' | 'choice' | 'part' | 'item' | 'pair' | 'picture'
+  /** The line, or for a `pair` its left-hand cell. Empty for a `picture`. */
   spans: SampleSpan[]
+  /** A `picture`'s answer boxes, in reading order. Each one is a ช่อง, and its
+   *  text is that ช่อง's เฉลย. */
+  boxes?: SampleBox[]
   /** A `pair`'s right-hand cell. An empty array is a choice with no ข้อ beside
    *  it, which is how a worksheet writes a ตัวเลือกลวง. */
   right?: SampleSpan[]
@@ -136,6 +153,10 @@ const key = (text: string): SampleSpan => ({ text, answer: true })
 const line = (kind: SampleLine['kind'], ...spans: SampleSpan[]): SampleLine => ({ kind, spans })
 /** One row of a จับคู่ table: the ข้อ on the left, the ตัวเลือก on the right. */
 const pair = (left: SampleSpan[], right: SampleSpan[]): SampleLine => ({ kind: 'pair', spans: left, right })
+/** The diagram of a เติมคำในรูป ข้อ, and the answer boxes standing on it. */
+const picture = (boxes: SampleBox[]): SampleLine => ({ kind: 'picture', spans: [], boxes })
+/** One answer box: its เฉลย, and where on the picture it stands. */
+const box = (text: string, x: number, y: number): SampleBox => ({ text, answer: true, x, y })
 
 // ─── One profile per question type ───────────────────────────────────────────
 
@@ -411,23 +432,48 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
   image_label: {
     slug: 'image-label',
     type: 'image_label',
-    label: 'ติดป้ายบนรูป',
-    noun: 'โจทย์ติดป้ายบนรูป',
-    blurb: 'รูปเดียวที่นักเรียนตอบว่าแต่ละจุดคืออะไร',
-    status: 'planned',
+    label: 'เติมคำในรูป',
+    noun: 'โจทย์เติมคำในรูป',
+    blurb: 'รูปหนึ่งใบที่มีช่องให้เติมคำอยู่บนรูป — แบบเดียวกับใบงานที่วางกล่องข้อความแล้วลากเส้นชี้',
+    status: 'ready',
     rules: [
       NUMBERING,
-      { id: 'one-picture', text: 'หนึ่งข้อมีรูปเดียว วางรูปแบบอยู่ในบรรทัด (In Line with Text) ไม่ใช่รูปลอย' },
-      { id: 'label-list', text: 'รายการคำตอบของแต่ละจุดพิมพ์เป็นบรรทัดย่อยใต้รูป' },
+      {
+        id: 'one-picture',
+        text: 'หนึ่งข้อมีรูปเดียว วางรูปแบบอยู่ในบรรทัด (In Line with Text) ไม่ใช่รูปลอย',
+      },
+      {
+        id: 'label-box',
+        text: 'ช่องให้เติมคำคือ "กล่องข้อความ" (Insert → Text Box) ที่วางไว้รอบรูป — หนึ่งกล่องคือหนึ่งช่อง · เส้นที่ลากจากกล่องไปชี้จุดบนรูปใช้เครื่องมือเส้น (Shapes → Line) ระบบจะได้ไม่นับเส้นเป็นช่อง',
+      },
+      ANSWER_MARK,
+      {
+        id: 'label-answer',
+        text: 'พิมพ์เฉลยลงในกล่องแล้วทำเครื่องหมายไว้ — ข้อความในกล่องคือเฉลยของช่องนั้น · กล่องที่เว้นว่าง (ฉบับที่แจกนักเรียน) นำเข้าได้เหมือนกัน แล้วค่อยพิมพ์เฉลยในเว็บ',
+      },
+      {
+        id: 'label-place',
+        text: 'ไฟล์ Word บอกได้แค่ว่ากล่องอยู่ตรงไหนของหน้ากระดาษ ไม่ได้บอกว่าเส้นชี้ไปที่จุดไหนบนรูป — ทุกข้อจึงต้องกด "แก้ไข" แล้วลากจุดไปวางบนรูปเองก่อนนำเข้า',
+      },
     ],
     sample: [
-      line('question', t('จงระบุส่วนประกอบของเซลล์พืชตามหมายเลขในภาพ')),
-      line('part', t('ผนังเซลล์')),
-      line('part', t('คลอโรพลาสต์')),
-      line('part', t('แวคิวโอล')),
+      line('heading', t('ใบงาน วงจรไฟฟ้าอย่างง่าย')),
+      line('question', t('จากรูปวงจรไฟฟ้า จงเติมคำตอบลงในช่องว่างให้ถูกต้อง')),
+      // Placed to match the drawing, and listed in the order a reader takes
+      // them off the page — down it — which is the order the ช่อง come back in.
+      picture([
+        box('สวิตช์', 40, 1),
+        box('ถ่านไฟฉาย', 0, 34),
+        box('หลอดไฟ', 80, 40),
+        box('แอมมิเตอร์', 34, 84),
+      ]),
     ],
     limits: [
-      'ตำแหน่งของจุดบนรูปไม่มีทางอยู่ในไฟล์ Word — นำเข้าได้แค่รูปกับรายการคำตอบ แล้วครูต้องคลิกวางจุดเองในเว็บ',
+      'ตำแหน่งของจุดบนรูปไม่มีอยู่ในไฟล์ Word — ไฟล์บอกแค่ว่ากล่องคำตอบวางอยู่ตรงไหน ส่วนเส้นที่ชี้เข้าไปในรูปเป็นคนละรูปทรงที่ไม่ได้บอกว่าคู่กับกล่องไหน ระบบจึงกระจายจุดไว้ให้ก่อน แล้วครูลากไปวางเอง',
+      'ทุกข้อของประเภทนี้ต้องกด "แก้ไข" แล้วกดตกลงก่อน ถึงจะนำเข้าได้ — กันไม่ให้รูปที่จุดยังผิดตำแหน่งหลุดเข้าคลังไปตรวจให้คะแนนนักเรียน',
+      'วิธีตอบตั้งให้เป็น "พิมพ์เอง" ทุกข้อ เปลี่ยนเป็นลากคำจากคลังหรือดรอปดาวน์ได้ในฟอร์ม',
+      'กล่องข้อความที่ไม่ได้เป็นช่องคำตอบ (เช่น หัวเรื่องบนรูป) จะถูกอ่านเป็นช่องด้วย — พิมพ์เป็นข้อความธรรมดาแทน',
+      EMF_LIMIT,
     ],
     createHref: '/questions/new/image-label',
   },
@@ -552,8 +598,10 @@ export function findProfile(slug: string): ImportProfile | null {
 }
 
 /** Plain text of one sample line — for titles, tests and the .docx generator.
- *  A จับคู่ row reads as both of its cells, which is how it reads on the page. */
+ *  A จับคู่ row reads as both of its cells, which is how it reads on the page,
+ *  and a picture reads as the words written in the boxes standing on it. */
 export function sampleLineText(line: SampleLine): string {
+  if (line.kind === 'picture') return (line.boxes ?? []).map(box => box.text).join(' ').trim()
   const left = line.spans.map(span => span.text).join('')
   const right = (line.right ?? []).map(span => span.text).join('')
   return right ? `${left} ${right}`.trim() : left

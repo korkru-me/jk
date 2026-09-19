@@ -295,7 +295,7 @@ describe('toSafeExamAnswer', () => {
     expect(config.rows).toEqual([])
   })
 
-  it('hands a ใบงานติดป้ายบนรูป to the student with no answer key in it', () => {
+  it('hands a ใบงานเติมคำในรูป to the student with no answer key in it', () => {
     // Two different leaks in one type. `answers` is the key outright. `label`
     // is the teacher's private name for a point, and a teacher naming the point
     // over the trachea names it "หลอดลม" — the answer under a field name that
@@ -435,7 +435,7 @@ describe('toSafeExamAnswer', () => {
     expect((partial.safe.questions.extra_data as { markers: unknown[] }).markers).toHaveLength(2)
   })
 
-  it('keeps a malformed ใบงานติดป้ายบนรูป from reaching the browser as junk', () => {
+  it('keeps a malformed ใบงานเติมคำในรูป from reaching the browser as junk', () => {
     const junk = serializedSafe('image_label', {
       extra_data: {
         image_url: 42,

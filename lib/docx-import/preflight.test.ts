@@ -13,7 +13,7 @@ function question(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
       { id: 'c2', text: 'ข', isCorrect: false },
     ],
     parts: [], answers: [], blanks: [], statements: [], orderItems: [], orderChoices: [], matching: null,
-    imageRelIds: [], mentionsPicture: false, warnings: [],
+    imageLabel: null, imageRelIds: [], mentionsPicture: false, warnings: [],
     ...overrides,
   }
 }

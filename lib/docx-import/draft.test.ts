@@ -33,6 +33,11 @@ function numbered(ilvl: number, ...content: string[]): string {
   return `<w:p><w:pPr><w:numPr><w:ilvl w:val="${ilvl}"/><w:numId w:val="7"/></w:numPr></w:pPr>${content.join('')}</w:p>`
 }
 
+/** The same, in a list of the caller's choosing — Word makes new ones freely. */
+function numberedIn(numId: string, ilvl: number, ...content: string[]): string {
+  return `<w:p><w:pPr><w:numPr><w:ilvl w:val="${ilvl}"/><w:numId w:val="${numId}"/></w:numPr></w:pPr>${content.join('')}</w:p>`
+}
+
 function plain(...content: string[]): string {
   return `<w:p>${content.join('')}</w:p>`
 }
@@ -61,6 +66,44 @@ function image(relId: string): string {
 /** A picture anchored to the page rather than sitting in the run order. */
 function floatingImage(relId: string): string {
   return `<w:r><w:drawing><wp:anchor><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="${relId}"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`
+}
+
+/** An inline picture that states the size Word prints it at, in EMU. */
+function sizedImage(relId: string, width: number, height: number): string {
+  return `<w:r><w:drawing><wp:inline><wp:extent cx="${width}" cy="${height}"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="${relId}"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`
+}
+
+/**
+ * A floating text box — the ช่อง of a เติมคำในรูป worksheet.
+ *
+ * Written with the `mc:AlternateContent` wrapper Word puts around one, because
+ * the older VML copy inside it says the same thing again and reading both
+ * would count every ช่อง twice.
+ */
+function textBox(
+  text: string,
+  { x, y, width = 838200, color, relativeFrom = 'column' }:
+  { x: number; y: number; width?: number; color?: string; relativeFrom?: string },
+): string {
+  const inner = text ? `<w:p>${run(text, color ? { color } : {})}</w:p>` : '<w:p/>'
+  return `<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wp:anchor>`
+    + `<wp:positionH relativeFrom="${relativeFrom}"><wp:posOffset>${x}</wp:posOffset></wp:positionH>`
+    + `<wp:positionV relativeFrom="paragraph"><wp:posOffset>${y}</wp:posOffset></wp:positionV>`
+    + `<wp:extent cx="${width}" cy="247650"/>`
+    + `<a:graphic><a:graphicData><wps:wsp><wps:cNvSpPr/><wps:txbx><w:txbxContent>${inner}</w:txbxContent></wps:txbx></wps:wsp></a:graphicData></a:graphic>`
+    + `</wp:anchor></w:drawing></mc:Choice>`
+    + `<mc:Fallback><w:pict><v:rect><v:textbox><w:txbxContent><w:p>${run(text)}</w:p></w:txbxContent></v:textbox></v:rect></w:pict></mc:Fallback>`
+    + `</mc:AlternateContent></w:r>`
+}
+
+/** The line a teacher draws from a ช่อง to the place on the picture it points at. */
+function connector(x: number, y: number): string {
+  return `<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wp:anchor>`
+    + `<wp:positionH relativeFrom="column"><wp:posOffset>${x}</wp:posOffset></wp:positionH>`
+    + `<wp:positionV relativeFrom="paragraph"><wp:posOffset>${y}</wp:posOffset></wp:positionV>`
+    + `<wp:extent cx="47625" cy="1143000"/>`
+    + `<a:graphic><a:graphicData><wps:wsp><wps:cNvCnPr/><wps:txbx><w:txbxContent><w:p/></w:txbxContent></wps:txbx></wps:wsp></a:graphicData></a:graphic>`
+    + `</wp:anchor></w:drawing></mc:Choice></mc:AlternateContent></w:r>`
 }
 
 /** Choices laid out two to a row, which is how a worksheet fits four on two lines. */
@@ -1316,5 +1359,156 @@ describe('เลขข้อที่พิมพ์เป็นเลขไท�
     expect(result.questions[0].type).toBe('mcq')
     expect(result.questions[0].choices.map(choice => choice.text))
       .toEqual(['นิวตัน', 'จูล', 'วัตต์', 'โอห์ม'])
+  })
+})
+
+describe('the ช่อง a เติมคำในรูป worksheet stands on its picture', () => {
+  const CM = 360000
+  /** The worksheet's shape: คำสั่ง, then the picture with boxes around it. */
+  const worksheet = (boxes: string[], picture = sizedImage('rId7', 16 * CM, 10 * CM)) =>
+    [numbered(0, run('จากรูปเซลล์สัตว์ จงเติมคำตอบลงในช่องว่างให้ถูกต้อง')), plain(picture, ...boxes)].join('')
+
+  const read = (body: string) => parse(body, {}, { expect: 'image_label' }).questions[0]
+
+  it('reads one ช่อง per text box, with the word in it as the เฉลย', () => {
+    const question = read(worksheet([
+      textBox('นิวเคลียส', { x: 6 * CM, y: 1 * CM, color: 'EE0000' }),
+      textBox('ไรโบโซม', { x: 12 * CM, y: 3 * CM, color: 'EE0000' }),
+    ]))
+
+    expect(question.type).toBe('image_label')
+    expect(question.imageLabel?.blanks.map(blank => blank.answer)).toEqual(['นิวเคลียส', 'ไรโบโซม'])
+    expect(question.imageLabel?.relId).toBe('rId7')
+    // None of the เฉลย reaches the wording the student is shown.
+    expect(question.html).toBe('<p>จากรูปเซลล์สัตว์ จงเติมคำตอบลงในช่องว่างให้ถูกต้อง</p>')
+  })
+
+  it('leaves the lines joining a ช่อง to the picture out of the count', () => {
+    // A leader line is a shape with no text in it, which is also what an empty
+    // ช่อง is. Word's own flag for a connector is the only thing that tells
+    // them apart, and a worksheet has about as many lines as it has ช่อง.
+    const question = read(worksheet([
+      connector(7 * CM, 1 * CM),
+      textBox('นิวเคลียส', { x: 6 * CM, y: 1 * CM, color: 'EE0000' }),
+      connector(9 * CM, 4 * CM),
+    ]))
+
+    expect(question.imageLabel?.blanks).toHaveLength(1)
+  })
+
+  it('keeps an empty box as a ช่อง with no เฉลย, which is the students’ copy', () => {
+    const question = read(worksheet([
+      textBox('', { x: 6 * CM, y: 1 * CM }),
+      textBox('', { x: 12 * CM, y: 3 * CM }),
+    ]))
+
+    expect(question.imageLabel?.blanks.map(blank => blank.answer)).toEqual(['', ''])
+    expect(warningCodes(question)).toContain('unkeyed-points')
+  })
+
+  it('measures a ช่อง across the picture, and says nothing about how far down', () => {
+    // The middle of a box 4cm wide at 6cm, over a picture 16cm wide, is 50%.
+    // Down the page is the half no file states: the box is positioned against
+    // a paragraph whose own place on the page only Word's layout knows.
+    const question = read(worksheet([
+      textBox('นิวเคลียส', { x: 6 * CM, y: 1 * CM, width: 4 * CM }),
+    ]))
+
+    expect(question.imageLabel?.blanks[0].x).toBeCloseTo(50, 5)
+  })
+
+  it('refuses to measure a box Word positioned against something else', () => {
+    const question = read(worksheet([
+      textBox('นิวเคลียส', { x: 6 * CM, y: 1 * CM, relativeFrom: 'page' }),
+    ]))
+
+    expect(question.imageLabel?.blanks[0].x).toBeNull()
+  })
+
+  it('takes the ช่อง in reading order: down the page, then down the picture', () => {
+    // Word anchors a floating box to whichever paragraph it sits nearest, so
+    // the ช่อง of one ข้อ are scattered over the blank paragraphs that make
+    // room for the picture — above it, on it, and below it.
+    const body = [
+      numbered(0, run('จงเติมคำตอบลงในช่องว่างให้ถูกต้อง')),
+      plain(textBox('บนสุด', { x: 0, y: 0.3 * CM })),
+      plain(
+        sizedImage('rId7', 16 * CM, 10 * CM),
+        textBox('ล่างของรูป', { x: 0, y: 8 * CM }),
+        textBox('บนของรูป', { x: 0, y: 2 * CM }),
+      ),
+      plain(textBox('ใต้รูป', { x: 0, y: 0.4 * CM })),
+    ].join('')
+
+    expect(read(body).imageLabel?.blanks.map(blank => blank.answer))
+      .toEqual(['บนสุด', 'บนของรูป', 'ล่างของรูป', 'ใต้รูป'])
+  })
+
+  it('leaves text boxes alone on every other kind of worksheet', () => {
+    // On a ปรนัย paper a floating box is a caption or a decoration. Reading
+    // one as a ช่อง would add an answer box to a โจทย์ that never had one.
+    const body = worksheet([textBox('หมายเหตุ', { x: 0, y: 0 })])
+
+    expect(parse(body, {}, { expect: 'mcq' }).questions[0].imageLabel).toBeNull()
+    expect(parse(body).questions[0].imageLabel).toBeNull()
+  })
+})
+
+describe('a โจทย์ list Word broke in two', () => {
+  /** Two lists printed `1.` and one printed `1)`, which is what a ตัวเลือก is. */
+  const LISTS = `<w:numbering>
+    <w:abstractNum w:abstractNumId="1">
+      <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl>
+    </w:abstractNum>
+    <w:abstractNum w:abstractNumId="2">
+      <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl>
+    </w:abstractNum>
+    <w:abstractNum w:abstractNumId="3">
+      <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1)"/></w:lvl>
+    </w:abstractNum>
+    <w:num w:numId="7"><w:abstractNumId w:val="1"/></w:num>
+    <w:num w:numId="9"><w:abstractNumId w:val="2"/></w:num>
+    <w:num w:numId="11"><w:abstractNumId w:val="3"/></w:num>
+  </w:numbering>`
+
+  it('reads a list that carries straight on as more โจทย์, not as part of the last one', () => {
+    // Paste a ข้อ in from another file and Word gives the paragraphs after it
+    // a new numId that prints exactly the same. The teacher sees one list; the
+    // file holds two, and the ข้อ in the second used to be swallowed whole.
+    const result = parse([
+      numberedIn('7', 0, run('ข้อแรก')),
+      numberedIn('7', 0, run('ข้อสอง')),
+      numberedIn('9', 0, run('ข้อสาม')),
+    ].join(''), { numbering: LISTS })
+
+    expect(result.questions.map(question => question.html))
+      .toEqual(['<p>ข้อแรก</p>', '<p>ข้อสอง</p>', '<p>ข้อสาม</p>'])
+  })
+
+  it('leaves a list that prints its numbers differently out of it', () => {
+    // `1)` is how a ตัวเลือก is numbered, and a ตัวเลือก is never a ข้อ
+    // however many of them there are.
+    const result = parse([
+      numberedIn('7', 0, run('ข้อแรก')),
+      numberedIn('7', 0, run('ข้อสอง')),
+      numberedIn('11', 0, run('ตัวเลือกที่พิมพ์เป็นรายการของตัวเอง')),
+    ].join(''), { numbering: LISTS })
+
+    expect(result.questions).toHaveLength(2)
+    expect(result.questions[1].html).toContain('ตัวเลือกที่พิมพ์เป็นรายการของตัวเอง')
+  })
+
+  it('leaves a numbered คำชี้แจง above the โจทย์ out of it', () => {
+    // A list that stops before the questions start is not a continuation of
+    // them, however it is formatted — which is what "every item after the last
+    // โจทย์" is there to rule out.
+    const result = parse([
+      numberedIn('9', 0, run('อ่านคำสั่งให้ครบก่อนลงมือทำ')),
+      numberedIn('7', 0, run('ข้อแรก')),
+      numberedIn('7', 0, run('ข้อสอง')),
+    ].join(''), { numbering: LISTS })
+
+    expect(result.questions.map(question => question.html)).toEqual(['<p>ข้อแรก</p>', '<p>ข้อสอง</p>'])
+    expect(result.preamble).toContain('อ่านคำสั่งให้ครบก่อนลงมือทำ')
   })
 })

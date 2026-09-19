@@ -5,6 +5,7 @@ import {
 } from './to-question'
 import type { DraftQuestion } from './draft'
 import type { QuestionFormData } from '@/lib/actions/questions'
+import type { ImageLabelConfig } from '@/lib/types'
 
 function draft(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
   return {
@@ -24,6 +25,7 @@ function draft(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
     orderItems: [],
     orderChoices: [],
     matching: null,
+    imageLabel: null,
     imageRelIds: [],
     mentionsPicture: false,
     warnings: [],
@@ -505,5 +507,91 @@ describe('a จับคู่ โจทย์ read off a worksheet', () => {
     expect(portable.question_type).toBe('matching')
     expect(portable.mcq_options).toHaveLength(2)
     expect((portable.extra_data as { distractors?: unknown[] }).distractors).toHaveLength(2)
+  })
+})
+
+describe('a เติมคำในรูป โจทย์ read off a worksheet', () => {
+  const imageLabel = (blanks: { answer: string; x: number | null }[]) => draft({
+    type: 'image_label',
+    title: 'จากรูปวงจรไฟฟ้า',
+    html: '<p>จากรูปวงจรไฟฟ้า จงเติมคำตอบลงในช่องว่างให้ถูกต้อง</p>',
+    choices: [],
+    imageLabel: { blanks, relId: 'rId7' },
+    imageRelIds: ['rId7'],
+  })
+
+  const urls = new Map([['rId7', 'https://example.test/circuit.png']])
+  const config = (entry: DraftEntry) => entry.question.extra_data as ImageLabelConfig
+
+  it('keeps the diagram where this type keeps it, and not where every renderer prints it', () => {
+    // `image_urls` is printed above the answer area by every renderer without
+    // looking at the type, so a diagram there would appear twice: once as an
+    // illustration and once as the thing being answered on.
+    const entry = draftToEntry(imageLabel([{ answer: 'สวิตช์', x: 50 }]), urls)
+
+    expect(entry.question.image_urls).toEqual([])
+    expect(config(entry).image_url).toBe('https://example.test/circuit.png')
+  })
+
+  it('fills each จุด in with the เฉลย written in its box, and names it after it', () => {
+    const entry = draftToEntry(imageLabel([
+      { answer: 'สวิตช์', x: 50 },
+      { answer: 'หลอดไฟ', x: 90 },
+    ]), urls)
+
+    expect(config(entry).markers.map(marker => marker.answers)).toEqual([['สวิตช์'], ['หลอดไฟ']])
+    // A marker's label never reaches a student's browser, so naming it after
+    // the เฉลย is what tells the teacher which จุด they are dragging.
+    expect(config(entry).markers.map(marker => marker.label)).toEqual(['สวิตช์', 'หลอดไฟ'])
+    // Typed, not ลากคำ: a word bank has to hold every answer to be answerable,
+    // and a worksheet handed out blank states none of them.
+    expect(config(entry).answer_mode).toBe('typed')
+  })
+
+  it('spreads the จุด out rather than claiming to know where they go', () => {
+    const entry = draftToEntry(imageLabel([
+      { answer: 'สวิตช์', x: 50 },
+      { answer: 'ถ่านไฟฉาย', x: 10 },
+      { answer: 'หลอดไฟ', x: null },
+    ]), urls)
+
+    // Across is read off the file; down the picture is a layout, evenly
+    // spaced, and no two จุด land on each other.
+    expect(config(entry).markers.map(marker => marker.point.x)).toEqual([50, 10, 50])
+    const downs = config(entry).markers.map(marker => marker.point.y)
+    expect(downs).toEqual([...downs].sort((a, b) => a - b))
+    expect(new Set(downs).size).toBe(downs.length)
+  })
+
+  it('will not import one until the teacher has opened it and placed the จุด', () => {
+    // The one type a file cannot finish: it says where each answer *box* sits
+    // and never what it points at. Importing unseen would store a picture
+    // whose จุด are all in the wrong places — and grade students on it.
+    const entry = draftToEntry(imageLabel([{ answer: 'สวิตช์', x: 50 }]), urls)
+
+    expect(validateForImport(entry)).toMatch(/ลากจุด/)
+    expect(validateForImport({ ...entry, reviewed: true })).toBeNull()
+  })
+
+  it('holds back a ใบงาน whose boxes are all empty until it has a เฉลย', () => {
+    // Every จุด unkeyed is a โจทย์ worth no marks, which would score every
+    // student zero without anything having said so.
+    const entry = draftToEntry(imageLabel([{ answer: '', x: 50 }, { answer: '', x: 90 }]), urls)
+
+    expect(validateForImport({ ...entry, reviewed: true })).toMatch(/ยังไม่มีเฉลย/)
+  })
+
+  it('keeps a ใบงาน that states only some of its เฉลย', () => {
+    // An unkeyed จุด still renders and is still answerable; it is simply not
+    // worth a mark. That is a โจทย์ a teacher may well mean to import.
+    const entry = draftToEntry(imageLabel([{ answer: 'สวิตช์', x: 50 }, { answer: '', x: 90 }]), urls)
+
+    expect(validateForImport({ ...entry, reviewed: true })).toBeNull()
+  })
+
+  it('says so when the file gave no picture to answer on', () => {
+    const entry = draftToEntry(imageLabel([{ answer: 'สวิตช์', x: 50 }]), new Map())
+
+    expect(validateForImport({ ...entry, reviewed: true })).toMatch(/ไม่พบรูป/)
   })
 })

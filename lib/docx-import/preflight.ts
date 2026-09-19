@@ -144,6 +144,61 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
     }
   }))
 
+  add(checkFor(profile, 'label-box', () => {
+    if (questions.length === 0) return null
+    const noPicture = questions.filter(question => !question.imageLabel?.relId)
+    if (noPicture.length > 0) {
+      return {
+        ruleId: 'label-box',
+        status: 'fail',
+        detail: `ข้อ ${noPicture.map(question => question.number).join(', ')} ไม่พบรูป — วางรูปแบบอยู่ในบรรทัด (In Line with Text) ไม่ใช่รูปลอย`,
+      }
+    }
+
+    const without = questions.filter(question => (question.imageLabel?.blanks.length ?? 0) === 0)
+    const total = questions.reduce((sum, question) => sum + (question.imageLabel?.blanks.length ?? 0), 0)
+    if (without.length === 0) {
+      return { ruleId: 'label-box', status: 'pass', detail: `พบช่องเติมคำรวม ${total} ช่อง จาก ${questions.length} ข้อ` }
+    }
+    return {
+      ruleId: 'label-box',
+      status: 'fail',
+      detail: `ข้อ ${without.map(question => question.number).join(', ')} ไม่พบกล่องข้อความบนรูป — ช่องให้เติมคำต้องเป็นกล่องข้อความ (Insert → Text Box)`,
+    }
+  }))
+
+  // Not a formatting mistake: the copy handed to students has every box empty
+  // on purpose, and the teacher fills the เฉลย in on the web. Reported so they
+  // know how much is still theirs to do.
+  add(checkFor(profile, 'label-answer', () => {
+    const withBlanks = questions.filter(question => (question.imageLabel?.blanks.length ?? 0) > 0)
+    if (withBlanks.length === 0) return null
+    const short = withBlanks.filter(question =>
+      question.imageLabel!.blanks.some(blank => !blank.answer))
+
+    if (short.length === 0) {
+      const total = withBlanks.reduce((sum, question) => sum + question.imageLabel!.blanks.length, 0)
+      return { ruleId: 'label-answer', status: 'pass', detail: `อ่านเฉลยได้ครบทั้ง ${total} ช่อง` }
+    }
+    return {
+      ruleId: 'label-answer',
+      status: 'warn',
+      detail: `ข้อ ${short.map(question => question.number).join(', ')} มีช่องที่ยังไม่มีเฉลย — พิมพ์เฉลยตอนกด "แก้ไข" ได้`,
+    }
+  }))
+
+  // Always said, and never a pass: no Word file states where a point lands on
+  // the picture. It is on the report so that "ทุกข้อต้องเปิดแก้ไขก่อน" is
+  // something the teacher reads before uploading, not after.
+  add(checkFor(profile, 'label-place', () => {
+    if (questions.length === 0) return null
+    return {
+      ruleId: 'label-place',
+      status: 'warn',
+      detail: `ต้องกด "แก้ไข" แล้วลากจุดไปวางบนรูปให้ครบทั้ง ${questions.length} ข้อก่อนนำเข้า — ไฟล์ Word ไม่มีข้อมูลตำแหน่งจุด`,
+    }
+  }))
+
   add(checkFor(profile, 'match-table', () => {
     if (questions.length === 0) return null
     const without = questions.filter(question => (question.matching?.pairs.length ?? 0) < 2)

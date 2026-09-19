@@ -239,7 +239,7 @@ describe('buildAnswerFeedback — the other question types', () => {
   })
 })
 
-describe('buildAnswerFeedback — ติดป้ายบนรูป', () => {
+describe('buildAnswerFeedback — เติมคำในรูป', () => {
   const config = {
     image_url: '/x.png',
     answer_mode: 'drag',

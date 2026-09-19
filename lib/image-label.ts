@@ -1,5 +1,5 @@
 /**
- * ติดป้ายบนรูป (`image_label`) — one diagram, and answer boxes that point at
+ * เติมคำในรูป (`image_label`) — one diagram, and answer boxes that point at
  * places on it.
  *
  * The worksheet this comes from gives a student a drawing of the respiratory

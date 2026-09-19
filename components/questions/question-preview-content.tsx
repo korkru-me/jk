@@ -203,7 +203,7 @@ export function QuestionPreviewContent({
   const [classifyGrid, setClassifyGrid] = useState<number[][]>(emptyClassifyGrid)
   const [classifyChecked, setClassifyChecked] = useState(false)
 
-  // ติดป้ายบนรูป — one answer per point, in the points' own order, which is the
+  // เติมคำในรูป — one answer per point, in the points' own order, which is the
   // same array the exam stores. The verdicts come from imageLabelKey, the same
   // module the attempt freezes its key from, so the teacher trying the question
   // is marked by the rule their students will be.

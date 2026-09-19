@@ -140,7 +140,10 @@ describe('import profiles', () => {
       profile => profile.status === 'ready' && profile.type !== 'essay' && profile.type !== 'written',
     )
     for (const profile of graded) {
-      const marked = profile.sample.some(line => line.spans.some(span => span.answer))
+      // A เติมคำในรูป ข้อ keeps its เฉลย in the boxes standing on the picture
+      // rather than in the line's own text, which is the whole shape of it.
+      const marked = profile.sample.some(line =>
+        [...line.spans, ...(line.right ?? []), ...(line.boxes ?? [])].some(span => span.answer))
       expect(marked, `${profile.slug} sample has no marked answer`).toBe(true)
     }
   })

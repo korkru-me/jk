@@ -13,13 +13,13 @@
  */
 import { toPortableQuestion, type PortableQuestion } from '@/lib/question-portable'
 import type { QuestionFormData } from '@/lib/actions/questions'
-import type { AnswerPart, FillBlankConfig, FillBlankItem, MatchingConfig, MatchingDistractor, MatchingPair, MCQOption, OrderingConfig, OrderingItem, Question, QuestionType, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
+import type { AnswerPart, FillBlankConfig, FillBlankItem, ImageLabelConfig, MatchingConfig, MatchingDistractor, MatchingPair, MCQOption, OrderingConfig, OrderingItem, Question, QuestionType, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
 import { acceptedAnswers, countBlanks } from '@/lib/fill-blank'
 import { applyOrder } from './draft'
-import type { DraftAnswer, DraftBlank, DraftMatching, DraftOrderChoice, DraftQuestion, DraftPart, DraftStatement, DraftWarning } from './draft'
+import type { DraftAnswer, DraftBlank, DraftImageLabel, DraftMatching, DraftOrderChoice, DraftQuestion, DraftPart, DraftStatement, DraftWarning } from './draft'
 
 /** The types a Word worksheet can produce. The rest are authored in the app. */
-export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering' | 'matching'>
+export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering' | 'matching' | 'image_label'>
 
 /**
  * What an exam paper says about a เรียงลำดับ ข้อ that the โจทย์ itself must not
@@ -293,6 +293,51 @@ function matchingFields(
 }
 
 /**
+ * A เติมคำในรูป โจทย์ in the shape its own form saves.
+ *
+ * Every blank the file stated becomes a point with its เฉลย already filled in,
+ * which is the part of this โจทย์ that is worth not retyping: a cell diagram is
+ * a dozen long Thai words.
+ *
+ * Where each point *goes* is the part no file can state — see `readImageLabel`
+ * — so the points are laid out rather than placed: across at the box's own
+ * position, which the file does give, and evenly down the picture in reading
+ * order, which is a layout and not a reading. Two things keep that from being
+ * mistaken for the teacher's own placement: the ข้อ carries a warning saying
+ * so, and `validateForImport` will not let it be imported until the teacher
+ * has opened it and pressed ตกลง.
+ *
+ * `typed` rather than the form's own default of ลากคำ, because a word bank has
+ * to hold every answer to be answerable and a worksheet handed out blank
+ * states none of them. The form switches it in one click.
+ */
+function imageLabelFields(
+  draft: DraftQuestion,
+  imageLabel: DraftImageLabel,
+  imageUrls: Map<string, string>,
+): { extra_data: ImageLabelConfig } {
+  const { blanks } = imageLabel
+  const spread = (index: number) => (blanks.length < 2 ? 50 : 10 + (80 * index) / (blanks.length - 1))
+
+  return {
+    extra_data: {
+      image_url: imageUrls.get(imageLabel.relId) ?? '',
+      answer_mode: 'typed',
+      markers: blanks.map((blank, index) => ({
+        id: `${draft.id}-point-${index}`,
+        // Named after its own เฉลย, which is what the teacher needs while
+        // dragging point 7 onto the right organ. Marker labels are never sent
+        // to a student's browser — see `ImageLabelMarker.label`.
+        ...(blank.answer ? { label: blank.answer } : {}),
+        point: { x: blank.x ?? 50, y: spread(index) },
+        answers: blank.answer ? [blank.answer] : [],
+        case_sensitive: false,
+      })),
+    },
+  }
+}
+
+/**
  * Where a เฉลย read from the file lands on the โจทย์.
  *
  * `answer_formula` for the ordinary case of one value, and `answer_parts` as
@@ -325,7 +370,11 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
   // A จับคู่'s pictures live inside the table cells and become the pairs' own
   // images; repeating them under the คำชี้แจง would print the answer key's
   // left-hand column above the exercise.
-  const image_urls = draft.type === 'matching'
+  // A เติมคำในรูป keeps its diagram in `extra_data.image_url`, for the same
+  // reason: every renderer prints `image_urls` above the answer area without
+  // looking at the type, so the picture being answered *on* would appear a
+  // second time as an illustration.
+  const image_urls = draft.type === 'matching' || draft.type === 'image_label'
     ? []
     : draft.imageRelIds
       .map(relId => imageUrls.get(relId))
@@ -340,6 +389,9 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
   const ordering = draft.type === 'ordering' ? orderingOf(draft) : null
   const matching = draft.type === 'matching' && draft.matching
     ? matchingFields(draft.matching, imageUrls)
+    : null
+  const imageLabel = draft.type === 'image_label' && draft.imageLabel
+    ? imageLabelFields(draft, draft.imageLabel, imageUrls)
     : null
 
   const question: Question = {
@@ -362,8 +414,9 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
     extra_data: trueFalse
       ? trueFalse.extra_data
       : matching ? matching.extra_data
-        : ordering ? { items: orderedItems(ordering) }
-          : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
+        : imageLabel ? imageLabel.extra_data
+          : ordering ? { items: orderedItems(ordering) }
+            : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
     image_urls,
   }
 
@@ -402,7 +455,7 @@ export function changeType(entry: DraftEntry, type: ImportableType): DraftEntry 
       mcq_options: type === 'mcq' ? (options.length > 0 ? options : null) : null,
       // Only อัตนัย grades against formulas; carrying them onto a type that
       // ignores them would leave an answer nothing reads.
-      extra_data: type === 'fill_blank' || type === 'true_false' || type === 'ordering' || type === 'matching'
+      extra_data: type === 'fill_blank' || type === 'true_false' || type === 'ordering' || type === 'matching' || type === 'image_label'
         ? entry.question.extra_data
         : {},
       answer_parts: type === 'written' ? entry.question.answer_parts : null,
@@ -508,6 +561,26 @@ export function validateForImport(entry: DraftEntry): string | null {
     // every attempt and mark the whole class wrong on it, silently.
     if (ordering && ordering.choices.length > 0 && !ordering.choices.some(choice => choice.isCorrect)) {
       return 'ยังไม่ได้เลือกลำดับที่ถูก — เลือกบนการ์ดได้เลย'
+    }
+    return null
+  }
+
+  if (question.question_type === 'image_label') {
+    const config = question.extra_data as ImageLabelConfig | undefined
+    if (!config?.image_url) return 'ไม่พบรูปของข้อนี้ในไฟล์ — กด "แก้ไข" เพื่ออัปโหลดรูปเอง'
+    const markers = config.markers ?? []
+    if (markers.length === 0) return 'ไม่พบช่องเติมคำบนรูป — กด "แก้ไข" เพื่อวางจุดเอง'
+    if (markers.every(marker => marker.answers.every(answer => !answer.trim()))) {
+      return 'ยังไม่มีเฉลยสักจุด — กด "แก้ไข" เพื่อพิมพ์เฉลยของแต่ละจุด'
+    }
+    // The one type whose โจทย์ the file cannot finish. A Word file says where
+    // each answer *box* sits on the page and never what it points at, so the
+    // points arrive spread out rather than placed, and importing without
+    // looking would store a picture whose จุด are all in the wrong places —
+    // graded, and wrong, without anything having said so. Opening the ข้อ and
+    // pressing ตกลง is the whole of what is being asked.
+    if (!entry.reviewed) {
+      return 'ยังไม่ได้วางจุดบนรูป — กด "แก้ไข" ลากจุดให้ตรงตำแหน่ง แล้วกดตกลง'
     }
     return null
   }
