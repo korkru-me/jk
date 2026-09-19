@@ -296,14 +296,21 @@ export function MatchingLineInput({
                   aria-pressed={isSelected}
                   onPointerDown={e => onDotPointerDown(e, i)}
                   className={cn(
-                    'absolute -right-2 top-1/2 h-4 w-4 min-w-0 -translate-y-1/2 touch-none rounded-full border-2 p-0 transition-colors',
+                    'absolute -right-5 top-1/2 h-10 w-10 min-w-0 -translate-y-1/2 touch-none rounded-full border-0 bg-transparent p-0 hover:bg-transparent pointer-coarse:h-11 pointer-coarse:w-11',
                     !disabled && 'cursor-grab',
-                    verdict === true ? 'border-success bg-success'
-                      : verdict === false ? 'border-destructive bg-destructive'
-                      : connected || isSelected ? 'border-primary bg-primary'
-                      : 'border-border bg-card'
                   )}
-                />
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'h-4 w-4 rounded-full border-2 transition-colors',
+                      verdict === true ? 'border-success bg-success'
+                        : verdict === false ? 'border-destructive bg-destructive'
+                        : connected || isSelected ? 'border-primary bg-primary'
+                        : 'border-border bg-card'
+                    )}
+                  />
+                </Button>
               </div>
             )
           })}
@@ -326,7 +333,7 @@ export function MatchingLineInput({
                 aria-pressed={isSelected}
                 onClick={() => activateOption(j)}
                 className={cn(
-                  'relative flex h-auto w-full items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors',
+                  'relative flex h-auto min-h-10 w-full items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors pointer-coarse:min-h-11',
                   isHovered ? 'border-primary bg-primary/10'
                     : verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'

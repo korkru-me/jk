@@ -399,7 +399,7 @@ export default function Scratchpad({
       aria-label="กระดาษทด"
       elevation="xl"
       className={open
-        ? 'fixed inset-0 z-[75] flex min-h-0 flex-col overflow-hidden rounded-none md:inset-y-4 md:left-auto md:right-4 md:min-w-[28rem] md:max-w-[80vw] md:w-[48vw] md:resize-x md:rounded-2xl xl:w-[44rem]'
+        ? 'fixed inset-x-0 top-0 z-[75] flex h-[var(--app-height,100dvh)] min-h-0 flex-col overflow-hidden rounded-none lg:inset-y-4 lg:left-auto lg:right-4 lg:h-auto lg:min-w-[28rem] lg:max-w-[80vw] lg:w-[48vw] lg:resize-x lg:rounded-2xl xl:w-[44rem]'
         : 'hidden'}
     >
       <div className="shrink-0 border-b border-border bg-card px-3 py-2.5">
@@ -420,6 +420,7 @@ export default function Scratchpad({
               type="button"
               variant="outline"
               size="xs"
+              className="min-h-10 pointer-coarse:min-h-11"
               onClick={() => void loadAttachedScene()}
               disabled={loadingAttached || attaching}
               title="โหลดฉบับที่แนบล่าสุดมาแทนกระดาษทดปัจจุบัน"
@@ -431,25 +432,26 @@ export default function Scratchpad({
           <Button
             type="button"
             size="xs"
+            className="min-h-10 pointer-coarse:min-h-11"
             onClick={() => void attachAsWork()}
             disabled={attaching || loadingAttached}
           >
             {attaching ? <Loader2 className="animate-spin" /> : <Paperclip />}
             {attaching ? 'กำลังแนบ...' : artifact ? 'อัปเดตวิธีทำ' : 'แนบวิธีทำ'}
           </Button>
-          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="ปิดกระดาษทด">
+          <Button type="button" variant="ghost" size="icon-sm" className="size-10 pointer-coarse:size-11" onClick={onClose} aria-label="ปิดกระดาษทด">
             <X />
           </Button>
         </div>
         <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('pen')}>
+          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('pen')}>
             <PenLine /> ปากกา
           </Button>
-          <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('highlighter')}>
+          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('highlighter')}>
             <Highlighter /> ไฮไลต์
           </Button>
           <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-          <label className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+          <label className="flex min-h-10 shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground pointer-coarse:min-h-11">
             ขนาดเส้น
             <input
               type="range"
@@ -470,7 +472,7 @@ export default function Scratchpad({
               type="button"
               variant={background === item.value ? 'secondary' : 'ghost'}
               size="xs"
-              className="shrink-0"
+              className="min-h-10 shrink-0 pointer-coarse:min-h-11"
               onClick={() => chooseBackground(item.value)}
               aria-pressed={background === item.value}
             >

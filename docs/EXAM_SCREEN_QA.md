@@ -1,6 +1,6 @@
 # แผนตรวจหน้าข้อสอบจริงตามขนาดจอ
 
-อัปเดต: 20 กันยายน 2026 · **เฟส 2 ผ่านในขอบเขต agent-only · physical-device UAT รอรวมหลังเฟส 8**
+อัปเดต: 20 กันยายน 2026 · **เฟส 3 ผ่านในขอบเขต agent-only · physical-device UAT รอรวมหลังเฟส 8**
 
 เอกสารนี้เป็นแผนตรวจหน้าข้อสอบ KorKru บน iPhone, iPad และ Mac ก่อนกลับไปทดสอบ SEB บน Windows ตามลำดับที่ผู้ใช้เลือก ไม่ได้เปลี่ยน Windows ให้เป็น “ผ่าน” และไม่ได้ใช้ผลจาก Apple อนุมานแทน Windows
 
@@ -81,9 +81,11 @@ Agent เปิด local URL และบอกทีละขั้น ผู�
 
 ### เฟส 3 — iPad
 
-สถานะ: รอ
+สถานะ: **ผ่านในขอบเขต agent-only**; เลื่อน physical-device UAT ไปรวมหลังเฟส 8 จึงยังไม่ถือว่า iPad จริงผ่าน release gate
 
-ผู้ใช้ช่วยทดสอบแนวตั้ง/แนวนอน split keyboard หรือคีย์บอร์ดปกติ Apple Pencil/touch และการเปลี่ยนหนึ่งข้อเป็นสามข้อต่อหน้า Agent บันทึกเฉพาะอาการและผล ไม่เก็บภาพที่มีข้อมูลจริง
+Agent ตรวจ 512×1024, 768×1024, 1024×1366 และ 1366×1024 แล้วไม่พบ overflow/control หลุดจอ แก้ iPad แนวตั้งกับ Split View ไม่ให้ navigator ด้านขวาบีบเนื้อหา โดยเพิ่ม dialog **ดูทุกข้อ** ที่รองรับเวลา สถานะทุกข้อ keyboard focus และ touch target; ปรับ viewport/safe-area ของโหมดโฟกัส dialog แป้นคณิตศาสตร์ เครื่องคิดเลข และกระดาษทด พร้อมเพิ่มพฤติกรรมลากด้วย touch/pen และเป้าสัมผัสของจับคู่/เรียงลำดับ ผลโต้ตอบจำลองของจับคู่สองแบบ เรียงลำดับ โหมดโฟกัส เครื่องคิดเลข และกระดาษทดผ่าน รวมถึง 96 test files / 1,310 tests, TypeScript, token lint และ production build ผ่าน รายละเอียดอยู่ใน `docs/EXAM_SCREEN_QA_IPAD.md`
+
+สิ่งที่จงใจรอ physical-device UAT หลังเฟส 8: Safari/WebKit และ SEB จริง, safe-area, split/floating keyboard, camera/file picker, การหมุนเครื่อง, long-press ด้วยนิ้ว และ Apple Pencil
 
 ### เฟส 4 — Mac
 
