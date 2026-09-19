@@ -20,11 +20,11 @@
  *   "ก) ... ข) ..." under a stem are usually two questions. Told apart by how
  *   many there are and whether they sit in a table, and flagged when close.
  */
-import type { QuestionType } from '@/lib/types'
+import type { MatchingAnswerMode, QuestionType } from '@/lib/types'
 import type { DocxBlock, DocxDocument, DocxInline, DocxParagraph, NumberingLevel } from './docx'
 import { flattenAnswerText, parseAnswerList, readAnswerKey, type DraftAnswer } from './answer-key'
 
-export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering'
+export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering' | 'matching'
 
 export type { DraftAnswer } from './answer-key'
 
@@ -61,6 +61,7 @@ export type DraftWarningCode =
   | 'unmarked-statement'
   | 'no-correct-order'
   | 'order-item-image'
+  | 'unpaired-matching'
 
 export interface DraftWarning {
   code: DraftWarningCode
@@ -123,6 +124,9 @@ export interface DraftQuestion {
   /** The orders an exam paper offered to choose between. Empty for a worksheet
    *  that simply lists the steps already in order. */
   orderChoices: DraftOrderChoice[]
+  /** For a จับคู่ โจทย์: the two columns and whatever pairing the file stated.
+   *  `html` is then the คำชี้แจง and nothing else. */
+  matching: DraftMatching | null
   /** Relationship ids, resolved to uploaded URLs by the caller. */
   imageRelIds: string[]
   /** Whether the โจทย์ talks about a picture ("ดังรูป"). Kept rather than
@@ -677,8 +681,10 @@ function readStatement(paragraph: DocxParagraph): DraftStatement {
 
 // ─── Splitting the document into questions ───────────────────────────────────
 
-/** `1)` `1.` `(1)` `ก)` `a.` — the way a choice or a sub-question is labelled. */
-const CHOICE_MARKER = /^[\s ]*\(?\s*([0-9]{1,2}|[ก-ฮ]|[a-hA-H])\s*[.)\]]\s*/
+/** `1)` `1.` `(1)` `ก)` `๑.` `a.` — how a choice or a sub-question is
+ *  labelled. Thai digits count: a worksheet set in a Thai font numbers its
+ *  ข้อ ๑ ๒ ๓ as readily as 1 2 3, and to the reader those were invisible. */
+const CHOICE_MARKER = /^[\s ]*\(?\s*([0-9๐-๙]{1,2}|[ก-ฮ]|[a-hA-H])\s*[.)\]]\s*/
 
 function matchMarker(text: string): { marker: string; rest: string } | null {
   const match = CHOICE_MARKER.exec(text)
@@ -1044,6 +1050,211 @@ function readOrdering(chunks: ChunkItem[]): OrderingRead | null {
   }
 }
 
+// ─── จับคู่: two columns, and which line joins which ─────────────────────────
+//
+// A worksheet writes this as a two-column table: the ข้อ down the left with a
+// row of dots in front of each, and the choices down the right labelled ก ข ค.
+// The เฉลย is the letter written into the dots — in red, the same mark every
+// other type uses — and it points at the choice carrying that letter.
+//
+// Two things about real files decide the shape of everything here.
+//
+//   The rows are not the answer. Left and right are deliberately out of step,
+//   so a ข้อ read as "row 1 pairs with row 1" would be an answer key that is
+//   wrong on nearly every line. The only pairing the file states is the one
+//   written in the dots.
+//
+//   The second column is longer. Ten ข้อ against twelve choices is normal: the
+//   two spare ones are there so the last ข้อ cannot be had by elimination.
+//   Those become `distractors`, which the โจทย์ type now carries.
+
+/** A single letter or number standing in a blank — what a เฉลย looks like here. */
+const MATCH_KEY = /^[\s\u00a0]*\(?[\s\u00a0]*([0-9\u0e50-\u0e59]{1,2}|[ก-ฮ]|[a-zA-Z])[\s\u00a0]*[.)\]]?[\s\u00a0]*$/
+/** The dots or underscores a worksheet leaves for the answer to be written in. */
+const MATCH_BLANK = /^[\s\u00a0.…_·\u2026\-]+/
+/** A ข้อ that asks for lines to be drawn rather than letters to be written. */
+const DRAWS_LINES = /โยงเส้น|ลากเส้น|โยงเข้าหากัน/
+
+export interface DraftMatchPair {
+  leftText: string
+  rightText: string
+  leftRelId?: string
+  rightRelId?: string
+  /** True when the file said this pairing. False means the two were left over
+   *  once the stated pairings were taken, and lined up in the order printed —
+   *  a placeholder the teacher has to settle, never an answer. */
+  keyed: boolean
+}
+
+export interface DraftMatchDistractor {
+  text: string
+  relId?: string
+}
+
+export interface DraftMatching {
+  pairs: DraftMatchPair[]
+  distractors: DraftMatchDistractor[]
+  /** Read from the ข้อ's own wording: "จงโยงเส้น" asks for lines. */
+  answerMode: MatchingAnswerMode
+  /** How many of `pairs` the file actually stated. Anything short of all of
+   *  them means the โจทย์ cannot be imported until the teacher pairs the rest. */
+  keyedCount: number
+}
+
+interface MatchCell {
+  /** Marker-stripped text — the ข้อ or the choice, without its ๑. or ก. */
+  text: string
+  /** The ๑ / ก the page prints in front, which is what a เฉลย points at. */
+  marker: string
+  /** The letter written into this cell's blank, when it has one. */
+  key: string
+  relId?: string
+  empty: boolean
+}
+
+/**
+ * Reads one cell of the table: its label, its text, and any เฉลย written in.
+ *
+ * The เฉลย is a single letter sitting inside the row of dots. Preferably it is
+ * marked in red, highlighter or bold like every other answer key in this
+ * importer; failing that, a lone letter between the dots is taken as one
+ * anyway, because its position says what the colour would have said and a
+ * teacher who typed the key in black should not have to redo the file.
+ */
+function readMatchCell(paragraphs: DocxParagraph[]): MatchCell {
+  const marked = markedCharacters(paragraphs)
+  const markerMatch = CHOICE_MARKER.exec(marked.text)
+  const marker = markerMatch ? markerMatch[1] : ''
+  const offset = markerMatch ? markerMatch[0].length : 0
+
+  const body = marked.text.slice(offset)
+  const marks = marked.marks.slice(offset)
+
+  // The most deliberate signal that covers part of this cell and not all of
+  // it — the same rule the ปรนัย key and the เติมคำ blanks are read with.
+  const signal = blankSignal(paragraphs)
+  let key = ''
+  let keyStart = -1
+  let keyEnd = -1
+
+  if (signal) {
+    let at = 0
+    while (at < body.length && keyStart === -1) {
+      if (marks[at]?.[signal] && body[at].trim()) {
+        let end = at
+        while (end < body.length && (marks[end]?.[signal] || !body[end].trim())) end++
+        const text = body.slice(at, end)
+        if (MATCH_KEY.test(text)) {
+          key = MATCH_KEY.exec(text)![1]
+          keyStart = at
+          keyEnd = end
+        }
+        at = end
+      } else {
+        at++
+      }
+    }
+  }
+
+  if (!key) {
+    // Nothing marked: a lone letter with dots on both sides of it is still a
+    // เฉลย, because nothing else is ever written there.
+    const inBlank = /[.…_·\u2026]{2,}[\s\u00a0]*([0-9\u0e50-\u0e59]{1,2}|[ก-ฮ]|[a-zA-Z])[\s\u00a0]*[.…_·\u2026]{2,}/.exec(body)
+    if (inBlank) {
+      key = inBlank[1]
+      keyStart = inBlank.index + inBlank[0].indexOf(key)
+      keyEnd = keyStart + key.length
+    }
+  }
+
+  const withoutKey = keyStart === -1 ? body : body.slice(0, keyStart) + body.slice(keyEnd)
+  const text = withoutKey.replace(MATCH_BLANK, '').replace(/\s+/g, ' ').trim()
+  const relId = collectImages(paragraphs).relIds[0]
+
+  return { text, marker, key, relId, empty: !text && !relId }
+}
+
+/** Every two-column table in the ข้อ, read as rows of left and right cells. */
+function readMatchRows(blocks: DocxBlock[]): { rows: Array<[MatchCell, MatchCell]>; consumed: Set<DocxBlock> } {
+  const rows: Array<[MatchCell, MatchCell]> = []
+  const consumed = new Set<DocxBlock>()
+
+  for (const block of blocks) {
+    if (block.kind !== 'table') continue
+    if (!block.rows.some(row => row.length >= 2)) continue
+    consumed.add(block)
+    for (const row of block.rows) {
+      if (row.length < 2) continue
+      rows.push([readMatchCell(row[0]), readMatchCell(row[1])])
+    }
+  }
+
+  return { rows, consumed }
+}
+
+/**
+ * Turns those rows into pairs, distractors, and an honest count of how much of
+ * it the file actually stated.
+ *
+ * A ข้อ whose เฉลย is written gets the choice carrying that letter. A ข้อ with
+ * nothing written gets whatever choice is left, in printed order — not because
+ * that is likely to be right, but because `MatchingPair` has no way to hold a
+ * prompt with no partner, and the ข้อ is held back from the คลัง until the
+ * teacher has settled it. Whatever is left over at the end is a choice that
+ * belongs to no ข้อ, which is exactly what a distractor is.
+ */
+function pairUp(rows: Array<[MatchCell, MatchCell]>, answerMode: MatchingAnswerMode): DraftMatching | null {
+  const prompts = rows.map(row => row[0]).filter(cell => !cell.empty)
+  const choices = rows.map(row => row[1]).filter(cell => !cell.empty)
+  if (prompts.length < 2 || choices.length < 2) return null
+
+  const takenChoice = new Set<number>()
+  const answerFor = prompts.map(prompt => {
+    if (!prompt.key) return -1
+    const at = choices.findIndex((choice, index) =>
+      !takenChoice.has(index) && choice.marker === prompt.key)
+    if (at === -1) return -1
+    takenChoice.add(at)
+    return at
+  })
+
+  const spare = choices.map((_, index) => index).filter(index => !takenChoice.has(index))
+  let nextSpare = 0
+
+  const pairs: DraftMatchPair[] = prompts.map((prompt, index) => {
+    const keyed = answerFor[index] !== -1
+    const choice = keyed ? choices[answerFor[index]] : choices[spare[nextSpare++]]
+    return {
+      leftText: prompt.text,
+      rightText: choice?.text ?? '',
+      ...(prompt.relId ? { leftRelId: prompt.relId } : {}),
+      ...(choice?.relId ? { rightRelId: choice.relId } : {}),
+      keyed,
+    }
+  })
+
+  const distractors: DraftMatchDistractor[] = spare.slice(nextSpare).map(index => ({
+    text: choices[index].text,
+    ...(choices[index].relId ? { relId: choices[index].relId } : {}),
+  }))
+
+  return { pairs, distractors, answerMode, keyedCount: pairs.filter(pair => pair.keyed).length }
+}
+
+/** Reads the จับคู่ table of one ข้อ, or null when it holds none. */
+function readMatching(head: DocxParagraph, blocks: DocxBlock[]): { result: DraftMatching; consumed: Set<DocxBlock> } | null {
+  const { rows, consumed } = readMatchRows(blocks)
+  if (rows.length === 0) return null
+
+  // The ข้อ says how it wants to be answered, in the words a teacher already
+  // writes: "จงโยงเส้นจับคู่" is the line-drawing layout, anything else is the
+  // one where a letter is written into the blank.
+  const wording = paragraphsText([head, ...blocks.flatMap(block =>
+    block.kind === 'paragraph' ? [block] : [])])
+  const result = pairUp(rows, DRAWS_LINES.test(wording) ? 'lines' : 'slots')
+  return result ? { result, consumed } : null
+}
+
 /** Puts the items in the order an option claims, or leaves them as they are. */
 export function applyOrder<T>(items: T[], order: number[]): T[] {
   if (!isCompleteOrder(order, items.length)) return items
@@ -1137,6 +1348,18 @@ function buildQuestion(
     })
   }
 
+  // Read before the body is flattened: a จับคู่ lives entirely inside one
+  // table, and which cell sits beside which is the whole โจทย์. The generic
+  // table reader below throws that away, cell by cell, in reading order.
+  let matching: DraftMatching | null = null
+  if (options.expect === 'matching') {
+    const read = readMatching(head, body)
+    if (read) {
+      matching = read.result
+      body = body.filter(block => !read.consumed.has(block))
+    }
+  }
+
   const items: ChunkItem[] = []
 
   for (const block of body) {
@@ -1167,7 +1390,7 @@ function buildQuestion(
   // Only when the teacher said so — see `ParseOptions`. A เรียงลำดับ ข้อ and a
   // ปรนัย one are the same four numbered lines on the page.
   const ordering = options.expect === 'ordering' ? readOrdering(items) : null
-  const treatAsChoices = !ordering && looksLikeChoices(markerItems)
+  const treatAsChoices = !ordering && !matching && looksLikeChoices(markerItems)
 
   const orderLines = new Set(ordering?.consumed ?? [])
   const stemParagraphs = [head, ...items.flatMap(item =>
@@ -1236,7 +1459,7 @@ function buildQuestion(
   // read for a เฉลย either — and the one number a paper marks there is an
   // option, which `readOrdering` has already taken.
   const isTrueFalse = statements.length > 0
-  const gradedElsewhere = treatAsChoices || useBlanks || isTrueFalse || !!ordering
+  const gradedElsewhere = treatAsChoices || useBlanks || isTrueFalse || !!ordering || !!matching
   const markedStem = gradedElsewhere ? null : readMarkedAnswer(stemParagraphs)
   const stem = gradedElsewhere
     ? {
@@ -1311,7 +1534,7 @@ function buildQuestion(
   // Two or three ก) ข) lines could be ตัวเลือก or sub-questions — unless each
   // one ends in its own เฉลย, which a ตัวเลือก never does.
   const partsAnswered = parts.some(part => part.answers.length > 0)
-  if (!ordering && markerItems.length > 0 && markerItems.length <= 3 && !partsAnswered) {
+  if (!ordering && !matching && markerItems.length > 0 && markerItems.length <= 3 && !partsAnswered) {
     warnings.push({
       code: 'ambiguous-choices',
       message: treatAsChoices
@@ -1335,8 +1558,9 @@ function buildQuestion(
     // อัตนัย and typing the answer is one control on the import screen.
     type: statements.length > 0
       ? 'true_false'
-      : ordering ? 'ordering'
-        : treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
+      : matching ? 'matching'
+        : ordering ? 'ordering'
+          : treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
     title: buildTitle(stemText, number),
     html: stem.html,
     choices,
@@ -1346,6 +1570,7 @@ function buildQuestion(
     statements,
     orderItems: ordering?.items ?? [],
     orderChoices: ordering?.choices ?? [],
+    matching,
     imageRelIds: relIds,
     mentionsPicture: MENTIONS_PICTURE.test(fullText),
     warnings,

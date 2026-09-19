@@ -196,6 +196,34 @@ describe('generated sample worksheets', () => {
     expect(parsed.questions.flatMap(question => question.warnings)).toEqual([])
   })
 
+  it('reads the จับคู่ sample back with its pairs, its spare and its two layouts', async () => {
+    const parsed = await parseSample(PROFILE_BY_TYPE.matching)
+
+    expect(parsed.questions.map(question => question.type)).toEqual(['matching', 'matching'])
+
+    const slots = parsed.questions[0]
+    expect(slots.matching?.answerMode).toBe('slots')
+    // Every pair stated, so the example imports without anything to settle —
+    // which is the claim a downloadable example makes.
+    expect(slots.matching?.keyedCount).toBe(slots.matching?.pairs.length)
+    expect(slots.matching?.pairs.map(pair => [pair.leftText, pair.rightText])).toEqual([
+      ['หน่วยของแรง', 'นิวตัน'],
+      ['หน่วยของงาน', 'จูล'],
+      ['หน่วยของกำลัง', 'วัตต์'],
+      ['หน่วยของกระแสไฟฟ้า', 'แอมแปร์'],
+    ])
+    // The row with no ข้อ beside it is a choice that belongs to nobody.
+    expect(slots.matching?.distractors.map(distractor => distractor.text)).toEqual(['โอห์ม'])
+    // None of the table reaches the wording the student reads.
+    expect(slots.html).not.toContain('นิวตัน')
+
+    // The wording of the second ข้อ asks for lines instead.
+    expect(parsed.questions[1].matching?.answerMode).toBe('lines')
+    expect(parsed.questions[1].matching?.keyedCount).toBe(3)
+
+    expect(parsed.questions.flatMap(question => question.warnings)).toEqual([])
+  })
+
   it('names the file after the type, without characters a filesystem refuses', async () => {
     for (const profile of READY) {
       const name = sampleFileName(profile)

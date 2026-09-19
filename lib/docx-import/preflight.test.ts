@@ -12,7 +12,7 @@ function question(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
       { id: 'c1', text: 'ก', isCorrect: true },
       { id: 'c2', text: 'ข', isCorrect: false },
     ],
-    parts: [], answers: [], blanks: [], statements: [], orderItems: [], orderChoices: [],
+    parts: [], answers: [], blanks: [], statements: [], orderItems: [], orderChoices: [], matching: null,
     imageRelIds: [], mentionsPicture: false, warnings: [],
     ...overrides,
   }
@@ -166,6 +166,50 @@ describe('reading a file against the เรียงลำดับ format', () 
   it('passes the sample file this profile hands out, with nothing to check', async () => {
     const parsed = await parseDocx(new Uint8Array(await packSampleDocx(ordering)), { expect: 'ordering' })
     const report = preflight(parsed, ordering)
+
+    expect(report.readable).toBe(true)
+    expect(report.checks.every(check => check.status === 'pass')).toBe(true)
+    expect(report.needsAttention).toBe(0)
+  })
+})
+
+describe('reading a file against the จับคู่ format', () => {
+  const matching = PROFILE_BY_TYPE.matching
+
+  const pairs = (keyed: number, total: number) => ({
+    answerMode: 'slots' as const,
+    keyedCount: keyed,
+    pairs: Array.from({ length: total }, (_, index) => ({
+      leftText: `ข้อ ${index + 1}`, rightText: `ตอบ ${index + 1}`, keyed: index < keyed,
+    })),
+    distractors: [],
+  })
+
+  it('names the ข้อ whose table it could not find', () => {
+    const report = preflight(result([
+      question({ type: 'matching', choices: [], matching: pairs(3, 3) }),
+      question({ id: 'q-2', number: 2, type: 'matching', choices: [], matching: null }),
+    ]), matching)
+
+    const check = checkFor(report, 'match-table')
+    expect(check?.status).toBe('fail')
+    expect(check?.detail).toContain('ข้อ 2')
+  })
+
+  it('reports a half-filled worksheet as something to finish, not as a mistake', () => {
+    // A worksheet handed to students has most of its blanks empty on purpose.
+    const report = preflight(result([
+      question({ type: 'matching', choices: [], matching: pairs(3, 10) }),
+    ]), matching)
+
+    expect(checkFor(report, 'match-table')?.status).toBe('pass')
+    expect(checkFor(report, 'match-key')?.status).toBe('warn')
+    expect(report.needsAttention).toBe(1)
+  })
+
+  it('passes the sample file this profile hands out, with nothing to check', async () => {
+    const parsed = await parseDocx(new Uint8Array(await packSampleDocx(matching)), { expect: 'matching' })
+    const report = preflight(parsed, matching)
 
     expect(report.readable).toBe(true)
     expect(report.checks.every(check => check.status === 'pass')).toBe(true)

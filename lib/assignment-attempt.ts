@@ -11,7 +11,8 @@ import {
   parseImageLabelAnswer, parseImageLabelKey,
 } from '@/lib/image-label'
 import { scoreChoiceTicks } from '@/lib/choice-ticks'
-import type { Assignment, AnswerPart, Question, Variable, LogicRule } from '@/lib/types'
+import { matchingChoiceCount } from '@/lib/matching-choices'
+import type { Assignment, AnswerPart, MatchingConfig, MatchingPair, Question, Variable, LogicRule } from '@/lib/types'
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -332,8 +333,18 @@ export function buildAttemptQuestion(
   // so the student sees one stable order.
   const shufflesOptions = question.question_type === 'matching'
     || (opts.shuffleOptions && question.question_type === 'mcq')
+  // A จับคู่ shuffles the choices a student picks from, which is its pairs'
+  // right-hand sides *and* the distractors that belong to no pair — one list,
+  // defined once in `matching-choices.ts`, because `option_order` is a
+  // permutation of its positions and every screen has to number it the same.
+  const optionCount = question.question_type === 'matching'
+    ? matchingChoiceCount(
+      (question.mcq_options ?? []) as unknown as MatchingPair[],
+      question.extra_data as MatchingConfig | undefined,
+    )
+    : ((question.mcq_options ?? []) as unknown[]).length
   const optionOrder = shufflesOptions && question.mcq_options
-    ? shuffleArray((question.mcq_options as unknown[]).map((_, i) => i))
+    ? shuffleArray(Array.from({ length: optionCount }, (_, i) => i))
     : null
 
   const base = buildSkeletonBase(question)

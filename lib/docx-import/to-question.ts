@@ -13,13 +13,13 @@
  */
 import { toPortableQuestion, type PortableQuestion } from '@/lib/question-portable'
 import type { QuestionFormData } from '@/lib/actions/questions'
-import type { AnswerPart, FillBlankConfig, FillBlankItem, MCQOption, OrderingConfig, OrderingItem, Question, QuestionType, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
+import type { AnswerPart, FillBlankConfig, FillBlankItem, MatchingConfig, MatchingDistractor, MatchingPair, MCQOption, OrderingConfig, OrderingItem, Question, QuestionType, TrueFalseConfig, TrueFalseStatement } from '@/lib/types'
 import { acceptedAnswers, countBlanks } from '@/lib/fill-blank'
 import { applyOrder } from './draft'
-import type { DraftAnswer, DraftBlank, DraftOrderChoice, DraftQuestion, DraftPart, DraftStatement, DraftWarning } from './draft'
+import type { DraftAnswer, DraftBlank, DraftMatching, DraftOrderChoice, DraftQuestion, DraftPart, DraftStatement, DraftWarning } from './draft'
 
 /** The types a Word worksheet can produce. The rest are authored in the app. */
-export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering'>
+export type ImportableType = Extract<QuestionType, 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering' | 'matching'>
 
 /**
  * What an exam paper says about a เรียงลำดับ ข้อ that the โจทย์ itself must not
@@ -55,6 +55,12 @@ export interface DraftEntry {
    *  said nothing about one. Cleared once the teacher has edited the โจทย์ in
    *  the form: from then on the list is theirs, not the page's. */
   ordering: DraftOrdering | null
+  /** Which of a จับคู่ ข้อ's pairs the file actually stated, one flag per pair
+   *  in the same order. The rest were lined up in printed order to fill the
+   *  shape, and have to be settled by the teacher before the โจทย์ may be
+   *  saved. Per pair rather than a count, because a worksheet's answered ข้อ
+   *  are scattered through the list, not the first few. */
+  matching: { keyed: boolean[] } | null
   question: Question
 }
 
@@ -251,6 +257,42 @@ export function pickOrder(entry: DraftEntry, index: number): DraftEntry {
 }
 
 /**
+ * A จับคู่ โจทย์ in the shape its own form saves.
+ *
+ * The pairs go to `mcq_options` — where this type has always kept them — and
+ * the choices that belong to no pair go to `extra_data.distractors`, which is
+ * where a teacher's own spare ก. ข. ค. would go if they added them by hand.
+ * Pictures in the table's cells become the pair's own images, so a worksheet
+ * that matches a drawing to a word arrives with its drawings attached.
+ */
+function matchingFields(
+  matching: DraftMatching,
+  imageUrls: Map<string, string>,
+): { mcq_options: MatchingPair[]; extra_data: MatchingConfig } {
+  const url = (relId?: string) => (relId ? imageUrls.get(relId) : undefined)
+
+  const pairs: MatchingPair[] = matching.pairs.map(pair => ({
+    left_text: pair.leftText,
+    right_text: pair.rightText,
+    ...(url(pair.leftRelId) ? { left_image: url(pair.leftRelId) } : {}),
+    ...(url(pair.rightRelId) ? { right_image: url(pair.rightRelId) } : {}),
+  }))
+
+  const distractors: MatchingDistractor[] = matching.distractors.map(distractor => ({
+    text: distractor.text,
+    ...(url(distractor.relId) ? { image: url(distractor.relId) } : {}),
+  }))
+
+  return {
+    mcq_options: pairs,
+    extra_data: {
+      answer_mode: matching.answerMode,
+      ...(distractors.length > 0 ? { distractors } : {}),
+    },
+  }
+}
+
+/**
  * Where a เฉลย read from the file lands on the โจทย์.
  *
  * `answer_formula` for the ordinary case of one value, and `answer_parts` as
@@ -280,9 +322,14 @@ function answerFields(draft: DraftQuestion): Pick<Question, 'answer_formula' | '
 }
 
 export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string>): DraftEntry {
-  const image_urls = draft.imageRelIds
-    .map(relId => imageUrls.get(relId))
-    .filter((url): url is string => !!url)
+  // A จับคู่'s pictures live inside the table cells and become the pairs' own
+  // images; repeating them under the คำชี้แจง would print the answer key's
+  // left-hand column above the exercise.
+  const image_urls = draft.type === 'matching'
+    ? []
+    : draft.imageRelIds
+      .map(relId => imageUrls.get(relId))
+      .filter((url): url is string => !!url)
 
   const mcq_options: MCQOption[] = draft.choices.map(choice => ({
     text: choice.text,
@@ -291,6 +338,9 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
 
   const trueFalse = draft.type === 'true_false' ? trueFalseFields(draft) : null
   const ordering = draft.type === 'ordering' ? orderingOf(draft) : null
+  const matching = draft.type === 'matching' && draft.matching
+    ? matchingFields(draft.matching, imageUrls)
+    : null
 
   const question: Question = {
     ...blankQuestion(),
@@ -302,12 +352,18 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
       : draft.type === 'written'
         ? draft.html
         : withPartsInBody(draft.html, draft.parts),
-    mcq_options: draft.type === 'mcq' ? mcq_options : null,
+    // A จับคู่ keeps its pairs here, which is where this type has always kept
+    // them — `resolveMcqOptions` in lib/actions/questions.ts writes them to the
+    // same column when the form saves one.
+    mcq_options: draft.type === 'mcq' ? mcq_options
+      : matching ? (matching.mcq_options as unknown as MCQOption[])
+        : null,
     ...answerFields(draft),
     extra_data: trueFalse
       ? trueFalse.extra_data
-      : ordering ? { items: orderedItems(ordering) }
-        : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
+      : matching ? matching.extra_data
+        : ordering ? { items: orderedItems(ordering) }
+          : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
     image_urls,
   }
 
@@ -320,6 +376,7 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
     warnings: draft.warnings,
     parkedOptions: draft.type === 'mcq' ? [] : mcq_options,
     ordering,
+    matching: draft.matching ? { keyed: draft.matching.pairs.map(pair => pair.keyed) } : null,
     question,
   }
 }
@@ -345,7 +402,7 @@ export function changeType(entry: DraftEntry, type: ImportableType): DraftEntry 
       mcq_options: type === 'mcq' ? (options.length > 0 ? options : null) : null,
       // Only อัตนัย grades against formulas; carrying them onto a type that
       // ignores them would leave an answer nothing reads.
-      extra_data: type === 'fill_blank' || type === 'true_false' || type === 'ordering'
+      extra_data: type === 'fill_blank' || type === 'true_false' || type === 'ordering' || type === 'matching'
         ? entry.question.extra_data
         : {},
       answer_parts: type === 'written' ? entry.question.answer_parts : null,
@@ -366,6 +423,9 @@ export function applyFormPayload(entry: DraftEntry, payload: QuestionFormData): 
     // paper's options on the card would offer to undo that edit in one click,
     // and they are only a way of finding the order in the first place.
     ordering: null,
+    // Same for a จับคู่: the pairs on screen are the ones the teacher just
+    // confirmed, so what the file did or did not state about them is spent.
+    matching: null,
     question: {
       ...entry.question,
       title: payload.title,
@@ -401,7 +461,7 @@ export function applyFormPayload(entry: DraftEntry, payload: QuestionFormData): 
  * failure text. Both mark every student wrong, silently.
  */
 export function validateForImport(entry: DraftEntry): string | null {
-  const { question, ordering } = entry
+  const { question, ordering, matching } = entry
   const bodyText = question.question_text.replace(/<[^>]*>/g, '').trim()
 
   if (!question.title.trim()) return 'ยังไม่มีชื่อโจทย์'
@@ -420,6 +480,22 @@ export function validateForImport(entry: DraftEntry): string | null {
   if (question.question_type === 'true_false') {
     const bodyText = question.question_text.replace(/<[^>]*>/g, '').trim()
     if (!bodyText) return 'ถูก-ผิดต้องมีข้อความอย่างน้อย 1 ข้อ'
+    return null
+  }
+
+  if (question.question_type === 'matching') {
+    const pairs = (question.mcq_options ?? []) as unknown as MatchingPair[]
+    if (pairs.length < 2) return 'จับคู่ต้องมีอย่างน้อย 2 คู่'
+    if (pairs.some(pair => (!pair.left_text.trim() && !pair.left_image) || (!pair.right_text.trim() && !pair.right_image))) {
+      return 'มีคู่ที่ยังว่างอยู่ด้านใดด้านหนึ่ง'
+    }
+    // The rows of a worksheet's table are not its answer key — the two columns
+    // are deliberately out of step — so pairs the file never stated are
+    // placeholders. Importing them would record an answer nobody wrote and
+    // mark the class wrong on it.
+    if (matching?.keyed.some(keyed => !keyed)) {
+      return 'ยังจับคู่ไม่ครบ — กด "แก้ไข" เพื่อจับคู่ให้ถูกก่อนนำเข้า'
+    }
     return null
   }
 
@@ -474,8 +550,21 @@ export function validateForImport(entry: DraftEntry): string | null {
  * what the *file* said, which no edit here changes.
  */
 export function liveWarnings(entry: DraftEntry, floatingImageUrls: ReadonlySet<string>): DraftWarning[] {
-  const { mentionsPicture, ordering, question } = entry
+  const { matching, mentionsPicture, ordering, question } = entry
   const warnings: DraftWarning[] = []
+
+  if (question.question_type === 'matching' && matching?.keyed.some(keyed => !keyed)) {
+    // Said out loud because the โจทย์ *looks* finished: every ข้อ has something
+    // beside it. What it has is the next unclaimed choice.
+    const keyedCount = matching.keyed.filter(Boolean).length
+    const missing = matching.keyed.length - keyedCount
+    warnings.push({
+      code: 'unpaired-matching',
+      message: keyedCount === 0
+        ? `ไฟล์ไม่ได้บอกว่าข้อไหนคู่กับอะไร — ${missing} คู่ที่เห็นคือการจับเรียงตามลำดับในไฟล์ ยังไม่ใช่เฉลย`
+        : `อ่านเฉลยได้ ${keyedCount} จาก ${matching.keyed.length} คู่ — อีก ${missing} คู่จับไว้ตามลำดับที่เหลือ ยังไม่ใช่เฉลย`,
+    })
+  }
 
   if (question.question_type === 'ordering' && ordering && ordering.choices.length > 0) {
     const marked = ordering.choices.filter(choice => choice.isCorrect).length

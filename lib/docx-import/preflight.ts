@@ -144,6 +144,41 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
     }
   }))
 
+  add(checkFor(profile, 'match-table', () => {
+    if (questions.length === 0) return null
+    const without = questions.filter(question => (question.matching?.pairs.length ?? 0) < 2)
+    const total = questions.reduce((sum, question) => sum + (question.matching?.pairs.length ?? 0), 0)
+
+    if (without.length === 0) {
+      return { ruleId: 'match-table', status: 'pass', detail: `พบคู่จับคู่รวม ${total} คู่ จาก ${questions.length} ข้อ` }
+    }
+    return {
+      ruleId: 'match-table',
+      status: 'fail',
+      detail: `ข้อ ${without.map(question => question.number).join(', ')} ไม่พบตาราง 2 คอลัมน์ — ตรวจว่าใช้ตารางของ Word ไม่ใช่การกด Tab ให้ตรงคอลัมน์`,
+    }
+  }))
+
+  // Not a formatting mistake — a worksheet handed to students has most of its
+  // blanks empty on purpose. It is reported so the teacher knows how much of
+  // the pairing is still theirs to do, not to tell them off.
+  add(checkFor(profile, 'match-key', () => {
+    const withPairs = questions.filter(question => (question.matching?.pairs.length ?? 0) > 0)
+    if (withPairs.length === 0) return null
+    const short = withPairs.filter(question =>
+      question.matching!.keyedCount < question.matching!.pairs.length)
+
+    if (short.length === 0) {
+      const total = withPairs.reduce((sum, question) => sum + question.matching!.keyedCount, 0)
+      return { ruleId: 'match-key', status: 'pass', detail: `อ่านเฉลยได้ครบทั้ง ${total} คู่` }
+    }
+    return {
+      ruleId: 'match-key',
+      status: 'warn',
+      detail: `ข้อ ${short.map(question => question.number).join(', ')} ยังจับคู่ไม่ครบ — นำเข้าได้หลังจับคู่บนการ์ดหรือในฟอร์มแล้ว`,
+    }
+  }))
+
   add(checkFor(profile, 'order-items', () => {
     if (questions.length === 0) return null
     const without = questions.filter(question => question.orderItems.length < 2)
@@ -228,6 +263,7 @@ export function preflight(result: DraftResult, profile: ImportProfile): Prefligh
   const needsAttention = questions.filter(question =>
     (isMcq(question) && !hasKey(question))
     || (question.orderChoices.length > 0 && !question.orderChoices.some(choice => choice.isCorrect))
+    || (question.matching ? question.matching.keyedCount < question.matching.pairs.length : false)
     || question.warnings.length > 0).length
 
   return {
