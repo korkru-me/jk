@@ -12,7 +12,8 @@ function question(overrides: Partial<DraftQuestion> = {}): DraftQuestion {
       { id: 'c1', text: 'ก', isCorrect: true },
       { id: 'c2', text: 'ข', isCorrect: false },
     ],
-    parts: [], answers: [], blanks: [], statements: [], imageRelIds: [], mentionsPicture: false, warnings: [],
+    parts: [], answers: [], blanks: [], statements: [], orderItems: [], orderChoices: [],
+    imageRelIds: [], mentionsPicture: false, warnings: [],
     ...overrides,
   }
 }
@@ -121,5 +122,53 @@ describe('reading a file against the format the teacher chose', () => {
       expect(report.checks.filter(check => check.status !== 'pass'), profile.slug).toEqual([])
       expect(report.needsAttention, profile.slug).toBe(0)
     }
+  })
+})
+
+describe('reading a file against the เรียงลำดับ format', () => {
+  const ordering = PROFILE_BY_TYPE.ordering
+
+  const item = (overrides: Partial<DraftQuestion> = {}) => question({
+    type: 'ordering', choices: [], orderItems: ['ก', 'ข', 'ค'], ...overrides,
+  })
+
+  it('names the ข้อ that came back with nothing to arrange', () => {
+    const report = preflight(result([
+      item(),
+      item({ id: 'q-2', number: 2, orderItems: [] }),
+    ]), ordering)
+
+    const check = checkFor(report, 'order-items')
+    expect(check?.status).toBe('fail')
+    expect(check?.detail).toContain('ข้อ 2')
+  })
+
+  it('treats a worksheet with no orders offered as already answered', () => {
+    const report = preflight(result([item(), item({ id: 'q-2', number: 2 })]), ordering)
+
+    expect(checkFor(report, 'order-items')?.status).toBe('pass')
+    expect(checkFor(report, 'order-key')?.status).toBe('pass')
+    expect(report.needsAttention).toBe(0)
+  })
+
+  it('asks for the order on the ข้อ whose paper offered one and marked none', () => {
+    const report = preflight(result([
+      item({ orderChoices: [{ order: [2, 1, 3], isCorrect: true }] }),
+      item({ id: 'q-2', number: 2, orderChoices: [{ order: [3, 2, 1], isCorrect: false }] }),
+    ]), ordering)
+
+    const check = checkFor(report, 'order-key')
+    expect(check?.status).toBe('warn')
+    expect(check?.detail).toContain('ข้อ 2')
+    expect(report.needsAttention).toBe(1)
+  })
+
+  it('passes the sample file this profile hands out, with nothing to check', async () => {
+    const parsed = await parseDocx(new Uint8Array(await packSampleDocx(ordering)), { expect: 'ordering' })
+    const report = preflight(parsed, ordering)
+
+    expect(report.readable).toBe(true)
+    expect(report.checks.every(check => check.status === 'pass')).toBe(true)
+    expect(report.needsAttention).toBe(0)
   })
 })

@@ -52,8 +52,10 @@ export interface SampleSpan {
 }
 
 export interface SampleLine {
-  /** `question` is a numbered item; `part` is one level deeper. */
-  kind: 'heading' | 'question' | 'choice' | 'part'
+  /** `question` is a numbered item; `part` is one level deeper. `item` is one
+   *  line of a เรียงลำดับ list, which is numbered like a `choice` and is not
+   *  one — the difference is the whole reading of that type. */
+  kind: 'heading' | 'question' | 'choice' | 'part' | 'item'
   spans: SampleSpan[]
 }
 
@@ -301,21 +303,47 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     type: 'ordering',
     label: 'เรียงลำดับ',
     noun: 'โจทย์เรียงลำดับ',
-    blurb: 'ขั้นตอนหรือเหตุการณ์ที่ต้องเรียงให้ถูกลำดับ',
-    status: 'planned',
+    blurb: 'ขั้นตอนหรือเหตุการณ์ที่ต้องเรียงให้ถูกลำดับ — อ่านได้ทั้งข้อสอบที่มีตัวเลือก 2-1-4-3 และใบงานที่พิมพ์เรียงถูกไว้แล้ว',
+    status: 'ready',
     rules: [
       NUMBERING,
-      { id: 'correct-order', text: 'พิมพ์รายการโดยเรียงถูกลำดับไว้แล้วในไฟล์ ระบบจะสลับให้นักเรียนเอง' },
-      { id: 'items', text: 'แต่ละรายการอยู่คนละบรรทัด ใช้รายการย่อยของ Word' },
+      {
+        id: 'order-items',
+        text: 'พิมพ์รายการที่ต้องเรียงบรรทัดละรายการ ขึ้นต้นด้วย 1. 2. 3. 4. หรือใช้รายการย่อยของ Word ก็ได้',
+      },
+      {
+        id: 'order-options',
+        text: 'ข้อสอบกระดาษที่มีตัวเลือกลำดับท้ายข้อ เช่น "2-1-4-3" ใส่มาได้เลย ระบบใช้หาว่าลำดับไหนถูก แล้วตัดตัวเลือกทิ้ง เพราะบนเว็บนักเรียนลากเรียงเอง ไม่ต้องเลือกข้อ',
+      },
+      ANSWER_MARK,
+      {
+        id: 'order-key',
+        text: 'ทำเครื่องหมายที่ตัวเลือกลำดับที่ถูก · ถ้าเป็นใบงานที่พิมพ์รายการเรียงถูกไว้อยู่แล้วและไม่มีตัวเลือก ไม่ต้องทำเครื่องหมาย ระบบถือว่าลำดับที่พิมพ์คือลำดับที่ถูก',
+      },
     ],
     sample: [
+      line('heading', t('ตอนที่ 1 การเรียงประโยค')),
+      line('question', t('การเรียงประโยคในข้อใดถูกต้อง')),
+      line('item', t('เป็นการแสดงออกให้เห็นถึงภูมิปัญญา')),
+      line('item', t('การที่มนุษย์รู้จักคิดและทอผ้าขึ้นมาได้นั้น')),
+      line('item', t('ตลอดจนการสร้างสรรค์ลวดลายบนผืนผ้า')),
+      line('item', t('ในการเลือกสรรวัสดุ วิธีการที่เหมาะสม กระบวนการและลำดับขั้นตอนในการทอผ้า')),
+      line('choice', key('2-1-4-3')),
+      line('choice', t('2-1-3-4')),
+      line('choice', t('4-1-2-3')),
+      line('choice', t('4-2-3-1')),
       line('question', t('จงเรียงขั้นตอนของกระบวนการทางวิทยาศาสตร์ให้ถูกต้อง')),
-      line('part', t('ตั้งปัญหา')),
-      line('part', t('ตั้งสมมติฐาน')),
-      line('part', t('ออกแบบและทำการทดลอง')),
-      line('part', t('สรุปผลการทดลอง')),
+      line('item', t('ตั้งปัญหา')),
+      line('item', t('ตั้งสมมติฐาน')),
+      line('item', t('ออกแบบและทำการทดลอง')),
+      line('item', t('สรุปผลการทดลอง')),
     ],
-    limits: [],
+    limits: [
+      'ข้อสอบที่แจกนักเรียนมักไม่ได้ทำเฉลยไว้ ข้อแบบนั้นเข้ามาโดยเรียงตามที่พิมพ์ในไฟล์ (ซึ่งเป็นลำดับที่สลับไว้) และจะยังนำเข้าไม่ได้จนกว่าจะเลือกลำดับที่ถูกบนการ์ด',
+      'รูปที่อยู่ในบรรทัดของรายการ เข้ามาเป็นรูปของทั้งข้อ ถ้าอยากให้อยู่กับรายการใดรายการหนึ่ง ต้องใส่เองในฟอร์ม',
+      'ฟอร์มเรียงลำดับรับได้สูงสุด 8 รายการต่อข้อ ข้อที่มีมากกว่านั้นนำเข้าได้ แต่จะเพิ่มรายการใหม่ในฟอร์มไม่ได้',
+      EMF_LIMIT,
+    ],
     createHref: '/questions/new/ordering',
   },
 
@@ -512,17 +540,27 @@ export function numberSampleLines(sample: SampleLine[]): NumberedSampleLine[] {
   let question = 0
   let choice = 0
   let part = 0
+  let item = 0
 
   return sample.map(line => {
     if (line.kind === 'question') {
       question += 1
       choice = 0
       part = 0
+      item = 0
       return { line, marker: `${question}.` }
     }
     if (line.kind === 'choice') {
       choice += 1
       return { line, marker: `${choice})` }
+    }
+    // The lines of a เรียงลำดับ list count on their own, because the orders
+    // offered underneath them are numbered 1) 2) 3) 4) as well — which is
+    // exactly the ambiguity a teacher's eye resolves and a parser must not
+    // guess at.
+    if (line.kind === 'item') {
+      item += 1
+      return { line, marker: `${item}.` }
     }
     if (line.kind === 'part') {
       part += 1

@@ -67,11 +67,14 @@ function paragraphFor(line: SampleLine, marker: string): Paragraph {
     })
   }
 
-  // A choice's "1)" is typed, not drawn by Word: the parser reads it out of the
-  // text, and a worksheet written any other way is one it cannot tell from a
-  // sub-question.
+  // A choice's "1)" — and a เรียงลำดับ item's "1." — is typed, not drawn by
+  // Word: the parser reads it out of the text, and a worksheet written any
+  // other way is one it cannot tell from a sub-question.
   return new Paragraph({
     indent: { left: 720 },
+    // The orders a เรียงลำดับ ข้อ offers sit under its list with a line's air
+    // between, the way the printed paper sets them.
+    ...(line.kind === 'choice' ? { spacing: { before: 60 } } : {}),
     children: [
       new TextRun({ text: `${marker} `, font: DOC_FONT, size: BODY_SIZE }),
       ...runsOf(line.spans),
