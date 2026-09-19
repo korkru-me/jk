@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   applyProctorEventChanges,
   applyProctorSessionChanges,
+  mergeFailedProctorSignals,
   proctorDashboardConnectionMode,
   proctorSignalRetryDelay,
+  shouldFlushQueuedProctorSignals,
   type ProctorEventRow,
   type ProctorSessionRow,
 } from './exam-proctor-realtime'
@@ -106,5 +108,16 @@ describe('exam proctor realtime reconciliation', () => {
       30_000,
       1_000,
     ])
+  })
+
+  it('requeues a failed batch before newer signals and keeps the newest cap', () => {
+    expect(mergeFailedProctorSignals([1, 2], [3, 4], 3)).toEqual([2, 3, 4])
+  })
+
+  it('promptly flushes signals that arrived during a successful request', () => {
+    expect(shouldFlushQueuedProctorSignals(1, true, false)).toBe(true)
+    expect(shouldFlushQueuedProctorSignals(0, true, false)).toBe(false)
+    expect(shouldFlushQueuedProctorSignals(1, false, false)).toBe(false)
+    expect(shouldFlushQueuedProctorSignals(1, true, true)).toBe(false)
   })
 })

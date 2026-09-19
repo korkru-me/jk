@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { examSecondsLeft } from '@/lib/exam-timer'
 
 /**
  * Counts down the time left in a timed attempt and fires `onExpire` once when
@@ -26,14 +27,11 @@ export function useExamTimer(
 
   useEffect(() => {
     if (!durationMinutes) return
-    const totalSeconds = durationMinutes * 60
-    const startMs = new Date(startedAt).getTime()
     let interval: ReturnType<typeof setInterval> | undefined
     let expired = false
 
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - startMs) / 1000)
-      const remaining = Math.max(0, totalSeconds - elapsed)
+      const remaining = examSecondsLeft(durationMinutes, startedAt)
       setSecondsLeft(remaining)
       if (remaining === 0 && !expired) {
         expired = true

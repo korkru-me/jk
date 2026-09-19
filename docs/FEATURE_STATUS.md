@@ -21,6 +21,8 @@ Authenticated exam QA มี staging isolation guard แล้ว: `npm run chec
 
 SEB platform evidence มี manifest แบบไม่เก็บ secret และ `npm run check:seb-platforms` แล้ว ตัวตรวจจะไม่ให้สถานะพร้อม production จน Windows/macOS/iPadOS/iOS ครบ native core + production-BEK verification + staging mock exam + physical UAT ของ config/build เดียวกัน ปัจจุบัน native core ผ่าน แต่ release gate อื่นยัง pending/unverified จึงจงใจรายงาน NOT READY
 
+Recovery/proctor QA เฟส 7 ผ่านในขอบเขต agent-only แล้ว: stale answer backup จาก attempt เก่าไม่ถูก replay, timer ยึดเวลาเริ่มจริงหลัง reload/throttle/clone, คิว proctor ไม่ปล่อย signal ที่เกิดระหว่าง request ค้างรอ heartbeat และ logic ของ retry/Realtime fallback/review alert มี unit test รองรับ การตัด Wi‑Fi, upload, resume, หลายบัญชีและหน้าคุมสอบจริงยังรอ staging แยกหลังเฟส 8 จึงยังไม่ใช่ production release gate
+
 ## MVP core
 
 ### Authentication — บางส่วน

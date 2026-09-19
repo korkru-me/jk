@@ -63,3 +63,31 @@ export function serializeAnswerBackup(entries: Iterable<readonly [string, Pendin
   }
   return JSON.stringify(backup)
 }
+
+/**
+ * Keep only recovery entries that still belong to the current attempt and
+ * differ from the server snapshot. A backup can outlive a route refresh or a
+ * discarded attempt; blindly replaying unknown answer ids would leave the UI
+ * stuck in "waiting to sync" even though those rows can never be saved.
+ */
+export function selectRestorableAnswerBackup(
+  entries: Record<string, PendingAnswerPayload>,
+  currentAnswers: Record<string, string>,
+  currentMathInputModes: Record<string, MathInputModes>,
+): Record<string, PendingAnswerPayload> {
+  const restorable: Record<string, PendingAnswerPayload> = {}
+  for (const [answerId, payload] of Object.entries(entries)) {
+    if (!Object.prototype.hasOwnProperty.call(currentAnswers, answerId)) continue
+    const current: PendingAnswerPayload = {
+      value: currentAnswers[answerId] ?? '',
+      mathInputModes: currentMathInputModes[answerId] ?? {},
+    }
+    if (!sameAnswerPayload(current, payload)) {
+      restorable[answerId] = {
+        value: payload.value,
+        mathInputModes: copyMathInputModes(payload.mathInputModes),
+      }
+    }
+  }
+  return restorable
+}

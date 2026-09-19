@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { recordProctorSignal } from '@/lib/actions/exam-proctor'
 import type { ProctorEvent, ProctorEventType } from '@/lib/exam-proctor'
-import { proctorSignalRetryDelay } from '@/lib/exam-proctor-realtime'
+import {
+  mergeFailedProctorSignals,
+  proctorSignalRetryDelay,
+  shouldFlushQueuedProctorSignals,
+} from '@/lib/exam-proctor-realtime'
 
 type ProctorConnectionStatus = 'disabled' | 'connecting' | 'connected' | 'offline'
 
@@ -115,7 +119,7 @@ export function useExamProctor({ enabled, submissionId, blockClipboard }: UseExa
         })
         if (!active) return
         if (result.error) {
-          if (!connectionClosed) queueRef.current = [...batch, ...queueRef.current].slice(-60)
+          if (!connectionClosed) queueRef.current = mergeFailedProctorSignals(batch, queueRef.current)
           consecutiveFailures += 1
           if (!connectionClosed) scheduleRetry()
           setStatus(navigator.onLine ? 'connecting' : 'offline')
@@ -127,12 +131,17 @@ export function useExamProctor({ enabled, submissionId, blockClipboard }: UseExa
           setActiveConnectionCount(result.activeConnectionCount ?? 0)
         }
       } catch {
-        if (!connectionClosed) queueRef.current = [...batch, ...queueRef.current].slice(-60)
+        if (!connectionClosed) queueRef.current = mergeFailedProctorSignals(batch, queueRef.current)
         consecutiveFailures += 1
         if (!connectionClosed) scheduleRetry()
         if (active) setStatus(navigator.onLine ? 'connecting' : 'offline')
       } finally {
         flushingRef.current = false
+        if (shouldFlushQueuedProctorSignals(
+          queueRef.current.length,
+          navigator.onLine,
+          retryTimer !== null,
+        )) scheduleFlush()
       }
     }
 

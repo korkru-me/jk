@@ -8,6 +8,7 @@ import {
   copyMathInputModes,
   parseAnswerBackup,
   sameAnswerPayload,
+  selectRestorableAnswerBackup,
   serializeAnswerBackup,
   type PendingAnswerPayload,
 } from '@/lib/math/answer-backup'
@@ -220,13 +221,12 @@ export function useAnswerAutosave({
       const saved = localStorage.getItem(LS_KEY(submissionId))
       if (!saved) return
       const entries = parseAnswerBackup(saved)
-      const restoredIds = Object.keys(entries).filter((answerId) => {
-        const serverPayload: PendingAnswerPayload = {
-          value: localAnswersRef.current[answerId] ?? '',
-          mathInputModes: localMathInputModesRef.current[answerId] ?? {},
-        }
-        return !sameAnswerPayload(serverPayload, entries[answerId])
-      })
+      const restorable = selectRestorableAnswerBackup(
+        entries,
+        localAnswersRef.current,
+        localMathInputModesRef.current,
+      )
+      const restoredIds = Object.keys(restorable)
       if (restoredIds.length === 0) {
         backupRef.current.clear()
         persistPendingBackup()
@@ -236,7 +236,7 @@ export function useAnswerAutosave({
       const nextAnswers = { ...localAnswersRef.current }
       const nextModes = { ...localMathInputModesRef.current }
       for (const answerId of restoredIds) {
-        const payload = entries[answerId]
+        const payload = restorable[answerId]
         nextAnswers[answerId] = payload.value
         nextModes[answerId] = copyMathInputModes(payload.mathInputModes)
         backupRef.current.set(answerId, payload)

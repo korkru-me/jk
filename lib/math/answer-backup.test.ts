@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { parseAnswerBackup, sameAnswerPayload, serializeAnswerBackup } from './answer-backup'
+import {
+  parseAnswerBackup,
+  sameAnswerPayload,
+  selectRestorableAnswerBackup,
+  serializeAnswerBackup,
+} from './answer-backup'
 
 describe('answer autosave backup', () => {
   it('round-trips answer text and DEG/RAD metadata together', () => {
@@ -29,5 +34,23 @@ describe('answer autosave backup', () => {
     const value = { value: 'sin(30)', mathInputModes: { main: 'deg' as const } }
     expect(sameAnswerPayload(value, value)).toBe(true)
     expect(sameAnswerPayload(value, { ...value, mathInputModes: { main: 'rad' } })).toBe(false)
+  })
+
+  it('restores only changed rows that still belong to the current attempt', () => {
+    const restored = selectRestorableAnswerBackup({
+      current: { value: '42', mathInputModes: { main: 'rad' } },
+      unchanged: { value: '7', mathInputModes: {} },
+      stale: { value: 'answer from an older attempt', mathInputModes: {} },
+    }, {
+      current: '',
+      unchanged: '7',
+    }, {
+      current: { main: 'deg' },
+      unchanged: {},
+    })
+
+    expect(restored).toEqual({
+      current: { value: '42', mathInputModes: { main: 'rad' } },
+    })
   })
 })

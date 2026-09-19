@@ -108,3 +108,25 @@ export function proctorSignalRetryDelay(consecutiveFailures: number): number {
   ))
   return PROCTOR_SIGNAL_RETRY_DELAYS_MS[index]
 }
+
+/** Requeue a failed batch ahead of newer signals while retaining the newest cap. */
+export function mergeFailedProctorSignals<T>(
+  failedBatch: T[],
+  queuedSignals: T[],
+  limit = 60,
+): T[] {
+  return [...failedBatch, ...queuedSignals].slice(-Math.max(0, limit))
+}
+
+/**
+ * A signal can arrive while another batch is in flight. When that first batch
+ * succeeds there is no retry timer, so flush the new queue promptly instead
+ * of waiting up to one heartbeat interval.
+ */
+export function shouldFlushQueuedProctorSignals(
+  queueLength: number,
+  online: boolean,
+  retryScheduled: boolean,
+): boolean {
+  return queueLength > 0 && online && !retryScheduled
+}

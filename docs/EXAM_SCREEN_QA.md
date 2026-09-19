@@ -119,9 +119,11 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ### เฟส 7 — การกู้คืนและห้องคุมสอบ
 
-สถานะ: รอ
+สถานะ: **ผ่านในขอบเขต agent-only · staging recovery/proctor drill รอหลังเฟส 8**
 
-ใช้ attempt จำลองแยกกันทดสอบ Wi‑Fi หลุด/กลับมา, pending sync, reload/resume, ไฟล์ล้มเหลว, งานบังคับรูป, timer clone, teacher presence และข้อความเตือน ครูตรวจเครื่องจริงได้ตามบริบทสอบในห้อง ห้ามจงใจทำให้เครื่องค้างหรือบังคับปิด
+เสริม recovery ไม่ให้ backup ของ attempt เก่าหรือ answer id ที่ไม่อยู่ในข้อสอบปัจจุบันถูกส่งค้าง, แยกการคำนวณ timer จากเวลาเริ่มจริงเพื่อทดสอบ reload/throttle/clone/invalid time และแก้คิว proctor ให้ส่ง signal ที่เกิดระหว่าง request ต่อทันทีแทนการรอ heartbeat พร้อม unit tests ครอบคลุม retry, Realtime reconciliation, polling fallback, review queue และ alert deduplication รายละเอียดอยู่ใน `docs/EXAM_RECOVERY_QA.md`
+
+ผลนี้ไม่แทน Wi‑Fi/Supabase/Realtime/upload/หลายบัญชีจริง เพราะยังไม่มี staging แยก การซ้อม attempt จำลอง, reload/resume, ไฟล์ล้มเหลว, timer, teacher presence และข้อความเตือนจึงรอทำรวมหลังเฟส 8 โดยห้ามจงใจทำให้เครื่องค้างหรือบังคับปิด
 
 ### เฟส 8 — regression และปิดหลักฐาน
 
