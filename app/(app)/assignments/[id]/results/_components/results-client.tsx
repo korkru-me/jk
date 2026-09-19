@@ -121,7 +121,7 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
     return gradable > 0 ? `ตอบ ${answered}/${gradable} ช่อง` : '—'
   }
 
-  // ติดป้ายบนรูป: the words themselves would be a long line in a narrow table
+  // เติมคำในรูป: the words themselves would be a long line in a narrow table
   // cell, so the column counts instead — the teacher opens the submission to
   // see which point.
   if (correctAnswer.startsWith(IMAGE_LABEL_PREFIX)) {

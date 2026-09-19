@@ -224,6 +224,32 @@ describe('generated sample worksheets', () => {
     expect(parsed.questions.flatMap(question => question.warnings)).toEqual([])
   })
 
+  it('reads the เติมคำในรูป sample back as a picture with its ช่อง on it', async () => {
+    const profile = PROFILE_BY_TYPE.image_label
+    const parsed = await parseSample(profile)
+
+    expect(parsed.questions.map(question => question.type)).toEqual(['image_label'])
+    const question = parsed.questions[0]
+
+    // The picture is in the file and belongs to this ข้อ, which is what makes
+    // the boxes standing on it mean anything.
+    expect(question.imageLabel?.relId).toBeTruthy()
+    expect(parsed.media.get(question.imageLabel!.relId)?.contentType).toBe('image/png')
+
+    // One ช่อง per box the example draws, in the order it lists them, each
+    // carrying the เฉลย written in it.
+    const boxes = profile.sample.find(line => line.kind === 'picture')?.boxes ?? []
+    expect(question.imageLabel?.blanks.map(blank => blank.answer)).toEqual(boxes.map(box => box.text))
+
+    // Across the picture is the half a Word file does state, and the example
+    // is laid out so each box sits over the thing it names.
+    expect(question.imageLabel?.blanks.map(blank => Math.round(blank.x ?? -1))).toEqual([50, 10, 90, 44])
+
+    // Said on every ข้อ of this type: the file never states where a point
+    // lands, so the teacher places them. Nothing else is wrong with the file.
+    expect(question.warnings.map(warning => warning.code)).toEqual(['unplaced-points'])
+  })
+
   it('names the file after the type, without characters a filesystem refuses', async () => {
     for (const profile of READY) {
       const name = sampleFileName(profile)

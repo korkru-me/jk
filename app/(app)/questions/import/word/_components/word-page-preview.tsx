@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card'
-import { numberSampleLines, type ImportProfile, type SampleSpan } from '@/lib/docx-import/profiles'
+import { numberSampleLines, type ImportProfile, type SampleBox, type SampleSpan } from '@/lib/docx-import/profiles'
 
 /** The เฉลย a teacher marks shows as the red it is written in. */
 function Spans({ spans }: { spans: SampleSpan[] }) {
@@ -11,6 +11,32 @@ function Spans({ spans }: { spans: SampleSpan[] }) {
         </span>
       ))}
     </>
+  )
+}
+
+/**
+ * A เติมคำในรูป ข้อ: the diagram, with its answer boxes standing on it.
+ *
+ * Drawn from the same box positions the generated .docx is built from, so the
+ * page a teacher is shown and the file they download put the boxes in the same
+ * places. The drawing is the app's own example circuit, which is the same one
+ * the file carries.
+ */
+function PictureSample({ boxes }: { boxes: SampleBox[] }) {
+  return (
+    <div className="relative mx-auto my-2 w-full max-w-md">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/samples/simple-circuit.svg" alt="ตัวอย่างรูปวงจรไฟฟ้า" className="block w-full" />
+      {boxes.map((box, at) => (
+        <span
+          key={at}
+          style={{ left: `${box.x}%`, top: `${box.y}%` }}
+          className="absolute rounded-xs border border-border bg-card px-1.5 py-0.5 text-[11px] font-semibold text-destructive shadow-xs"
+        >
+          {box.text}
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -28,7 +54,8 @@ function Spans({ spans }: { spans: SampleSpan[] }) {
  */
 export function WordPagePreview({ profile }: { profile: ImportProfile }) {
   const lines = numberSampleLines(profile.sample)
-  const hasAnswer = profile.sample.some(line => line.spans.some(span => span.answer))
+  const hasAnswer = profile.sample.some(line =>
+    [...line.spans, ...(line.right ?? []), ...(line.boxes ?? [])].some(span => span.answer))
 
   return (
     <div className="space-y-2">
@@ -58,6 +85,10 @@ export function WordPagePreview({ profile }: { profile: ImportProfile }) {
                 </p>
               </div>
             )
+          }
+
+          if (line.kind === 'picture') {
+            return <PictureSample key={index} boxes={line.boxes ?? []} />
           }
 
           if (line.kind === 'heading') {

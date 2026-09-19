@@ -965,7 +965,7 @@ describe('ตารางจำแนก, from attempt to grade', () => {
   })
 })
 
-describe('ติดป้ายบนรูป, from attempt to grade', () => {
+describe('เติมคำในรูป, from attempt to grade', () => {
   const config = {
     image_url: '/samples/simple-circuit.svg',
     answer_mode: 'drag',

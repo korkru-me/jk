@@ -28,9 +28,9 @@ export const EXAM_SCREEN_QA_CASES = [
   { slug: 'ordering', source: 'ordering', label: 'เรียงลำดับ' },
   { slug: 'composite', source: 'composite', label: 'โจทย์หลายรูปแบบในข้อเดียว' },
   { slug: 'classify', source: 'classify', label: 'ตารางจำแนกหลายมิติ' },
-  { slug: 'image-label-drag', source: 'image_label', label: 'ติดป้ายบนรูป — ลากคำจากคลัง' },
-  { slug: 'image-label-typed', source: 'image_label', label: 'ติดป้ายบนรูป — พิมพ์เอง' },
-  { slug: 'image-label-dropdown', source: 'image_label', label: 'ติดป้ายบนรูป — ดรอปดาวน์' },
+  { slug: 'image-label-drag', source: 'image_label', label: 'เติมคำในรูป — ลากคำจากคลัง' },
+  { slug: 'image-label-typed', source: 'image_label', label: 'เติมคำในรูป — พิมพ์เอง' },
+  { slug: 'image-label-dropdown', source: 'image_label', label: 'เติมคำในรูป — ดรอปดาวน์' },
   { slug: 'essay', source: 'essay', label: 'คำตอบยาวภาษาไทย' },
   { slug: 'file-upload', source: 'file_upload', label: 'แนบรูปหรือ PDF' },
 ] as const satisfies ReadonlyArray<{

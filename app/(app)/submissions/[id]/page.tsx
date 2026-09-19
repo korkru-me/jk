@@ -923,7 +923,7 @@ function AnswerReview({
     )
   }
 
-  // ─── ติดป้ายบนรูป — one line per keyed point, named after the point ──────
+  // ─── เติมคำในรูป — one line per keyed point, named after the point ──────
   // Like the classify branch above, this reads the question's own config as
   // well as the frozen key: the key knows what each point should say but not
   // which place on the picture it is, and "จุดที่ 3" sends a teacher back to

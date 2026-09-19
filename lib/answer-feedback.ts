@@ -311,7 +311,7 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
     return { ...base, rows }
   }
 
-  // ─── ติดป้ายบนรูป (image_label) ──────────────────────────────────────────
+  // ─── เติมคำในรูป (image_label) ──────────────────────────────────────────
   // One line per point the teacher keyed, named after the point rather than
   // numbered: a student reading "หลอดลม" knows which place on the picture went
   // wrong, and "จุดที่ 3" tells them to go back and count dots. Points the key

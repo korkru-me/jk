@@ -33,13 +33,52 @@ export interface RunFormat {
 export type DocxInline =
   | { kind: 'text'; text: string; format: RunFormat }
   | { kind: 'math'; value: string; plain: string; structured: boolean }
-  | { kind: 'image'; relId: string; floating: boolean }
+  | { kind: 'image'; relId: string; floating: boolean; width: number; height: number }
   | { kind: 'break' }
   | { kind: 'tab' }
+
+/**
+ * A shape drawn on top of the page: a text box, or a line joining one to
+ * something.
+ *
+ * Kept apart from `inlines` rather than folded into them, because a floating
+ * shape is not part of the sentence it happens to be anchored to. Folded in, a
+ * decorative box beside a ปรนัย ข้อ would arrive inside the question's words on
+ * every one of the seven types that already read, none of which asked for it.
+ * Only the reader that needs them looks here.
+ *
+ * This is how a เติมคำในรูป worksheet is written: the blanks the student fills
+ * are text boxes standing on the picture, joined to the thing they point at by
+ * a line. Word tells the two apart itself — a line is a *connector*, which is a
+ * different kind of shape and not a blank.
+ */
+export interface DocxShape {
+  /** What is written in the box. Empty for a line, and for a blank box on a
+   *  student's copy of a worksheet — which is a blank with no เฉลย, not a
+   *  shape to ignore. */
+  inlines: DocxInline[]
+  /** Word's own flag for a joining line. Never a blank. */
+  connector: boolean
+  /** Offset from the left of the text column, in EMU, or null when Word
+   *  positioned the shape by alignment instead. Comparable with an inline
+   *  picture's width, because a picture in a paragraph of its own starts at
+   *  that same left edge. */
+  x: number | null
+  /** Offset from the top of the paragraph the shape is anchored to, in EMU.
+   *  Only comparable between shapes anchored to the *same* paragraph: what
+   *  falls between two paragraphs is a matter of how Word lays the page out,
+   *  which is not written down anywhere in the file. */
+  y: number | null
+  /** Size in EMU. */
+  width: number
+  height: number
+}
 
 export interface DocxParagraph {
   kind: 'paragraph'
   inlines: DocxInline[]
+  /** Floating shapes anchored to this paragraph, in document order. */
+  shapes: DocxShape[]
   /** The `w:numId` of the list this paragraph belongs to, or null. */
   numId: string | null
   /** List depth: 0 is the outer level, 1 the first nested one. */
@@ -120,18 +159,88 @@ function readRunFormat(rPr: XmlNode | null): RunFormat {
  * suspicious about.
  */
 function collectDrawing(drawing: XmlNode, out: DocxInline[]): void {
-  const floating = !!firstChild(drawing, 'wp:anchor')
+  const anchor = firstChild(drawing, 'wp:anchor')
+  const wrapper = anchor ?? firstChild(drawing, 'wp:inline')
+  const extent = wrapper ? firstChild(wrapper, 'wp:extent') : null
+
+  // The size Word prints the picture at, which is what the shapes standing on
+  // it were positioned against. Zero when the file does not say, which every
+  // caller reads as "no scale to compare with" rather than as a picture of no
+  // width.
+  const width = emu(extent?.attrs['cx'])
+  const height = emu(extent?.attrs['cy'])
+
   for (const blip of descendants(drawing, 'a:blip')) {
     const relId = blip.attrs['r:embed'] ?? blip.attrs['r:link'] ?? ''
-    if (relId) out.push({ kind: 'image', relId, floating })
+    if (relId) out.push({ kind: 'image', relId, floating: !!anchor, width, height })
   }
+}
+
+function emu(value: string | undefined): number {
+  const parsed = parseInt(value ?? '', 10)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+/**
+ * The floating shapes anchored to one paragraph.
+ *
+ * Read from the paragraph's own XML rather than threaded out of the run
+ * walker, because a shape is not one of the paragraph's inlines and nothing
+ * that reads inlines should have to step around it.
+ *
+ * `wp:anchor` is the modern form. The `mc:Fallback` beside it says the same
+ * thing again in the older VML markup for readers that cannot manage the
+ * first, and is deliberately not read: counting both would double every blank
+ * on the page.
+ */
+function readShapes(node: XmlNode): DocxShape[] {
+  const shapes: DocxShape[] = []
+
+  for (const anchor of descendants(node, 'wp:anchor')) {
+    // A floating *picture* is already an inline of this paragraph. It is not a
+    // blank, and reading it as one would put an empty answer box on the page
+    // for every illustration a worksheet floats beside its text.
+    if (firstDescendant(anchor, 'pic:pic') || firstDescendant(anchor, 'a:blip')) continue
+
+    const inlines: DocxInline[] = []
+    const content = firstDescendant(anchor, 'w:txbxContent')
+    if (content) walkInlines(content, inlines)
+
+    const offsetOf = (name: string): number | null => {
+      const position = firstChild(anchor, name)
+      const offset = position ? firstChild(position, 'wp:posOffset') : null
+      if (!offset?.text) return null
+      const parsed = parseInt(offset.text, 10)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const extent = firstChild(anchor, 'wp:extent')
+    shapes.push({
+      inlines,
+      connector: !!firstDescendant(anchor, 'wps:cNvCnPr'),
+      // Only an offset from the text column can be compared with a picture
+      // sitting in that column. One measured from the page or its margins is
+      // in different units of the same page and would need the section's own
+      // geometry to make sense of, which is a different job than reading a
+      // โจทย์.
+      x: firstChild(anchor, 'wp:positionH')?.attrs['relativeFrom'] === 'column' ? offsetOf('wp:positionH') : null,
+      y: offsetOf('wp:positionV'),
+      width: emu(extent?.attrs['cx']),
+      height: emu(extent?.attrs['cy']),
+    })
+  }
+
+  return shapes
 }
 
 /** Pictures in the older VML form, which is what `w:pict` and `w:object` hold. */
 function collectPict(pict: XmlNode, out: DocxInline[]): void {
   for (const data of descendants(pict, 'v:imagedata')) {
     const relId = data.attrs['r:id'] ?? ''
-    if (relId) out.push({ kind: 'image', relId, floating: false })
+    // VML keeps its size in a CSS-like `style` string rather than in EMU.
+    // Nothing needs a VML picture's size, so it is left unmeasured instead of
+    // parsed on the chance that one day something might.
+    if (relId) out.push({ kind: 'image', relId, floating: false, width: 0, height: 0 })
   }
 }
 
@@ -286,6 +395,7 @@ function readParagraph(node: XmlNode): DocxParagraph {
   return {
     kind: 'paragraph',
     inlines,
+    shapes: readShapes(node),
     numId: (numPr ? firstChild(numPr, 'w:numId')?.attrs['w:val'] : null) ?? null,
     ilvl: Number.isFinite(parsedIlvl) ? parsedIlvl : 0,
     styleId: (pPr ? firstChild(pPr, 'w:pStyle')?.attrs['w:val'] : null) ?? null,

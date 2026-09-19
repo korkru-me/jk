@@ -24,7 +24,7 @@ import type { MatchingAnswerMode, QuestionType } from '@/lib/types'
 import type { DocxBlock, DocxDocument, DocxInline, DocxParagraph, NumberingLevel } from './docx'
 import { flattenAnswerText, parseAnswerList, readAnswerKey, type DraftAnswer } from './answer-key'
 
-export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering' | 'matching'
+export type DraftQuestionType = 'mcq' | 'written' | 'essay' | 'fill_blank' | 'true_false' | 'ordering' | 'matching' | 'image_label'
 
 export type { DraftAnswer } from './answer-key'
 
@@ -62,6 +62,8 @@ export type DraftWarningCode =
   | 'no-correct-order'
   | 'order-item-image'
   | 'unpaired-matching'
+  | 'unplaced-points'
+  | 'unkeyed-points'
 
 export interface DraftWarning {
   code: DraftWarningCode
@@ -127,6 +129,9 @@ export interface DraftQuestion {
   /** For a จับคู่ โจทย์: the two columns and whatever pairing the file stated.
    *  `html` is then the คำชี้แจง and nothing else. */
   matching: DraftMatching | null
+  /** For a เติมคำในรูป โจทย์: the picture and the blanks standing on it.
+   *  `html` is then the คำสั่ง and nothing else. */
+  imageLabel: DraftImageLabel | null
   /** Relationship ids, resolved to uploaded URLs by the caller. */
   imageRelIds: string[]
   /** Whether the โจทย์ talks about a picture ("ดังรูป"). Kept rather than
@@ -701,8 +706,54 @@ function numbersThings(numFmt: string): boolean {
 }
 
 interface QuestionList {
-  numId: string
+  /** Usually one. See `continuationLists` for when it is more. */
+  numIds: Set<string>
   ilvl: number
+}
+
+/**
+ * A list that carries on where the โจทย์ list stopped.
+ *
+ * Word starts a new list far more readily than anyone writing the document
+ * means it to — paste a question in from another file, or break the run of
+ * numbering once, and the paragraphs after it belong to a new `numId` that
+ * looks and prints exactly the same. A teacher sees one list of questions; the
+ * file holds two, and the โจทย์ in the second used to be swallowed by the last
+ * โจทย์ of the first, carrying all of its content with it.
+ *
+ * Joined only when all three hold, because each one rules out a different
+ * thing that also lives in a numbered list:
+ *
+ *   Same level and identical printed numbering — the `1)` of a ตัวเลือก is not
+ *   the `1.` of a ข้อ, and the file says which is which.
+ *
+ *   Every item after the last item of the โจทย์ list — a numbered คำชี้แจง at
+ *   the top of the paper is a list that stops before the questions start.
+ *
+ *   No interleaving, which the "after" rule already gives: the ตัวเลือก of a
+ *   ปรนัย ข้อ sit *between* its questions, so their list can never qualify
+ *   however it is formatted.
+ */
+function continuationLists(
+  document: DocxDocument,
+  best: { numId: string; ilvl: number },
+  positions: Map<string, number[]>,
+): string[] {
+  const reference = document.numbering.get(best.numId)?.get(best.ilvl)
+  // Nothing to compare against: a file with no numbering part is read as the
+  // single list it appears to be rather than guessed at.
+  if (!reference) return []
+
+  const lastQuestion = Math.max(...(positions.get(best.numId) ?? [-1]))
+
+  return [...positions.keys()].filter(numId => {
+    if (numId === best.numId) return false
+    const definition = document.numbering.get(numId)?.get(best.ilvl)
+    if (!definition) return false
+    if (definition.numFmt !== reference.numFmt || definition.lvlText !== reference.lvlText) return false
+    const items = positions.get(numId) ?? []
+    return items.length > 0 && items.every(index => index > lastQuestion)
+  })
 }
 
 /**
@@ -710,19 +761,22 @@ interface QuestionList {
  *
  * A worksheet usually holds several: the questions, and whatever lists live
  * inside them. The questions are the list with the most items at its own
- * outermost level.
+ * outermost level — plus any list that carries straight on from it.
  */
 function findQuestionList(document: DocxDocument): QuestionList | null {
   const counts = new Map<string, Map<number, number>>()
+  /** Block indexes of each list's items at its own outermost level. */
+  const positions = new Map<string, number[]>()
 
-  for (const block of document.blocks) {
-    if (block.kind !== 'paragraph' || !block.numId) continue
+  document.blocks.forEach((block, index) => {
+    if (block.kind !== 'paragraph' || !block.numId) return
     const levels = counts.get(block.numId) ?? new Map<number, number>()
     levels.set(block.ilvl, (levels.get(block.ilvl) ?? 0) + 1)
     counts.set(block.numId, levels)
-  }
+    positions.set(block.numId, [...(positions.get(block.numId) ?? []), index])
+  })
 
-  let best: QuestionList | null = null
+  let best: { numId: string; ilvl: number } | null = null
   let bestCount = 0
 
   for (const [numId, levels] of counts) {
@@ -743,7 +797,18 @@ function findQuestionList(document: DocxDocument): QuestionList | null {
   // item whatever else is true, and a worksheet holding a single โจทย์ should
   // import as readily as one holding forty. The typed-digit fallback below is
   // the guess that needs a corroborating second item.
-  return best
+  if (!best) return null
+
+  // Counted only at the level the questions are numbered at: a list's own
+  // deeper levels are its ก) ข) ค), which belong to the โจทย์ above them.
+  const atLevel = new Map(
+    [...positions].map(([numId, items]) => [
+      numId,
+      items.filter(index => (document.blocks[index] as DocxParagraph).ilvl === best.ilvl),
+    ]),
+  )
+
+  return { numIds: new Set([best.numId, ...continuationLists(document, best, atLevel)]), ilvl: best.ilvl }
 }
 
 /**
@@ -1255,6 +1320,90 @@ function readMatching(head: DocxParagraph, blocks: DocxBlock[]): { result: Draft
   return result ? { result, consumed } : null
 }
 
+// ─── เติมคำในรูป: a picture, and the boxes standing on it ────────────────────
+
+/**
+ * One blank on the picture, as the file states it.
+ *
+ * A teacher writes this โจทย์ by putting a text box where each answer goes and
+ * drawing a line from it to the thing it points at. The box is the blank; what
+ * is typed in it is the เฉลย; the line is decoration this reader ignores.
+ */
+export interface DraftImageBlank {
+  /**
+   * What the teacher wrote in the box. Empty when the box is empty, which is
+   * not a mistake — it is a student's copy of the worksheet, and it arrives as
+   * a blank whose เฉลย the teacher fills in afterwards.
+   */
+  answer: string
+  /**
+   * Where the middle of the box sits across the picture, 0–100, or null when
+   * Word positioned it in a way that cannot be compared with the picture.
+   *
+   * Horizontal only. See `DocxShape.y` for why the vertical half of the same
+   * question has no answer in the file.
+   */
+  x: number | null
+}
+
+export interface DraftImageLabel {
+  /** In reading order: down the page, and down the picture within it. */
+  blanks: DraftImageBlank[]
+  /** The picture the blanks stand on, or '' when the ข้อ has none. */
+  relId: string
+}
+
+/**
+ * The picture and the blanks of one เติมคำในรูป ข้อ.
+ *
+ * The order matters and is worked out rather than read: Word stores a floating
+ * shape against whichever paragraph it happens to sit nearest, so the boxes of
+ * one ข้อ are scattered over the empty paragraphs that make room for the
+ * picture. Taking the paragraphs in document order and each paragraph's own
+ * boxes top-first puts them back into the order a reader's eye would take
+ * them, which is the order the teacher will match against the picture.
+ *
+ * What is deliberately *not* attempted is the thing the โจทย์ is really about —
+ * which spot on the picture each blank points at. The line that says so is a
+ * separate shape with no stated owner, and the box's own vertical offset is
+ * measured from a paragraph whose position on the page only Word's layout
+ * knows. Guessing it would put a point on the wrong organ and read as if the
+ * teacher had put it there. `to-question.ts` spreads the points out instead,
+ * and the โจทย์ cannot be imported until someone has dragged them into place.
+ */
+function readImageLabel(paragraphs: DocxParagraph[]): DraftImageLabel | null {
+  const picture = paragraphs
+    .flatMap(paragraph => paragraph.inlines)
+    .find((inline): inline is Extract<DocxInline, { kind: 'image' }> =>
+      inline.kind === 'image' && !inline.floating)
+
+  const blanks: DraftImageBlank[] = []
+  for (const paragraph of paragraphs) {
+    const boxes = paragraph.shapes
+      .filter(shape => !shape.connector)
+      // Anything Word did not give an offset to sorts first, which keeps it in
+      // the order it was written rather than sending it to the end.
+      .sort((a, b) => (a.y ?? 0) - (b.y ?? 0))
+
+    for (const box of boxes) {
+      const width = picture?.width ?? 0
+      blanks.push({
+        answer: inlinesToPlain(box.inlines).replace(/\s+/g, ' ').trim(),
+        // Measured to the middle of the box, which is where the teacher aimed
+        // it. Assumes the picture starts at the left of the text column, which
+        // is where a picture in a paragraph of its own sits; a centred one is
+        // off by its own margin, and is dragged into place like every other.
+        x: box.x !== null && width > 0
+          ? Math.min(100, Math.max(0, ((box.x + box.width / 2) / width) * 100))
+          : null,
+      })
+    }
+  }
+
+  if (blanks.length === 0 && !picture) return null
+  return { blanks, relId: picture?.relId ?? '' }
+}
+
 /** Puts the items in the order an option claims, or leaves them as they are. */
 export function applyOrder<T>(items: T[], order: number[]): T[] {
   if (!isCompleteOrder(order, items.length)) return items
@@ -1448,6 +1597,11 @@ function buildQuestion(
   const { relIds } = collectImages(allParagraphs)
   const fullText = paragraphsText(allParagraphs)
 
+  // Only when the teacher said so — see `ParseOptions`. A floating text box on
+  // any other worksheet is a caption or a decoration, and reading one as a
+  // blank would put an answer box on a โจทย์ that never had one.
+  const imageLabel = options.expect === 'image_label' ? readImageLabel(allParagraphs) : null
+
   // Only read when the teacher said the file is เติมคำ — see `ParseOptions`.
   const blanked = options.expect === 'fill_blank' && !treatAsChoices ? readBlanks(stemParagraphs) : null
   const useBlanks = (blanked?.blanks.length ?? 0) > 0
@@ -1459,7 +1613,7 @@ function buildQuestion(
   // read for a เฉลย either — and the one number a paper marks there is an
   // option, which `readOrdering` has already taken.
   const isTrueFalse = statements.length > 0
-  const gradedElsewhere = treatAsChoices || useBlanks || isTrueFalse || !!ordering || !!matching
+  const gradedElsewhere = treatAsChoices || useBlanks || isTrueFalse || !!ordering || !!matching || !!imageLabel
   const markedStem = gradedElsewhere ? null : readMarkedAnswer(stemParagraphs)
   const stem = gradedElsewhere
     ? {
@@ -1543,6 +1697,27 @@ function buildQuestion(
     })
   }
 
+  if (imageLabel && imageLabel.blanks.length > 0) {
+    // Said on every ข้อ of this type, because it is true of every ข้อ of this
+    // type: the file says where the *box* is and never what it points at. The
+    // โจทย์ is held back until someone has placed them — see
+    // `validateForImport` — and this is the sentence that explains why.
+    warnings.push({
+      code: 'unplaced-points',
+      message: `อ่านได้ ${imageLabel.blanks.length} ช่อง — ไฟล์ Word ไม่ได้บอกว่าแต่ละช่องชี้ไปที่จุดไหนบนรูป กด "แก้ไข" เพื่อลากจุดไปวางให้ตรง`,
+    })
+
+    const unkeyed = imageLabel.blanks.filter(blank => !blank.answer).length
+    if (unkeyed > 0) {
+      warnings.push({
+        code: 'unkeyed-points',
+        message: unkeyed === imageLabel.blanks.length
+          ? 'ช่องในไฟล์ว่างทั้งหมด (เป็นฉบับที่แจกนักเรียน) — พิมพ์เฉลยของแต่ละจุดตอนกด "แก้ไข" ได้เลย'
+          : `มี ${unkeyed} ช่องที่ไฟล์ไม่ได้เขียนเฉลยไว้ — ใส่เฉลยตอนกด "แก้ไข" ได้`,
+      })
+    }
+  }
+
   if (REFERS_TO_PREVIOUS.test(fullText)) {
     warnings.push({
       code: 'refers-to-previous',
@@ -1560,7 +1735,8 @@ function buildQuestion(
       ? 'true_false'
       : matching ? 'matching'
         : ordering ? 'ordering'
-          : treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
+          : imageLabel ? 'image_label'
+            : treatAsChoices ? 'mcq' : useBlanks ? 'fill_blank' : hasAnswers ? 'written' : 'essay',
     title: buildTitle(stemText, number),
     html: stem.html,
     choices,
@@ -1571,6 +1747,7 @@ function buildQuestion(
     orderItems: ordering?.items ?? [],
     orderChoices: ordering?.choices ?? [],
     matching,
+    imageLabel,
     imageRelIds: relIds,
     mentionsPicture: MENTIONS_PICTURE.test(fullText),
     warnings,
@@ -1634,7 +1811,7 @@ export function buildDrafts(document: DocxDocument, options: ParseOptions = {}):
 
   const isHead = (block: DocxBlock, index: number): block is DocxParagraph => {
     if (block.kind !== 'paragraph') return false
-    if (list) return block.numId === list.numId && block.ilvl === list.ilvl
+    if (list) return !!block.numId && list.numIds.has(block.numId) && block.ilvl === list.ilvl
     return typed.has(index)
   }
 
@@ -1661,7 +1838,10 @@ export function buildDrafts(document: DocxDocument, options: ParseOptions = {}):
       if (text) preamble.push(text)
     }
 
-    return buildQuestion(head, body.slice(0, bodyEnd), position + 1, list ? document.numbering.get(list.numId) : undefined, options)
+    // The levels of this โจทย์'s own list, which is what labels its ก) ข) ค).
+    // Read off the head rather than off the list as a whole, because a list
+    // that carries on from another has its own definition to be labelled from.
+    return buildQuestion(head, body.slice(0, bodyEnd), position + 1, head.numId ? document.numbering.get(head.numId) : undefined, options)
   })
 
   const floating = new Set<string>()

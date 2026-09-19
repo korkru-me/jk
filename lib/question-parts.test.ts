@@ -58,7 +58,7 @@ describe('subQuestionCount', () => {
     expect(subQuestionCount(q('classify', { extra_data: partial }))).toBe(3)
   })
 
-  it('counts ติดป้ายบนรูป by the points the teacher keyed', () => {
+  it('counts เติมคำในรูป by the points the teacher keyed', () => {
     expect(subQuestionCount(q('image_label', { extra_data: {
         image_url: '/samples/simple-circuit.svg',
         answer_mode: 'drag',
@@ -71,7 +71,7 @@ describe('subQuestionCount', () => {
       } }))).toBe(3)
   })
 
-  it('leaves a ติดป้ายบนรูป point nobody could answer out of the count', () => {
+  it('leaves a เติมคำในรูป point nobody could answer out of the count', () => {
     // A point with no answer, and a point keyed to a word the bank does not
     // offer, are both unanswerable — so neither is a ข้อย่อย, and the badge has
     // to say the same number the งาน scores.

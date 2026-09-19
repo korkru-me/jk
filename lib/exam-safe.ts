@@ -114,7 +114,7 @@ export interface SafeClassifyConfig {
 }
 
 /**
- * A ใบงานติดป้ายบนรูป as the student may see it.
+ * A ใบงานเติมคำในรูป as the student may see it.
  *
  * Two things have to leave, and they leave for different reasons.
  *

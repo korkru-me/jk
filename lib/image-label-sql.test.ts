@@ -1,5 +1,5 @@
 /**
- * The SQL half of ติดป้ายบนรูป scoring, run for real.
+ * The SQL half of เติมคำในรูป scoring, run for real.
  *
  * `education_research_question_max_score` is a plpgsql mirror of
  * `imageLabelMarkerCount` — a research project reads a question's worth through

@@ -3113,7 +3113,7 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
   )
 }
 
-// ─── ติดป้ายบนรูป ─────────────────────────────────────────────────────────────
+// ─── เติมคำในรูป ─────────────────────────────────────────────────────────────
 // The picture, the points on it and the boxes in the margins live in
 // ImageLabelInput; this only translates between that component's array of
 // answers and the single string the attempt stores. One string per point, in

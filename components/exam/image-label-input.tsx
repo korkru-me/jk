@@ -92,7 +92,7 @@ export function imageLabelMarkerClass(state: ImageLabelMarkerState): string {
 }
 
 /**
- * ติดป้ายบนรูป — one diagram with answer boxes pointing into it.
+ * เติมคำในรูป — one diagram with answer boxes pointing into it.
  *
  * The boxes sit in the margins either side of the picture and each carries a
  * leader line to the place it is asking about, which is the layout of the paper

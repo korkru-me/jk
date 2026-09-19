@@ -194,7 +194,7 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
     }
   }
 
-  // ติดป้ายบนรูป: the key is one entry per point, in the points' own order,
+  // เติมคำในรูป: the key is one entry per point, in the points' own order,
   // carrying the accepted answers and how to compare them — see
   // lib/image-label.ts, which builds it and decides which points count.
   if (q.question_type === 'image_label') {
@@ -662,7 +662,7 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
     }
   }
 
-  // ติดป้ายบนรูป grading — one point per box whose text matches that point's
+  // เติมคำในรูป grading — one point per box whose text matches that point's
   // frozen accepted answers. Points the key left unkeyed are skipped rather
   // than counted wrong, matching how they were left out of max_score.
   //

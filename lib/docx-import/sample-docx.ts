@@ -13,9 +13,11 @@
  * browser bundle.
  */
 import {
-  AlignmentType, Document, LevelFormat, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType,
+  AlignmentType, Document, HorizontalPositionRelativeFrom, ImageRun, LevelFormat, Packer, Paragraph,
+  Table, TableCell, TableRow, TextRun, VerticalPositionRelativeFrom, WidthType, WpsShapeRun,
 } from 'docx'
 import { numberSampleLines, type ImportProfile, type NumberedSampleLine, type SampleLine, type SampleSpan } from './profiles'
+import { SAMPLE_DIAGRAM_PNG, SAMPLE_DIAGRAM_SIZE } from './sample-diagram'
 
 /** What Thai school paperwork is set in; Word substitutes if it is missing. */
 const DOC_FONT = 'TH SarabunPSK'
@@ -84,6 +86,73 @@ function paragraphFor(line: SampleLine, marker: string): Paragraph {
   })
 }
 
+const BOX_SIZE = { width: 88, height: 26 }
+
+/** Word measures a floating shape's position in EMU and its size in pixels. */
+const EMU_PER_PIXEL = 9525
+
+/**
+ * The diagram of a เติมคำในรูป ข้อ, with its answer boxes standing on it.
+ *
+ * The picture is placed inline — in the run order, not floating — because
+ * that is the one thing the reader needs from it: a floating picture is
+ * anchored whereever Word likes and cannot be said to belong to this ข้อ.
+ * The boxes are the opposite: each is a floating text box, which is how a
+ * teacher puts an answer somewhere in particular on a page, and is what the
+ * reader counts to know how many ช่อง the ข้อ has.
+ *
+ * They stand on the picture rather than around it with lines drawn in, which
+ * a worksheet more often does. Drawing those lines here would mean drawing
+ * real Word *connectors* — anything else is a shape with no text in it, which
+ * is precisely what an empty answer box is — and the plainer layout is the
+ * truer example anyway: what makes a ช่อง is the box.
+ */
+function pictureParagraph(line: SampleLine): Paragraph {
+  const boxes = line.boxes ?? []
+  const percent = (value: number, total: number) => Math.round((value / 100) * total) * EMU_PER_PIXEL
+
+  return new Paragraph({
+    spacing: { before: 120, after: 120 },
+    children: [
+      new ImageRun({
+        type: 'png',
+        data: SAMPLE_DIAGRAM_PNG,
+        transformation: SAMPLE_DIAGRAM_SIZE,
+        altText: { name: 'วงจรไฟฟ้า', description: 'แผนผังวงจรไฟฟ้าอย่างง่าย', title: 'วงจรไฟฟ้า' },
+      }),
+      ...boxes.map(box => {
+        return new WpsShapeRun({
+          type: 'wps',
+          transformation: BOX_SIZE,
+          // A plain outlined box on white. Left to the theme it would come out
+          // as Word's default filled blue shape, which reads as decoration
+          // rather than as somewhere a student writes an answer.
+          solidFill: { type: 'rgb', value: 'FFFFFF' },
+          outline: { type: 'solidFill', solidFillType: 'rgb', value: '334155', width: 9525 },
+          floating: {
+            // Measured from the text column and from the top of this
+            // paragraph, which is where the picture starts — the two the
+            // reader can make sense of. See `DocxShape`.
+            horizontalPosition: {
+              relative: HorizontalPositionRelativeFrom.COLUMN,
+              offset: percent(box.x, SAMPLE_DIAGRAM_SIZE.width),
+            },
+            verticalPosition: {
+              relative: VerticalPositionRelativeFrom.PARAGRAPH,
+              offset: percent(box.y, SAMPLE_DIAGRAM_SIZE.height),
+            },
+            allowOverlap: true,
+          },
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: runsOf([box]),
+          })],
+        })
+      }),
+    ],
+  })
+}
+
 /**
  * One row of a จับคู่ table: the ข้อ on the left, the ตัวเลือก on the right.
  *
@@ -124,7 +193,9 @@ function bodyOf(lines: NumberedSampleLine[]): (Paragraph | Table)[] {
   for (const entry of lines) {
     if (entry.line.kind === 'pair') { rows.push(entry); continue }
     flush()
-    out.push(paragraphFor(entry.line, entry.marker))
+    out.push(entry.line.kind === 'picture'
+      ? pictureParagraph(entry.line)
+      : paragraphFor(entry.line, entry.marker))
   }
   flush()
 
