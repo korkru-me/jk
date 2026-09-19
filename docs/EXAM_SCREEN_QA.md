@@ -99,9 +99,13 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ### เฟส 5 — เส้นทางนักเรียนจริงใน browser ปกติ
 
-สถานะ: ถูกกั้นจนมี staging แยก
+สถานะ: **agent-only readiness ผ่าน · authenticated E2E ถูกกั้นจนมี staging แยก**
 
-ใช้บัญชีและข้อมูล QA ใน staging เท่านั้น ตรวจ login, start, autosave, reload/resume, upload, submit, result และผลที่ครูเห็น การทำ browser ก่อนช่วยแยกปัญหา KorKru ออกจากปัญหา native SEB
+เพิ่ม `.env.qa.example` และ `npm run check:exam-staging` ซึ่งอ่านเฉพาะ `.env.qa.local` แบบไม่เรียก network/ฐานข้อมูล ไม่แสดงค่าที่ตั้ง และ fail closed เมื่อไม่ประกาศ staging, ใช้ production deployment, site ซ้ำ หรือ Supabase project ซ้ำ production พร้อม unit tests ครอบคลุมกรณีผ่าน/ปฏิเสธ รายละเอียดอยู่ใน `docs/EXAM_STAGING_SETUP.md`
+
+ยังต้องใช้บัญชีและข้อมูล QA ใน staging จริงเพื่อตรวจ login, start, autosave, reload/resume, upload, submit, result และผลที่ครูเห็น จึงบันทึกเป็น release blocker โดยไม่สร้างข้อมูลทดสอบใน production แทนการอ้างว่าผ่าน
+
+ผลตรวจรอบเฟส: staging-guard tests 4 ข้อและชุดรวม 97 files / 1,314 tests ผ่าน, TypeScript กับ token lint ผ่าน; การรัน guard ในเครื่องปัจจุบันปฏิเสธอย่างถูกต้องเพราะไม่มี `.env.qa.local` และ staging แยก
 
 ### เฟส 6 — เส้นทางเดิมใน SEB
 

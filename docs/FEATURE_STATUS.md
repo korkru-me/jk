@@ -17,6 +17,8 @@
 
 Responsive QA เฟส Mac ผ่านในขอบเขต agent-only แล้วต่อจาก iPhone/iPad: fixture 16 กรณีไม่ล้นในหน้าต่าง 900×600 ถึง 1728×1117, keyboard/focus/Escape, mouse pointer drag, local-only file preview และ overlay สำคัญผ่าน แก้ focus return, Escape ของ Excalidraw และ contrast ของสถานะสำเร็จแล้ว ผลนี้ยังไม่แทน Safari/SEB, native file picker หรือ trackpad บน Mac จริง ซึ่งรอทดสอบรวมหลังเฟส 8
 
+Authenticated exam QA มี staging isolation guard แล้ว: `npm run check:exam-staging` อ่านเฉพาะ `.env.qa.local` แบบ read-only, ไม่พิมพ์ค่าที่ตั้ง และบล็อก production deployment หรือ site/Supabase project ที่ซ้ำ production แต่ยังไม่มี staging แยก จึงยังไม่ทำ login/autosave/upload/submit E2E และไม่สร้างข้อมูล QA ในฐาน production
+
 ## MVP core
 
 ### Authentication — บางส่วน

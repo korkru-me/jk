@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "measure:take-bundle": "node scripts/report-route-client-size.mjs 'app/(app)/assignments/[id]/take/page'",
+    "check:exam-staging": "node scripts/check-exam-staging-readiness.mjs",
     "check:seb-readiness": "node scripts/check-seb-readiness.mjs",
     "lint:tokens": "node scripts/check-design-tokens.mjs",
     "test": "vitest run",
