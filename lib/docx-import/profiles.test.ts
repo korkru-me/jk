@@ -13,12 +13,27 @@ import { TYPE_LABEL } from '@/lib/question-display'
  * it appears on the chooser rather than existing only in the map.
  */
 describe('import profiles', () => {
-  it('covers every question type exactly once, in the map and on the chooser', () => {
+  it('covers every question type exactly once, and offers all but the ones ruled out', () => {
     const types = Object.keys(PROFILE_BY_TYPE)
-    const listed = IMPORT_PROFILES.filter(profile => profile.type !== null).map(profile => profile.type)
+    const offered = IMPORT_PROFILES.filter(profile => profile.type !== null).map(profile => profile.type)
+    const ruledOut = Object.values(PROFILE_BY_TYPE)
+      .filter(profile => profile.status === 'not-applicable')
+      .map(profile => profile.type)
 
-    expect(listed).toHaveLength(types.length)
-    expect(new Set(listed)).toEqual(new Set(types))
+    expect(offered).toHaveLength(types.length - ruledOut.length)
+    expect(new Set([...offered, ...ruledOut])).toEqual(new Set(types))
+    // Ruled out is not the same as forgotten: the map still holds them.
+    expect(ruledOut.length).toBeLessThan(types.length)
+  })
+
+  it('makes a type with no import say why, and keeps it off the chooser', () => {
+    for (const profile of Object.values(PROFILE_BY_TYPE)) {
+      if (profile.status !== 'not-applicable') continue
+      expect(profile.notApplicableReason, profile.slug).toBeTruthy()
+      expect(IMPORT_PROFILES, profile.slug).not.toContain(profile)
+      // And no page of its own: nothing links there, so a 404 is the truth.
+      expect(findProfile(profile.slug), profile.slug).toBeNull()
+    }
   })
 
   it('keys each profile by the type it produces', () => {
@@ -55,6 +70,7 @@ describe('import profiles', () => {
   })
 
   it('always has something to show a teacher', () => {
+    // Only the profiles a teacher can actually open.
     for (const profile of IMPORT_PROFILES) {
       expect(profile.label.length).toBeGreaterThan(0)
       expect(profile.blurb.length).toBeGreaterThan(0)
