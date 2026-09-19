@@ -145,6 +145,16 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ผลตรวจเฟส 9: 101 test files / 1,333 tests, TypeScript, design-token lint และ schema checks ผ่าน; `check:exam-uat` จงใจรายงาน 7 pending suites และ `check:exam-release` จงใจรายงาน 3 external blocker groups โดยไม่แสดงค่ารุ่นหรือข้อมูลที่บันทึกไว้
 
+### เฟส 10 — UAT ทีละขั้นและ cleanup ordering
+
+สถานะ: **agent-only tooling ผ่าน · ขั้นแรกที่รายงานคือสร้าง staging แยก**
+
+เพิ่ม `npm run next:exam-uat` เพื่ออ่านหลักฐานแบบ read-only แล้วบอกงานถัดไปเพียงหนึ่งข้อ ตามลำดับ staging → responsive 4 ระบบ → authenticated flow → recovery/proctor → SEB 4 ระบบ → cleanup พร้อม unit tests ครบเส้นทาง malformed/pending/complete รายละเอียดอยู่ใน `docs/EXAM_UAT_NEXT_STEP.md`
+
+ขยาย evidence state เป็น `pending`/`failed`/`passed` แบบสอดคล้องกับเวลาและรุ่นที่ทดสอบ และบังคับว่า QA cleanup ต้องเกิดหลัง suite อื่นผ่านครบพร้อม timestamp ไม่เก่ากว่า ป้องกันการใช้ผล cleanup เก่าปิด release หลังมีการทดสอบเพิ่ม
+
+ผลตรวจเฟส 10: 102 test files / 1,342 tests, TypeScript และ design-token lint ผ่าน; `next:exam-uat` รายงานขั้นแรกว่า “สร้าง staging แยกจาก production” ตรงตามสถานะจริงและไม่พิมพ์ค่าจาก environment/manifests
+
 ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) แต่ Windows ยังเป็น pending production release gate จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
 
 ## หลักฐานที่เก็บได้

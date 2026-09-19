@@ -31,6 +31,10 @@ Regression ปิดเฟสผ่าน 100 test files / 1,326 tests, TypeScri
 
 Regression หลังเฟส 9 ผ่าน 101 test files / 1,333 tests, TypeScript และ token lint; release/UAT checks ยัง fail closed ตาม external evidence ที่ขาด ไม่ได้เปลี่ยน pending เป็นผ่านอัตโนมัติ
 
+เฟส 10 เพิ่ม `npm run next:exam-uat` เป็นตัวนำ UAT ทีละหนึ่งขั้นและบังคับลำดับ cleanup หลัง responsive/authenticated/recovery/SEB ครบ ตัว evidence รองรับ `failed` เพื่อบันทึกว่าทดสอบแล้วพบปัญหาโดยไม่หลอกเป็น pending หรือ passed และยังคง fixed schema/no-secret เหมือนเดิม
+
+Regression หลังเฟส 10 ผ่าน 102 test files / 1,342 tests, TypeScript และ token lint; next-step planner ปัจจุบันชี้ไปการสร้าง staging แยก ซึ่งเป็น blocker แรกจริง
+
 ## MVP core
 
 ### Authentication — บางส่วน

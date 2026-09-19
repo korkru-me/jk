@@ -28,7 +28,8 @@
 
 - `testedAt` ต้องเป็นเวลา ISO UTC จากวันที่ทดสอบจริง
 - `testedVersion` ใช้เพียง OS/browser หรือชื่อ build ที่ไม่เป็นความลับ ไม่ใส่ URL, account, token หรือ key
-- ถ้ายังไม่ผ่านให้คง `pending`, `testedAt: null` และ placeholder เดิมไว้
+- ถ้ายังไม่ได้ทดสอบให้คง `pending`, `testedAt: null` และ placeholder เดิมไว้
+- ถ้าทดสอบแล้วไม่ผ่าน ใช้ `failed` พร้อม `testedAt`/`testedVersion` ของรอบที่พบปัญหา; หลังแก้ต้องทดสอบซ้ำก่อนเปลี่ยนเป็น `passed`
 - ห้ามเพิ่ม field ใหม่ ตัวตรวจจะปฏิเสธทันที
 
 หลังแก้ให้รัน:

@@ -78,23 +78,42 @@ export function inspectExamUatEvidence(manifest) {
     }
 
     const unknownFields = Object.keys(row).filter(field => !ALLOWED_SUITE_FIELDS.has(field))
-    const statusReady = row.status === 'pending' || row.status === 'passed'
+    const statusReady = row.status === 'pending' || row.status === 'failed' || row.status === 'passed'
+    const pendingShape = row.status === 'pending'
+      && row.testedAt === null
+      && row.testedVersion === 'record during final UAT'
+    const testedShape = (row.status === 'failed' || row.status === 'passed')
+      && validIsoTimestamp(row.testedAt)
+      && safeVersionMetadata(row.testedVersion)
+      && row.testedVersion !== 'record during final UAT'
     const shapeReady = unknownFields.length === 0
       && row.label === REQUIRED_LABELS[id]
       && statusReady
-      && safeVersionMetadata(row.testedVersion)
-      && (row.testedAt === null || validIsoTimestamp(row.testedAt))
+      && (pendingShape || testedShape)
     checks.push(shapeReady
       ? { status: 'pass', field: `${id} evidence`, message: 'รูปแบบหลักฐานครบและไม่มี free text' }
       : { status: 'blocker', field: `${id} evidence`, message: 'ข้อมูลไม่ครบ, เวลาไม่ใช่ ISO หรือมี field นอก schema' })
 
     if (!shapeReady) continue
     const releaseReady = row.status === 'passed'
-      && validIsoTimestamp(row.testedAt)
-      && row.testedVersion !== 'record during final UAT'
     checks.push(releaseReady
       ? { status: 'pass', field: `${id} release gate`, message: 'มีผลผ่านและรุ่นที่ทดสอบ' }
       : { status: 'blocker', field: `${id} release gate`, message: 'ยังไม่ได้ยืนยันผลผ่านพร้อมวันและรุ่นที่ทดสอบ' })
+  }
+
+  const cleanup = suites.find(row => row?.id === 'qa-data-cleanup')
+  if (cleanup?.status === 'passed') {
+    const prerequisiteRows = suites.filter(row => REQUIRED_SUITE_IDS.includes(row?.id)
+      && row.id !== 'qa-data-cleanup')
+    const prerequisitesPassed = prerequisiteRows.length === REQUIRED_SUITE_IDS.length - 1
+      && prerequisiteRows.every(row => row.status === 'passed' && validIsoTimestamp(row.testedAt))
+    const cleanupTime = validIsoTimestamp(cleanup.testedAt) ? new Date(cleanup.testedAt).getTime() : 0
+    const latestPrerequisiteTime = prerequisitesPassed
+      ? Math.max(...prerequisiteRows.map(row => new Date(row.testedAt).getTime()))
+      : Number.POSITIVE_INFINITY
+    checks.push(prerequisitesPassed && cleanupTime >= latestPrerequisiteTime
+      ? { status: 'pass', field: 'qa-data-cleanup ordering', message: 'ล้างข้อมูลหลัง UAT ชุดอื่นเสร็จแล้ว' }
+      : { status: 'blocker', field: 'qa-data-cleanup ordering', message: 'ต้องล้างข้อมูลหลัง UAT ชุดอื่นผ่านครบและใช้เวลาที่ไม่เก่ากว่า' })
   }
 
   return { ready: checks.every(check => check.status !== 'blocker'), checks }

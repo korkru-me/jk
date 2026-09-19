@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+import { readFile } from 'node:fs/promises'
+import { parseEnvFile } from './check-seb-readiness-core.mjs'
+import { inspectExamStagingReadiness } from './check-exam-staging-readiness-core.mjs'
+import {
+  formatNextExamUatStep,
+  nextExamUatStep,
+} from './next-exam-uat-step-core.mjs'
+
+const QA_ENV_URL = new URL('../.env.qa.local', import.meta.url)
+const UAT_MANIFEST_URL = new URL('../config/exam-uat-evidence.json', import.meta.url)
+const SEB_MANIFEST_URL = new URL('../config/seb-platform-evidence.json', import.meta.url)
+
+async function readQaEnvironment() {
+  try {
+    const parsed = parseEnvFile(await readFile(QA_ENV_URL, 'utf8'), process.env)
+    return {
+      ready: parsed.warnings.length === 0
+        && inspectExamStagingReadiness({ ...parsed.values, ...process.env }).ready,
+    }
+  } catch {
+    return { ready: false }
+  }
+}
+
+async function readJson(url) {
+  try {
+    return JSON.parse(await readFile(url, 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+const [staging, uatManifest, sebManifest] = await Promise.all([
+  readQaEnvironment(),
+  readJson(UAT_MANIFEST_URL),
+  readJson(SEB_MANIFEST_URL),
+])
+
+console.log(formatNextExamUatStep(nextExamUatStep({
+  stagingReady: staging.ready,
+  uatManifest,
+  sebManifest,
+})))

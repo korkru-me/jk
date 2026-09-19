@@ -41,10 +41,9 @@ describe('exam UAT evidence', () => {
     expect(inspectExamUatEvidence(readyManifest()).ready).toBe(true)
   })
 
-  it('blocks pending suites without printing version values in the report', () => {
+  it('blocks failed suites without printing version values in the report', () => {
     const manifest = readyManifest()
-    manifest.suites[0].status = 'pending'
-    manifest.suites[0].testedAt = null
+    manifest.suites[0].status = 'failed'
     manifest.suites[0].testedVersion = 'private-build-reference'
     const result = inspectExamUatEvidence(manifest)
     expect(result.ready).toBe(false)
@@ -107,7 +106,7 @@ describe('exam UAT evidence', () => {
       status: 'blocker',
     }))
     expect(result.checks).toContainEqual(expect.objectContaining({
-      field: 'ipad-responsive release gate',
+      field: 'ipad-responsive evidence',
       status: 'blocker',
     }))
   })
@@ -122,5 +121,42 @@ describe('exam UAT evidence', () => {
       manifest.suites[0].testedVersion = unsafeValue
       expect(inspectExamUatEvidence(manifest).ready).toBe(false)
     }
+  })
+
+  it('does not accept cleanup evidence captured before the other UAT suites', () => {
+    const manifest = readyManifest()
+    manifest.suites.find(row => row.id === 'iphone-responsive').testedAt = '2026-09-20T11:00:00.000Z'
+    manifest.suites.find(row => row.id === 'qa-data-cleanup').testedAt = '2026-09-20T10:30:00.000Z'
+    const result = inspectExamUatEvidence(manifest)
+    expect(result.ready).toBe(false)
+    expect(result.checks).toContainEqual(expect.objectContaining({
+      field: 'qa-data-cleanup ordering',
+      status: 'blocker',
+    }))
+  })
+
+  it('does not accept cleanup while another required suite is still pending', () => {
+    const manifest = readyManifest()
+    manifest.suites.find(row => row.id === 'recovery-proctor').status = 'pending'
+    manifest.suites.find(row => row.id === 'recovery-proctor').testedAt = null
+    manifest.suites.find(row => row.id === 'recovery-proctor').testedVersion = 'record during final UAT'
+    const result = inspectExamUatEvidence(manifest)
+    expect(result.ready).toBe(false)
+    expect(result.checks).toContainEqual(expect.objectContaining({
+      field: 'qa-data-cleanup ordering',
+      status: 'blocker',
+    }))
+  })
+
+  it('rejects stale tested metadata on pending rows and missing metadata on failed rows', () => {
+    const pendingWithStaleEvidence = readyManifest()
+    pendingWithStaleEvidence.suites[0].status = 'pending'
+    expect(inspectExamUatEvidence(pendingWithStaleEvidence).ready).toBe(false)
+
+    const failedWithoutEvidence = readyManifest()
+    failedWithoutEvidence.suites[0].status = 'failed'
+    failedWithoutEvidence.suites[0].testedAt = null
+    failedWithoutEvidence.suites[0].testedVersion = 'record during final UAT'
+    expect(inspectExamUatEvidence(failedWithoutEvidence).ready).toBe(false)
   })
 })

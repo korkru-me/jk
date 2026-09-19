@@ -6,6 +6,8 @@
 
 ผล responsive/authenticated/recovery/cleanup บันทึกสถานะใน `config/exam-uat-evidence.json` ตาม `docs/EXAM_UAT_EVIDENCE.md`; ผล native SEB บันทึกแยกใน `config/seb-platform-evidence.json` ห้ามเก็บข้อมูลลับหรือข้อมูลนักเรียนในทั้งสองไฟล์
 
+หากจำไม่ได้ว่าต้องทำอะไรต่อ ให้รัน `npm run next:exam-uat` ระบบจะบอกทีละหนึ่งขั้นตามลำดับใน `docs/EXAM_UAT_NEXT_STEP.md`
+
 ## 1. สร้าง staging แยกก่อน
 
 - ใช้ Vercel Preview/โดเมน HTTPS ที่ไม่ใช่ production
