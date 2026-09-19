@@ -6,7 +6,7 @@
 
 ## Stack
 
-- Next.js 16.2.4 App Router
+- Next.js 16.3.5 App Router
 - React 19.2.4 และ TypeScript `strict`
 - Tailwind CSS 4, Base UI และ component ภายใน `components/ui/`
 - Supabase Auth, PostgreSQL, RLS และ Storage

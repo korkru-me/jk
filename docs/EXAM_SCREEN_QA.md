@@ -1,6 +1,6 @@
 # แผนตรวจหน้าข้อสอบจริงตามขนาดจอ
 
-อัปเดต: 12 กันยายน 2026 · **เฟส 1 ผ่านและพร้อม commit**
+อัปเดต: 20 กันยายน 2026 · **เฟส 1 ผ่าน · เครื่องมือทดสอบ runtime พร้อมสำหรับเฟส 2**
 
 เอกสารนี้เป็นแผนตรวจหน้าข้อสอบ KorKru บน iPhone, iPad และ Mac ก่อนกลับไปทดสอบ SEB บน Windows ตามลำดับที่ผู้ใช้เลือก ไม่ได้เปลี่ยน Windows ให้เป็น “ผ่าน” และไม่ได้ใช้ผลจาก Apple อนุมานแทน Windows
 
@@ -62,9 +62,11 @@ Agent ทำทั้งหมด: เพิ่มหน้าทดลอง de
 
 ### เฟส 2 — iPhone
 
-สถานะ: รอ
+สถานะ: กำลังทำแบบ agent-only; เลื่อน physical-device UAT ไปรวมหลังเฟส 8 ตามคำสั่งเจ้าของผลิตภัณฑ์
 
 Agent เปิด local URL และบอกทีละขั้น ผู้ใช้ช่วยถือ iPhone ทดสอบแนวตั้ง/แนวนอน คีย์บอร์ดภาษาไทย ช่องคณิตศาสตร์ แตะจับคู่ เรียงลำดับ เครื่องคิดเลข กระดาษทด รูป และไฟล์ โดยใช้ข้อมูลสมมติเท่านั้น
+
+ก่อนเริ่มแก้ UI ได้อัปเกรด Next.js จาก 16.2.4 เป็น 16.3.5 และติดตั้ง `agent-browser` 0.38.1 เพื่อให้ตรวจ runtime สองทางได้ตามกติกาโครงการ: `/_next/mcp` รายงาน `get_compilation_issues` ว่าง, route `/exam-screen-lab` อยู่ใน route map, หน้าเปิดด้วย Chrome จริงโดยไม่มี config/session error และ production build กับ 1,302 tests ผ่านทั้งหมด งานนี้ไม่เปลี่ยนฐานข้อมูล, environment หรือ production deployment
 
 ### เฟส 3 — iPad
 
@@ -112,5 +114,5 @@ Agent รันชุดตรวจทั้งหมด, ตรวจสิท
 
 - ยังไม่มี staging จึงยังพิสูจน์ autosave/upload/submit/RLS จริงไม่ได้
 - ยังไม่มี browser E2E framework; physical-device UAT ยังจำเป็น
-- dependency audit วันที่ 12 กันยายน 2026 รายงานช่องโหว่ 57 รายการ รวม Next.js ระดับ critical และ TipTap ระดับ high ต้องแก้เป็นงาน dependency แยกอย่างควบคุมก่อน production ห้ามใช้ automatic/forced fix เพราะอาจทำระบบเดิมพัง
+- dependency audit วันที่ 20 กันยายน 2026 หลังอัปเกรด Next.js เป็น 16.3.5 รายงาน 54 รายการ (3 low, 40 moderate, 11 high); ช่องโหว่ critical ของ Next.js เดิมไม่ปรากฏแล้ว แต่ TipTap และ dependency อื่นยังมีรายการ high ต้องแก้เป็นงาน dependency แยกอย่างควบคุมก่อน production ห้ามใช้ automatic/forced fix เพราะอาจทำระบบเดิมพัง
 - `npm run check:seb-readiness` ใน local คาดว่าจะไม่ผ่านเพราะจงใจไม่เก็บ production secret และ canonical HTTPS config ไว้ในเครื่อง ผลนี้ไม่ใช่ความล้มเหลวของห้องทดลองหน้าจอ

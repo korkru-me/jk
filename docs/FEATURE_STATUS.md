@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 14 กันยายน 2569
+ตรวจจาก repository: 20 กันยายน 2569
 
 ## วิธีอ่านสถานะ
 
@@ -12,6 +12,8 @@
 > โจทย์ประเภท "ส่งไฟล์งาน" (`file_upload`) เคยใช้งานบน production ไม่ได้จนถึง 23 สิงหาคม 2026 เพราะ `20260726120000_file_upload_question_type.sql` ไม่เคยถูก apply — ทั้งที่โค้ดฝั่งแอปรองรับครบมาตั้งแต่กรกฎาคม ตอนนี้รันแล้ว: enum `question_type` มีค่า `'file_upload'` และ bucket `submission-files` มีอยู่จริง (public, จำกัด 10 MB, รับ png/jpeg/webp/pdf) ยังไม่ได้ทดสอบเส้นทางอัปโหลดจริงจากฝั่งนักเรียน
 
 มี automated test (`npm test`) ครอบคลุม pure logic หลักและ route สำคัญบางส่วน รวมถึง upload/download ของงานวิจัยด้วย mock Supabase แต่ยังไม่แทนการทดสอบ Supabase, server action และ browser กับหลายบัญชีจริง การยืนยันฐานข้อมูลที่ deploy จริงจะระบุแยกไว้เฉพาะฟีเจอร์ที่ตรวจแล้ว และทุกสถานะยังต้องผ่าน end-to-end กับ authorization testing ก่อนเปลี่ยนเป็น “พร้อมใช้จริง”
+
+ชุดเครื่องมือพัฒนาอัปเกรดเป็น Next.js 16.3.5 แล้วเมื่อ 20 กันยายน 2026 เพื่อเปิดใช้ runtime verification ผ่าน `/_next/mcp` ร่วมกับ `agent-browser` 0.38.1 ก่อนทำ responsive QA ของหน้าข้อสอบ ตรวจ baseline และหลังอัปเกรดแล้วว่า 1,302 tests, TypeScript, design-token lint และ production build ผ่าน; MCP รายงาน compilation issues ว่างและ browser session ของ `/exam-screen-lab` ไม่มี config/runtime error การอัปเกรดนี้ไม่เปลี่ยน schema, environment หรือ production deployment ส่วน `npm audit` ลดจาก 57 เหลือ 54 รายการและไม่พบ Next.js critical เดิมแล้ว แต่ยังมี high severity ใน TipTap และ dependency อื่น จึงยังไม่ใช่หลักฐานว่าพร้อมเปิด production
 
 ## MVP core
 
