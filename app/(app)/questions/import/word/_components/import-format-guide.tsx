@@ -29,7 +29,7 @@ export function ImportFormatGuide({ profile }: { profile: ImportProfile }) {
         <p className="mt-0.5 text-xs text-muted-foreground">
           {planned
             ? 'ยังไม่ตายตัว — ถ้าไฟล์ของคุณเขียนคนละแบบ ส่งไฟล์ตัวอย่างมาได้ เราจะทำตามของจริงที่ครูใช้อยู่'
-            : `สำหรับโจทย์${profile.label}`}
+            : `สำหรับ${profile.noun}`}
         </p>
       </div>
 

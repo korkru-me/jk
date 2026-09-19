@@ -327,7 +327,7 @@ export function WordImportClient({ allTags, presets, profile, guide }: Props) {
               <div>
                 <p className="text-sm font-medium text-foreground">ลากไฟล์ Word มาวาง หรือเลือกไฟล์</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  ไฟล์ที่มีโจทย์{profile.label} · รองรับ .docx เท่านั้น
+                  ไฟล์ที่มี{profile.noun} · รองรับ .docx เท่านั้น
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   ตัวไฟล์อ่านในเครื่องของคุณ มีเฉพาะรูปที่ถูกอัปโหลดขึ้นระบบ

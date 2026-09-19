@@ -25,7 +25,7 @@ export function PlannedTypeNotice({
       <Construction className="size-8 text-muted-foreground" aria-hidden />
       <div>
         <p className="text-sm font-medium text-foreground">
-          ยังนำเข้าโจทย์{profile.label}จากไฟล์ Word ไม่ได้
+          ยังนำเข้า{profile.noun}จากไฟล์ Word ไม่ได้
         </p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           กำลังทำอยู่ — รูปแบบไฟล์ข้าง ๆ นี้คือสิ่งที่กำลังจะรองรับ จัดไฟล์รอไว้ได้
@@ -36,7 +36,7 @@ export function PlannedTypeNotice({
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Link href={profile.createHref}>
-          <Button type="button" size="sm">สร้างโจทย์{profile.label}ในเว็บ</Button>
+          <Button type="button" size="sm">สร้าง{profile.noun}ในเว็บ</Button>
         </Link>
         <Link href={chooserHref}>
           <Button type="button" variant="outline" size="sm">ดูประเภทที่นำเข้าได้แล้ว</Button>

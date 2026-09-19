@@ -88,10 +88,18 @@ export function WordTypeChoice({ selfHref }: { selfHref: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">นำเข้าได้แล้ว</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            ใบแรกคือไฟล์ที่มีโจทย์หลายข้อคละชนิดกัน · ที่เหลือเลือกเมื่อทั้งไฟล์เป็นชนิดเดียวกัน
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {ready.map(profile => (
           <ProfileCard key={profile.slug} profile={profile} href={hrefFor(profile)} />
         ))}
+        </div>
       </div>
 
       <div className="space-y-3">

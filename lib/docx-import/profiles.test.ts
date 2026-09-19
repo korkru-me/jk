@@ -65,6 +65,33 @@ describe('import profiles', () => {
     }
   })
 
+  it('names each profile twice: once for the card, once for a sentence', () => {
+    for (const profile of IMPORT_PROFILES) {
+      expect(profile.noun.length, profile.slug).toBeGreaterThan(0)
+      // "นำเข้าโจทย์โจทย์ผสม" is what happens when one name is used for both.
+      expect(profile.noun, profile.slug).not.toContain('โจทย์โจทย์')
+      expect(`นำเข้า${profile.noun}`, profile.slug).not.toContain('โจทย์โจทย์')
+    }
+  })
+
+  it('does not call the automatic reader a kind of โจทย์', () => {
+    // It reads a file that holds several kinds; it is not one of them. Naming
+    // it like a type is what made it read as โจทย์ผสม on the chooser.
+    expect(AUTO_PROFILE.type).toBeNull()
+    expect(AUTO_PROFILE.noun).not.toBe('โจทย์อ่านอัตโนมัติ')
+    expect(AUTO_PROFILE.label).toContain('ไฟล์')
+  })
+
+  it('keeps โจทย์ผสม and the automatic reader plainly apart', () => {
+    // One is many kinds inside a single ข้อ, the other many ข้อ inside a single
+    // file. They were worded almost identically and teachers could not tell
+    // which was which.
+    const composite = PROFILE_BY_TYPE.composite
+    expect(composite.label).toContain('ข้อเดียว')
+    expect(AUTO_PROFILE.label).toContain('ไฟล์เดียว')
+    expect(composite.blurb).not.toEqual(AUTO_PROFILE.blurb)
+  })
+
   it('numbers its rules from the document-splitting one', () => {
     // Word keeps question numbers outside the text, so this rule decides
     // whether a file can be read at all. It stays first everywhere.
