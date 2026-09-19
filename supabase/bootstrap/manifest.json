@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "freshProjectOnly": true,
+  "orderedSteps": [
+    {
+      "kind": "sql",
+      "path": "supabase/schema.sql",
+      "purpose": "ฐาน schema รุ่นแรกที่อยู่ก่อน migration ledger"
+    },
+    {
+      "kind": "sql",
+      "path": "supabase/bootstrap/010_question_images_prerequisite.sql",
+      "purpose": "สร้าง bucket ที่เดิมสร้างผ่าน Dashboard ก่อน migration ที่ปรับค่าและ policy"
+    },
+    {
+      "kind": "migrations",
+      "path": "supabase/migrations",
+      "purpose": "apply migration ตั้งแต่ 002 ตามลำดับ"
+    },
+    {
+      "kind": "sql",
+      "path": "supabase/bootstrap/900_disable_staging_cron.sql",
+      "purpose": "ปิด scheduled jobs ทั้งหมดบน Staging จนกว่าจะอนุมัติเปิดแยก"
+    },
+    {
+      "kind": "storage-api",
+      "path": "supabase/bootstrap/manifest.json",
+      "purpose": "ตรวจ bucket manifest และลบ bucket รุ่นเก่าผ่าน Storage API เมื่อว่างเท่านั้น"
+    },
+    {
+      "kind": "seed",
+      "path": "supabase/seed.sql",
+      "purpose": "ไม่มีข้อมูลผู้ใช้; ข้อมูล QA สังเคราะห์สร้างภายหลังผ่าน flow ของแอป"
+    }
+  ],
+  "storage": {
+    "requiredBuckets": [
+      {
+        "id": "question-images",
+        "public": true,
+        "fileSizeLimit": 10485760,
+        "allowedMimeTypes": ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"]
+      },
+      {
+        "id": "work-images",
+        "public": true,
+        "fileSizeLimit": 5242880,
+        "allowedMimeTypes": ["image/png", "image/jpeg", "image/webp"]
+      },
+      {
+        "id": "submission-files",
+        "public": true,
+        "fileSizeLimit": 10485760,
+        "allowedMimeTypes": ["image/png", "image/jpeg", "image/webp", "application/pdf"]
+      },
+      {
+        "id": "classroom-post-files",
+        "public": true,
+        "fileSizeLimit": 10485760,
+        "allowedMimeTypes": [
+          "image/png",
+          "image/jpeg",
+          "image/webp",
+          "image/gif",
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-powerpoint",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "text/plain",
+          "text/csv",
+          "application/zip",
+          "application/x-zip-compressed"
+        ]
+      },
+      {
+        "id": "math-work-artifacts",
+        "public": false,
+        "fileSizeLimit": 5242880,
+        "allowedMimeTypes": ["image/webp", "image/png", "application/json"]
+      },
+      {
+        "id": "ioc-signatures",
+        "public": false,
+        "fileSizeLimit": 262144,
+        "allowedMimeTypes": ["image/png"]
+      }
+    ],
+    "retiredBuckets": [
+      {
+        "id": "classroom-post-images",
+        "removeWith": "storage-api",
+        "mustBeEmpty": true
+      }
+    ]
+  },
+  "cron": {
+    "policy": "disabled",
+    "jobs": [
+      "homeroom-weekly-digest",
+      "exam-proctor-retention-daily",
+      "exam-android-approval-retention-daily"
+    ]
+  },
+  "seed": {
+    "policy": "synthetic-only",
+    "copyProductionRows": false,
+    "copyProductionStorage": false
+  }
+}

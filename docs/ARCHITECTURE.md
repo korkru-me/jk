@@ -18,8 +18,10 @@
 - Production ใช้ Vercel + Supabase project ที่แยกจาก environment อื่น และ Git migration ledger ตรงกับฐานที่ link อยู่ ณ 20 กันยายน 2026
 - Staging ยังไม่มี deployment/database จริง ณ วันเดียวกัน ห้ามใช้ Production เป็นพื้นที่ authenticated QA
 - แผน Staging ใช้ Vercel Preview ของ branch `staging` กับ Supabase project แยก และใช้ข้อมูล QA สังเคราะห์เท่านั้น
-- migration folder ไม่สามารถ bootstrap fresh project ได้เอง เพราะ migration เริ่มที่ `002`, อาศัย `supabase/schema.sql` และมี bucket ที่เคยสร้างนอก migration จึงต้องผ่าน bootstrap guard ในเฟส 2B ก่อนสร้าง Staging
-- inventory, blockers และ data-separation plan อยู่ใน `docs/STAGING_PHASE_2A_AUDIT.md`
+- migration folder ไม่สามารถ bootstrap fresh project ได้เอง เพราะ migration เริ่มที่ `002`, อาศัย `supabase/schema.sql` และมี bucket ที่เคยสร้างนอก migration; เฟส 2B จึงกำหนด fresh-project-only bootstrap manifest แยกจาก Production migration ledger พร้อม guard ที่ `supabase/bootstrap/manifest.json`
+- `KORKRU_DEPLOYMENT_ENV` เป็น environment contract กลาง: Vercel Preview ต้องระบุ `staging` และผ่าน site/Supabase isolation ก่อน build/start ส่วน Production เดิมอนุมานจาก `VERCEL_ENV=production` ได้เพื่อไม่ทำให้ deployment ปัจจุบันหยุดโดยไม่ตั้งใจ
+- Staging render ป้ายทดสอบและ `noindex`; `next.config.ts` ตรวจ build, `instrumentation.ts` ตรวจ startup และ root layout ตรวจก่อน render โดย error ไม่พิมพ์ URL/project ref/secret
+- inventory และ data-separation plan อยู่ใน `docs/STAGING_PHASE_2A_AUDIT.md`; guard/bootstrap contract อยู่ใน `docs/STAGING_PHASE_2B_GUARDS.md`
 
 ## โครงสร้าง repository
 
@@ -31,6 +33,7 @@
 - `lib/types.ts` — application domain types ที่เขียนด้วยมือ
 - `supabase/migrations/` — ประวัติการเปลี่ยน schema/RLS
 - `supabase/schema.sql` — baseline รุ่นแรก ไม่ควรถือว่าแทน migration ทั้งหมด
+- `supabase/bootstrap/` — ลำดับและ SQL สำหรับ fresh Staging project เท่านั้น ไม่อยู่ใน Production migration ledger
 - `proxy.ts` — refresh Supabase session สำหรับ request ที่เข้าแอป
 
 ## Runtime boundaries

@@ -1,0 +1,6 @@
+-- Intentionally empty.
+--
+-- Staging and local resets must never copy Production users, organizations,
+-- classrooms, answers, scores, research data, or Storage objects. Reference
+-- rows belong in versioned schema/migrations. Synthetic QA accounts and exam
+-- data are created later through the same application flows users exercise.

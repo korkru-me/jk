@@ -6,6 +6,7 @@ import {
 
 function validEnvironment(overrides = {}) {
   return {
+    KORKRU_DEPLOYMENT_ENV: 'staging',
     EXAM_QA_ENVIRONMENT: 'staging',
     VERCEL_ENV: 'preview',
     NEXT_PUBLIC_SITE_URL: 'https://staging.example.test',

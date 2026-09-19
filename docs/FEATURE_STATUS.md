@@ -41,6 +41,8 @@ Regression หลังเฟส 11 ผ่าน 103 test files / 1,348 tests, T
 
 Staging เฟส 2A สำรวจแบบ read-only แล้วและบันทึกใน `docs/STAGING_PHASE_2A_AUDIT.md`: Supabase migration local/remote ตรงกัน 117 รายการ, ยังไม่มี branch/deployment/database Staging และ Vercel CLI ยังไม่ link จุดสำคัญคือ fresh Supabase project ยังสร้างจาก migration folder อย่างเดียวไม่ได้ เพราะ history เริ่มที่ `002`, อาศัย `supabase/schema.sql`, `question-images` เคยสร้างจาก Dashboard และ config ชี้ `seed.sql` ที่ไม่มีอยู่ จึงห้าม `db push` ไปโปรเจกต์ใหม่จนกว่าเฟส 2B จะทำ bootstrap/runtime isolation guard แบบ versioned ก่อน เฟสนี้ไม่ได้แก้ Production, deploy, สร้างบัญชี หรือคัดลอกข้อมูลจริง
 
+Staging เฟส 2B เพิ่ม environment contract และ fail-closed build/start guard แล้ว: Preview ที่ไม่ระบุ `staging`, ชี้ site/Supabase ซ้ำ Production หรือขาด Staging keys จะไม่เริ่มแอป; Staging มีป้ายคงที่และ `noindex` ขณะที่ Production ไม่เปลี่ยน เพิ่ม fresh-project bootstrap manifest, `question-images` prerequisite, cron-disable policy, empty seed และ Storage API reconciler ที่ read-only โดยปริยาย ตัวตรวจ `npm run check:staging-bootstrap` ไม่แสดง URL/project ref/secret และยังจงใจรายงาน NOT READY จนมี Supabase Staging จริง เฟสนี้ไม่ได้สร้าง project, apply SQL/migration, deploy หรือแก้ Production รายละเอียดอยู่ใน `docs/STAGING_PHASE_2B_GUARDS.md`
+
 ## MVP core
 
 ### Authentication — บางส่วน

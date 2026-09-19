@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { IBM_Plex_Sans_Thai, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from 'next-themes'
+import { StagingIndicator } from '@/components/layout/staging-indicator'
+import { assertDeploymentEnvironment } from '@/lib/deployment-environment.mjs'
 import './globals.css'
 
 const ibmPlexSansThai = IBM_Plex_Sans_Thai({
@@ -16,9 +18,13 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+const deployment = assertDeploymentEnvironment(process.env)
+const isStaging = deployment.tier === 'staging'
+
 export const metadata: Metadata = {
   title: 'KorKru — กอการเรียนรู้ โดยครู',
   description: 'เว็บไซต์โจทย์ฟิสิกส์สำหรับครูและนักเรียน สร้างโจทย์สุ่มเลขไม่ซ้ำกัน',
+  robots: isStaging ? { index: false, follow: false, nocache: true } : undefined,
 }
 
 export default function RootLayout({
@@ -32,10 +38,12 @@ export default function RootLayout({
       suppressHydrationWarning
       // Style preset — see [data-style] at the bottom of app/globals.css.
       data-style="playful"
+      data-deployment-environment={deployment.tier}
       className={`${ibmPlexSansThai.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
+          {isStaging ? <StagingIndicator /> : null}
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

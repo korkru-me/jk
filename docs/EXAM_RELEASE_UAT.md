@@ -12,11 +12,11 @@
 
 ## 1. สร้าง staging แยกก่อน
 
-- อ่าน inventory และ blocker ใน `docs/STAGING_PHASE_2A_AUDIT.md`; ห้าม `supabase db push` ไป fresh project จนกว่า bootstrap guard เฟส 2B จะเสร็จ
+- อ่าน inventory ใน `docs/STAGING_PHASE_2A_AUDIT.md` และ bootstrap contract ใน `docs/STAGING_PHASE_2B_GUARDS.md`; ห้าม apply schema/migration จน `npm run check:staging-bootstrap` ผ่านกับ target Staging จริง
 - ใช้ Vercel Preview/โดเมน HTTPS ที่ไม่ใช่ production
 - ใช้ Supabase project ใหม่ที่ไม่ใช่ production
 - สร้างเฉพาะบัญชีครู/นักเรียนและข้อสอบจำลอง ห้ามคัดลอกข้อมูลนักเรียนจริง
-- ตั้งค่าตาม `.env.qa.example` แล้วรัน `npm run check:exam-staging` ให้ผ่านก่อนเริ่ม
+- ตั้งค่าตาม `.env.qa.example` แล้วรัน `npm run check:exam-staging` และ `npm run check:staging-bootstrap` ให้ผ่านก่อนเริ่ม
 
 ## 2. ตรวจหน้าจอจริง
 

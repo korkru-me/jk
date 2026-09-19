@@ -8,6 +8,8 @@
     "start": "next start",
     "measure:take-bundle": "node scripts/report-route-client-size.mjs 'app/(app)/assignments/[id]/take/page'",
     "check:exam-staging": "node scripts/check-exam-staging-readiness.mjs",
+    "check:staging-bootstrap": "node scripts/check-staging-bootstrap.mjs",
+    "reconcile:staging-storage": "node scripts/reconcile-staging-storage.mjs",
     "check:exam-release": "node scripts/check-exam-release.mjs",
     "check:exam-candidate": "node scripts/check-exam-release-candidate.mjs",
     "check:seb-platforms": "node scripts/check-seb-platform-evidence.mjs",
