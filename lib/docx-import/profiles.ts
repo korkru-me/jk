@@ -31,7 +31,13 @@
  */
 import type { QuestionType } from '@/lib/types'
 
-export type ImportProfileStatus = 'ready' | 'planned'
+/**
+ * `not-applicable` is a type that deliberately has no Word import — not one
+ * that is merely unfinished. It stays in the register so that adding a
+ * question type still forces the question to be answered, and so that the
+ * answer is written down where the next person can read it.
+ */
+export type ImportProfileStatus = 'ready' | 'planned' | 'not-applicable'
 
 export interface ImportRule {
   /** Stable across wording changes — warnings and tests cite this, not the text. */
@@ -77,6 +83,9 @@ export interface ImportProfile {
   limits: string[]
   /** Where to author this type by hand instead. */
   createHref: string
+  /** Why a `not-applicable` type is not imported. Read by nobody but the next
+   *  person to ask "where did this one go?" — which is the point. */
+  notApplicableReason?: string
 }
 
 // ─── Rules shared by every profile ───────────────────────────────────────────
@@ -374,17 +383,19 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
     label: 'ส่งไฟล์งาน',
     noun: 'โจทย์ส่งไฟล์งาน',
     blurb: 'คำสั่งงานที่นักเรียนส่งเป็นไฟล์กลับมา',
-    status: 'planned',
-    rules: [
-      NUMBERING,
-      { id: 'instruction', text: 'คำสั่งงานหนึ่งย่อหน้าต่อหนึ่งข้อ ไม่ต้องมีเฉลย' },
-    ],
+    // Not shown on the chooser at all. This one is modelled on posting an
+    // assignment the way Google Classroom does: the teacher writes the
+    // instruction and posts it. There is nothing in a .docx to read but that
+    // one instruction, so an import screen would be a longer way round to the
+    // same typing — and a card promising otherwise wastes the teacher's time
+    // before it disappoints them.
+    status: 'not-applicable',
+    notApplicableReason: 'คำสั่งงานหนึ่งย่อหน้าไม่มีอะไรให้อ่านจากไฟล์ — ครูโพสต์งานในเว็บได้เร็วกว่า',
+    rules: [NUMBERING],
     sample: [
       line('question', t('ให้นักเรียนถ่ายภาพการทดลองพร้อมเขียนผลการทดลอง แล้วส่งเป็นไฟล์ PDF')),
     ],
-    limits: [
-      'ประเภทนี้แทบไม่มีอะไรให้อ่านจากไฟล์ การสร้างในเว็บโดยตรงเร็วกว่า',
-    ],
+    limits: [],
     createHref: '/questions/new/file-upload',
   },
 }
@@ -442,11 +453,22 @@ const PROFILE_ORDER: QuestionType[] = [
   'composite', 'file_upload',
 ]
 
+/**
+ * The profiles the chooser offers, which is every type but the ones whose
+ * answer to "does this import from Word?" is no.
+ */
 export const IMPORT_PROFILES: ImportProfile[] = [
   AUTO_PROFILE,
-  ...PROFILE_ORDER.map(type => PROFILE_BY_TYPE[type]),
+  ...PROFILE_ORDER.map(type => PROFILE_BY_TYPE[type]).filter(profile => profile.status !== 'not-applicable'),
 ]
 
+/**
+ * Only ever finds a profile the chooser offers.
+ *
+ * A type with no import has no page: the address exists in nobody's history,
+ * so a 404 is a truer answer than a screen explaining a feature that was
+ * decided against.
+ */
 export function findProfile(slug: string): ImportProfile | null {
   return IMPORT_PROFILES.find(profile => profile.slug === slug) ?? null
 }
