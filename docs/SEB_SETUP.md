@@ -98,10 +98,16 @@ Migrations ตามลำดับ:
 - ก่อน deploy ต้องตั้ง `NEXT_PUBLIC_SEB_CONFIG_URL=https://www.korkru.com/exam/korkru-production-v1.seb`; หลัง deploy ต้องทดสอบดาวน์โหลดไฟล์, system check, autosave/reconnect/submit และห้องคุมสอบด้วย Mac กับ iPad จริง
 - Windows ยังไม่อยู่ใน production matrix จนกว่าจะเก็บ BEK จาก SEB build ที่จะอนุญาตและผ่าน mock exam บนเครื่อง Windows จริง; Android ยังพักไว้ตามขอบเขตการเปิดใช้รอบนี้
 
+อัปเดตการทดสอบ Windows วันที่ 19 กันยายน 2026:
+
+- ชุดทดลอง N2.1 แบบแยกจาก production ผ่านบน **Windows 11 x64 + SEB 3.10.2.920**: ไฟล์ A/B เปิดโดยไม่ถาม opening password, CK และ BEK ที่ผู้ทดสอบอ่านจาก native build ตรง, รหัสออกข้ามชุดถูกปฏิเสธ, รหัสของไฟล์ตัวเองใช้ได้ และ Quit URL ออกได้โดยไม่ถามรหัส
+- เมื่อหน้าตรวจคาดหวัง A การเปิด B ถูกปฏิเสธ และ `LAB-N2-a-modified.seb` ถูกปฏิเสธโดยไม่มีลิงก์ออก หลักฐานไฟล์ที่ไม่เป็นความลับคือ A `6cd4858f…617db`, B `b70d1a3d…42330`, A-modified `4b664bb0…892ae`
+- ผลนี้พิสูจน์เฉพาะ native core ของชุดทดลอง ไม่ใช่ mock exam จริงและยัง **ไม่เพิ่ม Windows เข้า production matrix**: ยังต้องเก็บ BEK ของไฟล์ production ที่จะเผยแพร่, ตั้ง environment อย่างปลอดภัย แล้วทดสอบ system check, autosave/reconnect, submit และเส้นทางออกบน staging/ข้อสอบจำลองก่อนเปิดใช้
+
 สิ่งที่ยังเป็น blocker และต้องจัดเตรียมก่อนเปิดข้อสอบ SEB จริง:
 
 - ตั้ง `NEXT_PUBLIC_SEB_CONFIG_URL` ให้ชี้ไปยัง public path ที่ deploy แล้ว และยืนยันว่าเปิดดาวน์โหลดไฟล์จริงได้
-- supported build matrix สำหรับรอบนำร่องให้ระบุเฉพาะ macOS และ iPadOS build ที่ผ่าน device test; เพิ่ม Windows ภายหลังเมื่อเก็บ BEK และทดสอบเครื่องจริงแล้ว
+- supported build matrix สำหรับรอบนำร่องให้ระบุเฉพาะ build ที่ผ่าน production-config mock exam แล้ว; Windows 11 x64 + SEB 3.10.2.920 ผ่านเฉพาะ N2.1 lab จึงยังไม่เพิ่มจนกว่าจะเก็บ production BEK และผ่านเส้นทางสอบจำลองจริง
 - staging ที่แยกจาก production พร้อมบัญชีครู/นักเรียนทดสอบและข้อสอบ fixture สำหรับทดสอบ login, Realtime, autosave, upload, reconnect และ submit โดยไม่สร้างข้อมูลทดสอบใน production
 
 รายการนี้เป็น production-readiness gate ไม่ควรแทนที่ด้วยค่า CK/BEK ปลอมหรือทดสอบสร้าง submission บนฐานข้อมูลจริง เมื่อได้ข้อมูลครบแล้วให้ deploy environment และไฟล์ `.seb` ไป staging ก่อน ทำ automated integration test ที่ไม่แตะ production แล้วจึงทดสอบเครื่องจริงตาม platform/build matrix
