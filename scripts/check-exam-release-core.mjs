@@ -1,9 +1,9 @@
 /**
- * Combine the two evidence gates that require external state. Code regression
+ * Combine the evidence gates that require external state. Code regression
  * remains a CI/local command and is intentionally not represented by a stale
  * boolean in a committed manifest.
  */
-export function inspectExamReleaseReadiness({ stagingReady, sebPlatformsReady }) {
+export function inspectExamReleaseReadiness({ stagingReady, sebPlatformsReady, externalUatReady }) {
   const checks = [
     stagingReady
       ? { status: 'pass', field: 'authenticated staging', message: 'staging isolation preflight ผ่าน' }
@@ -11,6 +11,9 @@ export function inspectExamReleaseReadiness({ stagingReady, sebPlatformsReady })
     sebPlatformsReady
       ? { status: 'pass', field: 'SEB platforms', message: 'ทุก platform ผ่าน production-config evidence gate' }
       : { status: 'blocker', field: 'SEB platforms', message: 'หลักฐาน BEK, staging mock exam หรือ physical UAT ยังไม่ครบทุก platform' },
+    externalUatReady
+      ? { status: 'pass', field: 'external UAT suites', message: 'responsive, authenticated, recovery และ cleanup evidence ครบ' }
+      : { status: 'blocker', field: 'external UAT suites', message: 'หลักฐาน responsive, authenticated, recovery หรือ cleanup ยังไม่ครบ' },
   ]
   return { ready: checks.every(check => check.status !== 'blocker'), checks }
 }

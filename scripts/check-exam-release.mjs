@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { parseEnvFile } from './check-seb-readiness-core.mjs'
 import { inspectExamStagingReadiness } from './check-exam-staging-readiness-core.mjs'
 import { inspectSebPlatformEvidence } from './check-seb-platform-evidence-core.mjs'
+import { inspectExamUatEvidence } from './check-exam-uat-evidence-core.mjs'
 import {
   formatExamReleaseReadinessReport,
   inspectExamReleaseReadiness,
@@ -10,6 +11,7 @@ import {
 
 const QA_ENV_URL = new URL('../.env.qa.local', import.meta.url)
 const PLATFORM_MANIFEST_URL = new URL('../config/seb-platform-evidence.json', import.meta.url)
+const UAT_MANIFEST_URL = new URL('../config/exam-uat-evidence.json', import.meta.url)
 
 async function readQaEnvironment() {
   try {
@@ -20,23 +22,26 @@ async function readQaEnvironment() {
   }
 }
 
-async function readPlatformManifest() {
+async function readJsonManifest(url) {
   try {
-    return JSON.parse(await readFile(PLATFORM_MANIFEST_URL, 'utf8'))
+    return JSON.parse(await readFile(url, 'utf8'))
   } catch {
     return {}
   }
 }
 
-const [{ environment, parseReady }, platformManifest] = await Promise.all([
+const [{ environment, parseReady }, platformManifest, uatManifest] = await Promise.all([
   readQaEnvironment(),
-  readPlatformManifest(),
+  readJsonManifest(PLATFORM_MANIFEST_URL),
+  readJsonManifest(UAT_MANIFEST_URL),
 ])
 const staging = inspectExamStagingReadiness(environment)
 const platforms = inspectSebPlatformEvidence(platformManifest)
+const externalUat = inspectExamUatEvidence(uatManifest)
 const result = inspectExamReleaseReadiness({
   stagingReady: parseReady && staging.ready,
   sebPlatformsReady: platforms.ready,
+  externalUatReady: externalUat.ready,
 })
 
 console.log(formatExamReleaseReadinessReport(result.checks))

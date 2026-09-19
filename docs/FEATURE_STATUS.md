@@ -27,6 +27,10 @@ Recovery/proctor QA เฟส 7 ผ่านในขอบเขต agent-only 
 
 Regression ปิดเฟสผ่าน 100 test files / 1,326 tests, TypeScript, token lint, production build 63 static pages และ Next.js MCP/browser runtime smoke โดยไม่พบ compilation/runtime error; ตัวเลขนี้ยืนยัน commit ฝั่งโค้ดเท่านั้น ไม่ยกเลิก external release blockers
 
+เฟส 9 เพิ่ม external UAT evidence แบบ fixed schema/no-free-text ใน `config/exam-uat-evidence.json` ครบ iPhone/iPad/Mac/Windows responsive, authenticated exam, recovery/proctor และ QA cleanup พร้อม `npm run check:exam-uat`; ตัวตรวจบังคับ timestamp ISO + รุ่นที่ทดสอบ, ปฏิเสธ field เพิ่ม และถูกนำไปรวมใน `check:exam-release` แล้ว สถานะทั้ง 7 suite ยัง pending ตามจริง
+
+Regression หลังเฟส 9 ผ่าน 101 test files / 1,333 tests, TypeScript และ token lint; release/UAT checks ยัง fail closed ตาม external evidence ที่ขาด ไม่ได้เปลี่ยน pending เป็นผ่านอัตโนมัติ
+
 ## MVP core
 
 ### Authentication — บางส่วน

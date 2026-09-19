@@ -1,6 +1,6 @@
 # แผนตรวจหน้าข้อสอบจริงตามขนาดจอ
 
-อัปเดต: 20 กันยายน 2026 · **เฟส agent-only 1–8 จบ · release gate ยังรอ staging และ physical-device UAT**
+อัปเดต: 20 กันยายน 2026 · **เฟส agent-only 1–9 จบ · release gate ยังรอ staging และ physical-device UAT**
 
 เอกสารนี้เป็นแผนตรวจหน้าข้อสอบ KorKru บน iPhone, iPad และ Mac ก่อนกลับไปทดสอบ SEB บน Windows ตามลำดับที่ผู้ใช้เลือก ไม่ได้เปลี่ยน Windows ให้เป็น “ผ่าน” และไม่ได้ใช้ผลจาก Apple อนุมานแทน Windows
 
@@ -133,7 +133,17 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ตัวตรวจต้องรายงาน `NOT READY` ในเครื่องปัจจุบัน เพราะยังไม่มี staging แยกและหลักฐาน production BEK + staging mock exam + physical UAT ยัง pending นี่เป็นผลที่ถูกต้อง ไม่ใช่ข้อผิดพลาด และห้ามเปลี่ยนสถานะให้ผ่านจากผล native lab เดิม
 
-ผลตรวจปิดเฟส: 100 test files / 1,326 tests ผ่าน, TypeScript และ design-token lint ผ่าน, production build สร้าง 63 static pages สำเร็จ, Next.js MCP ไม่พบ config/session/compilation issue และ browser smoke หลัง restart ไม่พบ runtime error; release checker รายงาน external blockers 2 กลุ่มตรงตามสถานะจริง (staging และ SEB platform evidence)
+ผลตรวจปิดเฟส: 100 test files / 1,326 tests ผ่าน, TypeScript และ design-token lint ผ่าน, production build สร้าง 63 static pages สำเร็จ, Next.js MCP ไม่พบ config/session/compilation issue และ browser smoke หลัง restart ไม่พบ runtime error
+
+### เฟส 9 — หลักฐาน UAT แบบ fail-closed
+
+สถานะ: **agent-only tooling ผ่าน · UAT จริงทั้ง 7 ชุดยัง pending**
+
+เพิ่ม manifest schema ตายตัว `config/exam-uat-evidence.json` กับ `npm run check:exam-uat` เพื่อแยก iPhone/iPad/Mac/Windows responsive, authenticated staging, recovery/proctor และการล้างข้อมูล QA ตัวตรวจบังคับผลผ่านพร้อมเวลา ISO/รุ่นที่ทดสอบและปฏิเสธ field เพิ่มเติม เพื่อกัน secret/ข้อมูลนักเรียน/free-text หลุดเข้า Git รายละเอียดอยู่ใน `docs/EXAM_UAT_EVIDENCE.md`
+
+`npm run check:exam-release` รวม gate นี้แล้วและปัจจุบันรายงาน external blockers 3 กลุ่มตรงตามสถานะจริง: staging isolation, SEB platform evidence และ external UAT suites
+
+ผลตรวจเฟส 9: 101 test files / 1,333 tests, TypeScript, design-token lint และ schema checks ผ่าน; `check:exam-uat` จงใจรายงาน 7 pending suites และ `check:exam-release` จงใจรายงาน 3 external blocker groups โดยไม่แสดงค่ารุ่นหรือข้อมูลที่บันทึกไว้
 
 ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) แต่ Windows ยังเป็น pending production release gate จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
 

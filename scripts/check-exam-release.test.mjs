@@ -9,6 +9,7 @@ describe('exam release gate', () => {
     expect(inspectExamReleaseReadiness({
       stagingReady: true,
       sebPlatformsReady: true,
+      externalUatReady: true,
     }).ready).toBe(true)
   })
 
@@ -16,9 +17,10 @@ describe('exam release gate', () => {
     const result = inspectExamReleaseReadiness({
       stagingReady: false,
       sebPlatformsReady: false,
+      externalUatReady: false,
     })
     expect(result.ready).toBe(false)
-    expect(result.checks.filter(check => check.status === 'blocker')).toHaveLength(2)
-    expect(formatExamReleaseReadinessReport(result.checks)).toContain('NOT READY: 2 external release blocker(s)')
+    expect(result.checks.filter(check => check.status === 'blocker')).toHaveLength(3)
+    expect(formatExamReleaseReadinessReport(result.checks)).toContain('NOT READY: 3 external release blocker(s)')
   })
 })

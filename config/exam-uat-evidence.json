@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "runId": "final-release-uat",
+  "suites": [
+    {
+      "id": "iphone-responsive",
+      "label": "iPhone responsive UI",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
+    },
+    {
+      "id": "ipad-responsive",
+      "label": "iPad responsive UI",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
+    },
+    {
+      "id": "mac-responsive",
+      "label": "Mac responsive UI",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
+    },
+    {
+      "id": "windows-responsive",
+      "label": "Windows responsive UI",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
+    },
+    {
+      "id": "authenticated-exam",
+      "label": "Authenticated staging exam",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
+    },
+    {
+      "id": "recovery-proctor",
+      "label": "Recovery and proctor drill",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
+    },
+    {
+      "id": "qa-data-cleanup",
+      "label": "QA data cleanup",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
+    }
+  ]
+}

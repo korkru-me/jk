@@ -2,7 +2,9 @@
 
 อัปเดต: 20 กันยายน 2026
 
-เฟส agent-only 1–8 จบแล้ว แต่ **ยังไม่พร้อมเปิดขายระบบสอบ** จนกว่ารายการด้านล่างจะผ่านบน staging และอุปกรณ์จริง ตัวตรวจ `npm run check:exam-release` จงใจขึ้น `NOT READY` ระหว่างที่หลักฐานเหล่านี้ยังไม่ครบ
+เฟส agent-only 1–9 จบแล้ว แต่ **ยังไม่พร้อมเปิดขายระบบสอบ** จนกว่ารายการด้านล่างจะผ่านบน staging และอุปกรณ์จริง ตัวตรวจ `npm run check:exam-release` จงใจขึ้น `NOT READY` ระหว่างที่หลักฐานเหล่านี้ยังไม่ครบ
+
+ผล responsive/authenticated/recovery/cleanup บันทึกสถานะใน `config/exam-uat-evidence.json` ตาม `docs/EXAM_UAT_EVIDENCE.md`; ผล native SEB บันทึกแยกใน `config/seb-platform-evidence.json` ห้ามเก็บข้อมูลลับหรือข้อมูลนักเรียนในทั้งสองไฟล์
 
 ## 1. สร้าง staging แยกก่อน
 
@@ -51,6 +53,7 @@
 
 - `npm test`, `npx tsc --noEmit`, `npm run lint:tokens` และ `npm run build` ผ่านจาก commit เดียวกัน
 - `npm run check:exam-staging` ผ่าน
+- `npm run check:exam-uat` ผ่าน
 - `npm run check:seb-platforms` ผ่าน
 - `npm run check:exam-release` ผ่าน
 - ไม่มี password, CK/BEK, token, request hash, ชื่อนักเรียน, คำตอบ หรือภาพข้อมูลจริงใน commit/log/เอกสาร
