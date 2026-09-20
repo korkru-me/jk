@@ -366,6 +366,67 @@
 }
 
 /*
+ * A phone in landscape has plenty of width but very little usable height,
+ * especially while Safari's tab and address bars are visible. Keep every
+ * math key at the 44px touch target, but use that width for fewer rows so the
+ * active answer and part of the question remain visible above the keypad.
+ */
+@media (orientation: landscape) and (max-height: 500px) {
+  [data-math-keypad-overlay] {
+    padding-block: 0.25rem;
+  }
+
+  [data-math-keypad-panel] {
+    max-height: 58%;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+  }
+
+  [data-math-keypad-panel] button {
+    min-height: 2.75rem;
+  }
+
+  [data-math-keypad-toolbar] {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  [data-math-keypad-title] {
+    order: 1;
+    flex: none;
+  }
+
+  [data-math-keypad-subtitle] {
+    display: none;
+  }
+
+  [data-math-keypad-controls] {
+    order: 2;
+    grid-column: auto;
+    min-width: 0;
+    flex: 1;
+    gap: 0.25rem;
+  }
+
+  [data-math-keypad-close] {
+    order: 3;
+  }
+
+  [data-math-keypad-core] {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+
+  [data-math-keypad-advanced] {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 0.25rem;
+    padding-top: 0.25rem;
+  }
+}
+
+/*
  * Staging keeps a fixed environment badge at the top of every screen. The
  * exam preview banner also starts at the top, so its first line needs a safe
  * zone underneath that badge. This selector is inert in Production.

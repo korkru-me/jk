@@ -260,69 +260,80 @@ export function MathAnswerField({
       </span>
 
       {active && typeof document !== 'undefined' && createPortal((
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-[80] flex h-[var(--app-height,100dvh)] items-end justify-center p-2">
+        <div
+          data-math-keypad-overlay
+          className="pointer-events-none fixed inset-x-0 top-0 z-[80] flex h-[var(--app-height,100dvh)] items-end justify-center p-2"
+        >
           <Card
             ref={panelRef}
             id={panelId}
+            data-math-keypad-panel
             role="group"
             aria-label="แป้นคณิตศาสตร์"
             padding="sm"
-            className="pointer-events-auto max-h-[70%] w-full max-w-2xl space-y-2 overflow-y-auto overscroll-contain shadow-xl"
+            className="pointer-events-auto flex max-h-[70%] w-full max-w-2xl flex-col gap-2 overflow-y-auto overscroll-contain shadow-xl"
             style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
             {...caret.keypadProps}
           >
-          <div className="flex items-center gap-2">
-            <div>
+          <div
+            data-math-keypad-toolbar
+            className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2"
+          >
+            <div data-math-keypad-title>
               <p className="text-sm font-semibold">แป้นคณิตศาสตร์</p>
-              <p className="text-[11px] text-muted-foreground">ใส่ที่ตำแหน่งเคอร์เซอร์ · กด Esc เพื่อปิด</p>
+              <p data-math-keypad-subtitle className="text-[11px] text-muted-foreground">ใส่ที่ตำแหน่งเคอร์เซอร์ · กด Esc เพื่อปิด</p>
             </div>
-            <Button type="button" variant="ghost" size="icon-sm" className="ml-auto pointer-coarse:size-11" onClick={closeKeypad} aria-label="ปิดแป้นคณิตศาสตร์">
+            <Button
+              data-math-keypad-close
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="pointer-coarse:size-11"
+              onClick={closeKeypad}
+              aria-label="ปิดแป้นคณิตศาสตร์"
+            >
               <X />
             </Button>
-          </div>
 
-          <div className="flex items-center gap-1">
-            <span className="mr-1 text-[11px] text-muted-foreground">หน่วยมุม</span>
-            {(['deg', 'rad'] as const).map(option => (
-              <Button
-                key={option}
-                type="button"
-                variant={mode === option ? 'secondary' : 'outline'}
-                size="xs"
-                aria-pressed={mode === option}
-                onClick={() => onModeChange(option)}
-                className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
-              >
-                {option.toUpperCase()}
+            <div data-math-keypad-controls className="col-span-2 flex items-center gap-1">
+              <span className="mr-1 text-[11px] text-muted-foreground">หน่วยมุม</span>
+              {(['deg', 'rad'] as const).map(option => (
+                <Button
+                  key={option}
+                  type="button"
+                  variant={mode === option ? 'secondary' : 'outline'}
+                  size="xs"
+                  aria-pressed={mode === option}
+                  onClick={() => onModeChange(option)}
+                  className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
+                >
+                  {option.toUpperCase()}
+                </Button>
+              ))}
+              <Button type="button" variant="ghost" size="sm" className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
+                {advanced ? <ChevronUp /> : <ChevronDown />}
+                ขั้นสูง
               </Button>
-            ))}
-            <Button type="button" variant="ghost" size="sm" className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
-              {advanced ? <ChevronUp /> : <ChevronDown />}
-              ขั้นสูง
-            </Button>
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            {CORE_KEYS.map((row, rowIndex) => (
-              <div key={rowIndex} className="grid grid-cols-6 gap-1.5">
-                {row.map((mathKey, keyIndex) => (
-                  <Button
-                    key={`${mathKey.label}-${keyIndex}`}
-                    type="button"
-                    variant="outline"
-                    className="h-9 min-w-0 px-1 font-mono pointer-coarse:h-11"
-                    aria-label={mathKey.ariaLabel ?? mathKey.label}
-                    onClick={() => runAction(mathKey.action)}
-                  >
-                    {mathKey.action.kind === 'backspace' ? <Delete /> : mathKey.label}
-                  </Button>
-                ))}
-              </div>
-            ))}
+          <div data-math-keypad-core className="grid grid-cols-6 gap-1.5">
+            {CORE_KEYS.flatMap((row, rowIndex) => row.map((mathKey, keyIndex) => (
+              <Button
+                key={`${mathKey.label}-${rowIndex}-${keyIndex}`}
+                type="button"
+                variant="outline"
+                className="h-9 min-w-0 px-1 font-mono pointer-coarse:h-11"
+                aria-label={mathKey.ariaLabel ?? mathKey.label}
+                onClick={() => runAction(mathKey.action)}
+              >
+                {mathKey.action.kind === 'backspace' ? <Delete /> : mathKey.label}
+              </Button>
+            )))}
           </div>
 
           {advanced && (
-            <div className="grid grid-cols-6 gap-1.5 border-t border-border pt-2">
+            <div data-math-keypad-advanced className="grid grid-cols-6 gap-1.5 border-t border-border pt-2">
               {ADVANCED_KEYS.map((mathKey, index) => (
                 <Button
                   key={`${mathKey.label}-${index}`}
