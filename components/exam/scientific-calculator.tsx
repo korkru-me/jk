@@ -261,7 +261,10 @@ export default function ScientificCalculator({
           ref={inputRef}
           value={expression}
           maxLength={1_000}
-          inputMode="text"
+          // The calculator supplies every supported symbol in its own keypad.
+          // Keep iOS/iPadOS from stacking the system keyboard on top of it;
+          // hardware keyboard input continues to work normally.
+          inputMode="none"
           autoComplete="off"
           spellCheck={false}
           aria-label="นิพจน์ในเครื่องคิดเลข"

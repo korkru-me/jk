@@ -105,6 +105,7 @@ export function MathAnswerField({
   inputClassName,
 }: MathAnswerFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const toggleButtonRef = useRef<HTMLButtonElement>(null)
   const caret = useMathCaret(inputRef)
   const panelId = useId()
@@ -125,6 +126,50 @@ export function MathAnswerField({
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [active, closeKeypad])
+
+  useEffect(() => {
+    if (!active) return
+    let frame = 0
+    const revealInput = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const input = inputRef.current
+        const panel = panelRef.current
+        if (!input || !panel) return
+        const inputBounds = input.getBoundingClientRect()
+        const panelBounds = panel.getBoundingClientRect()
+        const coveredBy = inputBounds.bottom - panelBounds.top + 12
+        if (coveredBy <= 0) return
+
+        // The keypad is a fixed bottom sheet, so the browser does not account
+        // for it when revealing the focused field. Move the nearest real
+        // scroller by exactly the covered distance, keeping the answer above
+        // the sheet without needlessly jumping the whole question.
+        let scroller = input.parentElement
+        while (scroller) {
+          const overflowY = getComputedStyle(scroller).overflowY
+          if (/auto|scroll|overlay/.test(overflowY) && scroller.scrollHeight > scroller.clientHeight) break
+          scroller = scroller.parentElement
+        }
+        if (scroller) scroller.scrollTop += coveredBy
+        else input.scrollIntoView({ block: 'start', inline: 'nearest' })
+      })
+    }
+
+    revealInput()
+    const panelResizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(revealInput)
+    if (panelRef.current) panelResizeObserver?.observe(panelRef.current)
+    window.addEventListener('resize', revealInput)
+    window.visualViewport?.addEventListener('resize', revealInput)
+    return () => {
+      cancelAnimationFrame(frame)
+      panelResizeObserver?.disconnect()
+      window.removeEventListener('resize', revealInput)
+      window.visualViewport?.removeEventListener('resize', revealInput)
+    }
+  }, [active])
 
   const apply = (edit: MathInputEditResult) => {
     onChange(edit.value)
@@ -157,7 +202,11 @@ export function MathAnswerField({
         <Input
           ref={inputRef}
           type="text"
-          inputMode="text"
+          // This field already opens the complete math keypad below. Asking
+          // for a second software keyboard leaves almost no usable viewport
+          // on iPhone/iPad; `none` suppresses that keyboard without blocking
+          // a physical keyboard on desktop or a paired keyboard on a tablet.
+          inputMode="none"
           autoComplete="off"
           spellCheck={false}
           aria-label={ariaLabel}
@@ -213,11 +262,12 @@ export function MathAnswerField({
       {active && typeof document !== 'undefined' && createPortal((
         <div className="pointer-events-none fixed inset-x-0 top-0 z-[80] flex h-[var(--app-height,100dvh)] items-end justify-center p-2">
           <Card
+            ref={panelRef}
             id={panelId}
             role="group"
             aria-label="แป้นคณิตศาสตร์"
             padding="sm"
-            className="pointer-events-auto max-h-full w-full max-w-2xl space-y-2 overflow-y-auto overscroll-contain shadow-xl"
+            className="pointer-events-auto max-h-[70%] w-full max-w-2xl space-y-2 overflow-y-auto overscroll-contain shadow-xl"
             style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
             {...caret.keypadProps}
           >
