@@ -1,7 +1,7 @@
 # Staging phase 2C — isolated Supabase and Vercel Preview rollout
 
 อัปเดต: 20 กันยายน 2026
-สถานะ: **ทรัพยากรภายนอก, bootstrap และ Vercel Preview deploy เสร็จแล้ว; รอ HTTPS certificate propagation ก่อน smoke test สุดท้าย**
+สถานะ: **ทรัพยากรภายนอก, bootstrap, Vercel Preview deploy, DNS และ HTTPS เสร็จแล้ว; รอเฉพาะ authenticated UI smoke test โดยผู้ใช้**
 
 ## ทรัพยากรที่สร้าง
 
@@ -48,8 +48,10 @@ post-bootstrap audit:
 - Vercel Preview ของ branch `staging` build สำเร็จและอยู่ในสถานะ Ready
 - `staging.korkru.com` ถูกผูกกับ branch `staging` โดยเฉพาะ
 - Cloudflare A record ชี้ `staging.korkru.com` ไป Vercel ที่ `76.76.21.21`
-- HTTP request ถึง Vercel และถูกส่งไป Vercel Authentication ตาม deployment
-  protection ที่ตั้งใจไว้; HTTPS certificate ยังอยู่ระหว่างออกหลังเปลี่ยน DNS
+- HTTP และ HTTPS request ถึง Vercel และถูกส่งไป Vercel Authentication ตาม
+  deployment protection ที่ตั้งใจไว้
+- Vercel ออก TLS certificate สำหรับ `staging.korkru.com` สำเร็จ เปิด auto-renew
+  และส่ง HSTS header แล้ว
 
 ## Fresh-bootstrap compatibility ที่พบจากการรันจริง
 
