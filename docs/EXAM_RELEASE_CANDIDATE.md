@@ -7,11 +7,13 @@ revision, Vercel Staging deployment และ SEB config ไว้ใน
 `config/exam-release-candidate.json`; `npm run check:exam-candidate` ผ่านครบ
 และงานถัดไปคือ responsive UAT บน iPhone จริง
 
-candidate ถูกล็อกใหม่เป็นรอบ `r2` หลังภาพจาก iPhone จริงพบว่าป้าย Staging ซ้อน
-ข้อความในแถบโหมดตัวอย่าง และแก้ให้แถบเว้น safe zone เฉพาะ Staging แล้ว build
-optimized ซ้ำทั้ง mobile/tablet/desktop; build ใหม่ขึ้นสถานะ Ready และ canonical
-Staging alias ชี้มาที่ build นี้แล้ว ผล UAT ทั้งหมดยังคงเป็น `pending` จึงไม่มีผลจาก
-build เก่าถูกนำมารวม
+candidate ถูกล็อกใหม่เป็นรอบ `r3` หลัง physical iPhone UAT พบรอบ `r2` ว่า
+ช่องคำตอบเรียกคีย์บอร์ด iOS ซ้อนกับแป้นคณิตศาสตร์ของเว็บ และ bottom sheet บัง
+ช่อง active; แก้ให้ช่องที่มีแป้นครบไม่ขอ software keyboard พร้อมเลื่อนช่องเหนือแผง
+ตามความสูงจริงแล้ว build optimized ซ้ำทั้ง mobile/tablet/desktop; deployment ใหม่
+ขึ้นสถานะ Ready, canonical Staging alias ชี้มาที่ commit `a953fcd` และตรวจ DOM
+บน `staging.korkru.com` ที่ 393×852 แล้วว่า `inputmode="none"` กับช่อง/แผงไม่ซ้อนกัน
+ผล UAT ทั้งหมดยังคงเป็น `pending` จึงไม่มีผลจาก build เก่าถูกนำมารวม
 
 หลักฐาน UAT หลังล็อก candidate ให้ commit/push ที่ branch `exam-uat-evidence`
 ซึ่งถูกปิด deployment ใน `vercel.json`; ห้าม push evidence-only commit ไป branch

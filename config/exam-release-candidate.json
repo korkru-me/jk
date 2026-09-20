@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "candidateId": "final-release-uat-r2",
-  "sourceRevision": "27f8e7cbd9a4d6053ee6a816c7fe42de14486c65",
-  "stagingBuild": "dpl_FceCRCraqahCo4GJPbSgUuimppkc",
+  "candidateId": "final-release-uat-r3",
+  "sourceRevision": "a953fcde0a71b5b7c013b4a84b82f587c0ccfb9f",
+  "stagingBuild": "dpl_HNartbB6yNu35TmBi2ftFZmyWUJo",
   "sebConfigId": "korkru-production-v1",
-  "lockedAt": "2026-09-20T14:23:12.000Z"
+  "lockedAt": "2026-09-20T14:57:41.000Z"
 }
