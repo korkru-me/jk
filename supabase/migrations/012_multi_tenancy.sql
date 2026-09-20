@@ -60,6 +60,11 @@ CREATE TABLE IF NOT EXISTS public.super_admins (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Platform authority is checked only from trusted SECURITY DEFINER/server
+-- paths. Production has RLS enabled with no client policies, so reproduce the
+-- same fail-closed posture when bootstrapping a fresh project.
+ALTER TABLE public.super_admins ENABLE ROW LEVEL SECURITY;
+
 
 -- =============================================================================
 -- PHASE 2: Helper Functions (SECURITY DEFINER — ป้องกัน infinite recursion)

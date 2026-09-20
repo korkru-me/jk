@@ -1,7 +1,10 @@
 # Staging phase 2B — guard และ fresh-project bootstrap contract
 
 อัปเดต: 20 กันยายน 2026
-สถานะ: **โค้ดป้องกันพร้อมแล้ว — ยังไม่ได้สร้างหรือแก้ Supabase/Vercel ภายนอก**
+สถานะ: **โค้ดป้องกันพร้อมแล้ว และถูกใช้ bootstrap Staging จริงในเฟส 2C**
+
+ผล rollout ภายนอกและ audit ล่าสุดอยู่ที่
+`docs/STAGING_PHASE_2C_ROLLOUT.md`
 
 เฟสนี้แก้ blocker ที่พบใน 2A โดยไม่เพิ่ม migration ย้อนหลัง ไม่ link CLI ไปโปรเจกต์ใหม่ และไม่แตะ Production
 

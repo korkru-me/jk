@@ -8,14 +8,17 @@ DROP POLICY IF EXISTS "classroom_posts_student_insert" ON public.classroom_posts
 DROP POLICY IF EXISTS "classroom_posts_student_select" ON public.classroom_posts;
 DROP POLICY IF EXISTS "classroom_posts_teacher_all" ON public.classroom_posts;
 
-ALTER TABLE public.classroom_posts DROP COLUMN user_id;
-ALTER TABLE public.classroom_posts DROP COLUMN content;
-ALTER TABLE public.classroom_posts DROP COLUMN image_url;
-ALTER TABLE public.classroom_posts DROP COLUMN pinned_at;
-ALTER TABLE public.classroom_posts ADD COLUMN pinned boolean NOT NULL DEFAULT false;
+-- Production originally had these out-of-band columns, while a fresh
+-- bootstrap reaches this migration through 20260714143536 and therefore
+-- already has the clean table shape. Keep the repair safe for both states.
+ALTER TABLE public.classroom_posts DROP COLUMN IF EXISTS user_id;
+ALTER TABLE public.classroom_posts DROP COLUMN IF EXISTS content;
+ALTER TABLE public.classroom_posts DROP COLUMN IF EXISTS image_url;
+ALTER TABLE public.classroom_posts DROP COLUMN IF EXISTS pinned_at;
+ALTER TABLE public.classroom_posts ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false;
 ALTER TABLE public.classroom_posts ALTER COLUMN body SET NOT NULL;
 
-ALTER TABLE public.classroom_posts DROP CONSTRAINT classroom_posts_author_id_fkey;
+ALTER TABLE public.classroom_posts DROP CONSTRAINT IF EXISTS classroom_posts_author_id_fkey;
 ALTER TABLE public.classroom_posts ADD CONSTRAINT classroom_posts_author_id_fkey
   FOREIGN KEY (author_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
@@ -24,6 +27,7 @@ DROP INDEX IF EXISTS idx_classroom_posts_created;
 CREATE INDEX idx_classroom_posts_classroom
   ON public.classroom_posts(classroom_id, pinned DESC, created_at DESC);
 
+DROP POLICY IF EXISTS "classroom_posts_owner_all" ON public.classroom_posts;
 CREATE POLICY "classroom_posts_owner_all" ON public.classroom_posts
   FOR ALL TO authenticated
   USING (

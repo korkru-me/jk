@@ -16,7 +16,11 @@ ALTER POLICY "users_select_own" ON public.users
 ALTER POLICY "users_update_own" ON public.users
   USING ((SELECT auth.uid()) = id);
 
-ALTER POLICY "classrooms_org_teacher_all" ON public.classrooms
+-- Migration 014 rebuilt this policy under the current
+-- "classrooms_teacher_all" name. Production had the older out-of-band name
+-- when this optimization first ran; fresh bootstraps must target the name
+-- created by the migration ledger.
+ALTER POLICY "classrooms_teacher_all" ON public.classrooms
   USING (
     teacher_id = (SELECT auth.uid())
     AND org_id = ANY(get_user_org_ids())

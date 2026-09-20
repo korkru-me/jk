@@ -19,6 +19,11 @@ CREATE INDEX IF NOT EXISTS idx_submission_answers_question
 -- Clicking a tag runs `tags @> ARRAY[...]` and the search resolves words with
 -- `tags && ARRAY[...]`. Neither operator can use a b-tree, so both were linear
 -- in the bank. GIN is the index type those array operators are built for.
+-- `tags` predated the migration ledger in Production. Re-declare the exact
+-- nullable text[] shape so a fresh project can reproduce that prerequisite.
+ALTER TABLE public.questions
+  ADD COLUMN IF NOT EXISTS tags text[];
+
 CREATE INDEX IF NOT EXISTS idx_questions_tags_gin
   ON public.questions USING gin(tags);
 
