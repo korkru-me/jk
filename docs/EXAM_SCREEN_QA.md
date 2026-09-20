@@ -158,13 +158,13 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ### เฟส 11 — ผูกหลักฐานกับ release candidate เดียว
 
-สถานะ: **candidate จริงถูกล็อกกับ source revision + Staging build + SEB config แล้ว**
+สถานะ: **candidate จริงถูกล็อกใหม่กับ source revision + Staging build + SEB config แล้ว หลังเปิด lab เฉพาะ Staging ที่ผ่าน isolation guard**
 
 เพิ่ม `config/exam-release-candidate.json` และ `npm run check:exam-candidate` เพื่อล็อก Git revision 40 ตัว, staging build id, SEB config id และเวลา ISO พร้อมตรวจว่า candidate id ตรงกับ UAT run และ config id ตรงกับ SEB platform evidence โดยไม่ยอมรับ URL, key-like build id, free text หรือ field เพิ่มเติม รายละเอียดอยู่ใน `docs/EXAM_RELEASE_CANDIDATE.md`
 
 รวม candidate gate เข้า `check:exam-release` และ `next:exam-uat` แล้ว ลำดับจึงเป็น staging พร้อม → ล็อก candidate → เริ่ม UAT หากแก้ code/config ระหว่างทางต้องสร้าง candidate ใหม่และทดสอบ suite ที่ได้รับผลกระทบซ้ำ ปัจจุบัน Staging กับ candidate ผ่านแล้ว และ release checker เหลือ external blockers 2 กลุ่มตามจริง: SEB platforms และ external UAT
 
-ผลรอบล็อก candidate: 105 test files / 1,360 tests, TypeScript, design-token lint และ production build ผ่าน; candidate checker ผ่านครบโดยไม่พิมพ์ค่า candidate/config และ next-step planner ชี้ iPhone responsive UAT เป็นงานถัดไป
+ผลรอบล็อก candidate ล่าสุด: 105 test files / 1,361 tests, TypeScript, design-token lint และ production build ผ่าน; local browser/MCP ไม่พบ compilation/runtime error, production smoke ตอบ 404 ที่ lab, Staging build Ready เปิด lab ได้พร้อมป้าย `STAGING · ระบบทดสอบ`; candidate checker ผ่านครบโดยไม่พิมพ์ค่า candidate/config และ next-step planner ชี้ iPhone responsive UAT เป็นงานถัดไป
 
 ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) แต่ Windows ยังเป็น pending production release gate จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
 
