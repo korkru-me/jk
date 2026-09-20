@@ -168,7 +168,7 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ผลรอบล็อก candidate ล่าสุด: 105 test files / 1,361 tests, TypeScript, design-token lint และ production build ผ่าน; local browser/MCP ไม่พบ compilation/runtime error, production smoke ตอบ 404 ที่ lab, Staging build Ready เปิด lab ได้พร้อมป้าย `STAGING · ระบบทดสอบ`; candidate checker ผ่านครบโดยไม่พิมพ์ค่า candidate/config และ next-step planner ชี้ iPhone responsive UAT เป็นงานถัดไป
 
-ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) แต่ Windows ยังเป็น pending production release gate จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
+ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) ต่อมาวันที่ 21 กันยายน 2026 ทดสอบ Windows responsive UAT บน canonical Staging candidate `r4` ผ่านทั้งหน้า dashboard/หน้าข้อสอบเต็มจอ, หน้าต่างครึ่งจอ, zoom, keyboard focus/Enter/Escape, รายการข้อ, แป้นคณิตศาสตร์และค่าคงอยู่หลังปิด, เครื่องคิดเลข, กระดาษทดและภาพวาดคงอยู่, โหมดโฟกัส, แนบ/ลบไฟล์ local-only และลากคำตอบด้วยเมาส์ จึงให้ Windows responsive suite ผ่านแล้ว อย่างไรก็ตาม SEB production platform gate เป็นคนละหลักฐานและยังคง pending จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
 
 ## หลักฐานที่เก็บได้
 

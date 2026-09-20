@@ -16,10 +16,14 @@ candidate ถูกล็อกใหม่เป็นรอบ `r4` หลั�
 Vercel deployment ใหม่ขึ้นสถานะ Ready และ canonical Staging alias ชี้มาที่ commit
 `c787823`; ตรวจ DOM จริงบน `staging.korkru.com` ที่ 844×390 แล้วพบว่าแผงสูง
 206px, ปุ่มหลักครบ 30 ปุ่มเรียง 3 แถว, ปุ่มสูง 44px, ช่องคำตอบอยู่เหนือแผง
-ประมาณ 12px, `inputmode="none"` และไม่มี horizontal overflow ผล UAT ทั้งหมดยังคง
+ประมาณ 12px, `inputmode="none"` และไม่มี horizontal overflow
+
 บันทึก iPhone responsive suite เป็น `passed` หลังยืนยันบน iPhone จริงว่า layout
-ไม่ล้น ไม่มีคีย์บอร์ดระบบซ้อน และค่าคำตอบยังอยู่หลังปิดแป้น ส่วน suite อื่นยังคง
-เป็น `pending` และไม่มีผลจาก build เก่าถูกนำมารวม
+ไม่ล้น ไม่มีคีย์บอร์ดระบบซ้อน และค่าคำตอบยังอยู่หลังปิดแป้น จากนั้นบันทึก Windows
+responsive suite เป็น `passed` หลังทดสอบ Windows 11 + Chrome ทั้งเต็มจอ/ครึ่งจอ,
+ซูม, keyboard navigation, แป้นคณิตศาสตร์, เครื่องคิดเลข, กระดาษทด, โหมดโฟกัส,
+แนบไฟล์และการลากด้วยเมาส์ ส่วน suite อื่นยังคงเป็น `pending` และไม่มีผลจาก build
+เก่าถูกนำมารวม ทั้งสองผลมาจาก canonical Staging candidate `r4` เดียวกัน
 
 หลักฐาน UAT หลังล็อก candidate ให้ commit/push ที่ branch `exam-uat-evidence`
 ซึ่งถูกปิด deployment ใน `vercel.json`; ห้าม push evidence-only commit ไป branch

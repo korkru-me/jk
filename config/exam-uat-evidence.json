@@ -26,9 +26,9 @@
     {
       "id": "windows-responsive",
       "label": "Windows responsive UI",
-      "status": "pending",
-      "testedAt": null,
-      "testedVersion": "record during final UAT"
+      "status": "passed",
+      "testedAt": "2026-09-20T23:46:01.000Z",
+      "testedVersion": "windows-11_x64_chrome_staging-c787823"
     },
     {
       "id": "authenticated-exam",
