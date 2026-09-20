@@ -1148,7 +1148,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
    * window edges and has nothing to round against.
    */
   const previewBanner = (rounded: boolean) => previewMode && (
-    <div className={`shrink-0 bg-warning text-amber-950 px-4 py-1.5 flex flex-col items-center gap-0.5 ${rounded ? 'rounded-xl' : ''}`}>
+    <div
+      className={`shrink-0 bg-warning text-amber-950 px-4 py-1.5 flex flex-col items-center gap-0.5 ${rounded ? 'rounded-xl' : ''}`}
+      data-staging-badge-safe-zone
+    >
       <div className="flex items-center justify-center gap-3 text-xs font-semibold text-center">
         <span>🔍 โหมดตัวอย่าง — มุมมองนักเรียน (คำตอบจะไม่ถูกบันทึกจริง)</span>
         <a href={previewReturnHref ?? '/assignments'} className="underline hover:no-underline shrink-0">

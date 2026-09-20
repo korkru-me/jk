@@ -365,6 +365,15 @@
   }
 }
 
+/*
+ * Staging keeps a fixed environment badge at the top of every screen. The
+ * exam preview banner also starts at the top, so its first line needs a safe
+ * zone underneath that badge. This selector is inert in Production.
+ */
+[data-deployment-environment='staging'] [data-staging-badge-safe-zone] {
+  padding-block-start: 2.75rem;
+}
+
 /* Rich text content display (preview) */
 .rich-text-content p {
   @apply my-0.5;
