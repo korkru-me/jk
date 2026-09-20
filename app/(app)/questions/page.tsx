@@ -71,7 +71,7 @@ export interface QuestionSearchResultGroup<T> {
 
 
 /** Questions per page in the bank list. */
-export const QUESTIONS_PER_PAGE = 24
+const QUESTIONS_PER_PAGE = 24
 
 export interface QuestionFilters {
   q: string

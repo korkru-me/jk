@@ -62,7 +62,7 @@ export type UnfiledQuestion = Pick<
 
 /** Questions per page in the browser. Matches the คลังโจทย์ list: the cards are
  *  the same weight, so the page should be too. */
-export const UNFILED_PER_PAGE = 24
+const UNFILED_PER_PAGE = 24
 
 /**
  * Which slice of the คลัง the browser at the foot of the page is showing.

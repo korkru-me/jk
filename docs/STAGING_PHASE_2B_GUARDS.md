@@ -69,7 +69,7 @@ npm run check:staging-bootstrap
 - ตรวจ simulated Staging runtime ผ่าน Next MCP และ browser: แสดง `STAGING · ระบบทดสอบ`, มี `noindex, nofollow, nocache` และไม่มี compilation/runtime error
 - preflight แบบไม่มี Staging จริงปฏิเสธตามที่ออกแบบ และ preflight ด้วยค่าทดสอบที่แยกจาก Production ผ่านครบโดยไม่พิมพ์ secret
 
-การตรวจ production build ในสภาพแวดล้อมนี้ยังไม่สำเร็จ: Turbopack ถูก sandbox ปฏิเสธการสร้าง process/เปิด port ระหว่างประมวลผล CSS ส่วน webpack fallback พบปัญหาเดิมที่ client import `node:crypto` ผ่าน `lib/ioc-token.ts` ซึ่งอยู่นอกขอบเขต 2B จึงต้องติดตามแยกก่อน release แต่ไม่ได้ลบล้างผล runtime และ regression tests ข้างต้น
+เฟส 2B.1 แยก IOC cryptography ไปไว้ใน server-only module และเอา page-only constants ที่ Next.js ไม่อนุญาตให้ออกจาก route exports แล้ว ผล webpack production build ผ่านครบทุก route ส่วน Turbopack production build ในสภาพแวดล้อมนี้ยังถูก sandbox ปฏิเสธการสร้าง process/เปิด port ระหว่างประมวลผล Excalidraw CSS ซึ่งเป็นข้อจำกัดของ runner ไม่ใช่ compilation issue ของแอป; Turbopack dev MCP รายงาน compilation/runtime issues เป็นศูนย์
 
 ## ขอบเขตที่ตั้งใจเลื่อนไป 2C
 

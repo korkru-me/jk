@@ -13,7 +13,8 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { hashIocToken, iocLinkUsability, looksLikeIocToken } from '@/lib/ioc-token'
+import { iocLinkUsability, looksLikeIocToken } from '@/lib/ioc-token'
+import { hashIocToken } from '@/lib/ioc-token-server'
 import type { IocSignatureMode } from '@/lib/types'
 
 export interface IocReviewExpert {

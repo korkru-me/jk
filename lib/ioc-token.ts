@@ -1,31 +1,17 @@
 /**
  * The link an expert opens, and the rules that decide whether it still works.
  *
- * The token lives in the URL the teacher sends and nowhere else: the database
- * keeps only its SHA-256, so a copy of the table is not a set of working links.
- * Lookup hashes what the visitor presents and compares hashes.
+ * Shared, browser-safe IOC link rules. Cryptographic token generation and
+ * hashing live in `ioc-token-server.ts` so Client Components never bundle
+ * Node.js crypto.
  *
  * A link therefore cannot be recovered after it is issued — regenerating is the
  * way back, and doing so invalidates the old one, which is also how a teacher
  * takes a link away from someone.
  */
 
-import { createHash, randomBytes } from 'node:crypto'
-
-/** 32 bytes of randomness, base64url so it survives a URL and a LINE message. */
-const IOC_TOKEN_BYTES = 32
-
 export const IOC_DEFAULT_LINK_DAYS = 30
 export const IOC_MAX_LINK_DAYS = 180
-
-export function generateIocToken(): string {
-  return randomBytes(IOC_TOKEN_BYTES).toString('base64url')
-}
-
-/** Lowercase hex, matching the `^[0-9a-f]{64}$` check on the column. */
-export function hashIocToken(token: string): string {
-  return createHash('sha256').update(token.trim()).digest('hex')
-}
 
 /** Shape a token has to have before it is worth a database round trip. */
 export function looksLikeIocToken(token: string): boolean {

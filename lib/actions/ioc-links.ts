@@ -5,9 +5,8 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { checkIocItemsReady } from '@/lib/ioc-form'
+import { generateIocToken, hashIocToken } from '@/lib/ioc-token-server'
 import {
-  generateIocToken,
-  hashIocToken,
   IOC_DEFAULT_LINK_DAYS,
   IOC_MAX_LINK_DAYS,
   iocLinkExpiry,

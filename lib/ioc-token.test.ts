@@ -1,7 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
-  generateIocToken,
-  hashIocToken,
   iocLinkDaysLeft,
   iocLinkExpiry,
   iocLinkPath,
@@ -9,6 +7,9 @@ import {
   looksLikeIocToken,
   type IocLinkState,
 } from '@/lib/ioc-token'
+import { generateIocToken, hashIocToken } from '@/lib/ioc-token-server'
+
+vi.mock('server-only', () => ({}))
 
 function link(overrides: Partial<IocLinkState> = {}): IocLinkState {
   return {
