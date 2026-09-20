@@ -1,8 +1,17 @@
+import { inspectDeploymentEnvironment } from './deployment-environment.mjs'
+
 export const EXAM_SCREEN_LAB_PATH = '/exam-screen-lab'
 
-/** The device-QA lab must never be reachable from a production build. */
-export function isExamScreenLabEnabled(nodeEnv: string | undefined): boolean {
-  return nodeEnv !== 'production'
+/**
+ * The synthetic device-QA lab is available locally and on a fully isolated
+ * Staging preview. It must never be reachable from Production or an
+ * incompletely labelled Preview deployment.
+ */
+export function isExamScreenLabEnabled(environment: NodeJS.ProcessEnv): boolean {
+  if (environment.NODE_ENV !== 'production') return true
+
+  const deployment = inspectDeploymentEnvironment(environment)
+  return deployment.ready && deployment.tier === 'staging'
 }
 
 export function isExamScreenLabPath(pathname: string): boolean {
@@ -16,7 +25,7 @@ export function isExamScreenLabPath(pathname: string): boolean {
  */
 export function shouldBypassSessionRefresh(
   pathname: string,
-  nodeEnv: string | undefined,
+  environment: NodeJS.ProcessEnv,
 ): boolean {
-  return isExamScreenLabEnabled(nodeEnv) && isExamScreenLabPath(pathname)
+  return isExamScreenLabPath(pathname) && isExamScreenLabEnabled(environment)
 }

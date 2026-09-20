@@ -8,15 +8,16 @@ export const metadata = { title: 'ห้องทดลองหน้าข้�
 export const dynamic = 'force-dynamic'
 
 /**
- * Development-only physical-device workbench for the real exam renderer.
- * Production receives a 404 before any synthetic fixture is built.
+ * Local/Staging physical-device workbench for the real exam renderer.
+ * Production and malformed Preview deployments receive a 404 before any
+ * synthetic fixture is built.
  */
 export default async function ExamScreenLabPage({
   searchParams,
 }: {
   searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[] }>
 }) {
-  if (!isExamScreenLabEnabled(process.env.NODE_ENV)) notFound()
+  if (!isExamScreenLabEnabled(process.env)) notFound()
 
   const params = await searchParams
   const rawPerPage = Array.isArray(params.perPage) ? params.perPage[0] : params.perPage

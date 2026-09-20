@@ -6,23 +6,24 @@
 
 ## กติกาความปลอดภัย
 
-เครื่องพัฒนาปัจจุบันเชื่อมกับ Supabase project ที่เอกสารโครงการระบุว่าเป็น production และยังไม่มี staging แยก จึงห้ามสร้างบัญชี ห้องเรียน ข้อสอบ คำตอบ การส่งงาน หรือไฟล์ QA ในฐานนี้
+มี Staging แยกจาก Production แล้ว การทดสอบบนเว็บที่ deploy ต้องใช้ `https://staging.korkru.com` และข้อมูลสังเคราะห์เท่านั้น ห้ามสร้างหรือแก้ข้อมูล QA ใน Production
 
 เฟส 1 ใช้ `/exam-screen-lab` ซึ่งมีคุณสมบัติดังนี้:
 
-- เปิดได้เฉพาะ development; production ตอบ 404
+- เปิดได้เฉพาะ local development หรือ Staging ที่ผ่าน isolation guard; Production และ Preview ที่ตั้งค่าไม่ครบตอบ 404
 - ใช้ `ExamClient` ตัวเดียวกับหน้าทำข้อสอบจริง แต่เปิด `previewMode`
-- ข้อมูลทุกชิ้นเป็นข้อมูลสมมติในหน่วยความจำ; proxy ข้าม Supabase session refresh สำหรับ route นี้ใน development
+- ข้อมูลทุกชิ้นเป็นข้อมูลสมมติในหน่วยความจำ; proxy ข้าม Supabase session refresh สำหรับ route นี้ทั้ง local และ Staging
 - คำตอบ รูปวิธีทำ กระดาษทด และไฟล์แนบไม่ถูกส่งขึ้น server; preview ไม่เขียน answer backup ลง localStorage
 - สร้าง submission id ใหม่ทุกครั้งที่เปิดหน้า เพื่อลดการปะปนกับ local backup จากรอบก่อน
 - ไม่เปิด proctor, fullscreen, clipboard blocking, timer หรือ SEB gate เพราะเฟสนี้ตรวจเฉพาะหน้าจอและการแตะ/พิมพ์
 
-เมื่อมี Supabase และ Vercel staging แยกแล้ว จึงค่อยสร้างบัญชี QA และทำเฟสที่ต้องพิสูจน์ autosave/upload/submit จริง ห้ามนำข้อมูลนักเรียนจริงมาเป็น fixture
+เส้นทางที่ต้องพิสูจน์ autosave/upload/submit จริงใช้บัญชีและข้อมูล QA ใน Staging แยกต่างหาก ห้ามนำข้อมูลนักเรียนจริงมาเป็น fixture
 
 ## วิธีเปิดห้องทดลอง
 
-- หนึ่งข้อต่อหน้า: `http://<ที่อยู่เครื่องพัฒนา>:<port>/exam-screen-lab`
-- สามข้อต่อหน้า: `http://<ที่อยู่เครื่องพัฒนา>:<port>/exam-screen-lab?perPage=3`
+- physical UAT หนึ่งข้อต่อหน้า: `https://staging.korkru.com/exam-screen-lab`
+- physical UAT สามข้อต่อหน้า: `https://staging.korkru.com/exam-screen-lab?perPage=3`
+- local unit/runtime smoke ใช้ `http://<ที่อยู่เครื่องพัฒนา>:<port>/exam-screen-lab` ได้ แต่ไม่นับแทน physical UAT
 
 ชุดจำลองมี 16 กรณี ครบ question type ที่บันทึกได้ทั้ง 11 ชนิด และแยกกรณีสัมผัส/โหมดตอบที่ต่างกันออกมาตรวจจริง:
 

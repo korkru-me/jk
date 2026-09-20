@@ -47,6 +47,8 @@ Staging เฟส 2B.1 แก้ production build boundary แล้ว: IOC hel
 
 Staging เฟส 2C สร้าง Supabase project และ Vercel Preview ที่แยกจาก Production จริงแล้ว พร้อม DNS/HTTPS, Auth redirect, RLS, Storage และ migration bootstrap; authenticated smoke test ผ่านด้วยบัญชี QA และไม่พบข้อมูล Production ปะปน ตัวตรวจ UAT/release รองรับการฉีด secret จาก Keychain/CI โดยไม่บังคับเขียนลง `.env.qa.local` และ release candidate สำหรับรอบ final UAT ถูกล็อกแล้ว รายละเอียดอยู่ใน `docs/STAGING_PHASE_2C_ROLLOUT.md` และ `docs/EXAM_RELEASE_CANDIDATE.md`
 
+ก่อนเริ่ม physical responsive UAT พบว่าคู่มือสั่งเปิด `/exam-screen-lab` บน Staging แต่ route เดิมปิดทุก production build จึงเข้า Staging ไม่ได้ แก้ access guard ให้ route นี้เปิดเฉพาะ local หรือ Staging Preview ที่ผ่าน environment/isolation contract และยังตอบ 404 บน Production/Preview ที่ตั้งค่าไม่ครบ พร้อมข้าม session refresh เฉพาะ fixture route นี้ การแก้ code ทำให้ candidate เดิมหมดอายุและต้อง deploy/ล็อก candidate ใหม่ก่อนบันทึกผลอุปกรณ์จริง
+
 ## MVP core
 
 ### Authentication — บางส่วน

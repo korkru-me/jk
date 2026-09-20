@@ -1,6 +1,6 @@
 # Architecture
 
-อัปเดตล่าสุด: 3 กันยายน 2026
+อัปเดตล่าสุด: 20 กันยายน 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
 
@@ -16,11 +16,11 @@
 ## Deployment environments
 
 - Production ใช้ Vercel + Supabase project ที่แยกจาก environment อื่น และ Git migration ledger ตรงกับฐานที่ link อยู่ ณ 20 กันยายน 2026
-- Staging ยังไม่มี deployment/database จริง ณ วันเดียวกัน ห้ามใช้ Production เป็นพื้นที่ authenticated QA
-- แผน Staging ใช้ Vercel Preview ของ branch `staging` กับ Supabase project แยก และใช้ข้อมูล QA สังเคราะห์เท่านั้น
+- Staging ใช้ Vercel Preview ของ branch `staging` ที่ `https://staging.korkru.com` กับ Supabase project แยก และใช้ข้อมูล QA สังเคราะห์เท่านั้น ห้ามใช้ Production เป็นพื้นที่ QA
 - migration folder ไม่สามารถ bootstrap fresh project ได้เอง เพราะ migration เริ่มที่ `002`, อาศัย `supabase/schema.sql` และมี bucket ที่เคยสร้างนอก migration; เฟส 2B จึงกำหนด fresh-project-only bootstrap manifest แยกจาก Production migration ledger พร้อม guard ที่ `supabase/bootstrap/manifest.json`
 - `KORKRU_DEPLOYMENT_ENV` เป็น environment contract กลาง: Vercel Preview ต้องระบุ `staging` และผ่าน site/Supabase isolation ก่อน build/start ส่วน Production เดิมอนุมานจาก `VERCEL_ENV=production` ได้เพื่อไม่ทำให้ deployment ปัจจุบันหยุดโดยไม่ตั้งใจ
 - Staging render ป้ายทดสอบและ `noindex`; `next.config.ts` ตรวจ build, `instrumentation.ts` ตรวจ startup และ root layout ตรวจก่อน render โดย error ไม่พิมพ์ URL/project ref/secret
+- `/exam-screen-lab` เปิดได้เฉพาะ local หรือ Staging ที่ผ่าน environment/isolation guard และข้าม Supabase session refresh เพราะใช้ fixture ในหน่วยความจำ; Production และ Preview ที่ตั้งค่าไม่ครบตอบ 404
 - inventory และ data-separation plan อยู่ใน `docs/STAGING_PHASE_2A_AUDIT.md`; guard/bootstrap contract อยู่ใน `docs/STAGING_PHASE_2B_GUARDS.md`
 
 ## โครงสร้าง repository
