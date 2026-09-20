@@ -5,7 +5,7 @@
 สถานะปัจจุบัน: **ล็อก release candidate สำหรับ final UAT แล้ว** โดยผูก source
 revision, Vercel Staging deployment และ SEB config ไว้ใน
 `config/exam-release-candidate.json`; `npm run check:exam-candidate` ผ่านครบ
-และงานถัดไปคือ responsive UAT บน iPhone จริง
+และงานถัดไปคือ responsive UAT บน iPad จริง
 
 candidate ถูกล็อกใหม่เป็นรอบ `r4` หลัง physical iPhone UAT ของรอบ `r3` ยืนยันว่า
 คีย์บอร์ด iOS ไม่ซ้อนกับแป้นคณิตศาสตร์แล้ว ช่อง active ไม่ถูกบัง และค่าคำตอบยังอยู่
@@ -17,7 +17,9 @@ Vercel deployment ใหม่ขึ้นสถานะ Ready และ canoni
 `c787823`; ตรวจ DOM จริงบน `staging.korkru.com` ที่ 844×390 แล้วพบว่าแผงสูง
 206px, ปุ่มหลักครบ 30 ปุ่มเรียง 3 แถว, ปุ่มสูง 44px, ช่องคำตอบอยู่เหนือแผง
 ประมาณ 12px, `inputmode="none"` และไม่มี horizontal overflow ผล UAT ทั้งหมดยังคง
-เป็น `pending` เพื่อรอการยืนยันบน iPhone จริง และไม่มีผลจาก build เก่าถูกนำมารวม
+บันทึก iPhone responsive suite เป็น `passed` หลังยืนยันบน iPhone จริงว่า layout
+ไม่ล้น ไม่มีคีย์บอร์ดระบบซ้อน และค่าคำตอบยังอยู่หลังปิดแป้น ส่วน suite อื่นยังคง
+เป็น `pending` และไม่มีผลจาก build เก่าถูกนำมารวม
 
 หลักฐาน UAT หลังล็อก candidate ให้ commit/push ที่ branch `exam-uat-evidence`
 ซึ่งถูกปิด deployment ใน `vercel.json`; ห้าม push evidence-only commit ไป branch

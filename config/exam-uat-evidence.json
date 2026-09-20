@@ -5,9 +5,9 @@
     {
       "id": "iphone-responsive",
       "label": "iPhone responsive UI",
-      "status": "pending",
-      "testedAt": null,
-      "testedVersion": "record during final UAT"
+      "status": "passed",
+      "testedAt": "2026-09-20T15:42:51.000Z",
+      "testedVersion": "ios-26.6.1_safari_staging-c787823"
     },
     {
       "id": "ipad-responsive",
