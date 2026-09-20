@@ -371,7 +371,8 @@
  * zone underneath that badge. This selector is inert in Production.
  */
 [data-deployment-environment='staging'] [data-staging-badge-safe-zone] {
-  padding-block-start: 2.75rem;
+  /* Tailwind emits `py-*` after global CSS in optimized builds. */
+  padding-block-start: 2.75rem !important;
 }
 
 /* Rich text content display (preview) */
