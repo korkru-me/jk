@@ -1,0 +1,21 @@
+---
+description: Require hosted, integration, and manual testing to use the isolated Staging environment
+alwaysApply: true
+---
+
+# Test in Staging
+
+- Run unit tests, type-checks, lint, and production builds locally as usual.
+- Any test that touches a deployed website, database, Auth, Storage, email,
+  cron, API integration, or SEB must use the isolated Staging environment.
+- Use `https://staging.korkru.com`, the `staging` Git branch, and the Staging
+  Supabase project. Verify the visible `STAGING · ระบบทดสอบ` badge before a
+  manual test.
+- Never create, edit, delete, seed, or reset Production data for testing.
+- Use synthetic test accounts and data only. Do not copy real student,
+  teacher, classroom, answer, score, or research data into Staging.
+- Keep Staging secrets and SEB CK/BEK separate from Production; never reuse or
+  copy Production credentials merely to make a test pass.
+- If a test cannot be performed safely in Staging, stop and explain the gap.
+  Production verification requires the user's explicit approval and must be
+  read-only unless the user separately authorizes a narrowly scoped change.
