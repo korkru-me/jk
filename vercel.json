@@ -1,6 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
+  "git": {
+    "deploymentEnabled": {
+      "exam-uat-evidence": false
+    }
+  },
   "crons": [
     {
       "path": "/api/internal/math-work-cleanup",
