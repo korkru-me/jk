@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "candidateId": "final-release-uat",
-  "sourceRevision": "pending",
-  "stagingBuild": "pending",
+  "sourceRevision": "8ed151839ddeae55acac97b7b3a13bd0a6a25ea2",
+  "stagingBuild": "dpl_52EesubzczEus7TeKGSTTuyLWYqz",
   "sebConfigId": "korkru-production-v1",
-  "lockedAt": null
+  "lockedAt": "2026-09-20T10:38:48.000Z"
 }

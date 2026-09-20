@@ -17,13 +17,13 @@
 
 Responsive QA เฟส Mac ผ่านในขอบเขต agent-only แล้วต่อจาก iPhone/iPad: fixture 16 กรณีไม่ล้นในหน้าต่าง 900×600 ถึง 1728×1117, keyboard/focus/Escape, mouse pointer drag, local-only file preview และ overlay สำคัญผ่าน แก้ focus return, Escape ของ Excalidraw และ contrast ของสถานะสำเร็จแล้ว ผลนี้ยังไม่แทน Safari/SEB, native file picker หรือ trackpad บน Mac จริง ซึ่งรอทดสอบรวมหลังเฟส 8
 
-Authenticated exam QA มี staging isolation guard แล้ว: `npm run check:exam-staging` อ่านเฉพาะ `.env.qa.local` แบบ read-only, ไม่พิมพ์ค่าที่ตั้ง และบล็อก production deployment หรือ site/Supabase project ที่ซ้ำ production แต่ยังไม่มี staging แยก จึงยังไม่ทำ login/autosave/upload/submit E2E และไม่สร้างข้อมูล QA ในฐาน production
+Authenticated exam QA มี Staging แยกแล้วและ isolation guard ผ่าน: Vercel Preview, Supabase, Auth และ Storage แยกจาก Production; สมัคร ยืนยันอีเมล และ login smoke test ผ่านโดยไม่เห็นข้อมูล Production ตัวตรวจรองรับทั้ง `.env.qa.local` และค่าที่ฉีดจาก Keychain/CI โดยไม่พิมพ์ secret ส่วน autosave/upload/submit E2E ยังรอชุดทดสอบจริงหลังล็อก candidate
 
 SEB platform evidence มี manifest แบบไม่เก็บ secret และ `npm run check:seb-platforms` แล้ว ตัวตรวจจะไม่ให้สถานะพร้อม production จน Windows/macOS/iPadOS/iOS ครบ native core + production-BEK verification + staging mock exam + physical UAT ของ config/build เดียวกัน ปัจจุบัน native core ผ่าน แต่ release gate อื่นยัง pending/unverified จึงจงใจรายงาน NOT READY
 
-Recovery/proctor QA เฟส 7 ผ่านในขอบเขต agent-only แล้ว: stale answer backup จาก attempt เก่าไม่ถูก replay, timer ยึดเวลาเริ่มจริงหลัง reload/throttle/clone, คิว proctor ไม่ปล่อย signal ที่เกิดระหว่าง request ค้างรอ heartbeat และ logic ของ retry/Realtime fallback/review alert มี unit test รองรับ การตัด Wi‑Fi, upload, resume, หลายบัญชีและหน้าคุมสอบจริงยังรอ staging แยกหลังเฟส 8 จึงยังไม่ใช่ production release gate
+Recovery/proctor QA เฟส 7 ผ่านในขอบเขต agent-only แล้ว: stale answer backup จาก attempt เก่าไม่ถูก replay, timer ยึดเวลาเริ่มจริงหลัง reload/throttle/clone, คิว proctor ไม่ปล่อย signal ที่เกิดระหว่าง request ค้างรอ heartbeat และ logic ของ retry/Realtime fallback/review alert มี unit test รองรับ Staging แยกพร้อมแล้ว แต่การตัด Wi‑Fi, upload, resume, หลายบัญชีและหน้าคุมสอบจริงยังรอ physical UAT จึงยังไม่ใช่ production release gate
 
-เฟส agent-only 1–8 ของ responsive exam QA ปิดแล้วและมี `npm run check:exam-release` เป็น fail-closed gate รวม staging isolation กับ SEB platform evidence รวมถึง `docs/EXAM_RELEASE_UAT.md` เป็นรายการทดสอบจริงชุดเดียว สถานะ release ปัจจุบันยังจงใจเป็น NOT READY เพราะ staging และ external device evidence ยังไม่ครบ ไม่ได้ deploy หรือสร้างข้อมูล QA/บัญชีจริงในเฟสนี้
+เฟส agent-only 1–8 ของ responsive exam QA ปิดแล้วและมี `npm run check:exam-release` เป็น fail-closed gate รวม staging isolation กับ SEB platform evidence รวมถึง `docs/EXAM_RELEASE_UAT.md` เป็นรายการทดสอบจริงชุดเดียว ปัจจุบัน Staging และ release candidate ผ่านแล้ว แต่ release ยังคง NOT READY เพราะ external device/UAT และ SEB platform evidence ยังไม่ครบ
 
 Regression ปิดเฟสผ่าน 100 test files / 1,326 tests, TypeScript, token lint, production build 63 static pages และ Next.js MCP/browser runtime smoke โดยไม่พบ compilation/runtime error; ตัวเลขนี้ยืนยัน commit ฝั่งโค้ดเท่านั้น ไม่ยกเลิก external release blockers
 
@@ -33,17 +33,19 @@ Regression หลังเฟส 9 ผ่าน 101 test files / 1,333 tests, Ty
 
 เฟส 10 เพิ่ม `npm run next:exam-uat` เป็นตัวนำ UAT ทีละหนึ่งขั้นและบังคับลำดับ cleanup หลัง responsive/authenticated/recovery/SEB ครบ ตัว evidence รองรับ `failed` เพื่อบันทึกว่าทดสอบแล้วพบปัญหาโดยไม่หลอกเป็น pending หรือ passed และยังคง fixed schema/no-secret เหมือนเดิม
 
-Regression หลังเฟส 10 ผ่าน 102 test files / 1,342 tests, TypeScript และ token lint; next-step planner ปัจจุบันชี้ไปการสร้าง staging แยก ซึ่งเป็น blocker แรกจริง
+เดิม regression หลังเฟส 10 ผ่าน 102 test files / 1,342 tests, TypeScript และ token lint; หลังสร้าง Staging และล็อก candidate แล้ว next-step planner ปัจจุบันชี้ไป responsive UAT บน iPhone จริง
 
-เฟส 11 เพิ่ม fixed-schema release candidate gate ผูก UAT run กับ Git revision, staging build และ SEB config เดียวกัน ป้องกันการรวมผลผ่านจากคนละ build/config; `check:exam-candidate`, `check:exam-release` และ `next:exam-uat` ใช้กติกาเดียวกัน สถานะ candidate ยัง pending เพราะยังไม่มี staging build จริง
+เฟส 11 เพิ่ม fixed-schema release candidate gate ผูก UAT run กับ Git revision, staging build และ SEB config เดียวกัน ป้องกันการรวมผลผ่านจากคนละ build/config; `check:exam-candidate`, `check:exam-release` และ `next:exam-uat` ใช้กติกาเดียวกัน ปัจจุบัน candidate ถูกล็อกกับ Staging build จริงและ candidate gate ผ่านแล้ว
 
-Regression หลังเฟส 11 ผ่าน 103 test files / 1,348 tests, TypeScript และ token lint; candidate checker รายงาน pending revision/build/time ตาม external state จริง
+รอบล็อก candidate ผ่าน 105 test files / 1,360 tests, TypeScript, token lint และ production build; release gate เหลือ blocker จริง 2 กลุ่มคือ SEB platform evidence และ external UAT suites
 
 Staging เฟส 2A สำรวจแบบ read-only แล้วและบันทึกใน `docs/STAGING_PHASE_2A_AUDIT.md`: Supabase migration local/remote ตรงกัน 117 รายการ, ยังไม่มี branch/deployment/database Staging และ Vercel CLI ยังไม่ link จุดสำคัญคือ fresh Supabase project ยังสร้างจาก migration folder อย่างเดียวไม่ได้ เพราะ history เริ่มที่ `002`, อาศัย `supabase/schema.sql`, `question-images` เคยสร้างจาก Dashboard และ config ชี้ `seed.sql` ที่ไม่มีอยู่ จึงห้าม `db push` ไปโปรเจกต์ใหม่จนกว่าเฟส 2B จะทำ bootstrap/runtime isolation guard แบบ versioned ก่อน เฟสนี้ไม่ได้แก้ Production, deploy, สร้างบัญชี หรือคัดลอกข้อมูลจริง
 
 Staging เฟส 2B เพิ่ม environment contract และ fail-closed build/start guard แล้ว: Preview ที่ไม่ระบุ `staging`, ชี้ site/Supabase ซ้ำ Production หรือขาด Staging keys จะไม่เริ่มแอป; Staging มีป้ายคงที่และ `noindex` ขณะที่ Production ไม่เปลี่ยน เพิ่ม fresh-project bootstrap manifest, `question-images` prerequisite, cron-disable policy, empty seed และ Storage API reconciler ที่ read-only โดยปริยาย ตัวตรวจ `npm run check:staging-bootstrap` ไม่แสดง URL/project ref/secret และยังจงใจรายงาน NOT READY จนมี Supabase Staging จริง เฟสนี้ไม่ได้สร้าง project, apply SQL/migration, deploy หรือแก้ Production รายละเอียดอยู่ใน `docs/STAGING_PHASE_2B_GUARDS.md`
 
 Staging เฟส 2B.1 แก้ production build boundary แล้ว: IOC helper ที่ Client Components ใช้ไม่มี `node:crypto`; การสร้าง token และ SHA-256 อยู่ใน `ioc-token-server.ts` ที่ประกาศ `server-only` โดยรูปแบบ token/hash เดิมไม่เปลี่ยน พร้อมแก้ route exports ที่ Next.js ไม่อนุญาตในหน้าคลังโจทย์ 2 จุด ผล webpack production build ผ่านครบทุก route และ Turbopack dev MCP ไม่มี compilation/runtime error
+
+Staging เฟส 2C สร้าง Supabase project และ Vercel Preview ที่แยกจาก Production จริงแล้ว พร้อม DNS/HTTPS, Auth redirect, RLS, Storage และ migration bootstrap; authenticated smoke test ผ่านด้วยบัญชี QA และไม่พบข้อมูล Production ปะปน ตัวตรวจ UAT/release รองรับการฉีด secret จาก Keychain/CI โดยไม่บังคับเขียนลง `.env.qa.local` และ release candidate สำหรับรอบ final UAT ถูกล็อกแล้ว รายละเอียดอยู่ใน `docs/STAGING_PHASE_2C_ROLLOUT.md` และ `docs/EXAM_RELEASE_CANDIDATE.md`
 
 ## MVP core
 

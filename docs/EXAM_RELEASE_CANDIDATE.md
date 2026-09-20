@@ -2,6 +2,15 @@
 
 อัปเดต: 20 กันยายน 2026
 
+สถานะปัจจุบัน: **ล็อก release candidate สำหรับ final UAT แล้ว** โดยผูก source
+revision, Vercel Staging deployment และ SEB config ไว้ใน
+`config/exam-release-candidate.json`; `npm run check:exam-candidate` ผ่านครบ
+และงานถัดไปคือ responsive UAT บน iPhone จริง
+
+หลักฐาน UAT หลังล็อก candidate ให้ commit/push ที่ branch `exam-uat-evidence`
+ซึ่งถูกปิด deployment ใน `vercel.json`; ห้าม push evidence-only commit ไป branch
+`staging` เพราะจะเลื่อน canonical Staging domain ออกจาก build ที่กำลังทดสอบ
+
 ก่อนเริ่ม UAT จริง ต้องกำหนดให้ชัดว่ากำลังทดสอบ **โค้ด commit ไหน + staging build ไหน + SEB config ไหน** มิฉะนั้นผลจากคนละรุ่นอาจถูกนำมารวมจน release gate ผ่านผิด ๆ
 
 ไฟล์ `config/exam-release-candidate.json` มี fixed schema และไม่มีช่อง URL/notes/credential:

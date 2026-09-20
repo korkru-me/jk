@@ -147,23 +147,23 @@ Agent ตรวจหน้าต่าง 900×600, 1280×720, 1440×900 แล
 
 ### เฟส 10 — UAT ทีละขั้นและ cleanup ordering
 
-สถานะ: **agent-only tooling ผ่าน · ขั้นแรกที่รายงานคือสร้าง staging แยก**
+สถานะ: **agent-only tooling ผ่าน · Staging และ candidate พร้อมแล้ว · ขั้นถัดไปคือ iPhone responsive UAT**
 
 เพิ่ม `npm run next:exam-uat` เพื่ออ่านหลักฐานแบบ read-only แล้วบอกงานถัดไปเพียงหนึ่งข้อ ตามลำดับ staging → responsive 4 ระบบ → authenticated flow → recovery/proctor → SEB 4 ระบบ → cleanup พร้อม unit tests ครบเส้นทาง malformed/pending/complete รายละเอียดอยู่ใน `docs/EXAM_UAT_NEXT_STEP.md`
 
 ขยาย evidence state เป็น `pending`/`failed`/`passed` แบบสอดคล้องกับเวลาและรุ่นที่ทดสอบ และบังคับว่า QA cleanup ต้องเกิดหลัง suite อื่นผ่านครบพร้อม timestamp ไม่เก่ากว่า ป้องกันการใช้ผล cleanup เก่าปิด release หลังมีการทดสอบเพิ่ม
 
-ผลตรวจเฟส 10: 102 test files / 1,342 tests, TypeScript และ design-token lint ผ่าน; `next:exam-uat` รายงานขั้นแรกว่า “สร้าง staging แยกจาก production” ตรงตามสถานะจริงและไม่พิมพ์ค่าจาก environment/manifests
+ผลเดิมของเฟส 10 คือ 102 test files / 1,342 tests ผ่านและชี้ไปสร้าง Staging; หลังเฟส 2C ตัวนำรองรับค่าที่ฉีดจาก Keychain/CI โดยไม่ต้องเขียน secret ลงไฟล์ และปัจจุบันชี้ไปทดสอบ iPhone จริงโดยไม่พิมพ์ค่า environment/manifests
 
 ### เฟส 11 — ผูกหลักฐานกับ release candidate เดียว
 
-สถานะ: **agent-only tooling ผ่าน · candidate จริงยังรอ staging build**
+สถานะ: **candidate จริงถูกล็อกกับ source revision + Staging build + SEB config แล้ว**
 
 เพิ่ม `config/exam-release-candidate.json` และ `npm run check:exam-candidate` เพื่อล็อก Git revision 40 ตัว, staging build id, SEB config id และเวลา ISO พร้อมตรวจว่า candidate id ตรงกับ UAT run และ config id ตรงกับ SEB platform evidence โดยไม่ยอมรับ URL, key-like build id, free text หรือ field เพิ่มเติม รายละเอียดอยู่ใน `docs/EXAM_RELEASE_CANDIDATE.md`
 
-รวม candidate gate เข้า `check:exam-release` และ `next:exam-uat` แล้ว ลำดับจึงเป็น staging พร้อม → ล็อก candidate → เริ่ม UAT หากแก้ code/config ระหว่างทางต้องสร้าง candidate ใหม่และทดสอบ suite ที่ได้รับผลกระทบซ้ำ ปัจจุบัน release checker รายงาน external blockers 4 กลุ่มตามจริง: staging, candidate, SEB platforms และ external UAT
+รวม candidate gate เข้า `check:exam-release` และ `next:exam-uat` แล้ว ลำดับจึงเป็น staging พร้อม → ล็อก candidate → เริ่ม UAT หากแก้ code/config ระหว่างทางต้องสร้าง candidate ใหม่และทดสอบ suite ที่ได้รับผลกระทบซ้ำ ปัจจุบัน Staging กับ candidate ผ่านแล้ว และ release checker เหลือ external blockers 2 กลุ่มตามจริง: SEB platforms และ external UAT
 
-ผลตรวจเฟส 11: 103 test files / 1,348 tests, TypeScript และ design-token lint ผ่าน; candidate checker จงใจรายงาน revision/build/time 3 blockers และไม่พิมพ์ค่า candidate/config ส่วน next-step planner ยังคงชี้ staging เป็นงานแรก
+ผลรอบล็อก candidate: 105 test files / 1,360 tests, TypeScript, design-token lint และ production build ผ่าน; candidate checker ผ่านครบโดยไม่พิมพ์ค่า candidate/config และ next-step planner ชี้ iPhone responsive UAT เป็นงานถัดไป
 
 ผู้ใช้เลื่อน Windows N2.1 มาทดสอบก่อนเฟส 8 และวันที่ 19 กันยายน 2026 ผ่าน native lab core บน Windows 11 x64 + SEB 3.10.2.920 แล้ว (A/B, CK+BEK, รหัสออกแยกชุด, Quit URL, เปิดผิดชุด และไฟล์แก้ไข) แต่ Windows ยังเป็น pending production release gate จนกว่าจะเก็บ BEK ของ production config และผ่าน mock exam จริง ส่วน device-UX เฟสที่เหลือยังต้องกลับมาทำต่อ
 
