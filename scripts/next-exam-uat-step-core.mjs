@@ -1,3 +1,5 @@
+import { parseEnvFile } from './check-seb-readiness-core.mjs'
+import { inspectExamStagingReadiness } from './check-exam-staging-readiness-core.mjs'
 import { inspectExamUatEvidence } from './check-exam-uat-evidence-core.mjs'
 import { inspectSebPlatformEvidence } from './check-seb-platform-evidence-core.mjs'
 import { inspectExamReleaseCandidate } from './check-exam-release-candidate-core.mjs'
@@ -14,6 +16,15 @@ const SEB_PLATFORM_ORDER = [
   ['ios', 'iPhone / iOS'],
   ['windows', 'Windows'],
 ]
+
+/** Accept a local env file, injected environment variables, or both. */
+export function inspectNextExamUatStagingEnvironment(contents = '', environment = {}) {
+  const parsed = parseEnvFile(contents, environment)
+  return {
+    ready: parsed.warnings.length === 0
+      && inspectExamStagingReadiness({ ...parsed.values, ...environment }).ready,
+  }
+}
 
 function hasShapeBlocker(inspection) {
   return inspection.checks.some(check => check.status === 'blocker'

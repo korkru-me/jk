@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { nextExamUatStep } from './next-exam-uat-step-core.mjs'
+import {
+  inspectNextExamUatStagingEnvironment,
+  nextExamUatStep,
+} from './next-exam-uat-step-core.mjs'
 
 const UAT_IDS = [
   ['iphone-responsive', 'iPhone responsive UI'],
@@ -64,6 +67,30 @@ function context(overrides = {}) {
     ...overrides,
   }
 }
+
+function stagingEnvironment() {
+  return {
+    KORKRU_DEPLOYMENT_ENV: 'staging',
+    VERCEL_ENV: 'preview',
+    EXAM_QA_ENVIRONMENT: 'staging',
+    NEXT_PUBLIC_SITE_URL: 'https://staging.example.test',
+    EXAM_QA_PRODUCTION_SITE_URL: 'https://www.example.test',
+    NEXT_PUBLIC_SUPABASE_URL: 'https://staging-project.supabase.co',
+    EXAM_QA_PRODUCTION_SUPABASE_URL: 'https://production-project.supabase.co',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon-key-long-enough-for-qa',
+    SUPABASE_SERVICE_ROLE_KEY: 'service-role-long-enough-for-qa',
+  }
+}
+
+describe('next exam UAT staging environment', () => {
+  it('accepts injected staging variables when .env.qa.local is absent', () => {
+    expect(inspectNextExamUatStagingEnvironment('', stagingEnvironment()).ready).toBe(true)
+  })
+
+  it('fails closed when an env file is malformed', () => {
+    expect(inspectNextExamUatStagingEnvironment('BROKEN LINE', stagingEnvironment()).ready).toBe(false)
+  })
+})
 
 describe('next exam UAT step', () => {
   it('repairs malformed evidence before directing a test', () => {

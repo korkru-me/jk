@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises'
-import { parseEnvFile } from './check-seb-readiness-core.mjs'
-import { inspectExamStagingReadiness } from './check-exam-staging-readiness-core.mjs'
 import {
   formatNextExamUatStep,
+  inspectNextExamUatStagingEnvironment,
   nextExamUatStep,
 } from './next-exam-uat-step-core.mjs'
 
@@ -13,15 +12,13 @@ const SEB_MANIFEST_URL = new URL('../config/seb-platform-evidence.json', import.
 const CANDIDATE_MANIFEST_URL = new URL('../config/exam-release-candidate.json', import.meta.url)
 
 async function readQaEnvironment() {
+  let contents = ''
   try {
-    const parsed = parseEnvFile(await readFile(QA_ENV_URL, 'utf8'), process.env)
-    return {
-      ready: parsed.warnings.length === 0
-        && inspectExamStagingReadiness({ ...parsed.values, ...process.env }).ready,
-    }
-  } catch {
-    return { ready: false }
+    contents = await readFile(QA_ENV_URL, 'utf8')
+  } catch (error) {
+    if (error?.code !== 'ENOENT') return { ready: false }
   }
+  return inspectNextExamUatStagingEnvironment(contents, process.env)
 }
 
 async function readJson(url) {
