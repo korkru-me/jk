@@ -1,7 +1,7 @@
 # Staging phase 2C — isolated Supabase and Vercel Preview rollout
 
 อัปเดต: 20 กันยายน 2026
-สถานะ: **ทรัพยากรภายนอกและ bootstrap เสร็จแล้ว; รอ Vercel Preview deploy/smoke test**
+สถานะ: **ทรัพยากรภายนอก, bootstrap และ Vercel Preview deploy เสร็จแล้ว; รอ HTTPS certificate propagation ก่อน smoke test สุดท้าย**
 
 ## ทรัพยากรที่สร้าง
 
@@ -45,6 +45,11 @@ post-bootstrap audit:
 - Storage required buckets ครบ 6 รายการ และ reconciliation เหลือ 0 changes
 - Auth Site URL และ redirect allow-list ชี้ `staging.korkru.com`
 - Google OAuth ยังปิดใน Staging; email/password ยังเปิดตามค่าเริ่มต้น
+- Vercel Preview ของ branch `staging` build สำเร็จและอยู่ในสถานะ Ready
+- `staging.korkru.com` ถูกผูกกับ branch `staging` โดยเฉพาะ
+- Cloudflare A record ชี้ `staging.korkru.com` ไป Vercel ที่ `76.76.21.21`
+- HTTP request ถึง Vercel และถูกส่งไป Vercel Authentication ตาม deployment
+  protection ที่ตั้งใจไว้; HTTPS certificate ยังอยู่ระหว่างออกหลังเปลี่ยน DNS
 
 ## Fresh-bootstrap compatibility ที่พบจากการรันจริง
 
@@ -84,4 +89,3 @@ security-hardening phase
 - ไม่ copy `SEB_CONFIG_KEY` หรือ `SEB_BROWSER_EXAM_KEYS` จาก Production เพราะ
   config ที่ชี้ Staging URL ต้องสร้าง CK/BEK ชุดใหม่ในเฟสทดสอบ SEB บน Staging
 - ไม่เปิด Google OAuth จนกว่าจะมี client configuration สำหรับ Staging โดยเฉพาะ
-
