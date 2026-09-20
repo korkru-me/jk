@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises'
+import { inspectExamStagingEnvironment } from './check-exam-staging-readiness-core.mjs'
 import {
   formatNextExamUatStep,
-  inspectNextExamUatStagingEnvironment,
   nextExamUatStep,
 } from './next-exam-uat-step-core.mjs'
 
@@ -18,7 +18,7 @@ async function readQaEnvironment() {
   } catch (error) {
     if (error?.code !== 'ENOENT') return { ready: false }
   }
-  return inspectNextExamUatStagingEnvironment(contents, process.env)
+  return inspectExamStagingEnvironment(contents, process.env)
 }
 
 async function readJson(url) {

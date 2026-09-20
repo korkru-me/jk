@@ -1,4 +1,18 @@
 import { inspectDeploymentEnvironment } from '../lib/deployment-environment.mjs'
+import { parseEnvFile } from './check-seb-readiness-core.mjs'
+
+/** Merge an optional local QA env file with injected values without requiring secrets on disk. */
+export function inspectExamStagingEnvironment(contents = '', environment = {}) {
+  const parsed = parseEnvFile(contents, environment)
+  const mergedEnvironment = { ...parsed.values, ...environment }
+  const inspection = inspectExamStagingReadiness(mergedEnvironment)
+  const parseReady = parsed.warnings.length === 0
+  return {
+    environment: mergedEnvironment,
+    parseReady,
+    ready: parseReady && inspection.ready,
+  }
+}
 
 /**
  * Validate isolation before an authenticated exam QA run. The function only

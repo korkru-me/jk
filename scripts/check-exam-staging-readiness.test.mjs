@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatExamStagingReadinessReport,
+  inspectExamStagingEnvironment,
   inspectExamStagingReadiness,
 } from './check-exam-staging-readiness-core.mjs'
 
@@ -20,6 +21,14 @@ function validEnvironment(overrides = {}) {
 }
 
 describe('exam staging readiness', () => {
+  it('accepts injected staging variables when .env.qa.local is absent', () => {
+    expect(inspectExamStagingEnvironment('', validEnvironment()).ready).toBe(true)
+  })
+
+  it('fails closed when an env file is malformed', () => {
+    expect(inspectExamStagingEnvironment('BROKEN LINE', validEnvironment()).ready).toBe(false)
+  })
+
   it('accepts an isolated preview deployment', () => {
     const result = inspectExamStagingReadiness(validEnvironment())
     expect(result.ready).toBe(true)
