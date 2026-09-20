@@ -7,10 +7,11 @@ revision, Vercel Staging deployment และ SEB config ไว้ใน
 `config/exam-release-candidate.json`; `npm run check:exam-candidate` ผ่านครบ
 และงานถัดไปคือ responsive UAT บน iPhone จริง
 
-candidate ถูกล็อกใหม่หลังแก้ `/exam-screen-lab` ให้เปิดได้เฉพาะ Staging ที่ผ่าน
-isolation guard; build ใหม่ขึ้นสถานะ Ready และ canonical Staging alias ชี้มาที่
-build นี้แล้ว ผล UAT เดิมทั้งหมดเป็น `pending` อยู่แล้ว จึงไม่มีผลผ่านจาก build เก่า
-ถูกนำมารวม
+candidate ถูกล็อกใหม่เป็นรอบ `r2` หลังภาพจาก iPhone จริงพบว่าป้าย Staging ซ้อน
+ข้อความในแถบโหมดตัวอย่าง และแก้ให้แถบเว้น safe zone เฉพาะ Staging แล้ว build
+optimized ซ้ำทั้ง mobile/tablet/desktop; build ใหม่ขึ้นสถานะ Ready และ canonical
+Staging alias ชี้มาที่ build นี้แล้ว ผล UAT ทั้งหมดยังคงเป็น `pending` จึงไม่มีผลจาก
+build เก่าถูกนำมารวม
 
 หลักฐาน UAT หลังล็อก candidate ให้ commit/push ที่ branch `exam-uat-evidence`
 ซึ่งถูกปิด deployment ใน `vercel.json`; ห้าม push evidence-only commit ไป branch
