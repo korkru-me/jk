@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "runId": "final-release-uat-r4",
+  "runId": "final-release-uat-r5",
   "suites": [
     {
       "id": "iphone-responsive",
       "label": "iPhone responsive UI",
-      "status": "passed",
-      "testedAt": "2026-09-20T15:42:51.000Z",
-      "testedVersion": "ios-26.6.1_safari_staging-c787823"
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
     },
     {
       "id": "ipad-responsive",
@@ -26,9 +26,9 @@
     {
       "id": "windows-responsive",
       "label": "Windows responsive UI",
-      "status": "passed",
-      "testedAt": "2026-09-20T23:46:01.000Z",
-      "testedVersion": "windows-11_x64_chrome_staging-c787823"
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
     },
     {
       "id": "authenticated-exam",

@@ -1,29 +1,26 @@
 # การล็อก Exam release candidate
 
-อัปเดต: 20 กันยายน 2026
+อัปเดต: 21 กันยายน 2026
 
 สถานะปัจจุบัน: **ล็อก release candidate สำหรับ final UAT แล้ว** โดยผูก source
 revision, Vercel Staging deployment และ SEB config ไว้ใน
 `config/exam-release-candidate.json`; `npm run check:exam-candidate` ผ่านครบ
-และงานถัดไปคือ responsive UAT บน iPad จริง
+และงานถัดไปคือ responsive spot retest บนอุปกรณ์จริง
 
-candidate ถูกล็อกใหม่เป็นรอบ `r4` หลัง physical iPhone UAT ของรอบ `r3` ยืนยันว่า
-คีย์บอร์ด iOS ไม่ซ้อนกับแป้นคณิตศาสตร์แล้ว ช่อง active ไม่ถูกบัง และค่าคำตอบยังอยู่
-หลังปิดแป้น แต่พบว่าแผงแนวนอนยังสูงจนเหลือพื้นที่อ่านโจทย์น้อย จึงปรับเฉพาะหน้าจอ
-แนวนอนความสูงไม่เกิน 500px ให้ toolbar กระชับ ปุ่มหลักเรียง 10 คอลัมน์ 3 แถว
-และรักษาพื้นที่แตะขั้นต่ำ 44px โดย layout แนวตั้ง/แท็บเล็ต/เดสก์ท็อปยังเหมือนเดิม
+candidate ถูกล็อกใหม่เป็นรอบ `r5` หลัง physical iPad UAT ของรอบ `r4` พบว่าหน่วย
+คำตอบอยู่หลังปุ่มเปิดแป้นคณิตศาสตร์ จึงแก้ component กลางให้ลำดับเป็น **ช่องคำตอบ
+→ หน่วย → ปุ่มเปิดแป้น** ครบทั้งคำตอบเดี่ยว หลายข้อย่อย และช่องฝังในโจทย์ โดย
+ไม่เปลี่ยนพฤติกรรมการกรอกหรือแป้นคณิตศาสตร์
 
 Vercel deployment ใหม่ขึ้นสถานะ Ready และ canonical Staging alias ชี้มาที่ commit
-`c787823`; ตรวจ DOM จริงบน `staging.korkru.com` ที่ 844×390 แล้วพบว่าแผงสูง
-206px, ปุ่มหลักครบ 30 ปุ่มเรียง 3 แถว, ปุ่มสูง 44px, ช่องคำตอบอยู่เหนือแผง
-ประมาณ 12px, `inputmode="none"` และไม่มี horizontal overflow
+`4e8a8c4`; ตรวจ DOM จริงบน `staging.korkru.com` แล้วพบลำดับช่องแรกเป็นช่องคำตอบ
+→ `m/s²` → ปุ่มเปิดแป้น และช่องถัดไปเป็นช่องคำตอบ → `m` → ปุ่มเปิดแป้น ตรงตาม
+ข้อกำหนด
 
-บันทึก iPhone responsive suite เป็น `passed` หลังยืนยันบน iPhone จริงว่า layout
-ไม่ล้น ไม่มีคีย์บอร์ดระบบซ้อน และค่าคำตอบยังอยู่หลังปิดแป้น จากนั้นบันทึก Windows
-responsive suite เป็น `passed` หลังทดสอบ Windows 11 + Chrome ทั้งเต็มจอ/ครึ่งจอ,
-ซูม, keyboard navigation, แป้นคณิตศาสตร์, เครื่องคิดเลข, กระดาษทด, โหมดโฟกัส,
-แนบไฟล์และการลากด้วยเมาส์ ส่วน suite อื่นยังคงเป็น `pending` และไม่มีผลจาก build
-เก่าถูกนำมารวม ทั้งสองผลมาจาก canonical Staging candidate `r4` เดียวกัน
+ผล physical UAT ของ iPhone และ Windows ในรอบ `r4` ยังเป็นหลักฐานการค้นพบที่มีค่า
+แต่ไม่ถูกยกมาเป็นผลผ่านของ `r5` เพราะตำแหน่งหน่วยเป็น UI ร่วมที่เปลี่ยนบนทุกขนาดจอ
+จึงคืน iPhone, iPad และ Windows responsive suite เป็น `pending` เพื่อ spot retest
+candidate เดียวกัน ส่วน Mac และ suite ระบบจริงอื่นยังคง `pending` ตามเดิม
 
 หลักฐาน UAT หลังล็อก candidate ให้ commit/push ที่ branch `exam-uat-evidence`
 ซึ่งถูกปิด deployment ใน `vercel.json`; ห้าม push evidence-only commit ไป branch
