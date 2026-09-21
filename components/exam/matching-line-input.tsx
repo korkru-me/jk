@@ -49,11 +49,12 @@ interface GestureStart {
  * worse than no line at all. The measurement re-runs on resize and on every
  * change to the connections.
  *
- * Every card is a drag target in both directions. Cards use `touch-action:
- * pan-y`, so a vertical gesture still scrolls the question while a horizontal
- * gesture (or a short hold before moving) picks the card up. Tapping either
- * column first, then the other, remains the keyboard-accessible alternative —
- * whichever row is tapped second completes the pair.
+ * Every card is a drag target in both directions. While answering, cards use
+ * `touch-action: none` so iPadOS cannot turn a slightly diagonal line gesture
+ * into page scrolling and cancel the pointer stream. The gaps around the cards
+ * remain normal scroll areas. Tapping either column first, then the other,
+ * remains the keyboard-accessible alternative — whichever row is tapped
+ * second completes the pair.
  */
 export function MatchingLineInput({
   prompts, options, placement, onChange,
@@ -216,12 +217,6 @@ export function MatchingLineInput({
         const dx = ev.clientX - current.x
         const dy = ev.clientY - current.y
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
-        // A vertical gesture belongs to the page. A horizontal gesture is the
-        // natural movement for joining the two columns and starts immediately.
-        if (Math.abs(dy) > Math.abs(dx)) {
-          endGesture()
-          return
-        }
         beginDrag(current, { x: ev.clientX, y: ev.clientY })
       }
       ev.preventDefault()
@@ -287,6 +282,7 @@ export function MatchingLineInput({
       <p className="text-xs text-muted-foreground">
         กดค้างที่การ์ดฝั่งใดก็ได้ แล้วลากไปปล่อยที่การ์ดอีกฝั่ง
         หรือแตะการ์ดฝั่งใดก่อนก็ได้ แล้วแตะอีกฝั่งให้ครบคู่
+        เลื่อนหน้าจากพื้นที่ว่างนอกการ์ด
       </p>
 
       <div ref={boxRef} className="relative grid grid-cols-2 gap-x-8 gap-y-2 sm:gap-x-16">
@@ -317,22 +313,34 @@ export function MatchingLineInput({
             const verdict = results?.[i]
             const isSelected = selected?.side === 'left' && selected.index === i
             const isHovered = hover?.side === 'left' && hover.index === i && drag !== null
+            const isDragging = drag?.source.side === 'left' && drag.source.index === i
             const connected = placement[i] != null
             return (
-              <div
+              <Button
                 key={i}
-                ref={el => { leftRefs.current[i] = el }}
+                type="button"
+                variant="outline"
+                disabled={disabled}
+                ref={el => { leftRefs.current[i] = el as HTMLElement | null }}
                 data-match-prompt={i}
+                aria-label={
+                  connected
+                    ? `ยกเลิกเส้นของข้อ ${i + 1}`
+                    : `เริ่มโยงเส้นจากข้อ ${i + 1}`
+                }
+                aria-pressed={isSelected}
                 onPointerDown={e => onCardPointerDown(e, { side: 'left', index: i })}
                 onClick={() => activatePrompt(i)}
                 className={cn(
-                  'relative flex touch-pan-y select-none items-center gap-2 rounded-xl border bg-card p-2.5 transition-colors',
+                  'relative flex h-auto min-h-10 w-full select-none items-center justify-start gap-2 rounded-xl border p-2.5 text-left font-normal whitespace-normal transition-all pointer-coarse:min-h-11',
+                  disabled ? 'touch-pan-y' : 'touch-none',
                   !disabled && 'cursor-grab active:cursor-grabbing',
                   isHovered ? 'border-primary bg-primary/10'
                     : verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'
                     : isSelected ? 'border-primary bg-primary/10'
-                    : 'border-border'
+                    : 'border-border bg-card',
+                  isDragging && 'translate-y-px ring-2 ring-primary/30'
                 )}
               >
                 <span className="shrink-0 text-xs font-medium text-muted-foreground">{i + 1}.</span>
@@ -345,35 +353,19 @@ export function MatchingLineInput({
                   <RichText text={prompt.text} />
                 </span>
 
-                {/* The grab point, half outside the card so the line starts at
-                    the edge rather than under the text. */}
-                <Button
-                  variant="ghost"
-                  size="icon-2xs"
-                  disabled={disabled}
-                  aria-label={
-                    connected
-                      ? `ยกเลิกเส้นของข้อ ${i + 1}`
-                      : `เริ่มโยงเส้นจากข้อ ${i + 1}`
-                  }
-                  aria-pressed={isSelected}
+                {/* Decorative connector only. The whole card is the target, so
+                    students never have to aim for this small circle. */}
+                <span
+                  aria-hidden
                   className={cn(
-                    'absolute -right-5 top-1/2 h-10 w-10 min-w-0 -translate-y-1/2 touch-none rounded-full border-0 bg-transparent p-0 hover:bg-transparent pointer-coarse:h-11 pointer-coarse:w-11',
-                    !disabled && 'cursor-grab',
+                    'absolute -right-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 transition-colors',
+                    verdict === true ? 'border-success bg-success'
+                      : verdict === false ? 'border-destructive bg-destructive'
+                      : connected || isSelected ? 'border-primary bg-primary'
+                      : 'border-border bg-card'
                   )}
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'h-4 w-4 rounded-full border-2 transition-colors',
-                      verdict === true ? 'border-success bg-success'
-                        : verdict === false ? 'border-destructive bg-destructive'
-                        : connected || isSelected ? 'border-primary bg-primary'
-                        : 'border-border bg-card'
-                    )}
-                  />
-                </Button>
-              </div>
+                />
+              </Button>
             )
           })}
         </div>
@@ -384,6 +376,7 @@ export function MatchingLineInput({
             const verdict = takenBy >= 0 ? results?.[takenBy] : undefined
             const isHovered = hover?.side === 'right' && hover.index === j && drag !== null
             const isSelected = selected?.side === 'right' && selected.index === j
+            const isDragging = drag?.source.side === 'right' && drag.source.index === j
             return (
               <Button
                 key={option.id}
@@ -396,14 +389,16 @@ export function MatchingLineInput({
                 onPointerDown={e => onCardPointerDown(e, { side: 'right', index: j })}
                 onClick={() => activateOption(j)}
                 className={cn(
-                  'relative flex h-auto min-h-10 w-full touch-pan-y select-none items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors pointer-coarse:min-h-11',
+                  'relative flex h-auto min-h-10 w-full select-none items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-all pointer-coarse:min-h-11',
+                  disabled ? 'touch-pan-y' : 'touch-none',
                   !disabled && 'cursor-grab active:cursor-grabbing',
                   isHovered ? 'border-primary bg-primary/10'
                     : verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'
                     : isSelected ? 'border-primary bg-primary/10'
                     : takenBy >= 0 ? 'border-primary/40'
-                    : 'border-border bg-card'
+                    : 'border-border bg-card',
+                  isDragging && 'translate-y-px ring-2 ring-primary/30'
                 )}
               >
                 <span
