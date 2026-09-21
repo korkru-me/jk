@@ -6,8 +6,8 @@ export function isTeachingBoardOperationPending(input: {
   questionId: string
   slot: number
 }): boolean {
-  return input.operation.questionId === input.questionId
-    && input.operation.slot === input.slot
+  return input.operation.kind !== 'idle'
+    && input.operation.questionId === input.questionId
     && input.operation.nonce !== input.handledNonce
 }
 
@@ -16,11 +16,14 @@ export function initialHandledTeachingBoardOperationNonce(input: {
   operation: TeachingBoardOperation
   questionId: string
   slot: number
+  boardId: string | null
   hasValidParkedScene: boolean
 }): number {
-  return input.hasValidParkedScene
+  return input.operation.kind === 'idle'
+    || (input.hasValidParkedScene
     && input.operation.questionId === input.questionId
     && input.operation.slot === input.slot
+    && input.operation.boardId === input.boardId)
     ? input.operation.nonce
     : 0
 }

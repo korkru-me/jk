@@ -50,6 +50,16 @@ import {
   type LegacyTeacherImageSnapshot,
 } from '@/lib/drawing-board-policy'
 import type { FingerInputMode } from '@/lib/drawing-board-input'
+import {
+  cleanTeacherDraftState,
+  editedTeacherDraftState,
+  initialTeacherDraftState,
+  TEACHER_DRAFT_STATE_LABEL,
+  type TeacherQuestionDraftState,
+  type TeachingBoardDraftRecord,
+  type TeachingBoardTarget,
+} from '@/lib/teaching-board-draft-state'
+import { scratchpadHasMeaningfulDraft } from '@/lib/scratchpad-state'
 
 interface Props {
   assignmentId: string
@@ -63,15 +73,31 @@ interface Props {
   /** What was on this ข้อ's board when the teacher last left it. */
   initialScene?: ScratchpadScene | null
   initialDirty?: boolean
+  initialDraftState?: TeacherQuestionDraftState
   onSaved: (
     questionId: string,
     slot: number,
     boardId: string,
     expectedTarget: { slot: number; boardId: string | null },
   ) => Promise<void>
-  onDirtyChange: (dirty: boolean) => void
+  onDraftStateChange: (
+    target: TeachingBoardTarget,
+    state: TeacherQuestionDraftState,
+    dirty: boolean,
+  ) => void
   /** Reports the live scene so the ข้อ can be returned to as it was left. */
-  onSceneChange?: (scene: ScratchpadScene) => void
+  onSceneChange?: (target: TeachingBoardTarget, scene: ScratchpadScene) => void
+  /** The board being fetched while the committed target stays on screen. */
+  pendingBoard?: TeachingBoardView | null
+  onLoadResolved?: (
+    nonce: number,
+    target: TeachingBoardTarget,
+    scene: ScratchpadScene,
+    state: TeacherQuestionDraftState,
+  ) => void
+  onLoadFailed?: (nonce: number, target: TeachingBoardTarget) => void
+  /** Gives the route owner a chance to confirm and keep one-step recovery. */
+  onResetRequested?: (draft: TeachingBoardDraftRecord) => Promise<boolean>
   /** This ข้อ's pictures, offered on the board itself as well as in the card. */
   questionImages?: string[]
   /**
@@ -83,7 +109,7 @@ interface Props {
   insertImage?: { url: string; nonce: number } | null
   onInsertImageHandled?: (nonce: number) => void
   /** Detaches the live draft from its source slot after a next-step clone. */
-  onDuplicated?: () => void
+  onDuplicated?: (scene: ScratchpadScene) => void
   fingerInputMode: FingerInputMode
   onFingerInputModeChange: (mode: FingerInputMode) => void
   presentationLocked: boolean
@@ -129,9 +155,14 @@ export default function TeachingBoardEditor({
   operation,
   initialScene,
   initialDirty = false,
+  initialDraftState,
   onSaved,
-  onDirtyChange,
+  onDraftStateChange,
   onSceneChange,
+  pendingBoard,
+  onLoadResolved,
+  onLoadFailed,
+  onResetRequested,
   questionImages = [],
   onResolveSaveSlot,
   insertImage,
@@ -156,6 +187,11 @@ export default function TeachingBoardEditor({
     ? 'กระดานฉบับนี้มีข้อมูลที่เวอร์ชันปัจจุบันยังไม่รองรับ จึงเก็บฉบับเดิมไว้และไม่เปิดให้แก้ไข'
     : null
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
+  const target = useMemo<TeachingBoardTarget>(() => ({
+    questionId,
+    slot,
+    boardId: board?.id ?? null,
+  }), [board?.id, questionId, slot])
   const mountedRef = useRef(true)
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   const paperRef = useRef<HTMLDivElement | null>(null)
@@ -171,6 +207,7 @@ export default function TeachingBoardEditor({
     operation,
     questionId,
     slot,
+    boardId: board?.id ?? null,
     hasValidParkedScene: Boolean(initialScene && initialValidation?.ok),
   }))
   // A matching load/reset must block in the very first render after the
@@ -207,6 +244,15 @@ export default function TeachingBoardEditor({
   const [insertingImage, setInsertingImage] = useState(false)
   const [pickingImage, setPickingImage] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [draftState, setDraftState] = useState<TeacherQuestionDraftState>(() => (
+    initialPolicyMessage
+      ? 'unsupported_read_only'
+      : initialDraftState ?? initialTeacherDraftState({
+          hasBoard: Boolean(board),
+          editable: canManage && (!board || board.editable),
+          dirty: initialDirty,
+        })
+  ))
   const [apiReady, setApiReady] = useState(false)
   const [sceneReady, setSceneReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -234,10 +280,27 @@ export default function TeachingBoardEditor({
     && !operationPending
   const canReset = canManage && (!board || board.editable)
 
+  const reportDraftState = useCallback((
+    nextState: TeacherQuestionDraftState,
+    nextDirty: boolean,
+    nextTarget = target,
+  ) => {
+    setDraftState(nextState)
+    onDraftStateChange(nextTarget, nextState, nextDirty)
+  }, [onDraftStateChange, target])
+
   const markDirty = useCallback((next: boolean) => {
     setDirty(next)
-    onDirtyChange(next)
-  }, [onDirtyChange])
+    reportDraftState(
+      next
+        ? editedTeacherDraftState(Boolean(board))
+        : cleanTeacherDraftState({
+            hasBoard: Boolean(board),
+            editable: canManage && (!board || board.editable),
+          }),
+      next,
+    )
+  }, [board, canManage, reportDraftState])
 
   const releaseChangeGuard = () => {
     requestAnimationFrame(() => { ignoreChangesRef.current = false })
@@ -256,8 +319,8 @@ export default function TeachingBoardEditor({
     setBackground('lined')
     setEditorScene(scene)
     setEditorRevision(value => value + 1)
-    markDirty(false)
-  }, [markDirty])
+    setDirty(false)
+  }, [])
 
   const resetCanvas = useCallback((dirtyAfterReset = false) => {
     loadRequestRef.current += 1
@@ -275,26 +338,49 @@ export default function TeachingBoardEditor({
     setPolicyReadOnlyMessage(null)
     setEditorScene(scene)
     setEditorRevision(value => value + 1)
-    onSceneChange?.(scene)
+    onSceneChange?.(target, scene)
     markDirty(dirtyAfterReset)
-  }, [markDirty, onSceneChange])
+  }, [markDirty, onSceneChange, target])
 
-  const loadBoardScene = useCallback(async () => {
-    if (!board || !apiRef.current) return
+  const loadBoardScene = useCallback(async (
+    targetBoard: TeachingBoardView,
+    targetOperation: TeachingBoardOperation,
+  ) => {
+    if (!apiRef.current) return
     const requestId = ++loadRequestRef.current
+    const requestedTarget: TeachingBoardTarget = {
+      questionId,
+      slot: targetBoard.slot,
+      boardId: targetBoard.id,
+    }
+    const replacingCommittedTarget = target.boardId !== requestedTarget.boardId
+      || target.slot !== requestedTarget.slot
+    const previousSceneReady = sceneReady
     persistenceBlockedRef.current = true
     releasePersistenceOnReadyRef.current = false
     setSceneReady(false)
     setLoading(true)
+    reportDraftState('loading_slot', dirty)
     try {
       const { getTeachingBoardScene } = await import('@/lib/actions/math-work')
       if (requestId !== loadRequestRef.current) return
-      const loaded = await getTeachingBoardScene(board.id)
+      const loaded = await getTeachingBoardScene(targetBoard.id)
       if (requestId !== loadRequestRef.current) return
       if (!loaded || 'error' in loaded) throw new Error(loaded?.error ?? 'เปิดกระดานสอนไม่สำเร็จ')
       const validated = validateStoredTeacherScene(loaded.scene)
       if (!validated.ok) {
-        throw new Error('รูปแบบกระดานสอนไม่รองรับ')
+        showSafeReadOnlyPlaceholder(
+          'กระดานฉบับนี้มีข้อมูลที่เวอร์ชันปัจจุบันยังไม่รองรับ ข้อมูลต้นฉบับยังเก็บอยู่และจะไม่ถูกเขียนทับ',
+        )
+        const placeholder = emptyScratchpadScene()
+        reportDraftState('unsupported_read_only', false, requestedTarget)
+        onLoadResolved?.(
+          targetOperation.nonce,
+          requestedTarget,
+          placeholder,
+          'unsupported_read_only',
+        )
+        return
       }
       const scene = validated.scene
 
@@ -309,42 +395,58 @@ export default function TeachingBoardEditor({
       setBackground(scene.background)
       setEditorScene(scene)
       setEditorRevision(value => value + 1)
-      onSceneChange?.(scene)
-      markDirty(false)
+      const resolvedState: TeacherQuestionDraftState = targetBoard.editable
+        ? 'saved_slot'
+        : 'read_only_slot'
+      setDirty(false)
+      setDraftState(resolvedState)
+      onSceneChange?.(requestedTarget, scene)
+      onLoadResolved?.(targetOperation.nonce, requestedTarget, scene, resolvedState)
       toast.success(loaded.legacySvgRasterized
         ? 'เปิดกระดานแล้ว · แปลงรูป SVG เดิมเป็นภาพปลอดภัยก่อนแก้ไข'
-        : board.editable ? `เปิดกระดานช่อง ${board.slot} แล้ว` : `เปิดกระดานของ ${board.creatorName} แล้ว`)
+        : targetBoard.editable
+          ? `เปิดกระดานช่อง ${targetBoard.slot} แล้ว`
+          : `เปิดกระดานของ ${targetBoard.creatorName} แล้ว`)
     } catch (error) {
       if (requestId !== loadRequestRef.current) return
-      showSafeReadOnlyPlaceholder(
-        error instanceof Error && error.message === 'รูปแบบกระดานสอนไม่รองรับ'
-          ? 'กระดานฉบับนี้มีข้อมูลที่เวอร์ชันปัจจุบันยังไม่รองรับ ข้อมูลต้นฉบับยังเก็บอยู่และจะไม่ถูกเขียนทับ'
-          : 'เปิดกระดานฉบับนี้ไม่สำเร็จ จึงหยุดการแก้ไขและเก็บข้อมูลต้นฉบับไว้โดยไม่เขียนทับ',
-      )
+      if (replacingCommittedTarget && previousSceneReady) {
+        persistenceBlockedRef.current = false
+        setSceneReady(true)
+        reportDraftState('load_failed', dirty)
+      } else {
+        showSafeReadOnlyPlaceholder(
+          'เปิดกระดานฉบับนี้ไม่สำเร็จ จึงหยุดการแก้ไขและเก็บข้อมูลต้นฉบับไว้โดยไม่เขียนทับ',
+        )
+        onSceneChange?.(target, emptyScratchpadScene())
+        reportDraftState('load_failed', false)
+      }
+      onLoadFailed?.(targetOperation.nonce, requestedTarget)
       toast.error(error instanceof Error ? error.message : 'เปิดกระดานสอนไม่สำเร็จ')
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false)
     }
-  }, [assignmentId, board, markDirty, onSceneChange, questionId, showSafeReadOnlyPlaceholder])
+  }, [dirty, onLoadFailed, onLoadResolved, onSceneChange, questionId, reportDraftState, sceneReady, showSafeReadOnlyPlaceholder, target])
 
   useEffect(() => {
     if (
       operation.nonce <= 0
       || handledOperationRef.current === operation.nonce
       || operation.questionId !== questionId
-      || operation.slot !== slot
     ) return
-    if (operation.kind === 'pending') return
+    if (operation.kind === 'idle' || operation.kind === 'pending') return
     if (operation.kind === 'load') {
-      if (!apiReady || !board || operation.boardId !== board.id) return
+      const targetBoard = pendingBoard?.id === operation.boardId
+        ? pendingBoard
+        : board?.id === operation.boardId ? board : null
+      if (!apiReady || !targetBoard) return
       handledOperationRef.current = operation.nonce
-      void loadBoardScene()
+      void loadBoardScene(targetBoard, operation)
       return
     }
     if (board || operation.boardId !== null) return
     handledOperationRef.current = operation.nonce
     resetCanvas(false)
-  }, [apiReady, board, loadBoardScene, operation, questionId, resetCanvas, slot])
+  }, [apiReady, board, loadBoardScene, operation, pendingBoard, questionId, resetCanvas, slot])
 
   useEffect(() => {
     if (!apiReady) return
@@ -364,8 +466,16 @@ export default function TeachingBoardEditor({
   useEffect(() => {
     if (!apiReady || restoredRef.current || !initialScene) return
     restoredRef.current = true
-    markDirty(initialDirty)
-  }, [apiReady, initialDirty, initialScene, markDirty])
+    setDirty(initialDirty)
+    reportDraftState(
+      initialDraftState ?? initialTeacherDraftState({
+        hasBoard: Boolean(board),
+        editable: canManage && (!board || board.editable),
+        dirty: initialDirty,
+      }),
+      initialDirty,
+    )
+  }, [apiReady, board, canManage, initialDirty, initialDraftState, initialScene, reportDraftState])
 
   const handleChange = useCallback((
     elements: readonly OrderedExcalidrawElement[],
@@ -392,16 +502,16 @@ export default function TeachingBoardEditor({
       const zoom = appState.zoom.value
       paper.style.transform = `translate(${appState.scrollX * zoom}px, ${appState.scrollY * zoom}px) scale(${zoom})`
     }
-    onSceneChange?.(sceneRef.current)
+    onSceneChange?.(target, sceneRef.current)
     if (contentChanged && !ignoreChangesRef.current && editable) markDirty(true)
-  }, [background, editable, markDirty, onSceneChange, operationPending])
+  }, [background, editable, markDirty, onSceneChange, operationPending, target])
 
   const chooseBackground = (next: ScratchpadBackground) => {
     if (!editable || presentationLocked) return
     sceneMutationEpochRef.current += 1
     setBackground(next)
     sceneRef.current = { ...sceneRef.current, background: next }
-    onSceneChange?.(sceneRef.current)
+    onSceneChange?.(target, sceneRef.current)
     markDirty(true)
   }
 
@@ -568,9 +678,9 @@ export default function TeachingBoardEditor({
       setBackground(scene.background)
       setEditorScene(scene)
       setEditorRevision(value => value + 1)
-      onSceneChange?.(scene)
-      onDuplicated?.()
-      markDirty(true)
+      onDuplicated?.(scene)
+      setDirty(true)
+      setDraftState('unsaved_new')
       toast.success('สร้างขั้นถัดไปแล้ว · ต้นฉบับยังอยู่ช่องเดิม')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'ทำสำเนากระดานไม่สำเร็จ')
@@ -637,6 +747,7 @@ export default function TeachingBoardEditor({
 
     savingRef.current = true
     setSaving(true)
+    reportDraftState('saving', true)
     const boardEpoch = loadRequestRef.current
     const mutationEpoch = sceneMutationEpochRef.current
     try {
@@ -688,7 +799,8 @@ export default function TeachingBoardEditor({
         boardId: board?.id ?? null,
       })
       if (stillCurrent) {
-        markDirty(false)
+        setDirty(false)
+        setDraftState('saved_slot')
         await refreshed
         toast.success(target.replacing
           ? `บันทึกทับ ${questionLabel} ช่อง ${target.slot} แล้ว`
@@ -698,11 +810,26 @@ export default function TeachingBoardEditor({
         toast.success(`บันทึก ${questionLabel} ช่อง ${target.slot} แล้ว · งานที่แก้ต่อยังไม่ได้บันทึก`)
       }
     } catch (error) {
+      reportDraftState('save_failed', true)
       toast.error(error instanceof Error ? error.message : 'บันทึกกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       savingRef.current = false
       if (mountedRef.current) setSaving(false)
     }
+  }
+
+  const requestReset = async () => {
+    const snapshot = snapshotDrawingScene(sceneRef.current)
+    if (
+      onResetRequested
+      && !await onResetRequested({
+        target,
+        scene: snapshot,
+        state: draftState,
+        dirty,
+      })
+    ) return
+    resetCanvas(Boolean(board))
   }
 
   return (
@@ -714,23 +841,21 @@ export default function TeachingBoardEditor({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{questionLabel}</p>
               <p className="text-[10px] text-muted-foreground" aria-live="polite">
-                {saving ? 'กำลังบันทึก...'
+                {saving ? TEACHER_DRAFT_STATE_LABEL.saving
                   : insertingImage ? 'กำลังใส่รูปจากโจทย์...'
                     : duplicating ? 'กำลังสร้างขั้นถัดไป...'
                       : presentationLocked ? 'ล็อกพรีเซนต์ · เขียนแก้ไม่ได้'
-                        : !editable ? 'ดูอย่างเดียว'
-                          : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก'
-                            : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
+                        : TEACHER_DRAFT_STATE_LABEL[draftState]}
               </p>
             </div>
             <div className="ml-auto flex items-center gap-1">
               {canReset && (
-                <Button type="button" variant="outline" size="xs" onClick={() => resetCanvas(Boolean(board))} disabled={saving || loading || operationPending || presentationLocked || duplicating}>
+                <Button type="button" variant="outline" size="xs" onClick={() => void requestReset()} disabled={saving || loading || operationPending || presentationLocked || duplicating || !scratchpadHasMeaningfulDraft(sceneRef.current)}>
                   <RotateCcw /> กระดานใหม่
                 </Button>
               )}
               {editable && (
-                <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || duplicating || (Boolean(board) && !dirty)}>
+                <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || duplicating || !dirty}>
                   {saving ? <Loader2 className="animate-spin" /> : <Save />}
                   {saving ? 'กำลังบันทึก...' : board ? 'บันทึกทับ' : 'บันทึก'}
                 </Button>

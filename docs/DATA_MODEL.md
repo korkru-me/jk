@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 3 กันยายน 2026
+อัปเดตล่าสุด: 22 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -135,6 +135,8 @@ Invariant สำคัญ:
 - Path ใหม่อยู่ใน private Storage และ database เก็บ path ไม่เก็บ signed URL ซึ่งมีอายุสั้น
 
 Local-only scratch scene ไม่ใช่ row ในฐานข้อมูล อยู่ใน IndexedDB keyed by user/submission/answer/part, จำกัด 2 MiB/10,000 elements และห้ามถูกนับเป็น submission attachment เมื่อผู้ใช้กดแนบจึงสร้าง WebP/scene และการอัปโหลดไฟล์ยังไม่ถือว่าเป็นหลักฐานจน Server Action ที่ตรวจไฟล์กับสิทธิ์บันทึก reference สำเร็จ; `part_key` ใช้ `answer` สำหรับคำตอบเดียวและ `part:N` สำหรับข้อย่อยตามตำแหน่ง เฟส drawing-board 3 เพิ่ม optional local metadata ใน record เดิม ได้แก่ semantic `editRevision`/`savedRevision`/fingerprint, snapshot identity ของ artifact ที่แนบ และ one-step recovery; metadata นี้ไม่ใช่ row หรือ server authority, record รุ่นเก่าที่ยังไม่มี metadata ยังอ่าน scene ได้ และต้องถือ attachment เป็น unverified จนเทียบหรือแนบใหม่
+
+Draft ของครูใน drawing-board เฟส 6 ก็ไม่ใช่ row ใหม่: route เก็บ scene/state/dirty ต่อ exact `{questionId, slot, boardId}` ใน memory จนกดบันทึก explicit เท่านั้น และเก็บ one-step recovery ฉบับเดียวใน memory ก่อน reset/โหลดช่องอื่น/ลบหรือแทน active draft; restore ใช้ได้ครั้งเดียว ไม่มี undo history และ route unmount เป็นจุดจบ จึงไม่เปลี่ยน `teaching_boards`, Storage path หรือ server authority เดิม
 
 หลัง submit ห้ามแก้ artifact ของนักเรียน Attempt ใหม่ไม่แก้หรือย้ายหลักฐานจาก attempt เก่า ส่วน `submission_answers.work_images` รุ่นเก่ายังคงเป็น source ที่อ่านได้เพื่อ backward compatibility
 

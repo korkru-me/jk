@@ -1,6 +1,6 @@
 # Architecture
 
-อัปเดตล่าสุด: 21 กันยายน 2026
+อัปเดตล่าสุด: 22 กันยายน 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
 
@@ -147,6 +147,8 @@ branch `codex/drawing-board-phase-4` วัดหลัง production build ไ�
 
 branch `codex/drawing-board-phase-5` วัดหลัง production build ได้ 17 initial chunks รวม 809,138 bytes raw / 247,984 bytes gzip (+370/+258 bytes จากเฟส 4 และยังต่ำกว่า gate 256,828 bytes gzip) และ scan ไม่พบ Excalidraw, mathjs, `supabase-js`, `lib/supabase/client`, duplicate module/action หรือ server-only board code ใน union; `\\sharp` ที่พบใน KaTeX เป็นคำสั่งสัญลักษณ์ดนตรี ไม่ใช่ server package
 
+branch `codex/drawing-board-phase-6` วัดหลัง production build ได้ 17 initial chunks รวม 809,138 bytes raw / 247,982 bytes gzip (+0/-2 bytes จากเฟส 5 และยังต่ำกว่า gate 256,828 bytes gzip) และ scan ไม่พบ Excalidraw, mathjs, `supabase-js`, `lib/supabase/client`, teacher draft-state/editor หรือ server-only board code ใน union
+
 legacy board ที่ผสม SVG กับ raster ใช้สองด่าน: rasterize SVG แล้ว full-validate exact scene/canonical bytes ก่อนออก claim ใหม่ให้ retained raster ทุกไฟล์ จากนั้น full-validate ลายเซ็นจริงอีกครั้งก่อนคืน browser จึงไม่มี partial trust จาก raw scene ส่วน editor ครูที่ remount หลัง hide/show ใช้ parked scene ซึ่ง validate แล้วเป็นหลักฐานว่า matching operation nonce ถูก handle ไปแล้ว จึงไม่ replay load/reset ทับ draft
 
 บน branch `codex/drawing-board-phase-1` ที่ยังไม่ merge/deploy ได้รวม Excalidraw host เป็น `DrawingBoardCore` แล้ว ใช้ pure role/command policy กับ scene validator ร่วมกัน และคง student IndexedDB/attachment lifecycle กับ teacher per-question draft/explicit-save lifecycle เป็นคนละ host การซ่อน UI ไม่ใช่ security boundary: allowlist เดียวกันครอบคลุม toolbar, native action, shortcut, context/long-press, paste, drop, Library และ scene ingress/pre-persist Validator ใช้ exact keys/numeric bounds; live mode ผ่อนเฉพาะ active new/point-editor element ตัวเดียวโดยไม่ persist transient shape, deleted tombstone และ stale eraser edge ที่จบกับ tombstone คงได้เพื่อ undo แต่ relation ระหว่าง live elements ต้อง reciprocal และ teacher file projection ตัด orphan ก่อน persist ฉาก invalid/unsupported จาก persistence ไม่ถูกป้อนเข้า Excalidraw หรือแปลงเป็น blank เงียบ ๆ ส่วน invalid live mutation จะ remount กลับ immutable last-good scene ของ editor revision เดียวกัน Lifecycle ครูใช้ `pending/load/reset`, identity `{question, slot, boardId}`, navigation/intent/fetch epoch และ immutable save snapshot เพื่อตัด stale response/save/delete race
@@ -159,7 +161,9 @@ legacy board ที่ผสม SVG กับ raster ใช้สองด่า
 
 บน branch `codex/drawing-board-phase-5` teacher host ประกอบ toolbar จาก command facade/primitives เดียวกับ student แล้วเพิ่มเฉพาะ app-owned laser, Frame, quick colors, presentation lock, grid/snap และ duplicate-next-step; lock ใช้ effective Excalidraw view mode แต่ controller ยอม laser/hand, grid/snap เป็น controlled session props ที่ไม่เข้า stable app state/history, และ native controls ยังถูก policy boundary ซ่อน/บล็อกเหมือนเดิม Duplicate เป็น authorized read/transform action ไม่ใช่ persistence: server full-validate scene/claim (รวม authentic expired claim และ exact legacy file จาก source board ที่มีสิทธิ์), สร้าง live-only semantic clone ด้วย identity/relation ใหม่ ออก image claim ใหม่ แล้ว client remount history และ detach board target ก่อนเข้า save slot resolver เดิม จึงคง source board และ storage ไว้จนผู้ใช้บันทึก explicit
 
-rollout blocker ที่สืบทอดจาก schema เดิม: migration `20260904023417_math_work_png_preview.sql` เพิ่ม PNG เฉพาะ bucket MIME แต่ CHECK ของ `student_work_artifacts`/`teaching_boards` และ student scope trigger ยังบังคับ `.webp`; เฟส 1–5 ไม่มี migration และไม่ได้ตรวจ live migration state ใหม่ ต้องรัน `supabase migration list` แล้วสร้าง migration ใหม่ผ่าน CLI ก่อนประกาศ Safari/PNG พร้อมใช้
+บน branch `codex/drawing-board-phase-6` teacher route มี local state machine แยกต่อ exact `{questionId, slot, boardId}` โดย scene อยู่ใน ref และ metadata revision เป็นตัวทำให้ป้ายสถานะ rerender; committed target ไม่เปลี่ยนระหว่าง pending load จน editor validate scene และตอบกลับด้วย matching nonce/question/target จากนั้น parent จึง commit scene กับ identity พร้อมกัน Load failure settle กลับ target เดิม ส่วน save success ย้าย draft record ไป board id ที่ action คืนก่อน refetch One-step recovery clone scene แยก object ก่อน reset/slot replacement/active delete และ restore ได้ครั้งเดียวเป็น dirty draft โดยไม่คืน undo history; all-draft exit guard ใช้ source รายการเดียวกันกับ app Back, same-window/same-origin app links และ `beforeunload` โดยไม่มี server/IndexedDB ownership เพิ่ม
+
+rollout blocker ที่สืบทอดจาก schema เดิม: migration `20260904023417_math_work_png_preview.sql` เพิ่ม PNG เฉพาะ bucket MIME แต่ CHECK ของ `student_work_artifacts`/`teaching_boards` และ student scope trigger ยังบังคับ `.webp`; เฟส 1–6 ไม่มี migration และไม่ได้ตรวจ live migration state ใหม่ ต้องรัน `supabase migration list` แล้วสร้าง migration ใหม่ผ่าน CLI ก่อนประกาศ Safari/PNG พร้อมใช้
 
 ## Compatibility hotspots
 

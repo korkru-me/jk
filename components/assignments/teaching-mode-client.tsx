@@ -17,7 +17,9 @@ import {
   Plus,
   Presentation,
   Trash2,
+  Undo2,
   UserRound,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +43,18 @@ import type { ScratchpadScene } from '@/lib/scratchpad'
 import type { FingerInputMode } from '@/lib/drawing-board-input'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { drawingBackgroundStyle } from '@/components/exam/drawing-board-utils'
+import {
+  adoptSavedTeachingBoard,
+  createTeachingBoardRecovery,
+  restoreTeachingBoardRecovery,
+  sameTeachingBoardTarget,
+  teachingBoardTargetKey,
+  type TeacherQuestionDraftState,
+  type TeachingBoardDraftRecord,
+  type TeachingBoardRecovery,
+  type TeachingBoardTarget,
+} from '@/lib/teaching-board-draft-state'
+import { scratchpadHasMeaningfulDraft } from '@/lib/scratchpad-state'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
@@ -314,7 +328,7 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
  */
 function TeachingBoardSlots({
   boards, loading, canManage, currentUserId, active, selectedSlot, selectedBoardId,
-  onOpenSlot, onOpenBoard, onDelete, onRefresh, onHide,
+  dirtySlots, onOpenSlot, onOpenBoard, onDelete, onRefresh, onHide,
 }: {
   boards: TeachingBoardView[]
   loading: boolean
@@ -323,6 +337,7 @@ function TeachingBoardSlots({
   active: boolean
   selectedSlot: number
   selectedBoardId: string | null
+  dirtySlots: number[]
   onOpenSlot: (slot: number) => void
   onOpenBoard: (board: TeachingBoardView) => void
   onDelete: (board: TeachingBoardView) => void
@@ -373,6 +388,7 @@ function TeachingBoardSlots({
                     </span>
                   )}
                   <span className="text-center text-xs font-medium">ช่อง {slot}</span>
+                  {dirtySlots.includes(slot) && <Badge variant="secondary">ยังไม่บันทึก</Badge>}
                 </Button>
                 {saved && (
                   <Button
@@ -533,11 +549,18 @@ export function TeachingModeClient({
     boards: TeachingBoardView[]
     resolve: (slot: number | null) => void
   } | null>(null)
-  // One board per ข้อ: what is on it stays with it, so leaving and coming
-  // back finds the same strokes, and a new ข้อ opens on a clean sheet.
-  const scenesRef = useRef(new Map<string, ScratchpadScene>())
-  const boardTargetsRef = useRef(new Map<string, { slot: number; boardId: string | null }>([
-    [questions[0].id, { slot: initialSlot, boardId: initialBoard?.id ?? null }],
+  // A draft belongs to an exact question/slot/board identity. The scene stays
+  // in a ref so pointer moves never rerender the whole teaching route; the
+  // small revision counter only changes when lifecycle metadata changes.
+  const draftsRef = useRef(new Map<string, TeachingBoardDraftRecord>())
+  const [draftsRevision, setDraftsRevision] = useState(0)
+  const initialTarget: TeachingBoardTarget = {
+    questionId: questions[0].id,
+    slot: initialSlot,
+    boardId: initialBoard?.id ?? null,
+  }
+  const boardTargetsRef = useRef(new Map<string, TeachingBoardTarget>([
+    [questions[0].id, initialTarget],
   ]))
   const navigationEpochRef = useRef(0)
   const boardIntentEpochRef = useRef(0)
@@ -550,8 +573,8 @@ export function TeachingModeClient({
     epoch: number
     result: TeachingBoardView[] | null
   }>())
-  const [dirtyQuestionIds, setDirtyQuestionIds] = useState<string[]>([])
   const [loadingQuestionIds, setLoadingQuestionIds] = useState<string[]>([])
+  const operationNonceRef = useRef(1)
   const [boardOperation, setBoardOperation] = useState<TeachingBoardOperation>(() => ({
     kind: initialBoard ? 'load' : 'reset',
     nonce: 1,
@@ -559,9 +582,22 @@ export function TeachingModeClient({
     slot: initialSlot,
     boardId: initialBoard?.id ?? null,
   }))
+  const initialPendingLoad = initialBoard
+    ? { nonce: 1, questionId: questions[0].id, board: initialBoard }
+    : null
+  const pendingLoadRef = useRef<{
+    nonce: number
+    questionId: string
+    board: TeachingBoardView
+  } | null>(initialPendingLoad)
+  const [pendingLoad, setPendingLoad] = useState(initialPendingLoad)
+  const [editorMountRevision, setEditorMountRevision] = useState(0)
+  const [recovery, setRecovery] = useState<TeachingBoardRecovery>({ state: 'none' })
 
   const requestBoardOperation = useCallback((input: Omit<TeachingBoardOperation, 'nonce'>) => {
-    setBoardOperation(current => ({ ...input, nonce: current.nonce + 1 }))
+    const operation = { ...input, nonce: ++operationNonceRef.current }
+    setBoardOperation(operation)
+    return operation
   }, [])
 
   const question = questions[questionIndex]
@@ -579,7 +615,53 @@ export function TeachingModeClient({
     const values = new Set([1, 2, 3, 4, 5, Math.max(1, Math.round(questionsPerPage) || 1)])
     return [...values].filter(value => value <= questions.length).sort((a, b) => a - b)
   }, [questions.length, questionsPerPage])
-  const dirty = dirtyQuestionIds.includes(question.id)
+  const draftRecords = useMemo(
+    () => {
+      // Reading the revision makes lifecycle changes observable without
+      // rerendering this route for every pointer-move scene update.
+      void draftsRevision
+      return [...draftsRef.current.values()]
+    },
+    [draftsRevision],
+  )
+  const dirtyDrafts = useMemo(
+    () => draftRecords.filter(draft => draft.dirty),
+    [draftRecords],
+  )
+  const confirmAllDraftExit = useCallback(async () => {
+    if (dirtyDrafts.length === 0) return true
+    const shown = dirtyDrafts.slice(0, 8)
+    return confirm({
+      title: `ออกทั้งที่มีกระดานยังไม่บันทึก ${dirtyDrafts.length} รายการ?`,
+      description: (
+        <div className="flex flex-col gap-2">
+          <p>งานเขียนต่อไปนี้จะหายเมื่อออกจากโหมดสอน ส่วนกระดานที่บันทึกไว้แล้วจะยังอยู่</p>
+          <ul className="list-disc pl-5">
+            {shown.map(draft => {
+              const index = questions.findIndex(item => item.id === draft.target.questionId)
+              return (
+                <li key={teachingBoardTargetKey(draft.target)}>
+                  ข้อ {index + 1} · ช่อง {draft.target.slot}
+                </li>
+              )
+            })}
+          </ul>
+          {dirtyDrafts.length > shown.length && (
+            <p>และอีก {dirtyDrafts.length - shown.length} รายการ</p>
+          )}
+        </div>
+      ),
+      confirmLabel: 'ออกและทิ้งงานเขียน',
+      variant: 'destructive',
+    })
+  }, [confirm, dirtyDrafts, questions])
+  const activeTarget = boardTargetsRef.current.get(question.id) ?? {
+    questionId: question.id,
+    slot: selectedSlot,
+    boardId: selectedBoardId,
+  }
+  const activeDraft = draftsRef.current.get(teachingBoardTargetKey(activeTarget)) ?? null
+  const dirty = activeDraft?.dirty ?? false
   const boards = useMemo(() => boardsByQuestion[question.id] ?? [], [boardsByQuestion, question.id])
   const selectedBoard = boards.find(board => board.id === selectedBoardId) ?? null
   const ownBoards = useMemo(
@@ -593,19 +675,89 @@ export function TeachingModeClient({
 
   // Any ข้อ with unsaved strokes is worth warning about, not just the open one.
   useEffect(() => {
-    if (dirtyQuestionIds.length === 0) return
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
+    if (dirtyDrafts.length === 0) return
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = true
+    }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [dirtyQuestionIds])
+  }, [dirtyDrafts.length])
 
-  const setDirty = useCallback((next: boolean) => {
-    setDirtyQuestionIds(current => {
-      const has = current.includes(question.id)
-      if (next === has) return current
-      return next ? [...current, question.id] : current.filter(id => id !== question.id)
-    })
-  }, [question.id])
+  // Next.js links in the persistent app shell do not trigger beforeunload.
+  // Capture same-window, same-origin exits so the sidebar and any future app
+  // link use the same all-draft confirmation as the explicit Back button.
+  useEffect(() => {
+    if (dirtyDrafts.length === 0) return
+    const guardAppLink = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented
+        || event.button !== 0
+        || event.metaKey
+        || event.ctrlKey
+        || event.shiftKey
+        || event.altKey
+        || !(event.target instanceof Element)
+      ) return
+      const anchor = event.target.closest<HTMLAnchorElement>('a[href]')
+      if (!anchor || anchor.hasAttribute('download') || (anchor.target && anchor.target !== '_self')) return
+      const destination = new URL(anchor.href, window.location.href)
+      if (destination.origin !== window.location.origin) return
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const next = `${destination.pathname}${destination.search}${destination.hash}`
+      if (next === current) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      void confirmAllDraftExit().then(leave => {
+        if (leave) router.push(next)
+      })
+    }
+    document.addEventListener('click', guardAppLink, true)
+    return () => document.removeEventListener('click', guardAppLink, true)
+  }, [confirmAllDraftExit, dirtyDrafts.length, router])
+
+  const commitDraftRecord = useCallback((record: TeachingBoardDraftRecord) => {
+    const key = teachingBoardTargetKey(record.target)
+    const previous = draftsRef.current.get(key)
+    draftsRef.current.set(key, record)
+    if (
+      previous?.state !== record.state
+      || previous?.dirty !== record.dirty
+      || !previous
+    ) setDraftsRevision(value => value + 1)
+  }, [])
+
+  const removeDraftRecord = useCallback((target: TeachingBoardTarget | undefined) => {
+    if (!target || !draftsRef.current.delete(teachingBoardTargetKey(target))) return
+    setDraftsRevision(value => value + 1)
+  }, [])
+
+  const updateDraftScene = useCallback((target: TeachingBoardTarget, scene: ScratchpadScene) => {
+    const key = teachingBoardTargetKey(target)
+    const previous = draftsRef.current.get(key)
+    draftsRef.current.set(key, previous
+      ? { ...previous, scene }
+      : {
+          target,
+          scene,
+          state: target.boardId ? 'saved_slot' : 'new_draft',
+          dirty: false,
+        })
+    if (!previous) setDraftsRevision(value => value + 1)
+  }, [])
+
+  const updateDraftState = useCallback((
+    target: TeachingBoardTarget,
+    state: TeacherQuestionDraftState,
+    nextDirty: boolean,
+  ) => {
+    const key = teachingBoardTargetKey(target)
+    const previous = draftsRef.current.get(key)
+    if (!previous || (previous.state === state && previous.dirty === nextDirty)) return
+    draftsRef.current.set(key, { ...previous, state, dirty: nextDirty })
+    setDraftsRevision(value => value + 1)
+  }, [])
 
   const fetchBoards = useCallback((
     questionId: string,
@@ -673,24 +825,71 @@ export function TeachingModeClient({
     }
   }, [fetchBoards, pageQuestionIds, showBoards])
 
+  const activeDraftFor = (questionId: string) => {
+    const currentTarget = boardTargetsRef.current.get(questionId)
+    return currentTarget
+      ? draftsRef.current.get(teachingBoardTargetKey(currentTarget)) ?? null
+      : null
+  }
+
   /** Asked only where strokes would actually be lost — never on a plain move. */
-  const allowDiscard = async (questionId = question.id) => {
-    if (!dirtyQuestionIds.includes(questionId)) return true
+  const confirmDiscardDraft = async (draft: TeachingBoardDraftRecord | null) => {
+    if (!draft?.dirty) return true
     return confirm({
       title: 'ทิ้งสิ่งที่ยังไม่ได้บันทึก?',
-      description: 'เส้นที่เขียนหลังการบันทึกล่าสุดจะหายไป แต่กระดานที่บันทึกไว้แล้วไม่ถูกลบ',
+      description: 'เส้นที่เขียนหลังการบันทึกล่าสุดจะถูกแทนที่ แต่กระดานที่บันทึกไว้แล้วไม่ถูกลบ และยังกู้ฉากนี้กลับได้อีกหนึ่งครั้ง',
       confirmLabel: 'ทิ้งแล้วไปต่อ',
       variant: 'destructive',
     })
   }
 
-  // A parked scene is valid only for the slot/board target it was paired with.
-  // Once the teacher confirms an explicit load/reset over that target, remove
-  // it before the async load begins so a failed load cannot resurrect and save
-  // the old strokes under the new board identity.
-  const discardParkedScene = (questionId: string) => {
-    scenesRef.current.delete(questionId)
-    setDirtyQuestionIds(current => current.filter(id => id !== questionId))
+  const rememberDraftForRecovery = (draft: TeachingBoardDraftRecord | null) => {
+    if (
+      !draft
+      || draft.state === 'read_only_slot'
+      || draft.state === 'unsupported_read_only'
+      || !scratchpadHasMeaningfulDraft(draft.scene)
+    ) return
+    setRecovery(createTeachingBoardRecovery(draft))
+  }
+
+  const prepareToReplaceActiveDraft = async (questionId: string) => {
+    const draft = activeDraftFor(questionId)
+    if (!await confirmDiscardDraft(draft)) return false
+    rememberDraftForRecovery(draft)
+    return true
+  }
+
+  const settleBoardOperation = (target: TeachingBoardTarget) => {
+    requestBoardOperation({ kind: 'idle', ...target })
+  }
+
+  const beginBoardLoad = (questionId: string, board: TeachingBoardView) => {
+    const operation = requestBoardOperation({
+      kind: 'load',
+      questionId,
+      slot: board.slot,
+      boardId: board.id,
+    })
+    const pending = { nonce: operation.nonce, questionId, board }
+    pendingLoadRef.current = pending
+    setPendingLoad(pending)
+  }
+
+  const commitEmptyTarget = (questionId: string, slot: number) => {
+    const previousTarget = boardTargetsRef.current.get(questionId)
+    const target: TeachingBoardTarget = { questionId, slot, boardId: null }
+    if (previousTarget && !sameTeachingBoardTarget(previousTarget, target)) {
+      removeDraftRecord(previousTarget)
+    }
+    boardTargetsRef.current.set(questionId, target)
+    if (activeQuestionIdRef.current === questionId) {
+      setSelectedSlot(slot)
+      setSelectedBoardId(null)
+    }
+    pendingLoadRef.current = null
+    setPendingLoad(null)
+    requestBoardOperation({ kind: 'reset', ...target })
   }
 
   /**
@@ -707,9 +906,7 @@ export function TeachingModeClient({
     if (nextIndex < 0 || nextIndex >= questions.length) return null
     if (nextIndex === questionIndex && preferredSlot === undefined) return navigationEpochRef.current
     const nextQuestion = questions[nextIndex]
-    const parked = scenesRef.current.get(nextQuestion.id)
-    if (preferredSlot !== undefined && !await allowDiscard(nextQuestion.id)) return null
-    if (preferredSlot !== undefined) discardParkedScene(nextQuestion.id)
+    if (preferredSlot !== undefined && !await prepareToReplaceActiveDraft(nextQuestion.id)) return null
     const navigationEpoch = ++navigationEpochRef.current
     const boardIntentEpoch = ++boardIntentEpochRef.current
     setImageRequest(null)
@@ -718,10 +915,16 @@ export function TeachingModeClient({
     // strokes can otherwise show work from one slot while the save button points
     // at another.
     const remembered = boardTargetsRef.current.get(nextQuestion.id)
+    const parked = remembered
+      ? draftsRef.current.get(teachingBoardTargetKey(remembered)) ?? null
+      : null
     if (parked && preferredSlot === undefined && remembered) {
+      pendingLoadRef.current = null
+      setPendingLoad(null)
       setSelectedSlot(remembered.slot)
       setSelectedBoardId(remembered.boardId)
       setQuestionIndex(nextIndex)
+      settleBoardOperation(remembered)
       void fetchBoards(nextQuestion.id)
       return navigationEpoch
     }
@@ -729,8 +932,14 @@ export function TeachingModeClient({
     // Mount the target editor behind a pending operation before network work.
     // It cannot accept strokes until the matching load/reset arrives.
     const pendingSlot = preferredSlot ?? remembered?.slot ?? 1
-    setSelectedSlot(pendingSlot)
-    setSelectedBoardId(null)
+    const committedBeforeLoad = remembered ?? {
+      questionId: nextQuestion.id,
+      slot: pendingSlot,
+      boardId: null,
+    }
+    boardTargetsRef.current.set(nextQuestion.id, committedBeforeLoad)
+    setSelectedSlot(committedBeforeLoad.slot)
+    setSelectedBoardId(committedBeforeLoad.boardId)
     requestBoardOperation({
       kind: 'pending',
       questionId: nextQuestion.id,
@@ -739,42 +948,31 @@ export function TeachingModeClient({
     })
     setQuestionIndex(nextIndex)
 
-    const nextBoards = await fetchBoards(nextQuestion.id) ?? boardsByQuestion[nextQuestion.id] ?? []
+    const fetchedBoards = await fetchBoards(nextQuestion.id)
     if (
       navigationEpoch !== navigationEpochRef.current
       || boardIntentEpoch !== boardIntentEpochRef.current
     ) return null
-    const slot = preferredSlot ?? firstAvailableSlot(nextBoards, currentUserId)
+    if (!fetchedBoards && !boardsByQuestion[nextQuestion.id]) {
+      settleBoardOperation(committedBeforeLoad)
+      return null
+    }
+    const nextBoards = fetchedBoards ?? boardsByQuestion[nextQuestion.id] ?? []
+    const slot = preferredSlot ?? remembered?.slot ?? firstAvailableSlot(nextBoards, currentUserId)
     const existing = preferredBoard
       ? nextBoards.find(board => board.id === preferredBoard.id) ?? null
-      : nextBoards.find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
-    const target = { slot, boardId: existing?.id ?? null }
-    boardTargetsRef.current.set(nextQuestion.id, target)
-    setSelectedSlot(slot)
-    setSelectedBoardId(target.boardId)
-    requestBoardOperation({
-      kind: existing ? 'load' : 'reset',
-      questionId: nextQuestion.id,
-      slot,
-      boardId: target.boardId,
-    })
+      : remembered?.boardId
+        ? nextBoards.find(board => board.id === remembered.boardId) ?? null
+        : nextBoards.find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
+    if (existing) beginBoardLoad(nextQuestion.id, existing)
+    else commitEmptyTarget(nextQuestion.id, slot)
     return navigationEpoch
   }
 
   const openBoard = async (board: TeachingBoardView) => {
-    if (!await allowDiscard()) return
-    discardParkedScene(question.id)
+    if (!await prepareToReplaceActiveDraft(question.id)) return
     boardIntentEpochRef.current += 1
-    boardTargetsRef.current.set(question.id, { slot: board.slot, boardId: board.id })
-    setSelectedSlot(board.slot)
-    setSelectedBoardId(board.id)
-    setDirty(false)
-    requestBoardOperation({
-      kind: 'load',
-      questionId: question.id,
-      slot: board.slot,
-      boardId: board.id,
-    })
+    beginBoardLoad(question.id, board)
   }
 
   /** A slot pressed under another ข้อ moves the board to that ข้อ first. */
@@ -800,19 +998,51 @@ export function TeachingModeClient({
       await openBoard(existing)
       return
     }
-    if (!await allowDiscard()) return
-    discardParkedScene(question.id)
+    if (!await prepareToReplaceActiveDraft(question.id)) return
     boardIntentEpochRef.current += 1
-    boardTargetsRef.current.set(question.id, { slot, boardId: null })
-    setSelectedSlot(slot)
-    setSelectedBoardId(null)
-    setDirty(false)
-    requestBoardOperation({
-      kind: 'reset',
-      questionId: question.id,
-      slot,
-      boardId: null,
-    })
+    commitEmptyTarget(question.id, slot)
+  }
+
+  const handleLoadResolved = (
+    nonce: number,
+    target: TeachingBoardTarget,
+    scene: ScratchpadScene,
+    state: TeacherQuestionDraftState,
+  ) => {
+    const pending = pendingLoadRef.current
+    if (
+      pending?.nonce !== nonce
+      || pending.questionId !== target.questionId
+      || pending.board.id !== target.boardId
+      || pending.board.slot !== target.slot
+    ) return
+    const previousTarget = boardTargetsRef.current.get(target.questionId)
+    if (previousTarget && !sameTeachingBoardTarget(previousTarget, target)) {
+      removeDraftRecord(previousTarget)
+    }
+    commitDraftRecord({ target, scene, state, dirty: false })
+    boardTargetsRef.current.set(target.questionId, target)
+    pendingLoadRef.current = null
+    setPendingLoad(null)
+    if (activeQuestionIdRef.current === target.questionId) {
+      setSelectedSlot(target.slot)
+      setSelectedBoardId(target.boardId)
+    }
+    settleBoardOperation(target)
+  }
+
+  const handleLoadFailed = (nonce: number, target: TeachingBoardTarget) => {
+    const pending = pendingLoadRef.current
+    if (
+      pending?.nonce !== nonce
+      || pending.questionId !== target.questionId
+      || pending.board.id !== target.boardId
+      || pending.board.slot !== target.slot
+    ) return
+    pendingLoadRef.current = null
+    setPendingLoad(null)
+    const currentTarget = boardTargetsRef.current.get(target.questionId)
+    if (currentTarget) settleBoardOperation(currentTarget)
   }
 
   const handleSaved = async (
@@ -830,26 +1060,62 @@ export function TeachingModeClient({
       await fetchBoards(questionId, true)
       return
     }
-    const target = { slot, boardId }
+    const target: TeachingBoardTarget = { questionId, slot, boardId }
+    setBoardsByQuestion(current => ({
+      ...current,
+      [questionId]: adoptSavedTeachingBoard({
+        boards: current[questionId] ?? [],
+        boardId,
+        previousBoardId: expectedTarget.boardId,
+        slot,
+        currentUserId,
+      }),
+    }))
+    const previousKey = teachingBoardTargetKey({ questionId, ...expectedTarget })
+    const previousDraft = draftsRef.current.get(previousKey)
+    if (previousDraft) {
+      draftsRef.current.delete(previousKey)
+      commitDraftRecord({
+        ...previousDraft,
+        target,
+        state: 'saved_slot',
+        dirty: false,
+      })
+    }
     boardTargetsRef.current.set(questionId, target)
     if (activeQuestionIdRef.current === questionId) {
       setSelectedSlot(target.slot)
       setSelectedBoardId(target.boardId)
     }
+    settleBoardOperation(target)
     await fetchBoards(questionId, true)
   }
 
-  const detachDuplicatedBoard = (questionId: string, sourceSlot: number) => {
+  const detachDuplicatedBoard = (
+    questionId: string,
+    sourceSlot: number,
+    scene: ScratchpadScene,
+  ) => {
     boardIntentEpochRef.current += 1
-    boardTargetsRef.current.set(questionId, { slot: sourceSlot, boardId: null })
+    const previousTarget = boardTargetsRef.current.get(questionId)
+    const target: TeachingBoardTarget = { questionId, slot: sourceSlot, boardId: null }
+    if (previousTarget && !sameTeachingBoardTarget(previousTarget, target)) {
+      removeDraftRecord(previousTarget)
+    }
+    boardTargetsRef.current.set(questionId, target)
+    commitDraftRecord({ target, scene, state: 'unsaved_new', dirty: true })
     if (activeQuestionIdRef.current === questionId) {
       setSelectedSlot(sourceSlot)
       setSelectedBoardId(null)
     }
+    settleBoardOperation(target)
   }
 
   const deleteBoard = async (board: TeachingBoardView, questionId: string) => {
-    if (!await allowDiscard(questionId)) return
+    const targetAtDeleteStart = boardTargetsRef.current.get(questionId)
+    const deletingActiveBoard = targetAtDeleteStart?.boardId === board.id
+    const activeAtDeleteStart = deletingActiveBoard ? activeDraftFor(questionId) : null
+    if (!await confirmDiscardDraft(activeAtDeleteStart)) return
     const ok = await confirm({
       title: `ลบกระดานช่อง ${board.slot}?`,
       description: 'ทั้งภาพตัวอย่างและไฟล์ที่ใช้กลับมาแก้ไขจะถูกลบ การกระทำนี้ย้อนกลับไม่ได้',
@@ -857,19 +1123,38 @@ export function TeachingModeClient({
       variant: 'destructive',
     })
     if (!ok) return
-    const sceneAtDeleteStart = scenesRef.current.get(questionId)
+    const sceneAtDeleteStart = activeAtDeleteStart?.scene
     try {
       const { deleteTeachingBoard } = await import('@/lib/actions/math-work')
       const result = await deleteTeachingBoard(board.id)
       if (!result || 'error' in result) throw new Error(result?.error ?? 'ลบกระดานไม่สำเร็จ')
       const currentTarget = boardTargetsRef.current.get(questionId)
       if (currentTarget?.boardId === board.id) {
+        if (
+          activeAtDeleteStart
+          && sceneAtDeleteStart
+          && scratchpadHasMeaningfulDraft(activeAtDeleteStart.scene)
+        ) {
+          setRecovery(createTeachingBoardRecovery({
+            ...activeAtDeleteStart,
+            target: { ...activeAtDeleteStart.target, boardId: null },
+            state: 'unsaved_new',
+            dirty: true,
+          }))
+        }
         boardIntentEpochRef.current += 1
-        boardTargetsRef.current.set(questionId, { slot: board.slot, boardId: null })
-        const changedDuringDelete = scenesRef.current.get(questionId) !== sceneAtDeleteStart
-        if (!changedDuringDelete) {
-          scenesRef.current.delete(questionId)
-          setDirtyQuestionIds(current => current.filter(id => id !== questionId))
+        const currentDraft = activeDraftFor(questionId)
+        const changedDuringDelete = currentDraft?.scene !== sceneAtDeleteStart
+        const detachedTarget: TeachingBoardTarget = { questionId, slot: board.slot, boardId: null }
+        boardTargetsRef.current.set(questionId, detachedTarget)
+        removeDraftRecord(currentTarget)
+        if (changedDuringDelete && currentDraft) {
+          commitDraftRecord({
+            ...currentDraft,
+            target: detachedTarget,
+            state: 'unsaved_new',
+            dirty: true,
+          })
         }
         if (activeQuestionIdRef.current === questionId) {
           setSelectedBoardId(null)
@@ -877,10 +1162,10 @@ export function TeachingModeClient({
           if (!changedDuringDelete) {
             requestBoardOperation({
               kind: 'reset',
-              questionId,
-              slot: board.slot,
-              boardId: null,
+              ...detachedTarget,
             })
+          } else if (currentDraft) {
+            settleBoardOperation(detachedTarget)
           }
         }
       }
@@ -959,8 +1244,81 @@ export function TeachingModeClient({
     })
   }
 
+  const requestBoardReset = async (draft: TeachingBoardDraftRecord) => {
+    if (!scratchpadHasMeaningfulDraft(draft.scene)) return true
+    const ok = await confirm({
+      title: 'เริ่มกระดานใหม่?',
+      description: draft.target.boardId
+        ? 'งานเขียนที่กำลังเปิดจะถูกล้าง แต่กระดานที่บันทึกไว้ในช่องนี้ยังอยู่ และยังกู้ฉากปัจจุบันกลับได้อีกหนึ่งครั้ง'
+        : 'งานเขียนที่ยังไม่บันทึกจะถูกล้าง และยังกู้ฉากปัจจุบันกลับได้อีกหนึ่งครั้ง',
+      confirmLabel: 'เริ่มกระดานใหม่',
+      variant: draft.dirty ? 'destructive' : 'default',
+    })
+    if (ok) setRecovery(createTeachingBoardRecovery(draft))
+    return ok
+  }
+
+  const restoreLatestBoard = async () => {
+    if (recovery.state !== 'available_once') return
+    const recoveryTarget = recovery.draft.target
+    const nextQuestionIndex = questions.findIndex(item => item.id === recoveryTarget.questionId)
+    if (nextQuestionIndex < 0) return
+    const replaceCandidates = [
+      activeDraftFor(question.id),
+      activeDraftFor(recoveryTarget.questionId),
+    ].filter((draft): draft is TeachingBoardDraftRecord => Boolean(draft?.dirty))
+      .filter((draft, index, drafts) => drafts.findIndex(other => (
+        sameTeachingBoardTarget(other.target, draft.target)
+      )) === index)
+    if (replaceCandidates.length > 0) {
+      const ok = await confirm({
+        title: 'กู้คืนทับงานที่ยังไม่บันทึก?',
+        description: (
+          <div className="flex flex-col gap-2">
+            <p>งานเขียนปัจจุบันต่อไปนี้จะถูกแทนด้วยกระดานที่กู้คืน</p>
+            <ul className="list-disc pl-5">
+              {replaceCandidates.map(draft => (
+                <li key={teachingBoardTargetKey(draft.target)}>
+                  ข้อ {questions.findIndex(item => item.id === draft.target.questionId) + 1} · ช่อง {draft.target.slot}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+        confirmLabel: 'ทับแล้วกู้คืน',
+        variant: 'destructive',
+      })
+      if (!ok) return
+    }
+    const restored = restoreTeachingBoardRecovery(recovery)
+    if (!restored.draft) return
+    const restoredDraft = restored.draft
+
+    const currentTarget = boardTargetsRef.current.get(question.id)
+    if (currentTarget && !sameTeachingBoardTarget(currentTarget, restoredDraft.target)) {
+      removeDraftRecord(currentTarget)
+    }
+    const destinationTarget = boardTargetsRef.current.get(restoredDraft.target.questionId)
+    if (destinationTarget && !sameTeachingBoardTarget(destinationTarget, restoredDraft.target)) {
+      removeDraftRecord(destinationTarget)
+    }
+    navigationEpochRef.current += 1
+    boardIntentEpochRef.current += 1
+    pendingLoadRef.current = null
+    setPendingLoad(null)
+    setRecovery(restored.recovery)
+    commitDraftRecord(restoredDraft)
+    boardTargetsRef.current.set(restoredDraft.target.questionId, restoredDraft.target)
+    setQuestionIndex(nextQuestionIndex)
+    setSelectedSlot(restoredDraft.target.slot)
+    setSelectedBoardId(restoredDraft.target.boardId)
+    requestBoardOperation({ kind: 'idle', ...restoredDraft.target })
+    setEditorMountRevision(value => value + 1)
+    toast.success(`กู้คืนกระดานข้อ ${nextQuestionIndex + 1} ช่อง ${restoredDraft.target.slot} แล้ว`)
+  }
+
   const leaveTeachingMode = async () => {
-    if (!await allowDiscard()) return
+    if (!await confirmAllDraftExit()) return
     router.push(backHref)
   }
 
@@ -975,6 +1333,25 @@ export function TeachingModeClient({
           </Button>
           <Presentation className="size-4 shrink-0 text-primary" aria-hidden="true" />
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">โหมดสอน · {assignmentTitle}</h1>
+          {dirtyDrafts.length > 0 && (
+            <Badge variant="secondary">ยังไม่บันทึก {dirtyDrafts.length} กระดาน</Badge>
+          )}
+          {recovery.state === 'available_once' && (
+            <div className="flex shrink-0 items-center gap-1">
+              <Button type="button" variant="outline" size="xs" onClick={() => void restoreLatestBoard()}>
+                <Undo2 data-icon="inline-start" /> กู้คืนกระดานล่าสุด
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="ล้างจุดกู้คืนกระดานล่าสุด"
+                onClick={() => setRecovery({ state: 'none' })}
+              >
+                <X />
+              </Button>
+            </div>
+          )}
           <NativeSelect
             aria-label="ไปที่ข้อ"
             className="h-8 w-auto max-w-44 shrink text-xs"
@@ -1105,6 +1482,9 @@ export function TeachingModeClient({
                         active={isBoardQuestion}
                         selectedSlot={selectedSlot}
                         selectedBoardId={selectedBoardId}
+                        dirtySlots={draftRecords
+                          .filter(draft => draft.target.questionId === pageQuestion.id && draft.dirty)
+                          .map(draft => draft.target.slot)}
                         onOpenSlot={slot => void openSlotOn(index, slot)}
                         onOpenBoard={board => void openBoardOn(index, board)}
                         onDelete={board => void deleteBoard(board, pageQuestion.id)}
@@ -1119,7 +1499,7 @@ export function TeachingModeClient({
                   <div className="min-h-[560px] min-w-0 lg:min-h-0">
                     {isBoardQuestion ? (
                       <TeachingBoardEditor
-                        key={pageQuestion.id}
+                        key={`${pageQuestion.id}:${editorMountRevision}`}
                         assignmentId={assignmentId}
                         questionId={pageQuestion.id}
                         slot={selectedSlot}
@@ -1127,18 +1507,23 @@ export function TeachingModeClient({
                         canManage={canManage}
                         operation={boardOperation}
                         questionLabel={`ข้อ ${index + 1}/${questions.length}`}
-                        initialScene={scenesRef.current.get(pageQuestion.id) ?? null}
-                        initialDirty={dirty}
+                        initialScene={activeDraft?.scene ?? null}
+                        initialDirty={activeDraft?.dirty ?? false}
+                        initialDraftState={activeDraft?.state}
                         onSaved={handleSaved}
-                        onDirtyChange={setDirty}
-                        onSceneChange={scene => scenesRef.current.set(pageQuestion.id, scene)}
+                        onDraftStateChange={updateDraftState}
+                        onSceneChange={updateDraftScene}
+                        pendingBoard={pendingLoad?.questionId === pageQuestion.id ? pendingLoad.board : null}
+                        onLoadResolved={handleLoadResolved}
+                        onLoadFailed={handleLoadFailed}
+                        onResetRequested={requestBoardReset}
                         questionImages={pageQuestion.image_urls ?? []}
                         onResolveSaveSlot={() => resolveSaveSlot(pageQuestion.id, `ข้อ ${index + 1}/${questions.length}`)}
                         insertImage={imageRequest?.questionId === pageQuestion.id ? imageRequest : null}
                         onInsertImageHandled={nonce => setImageRequest(current => (
                           current?.nonce === nonce ? null : current
                         ))}
-                        onDuplicated={() => detachDuplicatedBoard(pageQuestion.id, selectedSlot)}
+                        onDuplicated={scene => detachDuplicatedBoard(pageQuestion.id, selectedSlot, scene)}
                         fingerInputMode={fingerInputMode}
                         onFingerInputModeChange={setFingerInputMode}
                         presentationLocked={presentationLocked}
@@ -1163,7 +1548,9 @@ export function TeachingModeClient({
                         <PenLine className="size-5 text-primary" aria-hidden="true" />
                         <p className="text-sm font-semibold">กระดานของข้อ {index + 1}</p>
                         <p className="text-xs text-muted-foreground">
-                          {scenesRef.current.has(pageQuestion.id) ? 'มีงานเขียนค้างไว้ในข้อนี้' : 'ยังไม่ได้เขียนอะไรในข้อนี้'}
+                          {draftRecords.some(draft => draft.target.questionId === pageQuestion.id && draft.dirty)
+                            ? 'มีงานเขียนค้างไว้ในข้อนี้'
+                            : 'ยังไม่ได้เขียนอะไรในข้อนี้'}
                         </p>
                         <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
                           <PenLine /> เขียนกระดานข้อนี้

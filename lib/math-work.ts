@@ -49,7 +49,7 @@ export interface TeachingBoardView {
 }
 
 export interface TeachingBoardOperation {
-  kind: 'pending' | 'load' | 'reset'
+  kind: 'idle' | 'pending' | 'load' | 'reset'
   nonce: number
   questionId: string
   slot: number
