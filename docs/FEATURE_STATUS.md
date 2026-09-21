@@ -57,6 +57,8 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 
 แป้นคณิตศาสตร์ของช่องคำตอบผ่านต่อบน iPad candidate `r7` แล้ว ผู้ใช้จึงขอปรับเครื่องคิดเลขให้แสดง comma คั่นหลักพัน เช่น `1900052` → `1,900,052` โค้ดใหม่จัดรูปแบบเฉพาะหน้าจอและประวัติ พร้อม mapping เคอร์เซอร์ การลบ และ paste กลับสู่นิพจน์ดิบ จึงไม่เปลี่ยนความหมายของฟังก์ชันที่ใช้ comma แยก argument หรือค่าที่ใส่กลับคำตอบ Local runtime, 105 test files / 1,364 tests, TypeScript, token lint และ production build ผ่าน; canonical Staging ยืนยัน `1,900,052+1,000` ได้ `1,901,052` และไม่มี console error จากนั้นล็อก candidate ใหม่เป็น `r8` และผู้ใช้ยืนยันบน iPad จริงว่าผ่าน ขั้นถัดไปคือกระดาษทดและ camera/file picker
 
+กระดาษทดบน iPad candidate `r8` ผ่านการวาดต่อเนื่องด้วยนิ้ว, ยางลบ, undo/redo, สี/ขนาดเส้น, รูปทรง, ข้อความ, pinch zoom/pan, หมุนจอ และปิด–เปิดแผงโดยงานยังอยู่ครบ การรีเฟรช lab แล้ว scene หายเป็นไปตามสัญญา preview ที่ปิด persistence; ข้อสอบจริงยังใช้ IndexedDB autosave ตาม user/submission/answer/part และโหลดกลับบนเครื่องเดิม ขั้นถัดไปเหลือ camera/file picker ก่อนปิด iPad responsive UAT
+
 ## MVP core
 
 ### Authentication — บางส่วน
