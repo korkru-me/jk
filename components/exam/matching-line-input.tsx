@@ -20,11 +20,21 @@ export interface MatchingLineInputProps {
 
 /** Pointer travel that separates a tap from the start of a drag. */
 const DRAG_THRESHOLD = 6
+/** A stationary press should also pick up the card before the finger moves. */
+const HOLD_TO_DRAG_MS = 180
 
 interface Point { x: number; y: number }
 
 /** A picked-up but not-yet-connected row, from either column. */
 interface Selection { side: 'left' | 'right'; index: number }
+
+interface GestureStart {
+  source: Selection
+  x: number
+  y: number
+  dragging: boolean
+  holdTimer: ReturnType<typeof setTimeout> | null
+}
 
 /**
  * Matching answered by drawing a line between two columns.
@@ -39,34 +49,30 @@ interface Selection { side: 'left' | 'right'; index: number }
  * worse than no line at all. The measurement re-runs on resize and on every
  * change to the connections.
  *
- * Only the connector dots carry `touch-action: none`, so dragging from a dot
- * never scrolls while the rest of the question scrolls normally — a student
- * must be able to scroll past a question they are working on. Tapping either
- * column first, then the other, connects them without any dragging at all —
- * whichever row is tapped second completes the pair — which is also the
- * keyboard route (the left dot stays the only focusable control on that
- * side; a tap or a keyboard activation on it bubbles up to the row's click
- * handler, so the row's whole card area, not just the small dot, is a valid
- * tap target).
+ * Every card is a drag target in both directions. Cards use `touch-action:
+ * pan-y`, so a vertical gesture still scrolls the question while a horizontal
+ * gesture (or a short hold before moving) picks the card up. Tapping either
+ * column first, then the other, remains the keyboard-accessible alternative —
+ * whichever row is tapped second completes the pair.
  */
 export function MatchingLineInput({
   prompts, options, placement, onChange,
   disabled = false, results, correctText,
 }: MatchingLineInputProps) {
   const [selected, setSelected] = useState<Selection | null>(null)
-  const [drag, setDrag] = useState<{ from: number; at: Point } | null>(null)
-  const [hover, setHover] = useState<number | null>(null)
+  const [drag, setDrag] = useState<{ source: Selection; at: Point } | null>(null)
+  const [hover, setHover] = useState<Selection | null>(null)
   const [, setMeasureTick] = useState(0)
 
   const boxRef = useRef<HTMLDivElement | null>(null)
   const leftRefs = useRef<Array<HTMLElement | null>>([])
   const rightRefs = useRef<Array<HTMLElement | null>>([])
-  const startRef = useRef<{ from: number; x: number; y: number; moved: boolean } | null>(null)
+  const startRef = useRef<GestureStart | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   // Set when a pointer gesture ends as a real drag, so the click event the
   // browser fires right after (bubbling from the dot to the row) is ignored
   // instead of re-toggling the selection it just made via connect().
-  const justDraggedRef = useRef(false)
+  const suppressClickUntilRef = useRef(0)
 
   const optionIndex = new Map(options.map((o, i) => [o.id, i]))
   const checked = !!results
@@ -128,10 +134,7 @@ export function MatchingLineInput({
    */
   function activatePrompt(i: number) {
     if (disabled) return
-    if (justDraggedRef.current) {
-      justDraggedRef.current = false
-      return
-    }
+    if (Date.now() < suppressClickUntilRef.current) return
     if (selected?.side === 'right') { connect(i, selected.index); return }
     if (placement[i] != null) { disconnect(i); return }
     setSelected(prev => (prev?.side === 'left' && prev.index === i ? null : { side: 'left', index: i }))
@@ -140,6 +143,7 @@ export function MatchingLineInput({
   /** The option-column mirror of {@link activatePrompt}. */
   function activateOption(j: number) {
     if (disabled) return
+    if (Date.now() < suppressClickUntilRef.current) return
     if (selected?.side === 'left') { connect(selected.index, j); return }
     const id = options[j]?.id
     const owner = id ? placement.indexOf(id) : -1
@@ -154,7 +158,21 @@ export function MatchingLineInput({
     return el ? Number(el.getAttribute('data-match-option')) : -1
   }
 
+  /** Which prompt row is under the pointer, read from the document. */
+  function promptAt(x: number, y: number): number {
+    if (typeof document === 'undefined') return -1
+    const el = document.elementFromPoint(x, y)?.closest('[data-match-prompt]')
+    return el ? Number(el.getAttribute('data-match-prompt')) : -1
+  }
+
+  function oppositeTargetAt(source: Selection, x: number, y: number): Selection | null {
+    const side = source.side === 'left' ? 'right' : 'left'
+    const index = side === 'right' ? optionAt(x, y) : promptAt(x, y)
+    return index >= 0 ? { side, index } : null
+  }
+
   function endGesture() {
+    if (startRef.current?.holdTimer) clearTimeout(startRef.current.holdTimer)
     cleanupRef.current?.()
     cleanupRef.current = null
     startRef.current = null
@@ -162,48 +180,87 @@ export function MatchingLineInput({
     setHover(null)
   }
 
-  function onDotPointerDown(e: React.PointerEvent<HTMLElement>, from: number) {
+  function onCardPointerDown(e: React.PointerEvent<HTMLElement>, source: Selection) {
     if (disabled || e.button > 0) return
     endGesture()
-    startRef.current = { from, x: e.clientX, y: e.clientY, moved: false }
+    const start: GestureStart = {
+      source,
+      x: e.clientX,
+      y: e.clientY,
+      dragging: false,
+      holdTimer: null,
+    }
+    startRef.current = start
 
-    const onMove = (ev: PointerEvent) => {
-      const start = startRef.current
-      if (!start) return
-      if (!start.moved) {
-        if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < DRAG_THRESHOLD) return
-        start.moved = true
-        setSelected(null)
-      }
+    const beginDrag = (current: GestureStart, point: Point) => {
+      if (current.dragging) return
+      current.dragging = true
+      if (current.holdTimer) clearTimeout(current.holdTimer)
+      current.holdTimer = null
+      setSelected(null)
       const box = boxRef.current
       if (!box) return
       const b = box.getBoundingClientRect()
-      setDrag({ from: start.from, at: { x: ev.clientX - b.left, y: ev.clientY - b.top } })
-      setHover(optionAt(ev.clientX, ev.clientY))
+      setDrag({ source: current.source, at: { x: point.x - b.left, y: point.y - b.top } })
+      setHover(oppositeTargetAt(current.source, point.x, point.y))
+    }
+
+    start.holdTimer = setTimeout(() => {
+      if (startRef.current === start) beginDrag(start, { x: start.x, y: start.y })
+    }, HOLD_TO_DRAG_MS)
+
+    const onMove = (ev: PointerEvent) => {
+      const current = startRef.current
+      if (!current) return
+      if (!current.dragging) {
+        const dx = ev.clientX - current.x
+        const dy = ev.clientY - current.y
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+        // A vertical gesture belongs to the page. A horizontal gesture is the
+        // natural movement for joining the two columns and starts immediately.
+        if (Math.abs(dy) > Math.abs(dx)) {
+          endGesture()
+          return
+        }
+        beginDrag(current, { x: ev.clientX, y: ev.clientY })
+      }
+      ev.preventDefault()
+      const box = boxRef.current
+      if (!box) return
+      const b = box.getBoundingClientRect()
+      setDrag({ source: current.source, at: { x: ev.clientX - b.left, y: ev.clientY - b.top } })
+      setHover(oppositeTargetAt(current.source, ev.clientX, ev.clientY))
     }
     const onUp = (ev: PointerEvent) => {
-      const start = startRef.current
-      const target = start?.moved ? optionAt(ev.clientX, ev.clientY) : -1
+      const current = startRef.current
+      const target = current?.dragging
+        ? oppositeTargetAt(current.source, ev.clientX, ev.clientY)
+        : null
       endGesture()
-      if (!start) return
-      if (!start.moved) {
+      if (!current) return
+      if (!current.dragging) {
         // No movement: let the browser's own click event (which bubbles from
-        // the dot up to the row) drive the tap-to-select behaviour, so a tap
-        // anywhere in the row and a tap on just the dot behave identically.
+        // the card) drive the tap-to-select behaviour.
         return
       }
-      justDraggedRef.current = true
-      if (target >= 0) connect(start.from, target)
+      suppressClickUntilRef.current = Date.now() + 400
+      if (!target) return
+      if (current.source.side === 'left' && target.side === 'right') {
+        connect(current.source.index, target.index)
+      } else if (current.source.side === 'right' && target.side === 'left') {
+        connect(target.index, current.source.index)
+      }
     }
+    const onCancel = () => endGesture()
 
     cleanupRef.current = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', endGesture)
+      window.removeEventListener('pointercancel', onCancel)
     }
-    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointermove', onMove, { passive: false })
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', endGesture)
+    window.addEventListener('pointercancel', onCancel)
   }
 
   const lines = placement.map((id, i) => {
@@ -218,7 +275,9 @@ export function MatchingLineInput({
 
   const dragLine = (() => {
     if (!drag) return null
-    const a = anchor(leftRefs.current[drag.from], 'left')
+    const a = drag.source.side === 'left'
+      ? anchor(leftRefs.current[drag.source.index], 'left')
+      : anchor(rightRefs.current[drag.source.index], 'right')
     return a ? { a, b: drag.at } : null
   })()
 
@@ -226,8 +285,8 @@ export function MatchingLineInput({
     <div className="space-y-4">
       <p className="text-sm font-medium">โยงเส้นจับคู่ให้ถูกต้อง:</p>
       <p className="text-xs text-muted-foreground">
-        กดค้างที่จุดวงกลมด้านขวาของรายการฝั่งซ้าย แล้วลากไปปล่อยที่รายการฝั่งขวา
-        หรือแตะรายการฝั่งใดก่อนก็ได้ แล้วแตะอีกฝั่งให้ครบคู่
+        กดค้างที่การ์ดฝั่งใดก็ได้ แล้วลากไปปล่อยที่การ์ดอีกฝั่ง
+        หรือแตะการ์ดฝั่งใดก่อนก็ได้ แล้วแตะอีกฝั่งให้ครบคู่
       </p>
 
       <div ref={boxRef} className="relative grid grid-cols-2 gap-x-8 gap-y-2 sm:gap-x-16">
@@ -257,16 +316,20 @@ export function MatchingLineInput({
           {prompts.map((prompt, i) => {
             const verdict = results?.[i]
             const isSelected = selected?.side === 'left' && selected.index === i
+            const isHovered = hover?.side === 'left' && hover.index === i && drag !== null
             const connected = placement[i] != null
             return (
               <div
                 key={i}
                 ref={el => { leftRefs.current[i] = el }}
+                data-match-prompt={i}
+                onPointerDown={e => onCardPointerDown(e, { side: 'left', index: i })}
                 onClick={() => activatePrompt(i)}
                 className={cn(
-                  'relative flex items-center gap-2 rounded-xl border bg-card p-2.5 transition-colors',
-                  !disabled && 'cursor-pointer',
-                  verdict === true ? 'border-success/40 bg-success/10'
+                  'relative flex touch-pan-y select-none items-center gap-2 rounded-xl border bg-card p-2.5 transition-colors',
+                  !disabled && 'cursor-grab active:cursor-grabbing',
+                  isHovered ? 'border-primary bg-primary/10'
+                    : verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'
                     : isSelected ? 'border-primary bg-primary/10'
                     : 'border-border'
@@ -294,7 +357,6 @@ export function MatchingLineInput({
                       : `เริ่มโยงเส้นจากข้อ ${i + 1}`
                   }
                   aria-pressed={isSelected}
-                  onPointerDown={e => onDotPointerDown(e, i)}
                   className={cn(
                     'absolute -right-5 top-1/2 h-10 w-10 min-w-0 -translate-y-1/2 touch-none rounded-full border-0 bg-transparent p-0 hover:bg-transparent pointer-coarse:h-11 pointer-coarse:w-11',
                     !disabled && 'cursor-grab',
@@ -320,7 +382,7 @@ export function MatchingLineInput({
           {options.map((option, j) => {
             const takenBy = placement.indexOf(option.id)
             const verdict = takenBy >= 0 ? results?.[takenBy] : undefined
-            const isHovered = hover === j && drag !== null
+            const isHovered = hover?.side === 'right' && hover.index === j && drag !== null
             const isSelected = selected?.side === 'right' && selected.index === j
             return (
               <Button
@@ -331,9 +393,11 @@ export function MatchingLineInput({
                 ref={el => { rightRefs.current[j] = el as HTMLElement | null }}
                 aria-label={`ตัวเลือก ${option.text}`}
                 aria-pressed={isSelected}
+                onPointerDown={e => onCardPointerDown(e, { side: 'right', index: j })}
                 onClick={() => activateOption(j)}
                 className={cn(
-                  'relative flex h-auto min-h-10 w-full items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors pointer-coarse:min-h-11',
+                  'relative flex h-auto min-h-10 w-full touch-pan-y select-none items-center justify-start gap-2 rounded-xl border p-2.5 text-left text-sm font-normal whitespace-normal transition-colors pointer-coarse:min-h-11',
+                  !disabled && 'cursor-grab active:cursor-grabbing',
                   isHovered ? 'border-primary bg-primary/10'
                     : verdict === true ? 'border-success/40 bg-success/10'
                     : verdict === false ? 'border-destructive/40 bg-destructive/10'
