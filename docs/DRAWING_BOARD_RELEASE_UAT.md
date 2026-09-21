@@ -12,10 +12,12 @@
 - ก่อนสร้าง migration ตรวจ `supabase migration list` กับ Supabase Staging แล้ว local/remote ตรงกันทุก version ถึง `20260916230106`
 - สร้าง `20260921185046_allow_png_math_work_preview_paths.sql` ด้วย `supabase migration new` migration คง RLS/Storage/ownership เดิมและขยายเฉพาะ exact preview suffix จาก `.webp` เป็น `.webp|.png` ใน CHECK ของนักเรียน/ครูและ student scope trigger
 - PGlite regression รัน SQL migration จริงและยืนยัน PNG/WebP ผ่าน แต่ GIF, path traversal และ student path ที่ชี้ submission ผิดยังถูกปฏิเสธ
-- commit migration ก่อน apply แล้วจึงใช้ `supabase db push` กับ Staging เท่านั้น; หลัง apply migration ledger ตรงกันถึง `20260921185046`, database lint ระดับ error ผ่าน และ dry-run รายงาน `Remote database is up to date`
+- commit migration ก่อน apply แล้วจึงใช้ `supabase db push` กับ Staging; หลัง apply migration ledger ตรงกันถึง `20260921185046`, database lint ระดับ error ผ่าน และ dry-run รายงาน `Remote database is up to date`
 - branch Preview ของ commit เฟส 8 ถูกสร้างแต่ deployment ล้มเหลวและไม่ถูกนับเป็น candidate; environment contract ของโครงการให้ Staging secrets เฉพาะ branch `staging` ขณะที่ canonical Staging ยังผูก source `564f12c` ของ Exam candidate `r8`
 - regression ล่าสุดผ่าน 121 files / 1,570 tests, TypeScript, design-token lint, production build 63 static pages และ bundle gate 17 chunks / 248,228 bytes gzip
-- Production database, Production deployment และ canonical Staging alias ไม่ถูกเปลี่ยนในรอบนี้
+- ก่อน rollout Production ตรวจ migration ledger ว่าตรงกัน, dry-run พบเฉพาะ `20260921185046`, database lint ระดับ error ผ่าน แล้วจึง apply migration; dry-run หลัง apply รายงานว่า remote up to date
+- fast-forward `master` ถึง `0a6904449dfdb8a007b0ada2749f5a83c64f5bf8` และ Vercel Production deployment สำเร็จตามคำสั่งเจ้าของผลิตภัณฑ์ แต่การ deploy นี้ไม่ใช่หลักฐาน UAT และไม่เปลี่ยนสถานะ **NOT READY**
+- canonical Staging alias ยังไม่ถูกเปลี่ยนและ Drawing Board candidate ยังไม่ได้ล็อก; authenticated/physical/cross-account suites ด้านล่างยังเป็น `pending`
 
 ## การล็อก candidate
 
