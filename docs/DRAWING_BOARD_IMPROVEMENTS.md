@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 21 กันยายน 2026
 
-สถานะ: **เฟส 1 — implementation ของ shared core และ policy boundary ทำเสร็จบน branch `codex/drawing-board-phase-1`; ยังไม่ merge/deploy** automated/local gates ผ่านแล้ว แต่ authenticated teacher loop/heap, Auth/Storage, physical UAT และ schema debt ของ preview PNG บน Safari ยังเป็น rollout gate ที่ต้องปิดก่อน deploy
+สถานะ: **เฟส 2 — implementation ของ student toolbar และ input mode ทำเสร็จบน branch `codex/drawing-board-phase-2`; ยังไม่ merge/deploy** โดยต่อจาก shared core/policy boundary ของเฟส 1; automated/local gates ผ่านแล้ว แต่ authenticated teacher loop/heap, Auth/Storage, physical UAT, upstream Excalidraw/React dev warnings และ schema debt ของ preview PNG บน Safari ยังเป็น rollout/hardening gate ก่อน deploy
 
-เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงพฤติกรรมที่ยังต้องทำในเฟส 2–8 ไม่ใช่ของที่ production มีแล้ว
+เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงสภาพปลายทางของเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว; ผลลัพธ์เฟส 1–2 ด้านล่างเป็นโค้ดบน branch ที่ยังไม่ merge/deploy และงานเฟส 3–8 ยังต้องทำต่อ
 
 ฐานที่ตรวจในเฟส 0 คือ commit `ecfacda79158d80fe73d529a45d1e49616b9218c` ซึ่งตรงกับ `origin/exam-uat-evidence` ณ วันที่ตรวจ งานเฟส 0 อยู่บน branch `codex/drawing-board-phase-0` และไม่ deploy หรือเปลี่ยน `origin/master`
 
@@ -33,6 +33,17 @@
 - automated regression ผ่าน 112 test files / 1,492 tests, type-check และ design-token lint ผ่าน; production build ผ่าน 63 static pages โดย `/assignments/[id]/take` ยังมี 17 initial chunks รวม 804,059 bytes raw / 246,601 bytes gzip (+33/+13 bytes จากเฟส 0) และไม่พบ Excalidraw, mathjs, Supabase browser client, `sharp` package หรือ server-only board code ใน union
 - local runtime ที่ `/exam-screen-lab` ตรวจการวาด, literal Thai paste, ลูกศรที่ bind กับรูปทรงพร้อม delete/undo, การบล็อก Save/Open/Print, hidden native entry points, single editor และ viewport 390×844, 768×1024, 1024×768, 1280×800 แล้ว; fixture นี้เป็น student preview จึงยังไม่ใช่หลักฐาน teacher switch 10 รอบ/heap, authenticated Auth/Storage/teacher flow, Safari จริง, stylus หรือ Staging ซึ่งต้องเก็บก่อน merge/deploy
 
+## ผลลัพธ์ของเฟส 2
+
+- เพิ่ม `DrawingBoardController` เป็น command facade กลางใน shared core: toolbar เรียกเฉพาะคำสั่งแบบ typed ส่วน adapter กัก internal action/history contract ของ Excalidraw 0.18.1 ไว้จุดเดียวและตรวจ shape แบบ fail closed ก่อนใช้ native undo/redo, สี, ความหนา และฟอนต์ จึงรักษา selection semantics, text reflow และ history เดิม; `clearHistory()` อัปเดตสถานะปุ่มเองเพราะ public `history.clear()` ไม่ emit event
+- กระดาษทดนักเรียนใช้ toolbar ของแอปสองแถวแล้ว แถวหลักมีเลือก/ย้าย, ปากกา, ยางลบทั้งวัตถุ, มือ/เลื่อน, undo, redo, fit และโหมดนิ้ว แถวรองมีไฮไลต์, สี, ความหนาเส้น 1–12 จากแหล่งเดียว, เส้น/ลูกศร/รูปทรง, ข้อความ, แบบ/ขนาดอักษร และพื้นเปล่า/เส้นบรรทัด/ตาราง/จุด; native toolbar/property/bottom bar ถูกซ่อนเฉพาะ student host แต่ยัง mount อยู่เพื่อรักษา action/history contract; ค่าที่แสดงอ่านจาก selection จริงและรายงาน “หลายค่า/หลายขนาด” เมื่อ multi-select ต่างกัน
+- `finger_draw`/`finger_pan` อยู่ใน `ExamClient` เป็น route-session state ค่าเริ่มต้น `finger_draw`: ปิด–เปิดหรือเปลี่ยนข้อยังคงค่า แต่ reload กลับค่าเริ่มต้นและไม่เข้า scene/IndexedDB/Storage/server; หนึ่งนิ้วใน draw ทำตาม active tool; หนึ่งนิ้วใน pan ยืม native Space-pan โดยไม่เปลี่ยน active tool; สองนิ้ว pinch/pan ได้ทั้งสองโหมด; mouse และ stylus ทำตาม active tool เสมอ โดย student host normalize technical `penMode=false` หลัง stylus เพื่อไม่ให้นิ้วครั้งถัดไปถูกปิดเงียบ ๆ
+- ปุ่ม/สี/slider/select ใช้ touch target 40px และ 44px บน coarse pointer; แถวเลื่อนแนวนอนได้โดยไม่ทำให้ document ล้น ตรวจแล้วที่ 390×844, 768×1024, 1024×768 และ 1280×800; ไม่มี native control ซ้ำที่มองเห็น และมี stroke-width input ของแอปเพียงหนึ่งจุด
+- local Chromium ที่เปิด touch emulation จริง (`navigator.maxTouchPoints=2`) ผ่าน one-finger draw, one-finger pan, pinch ในทั้งสองโหมด, stylus แล้วใช้นิ้วเขียนต่อ, mouse, tool persistence, selection-aware color/width/font, mixed selection และ native undo/redo semantic steps รวมทั้ง close/reopen คงโหมด และ reload กลับโหมดเริ่มต้น; การกด Escape ขณะพิมพ์ข้อความออกจาก text editor ก่อน ไม่ปิดกระดาษทดทันที
+- regression ผ่าน 113 test files / 1,502 tests, TypeScript, design-token lint และ production build 63 static pages; initial route `/assignments/[id]/take` ยังมี 17 chunks รวม 805,430 bytes raw / 247,011 bytes gzip (+1,371/+410 จากเฟส 1 และต่ำกว่า gate 256,828 gzip) พร้อม scan ไม่พบ Excalidraw, mathjs, Supabase browser client, `sharp` package หรือ server-only board code ใน union
+- ไม่มี migration, RLS, Storage path, scene format, IndexedDB contract หรือ teacher toolbar/persistence change ในเฟสนี้; partial eraser, student revision/recovery, teacher presentation/save state และ rollout ยังอยู่เฟส 3–8; PNG/Safari schema debt เดิมยังเป็น blocker แยก
+- Excalidraw 0.18.1 บน React 19 dev build ยังเขียน warning ของ library เองเมื่อ pinch (`setState` ซ้อนใน updater) แม้ interaction, automated checks และ production build ผ่าน ส่วน warning `flushSync` ตอนคืน focus หลังปิด editor ถูกตัดด้วยการ defer focus restoration แล้ว เฟส 7 ต้องยืนยัน dependency version/production candidate และ physical browser ก่อนตัด pinch warning ออกจาก hardening gate
+
 ## ขอบเขตผลิตภัณฑ์ที่อนุมัติแล้ว
 
 ### หลักร่วม
@@ -60,7 +71,7 @@
 
 ## Capability matrix
 
-คำว่า “ปัจจุบัน” ในสองคอลัมน์แรกหมายถึง deployed baseline ที่ตรวจในเฟส 0 ไม่ใช่โค้ดบน branch เฟส 1 ที่ยังไม่ merge/deploy
+คำว่า “ปัจจุบัน” ในสองคอลัมน์แรกหมายถึง deployed baseline ที่ตรวจในเฟส 0 ไม่ใช่โค้ดบน branch เฟส 1–2 ที่ยังไม่ merge/deploy
 
 | ความสามารถ | นักเรียนปัจจุบัน | ครูปัจจุบัน | เป้าหมายนักเรียน | เป้าหมายครู |
 | --- | --- | --- | --- | --- |
@@ -316,8 +327,8 @@ fixture รูปโจทย์ต้องพิสูจน์เพิ่ม
 ## ลำดับเฟสและ commit gates
 
 0. **Spec และ baseline** — เอกสารนี้, แก้ documentation drift และบันทึกหลักฐานปัจจุบัน
-1. **Shared core และ policy boundary — implementation เสร็จบน branch เฟส 1; rollout gate ยัง pending** — รวม editor host, command policy และ validator, ปิด bypass ทุกทาง และคง scene/persistence contract ส่วน imperative command facade ที่ใช้กับ toolbar ใหม่จะรวมต่อในเฟส 2/5; authenticated teacher loop/heap ยังต้องผ่านก่อน merge/deploy
-2. **Student toolbar และ input mode** — แถวหลัก/รอง, fit, single stroke-width source, finger draw/pan และ responsive behavior
+1. **Shared core และ policy boundary — implementation เสร็จบน branch เฟส 1; rollout gate ยัง pending** — รวม editor host, command policy และ validator, ปิด bypass ทุกทาง และคง scene/persistence contract; authenticated teacher loop/heap ยังต้องผ่านก่อน merge/deploy
+2. **Student toolbar และ input mode — implementation เสร็จบน branch เฟส 2; rollout gate ยัง pending** — command facade, แถวหลัก/รอง, fit, single stroke-width source, selection semantics, finger draw/pan และ responsive behavior พร้อม local touch/pen evidence; physical Safari/iPad/stylus และ upstream dev warnings ยังรอ hardening/UAT
 3. **Student draft/attachment correctness** — revision-based status, stale attachment warning, load confirmation และ one-step recovery
 4. **Partial eraser** — freehand/highlighter เท่านั้น พร้อม deterministic undo/redo และ limit tests
 5. **Teacher presentation tools** — laser, Frame, รูปโจทย์, quick colors, presentation lock, grid/snap และ duplicate-next-step

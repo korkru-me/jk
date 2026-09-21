@@ -1,6 +1,6 @@
 'use client'
 
-import { CaptureUpdateAction } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, FONT_FAMILY } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
@@ -10,12 +10,17 @@ import type {
 } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Database, Highlighter, Loader2, Paperclip, PenLine, RefreshCw, X } from 'lucide-react'
+import { Database, Loader2, Paperclip, PenLine, RefreshCw, X } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DrawingBoardCore } from '@/components/drawing-board/drawing-board-core'
+import { StudentDrawingToolbar } from '@/components/drawing-board/drawing-board-toolbar'
+import type {
+  DrawingBoardCommandState,
+  DrawingBoardController,
+} from '@/components/drawing-board/drawing-board-controller'
 import {
   purgeExpiredScratchpads,
   readScratchpadScene,
@@ -38,18 +43,13 @@ import {
   type StudentWorkArtifactView,
 } from '@/lib/math-work'
 import {
-  clampStrokeWidth,
   createDrawingPreview,
-  DRAWING_BACKGROUNDS,
   DRAWING_DEFAULT_ITEM_STATE,
   drawingBackgroundStyle,
-  HIGHLIGHTER_INK,
-  MAX_STROKE_WIDTH,
-  MIN_STROKE_WIDTH,
-  PEN_INK,
   stableDrawingAppState,
   TRANSPARENT_CANVAS,
 } from './drawing-board-utils'
+import type { FingerInputMode } from '@/lib/drawing-board-input'
 
 export interface ScratchpadProps {
   open: boolean
@@ -60,6 +60,8 @@ export interface ScratchpadProps {
   artifact: StudentWorkArtifactView | null
   loadAttachedNonce: number
   previewMode: boolean
+  fingerInputMode: FingerInputMode
+  onFingerInputModeChange: (mode: FingerInputMode) => void
   onAttachmentSaved: (artifact: StudentWorkArtifactView) => void
   onClose: () => void
 }
@@ -100,6 +102,8 @@ export default function Scratchpad({
   artifact,
   loadAttachedNonce,
   previewMode,
+  fingerInputMode,
+  onFingerInputModeChange,
   onAttachmentSaved,
   onClose,
 }: ScratchpadProps) {
@@ -120,7 +124,19 @@ export default function Scratchpad({
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const [background, setBackground] = useState<ScratchpadBackground>('lined')
-  const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
+  const [controller, setController] = useState<DrawingBoardController | null>(null)
+  const [commandState, setCommandState] = useState<DrawingBoardCommandState>({
+    ready: false,
+    readOnly: false,
+    activeTool: 'freedraw',
+    strokeColor: DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeColor,
+    strokeWidth: DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth,
+    opacity: DRAWING_DEFAULT_ITEM_STATE.currentItemOpacity,
+    fontFamily: FONT_FAMILY.Helvetica,
+    fontSize: 20,
+    canUndo: false,
+    canRedo: false,
+  })
   const [status, setStatus] = useState<SaveStatus>(persistenceEnabled ? 'loading' : 'idle')
   const [apiReady, setApiReady] = useState(false)
   const [attaching, setAttaching] = useState(false)
@@ -225,6 +241,10 @@ export default function Scratchpad({
     })
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) {
+        if (
+          event.target instanceof Element
+          && event.target.matches('textarea, [contenteditable="true"], .excalidraw-wysiwyg')
+        ) return
         event.preventDefault()
         onCloseRef.current()
         return
@@ -253,20 +273,23 @@ export default function Scratchpad({
         first.focus()
       }
     }
-    // Excalidraw handles Escape inside its canvas. Listen during capture so
-    // the surrounding exam panel can close consistently before the editor
-    // consumes the event.
+    // Listen during capture so Escape closes the surrounding panel before
+    // Excalidraw consumes it, except while a text field is actively editing.
     window.addEventListener('keydown', closeOnEscape, true)
     return () => {
       window.cancelAnimationFrame(frame)
       window.removeEventListener('keydown', closeOnEscape, true)
-      const activeElement = document.activeElement
-      const focusNeedsRestoring = activeElement === document.body
-        || activeElement === document.documentElement
-        || (activeElement instanceof Node && panelRef.current?.contains(activeElement))
-      if (focusNeedsRestoring && previousFocus?.isConnected && previousFocus.getClientRects().length > 0) {
-        previousFocus.focus()
-      }
+      // Excalidraw handles focus synchronously. Restore after React finishes
+      // this effect cleanup so its blur path cannot call flushSync mid-commit.
+      queueMicrotask(() => {
+        const activeElement = document.activeElement
+        const focusNeedsRestoring = activeElement === document.body
+          || activeElement === document.documentElement
+          || (activeElement instanceof Node && panelRef.current?.contains(activeElement))
+        if (focusNeedsRestoring && previousFocus?.isConnected && previousFocus.getClientRects().length > 0) {
+          previousFocus.focus()
+        }
+      })
     }
   }, [open])
 
@@ -311,8 +334,6 @@ export default function Scratchpad({
       appState: stableDrawingAppState(appState),
       files,
     }
-    // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
-    setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
     scheduleSave()
   }, [scheduleSave])
 
@@ -321,29 +342,6 @@ export default function Scratchpad({
     setBackground(next)
     sceneRef.current = { ...sceneRef.current, background: next }
     scheduleSave(150)
-  }
-
-  const chooseInkPreset = (kind: 'pen' | 'highlighter') => {
-    const api = apiRef.current
-    if (!api || persistenceBlockedRef.current) return
-    const ink = kind === 'pen' ? PEN_INK : HIGHLIGHTER_INK
-    api.updateScene({
-      appState: {
-        currentItemStrokeColor: ink.color,
-        currentItemStrokeWidth: ink.width,
-        currentItemOpacity: ink.opacity,
-      },
-    })
-    setStrokeWidth(ink.width)
-    api.setActiveTool({ type: 'freedraw', locked: true })
-  }
-
-  const chooseStrokeWidth = (value: number) => {
-    const api = apiRef.current
-    if (!api || persistenceBlockedRef.current) return
-    const next = clampStrokeWidth(value)
-    setStrokeWidth(next)
-    api.updateScene({ appState: { currentItemStrokeWidth: next } })
   }
 
   const loadAttachedScene = useCallback(async () => {
@@ -379,7 +377,7 @@ export default function Scratchpad({
         captureUpdate: CaptureUpdateAction.NEVER,
       })
       api.addFiles(Object.values(scene.files) as BinaryFileData[])
-      api.history.clear()
+      if (!controller?.clearHistory()) api.history.clear()
       sceneRef.current = scene
       setBackground(scene.background)
       await persist(scene)
@@ -389,23 +387,23 @@ export default function Scratchpad({
     } finally {
       setLoadingAttached(false)
     }
-  }, [artifact, artifactPartKey, persist, previewMode, scope.answerId])
+  }, [artifact, artifactPartKey, controller, persist, previewMode, scope.answerId])
 
   // Keep the chosen tool after each stroke: a line or an arrow is rarely
   // drawn only once, and reverting to selection breaks the flow.
   useEffect(() => {
-    if (!apiReady || persistenceBlockedRef.current) return
+    if (!apiReady || !controller || persistenceBlockedRef.current) return
     let frame: number | null = null
     let cancelled = false
     void initialData.then(() => {
       if (cancelled || persistenceBlockedRef.current) return
-      frame = requestAnimationFrame(() => apiRef.current?.setActiveTool({ type: 'freedraw', locked: true }))
+      frame = requestAnimationFrame(() => controller.selectTool('freedraw'))
     })
     return () => {
       cancelled = true
       if (frame !== null) cancelAnimationFrame(frame)
     }
-  }, [apiReady, initialData])
+  }, [apiReady, controller, initialData])
 
   useEffect(() => {
     if (!apiReady || !open || loadAttachedNonce <= 0) return
@@ -572,46 +570,17 @@ export default function Scratchpad({
             <X />
           </Button>
         </div>
-        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('pen')} disabled={Boolean(readOnlyMessage)}>
-            <PenLine /> ปากกา
-          </Button>
-          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('highlighter')} disabled={Boolean(readOnlyMessage)}>
-            <Highlighter /> ไฮไลต์
-          </Button>
-          <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-          <label className="flex min-h-10 shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground pointer-coarse:min-h-11">
-            ขนาดเส้น
-            <input
-              type="range"
-              min={MIN_STROKE_WIDTH}
-              max={MAX_STROKE_WIDTH}
-              step={1}
-              value={strokeWidth}
-              onChange={event => chooseStrokeWidth(Number(event.target.value))}
-              disabled={Boolean(readOnlyMessage)}
-              aria-label="ขนาดเส้น"
-              className="h-1 w-24 cursor-pointer accent-primary"
-            />
-            <span className="w-3 text-right font-mono text-[10px] text-foreground" aria-hidden="true">{strokeWidth}</span>
-          </label>
-          <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-          {DRAWING_BACKGROUNDS.map(item => (
-            <Button
-              key={item.value}
-              type="button"
-              variant={background === item.value ? 'secondary' : 'ghost'}
-              size="xs"
-              className="min-h-10 shrink-0 pointer-coarse:min-h-11"
-              onClick={() => chooseBackground(item.value)}
-              disabled={Boolean(readOnlyMessage)}
-              aria-pressed={background === item.value}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </div>
       </div>
+
+      <StudentDrawingToolbar
+        controller={controller}
+        state={commandState}
+        background={background}
+        fingerMode={fingerInputMode}
+        disabled={Boolean(readOnlyMessage)}
+        onBackgroundChange={chooseBackground}
+        onFingerModeChange={onFingerInputModeChange}
+      />
 
       <DrawingBoardCore
         role="student"
@@ -621,6 +590,10 @@ export default function Scratchpad({
         onChange={handleChange}
         onPointerUp={() => scheduleSave(120)}
         viewModeEnabled={Boolean(readOnlyMessage)}
+        fingerInputMode={fingerInputMode}
+        hideNativeControls
+        onControllerReady={setController}
+        onCommandStateChange={setCommandState}
         autoFocus
         theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
         className="flex-1"

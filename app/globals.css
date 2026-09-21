@@ -479,6 +479,16 @@
   display: none !important;
 }
 
+/* Student Phase 2 uses the app-owned two-row toolbar. Keep Excalidraw's
+   controls mounted for its internal action/history contract, but remove every
+   duplicate visual entry point (including the second stroke-width source). */
+.drawing-board-app-controls .App-toolbar-container,
+.drawing-board-app-controls .App-menu__left,
+.drawing-board-app-controls .App-bottom-bar,
+.drawing-board-app-controls .App-menu_bottom {
+  display: none !important;
+}
+
 /* Product commands own these paths. Native Excalidraw entry points can bypass
    role policy even when the corresponding canvas action is hidden. */
 .drawing-board-policy .App-toolbar__extra-tools-trigger,

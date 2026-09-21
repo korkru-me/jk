@@ -68,6 +68,10 @@ import { ExamWatermark } from './exam-watermark'
 import { MathAnswerField } from './math-answer-field'
 import { mathInputPartKey, readMathInputMode, type MathInputModes } from '@/lib/math/input-mode'
 import { hasCompleteWorkEvidence, workArtifactPartKey, type StudentWorkArtifactView } from '@/lib/math-work'
+import {
+  DEFAULT_FINGER_INPUT_MODE,
+  type FingerInputMode,
+} from '@/lib/drawing-board-input'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -315,6 +319,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [scratchpadLoaded, setScratchpadLoaded] = useState(false)
   const [showScratchpad, setShowScratchpad] = useState(false)
   const [scratchpadTarget, setScratchpadTarget] = useState<ScratchpadTarget | null>(null)
+  const [scratchpadFingerInputMode, setScratchpadFingerInputMode] = useState<FingerInputMode>(
+    DEFAULT_FINGER_INPUT_MODE,
+  )
   const [loadAttachedNonce, setLoadAttachedNonce] = useState(0)
   const questionNavigatorDialogRef = useRef<HTMLDivElement | null>(null)
   const questionNavigatorCloseRef = useRef<HTMLButtonElement | null>(null)
@@ -1894,6 +1901,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             artifact={scratchpadArtifact}
             loadAttachedNonce={loadAttachedNonce}
             previewMode={previewMode}
+            fingerInputMode={scratchpadFingerInputMode}
+            onFingerInputModeChange={setScratchpadFingerInputMode}
             onAttachmentSaved={handleArtifactSaved}
             onClose={() => setShowScratchpad(false)}
           />
