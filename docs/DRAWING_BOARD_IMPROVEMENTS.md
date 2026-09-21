@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 21 กันยายน 2026
 
-สถานะ: **เฟส 2 — implementation ของ student toolbar และ input mode ทำเสร็จบน branch `codex/drawing-board-phase-2`; ยังไม่ merge/deploy** โดยต่อจาก shared core/policy boundary ของเฟส 1; automated/local gates ผ่านแล้ว แต่ authenticated teacher loop/heap, Auth/Storage, physical UAT, upstream Excalidraw/React dev warnings และ schema debt ของ preview PNG บน Safari ยังเป็น rollout/hardening gate ก่อน deploy
+สถานะ: **เฟส 3 — implementation ของ student draft/attachment correctness ทำเสร็จบน branch `codex/drawing-board-phase-3`; ยังไม่ merge/deploy** โดยต่อจาก shared core/policy boundary และ student toolbar/input mode ของเฟส 1–2; automated/local gates ผ่านแล้ว แต่ authenticated Auth/Storage, physical UAT, teacher loop/heap, upstream Excalidraw/React dev warnings และ schema debt ของ preview PNG บน Safari ยังเป็น rollout/hardening gate ก่อน deploy
 
-เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงสภาพปลายทางของเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว; ผลลัพธ์เฟส 1–2 ด้านล่างเป็นโค้ดบน branch ที่ยังไม่ merge/deploy และงานเฟส 3–8 ยังต้องทำต่อ
+เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงสภาพปลายทางของเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว; ผลลัพธ์เฟส 1–3 ด้านล่างเป็นโค้ดบน branch ที่ยังไม่ merge/deploy และงานเฟส 4–8 ยังต้องทำต่อ
 
 ฐานที่ตรวจในเฟส 0 คือ commit `ecfacda79158d80fe73d529a45d1e49616b9218c` ซึ่งตรงกับ `origin/exam-uat-evidence` ณ วันที่ตรวจ งานเฟส 0 อยู่บน branch `codex/drawing-board-phase-0` และไม่ deploy หรือเปลี่ยน `origin/master`
 
@@ -44,6 +44,17 @@
 - ไม่มี migration, RLS, Storage path, scene format, IndexedDB contract หรือ teacher toolbar/persistence change ในเฟสนี้; partial eraser, student revision/recovery, teacher presentation/save state และ rollout ยังอยู่เฟส 3–8; PNG/Safari schema debt เดิมยังเป็น blocker แยก
 - Excalidraw 0.18.1 บน React 19 dev build ยังเขียน warning ของ library เองเมื่อ pinch (`setState` ซ้อนใน updater) แม้ interaction, automated checks และ production build ผ่าน ส่วน warning `flushSync` ตอนคืน focus หลังปิด editor ถูกตัดด้วยการ defer focus restoration แล้ว เฟส 7 ต้องยืนยัน dependency version/production candidate และ physical browser ก่อนตัด pinch warning ออกจาก hardening gate
 
+## ผลลัพธ์ของเฟส 3
+
+- เพิ่ม state machine นักเรียนครบตามสัญญา: draft แยก `loading`, `empty`, `dirty_local`, `saving_local`, `saved_local`, `save_failed`, `limit_exceeded`, `load_failed`, `unsupported_read_only`; attachment แยก `not_attached`, `attaching`, `attached_current`, `attached_stale`, `attached_unverified`, `attach_failed` และแสดงสถานะภาษาไทยในกระดาษทด
+- semantic fingerprint รวมเฉพาะ element ที่มองเห็น, file reference และ background โดยไม่รวม active tool, selection, pan/zoom หรือ volatile element fields; semantic edit เพิ่ม `editRevision` ทันที, autosave สำเร็จจึงเลื่อน `savedRevision`, และ attach สำเร็จเก็บ exact revision/fingerprint ของ snapshot เดียวกับ preview/scene
+- ขยาย record เดิมใน IndexedDB ด้วย metadata `revision` แบบ optional โดยไม่เปลี่ยน database `korkru-math-work`, store `scratchpads`, key, `DB_VERSION=1`, debounce 650 ms, pointer-up 120 ms, TTL หรือเพดานเดิม Record รุ่นเก่าที่ยังไม่มี metadata อ่านได้ต่อและรายงาน attachment เป็น `attached_unverified` แทนการเดาว่า current
+- edit หลังแนบเปลี่ยนเป็น `attached_stale` ทันทีและคงสถานะหลัง close/reopen/reload; ก่อน submit ระบบอ่านสถานะจาก IndexedDB อีกครั้ง แล้วเตือนพร้อมระบุข้อ/ข้อย่อยที่ stale หรือ unverified และบอกชัดว่า server จะรับฉบับที่แนบไว้ ไม่ใช่เส้นล่าสุดในเครื่อง โดย requirement/authorization ฝั่ง server เดิมยังเป็นผู้ตัดสินสุดท้าย
+- การเปิดฉบับแนบมาทับ local draft ที่มีเนื้อหาต่างกันต้องยืนยันก่อน และเขียน one-step recovery กับฉบับใหม่ลง record เดียวกันให้สำเร็จก่อนแทน editor; recovery อยู่ข้าม reload, กู้ได้ครั้งเดียวแล้วเป็น dirty/unsaved, destructive load ครั้งใหม่แทนฉบับก่อน, ผู้ใช้ทิ้งเองได้ และ save/attach ไม่ลบ recovery อัตโนมัติ การอ่าน/ดาวน์โหลด/validate/persist ที่ล้มเหลวคง local draft และ artifact เดิมไว้
+- local Chromium ที่ `/exam-screen-lab` ผ่าน attach → edit เป็น stale → ยืนยัน load → recovery → restore ครั้งเดียว → submit warning, รวมกรณี unverified, single editor และ viewport 390×844, 768×1024, 1024×768, 1280×800 โดย document ไม่ล้น; Next dev MCP ไม่มี compilation/runtime issue และ axe ที่ scope กระดาษทดไม่พบ violation หลังแก้ contrast ของ badge ส่วน `.HintViewer` ของ Excalidraw ยังเป็น manual/incomplete contrast check ของ dependency
+- regression ผ่าน 114 test files / 1,511 tests, TypeScript, design-token lint และ production build 63 static pages; initial route `/assignments/[id]/take` ยังมี 17 chunks รวม 808,768 bytes raw / 247,723 bytes gzip (+3,338/+712 จากเฟส 2 และต่ำกว่า gate 256,828 gzip) พร้อม scan ไม่พบ Excalidraw, mathjs, Supabase browser client, `sharp` package หรือ server-only board code ใน union
+- ไม่มี migration, RLS, Storage path, scene envelope, artifact schema/server authorization หรือ teacher behavior change ในเฟสนี้; preview ยังเก็บ scene ใน memory เท่านั้น และ authenticated Auth/Storage flow, physical Safari/iPad/stylus, teacher hardening/UAT กับ PNG schema debt เดิมยังเป็น rollout gate แยก
+
 ## ขอบเขตผลิตภัณฑ์ที่อนุมัติแล้ว
 
 ### หลักร่วม
@@ -71,7 +82,7 @@
 
 ## Capability matrix
 
-คำว่า “ปัจจุบัน” ในสองคอลัมน์แรกหมายถึง deployed baseline ที่ตรวจในเฟส 0 ไม่ใช่โค้ดบน branch เฟส 1–2 ที่ยังไม่ merge/deploy
+คำว่า “ปัจจุบัน” ในสองคอลัมน์แรกหมายถึง deployed baseline ที่ตรวจในเฟส 0 ไม่ใช่โค้ดบน branch เฟส 1–3 ที่ยังไม่ merge/deploy
 
 | ความสามารถ | นักเรียนปัจจุบัน | ครูปัจจุบัน | เป้าหมายนักเรียน | เป้าหมายครู |
 | --- | --- | --- | --- | --- |
@@ -329,7 +340,7 @@ fixture รูปโจทย์ต้องพิสูจน์เพิ่ม
 0. **Spec และ baseline** — เอกสารนี้, แก้ documentation drift และบันทึกหลักฐานปัจจุบัน
 1. **Shared core และ policy boundary — implementation เสร็จบน branch เฟส 1; rollout gate ยัง pending** — รวม editor host, command policy และ validator, ปิด bypass ทุกทาง และคง scene/persistence contract; authenticated teacher loop/heap ยังต้องผ่านก่อน merge/deploy
 2. **Student toolbar และ input mode — implementation เสร็จบน branch เฟส 2; rollout gate ยัง pending** — command facade, แถวหลัก/รอง, fit, single stroke-width source, selection semantics, finger draw/pan และ responsive behavior พร้อม local touch/pen evidence; physical Safari/iPad/stylus และ upstream dev warnings ยังรอ hardening/UAT
-3. **Student draft/attachment correctness** — revision-based status, stale attachment warning, load confirmation และ one-step recovery
+3. **Student draft/attachment correctness — implementation เสร็จบน branch เฟส 3; rollout gate ยัง pending** — revision/fingerprint-based status, stale/unverified submit warning, confirmed attached-scene load และ persistent one-step recovery ผ่าน automated/local browser gates แล้ว; authenticated Auth/Storage และ physical UAT ยังรอเฟส 8
 4. **Partial eraser** — freehand/highlighter เท่านั้น พร้อม deterministic undo/redo และ limit tests
 5. **Teacher presentation tools** — laser, Frame, รูปโจทย์, quick colors, presentation lock, grid/snap และ duplicate-next-step
 6. **Teacher draft/save correctness** — state ต่อ question/slot, atomic load/save identity, all-draft exit guard และ one-step recovery

@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { classifyStoredScratchpadScene } from '@/lib/scratchpad-storage'
+import {
+  classifyScratchpadRevision,
+  classifyStoredScratchpadScene,
+} from '@/lib/scratchpad-storage'
 import { CURRENT_WORK_FORMAT_VERSION } from '@/lib/math-work'
+import type { ScratchpadScene } from '@/lib/scratchpad'
+import {
+  initialScratchpadRevision,
+  markScratchpadAttached,
+  reviseScratchpad,
+  scratchpadAttachmentState,
+  scratchpadSemanticFingerprint,
+} from '@/lib/scratchpad-state'
 
-function scene(overrides: Record<string, unknown> = {}) {
+function scene(overrides: Partial<ScratchpadScene> = {}): ScratchpadScene {
   return {
     formatVersion: CURRENT_WORK_FORMAT_VERSION,
     elements: [],
@@ -36,5 +47,79 @@ describe('stored scratchpad classification', () => {
     const before = JSON.stringify(raw)
     expect(classifyStoredScratchpadScene(raw).status).toBe('unsupported')
     expect(JSON.stringify(raw)).toBe(before)
+  })
+
+  it('keeps old scene-only records readable with unverified revision metadata', () => {
+    const storedScene = scene()
+    expect(classifyScratchpadRevision(undefined, storedScene)).toEqual(
+      initialScratchpadRevision(storedScene),
+    )
+  })
+
+  it('drops attachment verification when metadata does not match the stored scene', () => {
+    const storedScene = scene()
+    const metadata = markScratchpadAttached(
+      initialScratchpadRevision(storedScene),
+      {
+        id: 'artifact-1',
+        submissionAnswerId: 'answer-1',
+        partKey: 'answer',
+        sourceType: 'scratchpad',
+        formatVersion: CURRENT_WORK_FORMAT_VERSION,
+        previewUrl: null,
+        sceneUrl: null,
+        updatedAt: '2026-09-21T00:00:00.000Z',
+      },
+    )
+    const changed = scene({ background: 'grid' })
+    expect(classifyScratchpadRevision(metadata, changed)).toMatchObject({
+      currentFingerprint: scratchpadSemanticFingerprint(changed),
+      attachment: null,
+    })
+  })
+
+  it('preserves a verified stale attachment when the stored metadata matches the edited scene', () => {
+    const attachedScene = scene()
+    const attachedArtifact = {
+      id: 'artifact-1',
+      submissionAnswerId: 'answer-1',
+      partKey: 'answer',
+      sourceType: 'scratchpad' as const,
+      formatVersion: CURRENT_WORK_FORMAT_VERSION,
+      previewUrl: null,
+      sceneUrl: null,
+      updatedAt: '2026-09-21T00:00:00.000Z',
+    }
+    const attached = markScratchpadAttached(
+      initialScratchpadRevision(attachedScene),
+      attachedArtifact,
+    )
+    const editedScene = scene({ background: 'grid' })
+    const persisted = classifyScratchpadRevision(
+      reviseScratchpad(attached, editedScene),
+      editedScene,
+    )
+    expect(scratchpadAttachmentState({ artifact: attachedArtifact, metadata: persisted }))
+      .toBe('attached_stale')
+  })
+
+  it('keeps only a fully validated one-step recovery', () => {
+    const storedScene = scene()
+    const recoveryScene = scene({ background: 'dots' })
+    const metadata = {
+      ...initialScratchpadRevision(storedScene),
+      recovery: {
+        state: 'available_once',
+        scene: recoveryScene,
+        fingerprint: scratchpadSemanticFingerprint(recoveryScene),
+        createdAt: 100,
+      },
+    }
+    expect(classifyScratchpadRevision(metadata, storedScene).recovery)
+      .toMatchObject({ state: 'available_once', createdAt: 100 })
+    expect(classifyScratchpadRevision({
+      ...metadata,
+      recovery: { ...metadata.recovery, fingerprint: scratchpadSemanticFingerprint(storedScene) },
+    }, storedScene).recovery).toEqual({ state: 'none' })
   })
 })

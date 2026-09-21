@@ -9,6 +9,16 @@ import {
   type ScratchpadScope,
 } from '@/lib/scratchpad'
 import { validateDrawingScene, type DrawingSceneIssueCode } from '@/lib/drawing-board-policy'
+import type { StudentWorkArtifactView } from '@/lib/math-work'
+import {
+  initialScratchpadRevision,
+  isScratchpadFingerprint,
+  scratchpadAttachmentState,
+  scratchpadSemanticFingerprint,
+  type ScratchpadRecovery,
+  type ScratchpadRevisionMetadata,
+  type StudentAttachmentState,
+} from '@/lib/scratchpad-state'
 
 const DB_NAME = 'korkru-math-work'
 const DB_VERSION = 1
@@ -19,7 +29,14 @@ interface ScratchpadRecord extends ScratchpadScope {
   submissionKey: string
   updatedAt: number
   scene: unknown
+  revision?: unknown
 }
+
+export type ScratchpadDraftReadResult =
+  | { status: 'missing' }
+  | { status: 'ready'; scene: ScratchpadScene; revision: ScratchpadRevisionMetadata }
+  | { status: 'invalid'; issue: DrawingSceneIssueCode }
+  | { status: 'unsupported'; issue: DrawingSceneIssueCode }
 
 export type ScratchpadSceneReadResult =
   | { status: 'missing' }
@@ -50,6 +67,86 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   })
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function safeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+}
+
+function validAttachment(value: unknown) {
+  if (!isRecord(value)) return null
+  if (
+    typeof value.artifactId !== 'string'
+    || value.artifactId.length === 0
+    || value.artifactId.length > 200
+    || typeof value.artifactUpdatedAt !== 'string'
+    || value.artifactUpdatedAt.length === 0
+    || value.artifactUpdatedAt.length > 100
+    || !safeInteger(value.revision)
+    || !isScratchpadFingerprint(value.fingerprint)
+  ) return null
+  return {
+    artifactId: value.artifactId,
+    artifactUpdatedAt: value.artifactUpdatedAt,
+    revision: value.revision,
+    fingerprint: value.fingerprint,
+  }
+}
+
+function validRecovery(value: unknown): ScratchpadRecovery {
+  if (!isRecord(value) || typeof value.state !== 'string') return { state: 'none' }
+  if (value.state === 'none') return { state: 'none' }
+  if (value.state === 'restored' && safeInteger(value.restoredAt)) {
+    return { state: 'restored', restoredAt: value.restoredAt }
+  }
+  if (
+    value.state !== 'available_once'
+    || !safeInteger(value.createdAt)
+    || !isScratchpadFingerprint(value.fingerprint)
+  ) return { state: 'none' }
+  const validated = validateDrawingScene(value.scene, { role: 'student' })
+  if (!validated.ok) return { state: 'none' }
+  if (scratchpadSemanticFingerprint(validated.scene) !== value.fingerprint) return { state: 'none' }
+  return {
+    state: 'available_once',
+    scene: validated.scene,
+    fingerprint: value.fingerprint,
+    createdAt: value.createdAt,
+  }
+}
+
+/** Old records contain only `scene`; they remain readable but unverified. */
+export function classifyScratchpadRevision(
+  value: unknown,
+  scene: ScratchpadScene,
+): ScratchpadRevisionMetadata {
+  const fallback = initialScratchpadRevision(scene)
+  if (!isRecord(value)) return fallback
+  if (
+    !safeInteger(value.editRevision)
+    || !safeInteger(value.savedRevision)
+    || value.savedRevision > value.editRevision
+    || !isScratchpadFingerprint(value.currentFingerprint)
+  ) return fallback
+
+  const currentFingerprint = scratchpadSemanticFingerprint(scene)
+  const metadataMatchesScene = currentFingerprint === value.currentFingerprint
+  const candidateAttachment = validAttachment(value.attachment)
+  const attachment = candidateAttachment && candidateAttachment.revision <= value.editRevision
+    ? candidateAttachment
+    : null
+  return {
+    editRevision: value.editRevision,
+    savedRevision: value.savedRevision,
+    currentFingerprint,
+    // A partial/corrupt record must never claim that an artifact is current.
+    attachment: metadataMatchesScene ? attachment : null,
+    recovery: validRecovery(value.recovery),
+  }
+}
+
 function openScratchpadDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('IndexedDB unavailable'))
   return new Promise((resolve, reject) => {
@@ -67,7 +164,7 @@ function openScratchpadDatabase(): Promise<IDBDatabase> {
   })
 }
 
-export async function readScratchpadScene(scope: ScratchpadScope): Promise<ScratchpadSceneReadResult> {
+export async function readScratchpadDraft(scope: ScratchpadScope): Promise<ScratchpadDraftReadResult> {
   const database = await openScratchpadDatabase()
   try {
     const transaction = database.transaction(STORE_NAME, 'readonly')
@@ -75,10 +172,22 @@ export async function readScratchpadScene(scope: ScratchpadScope): Promise<Scrat
       transaction.objectStore(STORE_NAME).get(scratchpadStorageKey(scope)),
     ) as ScratchpadRecord | undefined
     if (!record) return { status: 'missing' }
-    return classifyStoredScratchpadScene(record.scene)
+    const classified = classifyStoredScratchpadScene(record.scene)
+    if (classified.status !== 'ready') return classified
+    return {
+      status: 'ready',
+      scene: classified.scene,
+      revision: classifyScratchpadRevision(record.revision, classified.scene),
+    }
   } finally {
     database.close()
   }
+}
+
+export async function readScratchpadScene(scope: ScratchpadScope): Promise<ScratchpadSceneReadResult> {
+  const result = await readScratchpadDraft(scope)
+  if (result.status !== 'ready') return result
+  return { status: 'ready', scene: result.scene }
 }
 
 /** @deprecated Use readScratchpadScene() so invalid raw data cannot look blank. */
@@ -87,10 +196,26 @@ export async function loadScratchpadScene(scope: ScratchpadScope): Promise<Scrat
   return result.status === 'ready' ? result.scene : emptyScratchpadScene()
 }
 
-export async function saveScratchpadScene(scope: ScratchpadScope, scene: ScratchpadScene): Promise<void> {
+export async function saveScratchpadDraft(
+  scope: ScratchpadScope,
+  scene: ScratchpadScene,
+  revision: ScratchpadRevisionMetadata,
+): Promise<void> {
   const validated = validateDrawingScene(scene, { role: 'student' })
-  if (!validated.ok) {
-    throw new Error('Scratchpad scene exceeds local limits')
+  if (!validated.ok) throw new Error('Scratchpad scene exceeds local limits')
+  if (
+    !safeInteger(revision.editRevision)
+    || !safeInteger(revision.savedRevision)
+    || revision.savedRevision > revision.editRevision
+    || revision.currentFingerprint !== scratchpadSemanticFingerprint(validated.scene)
+  ) throw new Error('Scratchpad revision is invalid')
+  const attachment = revision.attachment ? validAttachment(revision.attachment) : null
+  if (revision.attachment && (!attachment || attachment.revision > revision.editRevision)) {
+    throw new Error('Scratchpad attachment revision is invalid')
+  }
+  const recovery = validRecovery(revision.recovery)
+  if (recovery.state !== revision.recovery.state) {
+    throw new Error('Scratchpad recovery is invalid')
   }
   const database = await openScratchpadDatabase()
   try {
@@ -101,12 +226,28 @@ export async function saveScratchpadScene(scope: ScratchpadScope, scene: Scratch
       submissionKey: scratchpadSubmissionKey(scope.ownerId, scope.submissionId),
       updatedAt: Date.now(),
       scene: validated.scene,
+      revision: { ...revision, recovery },
     }
     transaction.objectStore(STORE_NAME).put(record)
     await transactionDone(transaction)
   } finally {
     database.close()
   }
+}
+
+export async function saveScratchpadScene(scope: ScratchpadScope, scene: ScratchpadScene): Promise<void> {
+  const revision = initialScratchpadRevision(scene)
+  await saveScratchpadDraft(scope, scene, revision)
+}
+
+export async function readScratchpadAttachmentState(
+  scope: ScratchpadScope,
+  artifact: StudentWorkArtifactView | null,
+): Promise<StudentAttachmentState> {
+  if (!artifact) return 'not_attached'
+  const draft = await readScratchpadDraft(scope)
+  if (draft.status !== 'ready') return 'attached_unverified'
+  return scratchpadAttachmentState({ artifact, metadata: draft.revision })
 }
 
 export async function deleteScratchpadScene(scope: ScratchpadScope): Promise<void> {

@@ -72,6 +72,7 @@ import {
   DEFAULT_FINGER_INPUT_MODE,
   type FingerInputMode,
 } from '@/lib/drawing-board-input'
+import type { StudentAttachmentState } from '@/lib/scratchpad-state'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -248,6 +249,11 @@ function workPartKeys(answer: AnswerRow, partIndex: number): { localPartKey: str
   }
 }
 
+function artifactPartIndex(partKey: string): number {
+  const match = /^part:(\d+)$/.exec(partKey)
+  return match ? Number(match[1]) : 0
+}
+
 /**
  * How many pieces of working evidence this question needs before submission.
  *
@@ -280,6 +286,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [workArtifacts, setWorkArtifacts] = useState<Record<string, StudentWorkArtifactView>>(
     () => workArtifactMap(initialWorkArtifacts)
   )
+  const [scratchpadAttachmentStates, setScratchpadAttachmentStates] = useState<
+    Record<string, StudentAttachmentState>
+  >({})
+  const scratchpadAttachmentStatesRef = useRef(scratchpadAttachmentStates)
+  scratchpadAttachmentStatesRef.current = scratchpadAttachmentStates
   const [submitting, setSubmitting] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   /** -1 for every งาน that is not a streak run, which disables the sync below. */
@@ -310,6 +321,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [showQuestionNavigator, setShowQuestionNavigator] = useState(false)
   const [navigationRequest, setNavigationRequest] = useState(0)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+  const [submitAttachmentWarnings, setSubmitAttachmentWarnings] = useState<string[]>([])
   const [submitCountdown, setSubmitCountdown] = useState(0)
   const [activeMathField, setActiveMathField] = useState<string | null>(null)
   const [calculatorTarget, setCalculatorTarget] = useState<CalculatorTarget | null>(null)
@@ -835,6 +847,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         delete next[`${artifact.submissionAnswerId}:${artifact.partKey}`]
         return next
       })
+      setScratchpadAttachmentStates(previous => {
+        const next = { ...previous }
+        delete next[`${artifact.submissionAnswerId}:${artifact.partKey}`]
+        scratchpadAttachmentStatesRef.current = next
+        return next
+      })
       toast.success('นำวิธีทำที่แนบออกแล้ว')
       return true
     } catch {
@@ -842,6 +860,59 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       return false
     }
   }, [previewMode])
+
+  const refreshScratchpadAttachmentStates = useCallback(async () => {
+    if (previewMode) return scratchpadAttachmentStatesRef.current
+    const scratchpadArtifacts = Object.entries(workArtifacts)
+      .filter(([, artifact]) => artifact.sourceType === 'scratchpad')
+    if (scratchpadArtifacts.length === 0) {
+      scratchpadAttachmentStatesRef.current = {}
+      setScratchpadAttachmentStates({})
+      return {} as Record<string, StudentAttachmentState>
+    }
+
+    try {
+      const { readScratchpadAttachmentState } = await import('@/lib/scratchpad-storage')
+      const entries = await Promise.all(scratchpadArtifacts.map(async ([key, artifact]) => {
+        const answer = answers.find(item => item.id === artifact.submissionAnswerId)
+        if (!answer) return [key, 'attached_unverified'] as const
+        const partIndex = artifactPartIndex(artifact.partKey)
+        const scope = {
+          ownerId: storageOwnerId,
+          submissionId,
+          answerId: answer.id,
+          partKey: workPartKeys(answer, partIndex).localPartKey,
+        }
+        try {
+          return [key, await readScratchpadAttachmentState(scope, artifact)] as const
+        } catch {
+          return [key, 'attached_unverified'] as const
+        }
+      }))
+      const liveStates = scratchpadAttachmentStatesRef.current
+      const next = Object.fromEntries(entries.map(([key, scannedState]) => [
+        key,
+        // An edit can be newer than the last IndexedDB transaction while the
+        // mounted scratchpad's 650 ms autosave is pending. Never let that
+        // older read hide a live stale warning immediately before submit.
+        liveStates[key] === 'attached_stale' ? 'attached_stale' : scannedState,
+      ])) as Record<string, StudentAttachmentState>
+      scratchpadAttachmentStatesRef.current = next
+      setScratchpadAttachmentStates(next)
+      return next
+    } catch {
+      const next = Object.fromEntries(scratchpadArtifacts.map(([key]) => (
+        [key, 'attached_unverified']
+      ))) as Record<string, StudentAttachmentState>
+      scratchpadAttachmentStatesRef.current = next
+      setScratchpadAttachmentStates(next)
+      return next
+    }
+  }, [answers, previewMode, storageOwnerId, submissionId, workArtifacts])
+
+  useEffect(() => {
+    void refreshScratchpadAttachmentStates()
+  }, [refreshScratchpadAttachmentStates])
 
   const insertCalculatorResult = useCallback((result: string) => {
     if (!calculatorTarget) return
@@ -980,13 +1051,28 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     return null
   }
 
-  function openSubmitDialog() {
+  async function openSubmitDialog() {
     const missingIndex = findMissingWorkImage()
     if (missingIndex !== null) {
       toast.error(`กรุณาแนบวิธีทำให้ครบก่อนส่งคำตอบ (ข้อ ${missingIndex + 1})`)
       navigateTo(missingIndex)
       return
     }
+    const attachmentStates = await refreshScratchpadAttachmentStates()
+    const warnings = Object.entries(attachmentStates).flatMap(([key, state]) => {
+      if (state !== 'attached_stale' && state !== 'attached_unverified') return []
+      const artifact = workArtifacts[key]
+      if (!artifact) return []
+      const questionIndex = answers.findIndex(answer => answer.id === artifact.submissionAnswerId)
+      const partIndex = artifactPartIndex(artifact.partKey)
+      const label = questionIndex >= 0
+        ? `ข้อ ${questionIndex + 1}${artifact.partKey === 'answer' ? '' : ` · ข้อย่อย ${partIndex + 1}`}`
+        : 'วิธีทำที่แนบ'
+      return [`${label} — ${state === 'attached_stale'
+        ? 'แก้กระดาษทดต่อหลังแนบ'
+        : 'ยังเทียบฉบับในเครื่องกับฉบับที่แนบไม่ได้'}`]
+    })
+    setSubmitAttachmentWarnings(warnings)
     setShowCalculator(false)
     setShowScratchpad(false)
     setShowQuestionNavigator(false)
@@ -1403,6 +1489,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
                   scratchpadEnabled={config.scratchpadEnabled}
                   workArtifacts={workArtifacts}
+                  scratchpadAttachmentStates={scratchpadAttachmentStates}
                   onOpenScratchpad={openScratchpadForPart}
                   onArtifactDelete={handleArtifactDelete}
                   onArtifactRefresh={refreshWorkArtifacts}
@@ -1904,6 +1991,13 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             fingerInputMode={scratchpadFingerInputMode}
             onFingerInputModeChange={setScratchpadFingerInputMode}
             onAttachmentSaved={handleArtifactSaved}
+            onAttachmentStateChange={state => {
+              if (!scratchpadAnswer) return
+              const key = `${scratchpadAnswer.id}:${scratchpadArtifactPartKey}`
+              const next = { ...scratchpadAttachmentStatesRef.current, [key]: state }
+              scratchpadAttachmentStatesRef.current = next
+              setScratchpadAttachmentStates(next)
+            }}
             onClose={() => setShowScratchpad(false)}
           />
         </Suspense>
@@ -1960,6 +2054,20 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   <AlertTriangle size={12} />
                   มีข้อที่ยังไม่ตอบหรือปักธงไว้ — ตรวจสอบอีกครั้งก่อนส่ง
                 </p>
+              )}
+              {submitAttachmentWarnings.length > 0 && (
+                <div className="mt-3 rounded-xl border border-warning/20 bg-warning/10 p-3 text-left text-xs">
+                  <p className="flex items-center gap-1.5 font-semibold text-warning">
+                    <AlertTriangle aria-hidden />
+                    ตรวจวิธีทำที่แนบก่อนส่ง
+                  </p>
+                  <ul className="mt-1.5 list-disc pl-4 text-foreground">
+                    {submitAttachmentWarnings.map(warning => <li key={warning}>{warning}</li>)}
+                  </ul>
+                  <p className="mt-1.5 text-muted-foreground">
+                    ส่งต่อได้ แต่ระบบจะใช้ฉบับที่แนบอยู่ ไม่ใช่เส้นล่าสุดที่ยังอยู่เฉพาะในเครื่อง
+                  </p>
+                </div>
               )}
             </div>
 
@@ -2492,6 +2600,7 @@ function WorkProofSlot({
   scratchpadEnabled,
   workImage,
   artifact,
+  attachmentState,
   localOnly,
   onPhotoChange,
   onOpenScratchpad,
@@ -2506,6 +2615,7 @@ function WorkProofSlot({
   scratchpadEnabled: boolean
   workImage: string | null
   artifact: StudentWorkArtifactView | null
+  attachmentState?: StudentAttachmentState
   localOnly?: boolean
   onPhotoChange: (url: string | null) => void
   onOpenScratchpad: (answerId: string, partIndex: number, label: string, loadAttached?: boolean) => void
@@ -2568,6 +2678,22 @@ function WorkProofSlot({
               </Button>
             )}
             <p className="text-[10px] text-muted-foreground">จากกระดาษทด · แก้ไขได้ก่อนส่ง</p>
+            {attachmentState && attachmentState !== 'attached_current' && (
+              <Badge
+                variant={attachmentState === 'attaching' ? 'outline' : 'destructive'}
+                className={attachmentState === 'attaching'
+                  ? 'max-w-44 whitespace-normal text-left'
+                  : 'max-w-44 whitespace-normal bg-destructive text-left text-destructive-foreground'}
+              >
+                {attachmentState === 'attached_stale'
+                  ? 'ฉบับที่แนบเก่ากว่าเส้นในเครื่อง'
+                  : attachmentState === 'attached_unverified'
+                    ? 'ยังเทียบกับฉบับในเครื่องไม่ได้'
+                    : attachmentState === 'attach_failed'
+                      ? 'แนบไม่สำเร็จ · ฉบับเดิมยังอยู่'
+                      : 'กำลังแนบฉบับนี้'}
+              </Badge>
+            )}
             <div className="flex gap-1">
               <Button
                 type="button"
@@ -2623,6 +2749,7 @@ function MultiPartAnswerInput({
   answerId, parts, questionText, labels, fallbackUnit, rawValue, onSingleChange, onPartChange,
   mathInputModes, activeMathField, onActivateMathField, onDeactivateMathField, onMathInputModeChange,
   requiresWorkImage, workImages, onWorkImageChange, scratchpadEnabled, workArtifacts,
+  scratchpadAttachmentStates,
   onOpenScratchpad, onArtifactDelete, onArtifactRefresh, localOnly,
 }: {
   answerId: string
@@ -2643,6 +2770,7 @@ function MultiPartAnswerInput({
   onWorkImageChange: (partIndex: number, url: string | null) => void
   scratchpadEnabled: boolean
   workArtifacts: Record<string, StudentWorkArtifactView>
+  scratchpadAttachmentStates: Record<string, StudentAttachmentState>
   onOpenScratchpad: (answerId: string, partIndex: number, label: string, loadAttached?: boolean) => void
   onArtifactDelete: (artifact: StudentWorkArtifactView) => Promise<boolean | void>
   onArtifactRefresh: (answerId: string) => Promise<void>
@@ -2751,6 +2879,7 @@ function MultiPartAnswerInput({
               scratchpadEnabled={scratchpadEnabled}
               workImage={workImages[index] ?? null}
               artifact={workArtifacts[`${answerId}:${artifactPartKey}`] ?? null}
+              attachmentState={scratchpadAttachmentStates[`${answerId}:${artifactPartKey}`]}
               localOnly={localOnly}
               onPhotoChange={url => onWorkImageChange(index, url)}
               onOpenScratchpad={onOpenScratchpad}
@@ -2802,6 +2931,7 @@ function MultiPartAnswerInput({
             scratchpadEnabled={scratchpadEnabled}
             workImage={workImages[0] ?? null}
             artifact={workArtifacts[`${answerId}:answer`] ?? null}
+            attachmentState={scratchpadAttachmentStates[`${answerId}:answer`]}
             localOnly={localOnly}
             onPhotoChange={url => onWorkImageChange(0, url)}
             onOpenScratchpad={onOpenScratchpad}
@@ -2845,6 +2975,7 @@ function MultiPartAnswerInput({
               scratchpadEnabled={scratchpadEnabled}
               workImage={workImages[i] ?? null}
               artifact={workArtifacts[`${answerId}:${workArtifactPartKey(i, activeParts.length)}`] ?? null}
+              attachmentState={scratchpadAttachmentStates[`${answerId}:${workArtifactPartKey(i, activeParts.length)}`]}
               localOnly={localOnly}
               onPhotoChange={url => onWorkImageChange(i, url)}
               onOpenScratchpad={onOpenScratchpad}
