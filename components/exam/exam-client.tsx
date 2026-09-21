@@ -2649,6 +2649,7 @@ function MultiPartAnswerInput({
     partIndex,
     totalParts,
     ariaLabel,
+    unit,
     className,
     inputClassName,
   }: {
@@ -2658,6 +2659,7 @@ function MultiPartAnswerInput({
     partIndex: number
     totalParts: number
     ariaLabel: string
+    unit?: ReactNode
     className?: string
     inputClassName?: string
   }) => {
@@ -2673,6 +2675,7 @@ function MultiPartAnswerInput({
         onChange={onChange}
         onModeChange={mode => onMathInputModeChange(partKey, mode)}
         ariaLabel={ariaLabel}
+        unit={unit}
         className={className}
         inputClassName={inputClassName}
       />
@@ -2715,10 +2718,10 @@ function MultiPartAnswerInput({
                     partIndex: i,
                     totalParts: activeParts.length,
                     ariaLabel: `คำตอบข้อย่อย ${num}`,
+                    unit: part.unit ? <UnitDisplay html={part.unit} /> : undefined,
                     className: 'max-w-[13rem]',
                     inputClassName: 'h-8 max-w-[9rem]',
                   })}
-                  {part.unit && <UnitDisplay html={part.unit} />}
                 </span>
               </span>
             )
@@ -2761,7 +2764,8 @@ function MultiPartAnswerInput({
       partIndex: 0,
       totalParts: 1,
       ariaLabel: 'คำตอบตัวเลข',
-      className: 'w-full max-w-xs',
+      unit: unit ? <UnitDisplay html={unit} /> : undefined,
+      className: 'w-full max-w-sm',
     })
     return (
       <div className="space-y-1">
@@ -2769,7 +2773,6 @@ function MultiPartAnswerInput({
           <div className="flex flex-wrap items-center gap-2 text-sm leading-loose">
             {blankSplit[0] && <RichText text={blankSplit[0]} className="[&_p]:inline" />}
             {inputEl}
-            {unit && <UnitDisplay html={unit} />}
             {blankSplit[1] && <RichText text={blankSplit[1]} className="[&_p]:inline" />}
           </div>
         ) : (
@@ -2777,7 +2780,6 @@ function MultiPartAnswerInput({
             <label className="text-sm font-medium">คำตอบ</label>
             <div className="flex items-center gap-2">
               {inputEl}
-              {unit && <UnitDisplay html={unit} />}
             </div>
           </>
         )}
@@ -2820,9 +2822,9 @@ function MultiPartAnswerInput({
               partIndex: i,
               totalParts: activeParts.length,
               ariaLabel: `คำตอบข้อย่อย ${labels[i] ?? i + 1}`,
-              className: 'w-full max-w-xs',
+              unit: part.unit ? <UnitDisplay html={part.unit} /> : undefined,
+              className: 'w-full max-w-sm',
             })}
-            {part.unit && <UnitDisplay html={part.unit} />}
           </div>
           {(requiresWorkImage || scratchpadEnabled || workArtifacts[`${answerId}:${workArtifactPartKey(i, activeParts.length)}`]) && (
             <WorkProofSlot
