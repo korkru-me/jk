@@ -1,6 +1,5 @@
 'use client'
 
-import { exportToCanvas } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import type { CSSProperties } from 'react'
@@ -122,6 +121,11 @@ export async function createDrawingPreview(
   emptyMessage: string,
   snapshot?: Pick<ScratchpadScene, 'elements' | 'appState' | 'files'>,
 ): Promise<DrawingPreview> {
+  // This utility is also imported by the teaching route before the editor is
+  // opened. Excalidraw reads browser globals while its module is evaluated,
+  // so keep the runtime import behind the user-triggered preview path instead
+  // of evaluating it during the server render.
+  const { exportToCanvas } = await import('@excalidraw/excalidraw')
   // A save can span several awaits. Render the same immutable scene sent to
   // the server instead of re-reading a canvas that may already have changed.
   const elements = snapshot

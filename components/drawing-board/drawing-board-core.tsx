@@ -37,13 +37,14 @@ import {
 } from '@/lib/drawing-board-partial-eraser'
 import {
   isDrawingBoardCommandAllowed,
+  drawingBoardPasteDecision,
   isIncompleteTransientDrawingElement,
   isDrawingBoardToolAllowed,
-  isSerializedDrawingClipboardText,
   recoveryDrawingScene,
   referencedDrawingFiles,
   snapshotDrawingScene,
   shouldBlockDrawingBoardKeyboardEvent,
+  shouldBlockDrawingBoardSurfaceEvent,
   validateDrawingScene,
   type DrawingBoardCommand,
   type DrawingBoardRole,
@@ -214,13 +215,6 @@ function targetInside(surface: HTMLDivElement, target: EventTarget | null): bool
 function isTextEditor(target: EventTarget | null): boolean {
   return target instanceof Element
     && target.matches('textarea, input, [contenteditable="true"], .excalidraw-wysiwyg')
-}
-
-function plainClipboardText(event: ClipboardEvent): string | null {
-  if (!event.clipboardData || event.clipboardData.files.length > 0) return null
-  const text = event.clipboardData.getData('text/plain')
-  if (!text || isSerializedDrawingClipboardText(text)) return null
-  return text
 }
 
 function insertLiteralText(target: EventTarget | null, text: string): boolean {
@@ -829,28 +823,33 @@ export function DrawingBoardCore({
       if (isScoped(event.target) && shouldBlockDrawingBoardKeyboardEvent(event)) stop(event)
     }
     const clipboardWrite = (event: ClipboardEvent) => {
-      if (isScoped(event.target) && !isTextEditor(event.target)) stop(event)
+      if (
+        isScoped(event.target)
+        && shouldBlockDrawingBoardSurfaceEvent({
+          kind: event.type as 'copy' | 'cut',
+          textEditing: isTextEditor(event.target),
+        })
+      ) stop(event)
     }
     const paste = (event: ClipboardEvent) => {
       if (!isScoped(event.target)) return
-      const text = plainClipboardText(event)
-      if (isTextEditor(event.target)) {
-        stop(event)
-        if (text !== null) insertLiteralText(event.target, text)
-        return
-      }
       const api = apiRef.current
-      if (
-        !api
-        || api.getAppState().activeTool.type !== 'text'
-        || text === null
-        || viewModeEnabledRef.current
-        || contentEditingLockedRef.current
-      ) {
-        stop(event)
+      const text = event.clipboardData?.getData('text/plain') ?? ''
+      const decision = drawingBoardPasteDecision({
+        hasClipboardData: Boolean(event.clipboardData),
+        fileCount: event.clipboardData?.files.length ?? 0,
+        text,
+        textEditing: isTextEditor(event.target),
+        activeTool: api?.getAppState().activeTool.type ?? null,
+        viewModeEnabled: viewModeEnabledRef.current,
+        contentEditingLocked: contentEditingLockedRef.current,
+      })
+      stop(event)
+      if (decision === 'literal-text-editor') {
+        insertLiteralText(event.target, text)
         return
       }
-      stop(event)
+      if (decision !== 'literal-canvas-text' || !api) return
       const rect = surface.getBoundingClientRect()
       const state = api.getAppState()
       const point = viewportCoordsToSceneCoords(
@@ -864,10 +863,18 @@ export function DrawingBoardCore({
       })
     }
     const denyTransfer = (event: Event) => {
-      if (isScoped(event.target)) stop(event)
+      if (
+        isScoped(event.target)
+        && shouldBlockDrawingBoardSurfaceEvent({
+          kind: event.type as 'dragover' | 'drop',
+        })
+      ) stop(event)
     }
     const denyContext = (event: MouseEvent) => {
-      if (targetInside(surface, event.target)) stop(event)
+      if (
+        targetInside(surface, event.target)
+        && shouldBlockDrawingBoardSurfaceEvent({ kind: 'contextmenu' })
+      ) stop(event)
     }
     const denyControl = (event: Event) => {
       if (

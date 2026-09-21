@@ -41,6 +41,10 @@ import type { Question } from '@/lib/types'
 import type { TeachingBoardOperation, TeachingBoardView } from '@/lib/math-work'
 import type { ScratchpadScene } from '@/lib/scratchpad'
 import type { FingerInputMode } from '@/lib/drawing-board-input'
+import {
+  MAX_DRAWING_SESSION_LIBRARY_ITEMS,
+  type DrawingBoardSessionLibraryItem,
+} from '@/lib/drawing-board-session-library'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { drawingBackgroundStyle } from '@/components/exam/drawing-board-utils'
 import {
@@ -543,6 +547,10 @@ export function TeachingModeClient({
   const [presentationLocked, setPresentationLocked] = useState(false)
   const [gridEnabled, setGridEnabled] = useState(false)
   const [snapEnabled, setSnapEnabled] = useState(false)
+  // Deliberately owned by this route component: it survives board/question
+  // remounts, but is never written to browser storage or the server and is
+  // discarded automatically when the teaching route unmounts.
+  const [sessionLibraryItems, setSessionLibraryItems] = useState<DrawingBoardSessionLibraryItem[]>([])
   const [imageRequest, setImageRequest] = useState<{ questionId: string; url: string; nonce: number } | null>(null)
   const imageRequestNonceRef = useRef(0)
   const [slotChoice, setSlotChoice] = useState<{
@@ -1532,6 +1540,16 @@ export function TeachingModeClient({
                         onGridEnabledChange={setGridEnabled}
                         snapEnabled={snapEnabled}
                         onSnapEnabledChange={setSnapEnabled}
+                        sessionLibraryItems={sessionLibraryItems}
+                        onSessionLibraryItemAdd={item => {
+                          setSessionLibraryItems(current => [
+                            ...current.slice(-(MAX_DRAWING_SESSION_LIBRARY_ITEMS - 1)),
+                            item,
+                          ])
+                        }}
+                        onSessionLibraryItemRemove={itemId => {
+                          setSessionLibraryItems(current => current.filter(item => item.id !== itemId))
+                        }}
                         onHide={hideBoard}
                       />
                     ) : (

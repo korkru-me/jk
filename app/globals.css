@@ -502,3 +502,11 @@
 .drawing-board-policy .context-menu {
   display: none !important;
 }
+
+/* The app-owned toolbar already labels every available command. Excalidraw's
+   native HintViewer is English-only in the Thai surface and can overlap our
+   scrollable command rows, so it must not become a second, low-contrast help
+   channel when native controls are hidden. */
+.drawing-board-app-controls .HintViewer {
+  display: none !important;
+}

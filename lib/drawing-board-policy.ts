@@ -945,3 +945,44 @@ export function isSerializedDrawingClipboardText(text: string): boolean {
     return false
   }
 }
+
+export type DrawingBoardPasteDecision = 'blocked' | 'literal-text-editor' | 'literal-canvas-text'
+
+/**
+ * One fail-closed paste decision shared by the capture handler and tests.
+ *
+ * Clipboard files and serialized Excalidraw payloads never reach the editor.
+ * Literal text is accepted only while the board can be edited and either its
+ * text tool or an existing text editor owns the paste.
+ */
+export function drawingBoardPasteDecision(input: {
+  hasClipboardData: boolean
+  fileCount: number
+  text: string
+  textEditing: boolean
+  activeTool: string | null
+  viewModeEnabled: boolean
+  contentEditingLocked: boolean
+}): DrawingBoardPasteDecision {
+  if (
+    !input.hasClipboardData
+    || input.fileCount > 0
+    || !input.text
+    || isSerializedDrawingClipboardText(input.text)
+    || input.viewModeEnabled
+    || input.contentEditingLocked
+  ) return 'blocked'
+  if (input.textEditing) return 'literal-text-editor'
+  return input.activeTool === 'text' ? 'literal-canvas-text' : 'blocked'
+}
+
+export type DrawingBoardSurfaceEventKind = 'copy' | 'cut' | 'dragover' | 'drop' | 'contextmenu'
+
+/** Runtime event matrix for native ingress/egress paths around the canvas. */
+export function shouldBlockDrawingBoardSurfaceEvent(input: {
+  kind: DrawingBoardSurfaceEventKind
+  textEditing?: boolean
+}): boolean {
+  if (input.kind === 'copy' || input.kind === 'cut') return !input.textEditing
+  return true
+}

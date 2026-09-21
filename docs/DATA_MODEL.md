@@ -138,6 +138,8 @@ Local-only scratch scene ไม่ใช่ row ในฐานข้อมู�
 
 Draft ของครูใน drawing-board เฟส 6 ก็ไม่ใช่ row ใหม่: route เก็บ scene/state/dirty ต่อ exact `{questionId, slot, boardId}` ใน memory จนกดบันทึก explicit เท่านั้น และเก็บ one-step recovery ฉบับเดียวใน memory ก่อน reset/โหลดช่องอื่น/ลบหรือแทน active draft; restore ใช้ได้ครั้งเดียว ไม่มี undo history และ route unmount เป็นจุดจบ จึงไม่เปลี่ยน `teaching_boards`, Storage path หรือ server authority เดิม
 
+Session Library ของครูใน drawing-board เฟส 7 ก็ไม่ใช่ row/file/local record: teaching route เก็บเฉพาะ vector/text item ที่ sanitize + validate แล้วใน React memory สูงสุด 12 รายการ และล้างทั้งหมดเมื่อ route unmount ไม่มี table, column, IndexedDB store, localStorage key หรือ Storage path ใหม่ และ item ไม่ใช่ authority หรือ saved board
+
 หลัง submit ห้ามแก้ artifact ของนักเรียน Attempt ใหม่ไม่แก้หรือย้ายหลักฐานจาก attempt เก่า ส่วน `submission_answers.work_images` รุ่นเก่ายังคงเป็น source ที่อ่านได้เพื่อ backward compatibility
 
 เฟส 7 ไม่มีตารางใหม่ Scheduled cleanup อ่าน object metadata จาก private Storage และตรวจ candidate path กับ `student_work_artifacts`/`teaching_boards` โดยตรงก่อนลบ จึงไม่เก็บ scene, path audit หรือ cron payload ซ้ำในฐานข้อมูล

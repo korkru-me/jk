@@ -1,0 +1,161 @@
+{
+  "formatVersion": 1,
+  "fixtures": [
+    {
+      "name": "empty-blank",
+      "role": "student",
+      "coverage": ["empty", "background-blank"],
+      "scene": { "formatVersion": 1, "elements": [], "appState": {}, "files": {}, "background": "blank" }
+    },
+    {
+      "name": "empty-lined",
+      "role": "student",
+      "coverage": ["background-lined"],
+      "scene": { "formatVersion": 1, "elements": [], "appState": {}, "files": {}, "background": "lined" }
+    },
+    {
+      "name": "empty-grid",
+      "role": "student",
+      "coverage": ["background-grid"],
+      "scene": { "formatVersion": 1, "elements": [], "appState": {}, "files": {}, "background": "grid" }
+    },
+    {
+      "name": "empty-dots",
+      "role": "student",
+      "coverage": ["background-dots"],
+      "scene": { "formatVersion": 1, "elements": [], "appState": {}, "files": {}, "background": "dots" }
+    },
+    {
+      "name": "freehand-highlighter",
+      "role": "student",
+      "coverage": ["freehand", "highlighter"],
+      "scene": {
+        "formatVersion": 1,
+        "elements": [
+          {
+            "id": "freehand-ink", "type": "freedraw", "x": 10, "y": 20, "width": 120, "height": 40,
+            "angle": 0, "strokeColor": "#172554", "backgroundColor": "transparent", "fillStyle": "hachure",
+            "strokeWidth": 2, "strokeStyle": "solid", "roundness": null, "roughness": 0, "opacity": 100,
+            "seed": 1, "version": 1, "versionNonce": 11, "index": null, "isDeleted": false, "link": null,
+            "groupIds": [], "frameId": null, "boundElements": null, "updated": 1, "locked": false,
+            "points": [[0, 0], [60, 20], [120, 40]], "pressures": [0.2, 0.5, 0.3],
+            "simulatePressure": false, "lastCommittedPoint": null
+          },
+          {
+            "id": "freehand-highlight", "type": "freedraw", "x": 15, "y": 80, "width": 130, "height": 8,
+            "angle": 0, "strokeColor": "#facc15", "backgroundColor": "transparent", "fillStyle": "hachure",
+            "strokeWidth": 4, "strokeStyle": "solid", "roundness": null, "roughness": 0, "opacity": 35,
+            "seed": 2, "version": 1, "versionNonce": 12, "index": null, "isDeleted": false, "link": null,
+            "groupIds": [], "frameId": null, "boundElements": null, "updated": 1, "locked": false,
+            "points": [[0, 0], [65, 4], [130, 8]], "pressures": [0, 0, 0],
+            "simulatePressure": true, "lastCommittedPoint": null
+          }
+        ],
+        "appState": { "currentItemStrokeColor": "#172554", "currentItemStrokeWidth": 2, "currentItemOpacity": 100 },
+        "files": {},
+        "background": "lined"
+      }
+    },
+    {
+      "name": "bilingual-text",
+      "role": "student",
+      "coverage": ["text-thai", "text-english"],
+      "scene": {
+        "formatVersion": 1,
+        "elements": [
+          {
+            "id": "text-th-en", "type": "text", "x": 30, "y": 40, "width": 240, "height": 52,
+            "angle": 0, "strokeColor": "#172554", "backgroundColor": "transparent", "fillStyle": "hachure",
+            "strokeWidth": 2, "strokeStyle": "solid", "roundness": null, "roughness": 0, "opacity": 100,
+            "seed": 3, "version": 1, "versionNonce": 13, "index": null, "isDeleted": false, "link": null,
+            "groupIds": [], "frameId": null, "boundElements": null, "updated": 1, "locked": false,
+            "text": "แรงลัพธ์ = net force", "originalText": "แรงลัพธ์ = net force", "fontSize": 20,
+            "fontFamily": 1, "textAlign": "left", "verticalAlign": "top", "containerId": null,
+            "autoResize": true, "lineHeight": 1.25
+          }
+        ],
+        "appState": { "currentItemFontFamily": 1, "currentItemFontSize": 20, "currentItemTextAlign": "left" },
+        "files": {},
+        "background": "blank"
+      }
+    },
+    {
+      "name": "line-and-shapes",
+      "role": "student",
+      "coverage": ["line", "shape"],
+      "scene": {
+        "formatVersion": 1,
+        "elements": [
+          {
+            "id": "shape-rectangle", "type": "rectangle", "x": 40, "y": 50, "width": 140, "height": 90,
+            "angle": 0, "strokeColor": "#172554", "backgroundColor": "transparent", "fillStyle": "hachure",
+            "strokeWidth": 2, "strokeStyle": "solid", "roundness": { "type": 3 }, "roughness": 0, "opacity": 100,
+            "seed": 4, "version": 1, "versionNonce": 14, "index": null, "isDeleted": false, "link": null,
+            "groupIds": [], "frameId": null, "boundElements": null, "updated": 1, "locked": false
+          },
+          {
+            "id": "line-diagonal", "type": "line", "x": 210, "y": 60, "width": 120, "height": 80,
+            "angle": 0, "strokeColor": "#991b1b", "backgroundColor": "transparent", "fillStyle": "hachure",
+            "strokeWidth": 2, "strokeStyle": "solid", "roundness": null, "roughness": 0, "opacity": 100,
+            "seed": 5, "version": 1, "versionNonce": 15, "index": null, "isDeleted": false, "link": null,
+            "groupIds": [], "frameId": null, "boundElements": null, "updated": 1, "locked": false,
+            "points": [[0, 0], [120, 80]], "lastCommittedPoint": null, "startBinding": null, "endBinding": null,
+            "startArrowhead": null, "endArrowhead": null
+          }
+        ],
+        "appState": {},
+        "files": {},
+        "background": "grid"
+      }
+    },
+    {
+      "name": "deleted-history",
+      "role": "student",
+      "coverage": ["deleted-element"],
+      "scene": {
+        "formatVersion": 1,
+        "elements": [
+          {
+            "id": "deleted-shape", "type": "ellipse", "x": 5, "y": 5, "width": 80, "height": 80,
+            "angle": 0, "strokeColor": "#172554", "backgroundColor": "transparent", "fillStyle": "hachure",
+            "strokeWidth": 2, "strokeStyle": "solid", "roundness": null, "roughness": 0, "opacity": 100,
+            "seed": 6, "version": 2, "versionNonce": 16, "index": null, "isDeleted": true, "link": null,
+            "groupIds": [], "frameId": null, "boundElements": null, "updated": 2, "locked": false
+          }
+        ],
+        "appState": {},
+        "files": {},
+        "background": "dots"
+      }
+    },
+    {
+      "name": "teacher-question-image",
+      "role": "teacher",
+      "coverage": ["teacher-question-image"],
+      "scene": {
+        "formatVersion": 1,
+        "elements": [
+          {
+            "id": "question-image", "type": "image", "x": 20, "y": 30, "width": 200, "height": 120,
+            "angle": 0, "strokeColor": "transparent", "backgroundColor": "transparent", "fillStyle": "hachure",
+            "strokeWidth": 1, "strokeStyle": "solid", "roundness": null, "roughness": 0, "opacity": 100,
+            "seed": 7, "version": 1, "versionNonce": 17, "index": null, "isDeleted": false, "link": null,
+            "groupIds": [], "frameId": null, "boundElements": null, "updated": 1, "locked": false,
+            "fileId": "question-file", "status": "saved", "scale": [1, 1], "crop": null
+          }
+        ],
+        "appState": {},
+        "files": {
+          "question-file": {
+            "id": "question-file",
+            "dataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+            "mimeType": "image/png",
+            "created": 1,
+            "korkruQuestionImage": { "version": 1, "claim": "phase-7-current-question-claim-fixture" }
+          }
+        },
+        "background": "lined"
+      }
+    }
+  ]
+}

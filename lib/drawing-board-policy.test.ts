@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createLegacyTeacherImageSnapshot,
+  drawingBoardPasteDecision,
   isDrawingBoardCommandAllowed,
   isDrawingBoardToolAllowed,
   isIncompleteTransientDrawingElement,
@@ -9,6 +10,7 @@ import {
   referencedDrawingFiles,
   snapshotDrawingScene,
   shouldBlockDrawingBoardShortcut,
+  shouldBlockDrawingBoardSurfaceEvent,
   validateDrawingScene,
   type DrawingBoardCommand,
 } from '@/lib/drawing-board-policy'
@@ -574,5 +576,51 @@ describe('native entry point decisions', () => {
     expect(isSerializedDrawingClipboardText('{"elements":[]}')).toBe(true)
     expect(isSerializedDrawingClipboardText('graph TD; A-->B')).toBe(false)
     expect(isSerializedDrawingClipboardText('ข้อความไทย')).toBe(false)
+  })
+
+  it.each([
+    ['literal text in an active text editor', {
+      hasClipboardData: true, fileCount: 0, text: 'ข้อความไทย', textEditing: true,
+      activeTool: 'selection', viewModeEnabled: false, contentEditingLocked: false,
+    }, 'literal-text-editor'],
+    ['literal text with the canvas text tool', {
+      hasClipboardData: true, fileCount: 0, text: 'A --> B', textEditing: false,
+      activeTool: 'text', viewModeEnabled: false, contentEditingLocked: false,
+    }, 'literal-canvas-text'],
+    ['literal text with a drawing tool', {
+      hasClipboardData: true, fileCount: 0, text: 'A --> B', textEditing: false,
+      activeTool: 'freedraw', viewModeEnabled: false, contentEditingLocked: false,
+    }, 'blocked'],
+    ['an Excalidraw clipboard', {
+      hasClipboardData: true, fileCount: 0,
+      text: '{"type":"excalidraw/clipboard","elements":[]}', textEditing: false,
+      activeTool: 'text', viewModeEnabled: false, contentEditingLocked: false,
+    }, 'blocked'],
+    ['a file clipboard', {
+      hasClipboardData: true, fileCount: 1, text: 'รูป', textEditing: false,
+      activeTool: 'text', viewModeEnabled: false, contentEditingLocked: false,
+    }, 'blocked'],
+    ['literal text while presentation lock is on', {
+      hasClipboardData: true, fileCount: 0, text: 'ห้ามแก้', textEditing: true,
+      activeTool: 'text', viewModeEnabled: false, contentEditingLocked: true,
+    }, 'blocked'],
+    ['literal text on a read-only board', {
+      hasClipboardData: true, fileCount: 0, text: 'ห้ามแก้', textEditing: true,
+      activeTool: 'text', viewModeEnabled: true, contentEditingLocked: false,
+    }, 'blocked'],
+  ])('classifies paste ingress: %s', (_name, input, expected) => {
+    expect(drawingBoardPasteDecision(input)).toBe(expected)
+  })
+
+  it.each([
+    ['drop', false, true],
+    ['dragover', false, true],
+    ['contextmenu', false, true],
+    ['copy', false, true],
+    ['cut', false, true],
+    ['copy', true, false],
+    ['cut', true, false],
+  ] as const)('applies the %s surface event rule when textEditing=%s', (kind, textEditing, blocked) => {
+    expect(shouldBlockDrawingBoardSurfaceEvent({ kind, textEditing })).toBe(blocked)
   })
 })

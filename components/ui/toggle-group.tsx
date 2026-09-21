@@ -27,6 +27,7 @@ function ToggleGroup({
   spacing = 2,
   orientation = "horizontal",
   children,
+  render,
   ...props
 }: ToggleGroupPrimitive.Props &
   VariantProps<typeof toggleVariants> & {
@@ -46,6 +47,17 @@ function ToggleGroup({
         className
       )}
       {...props}
+      // Base UI 1.4.1's composite root adds aria-orientation to a role=group,
+      // which is not a valid ARIA combination. Keep the arrow-key behavior
+      // and data-orientation while removing only that invalid attribute. The
+      // current Base UI docs likewise expose data-orientation, not this ARIA
+      // attribute, for ToggleGroup.
+      render={(renderProps, state) => {
+        const { "aria-orientation": _ariaOrientation, ...safeProps } = renderProps
+        if (typeof render === "function") return render(safeProps, state)
+        if (React.isValidElement(render)) return React.cloneElement(render, safeProps)
+        return <div {...safeProps} />
+      }}
     >
       <ToggleGroupContext.Provider
         value={{ variant, size, spacing, orientation }}
