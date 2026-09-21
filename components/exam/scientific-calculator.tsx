@@ -13,7 +13,11 @@ import {
   type MathInputEditResult,
 } from '@/lib/math/input-edit'
 import {
+  calculatorDisplayIndexFromExpression,
+  calculatorExpressionIndexFromDisplay,
+  editCalculatorExpressionFromDisplay,
   evaluateCalculatorExpression,
+  formatCalculatorExpression,
   type CalculatorEvaluation,
 } from '@/lib/math/calculator'
 import { useMathCaret } from '@/hooks/use-math-caret'
@@ -86,13 +90,21 @@ export default function ScientificCalculator({
 
   if (!open || typeof document === 'undefined') return null
 
-  const selection = () => caret.read(expression)
+  const displayExpression = formatCalculatorExpression(expression)
+
+  const selection = () => {
+    const range = caret.read(displayExpression)
+    return {
+      start: calculatorExpressionIndexFromDisplay(expression, range.start),
+      end: calculatorExpressionIndexFromDisplay(expression, range.end),
+    }
+  }
 
   const apply = (edit: MathInputEditResult) => {
     setExpression(edit.value)
     setEvaluation(null)
     setJustEvaluated(false)
-    caret.restore(edit.cursor)
+    caret.restore(calculatorDisplayIndexFromExpression(edit.value, edit.cursor))
   }
 
   const insert = (text: string, kind: 'number' | 'operator' | 'constant' = 'number', cursorOffset?: number) => {
@@ -151,6 +163,16 @@ export default function ScientificCalculator({
     apply(backspaceMathInput(expression, range.start, range.end))
   }
 
+  const deleteForward = () => {
+    const range = selection()
+    if (range.start !== range.end) {
+      apply(insertMathText(expression, range.start, range.end, ''))
+      return
+    }
+    if (range.start >= expression.length) return
+    apply(insertMathText(expression, range.start, range.start + 1, ''))
+  }
+
   const clear = () => {
     setExpression('')
     setEvaluation(null)
@@ -177,7 +199,7 @@ export default function ScientificCalculator({
     setJustEvaluated(true)
     setShowHistory(false)
     onModeChange(entry.mode)
-    caret.restore(entry.expression.length)
+    caret.restore(calculatorDisplayIndexFromExpression(entry.expression, entry.expression.length))
   }
 
   const trig = inverse
@@ -249,8 +271,8 @@ export default function ScientificCalculator({
               className="h-auto w-full justify-between gap-3 px-2 py-1 text-left font-mono text-xs pointer-coarse:min-h-11"
               onClick={() => recall(entry)}
             >
-              <span className="truncate">{entry.expression}</span>
-              <span className="shrink-0 text-primary">= {entry.result}</span>
+              <span className="truncate">{formatCalculatorExpression(entry.expression)}</span>
+              <span className="shrink-0 text-primary">= {formatCalculatorExpression(entry.result)}</span>
             </Button>
           ))}
         </div>
@@ -259,7 +281,7 @@ export default function ScientificCalculator({
       <div className="space-y-2 p-3">
         <Input
           ref={inputRef}
-          value={expression}
+          value={displayExpression}
           maxLength={1_000}
           // The calculator supplies every supported symbol in its own keypad.
           // Keep iOS/iPadOS from stacking the system keyboard on top of it;
@@ -272,12 +294,19 @@ export default function ScientificCalculator({
           className="h-10 text-right font-mono"
           {...caret.inputProps}
           onChange={event => {
-            setExpression(event.target.value)
-            setEvaluation(null)
-            setJustEvaluated(false)
-            caret.remember()
+            apply(editCalculatorExpressionFromDisplay(expression, event.target.value))
           }}
           onKeyDown={event => {
+            if (event.key === 'Backspace') {
+              event.preventDefault()
+              backspace()
+              return
+            }
+            if (event.key === 'Delete') {
+              event.preventDefault()
+              deleteForward()
+              return
+            }
             if (event.key === 'Enter') {
               event.preventDefault()
               evaluate()
@@ -293,7 +322,7 @@ export default function ScientificCalculator({
             }`}
             aria-live="polite"
           >
-            {evaluation?.ok ? evaluation.display : evaluation?.error ?? '—'}
+            {evaluation?.ok ? formatCalculatorExpression(evaluation.display) : evaluation?.error ?? '—'}
           </span>
         </div>
 
