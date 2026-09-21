@@ -1,21 +1,19 @@
 'use client'
 
-import '@excalidraw/excalidraw/index.css'
-import { CaptureUpdateAction, convertToExcalidrawElements, Excalidraw, MainMenu } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, convertToExcalidrawElements } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
   BinaryFileData,
   BinaryFiles,
-  DataURL,
   ExcalidrawImperativeAPI,
 } from '@excalidraw/excalidraw/types'
-import type { FileId } from '@excalidraw/excalidraw/element/types'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Eraser, Highlighter, ImagePlus, Loader2, Maximize2, PanelRightClose, PenLine, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { DrawingBoardCore } from '@/components/drawing-board/drawing-board-core'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   clampStrokeWidth,
@@ -33,16 +31,25 @@ import {
 import {
   CURRENT_WORK_FORMAT_VERSION,
   MATH_WORK_BUCKET,
+  type TeachingBoardOperation,
   type TeachingBoardView,
 } from '@/lib/math-work'
-import { downscaleImage } from '@/lib/image-downscale'
+import {
+  initialHandledTeachingBoardOperationNonce,
+  isTeachingBoardOperationPending,
+} from '@/lib/teaching-board-lifecycle'
 import {
   emptyScratchpadScene,
-  isScratchpadSceneWithinLimits,
-  sanitizeScratchpadScene,
   type ScratchpadBackground,
   type ScratchpadScene,
 } from '@/lib/scratchpad'
+import {
+  createLegacyTeacherImageSnapshot,
+  isIncompleteTransientDrawingElement,
+  snapshotDrawingScene,
+  validateDrawingScene,
+  type LegacyTeacherImageSnapshot,
+} from '@/lib/drawing-board-policy'
 
 interface Props {
   assignmentId: string
@@ -52,12 +59,16 @@ interface Props {
   slot: number
   board: TeachingBoardView | null
   canManage: boolean
-  loadNonce: number
-  resetNonce: number
+  operation: TeachingBoardOperation
   /** What was on this ข้อ's board when the teacher last left it. */
   initialScene?: ScratchpadScene | null
   initialDirty?: boolean
-  onSaved: (slot: number) => Promise<void>
+  onSaved: (
+    questionId: string,
+    slot: number,
+    boardId: string,
+    expectedTarget: { slot: number; boardId: string | null },
+  ) => Promise<void>
   onDirtyChange: (dirty: boolean) => void
   /** Reports the live scene so the ข้อ can be returned to as it was left. */
   onSceneChange?: (scene: ScratchpadScene) => void
@@ -70,6 +81,7 @@ interface Props {
   onResolveSaveSlot?: () => Promise<{ slot: number; replacing: boolean } | null>
   /** A รูปประกอบโจทย์ the teacher asked to drop onto this board. */
   insertImage?: { url: string; nonce: number } | null
+  onInsertImageHandled?: (nonce: number) => void
   /** Given when the board can be put away. */
   onHide?: () => void
 }
@@ -89,6 +101,14 @@ function contentSignature(elements: readonly OrderedExcalidrawElement[]): string
   return elements.map(element => `${element.id}:${element.version}:${element.isDeleted ? 1 : 0}`).join('|')
 }
 
+function validateStoredTeacherScene(value: unknown) {
+  return validateDrawingScene(value, {
+    role: 'teacher',
+    verifyTeacherImage: ({ claim }) => claim ? 'valid' : 'invalid',
+    allowUnsignedTeacherImages: true,
+  })
+}
+
 export default function TeachingBoardEditor({
   assignmentId,
   questionId,
@@ -96,8 +116,7 @@ export default function TeachingBoardEditor({
   slot,
   board,
   canManage,
-  loadNonce,
-  resetNonce,
+  operation,
   initialScene,
   initialDirty = false,
   onSaved,
@@ -106,30 +125,83 @@ export default function TeachingBoardEditor({
   questionImages = [],
   onResolveSaveSlot,
   insertImage,
+  onInsertImageHandled,
   onHide,
 }: Props) {
+  const initialValidation = useMemo(
+    () => initialScene ? validateStoredTeacherScene(initialScene) : null,
+    [initialScene],
+  )
+  const safeInitialScene = initialValidation?.ok ? initialValidation.scene : emptyScratchpadScene()
+  const initialPolicyMessage = initialValidation && !initialValidation.ok
+    ? 'กระดานฉบับนี้มีข้อมูลที่เวอร์ชันปัจจุบันยังไม่รองรับ จึงเก็บฉบับเดิมไว้และไม่เปิดให้แก้ไข'
+    : null
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
+  const mountedRef = useRef(true)
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   const paperRef = useRef<HTMLDivElement | null>(null)
-  const sceneRef = useRef<ScratchpadScene>(initialScene ?? emptyScratchpadScene())
+  const loadRequestRef = useRef(0)
+  const sceneMutationEpochRef = useRef(0)
+  const savingRef = useRef(false)
+  const releasePersistenceOnReadyRef = useRef(false)
+  const sceneRef = useRef<ScratchpadScene>(safeInitialScene)
   const contentSignatureRef = useRef(
-    initialScene ? contentSignature(initialScene.elements as readonly OrderedExcalidrawElement[]) : '',
+    contentSignature(safeInitialScene.elements as readonly OrderedExcalidrawElement[]),
+  )
+  const handledOperationRef = useRef(initialHandledTeachingBoardOperationNonce({
+    operation,
+    questionId,
+    slot,
+    hasValidParkedScene: Boolean(initialScene && initialValidation?.ok),
+  }))
+  // A matching load/reset must block in the very first render after the
+  // parent switches targets. Waiting for the passive effect below leaves one
+  // paint where the old scene can still be edited or saved under the new id.
+  const operationPending = isTeachingBoardOperationPending({
+    operation,
+    handledNonce: handledOperationRef.current,
+    questionId,
+    slot,
+  })
+  const persistenceBlockedRef = useRef(
+    Boolean(initialPolicyMessage) || !initialValidation?.ok || operationPending,
+  )
+  const legacyTeacherImagesRef = useRef<LegacyTeacherImageSnapshot | null>(
+    createLegacyTeacherImageSnapshot(safeInitialScene),
   )
   const ignoreChangesRef = useRef(true)
-  const handledLoadRef = useRef(0)
-  const handledResetRef = useRef(0)
-  const [background, setBackground] = useState<ScratchpadBackground>(initialScene?.background ?? 'lined')
+  const [background, setBackground] = useState<ScratchpadBackground>(safeInitialScene.background)
   const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
   const [toolsHidden, setToolsHidden] = useState(false)
   const [insertingImage, setInsertingImage] = useState(false)
   const [pickingImage, setPickingImage] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [apiReady, setApiReady] = useState(false)
+  const [sceneReady, setSceneReady] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [policyReadOnlyMessage, setPolicyReadOnlyMessage] = useState<string | null>(initialPolicyMessage)
+  const [editorScene, setEditorScene] = useState<ScratchpadScene>(safeInitialScene)
+  const [editorRevision, setEditorRevision] = useState(0)
   const [confirm, confirmDialog] = useConfirm()
 
-  const editable = canManage && (!board || board.editable)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      loadRequestRef.current += 1
+      apiRef.current = null
+    }
+  }, [])
+
+  const editable = canManage
+    && (!board || board.editable)
+    && !policyReadOnlyMessage
+    && !loading
+    && !saving
+    && sceneReady
+    && !operationPending
+  const canReset = canManage && (!board || board.editable)
 
   const markDirty = useCallback((next: boolean) => {
     setDirty(next)
@@ -140,82 +212,109 @@ export default function TeachingBoardEditor({
     requestAnimationFrame(() => { ignoreChangesRef.current = false })
   }
 
-  const resetCanvas = useCallback((dirtyAfterReset = false) => {
-    const api = apiRef.current
-    if (!api) return
+  const showSafeReadOnlyPlaceholder = useCallback((message: string) => {
+    persistenceBlockedRef.current = true
+    releasePersistenceOnReadyRef.current = false
+    setSceneReady(false)
+    setPolicyReadOnlyMessage(message)
     ignoreChangesRef.current = true
-    api.resetScene()
-    api.updateScene({
-      appState: { ...DRAWING_DEFAULT_ITEM_STATE, viewBackgroundColor: TRANSPARENT_CANVAS },
-      captureUpdate: CaptureUpdateAction.NEVER,
-    })
-    setStrokeWidth(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
-    api.setActiveTool({ type: 'freedraw', locked: true })
-    api.history.clear()
     const scene = emptyScratchpadScene()
     sceneRef.current = scene
+    legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
+    contentSignatureRef.current = ''
+    setBackground('lined')
+    setEditorScene(scene)
+    setEditorRevision(value => value + 1)
+    markDirty(false)
+  }, [markDirty])
+
+  const resetCanvas = useCallback((dirtyAfterReset = false) => {
+    loadRequestRef.current += 1
+    sceneMutationEpochRef.current += 1
+    setLoading(false)
+    setSceneReady(false)
+    persistenceBlockedRef.current = true
+    releasePersistenceOnReadyRef.current = true
+    ignoreChangesRef.current = true
+    setStrokeWidth(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
+    const scene = emptyScratchpadScene()
+    sceneRef.current = scene
+    legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
     contentSignatureRef.current = ''
     setBackground(scene.background)
+    setPolicyReadOnlyMessage(null)
+    setEditorScene(scene)
+    setEditorRevision(value => value + 1)
+    onSceneChange?.(scene)
     markDirty(dirtyAfterReset)
-    releaseChangeGuard()
-  }, [markDirty])
+  }, [markDirty, onSceneChange])
 
   const loadBoardScene = useCallback(async () => {
     if (!board || !apiRef.current) return
+    const requestId = ++loadRequestRef.current
+    persistenceBlockedRef.current = true
+    releasePersistenceOnReadyRef.current = false
+    setSceneReady(false)
     setLoading(true)
     try {
-      let sceneUrl = board.sceneUrl
-      let response = sceneUrl ? await fetch(sceneUrl, { cache: 'no-store' }) : null
-      if (!response?.ok) {
-        const { getTeachingBoards } = await import('@/lib/actions/math-work')
-        const refreshed = await getTeachingBoards(assignmentId, questionId)
-        if (!refreshed || 'error' in refreshed) throw new Error(refreshed?.error ?? 'เปิดกระดานสอนไม่สำเร็จ')
-        sceneUrl = refreshed.boards.find(item => item.id === board.id)?.sceneUrl ?? null
-        response = sceneUrl ? await fetch(sceneUrl, { cache: 'no-store' }) : null
+      const { getTeachingBoardScene } = await import('@/lib/actions/math-work')
+      if (requestId !== loadRequestRef.current) return
+      const loaded = await getTeachingBoardScene(board.id)
+      if (requestId !== loadRequestRef.current) return
+      if (!loaded || 'error' in loaded) throw new Error(loaded?.error ?? 'เปิดกระดานสอนไม่สำเร็จ')
+      const validated = validateStoredTeacherScene(loaded.scene)
+      if (!validated.ok) {
+        throw new Error('รูปแบบกระดานสอนไม่รองรับ')
       }
-      if (!response?.ok) throw new Error('เปิดไฟล์ต้นฉบับของกระดานไม่สำเร็จ')
-      const scene = sanitizeScratchpadScene(await response.json())
-      if (!scene || !isScratchpadSceneWithinLimits(scene)) throw new Error('รูปแบบกระดานสอนไม่รองรับ')
+      const scene = validated.scene
 
-      const api = apiRef.current
+      if (requestId !== loadRequestRef.current) return
       ignoreChangesRef.current = true
       contentSignatureRef.current = contentSignature(scene.elements as readonly OrderedExcalidrawElement[])
-      api.resetScene()
-      api.updateScene({
-        elements: scene.elements as readonly OrderedExcalidrawElement[],
-        appState: {
-          ...DRAWING_DEFAULT_ITEM_STATE,
-          ...scene.appState,
-          viewBackgroundColor: TRANSPARENT_CANVAS,
-        } as AppState,
-        captureUpdate: CaptureUpdateAction.NEVER,
-      })
-      api.addFiles(Object.values(scene.files) as BinaryFileData[])
-      api.history.clear()
-      if (board.editable) api.setActiveTool({ type: 'freedraw', locked: true })
       sceneRef.current = scene
+      sceneMutationEpochRef.current += 1
+      legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
+      releasePersistenceOnReadyRef.current = true
+      setPolicyReadOnlyMessage(null)
       setBackground(scene.background)
+      setEditorScene(scene)
+      setEditorRevision(value => value + 1)
+      onSceneChange?.(scene)
       markDirty(false)
-      releaseChangeGuard()
-      toast.success(board.editable ? `เปิดกระดานช่อง ${board.slot} แล้ว` : `เปิดกระดานของ ${board.creatorName} แล้ว`)
+      toast.success(loaded.legacySvgRasterized
+        ? 'เปิดกระดานแล้ว · แปลงรูป SVG เดิมเป็นภาพปลอดภัยก่อนแก้ไข'
+        : board.editable ? `เปิดกระดานช่อง ${board.slot} แล้ว` : `เปิดกระดานของ ${board.creatorName} แล้ว`)
     } catch (error) {
+      if (requestId !== loadRequestRef.current) return
+      showSafeReadOnlyPlaceholder(
+        error instanceof Error && error.message === 'รูปแบบกระดานสอนไม่รองรับ'
+          ? 'กระดานฉบับนี้มีข้อมูลที่เวอร์ชันปัจจุบันยังไม่รองรับ ข้อมูลต้นฉบับยังเก็บอยู่และจะไม่ถูกเขียนทับ'
+          : 'เปิดกระดานฉบับนี้ไม่สำเร็จ จึงหยุดการแก้ไขและเก็บข้อมูลต้นฉบับไว้โดยไม่เขียนทับ',
+      )
       toast.error(error instanceof Error ? error.message : 'เปิดกระดานสอนไม่สำเร็จ')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestRef.current) setLoading(false)
     }
-  }, [assignmentId, board, markDirty, questionId])
+  }, [assignmentId, board, markDirty, onSceneChange, questionId, showSafeReadOnlyPlaceholder])
 
   useEffect(() => {
-    if (!apiReady || loadNonce <= 0 || handledLoadRef.current === loadNonce) return
-    handledLoadRef.current = loadNonce
-    void loadBoardScene()
-  }, [apiReady, loadBoardScene, loadNonce])
-
-  useEffect(() => {
-    if (!apiReady || resetNonce <= 0 || handledResetRef.current === resetNonce) return
-    handledResetRef.current = resetNonce
+    if (
+      operation.nonce <= 0
+      || handledOperationRef.current === operation.nonce
+      || operation.questionId !== questionId
+      || operation.slot !== slot
+    ) return
+    if (operation.kind === 'pending') return
+    if (operation.kind === 'load') {
+      if (!apiReady || !board || operation.boardId !== board.id) return
+      handledOperationRef.current = operation.nonce
+      void loadBoardScene()
+      return
+    }
+    if (board || operation.boardId !== null) return
+    handledOperationRef.current = operation.nonce
     resetCanvas(false)
-  }, [apiReady, resetCanvas, resetNonce])
+  }, [apiReady, board, loadBoardScene, operation, questionId, resetCanvas, slot])
 
   useEffect(() => {
     if (!apiReady) return
@@ -240,9 +339,11 @@ export default function TeachingBoardEditor({
     appState: AppState,
     files: BinaryFiles,
   ) => {
+    if (operationPending || persistenceBlockedRef.current) return
     const nextSignature = contentSignature(elements)
     const contentChanged = nextSignature !== contentSignatureRef.current
     contentSignatureRef.current = nextSignature
+    if (contentChanged) sceneMutationEpochRef.current += 1
     sceneRef.current = {
       formatVersion: CURRENT_WORK_FORMAT_VERSION,
       elements,
@@ -262,12 +363,14 @@ export default function TeachingBoardEditor({
     // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
     setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
     if (contentChanged && !ignoreChangesRef.current && editable) markDirty(true)
-  }, [background, editable, markDirty, onSceneChange])
+  }, [background, editable, markDirty, onSceneChange, operationPending])
 
   const chooseBackground = (next: ScratchpadBackground) => {
     if (!editable) return
+    sceneMutationEpochRef.current += 1
     setBackground(next)
     sceneRef.current = { ...sceneRef.current, background: next }
+    onSceneChange?.(sceneRef.current)
     markDirty(true)
   }
 
@@ -296,35 +399,32 @@ export default function TeachingBoardEditor({
    *
    * The picture is embedded rather than linked: the board is saved as one
    * scene file, and a link would break the day the question's image moves.
-   * That file is capped at 2 MiB, so it goes through the same downscaler the
-   * upload paths use before it becomes part of the scene.
+   * The server verifies that the URL belongs to this question, rasterizes it,
+   * strips metadata and returns a signed provenance claim with the file.
    */
-  const dropQuestionImage = useCallback(async (url: string) => {
+  const dropQuestionImage = useCallback(async (url: string): Promise<boolean> => {
     const api = apiRef.current
-    if (!api) return
+    if (!api || !editable || !sceneReady || persistenceBlockedRef.current || savingRef.current) return false
+    const boardEpoch = loadRequestRef.current
     setInsertingImage(true)
     try {
-      const response = await fetch(url, { cache: 'no-store' })
-      if (!response.ok) throw new Error('โหลดรูปจากโจทย์ไม่สำเร็จ')
-      const blob = await response.blob()
-      const shrunk = await downscaleImage(
-        new File([blob], 'question-image', { type: blob.type || 'image/png' }),
-        { maxEdge: 1200 },
-      )
-      const dataURL = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result))
-        reader.onerror = () => reject(new Error('อ่านไฟล์รูปไม่สำเร็จ'))
-        reader.readAsDataURL(shrunk)
+      const { prepareTeachingQuestionImage } = await import('@/lib/actions/math-work')
+      const prepared = await prepareTeachingQuestionImage({
+        assignmentId,
+        questionId,
+        sourceUrl: url,
       })
-      // Measured through an <img>, not createImageBitmap: that cannot decode
-      // an SVG, which Excalidraw itself is perfectly happy to draw.
-      const size = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-        const image = new Image()
-        image.onload = () => resolve({ width: image.naturalWidth || 800, height: image.naturalHeight || 600 })
-        image.onerror = () => reject(new Error('รูปประกอบโจทย์นี้เปิดไม่ได้'))
-        image.src = dataURL
-      })
+      // A question/slot switch or remount while the server rasterizes must not
+      // write into a detached editor or mark the new board dirty.
+      if (
+        apiRef.current !== api
+        || loadRequestRef.current !== boardEpoch
+        || persistenceBlockedRef.current
+        || savingRef.current
+      ) return true
+      if (!prepared || 'error' in prepared) {
+        throw new Error(prepared?.error ?? 'เตรียมรูปจากโจทย์ไม่สำเร็จ')
+      }
 
       const state = api.getAppState()
       const box = surfaceRef.current?.getBoundingClientRect()
@@ -333,23 +433,21 @@ export default function TeachingBoardEditor({
       const viewHeight = (box?.height ?? PAGE_HEIGHT) / zoom
       const fit = Math.min(
         1,
-        (viewWidth * 0.7) / size.width,
-        (viewHeight * 0.7) / size.height,
-        (PAGE_WIDTH * 0.8) / size.width,
+        (viewWidth * 0.7) / prepared.width,
+        (viewHeight * 0.7) / prepared.height,
+        (PAGE_WIDTH * 0.8) / prepared.width,
       )
-      const width = Math.round(size.width * fit)
-      const height = Math.round(size.height * fit)
+      const width = Math.round(prepared.width * fit)
+      const height = Math.round(prepared.height * fit)
 
-      const fileId = crypto.randomUUID() as FileId
-      api.addFiles([{
-        id: fileId,
-        dataURL: dataURL as DataURL,
-        mimeType: (shrunk.type || 'image/png') as BinaryFileData['mimeType'],
-        created: Date.now(),
-      }])
+      const fileId = prepared.file.id as BinaryFileData['id']
+      api.addFiles([prepared.file as unknown as BinaryFileData])
       api.updateScene({
         elements: [
-          ...api.getSceneElements(),
+          // Keep deleted tombstones: Excalidraw's eraser can leave a surviving
+          // binding pointed at one, and dropping history here would turn that
+          // valid inert edge into a dangling relation.
+          ...api.getSceneElementsIncludingDeleted(),
           ...convertToExcalidrawElements([{
             type: 'image',
             fileId,
@@ -368,14 +466,26 @@ export default function TeachingBoardEditor({
     } finally {
       setInsertingImage(false)
     }
-  }, [markDirty])
+    return true
+  }, [assignmentId, editable, markDirty, questionId, sceneReady])
 
   const handledInsertRef = useRef(0)
   useEffect(() => {
-    if (!apiReady || !editable || !insertImage || insertImage.nonce === handledInsertRef.current) return
+    if (
+      !apiReady
+      || !sceneReady
+      || !editable
+      || persistenceBlockedRef.current
+      || !insertImage
+      || insertImage.nonce === handledInsertRef.current
+    ) return
     handledInsertRef.current = insertImage.nonce
-    void dropQuestionImage(insertImage.url)
-  }, [apiReady, dropQuestionImage, editable, insertImage])
+    const request = insertImage
+    void dropQuestionImage(request.url).then(attempted => {
+      if (attempted) onInsertImageHandled?.(request.nonce)
+      else if (handledInsertRef.current === request.nonce) handledInsertRef.current = 0
+    })
+  }, [apiReady, dropQuestionImage, editable, insertImage, onInsertImageHandled, sceneReady])
 
   /** Puts the whole sheet on screen — the way back when the view wanders. */
   const fitPaper = () => {
@@ -419,7 +529,8 @@ export default function TeachingBoardEditor({
 
   const saveBoard = async () => {
     const api = apiRef.current
-    if (!api || !editable || saving) return
+    if (!api || !editable || savingRef.current || persistenceBlockedRef.current) return
+    const resolveEpoch = loadRequestRef.current
 
     // Which ช่อง this lands in belongs to the parent: it is the side that
     // knows all five, and the one that asks when they are all taken.
@@ -436,19 +547,42 @@ export default function TeachingBoardEditor({
       })
       if (!ok) return
     }
+    if (
+      apiRef.current !== api
+      || loadRequestRef.current !== resolveEpoch
+      || persistenceBlockedRef.current
+    ) return
 
+    const state = api.getAppState()
+    const transientElementId = state.newElement?.id
+      ?? state.editingLinearElement?.elementId
+      ?? null
+    if (isIncompleteTransientDrawingElement(
+      api.getSceneElementsIncludingDeleted(),
+      transientElementId,
+    )) {
+      toast.error('แก้เส้นให้เสร็จก่อนบันทึกกระดาน')
+      return
+    }
+    const snapshot = snapshotDrawingScene(sceneRef.current)
+
+    savingRef.current = true
     setSaving(true)
+    const boardEpoch = loadRequestRef.current
+    const mutationEpoch = sceneMutationEpochRef.current
     try {
-      const scene: ScratchpadScene = {
-        formatVersion: CURRENT_WORK_FORMAT_VERSION,
-        elements: api.getSceneElementsIncludingDeleted(),
-        appState: stableDrawingAppState(api.getAppState()),
-        files: api.getFiles(),
+      const validated = validateDrawingScene(snapshot, {
+        role: 'teacher',
+        verifyTeacherImage: ({ claim }) => claim ? 'valid' : 'invalid',
+        legacyTeacherImages: legacyTeacherImagesRef.current,
+      })
+      if (!validated.ok) throw new Error('กระดานมีข้อมูลที่ไม่รองรับหรือรูปโจทย์ไม่ผ่านการตรวจสอบ')
+      const preview = await createDrawingPreview(
+        api,
         background,
-      }
-      if (!isScratchpadSceneWithinLimits(scene)) throw new Error('กระดานมีขนาดใหญ่เกิน 2 MB หรือมีเส้นมากเกินไป')
-      const preview = await createDrawingPreview(api, background, 'เขียนบนกระดานก่อนกดบันทึก')
-      const sceneBlob = new Blob([JSON.stringify(scene)], { type: 'application/json' })
+        'เขียนบนกระดานก่อนกดบันทึก',
+        snapshot,
+      )
       const { prepareTeachingBoardUpload, saveTeachingBoard } = await import('@/lib/actions/math-work')
       const prepared = await prepareTeachingBoardUpload({
         assignmentId,
@@ -456,41 +590,49 @@ export default function TeachingBoardEditor({
         slot: target.slot,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         previewFormat: preview.format,
+        scene: snapshot,
       })
       if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่บันทึกไม่สำเร็จ')
-      if (!prepared.scene) throw new Error('เตรียมไฟล์ต้นฉบับไม่สำเร็จ')
 
       const { createClient } = await import('@/lib/supabase/client')
       const bucket = createClient().storage.from(MATH_WORK_BUCKET)
-      await Promise.allSettled([
-        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
-          contentType: preview.blob.type,
-          cacheControl: '300',
-        }),
-        bucket.uploadToSignedUrl(prepared.scene.path, prepared.scene.token, sceneBlob, {
-          contentType: 'application/json',
-          cacheControl: '300',
-        }),
-      ])
+      await bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
+        contentType: preview.blob.type,
+        cacheControl: '300',
+      })
       const saved = await saveTeachingBoard({
         assignmentId,
         questionId,
         slot: target.slot,
         uploadId: prepared.uploadId,
+        uploadReceipt: prepared.uploadReceipt,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         replaceExisting: target.replacing,
         previewFormat: preview.format,
       })
       if (!saved || 'error' in saved) throw new Error(saved?.error ?? 'บันทึกกระดานสอนไม่สำเร็จ')
-      markDirty(false)
-      await onSaved(target.slot)
-      toast.success(target.replacing
-        ? `บันทึกทับ ${questionLabel} ช่อง ${target.slot} แล้ว`
-        : `บันทึกกระดานลง ${questionLabel} ช่อง ${target.slot} แล้ว`)
+      const stillCurrent = apiRef.current === api
+        && loadRequestRef.current === boardEpoch
+        && sceneMutationEpochRef.current === mutationEpoch
+      const refreshed = onSaved(questionId, target.slot, saved.board.id, {
+        slot,
+        boardId: board?.id ?? null,
+      })
+      if (stillCurrent) {
+        markDirty(false)
+        await refreshed
+        toast.success(target.replacing
+          ? `บันทึกทับ ${questionLabel} ช่อง ${target.slot} แล้ว`
+          : `บันทึกกระดานลง ${questionLabel} ช่อง ${target.slot} แล้ว`)
+      } else {
+        await refreshed
+        toast.success(`บันทึก ${questionLabel} ช่อง ${target.slot} แล้ว · งานที่แก้ต่อยังไม่ได้บันทึก`)
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'บันทึกกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
     } finally {
-      setSaving(false)
+      savingRef.current = false
+      if (mountedRef.current) setSaving(false)
     }
   }
 
@@ -503,16 +645,16 @@ export default function TeachingBoardEditor({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{questionLabel}</p>
               <p className="text-[10px] text-muted-foreground" aria-live="polite">
-                {!editable ? 'ดูอย่างเดียว'
+                {saving ? 'กำลังบันทึก...'
                   : insertingImage ? 'กำลังใส่รูปจากโจทย์...'
-                    : saving ? 'กำลังบันทึก...'
+                    : !editable ? 'ดูอย่างเดียว'
                       : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก'
                         : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
               </p>
             </div>
             <div className="ml-auto flex items-center gap-1">
-              {editable && (
-                <Button type="button" variant="outline" size="xs" onClick={() => resetCanvas(Boolean(board))} disabled={saving || loading}>
+              {canReset && (
+                <Button type="button" variant="outline" size="xs" onClick={() => resetCanvas(Boolean(board))} disabled={saving || loading || operationPending}>
                   <RotateCcw /> กระดานใหม่
                 </Button>
               )}
@@ -628,12 +770,36 @@ export default function TeachingBoardEditor({
           </div>
         )}
 
-        {/* `main-menu-trigger` is Excalidraw's ☰ button. An empty MainMenu
-            leaves nothing behind it, and this takes the button away too. */}
-        <div
-          ref={surfaceRef}
+        <DrawingBoardCore
+          role="teacher"
+          background={background}
+          surfaceRef={surfaceRef}
           onWheelCapture={passWheelToPage}
-          className={`relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/40 [&_.excalidraw]:!min-w-0 [&_.excalidraw]:!bg-transparent [&_.main-menu-trigger]:!hidden ${toolsHidden ? 'board-tools-hidden' : ''}`}
+          className={`flex-1 bg-muted/40 [&_.excalidraw]:!min-w-0 [&_.excalidraw]:!bg-transparent ${toolsHidden ? 'board-tools-hidden' : ''}`}
+          initialData={{
+            elements: editorScene.elements as readonly OrderedExcalidrawElement[],
+            appState: {
+              ...DRAWING_DEFAULT_ITEM_STATE,
+              ...editorScene.appState,
+              viewBackgroundColor: TRANSPARENT_CANVAS,
+            },
+            files: editorScene.files as BinaryFiles,
+            scrollToContent: false,
+          }}
+          editorRevision={editorRevision}
+          onReady={api => {
+            apiRef.current = api
+            if (releasePersistenceOnReadyRef.current) {
+              releasePersistenceOnReadyRef.current = false
+              persistenceBlockedRef.current = false
+            }
+            setSceneReady(!persistenceBlockedRef.current)
+            releaseChangeGuard()
+            setApiReady(true)
+          }}
+          onChange={handleChange}
+          viewModeEnabled={!editable}
+          legacyTeacherImagesRef={legacyTeacherImagesRef}
         >
           {/* The sheet: sits under a transparent canvas and is moved by
               handleChange, so panning and zooming are visible even on a board
@@ -644,59 +810,22 @@ export default function TeachingBoardEditor({
             className="pointer-events-none absolute left-0 top-0 origin-top-left rounded-md shadow-sm ring-1 ring-border"
             style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT, ...drawingBackgroundStyle(background) }}
           />
-          {loading && (
+          {(loading || operationPending) && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-overlay/20 backdrop-blur-[1px]">
               <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-sm shadow-md">
                 <Loader2 className="size-4 animate-spin" /> กำลังเปิดกระดาน...
               </div>
             </div>
           )}
-          <Excalidraw
-            /* Coming back to a ข้อ opens its board exactly as it was left,
-               unsaved strokes included, because the parked scene is what
-               Excalidraw mounts with. */
-            initialData={{
-              elements: (initialScene?.elements ?? []) as readonly OrderedExcalidrawElement[],
-              appState: {
-                ...DRAWING_DEFAULT_ITEM_STATE,
-                ...(initialScene?.appState ?? {}),
-                viewBackgroundColor: TRANSPARENT_CANVAS,
-              },
-              files: (initialScene?.files ?? {}) as BinaryFiles,
-              scrollToContent: false,
-            }}
-            excalidrawAPI={api => {
-              apiRef.current = api
-              setApiReady(true)
-            }}
-            onChange={handleChange}
-            langCode="th-TH"
-            viewModeEnabled={!editable}
-            handleKeyboardGlobally={false}
-            autoFocus={false}
-            aiEnabled={false}
-            validateEmbeddable={false}
-            UIOptions={{
-              canvasActions: {
-                changeViewBackgroundColor: false,
-                export: false,
-                loadScene: false,
-                saveToActiveFile: false,
-                saveAsImage: false,
-                toggleTheme: false,
-              },
-              tools: { image: false },
-            }}
-          >
-            {/*
-              Replaces Excalidraw's own ☰ menu, which otherwise offers Reset
-              the canvas — a second, blunter กระดานใหม่ that skips our state —
-              beside links out to Excalidraw's GitHub, X and Discord. A board
-              used to work an answer in front of a class needs none of it.
-            */}
-            <MainMenu />
-          </Excalidraw>
-        </div>
+          {policyReadOnlyMessage && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-overlay/20 p-6 backdrop-blur-[1px]">
+              <Card role="status" radius="md" padding="md" elevation="md" className="max-w-sm text-center text-sm">
+                <p className="font-semibold">เปิดแก้ไขกระดานฉบับนี้ไม่ได้</p>
+                <p className="mt-1 text-xs text-muted-foreground">{policyReadOnlyMessage}</p>
+              </Card>
+            </div>
+          )}
+        </DrawingBoardCore>
       </Card>
       {confirmDialog}
     </>

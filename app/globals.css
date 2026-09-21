@@ -478,3 +478,17 @@
 .board-tools-hidden .App-menu__left {
   display: none !important;
 }
+
+/* Product commands own these paths. Native Excalidraw entry points can bypass
+   role policy even when the corresponding canvas action is hidden. */
+.drawing-board-policy .App-toolbar__extra-tools-trigger,
+.drawing-board-policy .App-toolbar__extra-tools-dropdown,
+.drawing-board-policy .ToolIcon__lock,
+.drawing-board-policy .sidebar-trigger__label-element,
+.drawing-board-policy .default-sidebar-trigger,
+.drawing-board-policy .default-sidebar,
+.drawing-board-policy .main-menu-trigger,
+.drawing-board-policy .help-icon,
+.drawing-board-policy .context-menu {
+  display: none !important;
+}

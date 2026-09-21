@@ -2,14 +2,13 @@
 
 import {
   emptyScratchpadScene,
-  isScratchpadSceneWithinLimits,
-  sanitizeScratchpadScene,
   scratchpadStorageKey,
   scratchpadSubmissionKey,
   SCRATCHPAD_TTL_MS,
   type ScratchpadScene,
   type ScratchpadScope,
 } from '@/lib/scratchpad'
+import { validateDrawingScene, type DrawingSceneIssueCode } from '@/lib/drawing-board-policy'
 
 const DB_NAME = 'korkru-math-work'
 const DB_VERSION = 1
@@ -19,7 +18,21 @@ interface ScratchpadRecord extends ScratchpadScope {
   key: string
   submissionKey: string
   updatedAt: number
-  scene: ScratchpadScene
+  scene: unknown
+}
+
+export type ScratchpadSceneReadResult =
+  | { status: 'missing' }
+  | { status: 'ready'; scene: ScratchpadScene }
+  | { status: 'invalid'; issue: DrawingSceneIssueCode }
+  | { status: 'unsupported'; issue: DrawingSceneIssueCode }
+
+export function classifyStoredScratchpadScene(
+  value: unknown,
+): Exclude<ScratchpadSceneReadResult, { status: 'missing' }> {
+  const validated = validateDrawingScene(value, { role: 'student' })
+  if (!validated.ok) return { status: validated.kind, issue: validated.code }
+  return { status: 'ready', scene: validated.scene }
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -54,23 +67,29 @@ function openScratchpadDatabase(): Promise<IDBDatabase> {
   })
 }
 
-export async function loadScratchpadScene(scope: ScratchpadScope): Promise<ScratchpadScene> {
+export async function readScratchpadScene(scope: ScratchpadScope): Promise<ScratchpadSceneReadResult> {
   const database = await openScratchpadDatabase()
   try {
     const transaction = database.transaction(STORE_NAME, 'readonly')
     const record = await requestResult(
       transaction.objectStore(STORE_NAME).get(scratchpadStorageKey(scope)),
     ) as ScratchpadRecord | undefined
-    const scene = sanitizeScratchpadScene(record?.scene)
-    return scene && isScratchpadSceneWithinLimits(scene) ? scene : emptyScratchpadScene()
+    if (!record) return { status: 'missing' }
+    return classifyStoredScratchpadScene(record.scene)
   } finally {
     database.close()
   }
 }
 
+/** @deprecated Use readScratchpadScene() so invalid raw data cannot look blank. */
+export async function loadScratchpadScene(scope: ScratchpadScope): Promise<ScratchpadScene> {
+  const result = await readScratchpadScene(scope)
+  return result.status === 'ready' ? result.scene : emptyScratchpadScene()
+}
+
 export async function saveScratchpadScene(scope: ScratchpadScope, scene: ScratchpadScene): Promise<void> {
-  const sanitized = sanitizeScratchpadScene(scene)
-  if (!sanitized || !isScratchpadSceneWithinLimits(sanitized)) {
+  const validated = validateDrawingScene(scene, { role: 'student' })
+  if (!validated.ok) {
     throw new Error('Scratchpad scene exceeds local limits')
   }
   const database = await openScratchpadDatabase()
@@ -81,7 +100,7 @@ export async function saveScratchpadScene(scope: ScratchpadScope, scene: Scratch
       key: scratchpadStorageKey(scope),
       submissionKey: scratchpadSubmissionKey(scope.ownerId, scope.submissionId),
       updatedAt: Date.now(),
-      scene: sanitized,
+      scene: validated.scene,
     }
     transaction.objectStore(STORE_NAME).put(record)
     await transactionDone(transaction)

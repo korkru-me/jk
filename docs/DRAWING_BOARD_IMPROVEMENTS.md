@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 21 กันยายน 2026
 
-สถานะ: **เฟส 0 — ล็อกสเปก สถานะ และ baseline แล้ว; ยังไม่เปลี่ยนพฤติกรรมแอป**
+สถานะ: **เฟส 1 — implementation ของ shared core และ policy boundary ทำเสร็จบน branch `codex/drawing-board-phase-1`; ยังไม่ merge/deploy** automated/local gates ผ่านแล้ว แต่ authenticated teacher loop/heap, Auth/Storage, physical UAT และ schema debt ของ preview PNG บน Safari ยังเป็น rollout gate ที่ต้องปิดก่อน deploy
 
-เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงพฤติกรรมที่ยังต้องทำในเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว
+เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงพฤติกรรมที่ยังต้องทำในเฟส 2–8 ไม่ใช่ของที่ production มีแล้ว
 
 ฐานที่ตรวจในเฟส 0 คือ commit `ecfacda79158d80fe73d529a45d1e49616b9218c` ซึ่งตรงกับ `origin/exam-uat-evidence` ณ วันที่ตรวจ งานเฟส 0 อยู่บน branch `codex/drawing-board-phase-0` และไม่ deploy หรือเปลี่ยน `origin/master`
 
@@ -16,6 +16,22 @@
 - เก็บ baseline ของ test, type-check, design-token lint, production build, initial bundle และ local runtime หลาย viewport
 - ระบุช่องว่างหลักของโค้ดปัจจุบัน: editor host ซ้ำกัน, policy ยังเป็นการซ่อน UI บางส่วน, สถานะบันทึกยังไม่แยก revision, และ automated coverage ของกระดานยังน้อย
 - ไม่แก้ schema, RLS, Storage, dependency, route, component หรือพฤติกรรมผู้ใช้ในเฟสนี้
+
+## ผลลัพธ์ของเฟส 1
+
+- รวม Excalidraw host เป็น `DrawingBoardCore` ชุดเดียวสำหรับนักเรียนและครู แล้วให้ role policy เดียวกันคุม tool, action, shortcut, menu/context/long-press, clipboard, paste และ drop; native Library, More tools, lock, import/export/help/link/embed/AI และ browser Save/Open/Print ถูกปิดจาก boundary เดียวกัน
+- เพิ่ม pure scene validator ที่ใช้ exact-key allowlist กับ envelope v1, stable app state, element แยกตาม type, binding/roundness/crop/fixed segment, file และ claim metadata พร้อมตรวจค่าตัวเลขแบบ finite/bounded (พิกัดและขนาด ±1,000,000, zoom 0.1–30, stroke 0–100, opacity 0–100, roughness 0–2, font ไม่เกิน 1,000 และ version/timestamp/nonce เป็น safe integer), role/type, link/custom data/group/lock/frame relation, MIME/signature/base64, 2 MiB และ 10,000 elements ก่อน raw scene เข้า editor และก่อน persist ฝั่ง client/server; live mode ผ่อนเฉพาะ line/arrow/freedraw ตัวเดียวที่ id ตรง `appState.newElement.id` ระหว่าง gesture ส่วน full mode ยังบังคับ point ที่สมบูรณ์ก่อนบันทึก
+- element ที่ลบแล้วยังตรวจ shape/field ทุกตัว แต่ stale binding/container ของ tombstone และ edge จาก element ที่ยังอยู่ไปยัง counterpart ที่ถูกยางลบทำเป็น tombstone ถูกถือเป็น undo history ที่ไม่ทำงาน; relation ระหว่าง element ที่ยังอยู่ทั้งคู่ต้อง reciprocal และ missing/wrong-type target ยังถูกปฏิเสธ Last-good scene ถูก clone แยกจาก object ที่ Excalidraw mutate in place และผูกกับ editor revision ก่อนใช้ recovery ส่วน point shape ที่ยังไม่สมบูรณ์ระหว่าง gesture/point editor ไม่ถูกส่งไป persistence หรือเลื่อน last-good
+- teacher file map ที่ข้าม policy/persistence boundary เก็บเฉพาะ file id ที่ image element ทั้งตัวปัจจุบันและ tombstone อ้างถึง จึงรักษาไฟล์สำหรับ undo/redo แต่ตัด file-only transient จาก `addFiles()` และ orphan ที่ไม่มี element อ้างถึง โดยไม่ได้อ้างว่า file map ภายใน Excalidraw ถูกล้าง
+- IndexedDB เดิมไม่ถูกเปลี่ยนชื่อ/version/store/key/debounce/TTL ฉากที่ invalid หรือ version/content ไม่รองรับจะไม่เข้า Excalidraw และไม่ถูก blank scene เขียนทับ แม้ผู้ใช้ปิดหน้าก่อน read เสร็จ แต่แสดง safe read-only placeholder และคง raw record ไว้
+- การโหลดกระดานครูใช้ operation `pending/load/reset` ที่ผูก question/slot/board, scene ที่พักไว้จับคู่ `{slot, boardId}`, navigation/board-intent/per-question fetch epoch และ latest-result adoption; editor เป้าหมายถือ matching nonce ที่ยังไม่ handle เป็น pending ตั้งแต่ render แรกและปิด edit/save/reset จน response ที่ตรง identity มาถึง จึงไม่มีหนึ่งเฟรมที่ scene เก่าถูกวาดหรือบันทึกใต้ slot ใหม่ การ hide/show ที่ remount จาก parked scene ซึ่ง validate แล้วจะถือ nonce เดิมว่า handle แล้ว จึงไม่ replay load/reset ทับ draft การเปิด load/reset ใหม่หลังผู้ใช้ยืนยันทิ้งงานจะลบ parked scene ของ target เดิมก่อน network เพื่อไม่ให้ load failure คืนเส้นเก่าใต้ board id ใหม่ Normal fetch แชร์ in-flight promise ส่วน save ใช้ immutable full-validated snapshot เดียวกับ preview, รับ board id ที่ server คืนทันที และล้าง dirty เฉพาะเมื่อ API/load/mutation identity ยังตรง
+- รูปโจทย์ใหม่ต้องเป็น URL exact ของโจทย์ใน bucket ของระบบ จากนั้น server จำกัดขนาด ตรวจ SVG/raster, rasterize เป็น WebP, ตัด metadata และออก HMAC claim อายุ 24 ชั่วโมงที่ผูก actor/assignment/question/file/MIME/bytes; board v1 ที่มี SVG แบบ self-contained จะถูก rasterize ใน memory ก่อนเข้า editor และย้ายเป็นรูปที่มี claim เมื่อเจ้าของบันทึกครั้งถัดไป สำหรับ board เก่าที่ผสม SVG กับ raster ระบบ full-validate ฉากหลังแปลงก่อน แล้วออก claim ใหม่จาก exact bytes ให้ retained raster ทุกไฟล์และ full-validate ด้วยลายเซ็นจริงอีกครั้ง จึงบันทึกกลับได้โดยไม่ใช้ partial trust ด่าน SVG ปฏิเสธ DOCTYPE/ENTITY declaration และ reference ที่ unknown/malformed, decode เฉพาะ predefined/numeric XML references ก่อน scan แล้วปฏิเสธ script/event/`foreignObject`, `<style>`, inline `style=`, `xml:base`, CSS escape/backslash, stylesheet/import และ external `href`/`url()`; ฉากที่ไม่ผ่านเป็น read-only โดยไม่เขียนทับต้นฉบับ
+- prepare action ตรวจและเขียน `scene.json` เองก่อนออก signed token เฉพาะ preview และออก upload receipt ที่เซ็นผูก actor/answer-part/source/include-scene หรือ assignment-question-slot, upload id, preview format และอายุ 2 ชั่วโมง; save action ตรวจ receipt และตรวจไฟล์จริงซ้ำ การปฏิเสธไม่ลบไฟล์ที่ database ยังอ้างอยู่ และ orphan ที่ผู้ใช้ละทิ้งยังอยู่ใต้ cleanup grace 7 วันเดิม
+- ทั้ง student attach และ teacher save clone full-validated scene ออกจาก object ที่ Excalidraw mutate in place แล้วใช้ immutable snapshot เดียวกันสร้าง preview และส่งให้ prepare action จึงไม่เกิด preview กับ `scene.json` คนละ revision ระหว่าง async upload
+- คง scene envelope v1, private Storage path, artifact uniqueness, 5 teacher slots, authorization/RLS และ lazy-load contract เดิม ไม่มี migration หรือการเปลี่ยน RLS ในเฟสนี้; เพิ่ม direct dependency `sharp` สำหรับ server-only rasterization และขยาย Server Action body limit เป็น 4 MiB โดย scene ยังถูกจำกัดจริงที่ 2 MiB
+- **Rollout blocker ที่สืบทอดจาก schema เดิม:** code สร้าง `preview.png` เมื่อ Safari เข้ารหัส WebP ไม่ได้ แต่ tracked CHECK ของ `student_work_artifacts`/`teaching_boards` และ student scope trigger ยังบังคับ `preview.webp`; migration `20260904023417_math_work_png_preview.sql` ขยายเพียง bucket MIME ดังนั้นห้ามอ้างว่า Safari save พร้อมใช้จนสร้าง migration ใหม่ด้วย `supabase migration new` หลังตรวจ `supabase migration list` และแก้ CHECK/trigger ครบ เฟส 1 นี้ไม่ได้ตรวจ live migration state หรือแตะฐานข้อมูล
+- automated regression ผ่าน 112 test files / 1,492 tests, type-check และ design-token lint ผ่าน; production build ผ่าน 63 static pages โดย `/assignments/[id]/take` ยังมี 17 initial chunks รวม 804,059 bytes raw / 246,601 bytes gzip (+33/+13 bytes จากเฟส 0) และไม่พบ Excalidraw, mathjs, Supabase browser client, `sharp` package หรือ server-only board code ใน union
+- local runtime ที่ `/exam-screen-lab` ตรวจการวาด, literal Thai paste, ลูกศรที่ bind กับรูปทรงพร้อม delete/undo, การบล็อก Save/Open/Print, hidden native entry points, single editor และ viewport 390×844, 768×1024, 1024×768, 1280×800 แล้ว; fixture นี้เป็น student preview จึงยังไม่ใช่หลักฐาน teacher switch 10 รอบ/heap, authenticated Auth/Storage/teacher flow, Safari จริง, stylus หรือ Staging ซึ่งต้องเก็บก่อน merge/deploy
 
 ## ขอบเขตผลิตภัณฑ์ที่อนุมัติแล้ว
 
@@ -43,6 +59,8 @@
 - รูปโจทย์เป็น trusted programmatic ingress เท่านั้น ต้องผ่านการย่อ ขีดจำกัด scene และการตรวจชนิดเดิม
 
 ## Capability matrix
+
+คำว่า “ปัจจุบัน” ในสองคอลัมน์แรกหมายถึง deployed baseline ที่ตรวจในเฟส 0 ไม่ใช่โค้ดบน branch เฟส 1 ที่ยังไม่ merge/deploy
 
 | ความสามารถ | นักเรียนปัจจุบัน | ครูปัจจุบัน | เป้าหมายนักเรียน | เป้าหมายครู |
 | --- | --- | --- | --- | --- |
@@ -244,15 +262,17 @@ Teacher persistence: per-question memory draft ── explicit save ── priva
 - private Storage path, artifact uniqueness ต่อ answer/part, teacher board 5 slots และ authorization ของ Server Actions
 - preview mode ที่เก็บ scene ใน memory เท่านั้น
 - lazy loading หลัง user gesture และการไม่ส่ง telemetry/server request ต่อ stroke
-- stable app state ที่เก็บ style/font/arrow/pen mode และ view ตามสัญญาปัจจุบัน; undo history ยังคงเป็น runtime-only
+- stable app state ที่เก็บ style/font/arrow/pen mode และ view ตามสัญญาปัจจุบัน; undo stack ยังคงเป็น runtime-only แต่ scene เก็บ deleted-element tombstone ที่จำเป็นต่อ history ได้
 
 fixture ขั้นต่ำสำหรับ regression ได้แก่ scene ว่าง, freehand/highlighter, ข้อความไทย/อังกฤษ, เส้น/รูปทรง, พื้นทั้ง 4 แบบ, deleted elements และกระดานครูที่ฝังรูปโจทย์
 
 fixture รูปโจทย์ต้องพิสูจน์เพิ่มว่า current-question claim ผ่าน, claim จากอีก question/assignment/actor กับ arbitrary data URL ไม่ผ่าน, board v1 เดิมที่มี image hash เดิมเปิดและ re-save ได้ และการแก้ payload รูปใน legacy board ถูกปฏิเสธโดยไม่เขียนทับฉบับดี
 
+เฟส 1 รองรับ board v1 เดิมที่เป็น PNG/JPEG/JPG/WebP/GIF ด้วย exact file/element snapshot fallback รวมกรณี signing key หมุนโดย token เดิมต้องตรงทุก byte ส่วน SVG ดิบไม่ถูกส่งเข้า browser: Server Action decode เฉพาะ predefined/numeric XML references แล้วแปลงเฉพาะ SVG แบบ self-contained ที่ไม่มี active content, external reference, style/xml-base หรือ CSS escape เป็น WebP พร้อม claim ใหม่ใน memory ก่อนเปิด หากแปลงไม่ได้ UI จะเป็น safe read-only และเก็บไฟล์เดิมไว้ ไม่ sanitize โดยตัดข้อมูลแล้วอ้างว่าโหลดสำเร็จ
+
 ## Security, privacy และ performance gates
 
-- ห้ามลด RLS หรือย้าย authorization มาไว้เฉพาะ client; service role และ signed URL contract ไม่เปลี่ยนในงาน UI/core
+- ห้ามลด RLS, ย้าย authorization มาไว้เฉพาะ client หรือขยายสิทธิ์ Storage ของ browser การเปลี่ยน signed URL contract ต้องเป็น hardening ที่บันทึกไว้และคง compatibility; เฟส 1 จึงย้าย `scene.json` ไปให้ server เขียนและให้ browser ได้เฉพาะ preview token + scoped receipt
 - scene, file metadata, signed URL และข้อมูลนักเรียนห้ามเข้า log, analytics หรือ error message
 - generic paste/drop/upload ต้อง fail closed ตาม role policy ก่อน Excalidraw รับ event
 - `/assignments/[id]/take` ต้องไม่เพิ่ม Excalidraw, mathjs, Supabase browser client หรือ server-only upload/cleanup code เข้า initial client chunk union
@@ -296,7 +316,7 @@ fixture รูปโจทย์ต้องพิสูจน์เพิ่ม
 ## ลำดับเฟสและ commit gates
 
 0. **Spec และ baseline** — เอกสารนี้, แก้ documentation drift และบันทึกหลักฐานปัจจุบัน
-1. **Shared core และ policy boundary** — รวม adapter/commands/validator, ปิด bypass ทุกทาง และคง scene/persistence contract
+1. **Shared core และ policy boundary — implementation เสร็จบน branch เฟส 1; rollout gate ยัง pending** — รวม editor host, command policy และ validator, ปิด bypass ทุกทาง และคง scene/persistence contract ส่วน imperative command facade ที่ใช้กับ toolbar ใหม่จะรวมต่อในเฟส 2/5; authenticated teacher loop/heap ยังต้องผ่านก่อน merge/deploy
 2. **Student toolbar และ input mode** — แถวหลัก/รอง, fit, single stroke-width source, finger draw/pan และ responsive behavior
 3. **Student draft/attachment correctness** — revision-based status, stale attachment warning, load confirmation และ one-step recovery
 4. **Partial eraser** — freehand/highlighter เท่านั้น พร้อม deterministic undo/redo และ limit tests

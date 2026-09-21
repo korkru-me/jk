@@ -35,7 +35,7 @@ export interface StudentWorkArtifactView {
   updatedAt: string
 }
 
-/** Client-safe teaching board metadata with short-lived private URLs. */
+/** Client-safe teaching board metadata with a short-lived preview URL. */
 export interface TeachingBoardView {
   id: string
   slot: number
@@ -44,9 +44,16 @@ export interface TeachingBoardView {
   editable: boolean
   formatVersion: number
   previewUrl: string | null
-  sceneUrl: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface TeachingBoardOperation {
+  kind: 'pending' | 'load' | 'reset'
+  nonce: number
+  questionId: string
+  slot: number
+  boardId: string | null
 }
 
 export interface WorkUploadPaths {

@@ -1,9 +1,10 @@
 'use client'
 
 import { exportToCanvas } from '@excalidraw/excalidraw'
-import type { AppState, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
+import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
+import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import type { CSSProperties } from 'react'
-import type { ScratchpadBackground } from '@/lib/scratchpad'
+import type { ScratchpadBackground, ScratchpadScene } from '@/lib/scratchpad'
 import { MAX_WORK_PREVIEW_BYTES, WORK_PREVIEW_MIMES, type WorkPreviewFormat } from '@/lib/math-work'
 
 export const DRAWING_BACKGROUNDS: Array<{ value: ScratchpadBackground; label: string }> = [
@@ -119,17 +120,22 @@ export async function createDrawingPreview(
   api: ExcalidrawImperativeAPI,
   background: ScratchpadBackground,
   emptyMessage: string,
+  snapshot?: Pick<ScratchpadScene, 'elements' | 'appState' | 'files'>,
 ): Promise<DrawingPreview> {
-  const elements = api.getSceneElements()
+  // A save can span several awaits. Render the same immutable scene sent to
+  // the server instead of re-reading a canvas that may already have changed.
+  const elements = snapshot
+    ? (snapshot.elements as readonly OrderedExcalidrawElement[]).filter(element => !element.isDeleted)
+    : api.getSceneElements()
   if (elements.length === 0) throw new Error(emptyMessage)
   const drawing = await exportToCanvas({
     elements,
     appState: {
-      ...api.getAppState(),
+      ...(snapshot ? snapshot.appState : api.getAppState()),
       exportBackground: false,
       viewBackgroundColor: TRANSPARENT_CANVAS,
     },
-    files: api.getFiles(),
+    files: (snapshot ? snapshot.files : api.getFiles()) as BinaryFiles,
     maxWidthOrHeight: 1600,
     exportPadding: 36,
   })

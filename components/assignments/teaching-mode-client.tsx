@@ -36,7 +36,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
-import type { TeachingBoardView } from '@/lib/math-work'
+import type { TeachingBoardOperation, TeachingBoardView } from '@/lib/math-work'
 import type { ScratchpadScene } from '@/lib/scratchpad'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { drawingBackgroundStyle } from '@/components/exam/drawing-board-utils'
@@ -523,6 +523,7 @@ export function TeachingModeClient({
   const [showBoards, setShowBoards] = useState(false)
   const [showBoard, setShowBoard] = useState(true)
   const [imageRequest, setImageRequest] = useState<{ questionId: string; url: string; nonce: number } | null>(null)
+  const imageRequestNonceRef = useRef(0)
   const [slotChoice, setSlotChoice] = useState<{
     boards: TeachingBoardView[]
     resolve: (slot: number | null) => void
@@ -530,12 +531,37 @@ export function TeachingModeClient({
   // One board per ข้อ: what is on it stays with it, so leaving and coming
   // back finds the same strokes, and a new ข้อ opens on a clean sheet.
   const scenesRef = useRef(new Map<string, ScratchpadScene>())
+  const boardTargetsRef = useRef(new Map<string, { slot: number; boardId: string | null }>([
+    [questions[0].id, { slot: initialSlot, boardId: initialBoard?.id ?? null }],
+  ]))
+  const navigationEpochRef = useRef(0)
+  const boardIntentEpochRef = useRef(0)
+  const fetchBoardsEpochRef = useRef(new Map<string, number>())
+  const fetchBoardsInFlightRef = useRef(new Map<string, {
+    epoch: number
+    promise: Promise<TeachingBoardView[] | null>
+  }>())
+  const fetchBoardsSettledRef = useRef(new Map<string, {
+    epoch: number
+    result: TeachingBoardView[] | null
+  }>())
   const [dirtyQuestionIds, setDirtyQuestionIds] = useState<string[]>([])
   const [loadingQuestionIds, setLoadingQuestionIds] = useState<string[]>([])
-  const [loadNonce, setLoadNonce] = useState(initialBoard ? 1 : 0)
-  const [resetNonce, setResetNonce] = useState(initialBoard ? 0 : 1)
+  const [boardOperation, setBoardOperation] = useState<TeachingBoardOperation>(() => ({
+    kind: initialBoard ? 'load' : 'reset',
+    nonce: 1,
+    questionId: questions[0].id,
+    slot: initialSlot,
+    boardId: initialBoard?.id ?? null,
+  }))
+
+  const requestBoardOperation = useCallback((input: Omit<TeachingBoardOperation, 'nonce'>) => {
+    setBoardOperation(current => ({ ...input, nonce: current.nonce + 1 }))
+  }, [])
 
   const question = questions[questionIndex]
+  const activeQuestionIdRef = useRef(question.id)
+  activeQuestionIdRef.current = question.id
   // Same paging arithmetic the exam page runs: the page is the block that
   // holds the ข้อ whose board is open, so jumping to a ข้อ brings its page.
   const pageStart = Math.floor(questionIndex / perPage) * perPage
@@ -576,25 +602,56 @@ export function TeachingModeClient({
     })
   }, [question.id])
 
-  const fetchBoards = useCallback(async (questionId: string): Promise<TeachingBoardView[] | null> => {
+  const fetchBoards = useCallback((
+    questionId: string,
+    force = false,
+  ): Promise<TeachingBoardView[] | null> => {
+    const inFlight = fetchBoardsInFlightRef.current.get(questionId)
+    if (inFlight && !force) return inFlight.promise
+    const requestEpoch = (fetchBoardsEpochRef.current.get(questionId) ?? 0) + 1
+    fetchBoardsEpochRef.current.set(questionId, requestEpoch)
     setLoadingQuestionIds(current => current.includes(questionId) ? current : [...current, questionId])
-    try {
-      const { getTeachingBoards } = await import('@/lib/actions/math-work')
-      const result = await getTeachingBoards(assignmentId, questionId)
-      if (!result || 'error' in result) {
-        toast.error(result?.error ?? 'เปิดรายการกระดานสอนไม่สำเร็จ')
-        return null
-      }
-      // Kept under the ข้อ it belongs to, so a slow answer for one ข้อ can
-      // never land on another's slots.
-      setBoardsByQuestion(current => ({ ...current, [questionId]: result.boards }))
-      return result.boards
-    } catch {
-      toast.error('เปิดรายการกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
-      return null
-    } finally {
-      setLoadingQuestionIds(current => current.filter(id => id !== questionId))
+    const adoptLatest = async (): Promise<TeachingBoardView[] | null> => {
+      const latest = fetchBoardsInFlightRef.current.get(questionId)
+      if (latest && latest.epoch > requestEpoch) return await latest.promise
+      const settled = fetchBoardsSettledRef.current.get(questionId)
+      return settled && settled.epoch > requestEpoch ? settled.result : null
     }
+    const request = (async () => {
+      try {
+        const { getTeachingBoards } = await import('@/lib/actions/math-work')
+        const result = await getTeachingBoards(assignmentId, questionId)
+        if (fetchBoardsEpochRef.current.get(questionId) !== requestEpoch) {
+          return await adoptLatest()
+        }
+        if (!result || 'error' in result) {
+          fetchBoardsSettledRef.current.set(questionId, { epoch: requestEpoch, result: null })
+          if (fetchBoardsEpochRef.current.get(questionId) === requestEpoch) {
+            toast.error(result?.error ?? 'เปิดรายการกระดานสอนไม่สำเร็จ')
+          }
+          return null
+        }
+        // Kept under the ข้อ it belongs to, so a slow answer for one ข้อ can
+        // never land on another's slots.
+        fetchBoardsSettledRef.current.set(questionId, { epoch: requestEpoch, result: result.boards })
+        setBoardsByQuestion(current => ({ ...current, [questionId]: result.boards }))
+        return result.boards
+      } catch {
+        if (fetchBoardsEpochRef.current.get(questionId) !== requestEpoch) return await adoptLatest()
+        fetchBoardsSettledRef.current.set(questionId, { epoch: requestEpoch, result: null })
+        if (fetchBoardsEpochRef.current.get(questionId) === requestEpoch) {
+          toast.error('เปิดรายการกระดานสอนไม่สำเร็จ กรุณาลองใหม่')
+        }
+        return null
+      } finally {
+        if (fetchBoardsEpochRef.current.get(questionId) === requestEpoch) {
+          fetchBoardsInFlightRef.current.delete(questionId)
+          setLoadingQuestionIds(current => current.filter(id => id !== questionId))
+        }
+      }
+    })()
+    fetchBoardsInFlightRef.current.set(questionId, { epoch: requestEpoch, promise: request })
+    return request
   }, [assignmentId])
 
   // Every ข้อ on the page shows its own slots, so each one's boards are
@@ -622,37 +679,97 @@ export function TeachingModeClient({
     })
   }
 
+  // A parked scene is valid only for the slot/board target it was paired with.
+  // Once the teacher confirms an explicit load/reset over that target, remove
+  // it before the async load begins so a failed load cannot resurrect and save
+  // the old strokes under the new board identity.
+  const discardParkedScene = (questionId: string) => {
+    scenesRef.current.delete(questionId)
+    setDirtyQuestionIds(current => current.filter(id => id !== questionId))
+  }
+
   /**
    * Moves to another ข้อ, which parks this board and opens that ข้อ's own.
    *
    * Nothing is thrown away, so this asks nothing — unless a saved slot is
    * being opened over strokes the target ข้อ still holds.
    */
-  const changeQuestion = async (nextIndex: number, preferredSlot?: number) => {
-    if (nextIndex < 0 || nextIndex >= questions.length) return
+  const changeQuestion = async (
+    nextIndex: number,
+    preferredSlot?: number,
+    preferredBoard?: TeachingBoardView,
+  ) => {
+    if (nextIndex < 0 || nextIndex >= questions.length) return null
+    if (nextIndex === questionIndex && preferredSlot === undefined) return navigationEpochRef.current
     const nextQuestion = questions[nextIndex]
     const parked = scenesRef.current.get(nextQuestion.id)
-    if (preferredSlot !== undefined && !await allowDiscard(nextQuestion.id)) return
-    setQuestionIndex(nextIndex)
+    if (preferredSlot !== undefined && !await allowDiscard(nextQuestion.id)) return null
+    if (preferredSlot !== undefined) discardParkedScene(nextQuestion.id)
+    const navigationEpoch = ++navigationEpochRef.current
+    const boardIntentEpoch = ++boardIntentEpochRef.current
+    setImageRequest(null)
+
+    // A parked scene and its save destination are one unit. Restoring only the
+    // strokes can otherwise show work from one slot while the save button points
+    // at another.
+    const remembered = boardTargetsRef.current.get(nextQuestion.id)
+    if (parked && preferredSlot === undefined && remembered) {
+      setSelectedSlot(remembered.slot)
+      setSelectedBoardId(remembered.boardId)
+      setQuestionIndex(nextIndex)
+      void fetchBoards(nextQuestion.id)
+      return navigationEpoch
+    }
+
+    // Mount the target editor behind a pending operation before network work.
+    // It cannot accept strokes until the matching load/reset arrives.
+    const pendingSlot = preferredSlot ?? remembered?.slot ?? 1
+    setSelectedSlot(pendingSlot)
     setSelectedBoardId(null)
+    requestBoardOperation({
+      kind: 'pending',
+      questionId: nextQuestion.id,
+      slot: pendingSlot,
+      boardId: null,
+    })
+    setQuestionIndex(nextIndex)
+
     const nextBoards = await fetchBoards(nextQuestion.id) ?? boardsByQuestion[nextQuestion.id] ?? []
+    if (
+      navigationEpoch !== navigationEpochRef.current
+      || boardIntentEpoch !== boardIntentEpochRef.current
+    ) return null
     const slot = preferredSlot ?? firstAvailableSlot(nextBoards, currentUserId)
-    const existing = nextBoards.find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
+    const existing = preferredBoard
+      ? nextBoards.find(board => board.id === preferredBoard.id) ?? null
+      : nextBoards.find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
+    const target = { slot, boardId: existing?.id ?? null }
+    boardTargetsRef.current.set(nextQuestion.id, target)
     setSelectedSlot(slot)
-    setSelectedBoardId(existing?.id ?? null)
-    // A parked board comes back as it was; only an untouched ข้อ opens its
-    // saved slot or a clean sheet.
-    if (parked && preferredSlot === undefined) return
-    if (existing) setLoadNonce(value => value + 1)
-    else setResetNonce(value => value + 1)
+    setSelectedBoardId(target.boardId)
+    requestBoardOperation({
+      kind: existing ? 'load' : 'reset',
+      questionId: nextQuestion.id,
+      slot,
+      boardId: target.boardId,
+    })
+    return navigationEpoch
   }
 
   const openBoard = async (board: TeachingBoardView) => {
     if (!await allowDiscard()) return
+    discardParkedScene(question.id)
+    boardIntentEpochRef.current += 1
+    boardTargetsRef.current.set(question.id, { slot: board.slot, boardId: board.id })
     setSelectedSlot(board.slot)
     setSelectedBoardId(board.id)
     setDirty(false)
-    setLoadNonce(value => value + 1)
+    requestBoardOperation({
+      kind: 'load',
+      questionId: question.id,
+      slot: board.slot,
+      boardId: board.id,
+    })
   }
 
   /** A slot pressed under another ข้อ moves the board to that ข้อ first. */
@@ -666,7 +783,7 @@ export function TeachingModeClient({
 
   const openBoardOn = async (index: number, board: TeachingBoardView) => {
     if (index !== questionIndex) {
-      await changeQuestion(index, board.slot)
+      await changeQuestion(index, board.slot, board)
       return
     }
     await openBoard(board)
@@ -679,19 +796,46 @@ export function TeachingModeClient({
       return
     }
     if (!await allowDiscard()) return
+    discardParkedScene(question.id)
+    boardIntentEpochRef.current += 1
+    boardTargetsRef.current.set(question.id, { slot, boardId: null })
     setSelectedSlot(slot)
     setSelectedBoardId(null)
     setDirty(false)
-    setResetNonce(value => value + 1)
+    requestBoardOperation({
+      kind: 'reset',
+      questionId: question.id,
+      slot,
+      boardId: null,
+    })
   }
 
-  const handleSaved = async (slot: number) => {
-    const refreshed = await fetchBoards(question.id)
-    const saved = refreshed?.find(board => board.createdBy === currentUserId && board.slot === slot) ?? null
-    setSelectedBoardId(saved?.id ?? null)
+  const handleSaved = async (
+    questionId: string,
+    slot: number,
+    boardId: string,
+    expectedTarget: { slot: number; boardId: string | null },
+  ) => {
+    const currentTarget = boardTargetsRef.current.get(questionId)
+    if (
+      !currentTarget
+      || currentTarget.slot !== expectedTarget.slot
+      || currentTarget.boardId !== expectedTarget.boardId
+    ) {
+      await fetchBoards(questionId, true)
+      return
+    }
+    const target = { slot, boardId }
+    boardTargetsRef.current.set(questionId, target)
+    if (activeQuestionIdRef.current === questionId) {
+      setSelectedSlot(target.slot)
+      setSelectedBoardId(target.boardId)
+    }
+    await fetchBoards(questionId, true)
   }
 
   const deleteBoard = async (board: TeachingBoardView, questionId: string) => {
+    if (!await allowDiscard(questionId)) return
     const ok = await confirm({
       title: `ลบกระดานช่อง ${board.slot}?`,
       description: 'ทั้งภาพตัวอย่างและไฟล์ที่ใช้กลับมาแก้ไขจะถูกลบ การกระทำนี้ย้อนกลับไม่ได้',
@@ -699,17 +843,34 @@ export function TeachingModeClient({
       variant: 'destructive',
     })
     if (!ok) return
+    const sceneAtDeleteStart = scenesRef.current.get(questionId)
     try {
       const { deleteTeachingBoard } = await import('@/lib/actions/math-work')
       const result = await deleteTeachingBoard(board.id)
       if (!result || 'error' in result) throw new Error(result?.error ?? 'ลบกระดานไม่สำเร็จ')
-      await fetchBoards(questionId)
-      if (selectedBoardId === board.id) {
-        setSelectedBoardId(null)
-        setSelectedSlot(board.slot)
-        setDirty(false)
-        setResetNonce(value => value + 1)
+      const currentTarget = boardTargetsRef.current.get(questionId)
+      if (currentTarget?.boardId === board.id) {
+        boardIntentEpochRef.current += 1
+        boardTargetsRef.current.set(questionId, { slot: board.slot, boardId: null })
+        const changedDuringDelete = scenesRef.current.get(questionId) !== sceneAtDeleteStart
+        if (!changedDuringDelete) {
+          scenesRef.current.delete(questionId)
+          setDirtyQuestionIds(current => current.filter(id => id !== questionId))
+        }
+        if (activeQuestionIdRef.current === questionId) {
+          setSelectedBoardId(null)
+          setSelectedSlot(board.slot)
+          if (!changedDuringDelete) {
+            requestBoardOperation({
+              kind: 'reset',
+              questionId,
+              slot: board.slot,
+              boardId: null,
+            })
+          }
+        }
       }
+      await fetchBoards(questionId, true)
       toast.success(`ลบกระดานช่อง ${board.slot} แล้ว`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'ลบกระดานไม่สำเร็จ กรุณาลองใหม่')
@@ -735,6 +896,20 @@ export function TeachingModeClient({
    */
   const resolveSaveSlot = async (questionId: string, label: string) => {
     const saved = (boardsByQuestion[questionId] ?? []).filter(board => board.createdBy === currentUserId)
+
+    // A board opened from a ช่อง saves back over itself, even while other free
+    // slots remain. Creating another copy here would quietly detach the parked
+    // scene from the slot shown in the header.
+    const open = questionId === question.id && selectedBoard?.createdBy === currentUserId ? selectedBoard : null
+    if (open) {
+      const ok = await confirm({
+        title: `บันทึกทับกระดาน ${label} ช่อง ${open.slot}?`,
+        description: 'ภาพและไฟล์ต้นฉบับเดิมในช่องนี้จะถูกแทนที่ด้วยกระดานที่กำลังเปิดอยู่',
+        confirmLabel: 'บันทึกทับ',
+      })
+      return ok ? { slot: open.slot, replacing: true } : null
+    }
+
     const used = new Set(saved.map(board => board.slot))
     const free = [1, 2, 3, 4, 5].find(slot => !used.has(slot))
 
@@ -748,16 +923,6 @@ export function TeachingModeClient({
       return picked === null ? null : { slot: picked, replacing: true }
     }
 
-    // A board opened from a ช่อง saves back over itself.
-    const open = questionId === question.id && selectedBoard?.createdBy === currentUserId ? selectedBoard : null
-    if (open) {
-      const ok = await confirm({
-        title: `บันทึกทับกระดาน ${label} ช่อง ${open.slot}?`,
-        description: 'ภาพและไฟล์ต้นฉบับเดิมในช่องนี้จะถูกแทนที่ด้วยกระดานที่กำลังเปิดอยู่',
-        confirmLabel: 'บันทึกทับ',
-      })
-      return ok ? { slot: open.slot, replacing: true } : null
-    }
     return { slot: free, replacing: false }
   }
 
@@ -768,12 +933,16 @@ export function TeachingModeClient({
    */
   const insertQuestionImage = async (index: number, url: string) => {
     setShowBoard(true)
-    if (index !== questionIndex) await changeQuestion(index)
-    setImageRequest(current => ({
+    const navigationEpoch = index !== questionIndex
+      ? await changeQuestion(index)
+      : navigationEpochRef.current
+    if (navigationEpoch === null || navigationEpoch !== navigationEpochRef.current) return
+    const nonce = ++imageRequestNonceRef.current
+    setImageRequest({
       questionId: questions[index].id,
       url,
-      nonce: (current?.nonce ?? 0) + 1,
-    }))
+      nonce,
+    })
   }
 
   const leaveTeachingMode = async () => {
@@ -942,8 +1111,7 @@ export function TeachingModeClient({
                         slot={selectedSlot}
                         board={selectedBoard}
                         canManage={canManage}
-                        loadNonce={loadNonce}
-                        resetNonce={resetNonce}
+                        operation={boardOperation}
                         questionLabel={`ข้อ ${index + 1}/${questions.length}`}
                         initialScene={scenesRef.current.get(pageQuestion.id) ?? null}
                         initialDirty={dirty}
@@ -953,6 +1121,9 @@ export function TeachingModeClient({
                         questionImages={pageQuestion.image_urls ?? []}
                         onResolveSaveSlot={() => resolveSaveSlot(pageQuestion.id, `ข้อ ${index + 1}/${questions.length}`)}
                         insertImage={imageRequest?.questionId === pageQuestion.id ? imageRequest : null}
+                        onInsertImageHandled={nonce => setImageRequest(current => (
+                          current?.nonce === nonce ? null : current
+                        ))}
                         onHide={hideBoard}
                       />
                     ) : (

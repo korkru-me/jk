@@ -1,7 +1,6 @@
 'use client'
 
-import '@excalidraw/excalidraw/index.css'
-import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
@@ -16,19 +15,23 @@ import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { DrawingBoardCore } from '@/components/drawing-board/drawing-board-core'
 import {
-  loadScratchpadScene,
   purgeExpiredScratchpads,
+  readScratchpadScene,
   saveScratchpadScene,
 } from '@/lib/scratchpad-storage'
 import {
   emptyScratchpadScene,
-  isScratchpadSceneWithinLimits,
-  sanitizeScratchpadScene,
   type ScratchpadBackground,
   type ScratchpadScene,
   type ScratchpadScope,
 } from '@/lib/scratchpad'
+import {
+  isIncompleteTransientDrawingElement,
+  snapshotDrawingScene,
+  validateDrawingScene,
+} from '@/lib/drawing-board-policy'
 import {
   CURRENT_WORK_FORMAT_VERSION,
   MATH_WORK_BUCKET,
@@ -61,7 +64,15 @@ export interface ScratchpadProps {
   onClose: () => void
 }
 
-type SaveStatus = 'loading' | 'idle' | 'saving' | 'saved' | 'error' | 'too-large'
+type SaveStatus =
+  | 'loading'
+  | 'idle'
+  | 'saving'
+  | 'saved'
+  | 'error'
+  | 'too-large'
+  | 'load-failed'
+  | 'unsupported-read-only'
 
 function statusText(status: SaveStatus, persistenceEnabled: boolean): string {
   if (!persistenceEnabled) return 'ตัวอย่างชั่วคราว · ไม่บันทึก'
@@ -69,6 +80,8 @@ function statusText(status: SaveStatus, persistenceEnabled: boolean): string {
   if (status === 'saving') return 'กำลังเก็บในเครื่อง...'
   if (status === 'saved') return 'เก็บในเครื่องนี้แล้ว'
   if (status === 'too-large') return 'กระดาษทดเต็มแล้ว'
+  if (status === 'load-failed') return 'เปิดฉบับเดิมไม่ได้ · ข้อมูลเดิมยังอยู่'
+  if (status === 'unsupported-read-only') return 'ฉบับเดิมยังไม่รองรับ · เก็บข้อมูลเดิมไว้แล้ว'
   if (status === 'error') return 'เก็บในเครื่องไม่สำเร็จ'
   return 'เก็บเฉพาะในเครื่อง · หมดอายุใน 7 วัน'
 }
@@ -96,6 +109,10 @@ export default function Scratchpad({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const mountedRef = useRef(true)
+  // A mounted editor is not allowed to write until its existing IndexedDB
+  // record has finished loading and passed policy validation. This also keeps
+  // an early close/unmount from replacing a real draft with the blank fallback.
+  const persistenceBlockedRef = useRef(persistenceEnabled)
   const loadedArtifactNonceRef = useRef(0)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -109,6 +126,7 @@ export default function Scratchpad({
   const [attaching, setAttaching] = useState(false)
   const [loadingAttached, setLoadingAttached] = useState(false)
   const [compactLayout, setCompactLayout] = useState(false)
+  const [readOnlyMessage, setReadOnlyMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1023px)')
@@ -123,14 +141,38 @@ export default function Scratchpad({
 
   const initialData = useMemo(async () => {
     let scene = emptyScratchpadScene()
+    persistenceBlockedRef.current = persistenceEnabled
+    if (mountedRef.current) setReadOnlyMessage(null)
     if (persistenceEnabled) {
       try {
         await purgeExpiredScratchpads()
-        scene = await loadScratchpadScene(scope)
-        if (mountedRef.current) setStatus(scene.elements.length > 0 ? 'saved' : 'idle')
+        const stored = await readScratchpadScene(scope)
+        if (stored.status === 'ready') {
+          scene = stored.scene
+          persistenceBlockedRef.current = false
+          if (mountedRef.current) setStatus(scene.elements.length > 0 ? 'saved' : 'idle')
+        } else if (stored.status === 'missing') {
+          persistenceBlockedRef.current = false
+          if (mountedRef.current) setStatus('idle')
+        } else {
+          persistenceBlockedRef.current = true
+          if (mountedRef.current) {
+            const unsupported = stored.status === 'unsupported'
+            setStatus(unsupported ? 'unsupported-read-only' : 'load-failed')
+            setReadOnlyMessage(unsupported
+              ? 'กระดาษทดฉบับเดิมมีข้อมูลที่เวอร์ชันนี้ยังไม่รองรับ จึงเปิดแบบดูอย่างเดียวและเก็บข้อมูลเดิมไว้ในเครื่อง'
+              : 'เปิดกระดาษทดฉบับเดิมไม่ได้ จึงหยุดการบันทึกไว้ก่อน ข้อมูลเดิมยังเก็บอยู่ในเครื่อง')
+          }
+        }
       } catch {
-        if (mountedRef.current) setStatus('error')
+        persistenceBlockedRef.current = true
+        if (mountedRef.current) {
+          setStatus('load-failed')
+          setReadOnlyMessage('เปิดกระดาษทดฉบับเดิมไม่ได้ จึงหยุดการบันทึกไว้ก่อน ข้อมูลเดิมยังเก็บอยู่ในเครื่อง')
+        }
       }
+    } else {
+      persistenceBlockedRef.current = false
     }
     sceneRef.current = scene
     if (mountedRef.current) setBackground(scene.background)
@@ -147,7 +189,7 @@ export default function Scratchpad({
   }, [persistenceEnabled, scope])
 
   const persist = useCallback((scene: ScratchpadScene) => {
-    if (!persistenceEnabled) return Promise.resolve()
+    if (!persistenceEnabled || persistenceBlockedRef.current) return Promise.resolve()
     if (mountedRef.current) setStatus('saving')
     saveQueueRef.current = saveQueueRef.current
       .catch(() => undefined)
@@ -163,7 +205,7 @@ export default function Scratchpad({
   }, [persistenceEnabled, scope])
 
   const scheduleSave = useCallback((delay = 650) => {
-    if (!persistenceEnabled) return
+    if (!persistenceEnabled || persistenceBlockedRef.current) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null
@@ -262,6 +304,7 @@ export default function Scratchpad({
     appState: AppState,
     files: BinaryFiles,
   ) => {
+    if (persistenceBlockedRef.current) return
     sceneRef.current = {
       ...sceneRef.current,
       elements,
@@ -274,6 +317,7 @@ export default function Scratchpad({
   }, [scheduleSave])
 
   const chooseBackground = (next: ScratchpadBackground) => {
+    if (persistenceBlockedRef.current) return
     setBackground(next)
     sceneRef.current = { ...sceneRef.current, background: next }
     scheduleSave(150)
@@ -281,7 +325,7 @@ export default function Scratchpad({
 
   const chooseInkPreset = (kind: 'pen' | 'highlighter') => {
     const api = apiRef.current
-    if (!api) return
+    if (!api || persistenceBlockedRef.current) return
     const ink = kind === 'pen' ? PEN_INK : HIGHLIGHTER_INK
     api.updateScene({
       appState: {
@@ -296,14 +340,19 @@ export default function Scratchpad({
 
   const chooseStrokeWidth = (value: number) => {
     const api = apiRef.current
-    if (!api) return
+    if (!api || persistenceBlockedRef.current) return
     const next = clampStrokeWidth(value)
     setStrokeWidth(next)
     api.updateScene({ appState: { currentItemStrokeWidth: next } })
   }
 
   const loadAttachedScene = useCallback(async () => {
-    if (!artifact || artifact.sourceType !== 'scratchpad' || !apiRef.current) return
+    if (
+      !artifact
+      || artifact.sourceType !== 'scratchpad'
+      || !apiRef.current
+      || persistenceBlockedRef.current
+    ) return
     // Preview attachments are object URLs for the thumbnail only; the live
     // editor is deliberately kept mounted and already holds the editable scene.
     if (previewMode && !artifact.sceneUrl) return
@@ -319,8 +368,9 @@ export default function Scratchpad({
         response = sceneUrl ? await fetch(sceneUrl, { cache: 'no-store' }) : null
       }
       if (!response?.ok) throw new Error('เปิดไฟล์ต้นฉบับไม่สำเร็จ')
-      const scene = sanitizeScratchpadScene(await response.json())
-      if (!scene || !isScratchpadSceneWithinLimits(scene)) throw new Error('รูปแบบไฟล์ต้นฉบับไม่รองรับ')
+      const validated = validateDrawingScene(await response.json(), { role: 'student' })
+      if (!validated.ok) throw new Error('รูปแบบไฟล์ต้นฉบับไม่รองรับ')
+      const scene = validated.scene
 
       const api = apiRef.current
       api.updateScene({
@@ -344,9 +394,18 @@ export default function Scratchpad({
   // Keep the chosen tool after each stroke: a line or an arrow is rarely
   // drawn only once, and reverting to selection breaks the flow.
   useEffect(() => {
-    if (!apiReady) return
-    apiRef.current?.setActiveTool({ type: 'freedraw', locked: true })
-  }, [apiReady])
+    if (!apiReady || persistenceBlockedRef.current) return
+    let frame: number | null = null
+    let cancelled = false
+    void initialData.then(() => {
+      if (cancelled || persistenceBlockedRef.current) return
+      frame = requestAnimationFrame(() => apiRef.current?.setActiveTool({ type: 'freedraw', locked: true }))
+    })
+    return () => {
+      cancelled = true
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [apiReady, initialData])
 
   useEffect(() => {
     if (!apiReady || !open || loadAttachedNonce <= 0) return
@@ -357,18 +416,29 @@ export default function Scratchpad({
 
   const attachAsWork = async () => {
     const api = apiRef.current
-    if (!api || attaching) return
+    if (!api || attaching || persistenceBlockedRef.current) return
+    const state = api.getAppState()
+    const transientElementId = state.newElement?.id
+      ?? state.editingLinearElement?.elementId
+      ?? null
+    if (isIncompleteTransientDrawingElement(
+      api.getSceneElementsIncludingDeleted(),
+      transientElementId,
+    )) {
+      toast.error('แก้เส้นให้เสร็จก่อนแนบวิธีทำ')
+      return
+    }
+    const snapshot = snapshotDrawingScene(sceneRef.current)
     setAttaching(true)
     try {
-      const scene: ScratchpadScene = {
-        formatVersion: CURRENT_WORK_FORMAT_VERSION,
-        elements: api.getSceneElementsIncludingDeleted(),
-        appState: stableDrawingAppState(api.getAppState()),
-        files: api.getFiles(),
+      const validated = validateDrawingScene(snapshot, { role: 'student' })
+      if (!validated.ok) throw new Error('กระดาษทดมีข้อมูลที่ไม่รองรับ ให้นำส่วนนั้นออกก่อนแนบ')
+      const preview = await createDrawingPreview(
+        api,
         background,
-      }
-      if (!isScratchpadSceneWithinLimits(scene)) throw new Error('กระดาษทดมีขนาดใหญ่เกิน 2 MB หรือมีเส้นมากเกินไป')
-      const preview = await createDrawingPreview(api, background, 'เขียนวิธีทำก่อนกดแนบ')
+        'เขียนวิธีทำก่อนกดแนบ',
+        snapshot,
+      )
 
       if (previewMode) {
         const previewUrl = URL.createObjectURL(preview.blob)
@@ -386,7 +456,6 @@ export default function Scratchpad({
         return
       }
 
-      const sceneBlob = new Blob([JSON.stringify(scene)], { type: 'application/json' })
       const {
         getStudentWorkArtifacts,
         prepareStudentWorkArtifactUpload,
@@ -399,32 +468,25 @@ export default function Scratchpad({
         includeScene: true,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         previewFormat: preview.format,
+        scene: snapshot,
       })
       if (!prepared || 'error' in prepared) {
         throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
       }
-      if (!prepared.scene) throw new Error('เตรียมไฟล์ต้นฉบับไม่สำเร็จ')
-
       const { createClient } = await import('@/lib/supabase/client')
       const bucket = createClient().storage.from(MATH_WORK_BUCKET)
-      // Always ask the server to inspect the pair after both requests settle.
-      // This also recovers cleanly when an upload response is lost even though
-      // the object reached storage; a genuinely partial pair is removed there.
-      await Promise.allSettled([
-        bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
-          contentType: preview.blob.type,
-          cacheControl: '300',
-        }),
-        bucket.uploadToSignedUrl(prepared.scene.path, prepared.scene.token, sceneBlob, {
-          contentType: 'application/json',
-          cacheControl: '300',
-        }),
-      ])
+      // The server already validated and stored scene.json. The browser gets a
+      // token only for the derived preview, so no unvalidated scene can race it.
+      await bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
+        contentType: preview.blob.type,
+        cacheControl: '300',
+      })
       const saved: Awaited<ReturnType<typeof saveStudentWorkArtifact>> = await saveStudentWorkArtifact({
         submissionAnswerId: scope.answerId,
         partKey: artifactPartKey,
         sourceType: 'scratchpad',
         uploadId: prepared.uploadId,
+        uploadReceipt: prepared.uploadReceipt,
         includeScene: true,
         formatVersion: CURRENT_WORK_FORMAT_VERSION,
         previewFormat: preview.format,
@@ -489,7 +551,7 @@ export default function Scratchpad({
               size="xs"
               className="min-h-10 pointer-coarse:min-h-11"
               onClick={() => void loadAttachedScene()}
-              disabled={loadingAttached || attaching}
+              disabled={loadingAttached || attaching || Boolean(readOnlyMessage)}
               title="โหลดฉบับที่แนบล่าสุดมาแทนกระดาษทดปัจจุบัน"
             >
               {loadingAttached ? <Loader2 className="animate-spin" /> : <RefreshCw />}
@@ -501,7 +563,7 @@ export default function Scratchpad({
             size="xs"
             className="min-h-10 pointer-coarse:min-h-11"
             onClick={() => void attachAsWork()}
-            disabled={attaching || loadingAttached}
+            disabled={attaching || loadingAttached || Boolean(readOnlyMessage)}
           >
             {attaching ? <Loader2 className="animate-spin" /> : <Paperclip />}
             {attaching ? 'กำลังแนบ...' : artifact ? 'อัปเดตวิธีทำ' : 'แนบวิธีทำ'}
@@ -511,10 +573,10 @@ export default function Scratchpad({
           </Button>
         </div>
         <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('pen')}>
+          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('pen')} disabled={Boolean(readOnlyMessage)}>
             <PenLine /> ปากกา
           </Button>
-          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('highlighter')}>
+          <Button type="button" variant="outline" size="xs" className="min-h-10 shrink-0 pointer-coarse:min-h-11" onClick={() => chooseInkPreset('highlighter')} disabled={Boolean(readOnlyMessage)}>
             <Highlighter /> ไฮไลต์
           </Button>
           <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
@@ -527,6 +589,7 @@ export default function Scratchpad({
               step={1}
               value={strokeWidth}
               onChange={event => chooseStrokeWidth(Number(event.target.value))}
+              disabled={Boolean(readOnlyMessage)}
               aria-label="ขนาดเส้น"
               className="h-1 w-24 cursor-pointer accent-primary"
             />
@@ -541,6 +604,7 @@ export default function Scratchpad({
               size="xs"
               className="min-h-10 shrink-0 pointer-coarse:min-h-11"
               onClick={() => chooseBackground(item.value)}
+              disabled={Boolean(readOnlyMessage)}
               aria-pressed={background === item.value}
             >
               {item.label}
@@ -549,31 +613,28 @@ export default function Scratchpad({
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1" style={drawingBackgroundStyle(background)}>
-        <Excalidraw
-          initialData={initialData}
-          excalidrawAPI={api => { apiRef.current = api; setApiReady(true) }}
-          onChange={handleChange}
-          onPointerUp={() => scheduleSave(120)}
-          langCode="th-TH"
-          theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
-          handleKeyboardGlobally={false}
-          autoFocus
-          aiEnabled={false}
-          validateEmbeddable={false}
-          UIOptions={{
-            canvasActions: {
-              changeViewBackgroundColor: false,
-              export: false,
-              loadScene: false,
-              saveToActiveFile: false,
-              saveAsImage: false,
-              toggleTheme: false,
-            },
-            tools: { image: false },
-          }}
-        />
-      </div>
+      <DrawingBoardCore
+        role="student"
+        background={background}
+        initialData={initialData}
+        onReady={api => { apiRef.current = api; setApiReady(true) }}
+        onChange={handleChange}
+        onPointerUp={() => scheduleSave(120)}
+        viewModeEnabled={Boolean(readOnlyMessage)}
+        autoFocus
+        theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+        className="flex-1"
+        style={drawingBackgroundStyle(background)}
+      >
+        {readOnlyMessage && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-overlay/20 p-6 backdrop-blur-[1px]">
+            <Card role="status" radius="md" padding="md" elevation="md" className="max-w-sm text-center text-sm">
+              <p className="font-semibold">เปิดแก้ไขฉบับเดิมไม่ได้</p>
+              <p className="mt-1 text-xs text-muted-foreground">{readOnlyMessage}</p>
+            </Card>
+          </div>
+        )}
+      </DrawingBoardCore>
     </Card>
   ), document.body)
 }
