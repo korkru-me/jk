@@ -5,7 +5,7 @@
 สถานะปัจจุบัน: **ล็อก release candidate สำหรับ final UAT แล้ว** โดยผูก source
 revision, Vercel Staging deployment และ SEB config ไว้ใน
 `config/exam-release-candidate.json`; `npm run check:exam-candidate` ผ่านครบ
-และ iPad responsive UAT ของ candidate นี้ผ่านแล้ว
+และกำลังทำ physical iPad UAT ต่อบน candidate นี้
 
 candidate ถูกล็อกใหม่เป็นรอบ `r5` หลัง physical iPad UAT ของรอบ `r4` พบว่าหน่วย
 คำตอบอยู่หลังปุ่มเปิดแป้นคณิตศาสตร์ จึงแก้ component กลางให้ลำดับเป็น **ช่องคำตอบ
@@ -21,9 +21,10 @@ Vercel deployment ใหม่ขึ้นสถานะ Ready และ canoni
 แต่ไม่ถูกยกมาเป็นผลผ่านของ `r5` เพราะตำแหน่งหน่วยเป็น UI ร่วมที่เปลี่ยนบนทุกขนาดจอ
 จึงคืน suite ที่ได้รับผลกระทบเป็น `pending` ก่อนทดสอบ candidate เดียวกัน จากนั้น
 เจ้าของผลิตภัณฑ์ยืนยันบน iPad จริงว่าหน่วยอยู่ถูกตำแหน่งและค่าคำตอบยังคงอยู่หลังปิด
-แป้น จึงบันทึก iPad responsive suite เป็น `passed`; iPhone และ Windows จะตรวจเอง
-โดยเจ้าของผลิตภัณฑ์และยังคง `pending` จนกว่าจะมีผลยืนยัน ส่วน Mac และ suite ระบบจริง
-อื่นยังคง `pending` ตามเดิม
+แป้น ซึ่งปิด regression จุดนี้แล้ว แต่ iPad suite ยังคง `pending` จนกว่าจะทดสอบ
+เมนู/overlay, touch gesture, กระดาษทด และ file picker ครบ; iPhone และ Windows จะ
+ตรวจเองโดยเจ้าของผลิตภัณฑ์และยังคง `pending` จนกว่าจะมีผลยืนยัน ส่วน Mac และ suite
+ระบบจริงอื่นยังคง `pending` ตามเดิม
 
 หลักฐาน UAT หลังล็อก candidate ให้ commit/push ที่ branch `exam-uat-evidence`
 ซึ่งถูกปิด deployment ใน `vercel.json`; ห้าม push evidence-only commit ไป branch

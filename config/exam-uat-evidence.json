@@ -12,9 +12,9 @@
     {
       "id": "ipad-responsive",
       "label": "iPad responsive UI",
-      "status": "passed",
-      "testedAt": "2026-09-21T01:52:23.000Z",
-      "testedVersion": "ipad-safari_staging-4e8a8c4"
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during final UAT"
     },
     {
       "id": "mac-responsive",
