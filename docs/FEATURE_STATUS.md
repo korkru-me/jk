@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 20 กันยายน 2569
+ตรวจจาก repository: 21 กันยายน 2569
 
 ## วิธีอ่านสถานะ
 
@@ -48,6 +48,8 @@ Staging เฟส 2B.1 แก้ production build boundary แล้ว: IOC hel
 Staging เฟส 2C สร้าง Supabase project และ Vercel Preview ที่แยกจาก Production จริงแล้ว พร้อม DNS/HTTPS, Auth redirect, RLS, Storage และ migration bootstrap; authenticated smoke test ผ่านด้วยบัญชี QA และไม่พบข้อมูล Production ปะปน ตัวตรวจ UAT/release รองรับการฉีด secret จาก Keychain/CI โดยไม่บังคับเขียนลง `.env.qa.local` และ release candidate สำหรับรอบ final UAT ถูกล็อกแล้ว รายละเอียดอยู่ใน `docs/STAGING_PHASE_2C_ROLLOUT.md` และ `docs/EXAM_RELEASE_CANDIDATE.md`
 
 ก่อนเริ่ม physical responsive UAT พบว่าคู่มือสั่งเปิด `/exam-screen-lab` บน Staging แต่ route เดิมปิดทุก production build จึงเข้า Staging ไม่ได้ แก้ access guard ให้ route นี้เปิดเฉพาะ local หรือ Staging Preview ที่ผ่าน environment/isolation contract และยังตอบ 404 บน Production/Preview ที่ตั้งค่าไม่ครบ พร้อมข้าม session refresh เฉพาะ fixture route นี้ จากนั้น deploy และล็อก candidate ใหม่แล้ว: ชุดรวม 105 files / 1,361 tests, TypeScript, token lint และ production build ผ่าน; production smoke ตอบ 404 และ Staging build Ready เปิด lab ได้พร้อมป้ายระบบทดสอบ งานถัดไปจึงกลับมาเป็น iPhone responsive UAT
+
+Physical responsive UAT บน candidate `r4` ยืนยัน iPhone และ Windows แล้ว ระหว่างทดสอบ iPad จริงพบว่าหน่วยคำตอบอยู่หลังปุ่มเปิดแป้นคณิตศาสตร์ แม้การกรอกและค่าคงอยู่ทำงานถูกต้อง จึงแก้ component กลางให้หน่วยอยู่ติดช่องคำตอบก่อนปุ่ม ครอบคลุมคำตอบเดี่ยว หลายข้อย่อย และช่องฝังในโจทย์; local runtime ที่ 390×844, 768×1024, 1024×768 และ 1280×800 ไม่พบ horizontal overflow และยังรอ deploy/relock candidate ก่อนยืนยัน iPad จริง
 
 ## MVP core
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronUp, Delete, Keyboard, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -85,6 +85,7 @@ export interface MathAnswerFieldProps {
   onChange: (value: string) => void
   onModeChange: (mode: MathInputMode) => void
   ariaLabel: string
+  unit?: ReactNode
   placeholder?: string
   className?: string
   inputClassName?: string
@@ -100,6 +101,7 @@ export function MathAnswerField({
   onChange,
   onModeChange,
   ariaLabel,
+  unit,
   placeholder = 'เช่น 10, 9+1, √100 หรือ sin(30)',
   className,
   inputClassName,
@@ -224,6 +226,11 @@ export function MathAnswerField({
           }}
           className={cn('min-w-[9rem]', inputClassName)}
         />
+        {unit && (
+          <span data-math-answer-unit className="shrink-0 whitespace-nowrap">
+            {unit}
+          </span>
+        )}
         <Button
           ref={toggleButtonRef}
           type="button"
