@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "pending",
+  "sourceRevision": "pending",
+  "stagingBuild": "pending",
+  "migrationVersion": "20260921185046",
+  "lockedAt": null,
+  "suites": [
+    {
+      "id": "iphone-safari",
+      "label": "iPhone Safari drawing board",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during phase 8 UAT"
+    },
+    {
+      "id": "ipad-safari-pencil",
+      "label": "iPad Safari and Apple Pencil",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during phase 8 UAT"
+    },
+    {
+      "id": "desktop-browsers",
+      "label": "Desktop Safari and Chromium",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during phase 8 UAT"
+    },
+    {
+      "id": "student-auth-storage-attachment",
+      "label": "Student Auth Storage attachment flow",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during phase 8 UAT"
+    },
+    {
+      "id": "teacher-auth-storage-board",
+      "label": "Teacher Auth Storage board flow",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during phase 8 UAT"
+    },
+    {
+      "id": "cross-account-authorization",
+      "label": "Cross-account authorization boundaries",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during phase 8 UAT"
+    },
+    {
+      "id": "qa-data-cleanup",
+      "label": "Drawing board QA data cleanup",
+      "status": "pending",
+      "testedAt": null,
+      "testedVersion": "record during phase 8 UAT"
+    }
+  ]
+}

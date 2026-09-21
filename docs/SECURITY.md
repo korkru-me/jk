@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 21 กันยายน 2026
+อัปเดตล่าสุด: 22 กันยายน 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -133,7 +133,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - การ finalize งานที่บังคับแนบวิธีทำตรวจ exact answer/part ฝั่ง server และยอมรับเฉพาะ artifact reference หรือ `work_images` รุ่นเก่าที่มีอยู่จริงใน answer; หน้าผลลัพธ์ sign เฉพาะ preview path ที่ได้จากคำตอบซึ่งผ่าน result-visibility/RLS แล้วและไม่เปิด scene
 - การแทนที่หรือลบต้องเปลี่ยน database reference ก่อนแล้วจึงลบไฟล์แบบ best effort; scheduled orphan cleanup เว้น grace period 7 วัน ลบเฉพาะ path ที่ตรงกับ builder ใต้ `students/`/`teachers/` หลังตรวจ exact path จากทั้งสอง reference tables ซ้ำ และหยุดก่อนเริ่มลบเมื่อ listing/reference scan ไม่ครบหรือเกินเพดาน
 - Cleanup route ใช้ Bearer `CRON_SECRET` อย่างน้อย 32 ตัวอักษรและเปรียบเทียบแบบ constant-time ก่อนสร้าง admin client; response/log มีเฉพาะ aggregate/error code ไม่ส่ง path, URL หรือข้อมูลนักเรียน และ deployment ที่ไม่มี secret จะ fail closed ด้วย 503
-- rollout audit เฟส 8 ตรวจแบบอ่านอย่างเดียวแล้วว่า bucket `math-work-artifacts` เป็น private จำกัด 5 MiB และ migration `20260904023417` เพิ่ม `image/png` ใน bucket MIME โดย Server Action ตรวจ byte signature ตรงชนิดที่ client แจ้ง แต่ tracked CHECK ของ `student_work_artifacts`/`teaching_boards` และ student scope trigger ยังบังคับ path `.webp`; หลักฐาน migration parity รอบเก่าไม่พิสูจน์ว่า PNG upsert ผ่าน และเฟส 1 ไม่ได้ตรวจ live state ใหม่ จึงต้องรัน `supabase migration list` แล้วสร้าง migration ใหม่ด้วย CLI ก่อน deploy Safari fallback นอกจากนี้ environment ที่ตรวจยังไม่มี Vercel project link/CLI และ `CRON_SECRET` จึงห้ามถือว่า scheduled cleanup ทำงาน production แล้วจนกว่าจะ deploy และตั้ง secret
+- drawing-board เฟส 8 ตรวจ migration parity กับ Supabase Staging ก่อนเปลี่ยน schema แล้วสร้าง `20260921185046_allow_png_math_work_preview_paths.sql` ผ่าน CLI Migration เพิ่ม `.png` เฉพาะ exact preview suffix ใน CHECK ของ `student_work_artifacts`/`teaching_boards` และ student scope trigger โดยไม่เปลี่ยน RLS/grant/ownership/path namespace; PGlite regression ยืนยันว่า GIF, traversal และ cross-submission path ยังถูกปฏิเสธ จากนั้น commit ก่อน apply และ apply เฉพาะ Staging พร้อมตรวจ parity/lint/dry-run ซ้ำ Production ยังไม่ถูก apply และ authenticated Safari/cross-account UAT ยังเป็น release gate นอกจากนี้ `CRON_SECRET` ต้องมีใน deployment เป้าหมายก่อนอ้างว่า scheduled cleanup ทำงานจริง
 - ห้าม log scene, คำตอบเต็ม, signed URL หรือ path ที่เปิดเผยข้อมูลนักเรียน รายละเอียด threat model และ lifecycle อยู่ใน `docs/STUDENT_MATH_TOOLS.md`
 
 ## Logging และ errors

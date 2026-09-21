@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 22 กันยายน 2026
 
-สถานะ: **เฟส 7 — implementation ของ hardening ทำเสร็จบน branch `codex/drawing-board-phase-7`; ยังไม่ merge/deploy** compatibility fixtures, session-only Library, keyboard/paste/drop/context policy matrix, accessibility, local teacher loop/heap และ security review ผ่านแล้ว; authenticated saved-board/attachment/Auth/Storage flow, physical Safari/iPad/desktop + stylus UAT และ schema debt ของ preview PNG บน Safari ยังเป็น rollout gate ในเฟส 8 ก่อน deploy
+สถานะ: **เฟส 8 — rollout กำลังดำเนินการบน branch `codex/drawing-board-phase-8`; ยังไม่ merge/deploy Production** schema debt ของ preview PNG ถูกปิดด้วย migration ใหม่และ apply กับ Supabase Staging แล้ว แต่ canonical Staging ยังล็อกกับ Exam candidate `r8` จึงยังไม่ได้ล็อก Drawing Board build; authenticated student/teacher flow, cross-account authorization และ physical iPhone/iPad/desktop + stylus UAT ยังคงเป็น release blocker ตาม `docs/DRAWING_BOARD_RELEASE_UAT.md`
 
-เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงสภาพปลายทางของเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว; ผลลัพธ์เฟส 1–7 ด้านล่างเป็นโค้ดบน branch ที่ยังไม่ merge/deploy และงานเฟส 8 ยังต้องทำต่อ
+เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงสภาพปลายทางของเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว; ผลลัพธ์เฟส 1–7 และ schema change ของเฟส 8 อยู่บน branch ที่ยังไม่ merge/deploy Production และ release gate จะยังไม่ผ่านจน evidence ของเฟส 8 ครบ
 
 ฐานที่ตรวจในเฟส 0 คือ commit `ecfacda79158d80fe73d529a45d1e49616b9218c` ซึ่งตรงกับ `origin/exam-uat-evidence` ณ วันที่ตรวจ งานเฟส 0 อยู่บน branch `codex/drawing-board-phase-0` และไม่ deploy หรือเปลี่ยน `origin/master`
 
@@ -95,6 +95,17 @@
 - regression ผ่าน 119 test files / 1,562 tests, TypeScript, design-token lint และ production build 63 static pages; initial route `/assignments/[id]/take` ยังมี 17 chunks รวม 809,105 bytes raw / 248,228 bytes gzip (-33/+246 จากเฟส 6 และต่ำกว่า gate 256,828 gzip) พร้อม scan ไม่พบ Excalidraw, mathjs, Supabase browser client, session Library, teacher editor หรือ server-only board code ใน union (`\\sharp` ที่พบยังเป็นสัญลักษณ์ KaTeX)
 - security review ไม่พบการขยาย auth/RLS/Storage หรือข้อมูลนักเรียนใหม่; Library revalidate ทั้ง ingress/insert และ event boundary fail closed ส่วน `npm audit --omit=dev` ยังเท่ากับ baseline 54 รายการ (low 3, moderate 40, high 11) เพราะ lockfile ไม่เปลี่ยน รายการ TipTap/Excalidraw/transitive ที่มีอยู่ยังต้องแก้ใน dependency work แยก ห้ามใช้ forced fix เพื่อให้เฟสนี้ดูผ่าน
 - ไม่มี migration, RLS, Storage path, scene envelope, IndexedDB หรือ saved-board schema change ในเฟสนี้ และไม่ได้เรียก Supabase; authenticated Supabase flow, physical Safari/iPad/stylus กับ pinch warning บนอุปกรณ์จริง และ PNG schema debt ยังรอเฟส 8
+
+## ผลลัพธ์ของเฟส 8 ที่ทำแล้ว
+
+- link worktree กับ Supabase Staging ที่แยกจาก Production และตรวจ migration ledger ก่อนแก้ schema: local/remote ตรงกันถึง `20260916230106`
+- สร้าง migration `20260921185046_allow_png_math_work_preview_paths.sql` ผ่าน `supabase migration new` โดยคง exact namespace และ path traversal guard เดิม แล้วเพิ่มเฉพาะ `.png` คู่กับ `.webp` ใน CHECK ของ `student_work_artifacts`/`teaching_boards` และ `validate_student_work_artifact_scope()`; ไม่เปลี่ยน RLS, grants, Storage policy, ownership หรือ scene path
+- เพิ่ม PGlite regression ที่ execute migration จริง: student/teacher PNG และ WebP ผ่าน, GIF/path traversal ถูกปฏิเสธ และ student path ที่ชี้ submission อื่นยังถูก trigger ปฏิเสธ; regression ปิดรอบพร้อม evidence checker ผ่าน 121 files / 1,570 tests, TypeScript, design-token lint และ production build 63 static pages
+- commit migration ก่อน apply จากนั้น apply เฉพาะ Supabase Staging; ledger หลัง apply ตรงกันถึง `20260921185046`, linked database lint ระดับ error ผ่าน และ dry-run รายงานว่า remote up to date Production ยังไม่ถูก apply
+- รวม ancestry ของ `origin/staging` เข้า branch เฟส 8 เพื่อเตรียม integration โดยรักษาหลักฐาน Exam candidate `r8` ที่ใหม่กว่าไว้ครบ แต่ไม่ย้าย canonical Staging alias
+- เพิ่ม `config/drawing-board-uat-evidence.json`, `npm run check:drawing-board-uat` และ checklist เฟส 8 แบบ fixed schema/no-secret ตัวตรวจจงใจรายงาน NOT READY จน revision/build ถูกล็อกและ physical/authenticated/authorization/cleanup ทั้ง 7 suite ผ่านบน candidate เดียวกัน
+- branch Preview ของเฟส 8 ถูกสร้างแต่ deployment ล้มเหลวและไม่นับเป็น candidate; Staging secrets ถูกจำกัดไว้ที่ branch `staging` ตาม environment contract ขณะที่ canonical Staging ยังใช้ source `564f12c` ของ Exam candidate `r8` การย้าย alias ตอนนี้จะทำให้หลักฐาน UAT เดิมเป็นคนละ build จึงหยุดไว้ตามจริง
+- production bundle หลัง merge staging และ tooling ยังเท่าเฟส 7: route `/assignments/[id]/take` มี 17 initial chunks, 809,105 bytes raw / 248,228 bytes gzip ต่ำกว่า gate 256,828 bytes gzip
 
 ## ขอบเขตผลิตภัณฑ์ที่อนุมัติแล้ว
 
@@ -385,7 +396,7 @@ fixture รูปโจทย์ต้องพิสูจน์เพิ่ม
 4. **Partial eraser — implementation เสร็จบน branch เฟส 4; rollout gate ยัง pending** — freehand/highlighter เท่านั้น, element อื่นลบทั้งวัตถุ, deterministic one-gesture undo/redo และ full-scene limit/sanitizer tests ผ่านแล้ว; physical Safari/iPad/stylus และ authenticated/teacher UAT ยังรอเฟส 8
 5. **Teacher presentation tools — implementation เสร็จบน branch เฟส 5; rollout gate ยัง pending** — app-owned shared toolbar, laser, Frame, trusted รูปโจทย์, quick colors, presentation lock, session-only grid/snap และ duplicate-next-step ที่ re-id/re-claim/detach ต้นฉบับผ่าน automated/local browser gates แล้ว; authenticated Auth/Storage/save-victim flow, physical UAT และ teacher loop/heap ยังรอเฟส 7–8
 6. **Teacher draft/save correctness — implementation เสร็จบน branch เฟส 6; rollout gate ยัง pending** — state ต่อ exact question/slot/board, atomic load/save identity, all-draft exit guard และ one-step recovery ผ่าน automated/local browser gates แล้ว; authenticated Supabase flow, physical UAT และ hardening findings ยังรอเฟส 7–8
-7. **Hardening — implementation เสร็จบน branch เฟส 7; rollout gate ยัง pending** — compatibility fixtures, session-only Library, accessibility, keyboard/paste/drop/context matrix, local performance/memory และ security review ผ่านแล้ว; dependency baseline, authenticated Supabase, physical browser/stylus และ PNG schema debt ยังรอเฟส 8 หรือ dependency work ที่แยกขอบเขต
-8. **Staging UAT และ rollout** — ล็อก candidate ใหม่ ทดสอบ physical iPhone/iPad/desktop + stylus/Auth/Storage/attachment/teacher flow แล้วค่อยพิจารณา merge/deploy
+7. **Hardening — implementation เสร็จบน branch เฟส 7; rollout gate ยัง pending** — compatibility fixtures, session-only Library, accessibility, keyboard/paste/drop/context matrix, local performance/memory และ security review ผ่านแล้ว; dependency baseline และ physical/authenticated UAT ยังต้องผ่านเฟส 8
+8. **Staging UAT และ rollout — กำลังดำเนินการ** — PNG schema gate ปิดและ apply เฉพาะ Staging แล้ว พร้อม fail-closed evidence checker; ยังต้องล็อก canonical Staging candidate ใหม่หลัง Exam `r8`, ทดสอบ physical iPhone/iPad/desktop + stylus/Auth/Storage/attachment/teacher/cross-account/cleanup แล้วจึงค่อยพิจารณา merge/deploy Production
 
 แต่ละเฟสเป็น commit ที่ตรวจรับและ push แยกกัน ห้ามรวมเฟสถัดไปเพื่อทำให้ gate ของเฟสก่อนดูผ่าน และห้ามเปลี่ยน production จนเฟส 8 ผ่าน UAT ที่ผูกกับ revision/build/config เดียวกัน
