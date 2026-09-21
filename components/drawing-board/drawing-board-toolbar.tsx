@@ -1,24 +1,33 @@
 'use client'
 
 import { FONT_FAMILY } from '@excalidraw/excalidraw'
+import type { ReactNode } from 'react'
 import {
   Circle,
+  CopyPlus,
   Diamond,
   Eraser,
+  Frame,
+  Grid3X3,
   Hand,
   Highlighter,
+  LockKeyhole,
+  Magnet,
   Maximize2,
   Minus,
   MousePointer2,
   MoveRight,
   PenLine,
+  Pointer,
   RectangleHorizontal,
   Redo2,
   Type,
   Undo2,
+  UnlockKeyhole,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/native-select'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FingerInputMode } from '@/lib/drawing-board-input'
 import type { ScratchpadBackground } from '@/lib/scratchpad'
 import type { DrawingBoardTool } from '@/lib/drawing-board-policy'
@@ -42,7 +51,34 @@ interface StudentDrawingToolbarProps {
   disabled?: boolean
   onBackgroundChange: (background: ScratchpadBackground) => void
   onFingerModeChange: (mode: FingerInputMode) => void
+  onFit?: () => void
+  primarySuffix?: ReactNode
+  secondaryPrefix?: ReactNode
+  labelContext?: 'scratchpad' | 'teaching'
+  placement?: 'top' | 'bottom'
 }
+
+interface TeacherDrawingToolbarProps extends Omit<
+  StudentDrawingToolbarProps,
+  'primarySuffix' | 'secondaryPrefix' | 'labelContext' | 'placement'
+> {
+  presentationLocked: boolean
+  gridEnabled: boolean
+  snapEnabled: boolean
+  duplicateBusy?: boolean
+  onPresentationLockedChange: (locked: boolean) => void
+  onGridEnabledChange: (enabled: boolean) => void
+  onSnapEnabledChange: (enabled: boolean) => void
+  onDuplicateNextStep: () => void
+}
+
+const TEACHER_QUICK_COLORS = [
+  { value: '#111827', label: 'ดำเข้ม' },
+  { value: '#172554', label: 'กรมท่า' },
+  { value: '#991b1b', label: 'แดงเข้ม' },
+  { value: '#14532d', label: 'เขียวเข้ม' },
+  { value: '#581c87', label: 'ม่วงเข้ม' },
+] as const
 
 const SHAPE_TOOLS: ReadonlyArray<{
   tool: Extract<DrawingBoardTool, 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'diamond'>
@@ -83,7 +119,7 @@ function ToolbarDivider() {
   return <span className="mx-0.5 h-6 w-px shrink-0 bg-border" aria-hidden="true" />
 }
 
-/** Shared, app-owned student controls; teacher composition follows in Phase 5. */
+/** Shared app-owned editing controls used by both student and teacher hosts. */
 export function StudentDrawingToolbar({
   controller,
   state,
@@ -92,6 +128,11 @@ export function StudentDrawingToolbar({
   disabled = false,
   onBackgroundChange,
   onFingerModeChange,
+  onFit,
+  primarySuffix,
+  secondaryPrefix,
+  labelContext = 'scratchpad',
+  placement = 'bottom',
 }: StudentDrawingToolbarProps) {
   const contentDisabled = disabled || state.readOnly || !state.ready || !controller
   const navigationDisabled = !state.ready || !controller
@@ -102,10 +143,10 @@ export function StudentDrawingToolbar({
     || FONT_SIZES.some(size => size === state.fontSize)
 
   return (
-    <div className="shrink-0 border-t border-border bg-card px-2 py-1.5 sm:px-3">
+    <div className={`shrink-0 border-border bg-card px-2 py-1.5 sm:px-3 ${placement === 'top' ? 'border-b' : 'border-t'}`}>
       <div
         role="toolbar"
-        aria-label="เครื่องมือหลักของกระดาษทด"
+        aria-label={labelContext === 'teaching' ? 'เครื่องมือหลักของกระดานสอน' : 'เครื่องมือหลักของกระดาษทด'}
         className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain pb-1"
       >
         <Button
@@ -179,7 +220,7 @@ export function StudentDrawingToolbar({
           size="xs"
           className="min-h-10 shrink-0 pointer-coarse:min-h-11"
           disabled={navigationDisabled}
-          onClick={() => controller?.fit()}
+          onClick={() => onFit ? onFit() : controller?.fit()}
         >
           <Maximize2 data-icon="inline-start" /> พอดีจอ
         </Button>
@@ -204,13 +245,15 @@ export function StudentDrawingToolbar({
         >
           <Hand data-icon="inline-start" /> นิ้วเลื่อน
         </Button>
+        {primarySuffix}
       </div>
 
       <div
         role="toolbar"
-        aria-label="เครื่องมือเสริมของกระดาษทด"
+        aria-label={labelContext === 'teaching' ? 'เครื่องมือเสริมของกระดานสอน' : 'เครื่องมือเสริมของกระดาษทด'}
         className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain"
       >
+        {secondaryPrefix}
         <Button
           type="button"
           variant={inkSelected(state, HIGHLIGHTER_INK) ? 'secondary' : 'ghost'}
@@ -329,6 +372,170 @@ export function StudentDrawingToolbar({
             {item.label}
           </Button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+export function TeacherDrawingToolbar({
+  controller,
+  state,
+  background,
+  fingerMode,
+  disabled = false,
+  presentationLocked,
+  gridEnabled,
+  snapEnabled,
+  duplicateBusy = false,
+  onBackgroundChange,
+  onFingerModeChange,
+  onFit,
+  onPresentationLockedChange,
+  onGridEnabledChange,
+  onSnapEnabledChange,
+  onDuplicateNextStep,
+}: TeacherDrawingToolbarProps) {
+  const ready = state.ready && Boolean(controller)
+  const contentDisabled = disabled || state.readOnly || !ready
+  const selectedColor = state.strokeColor?.toLowerCase() ?? ''
+  const selectedColorLabel = TEACHER_QUICK_COLORS.find(color => color.value === selectedColor)?.label
+    ?? (selectedColor ? 'กำหนดเอง' : 'หลายสี')
+
+  const laserAndLock = (
+    <>
+      <ToolbarDivider />
+      <Button
+        type="button"
+        variant={toolSelected(state, 'laser') ? 'secondary' : 'ghost'}
+        size="xs"
+        className="min-h-10 shrink-0 pointer-coarse:min-h-11"
+        aria-pressed={toolSelected(state, 'laser')}
+        disabled={!ready || (disabled && !presentationLocked)}
+        onClick={() => controller?.selectTool('laser')}
+      >
+        <Pointer data-icon="inline-start" /> เลเซอร์
+      </Button>
+      <Button
+        type="button"
+        variant={presentationLocked ? 'secondary' : 'outline'}
+        size="xs"
+        className="min-h-10 shrink-0 pointer-coarse:min-h-11"
+        aria-pressed={presentationLocked}
+        disabled={!ready || (disabled && !presentationLocked)}
+        onClick={() => {
+          if (!presentationLocked) controller?.selectTool('laser')
+          onPresentationLockedChange(!presentationLocked)
+        }}
+      >
+        {presentationLocked
+          ? <UnlockKeyhole data-icon="inline-start" />
+          : <LockKeyhole data-icon="inline-start" />}
+        {presentationLocked ? 'ปลดล็อกพรีเซนต์' : 'ล็อกพรีเซนต์'}
+      </Button>
+    </>
+  )
+
+  const frameTool = (
+    <Button
+      type="button"
+      variant={toolSelected(state, 'frame') ? 'secondary' : 'ghost'}
+      size="xs"
+      className="min-h-10 shrink-0 pointer-coarse:min-h-11"
+      aria-pressed={toolSelected(state, 'frame')}
+      disabled={contentDisabled}
+      onClick={() => controller?.selectTool('frame')}
+    >
+      <Frame data-icon="inline-start" /> กรอบ
+    </Button>
+  )
+
+  return (
+    <div className="shrink-0 bg-card">
+      <StudentDrawingToolbar
+        controller={controller}
+        state={state}
+        background={background}
+        fingerMode={fingerMode}
+        disabled={disabled}
+        onBackgroundChange={onBackgroundChange}
+        onFingerModeChange={onFingerModeChange}
+        onFit={onFit}
+        primarySuffix={laserAndLock}
+        secondaryPrefix={frameTool}
+        labelContext="teaching"
+        placement="top"
+      />
+      <div
+        role="toolbar"
+        aria-label="เครื่องมือพรีเซนต์ของครู"
+        className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain px-2 py-1.5 sm:px-3"
+      >
+        <span className="shrink-0 text-xs text-muted-foreground">สีด่วน</span>
+        <span className="sr-only" aria-live="polite">สีที่เลือก {selectedColorLabel}</span>
+        <ToggleGroup
+          value={selectedColor ? [selectedColor] : []}
+          onValueChange={values => {
+            const color = values.at(-1)
+            if (color) controller?.setStrokeColor(color)
+          }}
+          disabled={contentDisabled}
+          aria-label="สีเส้นด่วน"
+          variant="outline"
+          size="lg"
+          spacing={1}
+          className="shrink-0"
+        >
+          {TEACHER_QUICK_COLORS.map(color => (
+            <ToggleGroupItem
+              key={color.value}
+              value={color.value}
+              aria-label={`เลือกสี${color.label}`}
+              title={`สี${color.label}`}
+              className="size-10 px-0 pointer-coarse:size-11"
+            >
+              <span
+                aria-hidden="true"
+                className="size-5 rounded-full ring-1 ring-border"
+                style={{ backgroundColor: color.value }}
+              />
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <ToolbarDivider />
+        <Button
+          type="button"
+          variant={gridEnabled ? 'secondary' : 'ghost'}
+          size="xs"
+          className="min-h-10 shrink-0 pointer-coarse:min-h-11"
+          aria-pressed={gridEnabled}
+          disabled={!ready}
+          onClick={() => onGridEnabledChange(!gridEnabled)}
+        >
+          <Grid3X3 data-icon="inline-start" /> เส้นกริด
+        </Button>
+        <Button
+          type="button"
+          variant={snapEnabled ? 'secondary' : 'ghost'}
+          size="xs"
+          className="min-h-10 shrink-0 pointer-coarse:min-h-11"
+          aria-pressed={snapEnabled}
+          disabled={!ready}
+          onClick={() => onSnapEnabledChange(!snapEnabled)}
+        >
+          <Magnet data-icon="inline-start" /> ดูดเข้ากริด
+        </Button>
+        <ToolbarDivider />
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          className="min-h-10 shrink-0 pointer-coarse:min-h-11"
+          disabled={contentDisabled || duplicateBusy}
+          onClick={onDuplicateNextStep}
+        >
+          <CopyPlus data-icon="inline-start" />
+          {duplicateBusy ? 'กำลังทำสำเนา...' : 'ทำสำเนาเป็นขั้นถัดไป'}
+        </Button>
       </div>
     </div>
   )

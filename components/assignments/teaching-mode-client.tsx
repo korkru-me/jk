@@ -38,6 +38,7 @@ import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
 import type { TeachingBoardOperation, TeachingBoardView } from '@/lib/math-work'
 import type { ScratchpadScene } from '@/lib/scratchpad'
+import type { FingerInputMode } from '@/lib/drawing-board-input'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { drawingBackgroundStyle } from '@/components/exam/drawing-board-utils'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
@@ -522,6 +523,10 @@ export function TeachingModeClient({
   // and then wants the width back for writing.
   const [showBoards, setShowBoards] = useState(false)
   const [showBoard, setShowBoard] = useState(true)
+  const [fingerInputMode, setFingerInputMode] = useState<FingerInputMode>('finger_draw')
+  const [presentationLocked, setPresentationLocked] = useState(false)
+  const [gridEnabled, setGridEnabled] = useState(false)
+  const [snapEnabled, setSnapEnabled] = useState(false)
   const [imageRequest, setImageRequest] = useState<{ questionId: string; url: string; nonce: number } | null>(null)
   const imageRequestNonceRef = useRef(0)
   const [slotChoice, setSlotChoice] = useState<{
@@ -834,6 +839,15 @@ export function TeachingModeClient({
     await fetchBoards(questionId, true)
   }
 
+  const detachDuplicatedBoard = (questionId: string, sourceSlot: number) => {
+    boardIntentEpochRef.current += 1
+    boardTargetsRef.current.set(questionId, { slot: sourceSlot, boardId: null })
+    if (activeQuestionIdRef.current === questionId) {
+      setSelectedSlot(sourceSlot)
+      setSelectedBoardId(null)
+    }
+  }
+
   const deleteBoard = async (board: TeachingBoardView, questionId: string) => {
     if (!await allowDiscard(questionId)) return
     const ok = await confirm({
@@ -1124,6 +1138,15 @@ export function TeachingModeClient({
                         onInsertImageHandled={nonce => setImageRequest(current => (
                           current?.nonce === nonce ? null : current
                         ))}
+                        onDuplicated={() => detachDuplicatedBoard(pageQuestion.id, selectedSlot)}
+                        fingerInputMode={fingerInputMode}
+                        onFingerInputModeChange={setFingerInputMode}
+                        presentationLocked={presentationLocked}
+                        onPresentationLockedChange={setPresentationLocked}
+                        gridEnabled={gridEnabled}
+                        onGridEnabledChange={setGridEnabled}
+                        snapEnabled={snapEnabled}
+                        onSnapEnabledChange={setSnapEnabled}
                         onHide={hideBoard}
                       />
                     ) : (

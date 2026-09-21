@@ -1,6 +1,6 @@
 'use client'
 
-import { CaptureUpdateAction, convertToExcalidrawElements } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, convertToExcalidrawElements, FONT_FAMILY } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
@@ -9,22 +9,21 @@ import type {
   ExcalidrawImperativeAPI,
 } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eraser, Highlighter, ImagePlus, Loader2, Maximize2, PanelRightClose, PenLine, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
+import { ImagePlus, Loader2, PanelRightClose, PenLine, RotateCcw, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DrawingBoardCore } from '@/components/drawing-board/drawing-board-core'
+import { TeacherDrawingToolbar } from '@/components/drawing-board/drawing-board-toolbar'
+import type {
+  DrawingBoardCommandState,
+  DrawingBoardController,
+} from '@/components/drawing-board/drawing-board-controller'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
-  clampStrokeWidth,
   createDrawingPreview,
-  DRAWING_BACKGROUNDS,
   DRAWING_DEFAULT_ITEM_STATE,
   drawingBackgroundStyle,
-  HIGHLIGHTER_INK,
-  MAX_STROKE_WIDTH,
-  MIN_STROKE_WIDTH,
-  PEN_INK,
   stableDrawingAppState,
   TRANSPARENT_CANVAS,
 } from '@/components/exam/drawing-board-utils'
@@ -50,6 +49,7 @@ import {
   validateDrawingScene,
   type LegacyTeacherImageSnapshot,
 } from '@/lib/drawing-board-policy'
+import type { FingerInputMode } from '@/lib/drawing-board-input'
 
 interface Props {
   assignmentId: string
@@ -82,6 +82,16 @@ interface Props {
   /** A รูปประกอบโจทย์ the teacher asked to drop onto this board. */
   insertImage?: { url: string; nonce: number } | null
   onInsertImageHandled?: (nonce: number) => void
+  /** Detaches the live draft from its source slot after a next-step clone. */
+  onDuplicated?: () => void
+  fingerInputMode: FingerInputMode
+  onFingerInputModeChange: (mode: FingerInputMode) => void
+  presentationLocked: boolean
+  onPresentationLockedChange: (locked: boolean) => void
+  gridEnabled: boolean
+  onGridEnabledChange: (enabled: boolean) => void
+  snapEnabled: boolean
+  onSnapEnabledChange: (enabled: boolean) => void
   /** Given when the board can be put away. */
   onHide?: () => void
 }
@@ -126,6 +136,15 @@ export default function TeachingBoardEditor({
   onResolveSaveSlot,
   insertImage,
   onInsertImageHandled,
+  onDuplicated,
+  fingerInputMode,
+  onFingerInputModeChange,
+  presentationLocked,
+  onPresentationLockedChange,
+  gridEnabled,
+  onGridEnabledChange,
+  snapEnabled,
+  onSnapEnabledChange,
   onHide,
 }: Props) {
   const initialValidation = useMemo(
@@ -171,8 +190,20 @@ export default function TeachingBoardEditor({
   )
   const ignoreChangesRef = useRef(true)
   const [background, setBackground] = useState<ScratchpadBackground>(safeInitialScene.background)
-  const [strokeWidth, setStrokeWidth] = useState<number>(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
-  const [toolsHidden, setToolsHidden] = useState(false)
+  const [controller, setController] = useState<DrawingBoardController | null>(null)
+  const [commandState, setCommandState] = useState<DrawingBoardCommandState>({
+    ready: false,
+    readOnly: false,
+    activeTool: 'freedraw',
+    strokeColor: DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeColor,
+    strokeWidth: DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth,
+    opacity: DRAWING_DEFAULT_ITEM_STATE.currentItemOpacity,
+    fontFamily: FONT_FAMILY.Helvetica,
+    fontSize: 20,
+    canUndo: false,
+    canRedo: false,
+  })
+  const [duplicating, setDuplicating] = useState(false)
   const [insertingImage, setInsertingImage] = useState(false)
   const [pickingImage, setPickingImage] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -236,7 +267,6 @@ export default function TeachingBoardEditor({
     persistenceBlockedRef.current = true
     releasePersistenceOnReadyRef.current = true
     ignoreChangesRef.current = true
-    setStrokeWidth(DRAWING_DEFAULT_ITEM_STATE.currentItemStrokeWidth)
     const scene = emptyScratchpadScene()
     sceneRef.current = scene
     legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
@@ -319,11 +349,14 @@ export default function TeachingBoardEditor({
   useEffect(() => {
     if (!apiReady) return
     const frame = requestAnimationFrame(() => {
-      apiRef.current?.setActiveTool({ type: editable ? 'freedraw' : 'hand', locked: true })
+      apiRef.current?.setActiveTool({
+        type: presentationLocked ? 'laser' : editable ? 'freedraw' : 'hand',
+        locked: true,
+      })
       releaseChangeGuard()
     })
     return () => cancelAnimationFrame(frame)
-  }, [apiReady, editable])
+  }, [apiReady, editable, presentationLocked])
 
   // The strokes come back through initialData; this only restores the
   // "not saved yet" state that came with them.
@@ -360,37 +393,16 @@ export default function TeachingBoardEditor({
       paper.style.transform = `translate(${appState.scrollX * zoom}px, ${appState.scrollY * zoom}px) scale(${zoom})`
     }
     onSceneChange?.(sceneRef.current)
-    // Excalidraw's own thin/bold/extra-bold buttons move the slider too.
-    setStrokeWidth(current => current === appState.currentItemStrokeWidth ? current : appState.currentItemStrokeWidth)
     if (contentChanged && !ignoreChangesRef.current && editable) markDirty(true)
   }, [background, editable, markDirty, onSceneChange, operationPending])
 
   const chooseBackground = (next: ScratchpadBackground) => {
-    if (!editable) return
+    if (!editable || presentationLocked) return
     sceneMutationEpochRef.current += 1
     setBackground(next)
     sceneRef.current = { ...sceneRef.current, background: next }
     onSceneChange?.(sceneRef.current)
     markDirty(true)
-  }
-
-  const chooseInkPreset = (kind: 'pen' | 'highlighter' | 'eraser') => {
-    const api = apiRef.current
-    if (!api || !editable) return
-    if (kind === 'eraser') {
-      api.setActiveTool({ type: 'eraser', locked: true })
-      return
-    }
-    const ink = kind === 'pen' ? PEN_INK : HIGHLIGHTER_INK
-    api.updateScene({
-      appState: {
-        currentItemStrokeColor: ink.color,
-        currentItemStrokeWidth: ink.width,
-        currentItemOpacity: ink.opacity,
-      },
-    })
-    setStrokeWidth(ink.width)
-    api.setActiveTool({ type: 'freedraw', locked: true })
   }
 
   /**
@@ -404,7 +416,15 @@ export default function TeachingBoardEditor({
    */
   const dropQuestionImage = useCallback(async (url: string): Promise<boolean> => {
     const api = apiRef.current
-    if (!api || !editable || !sceneReady || persistenceBlockedRef.current || savingRef.current) return false
+    if (
+      !api
+      || !editable
+      || presentationLocked
+      || duplicating
+      || !sceneReady
+      || persistenceBlockedRef.current
+      || savingRef.current
+    ) return false
     const boardEpoch = loadRequestRef.current
     setInsertingImage(true)
     try {
@@ -467,7 +487,7 @@ export default function TeachingBoardEditor({
       setInsertingImage(false)
     }
     return true
-  }, [assignmentId, editable, markDirty, questionId, sceneReady])
+  }, [assignmentId, duplicating, editable, markDirty, presentationLocked, questionId, sceneReady])
 
   const handledInsertRef = useRef(0)
   useEffect(() => {
@@ -502,6 +522,63 @@ export default function TeachingBoardEditor({
     })
   }
 
+  const duplicateNextStep = async () => {
+    const api = apiRef.current
+    if (
+      !api
+      || !editable
+      || presentationLocked
+      || duplicating
+      || insertingImage
+      || savingRef.current
+      || persistenceBlockedRef.current
+    ) return
+    const source = snapshotDrawingScene(sceneRef.current)
+    const requestEpoch = loadRequestRef.current
+    setDuplicating(true)
+    try {
+      const { duplicateTeachingBoardScene } = await import('@/lib/actions/math-work')
+      const result = await duplicateTeachingBoardScene({
+        assignmentId,
+        questionId,
+        sourceBoardId: board?.id ?? null,
+        scene: source,
+      })
+      if (
+        apiRef.current !== api
+        || loadRequestRef.current !== requestEpoch
+        || persistenceBlockedRef.current
+        || savingRef.current
+      ) return
+      if (!result || 'error' in result) {
+        throw new Error(result?.error ?? 'ทำสำเนากระดานไม่สำเร็จ')
+      }
+      const validated = validateStoredTeacherScene(result.scene)
+      if (!validated.ok) throw new Error('สำเนากระดานมีข้อมูลที่ไม่รองรับ')
+      const scene = validated.scene
+
+      sceneMutationEpochRef.current += 1
+      persistenceBlockedRef.current = true
+      releasePersistenceOnReadyRef.current = true
+      setSceneReady(false)
+      ignoreChangesRef.current = true
+      sceneRef.current = scene
+      contentSignatureRef.current = contentSignature(scene.elements as readonly OrderedExcalidrawElement[])
+      legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
+      setBackground(scene.background)
+      setEditorScene(scene)
+      setEditorRevision(value => value + 1)
+      onSceneChange?.(scene)
+      onDuplicated?.()
+      markDirty(true)
+      toast.success('สร้างขั้นถัดไปแล้ว · ต้นฉบับยังอยู่ช่องเดิม')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'ทำสำเนากระดานไม่สำเร็จ')
+    } finally {
+      if (mountedRef.current) setDuplicating(false)
+    }
+  }
+
   /**
    * Scrolling past the top or bottom edge of the sheet belongs to the page,
    * not to the board: that is how a teacher reaches the next ข้อ with the same
@@ -517,14 +594,6 @@ export default function TeachingBoardEditor({
     const pastBottom = event.deltaY > 0 && paper.bottom <= box.bottom + 1
     const pastTop = event.deltaY < 0 && paper.top >= box.top - 1
     if (pastBottom || pastTop) event.stopPropagation()
-  }
-
-  const chooseStrokeWidth = (value: number) => {
-    const api = apiRef.current
-    if (!api || !editable) return
-    const next = clampStrokeWidth(value)
-    setStrokeWidth(next)
-    api.updateScene({ appState: { currentItemStrokeWidth: next } })
   }
 
   const saveBoard = async () => {
@@ -647,19 +716,21 @@ export default function TeachingBoardEditor({
               <p className="text-[10px] text-muted-foreground" aria-live="polite">
                 {saving ? 'กำลังบันทึก...'
                   : insertingImage ? 'กำลังใส่รูปจากโจทย์...'
-                    : !editable ? 'ดูอย่างเดียว'
-                      : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก'
-                        : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
+                    : duplicating ? 'กำลังสร้างขั้นถัดไป...'
+                      : presentationLocked ? 'ล็อกพรีเซนต์ · เขียนแก้ไม่ได้'
+                        : !editable ? 'ดูอย่างเดียว'
+                          : dirty ? 'มีการแก้ไขที่ยังไม่บันทึก'
+                            : board ? 'บันทึกแล้ว' : 'กระดานใหม่'}
               </p>
             </div>
             <div className="ml-auto flex items-center gap-1">
               {canReset && (
-                <Button type="button" variant="outline" size="xs" onClick={() => resetCanvas(Boolean(board))} disabled={saving || loading || operationPending}>
+                <Button type="button" variant="outline" size="xs" onClick={() => resetCanvas(Boolean(board))} disabled={saving || loading || operationPending || presentationLocked || duplicating}>
                   <RotateCcw /> กระดานใหม่
                 </Button>
               )}
               {editable && (
-                <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || (Boolean(board) && !dirty)}>
+                <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || duplicating || (Boolean(board) && !dirty)}>
                   {saving ? <Loader2 className="animate-spin" /> : <Save />}
                   {saving ? 'กำลังบันทึก...' : board ? 'บันทึกทับ' : 'บันทึก'}
                 </Button>
@@ -671,40 +742,13 @@ export default function TeachingBoardEditor({
               )}
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5">
-            <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('pen')} disabled={!editable}>
-              <PenLine /> ปากกา
-            </Button>
-            <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('highlighter')} disabled={!editable}>
-              <Highlighter /> ไฮไลต์
-            </Button>
-            <Button type="button" variant="outline" size="xs" onClick={() => chooseInkPreset('eraser')} disabled={!editable}>
-              <Eraser /> ยางลบ
-            </Button>
-            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-            <label className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
-              ขนาดเส้น
-              <input
-                type="range"
-                min={MIN_STROKE_WIDTH}
-                max={MAX_STROKE_WIDTH}
-                step={1}
-                value={strokeWidth}
-                onChange={event => chooseStrokeWidth(Number(event.target.value))}
-                disabled={!editable}
-                aria-label="ขนาดเส้น"
-                className="h-1 w-24 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
-              />
-              <span className="w-3 text-right font-mono text-[10px] text-foreground" aria-hidden="true">{strokeWidth}</span>
-            </label>
-            {/* The same รูปประกอบโจทย์ the card offers, within reach of a
-                teacher whose eyes are already on the board. */}
-            {editable && questionImages.length > 0 && (
+          {editable && questionImages.length > 0 && (
+            <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5">
               <Button
                 type="button"
                 variant={pickingImage ? 'secondary' : 'outline'}
                 size="xs"
-                disabled={insertingImage}
+                disabled={insertingImage || presentationLocked}
                 aria-pressed={questionImages.length > 1 ? pickingImage : undefined}
                 onClick={() => {
                   if (questionImages.length === 1) void dropQuestionImage(questionImages[0])
@@ -714,37 +758,8 @@ export default function TeachingBoardEditor({
                 {insertingImage ? <Loader2 className="animate-spin" /> : <ImagePlus />}
                 รูปโจทย์{questionImages.length > 1 ? ` (${questionImages.length})` : ''}
               </Button>
-            )}
-            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-            <Button type="button" variant="outline" size="xs" onClick={fitPaper} title="จัดกระดาษให้พอดีจอ">
-              <Maximize2 /> พอดีจอ
-            </Button>
-            <Button
-              type="button"
-              variant={toolsHidden ? 'secondary' : 'outline'}
-              size="xs"
-              aria-pressed={toolsHidden}
-              onClick={() => setToolsHidden(value => !value)}
-              title="ซ่อน/แสดงแถบเครื่องมือของกระดาน"
-            >
-              <SlidersHorizontal /> {toolsHidden ? 'แสดงแถบเครื่องมือ' : 'ซ่อนแถบเครื่องมือ'}
-            </Button>
-            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-            {DRAWING_BACKGROUNDS.map(item => (
-              <Button
-                key={item.value}
-                type="button"
-                variant={background === item.value ? 'secondary' : 'ghost'}
-                size="xs"
-                className="shrink-0"
-                onClick={() => chooseBackground(item.value)}
-                disabled={!editable}
-                aria-pressed={background === item.value}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {pickingImage && questionImages.length > 1 && (
@@ -770,12 +785,34 @@ export default function TeachingBoardEditor({
           </div>
         )}
 
+        <TeacherDrawingToolbar
+          controller={controller}
+          state={commandState}
+          background={background}
+          fingerMode={fingerInputMode}
+          disabled={!editable || duplicating || insertingImage}
+          presentationLocked={presentationLocked}
+          gridEnabled={gridEnabled}
+          snapEnabled={snapEnabled}
+          duplicateBusy={duplicating}
+          onBackgroundChange={chooseBackground}
+          onFingerModeChange={onFingerInputModeChange}
+          onFit={fitPaper}
+          onPresentationLockedChange={locked => {
+            setPickingImage(false)
+            onPresentationLockedChange(locked)
+          }}
+          onGridEnabledChange={onGridEnabledChange}
+          onSnapEnabledChange={onSnapEnabledChange}
+          onDuplicateNextStep={() => void duplicateNextStep()}
+        />
+
         <DrawingBoardCore
           role="teacher"
           background={background}
           surfaceRef={surfaceRef}
           onWheelCapture={passWheelToPage}
-          className={`flex-1 bg-muted/40 [&_.excalidraw]:!min-w-0 [&_.excalidraw]:!bg-transparent ${toolsHidden ? 'board-tools-hidden' : ''}`}
+          className="flex-1 bg-muted/40 [&_.excalidraw]:!min-w-0 [&_.excalidraw]:!bg-transparent"
           initialData={{
             elements: editorScene.elements as readonly OrderedExcalidrawElement[],
             appState: {
@@ -799,6 +836,13 @@ export default function TeachingBoardEditor({
           }}
           onChange={handleChange}
           viewModeEnabled={!editable}
+          contentEditingLocked={presentationLocked || duplicating}
+          gridModeEnabled={gridEnabled}
+          objectsSnapModeEnabled={snapEnabled}
+          fingerInputMode={fingerInputMode}
+          hideNativeControls
+          onControllerReady={setController}
+          onCommandStateChange={setCommandState}
           legacyTeacherImagesRef={legacyTeacherImagesRef}
         >
           {/* The sheet: sits under a transparent canvas and is moved by

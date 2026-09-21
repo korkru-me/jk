@@ -119,6 +119,10 @@ interface DrawingBoardCoreProps {
   onReady: (api: ExcalidrawImperativeAPI) => void
   onPointerUp?: ExcalidrawProps['onPointerUp']
   viewModeEnabled?: boolean
+  /** Session-only presentation lock. Laser and hand remain available. */
+  contentEditingLocked?: boolean
+  gridModeEnabled?: boolean
+  objectsSnapModeEnabled?: boolean
   autoFocus?: boolean
   theme?: ExcalidrawProps['theme']
   surfaceRef?: RefObject<HTMLDivElement | null>
@@ -387,6 +391,9 @@ export function DrawingBoardCore({
   onReady,
   onPointerUp,
   viewModeEnabled = false,
+  contentEditingLocked = false,
+  gridModeEnabled = false,
+  objectsSnapModeEnabled = false,
   autoFocus = false,
   theme,
   surfaceRef,
@@ -413,6 +420,9 @@ export function DrawingBoardCore({
   const lifecycleGenerationRef = useRef(0)
   const inputModeRef = useRef(fingerInputMode)
   const viewModeEnabledRef = useRef(viewModeEnabled)
+  const contentEditingLockedRef = useRef(contentEditingLocked)
+  const gridModeEnabledRef = useRef(gridModeEnabled)
+  const objectsSnapModeEnabledRef = useRef(objectsSnapModeEnabled)
   const onControllerReadyRef = useRef(onControllerReady)
   const onCommandStateChangeRef = useRef(onCommandStateChange)
   const pointerRoutingRef = useRef<DrawingPointerRoutingState>(
@@ -433,6 +443,9 @@ export function DrawingBoardCore({
   backgroundRef.current = background
   inputModeRef.current = fingerInputMode
   viewModeEnabledRef.current = viewModeEnabled
+  contentEditingLockedRef.current = contentEditingLocked
+  gridModeEnabledRef.current = gridModeEnabled
+  objectsSnapModeEnabledRef.current = objectsSnapModeEnabled
   onControllerReadyRef.current = onControllerReady
   onCommandStateChangeRef.current = onCommandStateChange
 
@@ -449,7 +462,7 @@ export function DrawingBoardCore({
       surface,
       api,
       nextAppState ?? api.getAppState(),
-      viewModeEnabledRef.current,
+      viewModeEnabledRef.current || contentEditingLockedRef.current,
       privateAppRef.current ? historyStateRef.current : undefined,
     )
     if (sameCommandState(lastCommandStateRef.current, next)) return
@@ -549,11 +562,18 @@ export function DrawingBoardCore({
             scheduleCommandState()
             return true
           }
-          const canChangeContent = () => !viewModeEnabledRef.current
+          const canChangeContent = () => (
+            !viewModeEnabledRef.current && !contentEditingLockedRef.current
+          )
           const controller: DrawingBoardController = {
             selectTool: tool => {
               if (!isDrawingBoardToolAllowed(role, tool)) return false
-              if (viewModeEnabledRef.current && tool !== 'hand') return false
+              if (
+                viewModeEnabledRef.current
+                && tool !== 'hand'
+                && !(contentEditingLockedRef.current && role === 'teacher' && tool === 'laser')
+              ) return false
+              if (contentEditingLockedRef.current && !['hand', 'laser'].includes(tool)) return false
               api.setActiveTool({ type: tool, locked: true })
               scheduleCommandState()
               return true
@@ -659,7 +679,7 @@ export function DrawingBoardCore({
 
   useEffect(() => {
     scheduleCommandState()
-  }, [scheduleCommandState, viewModeEnabled])
+  }, [contentEditingLocked, scheduleCommandState, viewModeEnabled])
 
   useLayoutEffect(() => {
     const surface = localSurfaceRef.current
@@ -756,6 +776,7 @@ export function DrawingBoardCore({
       if (
         !api
         || viewModeEnabledRef.current
+        || contentEditingLockedRef.current
         || api.getAppState().activeTool.type !== 'eraser'
         || (event.pointerType === 'touch' && inputModeRef.current === 'finger_pan')
         || (event.pointerType === 'mouse' && event.button !== 0)
@@ -819,7 +840,13 @@ export function DrawingBoardCore({
         return
       }
       const api = apiRef.current
-      if (!api || api.getAppState().activeTool.type !== 'text' || text === null || viewModeEnabled) {
+      if (
+        !api
+        || api.getAppState().activeTool.type !== 'text'
+        || text === null
+        || viewModeEnabledRef.current
+        || contentEditingLockedRef.current
+      ) {
         stop(event)
         return
       }
@@ -870,7 +897,7 @@ export function DrawingBoardCore({
       window.removeEventListener('pointerdown', denyControl, true)
       window.removeEventListener('click', denyControl, true)
     }
-  }, [viewModeEnabled])
+  }, [])
 
   const handleChange = useCallback((
     elements: readonly OrderedExcalidrawElement[],
@@ -899,7 +926,7 @@ export function DrawingBoardCore({
       api.setActiveTool({
         type: isDrawingBoardToolAllowed(role, activeTool)
           ? activeTool as 'freedraw'
-          : (viewModeEnabled ? 'hand' : 'freedraw'),
+          : ((viewModeEnabled || contentEditingLocked) ? 'hand' : 'freedraw'),
         locked: true,
       })
     }
@@ -910,11 +937,20 @@ export function DrawingBoardCore({
     if (appState.openMenu !== null) transientPatch.openMenu = null
     if (appState.openDialog !== null) transientPatch.openDialog = null
     if (appState.showHyperlinkPopup !== false) transientPatch.showHyperlinkPopup = false
-    if (appState.gridModeEnabled) transientPatch.gridModeEnabled = false
-    if (appState.objectsSnapModeEnabled) transientPatch.objectsSnapModeEnabled = false
+    if (appState.gridModeEnabled !== gridModeEnabledRef.current) {
+      transientPatch.gridModeEnabled = gridModeEnabledRef.current
+    }
+    if (appState.objectsSnapModeEnabled !== objectsSnapModeEnabledRef.current) {
+      transientPatch.objectsSnapModeEnabled = objectsSnapModeEnabledRef.current
+    }
     if (appState.fileHandle !== null) transientPatch.fileHandle = null
     if (appState.pendingImageElementId !== null) transientPatch.pendingImageElementId = null
-    if (Object.keys(transientPatch).length > 0) api?.updateScene({ appState: transientPatch as AppState })
+    if (Object.keys(transientPatch).length > 0) {
+      api?.updateScene({
+        appState: transientPatch as AppState,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      })
+    }
 
     // Excalidraw's binary-file map is intentionally outside undo history. A
     // trusted image insertion therefore emits one transient file-only change,
@@ -983,7 +1019,7 @@ export function DrawingBoardCore({
       snapshot.appState as unknown as AppState,
       snapshot.files as BinaryFiles,
     )
-  }, [editorRevision, fingerInputEnabled, legacyTeacherImagesRef, onChange, role, scheduleCommandState, viewModeEnabled])
+  }, [contentEditingLocked, editorRevision, fingerInputEnabled, legacyTeacherImagesRef, onChange, role, scheduleCommandState, viewModeEnabled])
 
   const handlePointerUp = useCallback<NonNullable<ExcalidrawProps['onPointerUp']>>((
     activeTool,
@@ -1001,6 +1037,7 @@ export function DrawingBoardCore({
         || !privateApp
         || !hasPartialEraserInternals(privateApp)
         || viewModeEnabledRef.current
+        || contentEditingLockedRef.current
         || !isDrawingBoardCommandAllowed(role, 'erase-partial')
       ) return
 
@@ -1086,14 +1123,14 @@ export function DrawingBoardCore({
         onDuplicate={(_next, previous) => [...previous]}
         onLinkOpen={(_element, event) => event.preventDefault()}
         langCode="th-TH"
-        viewModeEnabled={viewModeEnabled}
+        viewModeEnabled={viewModeEnabled || contentEditingLocked}
         handleKeyboardGlobally={false}
         autoFocus={autoFocus}
         aiEnabled={false}
         validateEmbeddable={false}
         theme={theme}
-        gridModeEnabled={false}
-        objectsSnapModeEnabled={false}
+        gridModeEnabled={gridModeEnabled}
+        objectsSnapModeEnabled={objectsSnapModeEnabled}
         UIOptions={{
           canvasActions: {
             changeViewBackgroundColor: false,

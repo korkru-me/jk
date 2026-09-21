@@ -27,6 +27,7 @@ import {
   type DrawingSceneValidationResult,
   type LegacyTeacherImageSnapshot,
 } from '@/lib/drawing-board-policy'
+import { duplicateDrawingScene } from '@/lib/drawing-board-duplicate'
 import {
   QUESTION_IMAGE_CLAIM_KIND,
   QUESTION_IMAGE_CLAIM_VERSION,
@@ -521,6 +522,117 @@ export async function prepareTeachingQuestionImage(input: {
   } catch {
     return { error: 'รูปประกอบโจทย์นี้เปิดไม่ได้' }
   }
+}
+
+/**
+ * Verifies a teacher scene and creates a detached next-step draft in memory.
+ * Image provenance is re-issued because each trusted claim is cryptographically
+ * bound to its file id; this action does not upload or persist anything.
+ */
+export async function duplicateTeachingBoardScene(input: {
+  assignmentId: string
+  questionId: string
+  sourceBoardId?: string | null
+  scene: unknown
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!isUuid(input.assignmentId) || !isUuid(input.questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
+  const managed = await loadManagedTeachingBoardContext(supabase, input.assignmentId, input.questionId)
+  if ('error' in managed) return managed
+  const claimSecret = uploadReceiptSecret()
+  if (!claimSecret) return { error: 'ระบบตรวจสอบรูปโจทย์ยังไม่พร้อมใช้งาน' }
+
+  let legacyTeacherImages: LegacyTeacherImageSnapshot | null = null
+  if (input.sourceBoardId) {
+    if (!isUuid(input.sourceBoardId)) return { error: 'กระดานต้นฉบับไม่ถูกต้อง' }
+    const { data: sourceBoard, error: sourceBoardError } = await supabase
+      .from('teaching_boards')
+      .select('id, assignment_id, question_id, created_by, scene_path')
+      .eq('id', input.sourceBoardId)
+      .eq('assignment_id', input.assignmentId)
+      .eq('question_id', input.questionId)
+      .eq('created_by', user.id)
+      .maybeSingle()
+    if (sourceBoardError || !sourceBoard) return { error: 'ไม่พบกระดานต้นฉบับหรือไม่มีสิทธิ์ทำสำเนา' }
+    const storedSource = await loadStoredScene(createAdminClient(), sourceBoard.scene_path)
+    if (!storedSource) return { error: 'เปิดกระดานต้นฉบับเพื่อทำสำเนาไม่สำเร็จ' }
+    legacyTeacherImages = previousTeacherImages(storedSource)
+  }
+
+  const verifiedFiles = new Map<string, { mimeType: string; bytes: Uint8Array }>()
+  const validated = validateDrawingScene(input.scene, {
+    role: 'teacher',
+    legacyTeacherImages,
+    verifyTeacherImage: ({ fileId, mimeType, bytes, claim }) => {
+      verifiedFiles.set(fileId, { mimeType, bytes })
+      const trust = verifyQuestionImageClaim(claim, {
+        actorId: user.id,
+        assignmentId: input.assignmentId,
+        questionId: input.questionId,
+        fileId,
+        mimeType,
+        dataSha256: sha256Hex(bytes),
+      }, claimSecret)
+      if (trust === 'valid' || trust === 'expired-authentic') {
+        // Authentic expired claims can be re-issued after fresh authorization.
+        return 'valid'
+      }
+      return 'invalid'
+    },
+  })
+  if (!validated.ok) return { error: 'กระดานมีข้อมูลที่ไม่รองรับหรือรูปโจทย์ไม่ผ่านการตรวจสอบ' }
+
+  const now = Date.now()
+  const duplicated = duplicateDrawingScene(validated.scene, () => crypto.randomUUID(), now)
+  const files: Record<string, unknown> = {}
+  for (const [oldFileId, newFileId] of duplicated.fileIdMap) {
+    const original = verifiedFiles.get(oldFileId)
+    const value = duplicated.scene.files[newFileId]
+    if (!original || !value || typeof value !== 'object' || Array.isArray(value)) {
+      return { error: 'ทำสำเนารูปในกระดานไม่สำเร็จ' }
+    }
+    const dataSha256 = sha256Hex(original.bytes)
+    const claim = signQuestionImageClaim({
+      version: QUESTION_IMAGE_CLAIM_VERSION,
+      kind: QUESTION_IMAGE_CLAIM_KIND,
+      actorId: user.id,
+      assignmentId: input.assignmentId,
+      questionId: input.questionId,
+      sourcePath: `duplicate-board/${oldFileId}`,
+      sourceSha256: dataSha256,
+      fileId: newFileId,
+      mimeType: original.mimeType,
+      dataSha256,
+      issuedAt: now,
+      expiresAt: now + QUESTION_IMAGE_CLAIM_LIFETIME_MS,
+    }, claimSecret)
+    files[newFileId] = {
+      ...value,
+      korkruQuestionImage: { version: QUESTION_IMAGE_CLAIM_VERSION, claim },
+    }
+  }
+  const scene = { ...duplicated.scene, files }
+  const final = validateDrawingScene(scene, {
+    role: 'teacher',
+    verifyTeacherImage: ({ fileId, mimeType, bytes, claim }) => verifyQuestionImageClaim(
+      claim,
+      {
+        actorId: user.id,
+        assignmentId: input.assignmentId,
+        questionId: input.questionId,
+        fileId,
+        mimeType,
+        dataSha256: sha256Hex(bytes),
+      },
+      claimSecret,
+      now,
+    ),
+  })
+  return final.ok
+    ? { success: true as const, scene: final.scene }
+    : { error: 'ทำสำเนากระดานไม่สำเร็จ' }
 }
 
 /**
