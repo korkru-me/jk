@@ -139,7 +139,7 @@ export function StudentDrawingToolbar({
           disabled={contentDisabled}
           onClick={() => chooseTool('eraser')}
         >
-          <Eraser data-icon="inline-start" /> ยางลบวัตถุ
+          <Eraser data-icon="inline-start" /> ยางลบ
         </Button>
         <Button
           type="button"

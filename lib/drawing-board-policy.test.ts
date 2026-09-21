@@ -98,7 +98,7 @@ function teacherImageScene(overrides: { dataURL?: string; claim?: string; elemen
 
 describe('drawing board command policy', () => {
   const common: DrawingBoardCommand[] = [
-    'select', 'edit', 'delete', 'erase-object', 'undo', 'redo', 'pan', 'zoom',
+    'select', 'edit', 'delete', 'erase-object', 'erase-partial', 'undo', 'redo', 'pan', 'zoom',
     'fit', 'change-tool', 'paste-literal-text',
   ]
   const teacherOnly: DrawingBoardCommand[] = [

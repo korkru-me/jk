@@ -8,7 +8,10 @@ import {
   MainMenu,
   viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw'
-import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
+import type {
+  ExcalidrawElement,
+  OrderedExcalidrawElement,
+} from '@excalidraw/excalidraw/element/types'
 import type {
   AppState,
   BinaryFiles,
@@ -28,6 +31,10 @@ import type {
   DrawingBoardController,
   DrawingBoardInkPreset,
 } from '@/components/drawing-board/drawing-board-controller'
+import {
+  applyPartialEraserGesture,
+  type DrawingEraserPoint,
+} from '@/lib/drawing-board-partial-eraser'
 import {
   isDrawingBoardCommandAllowed,
   isIncompleteTransientDrawingElement,
@@ -152,10 +159,20 @@ interface PrivateExcalidrawApp {
       }) => void) => () => void
     }
   }
+  elementsPendingErasure?: Set<string>
+  store?: {
+    shouldCaptureIncrement: () => void
+  }
+}
+
+interface ActivePartialEraserGesture {
+  pointerId: number
+  points: DrawingEraserPoint[]
 }
 
 const COMMAND_BRIDGE_NAME = 'korkru-command-bridge'
 const COMMAND_BRIDGE_KEY = 'F13'
+const PARTIAL_ERASER_RADIUS_PX = 9
 
 function isPrivateExcalidrawApp(value: unknown): value is PrivateExcalidrawApp {
   if (!value || typeof value !== 'object') return false
@@ -175,6 +192,15 @@ function isPrivateExcalidrawApp(value: unknown): value is PrivateExcalidrawApp {
     && history.onHistoryChangedEmitter
     && typeof history.onHistoryChangedEmitter.on === 'function',
   )
+}
+
+function hasPartialEraserInternals(app: PrivateExcalidrawApp): app is PrivateExcalidrawApp & {
+  elementsPendingErasure: Set<string>
+  store: { shouldCaptureIncrement: () => void }
+} {
+  return app.elementsPendingErasure instanceof Set
+    && Boolean(app.store)
+    && typeof app.store?.shouldCaptureIncrement === 'function'
 }
 
 function targetInside(surface: HTMLDivElement, target: EventTarget | null): boolean {
@@ -392,6 +418,7 @@ export function DrawingBoardCore({
   const pointerRoutingRef = useRef<DrawingPointerRoutingState>(
     INITIAL_DRAWING_POINTER_ROUTING_STATE,
   )
+  const partialEraserGestureRef = useRef<ActivePartialEraserGesture | null>(null)
   const activeEditorRevisionRef = useRef(editorRevision)
   const lastGoodRef = useRef<RevisionedDrawingSceneSnapshot | null>(null)
   const restoringRevisionRef = useRef<number | null>(null)
@@ -709,6 +736,66 @@ export function DrawingBoardCore({
   useLayoutEffect(() => {
     const surface = localSurfaceRef.current
     if (!surface) return
+
+    const appendPoint = (event: PointerEvent, force = false) => {
+      const gesture = partialEraserGestureRef.current
+      const api = apiRef.current
+      if (!gesture || gesture.pointerId !== event.pointerId || !api) return
+      const point = viewportCoordsToSceneCoords(event, api.getAppState())
+      const previous = gesture.points.at(-1)
+      const minimumDistance = 0.5 / Math.max(api.getAppState().zoom.value, 0.1)
+      if (
+        force
+        || !previous
+        || Math.hypot(point.x - previous.x, point.y - previous.y) >= minimumDistance
+      ) gesture.points.push(point)
+    }
+    const pointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof HTMLCanvasElement)) return
+      const api = apiRef.current
+      if (
+        !api
+        || viewModeEnabledRef.current
+        || api.getAppState().activeTool.type !== 'eraser'
+        || (event.pointerType === 'touch' && inputModeRef.current === 'finger_pan')
+        || (event.pointerType === 'mouse' && event.button !== 0)
+      ) return
+      if (
+        partialEraserGestureRef.current
+        && partialEraserGestureRef.current.pointerId !== event.pointerId
+      ) {
+        // A second touch belongs to Excalidraw's native pinch gesture, not to
+        // a partial erase path.
+        partialEraserGestureRef.current = null
+        return
+      }
+      partialEraserGestureRef.current = { pointerId: event.pointerId, points: [] }
+      appendPoint(event, true)
+    }
+    const pointerMove = (event: PointerEvent) => appendPoint(event)
+    const pointerUp = (event: PointerEvent) => appendPoint(event, true)
+    const pointerCancel = (event: PointerEvent) => {
+      if (partialEraserGestureRef.current?.pointerId === event.pointerId) {
+        partialEraserGestureRef.current = null
+      }
+    }
+
+    surface.addEventListener('pointerdown', pointerDown, true)
+    window.addEventListener('pointermove', pointerMove, true)
+    window.addEventListener('pointerup', pointerUp, true)
+    window.addEventListener('pointercancel', pointerCancel, true)
+    return () => {
+      surface.removeEventListener('pointerdown', pointerDown, true)
+      window.removeEventListener('pointermove', pointerMove, true)
+      window.removeEventListener('pointerup', pointerUp, true)
+      window.removeEventListener('pointercancel', pointerCancel, true)
+      partialEraserGestureRef.current = null
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    const surface = localSurfaceRef.current
+    if (!surface) return
     const isScoped = (target: EventTarget | null) => (
       targetInside(surface, target) || targetInside(surface, document.activeElement)
     )
@@ -898,6 +985,78 @@ export function DrawingBoardCore({
     )
   }, [editorRevision, fingerInputEnabled, legacyTeacherImagesRef, onChange, role, scheduleCommandState, viewModeEnabled])
 
+  const handlePointerUp = useCallback<NonNullable<ExcalidrawProps['onPointerUp']>>((
+    activeTool,
+    pointerDownState,
+  ) => {
+    const gesture = partialEraserGestureRef.current
+    partialEraserGestureRef.current = null
+    try {
+      const api = apiRef.current
+      const privateApp = privateAppRef.current
+      if (
+        activeTool.type !== 'eraser'
+        || !gesture
+        || !api
+        || !privateApp
+        || !hasPartialEraserInternals(privateApp)
+        || viewModeEnabledRef.current
+        || !isDrawingBoardCommandAllowed(role, 'erase-partial')
+      ) return
+
+      const appState = api.getAppState()
+      const currentElements = api.getSceneElementsIncludingDeleted()
+      const files = role === 'teacher'
+        ? referencedDrawingFiles(
+            currentElements,
+            api.getFiles() as Record<string, unknown>,
+          ) as BinaryFiles
+        : api.getFiles()
+      const result = applyPartialEraserGesture(
+        currentElements as readonly ExcalidrawElement[],
+        gesture.points,
+        {
+          radius: PARTIAL_ERASER_RADIUS_PX / Math.max(appState.zoom.value, 0.1),
+          minFragmentLength: 1 / Math.max(appState.zoom.value, 0.1),
+          updated: Date.now(),
+          acceptElements: elements => validateDrawingScene({
+            formatVersion: CURRENT_WORK_FORMAT_VERSION,
+            elements,
+            appState: stableDrawingAppState(appState),
+            files,
+            background: backgroundRef.current,
+          }, {
+            role,
+            verifyTeacherImage: ({ claim }) => claim ? 'valid' : 'invalid',
+            legacyTeacherImages: legacyTeacherImagesRef?.current ?? null,
+          }).ok,
+        },
+      )
+      if (result.status === 'rejected') {
+        // Reject the entire gesture, including native whole-object targets,
+        // when the candidate scene would cross the shared persistence guard.
+        privateApp.elementsPendingErasure.clear()
+        return
+      }
+      if (result.status !== 'applied') return
+
+      for (const elementId of result.erasedElementIds) {
+        privateApp.elementsPendingErasure.delete(elementId)
+      }
+      // Public updateScene(EVENTUALLY) changes the scene without taking a
+      // separate snapshot. The native whole-object eraser then commits the
+      // same scheduled increment, so a mixed gesture is still one undo step.
+      privateApp.store.shouldCaptureIncrement()
+      api.updateScene({
+        elements: result.elements,
+        captureUpdate: CaptureUpdateAction.EVENTUALLY,
+      })
+      scheduleCommandState()
+    } finally {
+      onPointerUp?.(activeTool, pointerDownState)
+    }
+  }, [legacyTeacherImagesRef, onPointerUp, role, scheduleCommandState])
+
   const activeRecovery = recovery?.editorRevision === editorRevision ? recovery : null
   const effectiveInitialData = activeRecovery ? {
     elements: activeRecovery.scene.elements as readonly OrderedExcalidrawElement[],
@@ -922,7 +1081,7 @@ export function DrawingBoardCore({
         initialData={effectiveInitialData}
         excalidrawAPI={handleReady}
         onChange={handleChange}
-        onPointerUp={onPointerUp}
+        onPointerUp={handlePointerUp}
         onPaste={() => false}
         onDuplicate={(_next, previous) => [...previous]}
         onLinkOpen={(_element, event) => event.preventDefault()}

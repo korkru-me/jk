@@ -2,9 +2,9 @@
 
 อัปเดตล่าสุด: 21 กันยายน 2026
 
-สถานะ: **เฟส 3 — implementation ของ student draft/attachment correctness ทำเสร็จบน branch `codex/drawing-board-phase-3`; ยังไม่ merge/deploy** โดยต่อจาก shared core/policy boundary และ student toolbar/input mode ของเฟส 1–2; automated/local gates ผ่านแล้ว แต่ authenticated Auth/Storage, physical UAT, teacher loop/heap, upstream Excalidraw/React dev warnings และ schema debt ของ preview PNG บน Safari ยังเป็น rollout/hardening gate ก่อน deploy
+สถานะ: **เฟส 4 — implementation ของ partial eraser ทำเสร็จบน branch `codex/drawing-board-phase-4`; ยังไม่ merge/deploy** โดยตัดเฉพาะเส้น freehand/highlighter และคงการลบทั้งวัตถุสำหรับ element อื่น; automated/local gates ผ่านแล้ว แต่ authenticated Auth/Storage, physical Safari/iPad/stylus UAT, teacher loop/heap, upstream Excalidraw/React dev warnings และ schema debt ของ preview PNG บน Safari ยังเป็น rollout/hardening gate ก่อน deploy
 
-เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงสภาพปลายทางของเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว; ผลลัพธ์เฟส 1–3 ด้านล่างเป็นโค้ดบน branch ที่ยังไม่ merge/deploy และงานเฟส 4–8 ยังต้องทำต่อ
+เอกสารนี้เป็น source of truth ของงานปรับปรุงพื้นที่เขียนรุ่นถัดไป ส่วน `docs/STUDENT_MATH_TOOLS.md` ยังอธิบายฟีเจอร์ที่ส่งมอบแล้วในรุ่นปัจจุบัน หากเอกสารนี้พูดถึง “เป้าหมาย” หมายถึงสภาพปลายทางของเฟส 1–8 ไม่ใช่ของที่ production มีแล้ว; ผลลัพธ์เฟส 1–4 ด้านล่างเป็นโค้ดบน branch ที่ยังไม่ merge/deploy และงานเฟส 5–8 ยังต้องทำต่อ
 
 ฐานที่ตรวจในเฟส 0 คือ commit `ecfacda79158d80fe73d529a45d1e49616b9218c` ซึ่งตรงกับ `origin/exam-uat-evidence` ณ วันที่ตรวจ งานเฟส 0 อยู่บน branch `codex/drawing-board-phase-0` และไม่ deploy หรือเปลี่ยน `origin/master`
 
@@ -55,6 +55,15 @@
 - regression ผ่าน 114 test files / 1,511 tests, TypeScript, design-token lint และ production build 63 static pages; initial route `/assignments/[id]/take` ยังมี 17 chunks รวม 808,768 bytes raw / 247,723 bytes gzip (+3,338/+712 จากเฟส 2 และต่ำกว่า gate 256,828 gzip) พร้อม scan ไม่พบ Excalidraw, mathjs, Supabase browser client, `sharp` package หรือ server-only board code ใน union
 - ไม่มี migration, RLS, Storage path, scene envelope, artifact schema/server authorization หรือ teacher behavior change ในเฟสนี้; preview ยังเก็บ scene ใน memory เท่านั้น และ authenticated Auth/Storage flow, physical Safari/iPad/stylus, teacher hardening/UAT กับ PNG schema debt เดิมยังเป็น rollout gate แยก
 
+## ผลลัพธ์ของเฟส 4
+
+- เพิ่ม partial eraser ใน shared core สำหรับ `freedraw` เท่านั้น จึงใช้ได้ทั้งปากกาและไฮไลต์ ส่วนเส้นตรง ลูกศร รูปทรง ข้อความ รูปภาพ และ Frame ยังปล่อยให้ native eraser ลบทั้งวัตถุตามเดิม
+- เรขาคณิตหาช่วงตัดจาก intersection ระหว่างแต่ละ segment ของเส้นกับ swept capsule ของทางลากยางลบโดยตรง ไม่ใช้การสุ่มจุด แล้วสร้าง fragment ที่คงพิกัดของเส้นหมุน, สี, ความหนา, opacity, pressure, group, frame และลำดับ z เดิม; fragment id/version nonce สร้างแบบ deterministic, เศษสั้นกว่าหนึ่งพิกเซลหน้าจอถูกทิ้ง และการแตะที่ครอบทั้งเส้นจะเหลือเฉพาะ tombstone สำหรับ undo
+- หนึ่ง pointer gesture สร้าง scene replacement แบบ atomic ก่อน native whole-object erase commit จึงตัด freehand และลบรูปทรงที่โดนในจังหวะเดียวกันได้ด้วย Undo ครั้งเดียว และ Redo คืน fragment id เดิม; runtime Chromium ยืนยัน pen, highlighter และ mixed freehand+rectangle แล้ว
+- ก่อนนำ fragment เข้า editor ใช้ full `validateDrawingScene` กับ exact scene/app state/files ทั้งก้อน จึงบังคับ sanitizer, เพดาน 2 MiB และ 10,000 elements เดิมแบบ fail closed; ถ้าผลตัดไม่ผ่านจะไม่แก้ฉากบางส่วน และไม่เปลี่ยน scene envelope, IndexedDB, Storage หรือ server persistence contract
+- regression ผ่าน 115 test files / 1,521 tests, TypeScript, design-token lint และ production build 63 static pages; initial route `/assignments/[id]/take` ยังมี 17 chunks รวม 808,768 bytes raw / 247,726 bytes gzip (+0/+3 จากเฟส 3 และต่ำกว่า gate 256,828 gzip) พร้อม scan ไม่พบ Excalidraw, mathjs, Supabase browser client, `sharp` package, partial-eraser module หรือ server-only board code ใน initial union
+- local Chromium ที่ `/exam-screen-lab` ผ่าน partial cut, highlighter style preservation, mixed whole-object erase, one-step undo/redo และ viewport 390×844, 768×1024, 1024×768, 1280×800 โดย document ไม่ล้นและ toolbar เลื่อนไปถึงคำสั่งท้ายแถวได้; Next dev MCP และ browser console ไม่มี compilation/runtime error แต่ physical Safari/iPad/stylus, authenticated flow และ teacher hardening/UAT ยังเป็น rollout gate
+
 ## ขอบเขตผลิตภัณฑ์ที่อนุมัติแล้ว
 
 ### หลักร่วม
@@ -67,7 +76,7 @@
 
 ### นักเรียน
 
-- แถวหลัก: เลือก/ย้าย, ปากกา, ยางลบทั้งวัตถุ, มือ/เลื่อน, undo, redo และพอดีจอ
+- แถวหลัก: เลือก/ย้าย, ปากกา, ยางลบ (ตัด freehand/highlighter และลบ element อื่นทั้งวัตถุ), มือ/เลื่อน, undo, redo และพอดีจอ
 - แถวรอง: สี, แหล่งปรับขนาดเส้นเพียงจุดเดียว, รูปทรง/เส้น, ข้อความ/แบบอักษร และพื้นเปล่า/เส้นบรรทัด/ตาราง/จุด
 - partial eraser รุ่นแรกตัดได้เฉพาะเส้น freehand และ highlighter; เส้นตรง รูปทรง ข้อความ และรูปภาพยังลบทั้งวัตถุ
 - ไม่ให้ใช้ Frame, Web Embed, Mermaid, Library, laser หรือ native lock
@@ -82,7 +91,7 @@
 
 ## Capability matrix
 
-คำว่า “ปัจจุบัน” ในสองคอลัมน์แรกหมายถึง deployed baseline ที่ตรวจในเฟส 0 ไม่ใช่โค้ดบน branch เฟส 1–3 ที่ยังไม่ merge/deploy
+คำว่า “ปัจจุบัน” ในสองคอลัมน์แรกหมายถึง deployed baseline ที่ตรวจในเฟส 0 ไม่ใช่โค้ดบน branch เฟส 1–4 ที่ยังไม่ merge/deploy
 
 | ความสามารถ | นักเรียนปัจจุบัน | ครูปัจจุบัน | เป้าหมายนักเรียน | เป้าหมายครู |
 | --- | --- | --- | --- | --- |
@@ -341,7 +350,7 @@ fixture รูปโจทย์ต้องพิสูจน์เพิ่ม
 1. **Shared core และ policy boundary — implementation เสร็จบน branch เฟส 1; rollout gate ยัง pending** — รวม editor host, command policy และ validator, ปิด bypass ทุกทาง และคง scene/persistence contract; authenticated teacher loop/heap ยังต้องผ่านก่อน merge/deploy
 2. **Student toolbar และ input mode — implementation เสร็จบน branch เฟส 2; rollout gate ยัง pending** — command facade, แถวหลัก/รอง, fit, single stroke-width source, selection semantics, finger draw/pan และ responsive behavior พร้อม local touch/pen evidence; physical Safari/iPad/stylus และ upstream dev warnings ยังรอ hardening/UAT
 3. **Student draft/attachment correctness — implementation เสร็จบน branch เฟส 3; rollout gate ยัง pending** — revision/fingerprint-based status, stale/unverified submit warning, confirmed attached-scene load และ persistent one-step recovery ผ่าน automated/local browser gates แล้ว; authenticated Auth/Storage และ physical UAT ยังรอเฟส 8
-4. **Partial eraser** — freehand/highlighter เท่านั้น พร้อม deterministic undo/redo และ limit tests
+4. **Partial eraser — implementation เสร็จบน branch เฟส 4; rollout gate ยัง pending** — freehand/highlighter เท่านั้น, element อื่นลบทั้งวัตถุ, deterministic one-gesture undo/redo และ full-scene limit/sanitizer tests ผ่านแล้ว; physical Safari/iPad/stylus และ authenticated/teacher UAT ยังรอเฟส 8
 5. **Teacher presentation tools** — laser, Frame, รูปโจทย์, quick colors, presentation lock, grid/snap และ duplicate-next-step
 6. **Teacher draft/save correctness** — state ต่อ question/slot, atomic load/save identity, all-draft exit guard และ one-step recovery
 7. **Hardening** — compatibility fixtures, accessibility, keyboard/paste/drop/context tests, performance/memory และ security review

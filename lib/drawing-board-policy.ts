@@ -26,6 +26,7 @@ export type DrawingBoardCommand =
   | 'edit'
   | 'delete'
   | 'erase-object'
+  | 'erase-partial'
   | 'undo'
   | 'redo'
   | 'pan'
@@ -61,6 +62,7 @@ const COMMON_COMMANDS = new Set<DrawingBoardCommand>([
   'edit',
   'delete',
   'erase-object',
+  'erase-partial',
   'undo',
   'redo',
   'pan',
