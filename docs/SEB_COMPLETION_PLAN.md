@@ -55,6 +55,9 @@
 
 ## เฟส S0 — Baseline และขอบเขตงาน
 
+**สถานะ: เสร็จแล้ว** — ผลตรวจอยู่ที่ [`SEB_BASELINE_AUDIT.md`](./SEB_BASELINE_AUDIT.md)
+โดยยังไม่มี runtime/migration/Storage/Production change
+
 **Agent ทำ**
 
 - อ่านกติกา/เอกสาร, fetch origin, ตรวจ worktree/branch/upstream และสร้าง branch จาก
