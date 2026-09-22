@@ -108,7 +108,7 @@ export function SebReadinessCard({
           title="Config Key (CK)"
           description={readiness.configKeyReady
             ? 'พบ CK รูปแบบ SHA-256 ที่ฝั่งเซิร์ฟเวอร์'
-            : 'SEB_CONFIG_KEY ต้องเป็นเลขฐานสิบหก 64 ตัวจากไฟล์ .seb ที่บันทึกล่าสุด'}
+            : 'SEB_CONFIG_KEY ต้องเป็นเลขฐานสิบหก 64 ตัวจากไฟล์ .seb ของ revision ที่อนุมัติ ห้ามนำค่าจากไฟล์คนละ revision มาปะปน'}
         />
         <ReadinessRow
           status={readiness.configRevisionReady ? 'ready' : 'blocked'}
@@ -128,7 +128,7 @@ export function SebReadinessCard({
           status={readiness.releaseRegistryReady && readiness.browserExamKeyCoverageReady ? 'ready' : 'blocked'}
           title="Policy และ build ที่ประกาศรองรับ"
           description={readiness.releaseRegistryReady && readiness.browserExamKeyCoverageReady
-            ? 'policy/build ใน release registry อนุมัติครบและมี BEK ครบทุก exact build'
+            ? 'policy/build ใน release registry อนุมัติครบและมี BEK ครบทุก exact build; สถานะนี้ไม่แทนผลทดสอบบนเครื่องจริง'
             : 'ยังต้องยืนยัน native policy, exact build และลงทะเบียน BEK ให้ครบตาม release registry'}
         />
         <ReadinessRow

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen } from 'lucide-react'
 import {
@@ -357,8 +358,11 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               className="accent-primary w-4 h-4 shrink-0"
             />
           </label>
-          <p className="pl-11 text-xs text-warning">
-            SEB รองรับ Windows, macOS, iPhone และ iPad · Android ใช้ monitored mode ด้านล่างได้
+          <p className="pl-11 text-xs leading-5 text-warning">
+            เผยแพร่ได้เฉพาะเมื่อ exact build และกุญแจของระบบเป้าหมายผ่าน readiness แล้ว · Android ใช้ monitored mode ด้านล่างได้ ·{' '}
+            <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+              ตรวจความพร้อม SEB
+            </Link>
             {hasSubmissions ? ' · ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำข้อสอบ' : ''}
           </p>
           {secureBrowserMode === 'seb_required' && (

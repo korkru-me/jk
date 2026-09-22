@@ -129,6 +129,13 @@ platform/version/build และ session ผูก revision, evidence/candidate 
 
 ## เฟส S3 — Teacher/student readiness และทางเข้าสอบ
 
+**สถานะ: ส่วน Agent เสร็จใน branch SEB แล้ว; รอเจ้าของทดลอง UX บน Staging** — system check
+ยังไม่สร้าง attempt/ไม่เริ่ม timer, หน้าทางเข้ารับมือ network failure โดยไม่ค้าง, แยกสถานะ
+browser ปกติออกจาก native SEB ตามจริง และถ้อยคำครู/นักเรียนไม่ประกาศรองรับ platform/build
+เกิน release registry เพิ่มห้องทดลอง `/exam-screen-lab/seb` สำหรับ local/Staging เท่านั้นเพื่อ
+ตรวจ normal-browser, config-not-ready, responsive และ accessibility โดยไม่มี assignment หรือ
+ฐานข้อมูลอยู่เบื้องหลัง ผลนี้ไม่แทน native CK/BEK UAT และไม่ทำให้ S2 ผ่าน
+
 **Agent ทำ**
 
 - ตรวจเส้นทางครูเปิด SEB, publish gate, readiness card, config download และคำอธิบายข้อจำกัด

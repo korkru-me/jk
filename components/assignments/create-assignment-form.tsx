@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
@@ -1239,8 +1240,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
-              <p className="pl-11 text-xs text-warning">
-                SEB รองรับ Windows, macOS, iPhone และ iPad นักเรียนต้องติดตั้งและตรวจเครื่องก่อนสอบ
+              <p className="pl-11 text-xs leading-5 text-warning">
+                ระบบจะยอมเผยแพร่เมื่อ exact build และกุญแจของระบบเป้าหมายผ่าน readiness แล้ว นักเรียนต้องตรวจเครื่องก่อนสอบ{' '}
+                <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+                  ตรวจความพร้อม SEB
+                </Link>
               </p>
               {secureBrowserMode === 'seb_required' && (
                 <div className="ml-11 space-y-2 border-t border-border pt-3">

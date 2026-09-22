@@ -282,6 +282,23 @@ export function AssignmentDetailClient({
         </div>
       </div>
 
+      {a.status === 'draft' && a.secure_browser_mode === 'seb_required' && (
+        <div className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertCircle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+            <div>
+              <p className="font-medium text-foreground">ตรวจความพร้อม SEB ก่อนเผยแพร่</p>
+              <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                ระบบจะปฏิเสธการเผยแพร่ หาก revision, exact build, CK หรือ BEK ที่อนุมัติยังไม่ครบ
+              </p>
+            </div>
+          </div>
+          <Link href="/settings/exam-defaults" className="shrink-0 font-medium text-primary hover:underline">
+            ไปหน้าตรวจความพร้อม
+          </Link>
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex items-center gap-1 bg-muted rounded-2xl p-1">
         {TABS.map(tab => {
