@@ -48,7 +48,7 @@ Recovery/proctor QA เฟส 7 ผ่านในขอบเขต agent-only 
 
 เฟส agent-only 1–8 ของ responsive exam QA ปิดแล้วและมี `npm run check:exam-release` เป็น fail-closed gate รวม staging isolation กับ SEB platform evidence รวมถึง `docs/EXAM_RELEASE_UAT.md` เป็นรายการทดสอบจริงชุดเดียว Staging/candidate `r8` เป็นหลักฐานประวัติที่เก่ากว่า SEB completion; รอบใหม่ `seb-v1-uat-r1` ยังไม่ล็อก source/deployment และ release ยังคง NOT READY เพราะ registry, external device/UAT และ SEB platform evidence ยังไม่ครบ
 
-Regression ปิดเฟสผ่าน 129 test files / 1,602 tests, TypeScript, token lint, production build 63 static pages และ Next.js MCP/browser runtime smoke โดยไม่พบ compilation/runtime error; ตัวเลขนี้ยืนยัน commit ฝั่งโค้ดเท่านั้น ไม่ยกเลิก external release blockers
+Regression ปิดเฟสผ่าน 129 test files / 1,603 tests, TypeScript, token lint, production build 63 static pages และ Next.js MCP/browser runtime smoke โดยไม่พบ compilation/runtime error; ตัวเลขนี้ยืนยัน commit ฝั่งโค้ดเท่านั้น ไม่ยกเลิก external release blockers
 
 เฟส 9 เพิ่ม external UAT evidence แบบ fixed schema/no-free-text ใน `config/exam-uat-evidence.json` ครบ iPhone/iPad/Mac/Windows responsive, authenticated exam, recovery/proctor และ QA cleanup พร้อม `npm run check:exam-uat`; ตัวตรวจบังคับ timestamp ISO + รุ่นที่ทดสอบ, ปฏิเสธ field เพิ่ม และถูกนำไปรวมใน `check:exam-release` แล้ว สถานะทั้ง 7 suite ยัง pending ตามจริง
 
