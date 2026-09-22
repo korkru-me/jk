@@ -9,7 +9,7 @@
 - **ต้นแบบ/ข้อมูลจำลอง** — UI มีไว้สาธิตหรือใช้ค่าคงที่ ไม่ใช่ข้อมูลธุรกิจจริง
 - **วางแผน** — อยู่ในทิศทางผลิตภัณฑ์แต่ยังไม่ใช่งานระยะปัจจุบัน
 
-> โจทย์ประเภท "ส่งไฟล์งาน" (`file_upload`) เคยใช้งานบน production ไม่ได้จนถึง 23 สิงหาคม 2026 เพราะ `20260726120000_file_upload_question_type.sql` ไม่เคยถูก apply — ทั้งที่โค้ดฝั่งแอปรองรับครบมาตั้งแต่กรกฎาคม ตอนนี้รันแล้ว: enum `question_type` มีค่า `'file_upload'` และ bucket `submission-files` มีอยู่จริง (public, จำกัด 10 MB, รับ png/jpeg/webp/pdf) ยังไม่ได้ทดสอบเส้นทางอัปโหลดจริงจากฝั่งนักเรียน
+> โจทย์ประเภท "ส่งไฟล์งาน" (`file_upload`) เคยใช้งานบน production ไม่ได้จนถึง 23 สิงหาคม 2026 เพราะ `20260726120000_file_upload_question_type.sql` ไม่เคยถูก apply — ทั้งที่โค้ดฝั่งแอปรองรับครบมาตั้งแต่กรกฎาคม ตอนนี้รันแล้ว: enum `question_type` มีค่า `'file_upload'` และ bucket `submission-files` มีอยู่จริง (public-read, จำกัด 10 MB, รับ png/jpeg/webp/pdf) ส่วน signed upload gate ของ S1 อยู่ใน branch SEB และยังรอ apply migration/ทดสอบ Staging ก่อน deploy
 
 มี automated test (`npm test`) ครอบคลุม pure logic หลักและ route สำคัญบางส่วน รวมถึง upload/download ของงานวิจัยด้วย mock Supabase แต่ยังไม่แทนการทดสอบ Supabase, server action และ browser กับหลายบัญชีจริง การยืนยันฐานข้อมูลที่ deploy จริงจะระบุแยกไว้เฉพาะฟีเจอร์ที่ตรวจแล้ว และทุกสถานะยังต้องผ่าน end-to-end กับ authorization testing ก่อนเปลี่ยนเป็น “พร้อมใช้จริง”
 
@@ -430,6 +430,7 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 
 - **ระบบสอบปลอดภัยเฟส 1–7 — SEB รองรับ Windows, macOS และ iOS/iPadOS; Android ใช้ monitored mode แยกที่ความมั่นใจต่ำกว่า** — ครูเปิด `secure_browser_mode = seb_required` ได้เฉพาะข้อสอบออนไลน์ ระบบบังคับเปิดห้องคุมสอบสด, นักเรียนได้หน้าแนะนำเปิด `.seb`, และ server ตรวจ CK + BEK ของ exact challenge URL ผ่าน SEB JavaScript API ก่อนออก HttpOnly session ที่ผูกผู้ใช้กับข้อสอบ
   - ตรวจ session ซ้ำที่ `startSubmission`, `getExamTakingData`, autosave/รูปวิธีทำ/ไฟล์แนบ, proctor heartbeat และ `submitSubmission`; การปลอม UI หรือเรียก Server Action ตรงจึงไม่ข้าม gate ส่วน forced-finalize ของ attempt หมดเวลายังทำงานได้
+  - **S1 hardening วันที่ 22 กันยายน 2026 (branch SEB; ยังไม่ deploy):** `work-images` และ `submission-files` ไม่ใช้ browser upload ตรงแล้ว แต่ขอ signed target หลัง server ตรวจ exact attempt/answer/timer/deadline/SEB หรือ Android session จากนั้น server ตรวจ path, MIME, size และ byte signature ของ object ก่อน save และ submit ซ้ำ Migration ถอนเฉพาะ browser INSERT/DELETE ของสอง legacy bucket และไม่แตะ Drawing Board Storage/RLS; path เดิมยังอ่านได้เฉพาะ compatibility ของ reference ที่มีอยู่
   - submission และห้องคุมสอบเก็บเฉพาะ verified timestamp/platform/version; ครูเห็นป้าย “SEB ยืนยันแล้ว” แบบ realtime โดยค่าฝั่งห้องคุมสอบถูก trigger คัดจาก submission ไม่รับจาก client
   - ห้ามเปลี่ยน browser ↔ SEB หลังมี submission แรก ป้องกันการล็อกนักเรียนกลางข้อสอบ และ SEB kiosk ไม่ซ้อน DOM fullscreen overlay ซึ่งเคยมีโอกาส false-block บน Apple platform
   - เฟส 2 เพิ่ม teacher readiness checklist ที่ไม่เปิดเผย key, กัน create/publish/แก้ข้อสอบ SEB ที่เผยแพร่อยู่เมื่อ production URL หรือ secret/CK/BEK ไม่พร้อม และเพิ่ม assignment-specific system check ที่ตรวจ roster + purpose-bound challenge โดยไม่โหลดโจทย์ ไม่ถาม access code ไม่สร้าง submission และไม่เริ่ม timer

@@ -23,6 +23,9 @@ import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
 import { parseMathInputModes } from '@/lib/math/input-mode'
 import { hasCompleteWorkEvidence } from '@/lib/math-work'
+import { getWritableStudentAnswer } from '@/lib/exam-write-access'
+import { parseSubmittedFiles } from '@/lib/exam-attachment'
+import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
 
 export async function startSubmission(
   assignmentId: string,
@@ -292,68 +295,6 @@ export async function startSubmission(
   return { submissionId: submission.id }
 }
 
-async function getWritableStudentAnswer(
-  admin: ReturnType<typeof createAdminClient>,
-  submissionAnswerId: string,
-  studentId: string,
-) {
-  const { data: answer } = await admin
-    .from('submission_answers')
-    .select(`
-      id, submission_id, work_images, carried_over, check_count,
-      submissions(
-        id, student_id, status, started_at, assignment_id,
-        current_streak, best_streak, streak_reached,
-        assignments(
-          id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode,
-          instant_check, instant_check_answer_key,
-          completion_rule, streak_target, streak_question_cap, streak_recycle_pool
-        )
-      )
-    `)
-    .eq('id', submissionAnswerId)
-    .maybeSingle()
-
-  if (!answer) return { error: 'ไม่พบคำตอบ' as const }
-  const submission = Array.isArray(answer.submissions) ? answer.submissions[0] : answer.submissions
-  if (!submission || submission.student_id !== studentId) return { error: 'ไม่มีสิทธิ์' as const }
-  if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว' as const }
-
-  const assignment = Array.isArray(submission.assignments)
-    ? submission.assignments[0]
-    : submission.assignments
-  const durationMinutes = assignment?.duration_minutes
-  if (durationMinutes) {
-    const deadline = new Date(submission.started_at).getTime() + durationMinutes * 60_000
-    if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' as const }
-  }
-
-  if (assignment?.end_at && new Date(assignment.end_at).getTime() < Date.now()) {
-    const { data: extension } = await admin
-      .from('assignment_extensions')
-      .select('extended_end_at')
-      .eq('assignment_id', submission.assignment_id)
-      .eq('student_id', studentId)
-      .maybeSingle()
-    if (!extension?.extended_end_at || new Date(extension.extended_end_at).getTime() < Date.now()) {
-      return { error: 'หมดเวลาส่งแล้ว' as const }
-    }
-  }
-
-  if (
-    assignment?.secure_browser_mode === 'seb_required'
-    && !await getExamAccessSession(
-      studentId,
-      submission.assignment_id,
-      assignment.android_exam_mode === 'monitored',
-    )
-  ) {
-    return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' as const }
-  }
-
-  return { answer, submission, assignment }
-}
-
 /**
  * The same four gates getWritableStudentAnswer applies, for an action that
  * addresses the attempt rather than one answer row — currently only
@@ -427,10 +368,32 @@ export async function saveAnswer(
   const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
   if ('error' in writable) return { error: writable.error }
 
+  let persistedAnswer = studentAnswer
+  if (writable.question?.question_type === 'file_upload') {
+    const files = parseSubmittedFiles(studentAnswer)
+    if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
+    const previousUrls = new Set(
+      (parseSubmittedFiles(writable.answer.student_answer) ?? []).map(file => file.url),
+    )
+    for (const file of files) {
+      const checked = await validateStoredExamAttachmentUrl(admin, {
+        kind: 'submission_file',
+        url: file.url,
+        studentId: user.id,
+        submissionId: writable.submission.id,
+        submissionAnswerId: writable.answer.id,
+        expectedMimeType: file.type,
+        allowLegacy: previousUrls.has(file.url),
+      })
+      if ('error' in checked) return checked
+    }
+    persistedAnswer = JSON.stringify(files)
+  }
+
   const { error } = await admin
     .from('submission_answers')
     .update({
-      student_answer: studentAnswer,
+      student_answer: persistedAnswer,
       ...(parsedModes ? { math_input_modes: parsedModes } : {}),
     })
     .eq('id', submissionAnswerId)
@@ -457,6 +420,17 @@ export async function saveWorkImage(submissionAnswerId: string, partIndex: numbe
     ? [...writable.answer.work_images]
     : []
   while (current.length <= partIndex) current.push(null)
+  if (url) {
+    const checked = await validateStoredExamAttachmentUrl(admin, {
+      kind: 'work_image',
+      url,
+      studentId: user.id,
+      submissionId: writable.submission.id,
+      submissionAnswerId: writable.answer.id,
+      allowLegacy: current[partIndex] === url,
+    })
+    if ('error' in checked) return checked
+  }
   current[partIndex] = url
 
   const { error } = await admin
@@ -970,6 +944,50 @@ async function gradeAndFinalizeSubmission(
   const carriedScore = answers
     .filter((a: any) => a.carried_over)
     .reduce((sum: number, a: any) => sum + Number(a.score ?? 0), 0)
+
+  // A URL-shaped string is not evidence of an uploaded answer. Re-inspect
+  // every legacy photo/file before the final grade so a tampered client cannot
+  // gain credit by calling saveAnswer/saveWorkImage with external or missing
+  // objects. New paths are bound to this exact student + attempt + answer;
+  // two-segment paths are accepted only for attempts opened before S1 shipped.
+  const attachmentChecks: Array<() => ReturnType<typeof validateStoredExamAttachmentUrl>> = []
+  for (const answer of (opts.enforceSecureBrowser ? gradable : []) as any[]) {
+    if (answer.questions?.question_type === 'file_upload') {
+      const files = parseSubmittedFiles(answer.student_answer)
+      if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
+      for (const file of files) {
+        attachmentChecks.push(() => validateStoredExamAttachmentUrl(admin, {
+          kind: 'submission_file',
+          url: file.url,
+          studentId,
+          submissionId,
+          submissionAnswerId: answer.id,
+          expectedMimeType: file.type,
+          allowLegacy: true,
+        }))
+      }
+    }
+    const workImages: unknown[] = Array.isArray(answer.work_images) ? answer.work_images : []
+    for (const url of workImages) {
+      if (typeof url !== 'string' || !url) continue
+      attachmentChecks.push(() => validateStoredExamAttachmentUrl(admin, {
+        kind: 'work_image',
+        url,
+        studentId,
+        submissionId,
+        submissionAnswerId: answer.id,
+        allowLegacy: true,
+      }))
+    }
+  }
+  const attachmentCheckConcurrency = 4
+  for (let index = 0; index < attachmentChecks.length; index += attachmentCheckConcurrency) {
+    const results = await Promise.all(
+      attachmentChecks.slice(index, index + attachmentCheckConcurrency).map(check => check()),
+    )
+    const failed = results.find(result => 'error' in result)
+    if (failed?.error) return { error: failed.error }
+  }
 
   // Server-side defense-in-depth: the exam UI already blocks submission
   // client-side when required working is missing, but a tampered

@@ -17,6 +17,7 @@ async function browserSupabase() {
 }
 
 interface FileSubmissionUploadProps {
+  submissionAnswerId?: string
   value: SubmittedFile[]
   onChange: (files: SubmittedFile[]) => void
   /**
@@ -42,7 +43,7 @@ function isImageType(type: string) {
 // mirrors WorkImageUpload's storage-upload pattern but keeps an array (like
 // the teacher-side QuestionImageUpload) instead of a single slot, and
 // accepts PDFs alongside images.
-export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmissionUploadProps) {
+export function FileSubmissionUpload({ submissionAnswerId, value, onChange, localOnly }: FileSubmissionUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -59,33 +60,49 @@ export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmiss
       return
     }
 
+    if (!submissionAnswerId) {
+      toast.error('ไม่พบคำตอบสำหรับแนบไฟล์ กรุณาโหลดข้อสอบใหม่')
+      return
+    }
     setUploading(true)
-    const supabase = await browserSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setUploading(false); return }
-
     const uploaded: SubmittedFile[] = []
     for (const original of files) {
       // Same reason as the work-photo slot: a student attaching their answer is
       // usually attaching a photo of it, from a phone, while a timer runs. PDFs
       // pass through untouched.
       const file = await downscaleImage(original)
-      const ext = file.name.split('.').pop() ?? 'jpg'
-      const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await supabase.storage
-        .from('submission-files')
-        .upload(path, file, { upsert: false })
-
-      if (error) {
-        toast.error(uploadErrorMessage(error.message, original.name, SUBMISSION_FILE_MAX_MB))
-        continue
+      try {
+        const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/actions/exam-attachments')
+        const prepared = await prepareExamAttachmentUpload({
+          submissionAnswerId,
+          kind: 'submission_file',
+          name: original.name,
+          mimeType: file.type,
+          size: file.size,
+        })
+        if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
+        const supabase = await browserSupabase()
+        const sent = await supabase.storage
+          .from(prepared.bucket)
+          .uploadToSignedUrl(prepared.path, prepared.token, file, {
+            contentType: file.type,
+            cacheControl: '300',
+          })
+        if (sent.error) throw sent.error
+        const completed = await completeExamAttachmentUpload({
+          submissionAnswerId,
+          kind: 'submission_file',
+          uploadId: prepared.uploadId,
+          name: original.name,
+          mimeType: file.type,
+          size: file.size,
+        })
+        if (!completed || 'error' in completed) throw new Error(completed?.error ?? 'ตรวจสอบไฟล์ไม่สำเร็จ')
+        uploaded.push(completed.file)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'
+        toast.error(uploadErrorMessage(message, original.name, SUBMISSION_FILE_MAX_MB))
       }
-      const { data: { publicUrl } } = supabase.storage
-        .from('submission-files')
-        .getPublicUrl(path)
-      // The teacher's list shows the name the student recognises, not the one
-      // re-encoding gave it.
-      uploaded.push({ url: publicUrl, name: original.name, type: file.type })
     }
 
     onChange([...value, ...uploaded])
@@ -97,10 +114,19 @@ export function FileSubmissionUpload({ value, onChange, localOnly }: FileSubmiss
     if (isLocalUrl(url)) {
       URL.revokeObjectURL(url)
     } else {
-      const supabase = await browserSupabase()
-      const match = url.match(/\/object\/public\/submission-files\/(.+)/)
-      if (match?.[1]) {
-        await supabase.storage.from('submission-files').remove([decodeURIComponent(match[1])])
+      if (!submissionAnswerId) {
+        toast.error('ไม่พบคำตอบสำหรับลบไฟล์ กรุณาโหลดข้อสอบใหม่')
+        return
+      }
+      const { deleteExamAttachment } = await import('@/lib/actions/exam-attachments')
+      const removed = await deleteExamAttachment({
+        submissionAnswerId,
+        kind: 'submission_file',
+        url,
+      })
+      if (!removed || 'error' in removed) {
+        toast.error(removed?.error ?? 'ลบไฟล์ไม่สำเร็จ กรุณาลองใหม่')
+        return
       }
     }
     onChange(value.filter(f => f.url !== url))

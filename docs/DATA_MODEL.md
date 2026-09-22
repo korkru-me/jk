@@ -180,11 +180,11 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 | bucket | ลิมิต | ชนิดที่รับ | ใครเขียน |
 | --- | --- | --- | --- |
 | `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์) และ `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้) |
-| `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย |
-| `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน |
+| `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย ผ่าน signed target ที่ Server Action อนุญาต |
+| `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน ผ่าน signed target ที่ Server Action อนุญาต |
 | `classroom-post-files` | 10 MB | รูป (PNG/JPEG/WebP/GIF), PDF, Word, Excel, PowerPoint, txt/csv, zip | `post-attach.tsx` — ไฟล์แนบในประกาศห้องเรียน |
 
-- ทุก bucket เป็น public-read และเก็บไฟล์ใต้ `{auth.uid()}/...` โดย `work-images`/`submission-files`/`classroom-post-files` มี RLS จำกัดให้เขียน/ลบได้เฉพาะโฟลเดอร์ของตัวเอง
+- ทุก bucket ในตารางยังเป็น public-read เพื่อ compatibility และเก็บไฟล์ใต้ `{auth.uid()}/...` · `work-images`/`submission-files` รุ่นใหม่ใช้ path `{student}/{submission}/{answer}/{upload}` และ signed upload จาก server หลังตรวจ attempt/session; migration `20260922005743` ถอน direct browser INSERT/DELETE ของสอง bucket นี้ ส่วน `classroom-post-files` ยังคง RLS จำกัดให้เขียน/ลบเฉพาะโฟลเดอร์ตัวเอง
 - **ลบ bucket ผ่าน migration ไม่ได้** Postgres ปฏิเสธ `DELETE FROM storage.buckets` ตรง ๆ (`Direct deletion from storage tables is not allowed`) ต้องใช้ Storage API — bucket `classroom-post-images` ที่ถูกแทนด้วย `classroom-post-files` จึงลบด้วยวิธีนั้น ส่วน policy ของมันลบใน migration ได้ตามปกติ
 - **`question-images` เคยไม่มีลิมิตและไม่จำกัดชนิดไฟล์เลย** ทั้งที่ UI เขียนว่า "สูงสุด 5 MB" เพราะเป็น bucket เดียวที่ถูกสร้างจากหน้า dashboard ก่อนโปรเจกต์ใช้ CLI — migration `20260828073436` ตั้งค่าให้ตรงกับอีกสองตัว (ลิมิตเป็น 10 MB ไม่ใช่ 5 เพราะ widget ไฟล์แนบโฆษณา 10 MB ไว้ และ PDF ย่อไม่ได้)
 - **รูปถูกย่อในเบราว์เซอร์ก่อนอัปโหลดเสมอ** (`lib/image-downscale.ts`) ลิมิตของ bucket เป็นแค่ตาข่ายรับ ไม่ใช่ทางเดินปกติ

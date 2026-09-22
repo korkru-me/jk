@@ -73,6 +73,14 @@ contract หรือขยายขอบเขต
 
 ## เฟส S1 — Harden server boundary และ regression
 
+**สถานะ: เสร็จใน branch SEB แล้ว; ยังไม่ apply migration หรือ deploy** — upload รูปวิธีทำและ
+ไฟล์คำตอบเปลี่ยนเป็น signed target ที่ server ออกให้หลังตรวจ exact user/attempt/answer,
+สถานะ, เวลา, deadline และ SEB/Android session จาก boundary กลางเดียวกัน เมื่ออัปโหลดแล้ว
+server ตรวจ path, MIME, size และ byte signature ซ้ำก่อนยอมบันทึก URL; final submit ตรวจ object
+ซ้ำอีกครั้ง Migration `20260922005743_gate_exam_attachment_writes.sql` ถอนเฉพาะ browser
+INSERT/DELETE ของ `work-images` และ `submission-files` โดยไม่แตะ Drawing Board bucket/policy
+และยังรอ apply ในเฟส Staging ที่ได้รับอนุมัติ
+
 **Agent ทำ**
 
 - ทำ matrix ทุก read/write boundary ของ attempt แล้วเพิ่ม regression ที่ขาดสำหรับ

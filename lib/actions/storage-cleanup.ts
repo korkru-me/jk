@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   ORPHAN_GRACE_MS,
   partitionOrphans,
@@ -17,10 +18,11 @@ import {
  * database before removing it, because the report a teacher is looking at may
  * be minutes old and a โจทย์ may have been saved in between.
  *
- * Everything is scoped to `{uid}/`. Storage's own policies enforce that for
- * `work-images` and `submission-files`; `question-images` has no such policy,
- * so the prefix is applied here and re-applied by the RPC, which refuses paths
- * outside the caller's folder outright.
+ * Everything is scoped to `{uid}/`. The server action authenticates the user,
+ * applies that prefix before listing/removing with the service role, and the
+ * reference RPC independently refuses paths outside the caller's folder. The
+ * service role is required because exam attachment writes are intentionally
+ * no longer granted directly to browser sessions.
  */
 
 /** The three buckets, with what a teacher would call them. */
@@ -43,14 +45,14 @@ export type FindOrphansResult = { error: string } | { reports: OrphanReport[]; g
 
 /** Storage lists one page at a time; a folder can hold more than one page. */
 async function listFolder(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  storageClient: ReturnType<typeof createAdminClient>,
   bucket: string,
   folder: string,
 ): Promise<StoredFile[]> {
   const out: StoredFile[] = []
   const pageSize = 100
   for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase.storage
+    const { data, error } = await storageClient.storage
       .from(bucket)
       .list(folder, { limit: pageSize, offset })
     if (error) throw new Error(error.message)
@@ -61,7 +63,7 @@ async function listFolder(
       // A row with no id is a folder, not an object — walk into it. The Moodle
       // import puts its images one level down.
       if (entry.id === null) {
-        out.push(...await listFolder(supabase, bucket, path))
+        out.push(...await listFolder(storageClient, bucket, path))
       } else {
         out.push({
           path,
@@ -101,13 +103,14 @@ export async function findOrphanFiles(): Promise<FindOrphansResult> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const admin = createAdminClient()
 
   const buckets = Object.keys(BUCKET_LABELS) as CleanableBucket[]
   const reports: OrphanReport[] = []
 
   try {
     for (const bucket of buckets) {
-      const files = await listFolder(supabase, bucket, user.id)
+      const files = await listFolder(admin, bucket, user.id)
       if (files.length === 0) {
         reports.push({
           bucket, label: BUCKET_LABELS[bucket],
@@ -148,6 +151,7 @@ export async function deleteOrphanFiles(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!(bucket in BUCKET_LABELS)) return { error: 'ไม่รู้จักที่เก็บไฟล์นี้' }
+  const admin = createAdminClient()
 
   const prefix = `${user.id}/`
   const own = [...new Set(paths)].filter(p => p.startsWith(prefix))
@@ -160,7 +164,7 @@ export async function deleteOrphanFiles(
     // Re-checked at the moment of deletion, not trusted from the report: the
     // teacher may have saved a โจทย์ using one of these files since they
     // pressed ตรวจสอบ.
-    onDisk = await listFolder(supabase, bucket, user.id)
+    onDisk = await listFolder(admin, bucket, user.id)
     stillUsed = await stillReferenced(supabase, own)
   } catch (e) {
     return { error: `ตรวจสอบก่อนลบไม่สำเร็จ จึงไม่ได้ลบอะไรเลย: ${(e as Error).message}` }
@@ -180,7 +184,7 @@ export async function deleteOrphanFiles(
   const skipped = own.length - orphans.length
   if (orphans.length === 0) return { deleted: 0, skipped, freedBytes: 0 }
 
-  const { error } = await supabase.storage.from(bucket).remove(orphans.map(f => f.path))
+  const { error } = await admin.storage.from(bucket).remove(orphans.map(f => f.path))
   if (error) return { error: `ลบไฟล์ไม่สำเร็จ: ${error.message}` }
 
   freedBytes = totalBytes(orphans)

@@ -72,6 +72,22 @@ S1 ต้องออกแบบให้ server อนุญาต upload ต�
 ช่องว่างนี้เป็นของ bucket legacy `work-images`/`submission-files` ไม่ใช่
 `student-work-artifacts` ของ Drawing Board และ S0 ไม่ได้แก้ bucket ใด
 
+#### ผลติดตาม S1 — ปิดช่องว่างใน branch แล้ว ยังไม่ deploy
+
+- browser ขอ signed upload target ผ่าน Server Action ที่ตรวจ exact authenticated student,
+  submission answer, assignment mode, attempt `in_progress`, timer/deadline และ live
+  SEB/Android monitored session ก่อนทุกครั้ง
+- path ใหม่ผูก `{student}/{submission}/{answer}/{upload}` และ server ตรวจ metadata กับ
+  byte signature ของ object หลัง upload ก่อนคืน URL; `saveAnswer`, `saveWorkImage` และ student
+  final submit ตรวจ origin/path/object ซ้ำ ไม่ยอมรับ URL ภายนอกหรือ object ที่ไม่มีจริง
+- path legacy สอง segment ยอมรับเฉพาะ reference เดิมของ attempt ที่กำลังทำ เพื่อไม่ทำลาย
+  attempt ที่เปิดค้างระหว่าง rollout; การอัปโหลดใหม่ใช้ path แบบใหม่เท่านั้น
+- migration `20260922005743_gate_exam_attachment_writes.sql` ถอนเฉพาะ direct browser
+  INSERT/DELETE ของ `work-images` และ `submission-files`; public read และ owner list compatibility
+  ยังอยู่ ส่วน orphan cleanup ที่ authenticated เปลี่ยนไปใช้ server role หลังตรวจ user/prefix/RPC
+- migration นี้ไม่แตะ `student_work_artifacts`, Drawing Board schema/RLS/Storage หรือหลักฐาน UAT
+  และยังไม่ได้ apply กับ Staging/Production
+
 ### 2. Runtime key registry ยังเป็น global flat list
 
 - `SEB_CONFIG_KEY` รับค่าเดียว

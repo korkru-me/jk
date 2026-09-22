@@ -19,6 +19,8 @@ async function browserSupabase() {
 const WORK_IMAGE_MAX_MB = 5
 
 interface WorkImageUploadProps {
+  submissionAnswerId?: string
+  partIndex?: number
   value: string | null
   onChange: (url: string | null) => void
   required?: boolean
@@ -40,7 +42,14 @@ function isLocalUrl(url: string) {
 // Single image per slot (one per answer part) — reuploading replaces the
 // existing image rather than appending, unlike the teacher-side
 // QuestionImageUpload which keeps an array.
-export function WorkImageUpload({ value, onChange, required, localOnly }: WorkImageUploadProps) {
+export function WorkImageUpload({
+  submissionAnswerId,
+  partIndex,
+  value,
+  onChange,
+  required,
+  localOnly,
+}: WorkImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -55,11 +64,11 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
       return
     }
 
+    if (!submissionAnswerId || partIndex === undefined) {
+      toast.error('ไม่พบช่องคำตอบสำหรับแนบรูป กรุณาโหลดข้อสอบใหม่')
+      return
+    }
     setUploading(true)
-    const supabase = await browserSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setUploading(false); return }
-
     // The one upload in the app that is genuinely time-critical: the input
     // above opens the phone camera, so this is a full-resolution photo of a
     // page of working, and it is being pushed up during a timed exam on
@@ -68,20 +77,40 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
     // still readable at 1600px.
     const file = await downscaleImage(original)
     const previous = value
-    const ext = file.name.split('.').pop() ?? 'jpg'
-    const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-    const { error } = await supabase.storage
-      .from('work-images')
-      .upload(path, file, { upsert: false })
-
-    if (error) {
-      toast.error(uploadErrorMessage(error.message, undefined, WORK_IMAGE_MAX_MB))
-    } else {
-      const { data: { publicUrl } } = supabase.storage
-        .from('work-images')
-        .getPublicUrl(path)
-      onChange(publicUrl)
+    try {
+      const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/actions/exam-attachments')
+      const prepared = await prepareExamAttachmentUpload({
+        submissionAnswerId,
+        kind: 'work_image',
+        partIndex,
+        name: file.name,
+        mimeType: file.type,
+        size: file.size,
+      })
+      if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
+      const supabase = await browserSupabase()
+      const sent = await supabase.storage
+        .from(prepared.bucket)
+        .uploadToSignedUrl(prepared.path, prepared.token, file, {
+          contentType: file.type,
+          cacheControl: '300',
+        })
+      if (sent.error) throw sent.error
+      const completed = await completeExamAttachmentUpload({
+        submissionAnswerId,
+        kind: 'work_image',
+        partIndex,
+        uploadId: prepared.uploadId,
+        name: file.name,
+        mimeType: file.type,
+        size: file.size,
+      })
+      if (!completed || 'error' in completed) throw new Error(completed?.error ?? 'ตรวจสอบไฟล์ไม่สำเร็จ')
+      onChange(completed.file.url)
       if (previous) await removeStoredImage(previous)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'
+      toast.error(uploadErrorMessage(message, undefined, WORK_IMAGE_MAX_MB))
     }
 
     setUploading(false)
@@ -89,17 +118,25 @@ export function WorkImageUpload({ value, onChange, required, localOnly }: WorkIm
   }
 
   async function removeStoredImage(url: string) {
-    const supabase = await browserSupabase()
-    const match = url.match(/\/object\/public\/work-images\/(.+)/)
-    if (match?.[1]) {
-      await supabase.storage.from('work-images').remove([decodeURIComponent(match[1])])
+    if (!submissionAnswerId || partIndex === undefined) return false
+    const { deleteExamAttachment } = await import('@/lib/actions/exam-attachments')
+    const removed = await deleteExamAttachment({
+      submissionAnswerId,
+      kind: 'work_image',
+      partIndex,
+      url,
+    })
+    if (!removed || 'error' in removed) {
+      toast.error(removed?.error ?? 'ลบรูปไม่สำเร็จ กรุณาลองใหม่')
+      return false
     }
+    return true
   }
 
   async function handleRemove() {
     if (value) {
       if (isLocalUrl(value)) URL.revokeObjectURL(value)
-      else await removeStoredImage(value)
+      else if (!await removeStoredImage(value)) return
     }
     onChange(null)
   }

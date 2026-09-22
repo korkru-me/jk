@@ -26,7 +26,8 @@
  *     because a form open in another tab has not saved its URLs yet.
  */
 
-/** Buckets this understands. Each is public-read with files under `{uid}/`. */
+/** Buckets this understands. Each is public-read with files under `{uid}/`;
+ * writes may be browser-policy or server-authorized depending on the bucket. */
 export type CleanableBucket = 'question-images' | 'work-images' | 'submission-files'
 
 /**

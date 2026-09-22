@@ -135,7 +135,7 @@ export function useAnswerAutosave({
           payload.mathInputModes,
         ))
         if (!call.ok) return markUnsaved()
-        if (call.data.error) return markUnsaved(call.data.error)
+        if ('error' in call.data) return markUnsaved(call.data.error)
         return markSaved()
       })
       .catch(() => markUnsaved())

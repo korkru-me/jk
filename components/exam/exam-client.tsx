@@ -947,7 +947,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     if (previewMode) return
     try {
       const result = await saveWorkImage(answerId, partIndex, url)
-      if (result.error) throw new Error(result.error)
+      if ('error' in result) throw new Error(result.error)
     } catch {
       toast.error('บันทึกรูปวิธีทำไม่สำเร็จ ลองใหม่อีกครั้ง')
     }
@@ -1437,6 +1437,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 />
               ) : current.questions.question_type === 'file_upload' ? (
                 <FileUploadAnswerInput
+                  answerId={current.id}
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={files => handleFileSubmissionChange(current.id, files)}
                   localOnly={previewMode}
@@ -2730,6 +2731,8 @@ function WorkProofSlot({
             </Button>
           )}
           <WorkImageUpload
+            submissionAnswerId={answerId}
+            partIndex={partIndex}
             value={workImage}
             onChange={onPhotoChange}
             required={required && !artifact}
@@ -3648,8 +3651,8 @@ function EssayAnswerInput({ rawValue, onChange }: {
 
 // ─── File upload ──────────────────────────────────────────────────────────────
 
-function FileUploadAnswerInput({ rawValue, onChange, localOnly }: {
-  rawValue: string; onChange: (files: SubmittedFile[]) => void; localOnly?: boolean
+function FileUploadAnswerInput({ answerId, rawValue, onChange, localOnly }: {
+  answerId: string; rawValue: string; onChange: (files: SubmittedFile[]) => void; localOnly?: boolean
 }) {
   let files: SubmittedFile[] = []
   try { files = rawValue ? JSON.parse(rawValue) : [] } catch { files = [] }
@@ -3657,7 +3660,12 @@ function FileUploadAnswerInput({ rawValue, onChange, localOnly }: {
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">แนบไฟล์คำตอบ (รูปภาพหรือ PDF)</p>
-      <FileSubmissionUpload value={files} onChange={onChange} localOnly={localOnly} />
+      <FileSubmissionUpload
+        submissionAnswerId={answerId}
+        value={files}
+        onChange={onChange}
+        localOnly={localOnly}
+      />
       {files.length === 0 ? (
         <p className="text-xs text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
       ) : (
