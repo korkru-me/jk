@@ -14,6 +14,7 @@ import {
 } from './check-seb-readiness-core.mjs'
 
 const ENV_FILE_URL = new URL('../.env.local', import.meta.url)
+const RELEASE_REGISTRY_URL = new URL('../config/seb-release-registry.json', import.meta.url)
 
 async function loadLocalEnvironment() {
   try {
@@ -58,7 +59,13 @@ async function loadLocalEnvironment() {
 
 const localEnvironment = await loadLocalEnvironment()
 const environment = { ...localEnvironment.values, ...process.env }
-const readiness = inspectSebDeploymentReadiness(environment)
+let releaseRegistry = {}
+try {
+  releaseRegistry = JSON.parse(await readFile(RELEASE_REGISTRY_URL, 'utf8'))
+} catch {
+  releaseRegistry = {}
+}
+const readiness = inspectSebDeploymentReadiness(environment, releaseRegistry)
 const parseChecks = localEnvironment.parseWarnings.map(warning => ({
   status: 'warning',
   field: `.env.local line ${warning.line}`,

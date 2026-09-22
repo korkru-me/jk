@@ -9,7 +9,55 @@ import {
 
 const CONFIG_KEY = 'a'.repeat(64)
 const BROWSER_KEY = 'b'.repeat(64)
+const CONFIG_REVISION = `production-v1-${'c'.repeat(64)}`
 const SECRET = 'phase-seven-seb-session-secret-for-tests'
+const ALL_KEY_ENTRIES = [
+  { platform: 'windows', versionString: '3.10.2', buildNumber: '920', key: BROWSER_KEY },
+  { platform: 'macos', versionString: '3.7', buildNumber: '100', key: 'c'.repeat(64) },
+  { platform: 'ios', versionString: '3.6.2', buildNumber: '101', key: 'd'.repeat(64) },
+  { platform: 'ios', versionString: '3.7.1', buildNumber: '102', key: 'e'.repeat(64) },
+]
+
+function keyRegistry(overrides = {}) {
+  return JSON.stringify({
+    schemaVersion: 1,
+    configRevision: CONFIG_REVISION,
+    entries: [{
+      platform: 'windows',
+      versionString: '3.10.2',
+      buildNumber: '920',
+      key: BROWSER_KEY,
+    }],
+    ...overrides,
+  })
+}
+
+function releaseRegistry() {
+  return {
+    revisions: [{
+      revision: CONFIG_REVISION,
+      lifecycle: 'candidate',
+      policy: {
+        startUrl: 'approved',
+        navigationFilters: 'approved',
+        uploads: 'approved',
+        quitPassword: 'approved',
+        adminPassword: 'approved',
+        distribution: 'approved',
+      },
+      builds: [
+        { target: 'windows', runtimePlatform: 'windows', versionString: '3.10.2', buildNumber: '920', approval: 'approved' },
+        { target: 'macos', runtimePlatform: 'macos', versionString: '3.7', buildNumber: '100', approval: 'approved' },
+        { target: 'ipados', runtimePlatform: 'ios', versionString: '3.6.2', buildNumber: '101', approval: 'approved' },
+        { target: 'ios', runtimePlatform: 'ios', versionString: '3.7.1', buildNumber: '102', approval: 'approved' },
+      ],
+    }],
+  }
+}
+
+function inspect(environment) {
+  return inspectSebDeploymentReadiness(environment, releaseRegistry())
+}
 
 function validEnvironment(overrides = {}) {
   return {
@@ -17,7 +65,8 @@ function validEnvironment(overrides = {}) {
     NEXT_PUBLIC_SEB_CONFIG_URL: 'https://exam.example/korkru.seb',
     SEB_SESSION_SECRET: SECRET,
     SEB_CONFIG_KEY: CONFIG_KEY,
-    SEB_BROWSER_EXAM_KEYS: BROWSER_KEY,
+    SEB_CONFIG_REVISION: CONFIG_REVISION,
+    SEB_BROWSER_EXAM_KEY_REGISTRY: keyRegistry({ entries: ALL_KEY_ENTRIES }),
     ...overrides,
   }
 }
@@ -63,10 +112,10 @@ describe('SEB readiness env parsing', () => {
       ESCAPED: '$DEPLOY_SECRET',
     })
     expect(baseEnvironment).toEqual(snapshot)
-    expect(inspectSebDeploymentReadiness(validEnvironment({
+    expect(inspect(validEnvironment({
       SEB_SESSION_SECRET: parsed.values.MISSING,
     })).appReadiness.sessionSecretReady).toBe(false)
-    expect(inspectSebDeploymentReadiness(validEnvironment({
+    expect(inspect(validEnvironment({
       SEB_SESSION_SECRET: parsed.values.COMMENTED,
     })).appReadiness.sessionSecretReady).toBe(false)
   })
@@ -92,10 +141,10 @@ describe('SEB readiness env parsing', () => {
       NESTED: '',
       SEB_SESSION_SECRET: fallback,
     })
-    expect(inspectSebDeploymentReadiness(validEnvironment({
+    expect(inspect(validEnvironment({
       SEB_SESSION_SECRET: parsed.values.NESTED,
     })).appReadiness.sessionSecretReady).toBe(false)
-    expect(inspectSebDeploymentReadiness(validEnvironment({
+    expect(inspect(validEnvironment({
       SEB_SESSION_SECRET: parsed.values.SEB_SESSION_SECRET,
     })).appReadiness.sessionSecretReady).toBe(true)
   })
@@ -109,24 +158,22 @@ describe('SEB readiness env parsing', () => {
       LITERAL: '$MISSING_VARIABLE_NAME_LONG_ENOUGH_FOR_THIRTY_TWO',
       SEB_SESSION_SECRET: '',
     })
-    expect(inspectSebDeploymentReadiness(validEnvironment({
+    expect(inspect(validEnvironment({
       SEB_SESSION_SECRET: parsed.values.SEB_SESSION_SECRET,
     })).appReadiness.sessionSecretReady).toBe(false)
   })
 })
 
 describe('SEB production readiness', () => {
-  it('accepts complete production configuration and de-duplicates BEKs', () => {
-    const result = inspectSebDeploymentReadiness(validEnvironment({
-      SEB_BROWSER_EXAM_KEYS: `${BROWSER_KEY},${BROWSER_KEY}`,
-    }))
+  it('accepts a complete revision-bound production configuration', () => {
+    const result = inspect(validEnvironment())
     expect(result.ready).toBe(true)
-    expect(result.appReadiness.browserExamKeyCount).toBe(1)
+    expect(result.appReadiness.browserExamKeyCount).toBe(4)
     expect(result.checks).not.toContainEqual(expect.objectContaining({ status: 'blocker' }))
   })
 
   it('blocks HTTP origins and an invalid configured .seb URL', () => {
-    const result = inspectSebDeploymentReadiness(validEnvironment({
+    const result = inspect(validEnvironment({
       NEXT_PUBLIC_SITE_URL: 'http://exam.example',
       NEXT_PUBLIC_SEB_CONFIG_URL: 'https://exam.example/config.json',
     }))
@@ -141,17 +188,17 @@ describe('SEB production readiness', () => {
       ' https://exam.example',
       'https://exam.example ',
     ]) {
-      expect(inspectSebDeploymentReadiness(validEnvironment({
+      expect(inspect(validEnvironment({
         NEXT_PUBLIC_SITE_URL: siteUrl,
       })).appReadiness.siteUrlReady).toBe(false)
     }
-    expect(inspectSebDeploymentReadiness(validEnvironment({
+    expect(inspect(validEnvironment({
       NEXT_PUBLIC_SEB_CONFIG_URL: 'https://user:password@exam.example/korkru.seb',
     })).appReadiness.configFileStatus).toBe('invalid')
   })
 
   it('allows manual .seb distribution with a non-blocking warning', () => {
-    const result = inspectSebDeploymentReadiness(validEnvironment({
+    const result = inspect(validEnvironment({
       NEXT_PUBLIC_SEB_CONFIG_URL: '',
     }))
     expect(result.ready).toBe(true)
@@ -170,21 +217,46 @@ describe('SEB production readiness', () => {
       validEnvironment({
         SEB_SESSION_SECRET: 'short',
         SEB_CONFIG_KEY: 'not-hex',
-        SEB_BROWSER_EXAM_KEYS: `${BROWSER_KEY},invalid`,
+        SEB_CONFIG_REVISION: 'bad revision',
+        SEB_BROWSER_EXAM_KEY_REGISTRY: keyRegistry({ configRevision: 'another-revision' }),
       }),
     ]
 
     for (const environment of cases) {
-      expect(inspectSebDeploymentReadiness(environment).appReadiness).toEqual(
-        inspectSebReadiness({ ...environment, NODE_ENV: 'production' }),
+      expect(inspect(environment).appReadiness).toEqual(
+        inspectSebReadiness({ ...environment, NODE_ENV: 'production' }, releaseRegistry()),
       )
     }
+  })
+
+  it('fails closed when build entries are duplicated or the revision differs', () => {
+    const duplicateEntries = [
+      { platform: 'windows', versionString: '3.10.2', buildNumber: '920', key: BROWSER_KEY },
+      { platform: 'windows', versionString: '3.10.2', buildNumber: '920', key: 'd'.repeat(64) },
+    ]
+    expect(inspect(validEnvironment({
+      SEB_BROWSER_EXAM_KEY_REGISTRY: keyRegistry({ entries: duplicateEntries }),
+    })).ready).toBe(false)
+    expect(inspect(validEnvironment({
+      SEB_BROWSER_EXAM_KEY_REGISTRY: keyRegistry({ configRevision: 'another-revision' }),
+    })).ready).toBe(false)
+  })
+
+  it('rejects a target mapped to the wrong SEB runtime platform', () => {
+    const registry = releaseRegistry()
+    registry.revisions[0].builds[2].runtimePlatform = 'macos'
+
+    expect(inspectSebDeploymentReadiness(validEnvironment(), registry).ready).toBe(false)
+    expect(inspectSebReadiness(
+      { ...validEnvironment(), NODE_ENV: 'production' },
+      registry,
+    ).publishReady).toBe(false)
   })
 
   it('never includes configured values in its formatted output', () => {
     const environment = validEnvironment()
     const report = formatSebReadinessReport(
-      inspectSebDeploymentReadiness(environment).checks,
+      inspect(environment).checks,
     )
     for (const value of Object.values(environment)) expect(report).not.toContain(value)
   })

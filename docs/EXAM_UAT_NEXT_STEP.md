@@ -8,19 +8,23 @@
 npm run next:exam-uat
 ```
 
-ระบบจะอ่านเฉพาะ `.env.qa.local`, `config/exam-uat-evidence.json` และ `config/seb-platform-evidence.json` แบบ read-only แล้วบอก **งานถัดไปหนึ่งข้อ** โดยไม่พิมพ์ URL, credential, key หรือค่ารุ่นที่บันทึกไว้
+ระบบจะอ่านเฉพาะ `.env.qa.local`, `config/seb-release-registry.json`,
+`config/exam-uat-evidence.json`, `config/seb-platform-evidence.json` และ checksum ของไฟล์
+candidate แบบ read-only แล้วบอก **งานถัดไปหนึ่งข้อ** โดยไม่พิมพ์ URL, credential, key
+หรือค่ารุ่นที่บันทึกไว้
 
 ลำดับที่ใช้:
 
 1. ซ่อม manifest ถ้ารูปแบบผิด
-2. สร้าง staging แยกและผ่าน isolation guard
-3. ล็อก Git revision + staging build + SEB config เป็น release candidate เดียว
-4. iPhone → iPad → Mac → Windows responsive UAT
-5. authenticated exam บน staging
-6. recovery/proctor drill
-7. SEB production-config gate: macOS → iPadOS → iOS → Windows
-8. ล้างข้อมูล QA เป็นขั้นตอนสุดท้าย
-9. รัน release gate และ regression/build จาก release candidate เดียวกัน
+2. ยืนยัน checksum, native policy และ exact platform/version/build ใน SEB release registry
+3. สร้าง staging แยกและผ่าน isolation guard
+4. ล็อก Git revision + staging build + immutable SEB config revision เป็น release candidate เดียว
+5. iPhone → iPad → Mac → Windows responsive UAT
+6. authenticated exam บน staging
+7. recovery/proctor drill
+8. SEB production-config gate: macOS → iPadOS → iOS → Windows
+9. ล้างข้อมูล QA เป็นขั้นตอนสุดท้าย
+10. รัน release gate และ regression/build จาก release candidate เดียวกัน
 
 ถ้าทดสอบแล้วพบปัญหา ให้ตั้ง suite เป็น `failed` พร้อมวัน/รุ่นที่ไม่เป็นความลับ แก้โค้ดและทดสอบ suite เดิมซ้ำก่อนเดินต่อ ตัวบอกขั้นตอนจะไม่ข้าม suite ที่ยังไม่เป็น `passed`
 

@@ -10,6 +10,8 @@ const UAT_IDS = [
   ['recovery-proctor', 'Recovery and proctor drill'],
   ['qa-data-cleanup', 'QA data cleanup'],
 ]
+const DIGEST = 'b'.repeat(64)
+const CONFIG_REVISION = `production-v1-${DIGEST}`
 
 function uatManifest(status = 'passed') {
   return {
@@ -29,13 +31,13 @@ function uatManifest(status = 'passed') {
 
 function sebManifest(ready = true) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     configId: 'production-v1',
+    configRevision: CONFIG_REVISION,
     platforms: ['macos', 'ipados', 'ios', 'windows'].map(id => ({
       id,
       label: id,
-      osVersion: 'tested-os',
-      sebVersion: 'tested-seb',
+      buildId: `${id}-tested-build`,
       nativeCore: 'passed',
       productionBek: ready ? 'registered' : 'unverified',
       stagingMockExam: ready ? 'passed' : 'pending',
@@ -44,13 +46,51 @@ function sebManifest(ready = true) {
   }
 }
 
-function candidateManifest(ready = true) {
+function sebRegistryManifest(ready = true) {
   return {
     schemaVersion: 1,
+    candidateRevision: CONFIG_REVISION,
+    productionRevision: null,
+    revisions: [{
+      revision: CONFIG_REVISION,
+      configId: 'production-v1',
+      lifecycle: 'candidate',
+      artifactPath: '/exam/production-v1.seb',
+      artifactSha256: DIGEST,
+      canonicalStartUrl: 'https://www.example.test/assignments',
+      supersedes: null,
+      rollbackRevision: null,
+      rollbackStrategy: 'restore-deployment-and-secrets',
+      retiredAt: null,
+      policy: {
+        startUrl: ready ? 'approved' : 'pending',
+        navigationFilters: ready ? 'approved' : 'pending',
+        uploads: ready ? 'approved' : 'pending',
+        quitPassword: ready ? 'approved' : 'pending',
+        adminPassword: ready ? 'approved' : 'pending',
+        distribution: ready ? 'approved' : 'pending',
+      },
+      builds: ['macos', 'ipados', 'ios', 'windows'].map(id => ({
+        id: `${id}-tested-build`,
+        target: id,
+        runtimePlatform: id === 'ipados' || id === 'ios' ? 'ios' : id,
+        osVersion: 'tested-os',
+        versionString: '3.7',
+        buildNumber: '100',
+        approval: ready ? 'approved' : 'pending',
+      })),
+    }],
+  }
+}
+
+function candidateManifest(ready = true) {
+  return {
+    schemaVersion: 2,
     candidateId: 'release-2026-09',
     sourceRevision: ready ? 'a'.repeat(40) : 'pending',
     stagingBuild: ready ? 'staging-build-123' : 'pending',
     sebConfigId: 'production-v1',
+    sebConfigRevision: CONFIG_REVISION,
     lockedAt: ready ? '2026-09-20T09:00:00.000Z' : null,
   }
 }
@@ -61,6 +101,8 @@ function context(overrides = {}) {
     candidateManifest: candidateManifest(),
     uatManifest: uatManifest(),
     sebManifest: sebManifest(),
+    sebRegistryManifest: sebRegistryManifest(),
+    candidateArtifactSha256: DIGEST,
     ...overrides,
   }
 }
@@ -79,6 +121,12 @@ describe('next exam UAT step', () => {
       uatManifest: uatManifest('pending'),
       sebManifest: sebManifest(false),
     })).id).toBe('prepare-staging')
+  })
+
+  it('requires the versioned SEB registry before staging UAT', () => {
+    expect(nextExamUatStep(context({
+      sebRegistryManifest: sebRegistryManifest(false),
+    })).id).toBe('confirm-seb-registry')
   })
 
   it('locks the release candidate after staging and before device UAT', () => {

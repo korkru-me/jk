@@ -61,6 +61,7 @@ export async function getSebSession(
     claims?.kind !== 'seb_session'
     || claims.userId !== userId
     || claims.assignmentId !== assignmentId
+    || claims.configRevision !== environment.configRevision
   ) return null
 
   return claims

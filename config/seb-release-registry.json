@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "candidateRevision": "korkru-production-v1-ce946d68df1f9a127b63a8cd16ad3f04a1d93c5e2c82c3b77b09174ae6e14cec",
+  "productionRevision": null,
+  "revisions": [
+    {
+      "revision": "korkru-production-v1-ce946d68df1f9a127b63a8cd16ad3f04a1d93c5e2c82c3b77b09174ae6e14cec",
+      "configId": "korkru-production-v1",
+      "lifecycle": "candidate",
+      "artifactPath": "/exam/korkru-production-v1.seb",
+      "artifactSha256": "ce946d68df1f9a127b63a8cd16ad3f04a1d93c5e2c82c3b77b09174ae6e14cec",
+      "canonicalStartUrl": "https://www.korkru.com/assignments",
+      "supersedes": null,
+      "rollbackRevision": null,
+      "rollbackStrategy": "restore-deployment-and-secrets",
+      "retiredAt": null,
+      "policy": {
+        "startUrl": "pending",
+        "navigationFilters": "pending",
+        "uploads": "pending",
+        "quitPassword": "pending",
+        "adminPassword": "pending",
+        "distribution": "pending"
+      },
+      "builds": [
+        {
+          "id": "macos-3.7-build-pending",
+          "target": "macos",
+          "runtimePlatform": "macos",
+          "osVersion": "record during final UAT",
+          "versionString": "3.7",
+          "buildNumber": "record during final UAT",
+          "approval": "pending"
+        },
+        {
+          "id": "ipados-3.6.2-build-pending",
+          "target": "ipados",
+          "runtimePlatform": "ios",
+          "osVersion": "record during final UAT",
+          "versionString": "3.6.2",
+          "buildNumber": "record during final UAT",
+          "approval": "pending"
+        },
+        {
+          "id": "ios-3.7.1-build-pending",
+          "target": "ios",
+          "runtimePlatform": "ios",
+          "osVersion": "26.6.1",
+          "versionString": "3.7.1",
+          "buildNumber": "record during final UAT",
+          "approval": "pending"
+        },
+        {
+          "id": "windows-3.10.2-920",
+          "target": "windows",
+          "runtimePlatform": "windows",
+          "osVersion": "11 x64",
+          "versionString": "3.10.2",
+          "buildNumber": "920",
+          "approval": "pending"
+        }
+      ]
+    }
+  ]
+}

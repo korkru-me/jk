@@ -6,13 +6,13 @@ import {
 
 function readyManifest() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     configId: 'production-v1',
+    configRevision: 'production-v1-revision',
     platforms: ['macos', 'ipados', 'ios', 'windows'].map(id => ({
       id,
       label: id,
-      osVersion: 'tested-os',
-      sebVersion: 'tested-seb',
+      buildId: `${id}-tested-build`,
       nativeCore: 'passed',
       productionBek: 'registered',
       stagingMockExam: 'passed',
@@ -21,15 +21,32 @@ function readyManifest() {
   }
 }
 
+function readyRegistry() {
+  return {
+    candidateRevision: 'production-v1-revision',
+    revisions: [{
+      revision: 'production-v1-revision',
+      configId: 'production-v1',
+      builds: ['macos', 'ipados', 'ios', 'windows'].map(id => ({
+        id: `${id}-tested-build`,
+        target: id,
+        approval: 'approved',
+      })),
+    }],
+  }
+}
+
 describe('SEB platform evidence', () => {
   it('passes only when every required platform clears every release gate', () => {
-    expect(inspectSebPlatformEvidence(readyManifest()).ready).toBe(true)
+    expect(inspectSebPlatformEvidence(readyManifest(), {
+      releaseRegistry: readyRegistry(),
+    }).ready).toBe(true)
   })
 
   it('blocks a pending platform without leaking a BEK value', () => {
     const manifest = readyManifest()
     manifest.platforms[0].productionBek = 'unverified'
-    const result = inspectSebPlatformEvidence(manifest)
+    const result = inspectSebPlatformEvidence(manifest, { releaseRegistry: readyRegistry() })
     expect(result.ready).toBe(false)
     expect(result.checks).toContainEqual(expect.objectContaining({
       field: 'macos release gate',
@@ -42,20 +59,31 @@ describe('SEB platform evidence', () => {
     const manifest = readyManifest()
     manifest.platforms.pop()
     manifest.platforms.push({ ...manifest.platforms[0] })
-    manifest.platforms[1].sebVersion = ''
-    const result = inspectSebPlatformEvidence(manifest)
+    manifest.platforms[1].buildId = ''
+    const result = inspectSebPlatformEvidence(manifest, { releaseRegistry: readyRegistry() })
     expect(result.ready).toBe(false)
     expect(result.checks.filter(check => check.status === 'blocker').length).toBeGreaterThanOrEqual(3)
   })
 
   it('rejects manifest fields intended to store secrets', () => {
-    const manifest = { ...readyManifest(), configKey: 'do-not-store-this' }
-    const result = inspectSebPlatformEvidence(manifest)
+    const manifest = { ...readyManifest(), notes: 'do-not-store-this' }
+    const result = inspectSebPlatformEvidence(manifest, { releaseRegistry: readyRegistry() })
     expect(result.ready).toBe(false)
     expect(result.checks).toContainEqual(expect.objectContaining({
-      field: 'secret hygiene',
+      field: 'evidence schema',
+      status: 'blocker',
+    }))
+  })
+
+  it('rejects evidence copied from another config revision or build', () => {
+    const manifest = readyManifest()
+    manifest.configRevision = 'another-revision'
+    manifest.platforms[0].buildId = 'another-build'
+    const result = inspectSebPlatformEvidence(manifest, { releaseRegistry: readyRegistry() })
+    expect(result.ready).toBe(false)
+    expect(result.checks).toContainEqual(expect.objectContaining({
+      field: 'release registry linkage',
       status: 'blocker',
     }))
   })
 })
-

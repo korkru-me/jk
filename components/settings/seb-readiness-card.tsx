@@ -111,11 +111,25 @@ export function SebReadinessCard({
             : 'SEB_CONFIG_KEY ต้องเป็นเลขฐานสิบหก 64 ตัวจากไฟล์ .seb ที่บันทึกล่าสุด'}
         />
         <ReadinessRow
-          status={readiness.browserExamKeyCount > 0 ? 'ready' : 'blocked'}
+          status={readiness.configRevisionReady ? 'ready' : 'blocked'}
+          title="Revision ของไฟล์ SEB"
+          description={readiness.configRevisionReady
+            ? 'SEB_CONFIG_REVISION ถูกกำหนดไว้เพื่อกัน CK/BEK จากไฟล์คนละ revision ปะปนกัน'
+            : 'ตั้ง SEB_CONFIG_REVISION ให้ตรงกับ revision ใน release registry ของไฟล์ .seb ชุดนี้'}
+        />
+        <ReadinessRow
+          status={readiness.browserExamKeyRegistryReady && readiness.browserExamKeyCount > 0 ? 'ready' : 'blocked'}
           title="Browser Exam Keys (BEK)"
-          description={readiness.browserExamKeyCount > 0
-            ? `พบ BEK ที่ไม่ซ้ำกัน ${readiness.browserExamKeyCount} ค่า — ตรวจว่าครบทุก OS/รุ่นที่โรงเรียนอนุญาต`
-            : 'ยังไม่พบ BEK ที่ถูกต้อง ต้องเพิ่มอย่างน้อยหนึ่งค่าใน SEB_BROWSER_EXAM_KEYS'}
+          description={readiness.browserExamKeyRegistryReady && readiness.browserExamKeyCount > 0
+            ? `พบ BEK ที่ผูก platform/version/build จำนวน ${readiness.browserExamKeyCount} รายการ`
+            : 'ตั้ง SEB_BROWSER_EXAM_KEY_REGISTRY แบบ JSON ให้ตรงกับ config revision และ build ที่อนุญาต'}
+        />
+        <ReadinessRow
+          status={readiness.releaseRegistryReady && readiness.browserExamKeyCoverageReady ? 'ready' : 'blocked'}
+          title="Policy และ build ที่ประกาศรองรับ"
+          description={readiness.releaseRegistryReady && readiness.browserExamKeyCoverageReady
+            ? 'policy/build ใน release registry อนุมัติครบและมี BEK ครบทุก exact build'
+            : 'ยังต้องยืนยัน native policy, exact build และลงทะเบียน BEK ให้ครบตาม release registry'}
         />
         <ReadinessRow
           status={readiness.configFileStatus === 'ready' ? 'ready' : 'warning'}

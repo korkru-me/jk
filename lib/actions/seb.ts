@@ -8,6 +8,7 @@ import {
   normalizeSebRequestUrl,
   parseSebVersion,
   readSebEnvironment,
+  selectSebBrowserExamKeys,
   signSebClaims,
   verifySebClaims,
   verifySebRequestHashes,
@@ -101,7 +102,7 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     configKeyHash: input.configKeyHash,
     browserExamKeyHash: input.browserExamKeyHash,
     configKey: environment.configKey,
-    browserExamKeys: environment.browserExamKeys,
+    browserExamKeys: selectSebBrowserExamKeys(environment.browserExamKeys, version),
   })
   if (!validHashes) {
     return { error: 'การตั้งค่า Safe Exam Browser หรือเวอร์ชันไม่ตรงกับที่โรงเรียนอนุญาต' }
@@ -110,6 +111,7 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
   const claims = createSebSessionClaims({
     userId: user.id,
     assignmentId: input.assignmentId,
+    configRevision: environment.configRevision,
     platform: version.platform,
     version: version.version,
   })

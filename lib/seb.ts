@@ -4,6 +4,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto'
+import sebReleaseRegistry from '@/config/seb-release-registry.json'
 
 export type SebPlatform = 'windows' | 'macos' | 'ios'
 export type SebChallengePurpose = 'take' | 'system_check'
@@ -11,6 +12,8 @@ export type SebChallengePurpose = 'take' | 'system_check'
 export interface SebVersionInfo {
   platform: SebPlatform
   version: string
+  versionString: string
+  buildNumber: string
 }
 
 export interface SebChallengeClaims {
@@ -27,6 +30,7 @@ export interface SebSessionClaims {
   kind: 'seb_session'
   userId: string
   assignmentId: string
+  configRevision: string
   platform: SebPlatform
   version: string
   issuedAt: number
@@ -38,13 +42,25 @@ type SebClaims = SebChallengeClaims | SebSessionClaims
 export interface SebEnvironment {
   sessionSecret: string
   configKey: string
-  browserExamKeys: string[]
+  configRevision: string
+  browserExamKeys: SebBrowserExamKeyEntry[]
+}
+
+export interface SebBrowserExamKeyEntry {
+  platform: SebPlatform
+  versionString: string
+  buildNumber: string
+  key: string
 }
 
 export interface SebReadiness {
   publishReady: boolean
   sessionSecretReady: boolean
   configKeyReady: boolean
+  configRevisionReady: boolean
+  releaseRegistryReady: boolean
+  browserExamKeyRegistryReady: boolean
+  browserExamKeyCoverageReady: boolean
   browserExamKeyCount: number
   siteUrlReady: boolean
   configFileStatus: 'ready' | 'manual' | 'invalid'
@@ -53,6 +69,10 @@ export interface SebReadiness {
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/i
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MAX_VERSION_LENGTH = 240
+const SAFE_METADATA_PATTERN = /^[A-Za-z0-9.+-]{1,40}$/
+const SAFE_REVISION_PATTERN = /^[A-Za-z0-9._-]{1,120}$/
+const SEB_KEY_REGISTRY_FIELDS = new Set(['schemaVersion', 'configRevision', 'entries'])
+const SEB_KEY_ENTRY_FIELDS = new Set(['platform', 'versionString', 'buildNumber', 'key'])
 
 function safeEqual(left: string, right: string) {
   const leftBuffer = Buffer.from(left)
@@ -69,6 +89,139 @@ function normalizedHash(value: string | undefined) {
   return validHex(value)?.toLowerCase() ?? null
 }
 
+function validConfigRevision(value: string | undefined) {
+  const trimmed = value?.trim() ?? ''
+  return SAFE_REVISION_PATTERN.test(trimmed) ? trimmed : null
+}
+
+function parseSebBrowserExamKeyRegistry(
+  rawValue: string | undefined,
+  expectedConfigRevision: string | null,
+): SebBrowserExamKeyEntry[] | null {
+  if (!rawValue || rawValue.length > 24_000 || !expectedConfigRevision) return null
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const registry = parsed as Record<string, unknown>
+    if (
+      Object.keys(registry).some(field => !SEB_KEY_REGISTRY_FIELDS.has(field))
+      || registry.schemaVersion !== 1
+      || registry.configRevision !== expectedConfigRevision
+      || !Array.isArray(registry.entries)
+      || registry.entries.length === 0
+      || registry.entries.length > 32
+    ) return null
+
+    const entries: SebBrowserExamKeyEntry[] = []
+    const identities = new Set<string>()
+    for (const candidate of registry.entries) {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null
+      const entry = candidate as Record<string, unknown>
+      if (Object.keys(entry).some(field => !SEB_KEY_ENTRY_FIELDS.has(field))) return null
+      if (
+        (entry.platform !== 'windows' && entry.platform !== 'macos' && entry.platform !== 'ios')
+        || typeof entry.versionString !== 'string'
+        || !SAFE_METADATA_PATTERN.test(entry.versionString)
+        || typeof entry.buildNumber !== 'string'
+        || !SAFE_METADATA_PATTERN.test(entry.buildNumber)
+        || typeof entry.key !== 'string'
+      ) return null
+      const key = validHex(entry.key)
+      if (!key) return null
+      const identity = `${entry.platform}:${entry.versionString}:${entry.buildNumber}`
+      if (identities.has(identity)) return null
+      identities.add(identity)
+      entries.push({
+        platform: entry.platform,
+        versionString: entry.versionString,
+        buildNumber: entry.buildNumber,
+        key,
+      })
+    }
+    return entries
+  } catch {
+    return null
+  }
+}
+
+function inspectReleaseRegistryBinding(
+  releaseRegistry: unknown,
+  configRevision: string | null,
+  browserExamKeys: SebBrowserExamKeyEntry[] | null,
+) {
+  const empty = {
+    configRevisionReady: false,
+    releaseRegistryReady: false,
+    browserExamKeyRegistryReady: false,
+    browserExamKeyCoverageReady: false,
+  }
+  if (!configRevision || !releaseRegistry || typeof releaseRegistry !== 'object') return empty
+  const registry = releaseRegistry as { revisions?: unknown }
+  if (!Array.isArray(registry.revisions)) return empty
+  const revision = registry.revisions.find(candidate => {
+    return candidate && typeof candidate === 'object'
+      && (candidate as { revision?: unknown }).revision === configRevision
+  }) as {
+    lifecycle?: unknown
+    policy?: unknown
+    builds?: unknown
+  } | undefined
+  if (!revision || (revision.lifecycle !== 'candidate' && revision.lifecycle !== 'active')) return empty
+
+  const builds = Array.isArray(revision.builds) ? revision.builds : []
+  const targets = new Set<string>()
+  const declaredIdentities = new Set<string>()
+  let buildsApproved = builds.length === 4
+  for (const candidate of builds) {
+    if (!candidate || typeof candidate !== 'object') {
+      buildsApproved = false
+      continue
+    }
+    const build = candidate as Record<string, unknown>
+    if (typeof build.target === 'string') targets.add(build.target)
+    const expectedRuntime = build.target === 'ipados' || build.target === 'ios'
+      ? 'ios'
+      : build.target
+    const metadataReady = (build.runtimePlatform === 'windows'
+      || build.runtimePlatform === 'macos'
+      || build.runtimePlatform === 'ios')
+      && build.runtimePlatform === expectedRuntime
+      && typeof build.versionString === 'string'
+      && SAFE_METADATA_PATTERN.test(build.versionString)
+      && typeof build.buildNumber === 'string'
+      && SAFE_METADATA_PATTERN.test(build.buildNumber)
+    if (metadataReady) {
+      declaredIdentities.add(`${build.runtimePlatform}:${build.versionString}:${build.buildNumber}`)
+    }
+    if (!metadataReady || build.approval !== 'approved') buildsApproved = false
+  }
+  const requiredTargetsReady = ['macos', 'ipados', 'ios', 'windows']
+    .every(target => targets.has(target))
+  const policy = revision.policy && typeof revision.policy === 'object'
+    ? revision.policy as Record<string, unknown>
+    : {}
+  const policiesReady = Object.keys(policy).length === 6
+    && Object.values(policy).every(value => value === 'approved')
+  const receivedIdentities = new Set(
+    (browserExamKeys ?? []).map(entry => `${entry.platform}:${entry.versionString}:${entry.buildNumber}`),
+  )
+  const entriesDeclared = browserExamKeys !== null
+    && receivedIdentities.size > 0
+    && [...receivedIdentities].every(identity => declaredIdentities.has(identity))
+  const coverageReady = entriesDeclared
+    && requiredTargetsReady
+    && declaredIdentities.size > 0
+    && [...declaredIdentities].every(identity => receivedIdentities.has(identity))
+
+  return {
+    configRevisionReady: true,
+    releaseRegistryReady: requiredTargetsReady && buildsApproved && policiesReady,
+    browserExamKeyRegistryReady: entriesDeclared,
+    browserExamKeyCoverageReady: coverageReady,
+  }
+}
+
 function parseHttpUrl(value: string | undefined) {
   if (!value?.trim()) return null
   try {
@@ -82,16 +235,28 @@ function parseHttpUrl(value: string | undefined) {
 /** Public-safe deployment status. It intentionally returns no key or secret values. */
 export function inspectSebReadiness(
   environment: Record<string, string | undefined> = process.env,
+  releaseRegistry: unknown = sebReleaseRegistry,
 ): SebReadiness {
   const production = environment.NODE_ENV === 'production'
   const sessionSecretReady = (environment.SEB_SESSION_SECRET?.trim().length ?? 0) >= 32
   const configKeyReady = validHex(environment.SEB_CONFIG_KEY) !== null
-  const browserExamKeyCount = new Set(
-    (environment.SEB_BROWSER_EXAM_KEYS ?? '')
-      .split(/[\s,;]+/)
-      .map(key => validHex(key))
-      .filter((key): key is string => key !== null),
-  ).size
+  const configRevision = validConfigRevision(environment.SEB_CONFIG_REVISION)
+  const browserExamKeys = parseSebBrowserExamKeyRegistry(
+    environment.SEB_BROWSER_EXAM_KEY_REGISTRY,
+    configRevision,
+  )
+  const registryBinding = inspectReleaseRegistryBinding(
+    releaseRegistry,
+    configRevision,
+    browserExamKeys,
+  )
+  const {
+    configRevisionReady,
+    releaseRegistryReady,
+    browserExamKeyRegistryReady,
+    browserExamKeyCoverageReady,
+  } = registryBinding
+  const browserExamKeyCount = browserExamKeys?.length ?? 0
 
   const siteUrlRaw = environment.NEXT_PUBLIC_SITE_URL
   const siteUrlValue = siteUrlRaw?.trim()
@@ -120,10 +285,18 @@ export function inspectSebReadiness(
   return {
     publishReady: sessionSecretReady
       && configKeyReady
+      && configRevisionReady
+      && releaseRegistryReady
+      && browserExamKeyRegistryReady
+      && browserExamKeyCoverageReady
       && browserExamKeyCount > 0
       && siteUrlReady,
     sessionSecretReady,
     configKeyReady,
+    configRevisionReady,
+    releaseRegistryReady,
+    browserExamKeyRegistryReady,
+    browserExamKeyCoverageReady,
     browserExamKeyCount,
     siteUrlReady,
     configFileStatus,
@@ -132,21 +305,47 @@ export function inspectSebReadiness(
 
 export function readSebEnvironment(
   environment: Record<string, string | undefined> = process.env,
+  releaseRegistry: unknown = sebReleaseRegistry,
 ): SebEnvironment | null {
   const sessionSecret = environment.SEB_SESSION_SECRET?.trim() ?? ''
   const configKey = validHex(environment.SEB_CONFIG_KEY)
-  const browserExamKeys = (environment.SEB_BROWSER_EXAM_KEYS ?? '')
-    .split(/[\s,;]+/)
-    .map(key => validHex(key))
-    .filter((key): key is string => key !== null)
+  const configRevision = validConfigRevision(environment.SEB_CONFIG_REVISION)
+  const browserExamKeys = parseSebBrowserExamKeyRegistry(
+    environment.SEB_BROWSER_EXAM_KEY_REGISTRY,
+    configRevision,
+  )
 
-  if (sessionSecret.length < 32 || !configKey || browserExamKeys.length === 0) return null
+  const registryBinding = inspectReleaseRegistryBinding(
+    releaseRegistry,
+    configRevision,
+    browserExamKeys,
+  )
+  if (
+    sessionSecret.length < 32
+    || !configKey
+    || !configRevision
+    || !browserExamKeys
+    || !registryBinding.configRevisionReady
+    || !registryBinding.browserExamKeyRegistryReady
+  ) return null
 
   return {
     sessionSecret,
     configKey,
-    browserExamKeys: [...new Set(browserExamKeys)],
+    configRevision,
+    browserExamKeys,
   }
+}
+
+export function selectSebBrowserExamKeys(
+  entries: SebBrowserExamKeyEntry[],
+  version: SebVersionInfo,
+) {
+  return entries
+    .filter(entry => entry.platform === version.platform
+      && entry.versionString === version.versionString
+      && entry.buildNumber === version.buildNumber)
+    .map(entry => entry.key)
 }
 
 /** SEB hashes the exact requested URL without a possible fragment. */
@@ -195,16 +394,21 @@ export function parseSebVersion(value: unknown): SebVersionInfo | null {
     || /[\u0000-\u001f\u007f]/.test(value)
   ) return null
 
-  const osMatch = value.match(/_(Windows|macOS|iOS)_/)
-  if (!osMatch) return null
+  const versionMatch = value.match(/_(Windows|macOS|iOS)_([A-Za-z0-9.+-]+)_([A-Za-z0-9.+-]+)_[^\s]+$/)
+  if (!versionMatch) return null
 
-  const platform: SebPlatform = osMatch[1] === 'Windows'
+  const platform: SebPlatform = versionMatch[1] === 'Windows'
     ? 'windows'
-    : osMatch[1] === 'macOS'
+    : versionMatch[1] === 'macOS'
       ? 'macos'
       : 'ios'
 
-  return { platform, version: value }
+  return {
+    platform,
+    version: value,
+    versionString: versionMatch[2],
+    buildNumber: versionMatch[3],
+  }
 }
 
 function encodeClaims(claims: SebClaims) {
@@ -250,9 +454,12 @@ export function verifySebClaims(token: string, secret: string, now = Date.now())
     }
 
     const sessionClaims = parsed as Partial<SebSessionClaims>
+    const sessionVersion = parseSebVersion(sessionClaims.version)
     if (
       (sessionClaims.platform !== 'windows' && sessionClaims.platform !== 'macos' && sessionClaims.platform !== 'ios')
-      || !parseSebVersion(sessionClaims.version)
+      || !validConfigRevision(sessionClaims.configRevision)
+      || !sessionVersion
+      || sessionVersion.platform !== sessionClaims.platform
     ) return null
     return sessionClaims as SebSessionClaims
   } catch {
@@ -280,6 +487,7 @@ export function createSebChallengeClaims(
 export function createSebSessionClaims(input: {
   userId: string
   assignmentId: string
+  configRevision: string
   platform: SebPlatform
   version: string
   now?: number
@@ -289,6 +497,7 @@ export function createSebSessionClaims(input: {
     kind: 'seb_session',
     userId: input.userId,
     assignmentId: input.assignmentId,
+    configRevision: input.configRevision,
     platform: input.platform,
     version: input.version,
     issuedAt: now,

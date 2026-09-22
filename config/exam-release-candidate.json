@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 1,
-  "candidateId": "final-release-uat-r8",
-  "sourceRevision": "564f12c3af6b2269cacda4504335c06b08111022",
-  "stagingBuild": "vercel-5eqWPtx4hf94SkkAWNEQBqyBiU7v",
+  "schemaVersion": 2,
+  "candidateId": "seb-v1-uat-r1",
+  "sourceRevision": "pending",
+  "stagingBuild": "pending",
   "sebConfigId": "korkru-production-v1",
-  "lockedAt": "2026-09-21T03:50:07.000Z"
+  "sebConfigRevision": "korkru-production-v1-ce946d68df1f9a127b63a8cd16ad3f04a1d93c5e2c82c3b77b09174ae6e14cec",
+  "lockedAt": null
 }

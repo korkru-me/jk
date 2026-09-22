@@ -4,6 +4,7 @@ const ALLOWED_FIELDS = new Set([
   'sourceRevision',
   'stagingBuild',
   'sebConfigId',
+  'sebConfigRevision',
   'lockedAt',
 ])
 
@@ -30,14 +31,17 @@ function validIsoTimestamp(value) {
  * Bind external evidence to one frozen code revision, staging deployment and
  * SEB config without storing a URL, credential, key or free-text note.
  */
-export function inspectExamReleaseCandidate(manifest, { uatRunId, sebConfigId } = {}) {
+export function inspectExamReleaseCandidate(
+  manifest,
+  { uatRunId, sebConfigId, sebConfigRevision } = {},
+) {
   const checks = []
   const fields = manifest && typeof manifest === 'object' ? Object.keys(manifest) : []
   const unknownFields = fields.filter(field => !ALLOWED_FIELDS.has(field))
 
-  checks.push(manifest?.schemaVersion === 1
-    ? { status: 'pass', field: 'schemaVersion', message: 'ใช้ schema 1' }
-    : { status: 'blocker', field: 'schemaVersion', message: 'ต้องเป็น 1' })
+  checks.push(manifest?.schemaVersion === 2
+    ? { status: 'pass', field: 'schemaVersion', message: 'ใช้ schema 2' }
+    : { status: 'blocker', field: 'schemaVersion', message: 'ต้องเป็น 2' })
   checks.push(unknownFields.length === 0
     ? { status: 'pass', field: 'candidate schema', message: 'ไม่มี field นอก schema' }
     : { status: 'blocker', field: 'candidate schema', message: 'พบ field นอก schema ที่อาจเก็บข้อมูลไม่เหมาะสม' })
@@ -47,6 +51,9 @@ export function inspectExamReleaseCandidate(manifest, { uatRunId, sebConfigId } 
   checks.push(safeId(manifest?.sebConfigId)
     ? { status: 'pass', field: 'SEB config evidence', message: 'รูปแบบ SEB config id ถูกต้อง' }
     : { status: 'blocker', field: 'SEB config evidence', message: 'SEB config id ต้องเป็น metadata สั้นที่ไม่เป็นความลับ' })
+  checks.push(safeId(manifest?.sebConfigRevision)
+    ? { status: 'pass', field: 'SEB config revision evidence', message: 'รูปแบบ SEB config revision ถูกต้อง' }
+    : { status: 'blocker', field: 'SEB config revision evidence', message: 'SEB config revision ต้องเป็น metadata สั้นที่ไม่เป็นความลับ' })
 
   const sourceReady = typeof manifest?.sourceRevision === 'string'
     && /^[a-f0-9]{40}$/.test(manifest.sourceRevision)
@@ -71,6 +78,9 @@ export function inspectExamReleaseCandidate(manifest, { uatRunId, sebConfigId } 
   checks.push(safeId(sebConfigId) && manifest?.sebConfigId === sebConfigId
     ? { status: 'pass', field: 'SEB candidate linkage', message: 'SEB evidence ผูกกับ config เดียวกัน' }
     : { status: 'blocker', field: 'SEB candidate linkage', message: 'SEB config id ต้องตรงกับ platform evidence' })
+  checks.push(safeId(sebConfigRevision) && manifest?.sebConfigRevision === sebConfigRevision
+    ? { status: 'pass', field: 'SEB revision linkage', message: 'candidate ผูกกับ config revision เดียวกัน' }
+    : { status: 'blocker', field: 'SEB revision linkage', message: 'SEB config revision ต้องตรงกับ platform evidence' })
 
   return { ready: checks.every(check => check.status !== 'blocker'), checks }
 }

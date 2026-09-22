@@ -102,6 +102,12 @@ INSERT/DELETE ของ `work-images` และ `submission-files` โดยไ�
 
 ## เฟส S2 — Versioned config และ release registry สำหรับ SEB v1
 
+**สถานะ: ส่วน Agent ทำเสร็จใน branch SEB แล้ว; รอเจ้าของยืนยัน native policy/build/BEK** —
+artifact ใน repository ถูกผูก checksum กับ immutable revision, runtime เลือก BEK ตาม exact
+platform/version/build และ session ผูก revision, evidence/candidate schema ปฏิเสธข้อมูลคนละ revision
+แล้ว รอบ `r8` ถูกเก็บเป็นประวัติและเปิด `seb-v1-uat-r1` แบบ pending โดยยังไม่มี deploy หรือ
+การเปลี่ยน secret ดูขั้นตอนที่ `docs/SEB_CONFIG_RELEASE_RUNBOOK.md`
+
 **Agent ทำ**
 
 - ตรวจไฟล์ production config, canonical start URL, download path, content/navigation filters,

@@ -35,13 +35,20 @@ Responsive QA เฟส Mac ผ่านในขอบเขต agent-only แ�
 
 Authenticated exam QA มี Staging แยกแล้วและ isolation guard ผ่าน: Vercel Preview, Supabase, Auth และ Storage แยกจาก Production; สมัคร ยืนยันอีเมล และ login smoke test ผ่านโดยไม่เห็นข้อมูล Production ตัวตรวจรองรับทั้ง `.env.qa.local` และค่าที่ฉีดจาก Keychain/CI โดยไม่พิมพ์ secret ส่วน autosave/upload/submit E2E ยังรอชุดทดสอบจริงหลังล็อก candidate
 
-SEB platform evidence มี manifest แบบไม่เก็บ secret และ `npm run check:seb-platforms` แล้ว ตัวตรวจจะไม่ให้สถานะพร้อม production จน Windows/macOS/iPadOS/iOS ครบ native core + production-BEK verification + staging mock exam + physical UAT ของ config/build เดียวกัน ปัจจุบัน native core ผ่าน แต่ release gate อื่นยัง pending/unverified จึงจงใจรายงาน NOT READY
+SEB completion S2 เพิ่ม immutable release registry ที่ผูกไฟล์ `.seb` ด้วย SHA-256, expected
+start URL, policy review, exact platform/version/build และ rollback metadata โดยไม่เก็บ secret;
+runtime เปลี่ยนจาก global `SEB_BROWSER_EXAM_KEYS` เป็น `SEB_CONFIG_REVISION` +
+`SEB_BROWSER_EXAM_KEY_REGISTRY` และเลือก BEK ตาม exact `SafeExamBrowser.version` พร้อมผูก
+session กับ config revision ตัวตรวจ `check:seb-registry`, `check:seb-platforms`,
+`check:exam-candidate` และ `check:exam-release` ปฏิเสธหลักฐานเก่า/คนละ revision ปัจจุบัน
+checksum ตรงไฟล์ใน repository แต่ native policy, build number บาง platform, BEK enrollment,
+Staging mock และ physical UAT ยัง pending/unverified จึงจงใจรายงาน NOT READY
 
 Recovery/proctor QA เฟส 7 ผ่านในขอบเขต agent-only แล้ว: stale answer backup จาก attempt เก่าไม่ถูก replay, timer ยึดเวลาเริ่มจริงหลัง reload/throttle/clone, คิว proctor ไม่ปล่อย signal ที่เกิดระหว่าง request ค้างรอ heartbeat และ logic ของ retry/Realtime fallback/review alert มี unit test รองรับ Staging แยกพร้อมแล้ว แต่การตัด Wi‑Fi, upload, resume, หลายบัญชีและหน้าคุมสอบจริงยังรอ physical UAT จึงยังไม่ใช่ production release gate
 
-เฟส agent-only 1–8 ของ responsive exam QA ปิดแล้วและมี `npm run check:exam-release` เป็น fail-closed gate รวม staging isolation กับ SEB platform evidence รวมถึง `docs/EXAM_RELEASE_UAT.md` เป็นรายการทดสอบจริงชุดเดียว ปัจจุบัน Staging และ release candidate ผ่านแล้ว แต่ release ยังคง NOT READY เพราะ external device/UAT และ SEB platform evidence ยังไม่ครบ
+เฟส agent-only 1–8 ของ responsive exam QA ปิดแล้วและมี `npm run check:exam-release` เป็น fail-closed gate รวม staging isolation กับ SEB platform evidence รวมถึง `docs/EXAM_RELEASE_UAT.md` เป็นรายการทดสอบจริงชุดเดียว Staging/candidate `r8` เป็นหลักฐานประวัติที่เก่ากว่า SEB completion; รอบใหม่ `seb-v1-uat-r1` ยังไม่ล็อก source/deployment และ release ยังคง NOT READY เพราะ registry, external device/UAT และ SEB platform evidence ยังไม่ครบ
 
-Regression ปิดเฟสผ่าน 100 test files / 1,326 tests, TypeScript, token lint, production build 63 static pages และ Next.js MCP/browser runtime smoke โดยไม่พบ compilation/runtime error; ตัวเลขนี้ยืนยัน commit ฝั่งโค้ดเท่านั้น ไม่ยกเลิก external release blockers
+Regression ปิดเฟสผ่าน 129 test files / 1,602 tests, TypeScript, token lint, production build 63 static pages และ Next.js MCP/browser runtime smoke โดยไม่พบ compilation/runtime error; ตัวเลขนี้ยืนยัน commit ฝั่งโค้ดเท่านั้น ไม่ยกเลิก external release blockers
 
 เฟส 9 เพิ่ม external UAT evidence แบบ fixed schema/no-free-text ใน `config/exam-uat-evidence.json` ครบ iPhone/iPad/Mac/Windows responsive, authenticated exam, recovery/proctor และ QA cleanup พร้อม `npm run check:exam-uat`; ตัวตรวจบังคับ timestamp ISO + รุ่นที่ทดสอบ, ปฏิเสธ field เพิ่ม และถูกนำไปรวมใน `check:exam-release` แล้ว สถานะทั้ง 7 suite ยัง pending ตามจริง
 
