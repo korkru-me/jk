@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 22 กันยายน 2026
+อัปเดตล่าสุด: 23 กันยายน 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -89,7 +89,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - เวลาหลักของรายงานคือ `exam_proctor_events.created_at` จาก server เท่านั้น `occurred_at_client` มาจากนาฬิกาที่ client ควบคุมและอาจคลาดเคลื่อนหรือถูกแก้ ห้ามใช้แทน server time เพื่อเรียงเหตุการณ์ ตัดสินความน่าเชื่อถือ หรือกล่าวหานักเรียน
 - Browser Notification ของห้องคุมสอบต้องขอสิทธิ์จาก user gesture ใช้ข้อความทั่วไปที่ไม่มีชื่อนักเรียน และเป็นเพียงส่วนเสริมขณะ dashboard เปิดอยู่; ชื่อแสดงได้เฉพาะ toast/feed ภายในหน้าที่ผ่าน authorization แล้ว ห้ามอ้างว่าเป็น background push หรือช่องทางแจ้งเหตุที่รับประกันการส่ง
 - ข้อสอบ `seb_required` ต้องตรวจ **ทั้ง** Config Key และ Browser Exam Key request hash จาก SEB JavaScript API ที่ server; ผูก hash กับ exact URL challenge (ตัดเฉพาะ fragment), ผูก challenge/session กับ user + assignment, ตรวจ origin/path และเก็บ token ใน HttpOnly SameSite=Strict cookie ห้ามใช้ user-agent หรือการมี `window.SafeExamBrowser` อย่างเดียวเป็น security boundary
-- ห้ามส่ง `SEB_SESSION_SECRET`, CK, BEK หรือ Quit/Admin Password ไป client/log/database; submission เก็บได้เฉพาะเวลา platform และ version ที่ผ่านตรวจ ส่วน raw request hash ไม่จำเป็นต่อ audit และห้ามเก็บ
+- ห้ามส่ง `SEB_SESSION_SECRET`, CK, BEK หรือ Admin Password ไป client/log/database และห้ามส่ง Quit Password กลับจาก server ไป client; รหัสออกที่ครูกรอกส่งเข้า server ได้เฉพาะ action สำหรับตั้งค่า ห้าม log/analytics/เก็บ plaintext หรือ confirmation ทุกกรณี ฐานข้อมูลเก็บได้เฉพาะ SHA-256 lower-case Base16 ในตาราง revision ที่ browser อ่านเขียนไม่ได้ และ RPC ต้องคืน metadata โดยไม่มี hash ส่วน submission เก็บได้เฉพาะเวลา platform และ version ที่ผ่านตรวจ ส่วน raw request hash ไม่จำเป็นต่อ audit และห้ามเก็บ
+- การหมุนรหัสออก SEB ต้องให้ครู active ที่เป็นเจ้าของ exact assignment เท่านั้น ตรวจ org membership + `online` + `exam` + `seb_required` + ไม่ปิด + ไม่มี `in_progress` ซ้ำใน service-role-only transaction, ล็อก assignment ก่อนตรวจ active attempt และใช้ compare-and-swap revision; co-teacher/admin/super admin ไม่มีสิทธิ์แทนเจ้าของ และห้ามกล่าวว่า “พร้อมใช้” จนกว่า exact revision จะถูกผูกกับ immutable `.seb` artifact และ CK/BEK แล้ว
 - SEB preflight เก็บได้เฉพาะผล `system_check` ที่ผ่านล่าสุดต่อ assignment/student: `verified_at`, `valid_until` ไม่เกิน 12 ชั่วโมง, platform และ version ห้ามเก็บ failure, raw CK/BEK/request hash, IP, user-agent หรือ device fingerprint; browser เขียนตรงไม่ได้ service-role-only RPC ต้องตรวจซ้ำว่า assignment เผยแพร่และบังคับ SEB พร้อมตรวจ exact roster membership ส่วน RLS เปิดอ่านแก่ครูที่จัดการ assignment และ super admin เท่านั้น ตารางนี้ไม่เข้า Postgres Changes publication เพราะ RLS ไม่ครอบคลุม `DELETE` payload หน้าครูจึง refresh ผ่าน RLS-protected SELECT แทน
 - สถานะ “พร้อม” ใน roster หมายถึงเคยผ่านการตรวจภายในอายุ session ไม่ใช่ device identity ไม่พิสูจน์ว่ายังใช้เครื่องเดิม และไม่ใช่หลักฐานว่าปกติหรือทุจริต จึงห้ามใช้ check-in เพียงอย่างเดียวเป็น hard gate หรือคำตัดสิน นักเรียนที่เปลี่ยนเครื่อง/รุ่น/ไฟล์ตั้งค่าต้องตรวจใหม่
 - SEB session ต้องถูกตรวจซ้ำทุก mutation/read ของ attempt ไม่ใช่แค่หน้าเข้า; การบังคับ SEB กลาง attempt ถูกห้ามเพราะจะล็อกนักเรียนออกจากคำตอบเดิม และ server-initiated forced finalize หลังหมดเวลาต้องทำได้แม้ client session หมดอายุ

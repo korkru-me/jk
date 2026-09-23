@@ -1,8 +1,9 @@
 # Teacher-owned SEB quit password — Phase 1 security contract
 
 Phase 1 defines the server-only policy and secret-handling boundary. It does
-not add a database table, UI, `.seb` generator, CK/BEK registry entry, or
-deployment setting.
+not add UI, a `.seb` generator, CK/BEK registry entry, or deployment setting.
+The hash-only database boundary described below was added separately in Phase
+2.
 
 ## Invariants
 
@@ -31,10 +32,11 @@ deployment setting.
 ## Phase boundary
 
 The prepared value is not proof that an exam configuration exists and must not
-be displayed as “ready”. Phase 2 will persist it behind a service-role-only
-boundary and repeat owner, active-attempt and revision checks atomically. Phase
-4 will create the immutable `.seb` artifact and its CK/BEK before any revision
-may be distributed to students.
+be displayed as “ready”. Phase 2 persists it behind a service-role-only
+boundary and repeats owner, active-attempt and revision checks atomically, but
+still does not create or distribute an exam configuration. Phase 4 will create
+the immutable `.seb` artifact and its CK/BEK before any revision may be
+distributed to students.
 
 The Base16 representation follows the official SEB developer specification:
 <https://safeexambrowser.org/developer/seb-config-key.html>.

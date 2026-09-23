@@ -54,6 +54,7 @@ Invariant สำคัญ:
 ## งานและการส่งคำตอบ
 
 - `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ, `secure_browser_mode` เป็น `browser|seb_required` และ `android_exam_mode` เป็น `blocked|monitored` สำหรับทางสำรองที่ครูตรวจเครื่อง
+- `assignment_seb_config_revisions` — ประวัติ revision แบบ append-only ของรหัสออก SEB ที่ครูเจ้าของข้อสอบกำหนด ผูก exact assignment + org + owner และเก็บเฉพาะ SHA-256 lower-case Base16 ที่ SEB ต้องใช้กับเวลาจาก server ไม่เก็บรหัสจริงหรือช่องยืนยัน Browser role ไม่มี policy/สิทธิ์อ่านเขียน และการสร้าง revision ต้องผ่าน service-role-only RPC ที่ล็อก assignment แล้วตรวจเจ้าของ สถานะข้อสอบ active attempt และ compare-and-swap ซ้ำใน transaction เดียว ข้อมูลนี้อย่างเดียวยังไม่หมายความว่ามีไฟล์ `.seb`/CK/BEK พร้อมแจก
 - `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom
 - `assignment_extensions` — ขยายเวลารายคน
 - `submissions` — attempt ต่อผู้เรียน; `exam_access_mode` แยก `browser|seb|android_monitored`, SEB audit เก็บ verified time/platform/version และ Android audit เก็บ approval time/teacher เท่านั้น ไม่เก็บ CK, BEK, request hash, user-agent หรือ fingerprint
