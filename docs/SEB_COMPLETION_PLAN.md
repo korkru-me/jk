@@ -110,9 +110,8 @@ platform/version/build และ session ผูก revision, evidence/candidate 
 
 อัปเดต 23 กันยายน 2026: retire encrypted Staging revision `korkru-staging-v1-d85fd70...`
 หลัง physical check พบ opening password และ key ของ revision นั้นปรากฏใน screenshot ส่วนไฟล์
-plaintext no-entry-password รอบถัดมาถูกปฏิเสธก่อนขึ้น registry เพราะ Quit/Unlock Password ไม่ผ่าน
-strength policy ไฟล์ดังกล่าวไม่ถูกเก็บใน repository, ห้าม enroll key ของทั้งสองรอบ และยังไม่ถือว่า
-S2 หรือ S5 ผ่าน
+plaintext no-entry-password ที่ใช้รหัสออกแบบง่ายถูกจัดเป็น test-only สำหรับ isolated Staging ตาม
+เจตนาของเจ้าของผลิตภัณฑ์ ไม่ใช่ release candidate/evidence และยังไม่ถือว่า S2 หรือ S5 ผ่าน
 
 **Agent ทำ**
 
@@ -157,7 +156,7 @@ browser ปกติออกจาก native SEB ตามจริง แล�
 **เกณฑ์ผ่าน:** ครูตั้งข้อสอบ SEB และนักเรียนตรวจเครื่องได้โดยไม่มีสถานะจำลองหรือข้อความที่
 กล่าวอ้างเกินหลักฐาน
 
-## เฟส S4 — ทางออก, พักสอบ และรหัสรายครู (decision gate)
+## เฟส S4 — ทางออก, พักสอบ และรหัสรายครู
 
 นโยบายเดิมที่ยืนยันไว้คือ เมื่อครูอนุญาตให้ออกกลางคัน ให้กลับมาทำ attempt เดิมได้และเวลาไม่หยุด
 แต่ implementation ต้องแยก “สิทธิ์ในเว็บ” ออกจาก “native SEB ปิดจริง”
@@ -166,11 +165,10 @@ browser ปกติออกจาก native SEB ตามจริง แล�
 
 - พิสูจน์ native behavior ของ submit → exit, teacher-authorized interruption และ resume ด้วย
   config ทดลองก่อนต่อ database/UI จริง
-- ประเมินสองเส้นทางโดยไม่เปลี่ยนไปใช้อีกเส้นทางเอง:
-  - **v1 operational:** ครูถือ Quit Password, เว็บคงคำตอบ/attempt/time และบันทึกสถานะเท่าที่
-    server ยืนยันได้
-  - **managed per-teacher/revision:** encrypted draft/release registry + BEK enrollment ต่อ
-    config/build หรือ protocol/server/native worker ที่พิสูจน์ได้
+- ทำ managed per-teacher/revision ให้หน้าเว็บ KorKru รับการตั้งหรือรีเซ็ต Quit/Unlock Password
+  จากครูที่มีสิทธิ์และผูก exact owner + exam/config revision ห้ามใช้รหัสกลางร่วมข้ามลูกค้าครู
+- ตรวจความแข็งแรงฝั่ง server, สร้าง immutable `.seb` revision และ CK/BEK release unit ใหม่ แล้ว
+  ทิ้ง plaintext password ทันที ห้ามเก็บ/แสดงย้อนกลับ และห้าม rotate ระหว่างมี attempt กำลังทำ
 - ห้ามอ้างว่า static Quit URL ที่ซ่อนปุ่มไว้เป็น authorization, ห้ามเปิด CK-only และห้าม merge
   vault/migration เก่าจนผ่านการทบทวน ledger, key recovery, tenant isolation และ BEK lifecycle ใหม่
 - Staging revision ถัดไปต้องตั้ง native Quit URL เป็น `/exam/quit`; หน้าผลการส่งแสดงลิงก์นี้เฉพาะ attempt ของ
@@ -180,7 +178,7 @@ browser ปกติออกจาก native SEB ตามจริง แล�
 **เจ้าของผลิตภัณฑ์มีส่วนร่วม:**
 
 - ทดสอบ native exit/resume บน Mac/iPad/iPhone/Windows ตามเคสที่ Agent เตรียม
-- เลือกว่าจะเปิดขาย v1 ก่อน หรือยอมรับต้นทุน/การดูแลของ managed per-teacher config
+- ยืนยัน UX การตั้ง/ยืนยัน/รีเซ็ตรหัสของครู รวมถึงข้อความว่ารหัสเดิมเรียกดูย้อนหลังไม่ได้
 - หากต้องมี service เพิ่ม ค่าใช้จ่าย หรือ production migration ต้องอนุมัติแยกก่อน
 
 **เกณฑ์ผ่าน:** มีขอบเขตที่พิสูจน์ได้จริงและข้อความผลิตภัณฑ์ตรงกับ assurance ที่ได้ หาก managed

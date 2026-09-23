@@ -1,13 +1,15 @@
 ---
-description: Keep SEB exam entry passwordless for students and exit teacher-controlled until submission
-globs: "{app/**/*seb*,app/exam/**,app/**/submissions/**,lib/**/*seb*,config/seb-*.json,docs/SEB_*.md,public/exam/*.seb}"
+description: Keep SEB entry passwordless and make exit credentials teacher-owned instead of global
+globs: "{app/**/*seb*,app/exam/**,app/**/assignments/**,app/**/submissions/**,lib/**/*seb*,config/seb-*.json,docs/SEB_*.md,public/exam/*.seb}"
 alwaysApply: false
 ---
 
 # SEB Entry and Exit Policy
 
 - นักเรียนต้องเข้าเริ่มข้อสอบจริงใน SEB ได้โดยไม่กรอกรหัสผ่าน ห้ามตั้ง Exam/Settings Password ในไฟล์ `.seb` ตัวจริง และ physical UAT ต้องไม่ผ่านหากมีหน้าถามรหัสก่อนถึงข้อสอบ KorKru
-- Administrator Password และ Quit/Unlock Password ต้องเป็นรหัสสุ่มที่แข็งแรง แยกจากกัน และมีเฉพาะครูหรือผู้คุมสอบ ใช้สำหรับการจัดการหรืออนุญาตให้ออกก่อนจบเท่านั้น ห้ามส่งไปยัง client, repository, log, screenshot หรือข้อความของนักเรียน
+- หน้าเว็บ KorKru ต้องให้ครูผู้มีสิทธิ์กำหนดหรือรีเซ็ต Quit/Unlock Password ของ SEB เอง โดยผูกกับเจ้าของและ exact exam/config revision ห้ามใช้รหัสกลางค่าเดียวร่วมกันข้ามครู องค์กร หรือ revision
+- การตั้งรหัสผ่านเว็บต้องตรวจสิทธิ์และความแข็งแรงฝั่ง server, สร้าง immutable `.seb` revision พร้อม CK/BEK ชุดใหม่ แล้วทิ้ง plaintext ทันที ห้ามเก็บในฐานข้อมูล, log หรือแสดงรหัสเดิมกลับภายหลัง การรีเซ็ตคือการออก revision ใหม่และห้าม rotate ระหว่างมี attempt กำลังทำ
+- Administrator Password และ Quit/Unlock Password ของ release จริงต้องแข็งแรงและแยกจากกัน โดยมีเฉพาะครูหรือผู้คุมสอบ รหัสสั้นใช้ได้เฉพาะ isolated Staging ที่มีแต่ข้อมูลสมมติเพื่อทดสอบการทำงาน และห้ามนับเป็น release evidence หรือนำไป Production
 - หลังนักเรียนส่ง attempt ที่บังคับ SEB และผ่านการตรวจ SEB สำเร็จแล้ว ให้แสดงทางออกที่เปิด native Quit URL และต้องปิด SEB ได้โดยไม่ถามรหัส ห้ามแสดงทางออกนี้ก่อนส่งข้อสอบหรือใน attempt ที่ไม่ได้รับการยืนยัน SEB
 - Quit URL เป็นเพียงกลไกอำนวยความสะดวก ไม่ใช่ authorization boundary การอนุญาตเริ่ม ทำต่อ บันทึก และส่งข้อสอบยังต้องตรวจ CK+BEK และ session ของ revision ที่ถูกต้องฝั่ง server
 - ห้ามเปลี่ยนนโยบายข้อนี้หรือใช้รหัสก่อนเข้าเป็นทางลัดเพื่อป้องกันไฟล์ตั้งค่า เว้นแต่เจ้าของผลิตภัณฑ์อนุมัติการเปลี่ยน requirement อย่างชัดเจน

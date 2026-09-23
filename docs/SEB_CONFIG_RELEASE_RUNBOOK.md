@@ -30,22 +30,25 @@ revision เดิม `korkru-staging-v1-d85f…591f6a` ถูก retire หล�
 Exam/Settings Password ก่อนเริ่มสอบ และ CK/BEK ของ revision นั้นปรากฏใน screenshot จึงห้ามใช้
 ค่าที่เคย enroll ไว้ต่อ ต้องหมุน CK/BEK/revision/config URL เป็นชุดเดียวกันก่อนทดสอบรอบใหม่
 
-ไฟล์ no-entry-password รอบถัดมาถูกปฏิเสธก่อนขึ้น registry เพราะ Quit/Unlock Password ไม่ผ่าน
-strength policy และไม่ถูกเก็บใน repository แม้โครงสร้าง Start URL, Quit URL และ no-entry-password
-จะตรง requirement ก็ตาม ห้าม enroll CK/BEK/revision/config URL ของไฟล์ที่ถูกปฏิเสธ ต้องสร้างไฟล์
-ใหม่โดยเว้น Settings Password ว่าง แต่ใช้ Admin และ Quit/Unlock Password แบบสุ่มยาว ไม่ซ้ำกัน
+ไฟล์ no-entry-password รอบถัดมาซึ่งใช้รหัสออกแบบง่ายถูกจัดเป็น test-only สำหรับ isolated Staging
+ตามเจตนาของเจ้าของผลิตภัณฑ์ ไม่ถูกเก็บเป็น release candidate และห้ามนับเป็น release evidence
+แม้โครงสร้าง Start URL, Quit URL และ no-entry-password จะตรง requirement ก็ตาม revision ที่จะใช้
+จริงต้องเว้น Settings Password ว่าง และให้ครูผู้มีสิทธิ์ตั้ง Quit/Unlock Password ของตนผ่าน KorKru
+โดยห้ามใช้รหัสกลางร่วมกันข้ามครู องค์กร หรือ config revision
 
 ไฟล์ no-entry-password จำเป็นต้องเป็น plaintext XML เมื่อยังไม่มี X.509 identity ที่ deploy ล่วงหน้า
 จึงทำให้ metadata และ password hash อ่านได้ ใช้ได้เฉพาะ Staging integration พร้อมบังคับ CK+BEK
 ฝั่ง server Production ต้องตัดสินใจระหว่าง X.509 identity encryption หรือยอมรับ plaintext ด้วย
 threat review ก่อนสร้าง production revision ที่ไม่มี opening password
 
-เมื่อมีไฟล์ใหม่แล้ว policy, Windows build approval, BEK registration, mock exam และ physical UAT
-ยังคงเป็น `pending` จนกว่าจะ enroll key ของ bytes ชุดใหม่และทดสอบ native flow สำเร็จ
+การตั้งหรือรีเซ็ตรหัสผ่านเว็บต้องออก immutable `.seb` revision ใหม่พร้อม CK/BEK ชุดใหม่และไม่เก็บ
+plaintext password ห้าม rotate ระหว่างมี attempt กำลังทำ เมื่อมี release candidate ใหม่แล้ว policy,
+Windows build approval, BEK registration, mock exam และ physical UAT ยังคงเป็น `pending` จนกว่า
+จะ enroll key ของ bytes ชุดใหม่และทดสอบ native flow สำเร็จ
 
 วันที่ 23 กันยายน 2026 เจ้าของผลิตภัณฑ์กรอก Staging-scoped session secret, CK และ Windows BEK
 ของ v1 ลง Vercel โดยตรง แต่ค่าชุดนั้นถูก retire พร้อม v1 แล้ว Agent ไม่ได้เห็นหรือรับค่า secret
-ใด ๆ และต้อง enroll CK/BEK ของ v2 ใหม่ก่อน native system check รอบถัดไป
+ใด ๆ และต้อง enroll CK/BEK ของ revision ที่อนุมัติใหม่ก่อน native system check รอบถัดไป
 
 `config/seb-release-registry.json` เป็น fixed-schema metadata ที่ไม่เก็บ secret ส่วน
 `config/seb-platform-evidence.json` เก็บสถานะหลักฐานและอ้าง `buildId` จาก revision เดียวกัน
