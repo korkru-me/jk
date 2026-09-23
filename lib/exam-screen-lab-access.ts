@@ -1,6 +1,7 @@
 import { inspectDeploymentEnvironment } from './deployment-environment.mjs'
 
 export const EXAM_SCREEN_LAB_PATH = '/exam-screen-lab'
+export const SEB_QUIT_PATH = '/exam/quit'
 
 /**
  * The synthetic device-QA lab is available locally and on a fully isolated
@@ -18,14 +19,20 @@ export function isExamScreenLabPath(pathname: string): boolean {
   return pathname === EXAM_SCREEN_LAB_PATH || pathname.startsWith(`${EXAM_SCREEN_LAB_PATH}/`)
 }
 
+export function isSebQuitPath(pathname: string): boolean {
+  return pathname === SEB_QUIT_PATH
+}
+
 /**
- * Development lab requests bypass the global Supabase session refresh. This
- * is what lets a physical device exercise the synthetic screen without the
- * production-linked local environment reading or refreshing an auth cookie.
+ * Development lab requests bypass the global Supabase session refresh. The
+ * exact native SEB Quit URL is also public: SEB intercepts it before an HTTP
+ * request, while the fallback page must remain harmless and renderable when
+ * someone opens the URL in a regular browser without an auth environment.
  */
 export function shouldBypassSessionRefresh(
   pathname: string,
   environment: NodeJS.ProcessEnv,
 ): boolean {
-  return isExamScreenLabPath(pathname) && isExamScreenLabEnabled(environment)
+  return isSebQuitPath(pathname)
+    || (isExamScreenLabPath(pathname) && isExamScreenLabEnabled(environment))
 }

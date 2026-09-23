@@ -64,14 +64,14 @@
     {
       "revision": "korkru-staging-v1-d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a",
       "configId": "korkru-staging-v1",
-      "lifecycle": "candidate",
+      "lifecycle": "retired",
       "artifactPath": "/exam/korkru-staging-v1.seb",
       "artifactSha256": "d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a",
       "canonicalStartUrl": "https://staging.korkru.com/assignments",
       "supersedes": null,
       "rollbackRevision": null,
       "rollbackStrategy": "restore-deployment-and-secrets",
-      "retiredAt": null,
+      "retiredAt": "2026-09-23T04:40:47.000Z",
       "policy": {
         "startUrl": "pending",
         "navigationFilters": "pending",

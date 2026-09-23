@@ -1,6 +1,6 @@
 # SEB v1 — versioned config, key enrollment และ rollback
 
-อัปเดต: 22 กันยายน 2026
+อัปเดต: 23 กันยายน 2026
 
 เอกสารนี้เป็น runbook ของเฟส S2 ห้ามใส่ CK, BEK, Quit/Admin Password, access token
 หรือค่า secret ใด ๆ ลง Git, issue, screenshot หรือแชต ให้กรอกค่าเหล่านี้ใน secret manager
@@ -20,31 +20,32 @@
 เข้ารหัส** จนกว่าเจ้าของจะเปิดไฟล์เดียวกันใน Config Tool/native SEB และตรวจรายการด้านล่าง
 ห้ามบันทึกไฟล์ซ้ำระหว่างเก็บ CK/BEK เพราะการบันทึกใหม่ทำให้ revision/key เปลี่ยน
 
-### Staging revision สำหรับ integration รอบปัจจุบัน
+### สถานะ Staging revision สำหรับ integration รอบปัจจุบัน
 
 ไฟล์ที่เจ้าของผลิตภัณฑ์สร้างจาก Windows SEB 3.10.2 build 920 ถูกเก็บแยกจาก production
-candidate เพื่อทดสอบบน `https://staging.korkru.com` เท่านั้น:
+candidate เพื่อทดสอบบน `https://staging.korkru.com` เท่านั้น แต่ขณะนี้ยังไม่มี Staging candidate
+ที่อนุมัติให้ enroll หรือแจก
 
-- config id: `korkru-staging-v1`
-- immutable revision:
-  `korkru-staging-v1-d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a`
-- public path: `/exam/korkru-staging-v1.seb`
-- SHA-256: `d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a`
-- canonical start URL: `https://staging.korkru.com/assignments`
+revision เดิม `korkru-staging-v1-d85f…591f6a` ถูก retire หลัง physical check พบว่าไฟล์ถาม
+Exam/Settings Password ก่อนเริ่มสอบ และ CK/BEK ของ revision นั้นปรากฏใน screenshot จึงห้ามใช้
+ค่าที่เคย enroll ไว้ต่อ ต้องหมุน CK/BEK/revision/config URL เป็นชุดเดียวกันก่อนทดสอบรอบใหม่
 
-ไฟล์นี้เป็น password-encrypted SEB settings (`pswd`) ไม่ใช่ plaintext XML แต่ policy,
-Windows build approval, BEK registration, mock exam และ physical UAT ยังเป็น `pending` จนกว่า
-จะเปิด bytes ชุดนี้โดยไม่บันทึกซ้ำและทดสอบ native flow สำเร็จ ห้ามนำผลจาก revision นี้ไปนับเป็น
-production evidence และ top-level `candidateRevision` ยังคงชี้ production candidate เดิม
+ไฟล์ no-entry-password รอบถัดมาถูกปฏิเสธก่อนขึ้น registry เพราะ Quit/Unlock Password ไม่ผ่าน
+strength policy และไม่ถูกเก็บใน repository แม้โครงสร้าง Start URL, Quit URL และ no-entry-password
+จะตรง requirement ก็ตาม ห้าม enroll CK/BEK/revision/config URL ของไฟล์ที่ถูกปฏิเสธ ต้องสร้างไฟล์
+ใหม่โดยเว้น Settings Password ว่าง แต่ใช้ Admin และ Quit/Unlock Password แบบสุ่มยาว ไม่ซ้ำกัน
 
-Staging runtime สามารถผูก `SEB_CONFIG_REVISION` กับ revision นี้และลงทะเบียนเฉพาะ Windows BEK
-เพื่อทำ native integration ทีละ platform ได้ แต่ teacher publish gate จะยังไม่ READY เพราะ policy,
-build matrix และ BEK coverage ยังไม่ครบทุก target ตามที่ออกแบบไว้
+ไฟล์ no-entry-password จำเป็นต้องเป็น plaintext XML เมื่อยังไม่มี X.509 identity ที่ deploy ล่วงหน้า
+จึงทำให้ metadata และ password hash อ่านได้ ใช้ได้เฉพาะ Staging integration พร้อมบังคับ CK+BEK
+ฝั่ง server Production ต้องตัดสินใจระหว่าง X.509 identity encryption หรือยอมรับ plaintext ด้วย
+threat review ก่อนสร้าง production revision ที่ไม่มี opening password
+
+เมื่อมีไฟล์ใหม่แล้ว policy, Windows build approval, BEK registration, mock exam และ physical UAT
+ยังคงเป็น `pending` จนกว่าจะ enroll key ของ bytes ชุดใหม่และทดสอบ native flow สำเร็จ
 
 วันที่ 23 กันยายน 2026 เจ้าของผลิตภัณฑ์กรอก Staging-scoped session secret, CK และ Windows BEK
-registry ลง Vercel โดยตรง พร้อมผูก public site/config URL และ config revision กับ branch `staging`
-Agent ไม่ได้เห็นหรือรับค่า secret ใด ๆ ขั้นตอนนี้เป็นเพียงการ enrollment; native system check,
-mock exam และ physical UAT ยังรอทดสอบและยังห้ามเปลี่ยนสถานะเป็นผ่าน
+ของ v1 ลง Vercel โดยตรง แต่ค่าชุดนั้นถูก retire พร้อม v1 แล้ว Agent ไม่ได้เห็นหรือรับค่า secret
+ใด ๆ และต้อง enroll CK/BEK ของ v2 ใหม่ก่อน native system check รอบถัดไป
 
 `config/seb-release-registry.json` เป็น fixed-schema metadata ที่ไม่เก็บ secret ส่วน
 `config/seb-platform-evidence.json` เก็บสถานะหลักฐานและอ้าง `buildId` จาก revision เดียวกัน
@@ -117,7 +118,9 @@ npm run check:seb-platforms
 
 ## 3. การแจกไฟล์
 
-- แจกเฉพาะไฟล์ `.seb` ที่เข้ารหัสและ checksum ตรง revision
+- แจกเฉพาะไฟล์ `.seb` ที่ checksum ตรง revision และผ่าน threat decision ของ environment นั้น
+- Staging no-entry-password เป็นข้อยกเว้นแบบ plaintext เพื่อทดสอบเท่านั้น; ห้ามเลื่อนเป็น
+  production artifact โดยอัตโนมัติ
 - ห้ามส่ง CK, BEK, Quit/Admin Password ไปกับไฟล์หรือข้อความนักเรียน
 - ก่อนวันสอบให้นักเรียนติดตั้ง SEB และดาวน์โหลดไฟล์ไว้ล่วงหน้า แล้วทำ system check ใหม่ในวันสอบ
 - ถ้าใช้ public HTTPS link ให้ทดสอบจากอุปกรณ์จริงว่าได้ไฟล์ revision เดียวกัน ไม่ถูก cache เป็นไฟล์เก่า

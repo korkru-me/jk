@@ -24,6 +24,7 @@ import { Card } from '@/components/ui/card'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 import { MATH_WORK_BUCKET } from '@/lib/math-work'
+import { shouldOfferSebExit } from '@/lib/seb-exit'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -75,9 +76,9 @@ export default async function SubmissionResultPage({
   const { data: ownSubmission } = await admin
     .from('submissions')
     .select(`
-      id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
+      id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
-      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score)
+      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
     .eq('id', id)
     .eq('student_id', user.id)
@@ -105,9 +106,9 @@ export default async function SubmissionResultPage({
     const { data: teacherVisibleSubmission } = await admin
       .from('submissions')
       .select(`
-        id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
+        id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at, secure_browser_verified_at,
         users!submissions_student_id_fkey(full_name),
-        assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score),
+        assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode),
         submission_answers(id, correct_answer, is_correct)
       `)
       .eq('id', id)
@@ -186,6 +187,11 @@ export default async function SubmissionResultPage({
   // `after_due` withholds answer details only until the deadline passes.
   const canShowScore = isTeacherViewer || canStudentViewScore(assignment.show_results, assignment.end_at)
   const canShowAnswers = isTeacherViewer || canStudentReviewAnswers(assignment.show_results, assignment.end_at)
+  const canExitSeb = shouldOfferSebExit({
+    isOwnSubmission,
+    secureBrowserMode: assignment.secure_browser_mode,
+    secureBrowserVerifiedAt: submission.secure_browser_verified_at,
+  })
 
   const answers = (submission as any).submission_answers as any[]
   const pendingManualCount = answers.filter(isPendingTeacherReview).length
@@ -372,6 +378,24 @@ export default async function SubmissionResultPage({
           )}
         </div>
       </Card>
+
+      {canExitSeb && (
+        <Card padding="lg" className="border-success/20 bg-success/5 text-center">
+          <h2 className="font-bold">ออกจาก Safe Exam Browser</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            ส่งคำตอบเสร็จแล้ว กดปุ่มด้านล่างเพื่อออกจากโหมดสอบโดยไม่ต้องกรอกรหัส
+          </p>
+          <a
+            href="/exam/quit"
+            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-success px-5 py-2.5 text-sm font-semibold text-success-foreground transition-colors hover:bg-success/90"
+          >
+            ออกจาก Safe Exam Browser
+          </a>
+          <p className="mt-2 text-xs text-muted-foreground">
+            หากปุ่มไม่ปิดโปรแกรม ให้แจ้งครูผู้คุมสอบและใช้รหัสออกฉุกเฉินของครู
+          </p>
+        </Card>
+      )}
 
       {/* Answer review */}
       {!canShowAnswers && (

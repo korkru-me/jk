@@ -108,9 +108,11 @@ platform/version/build และ session ผูก revision, evidence/candidate 
 แล้ว รอบ `r8` ถูกเก็บเป็นประวัติและเปิด `seb-v1-uat-r1` แบบ pending โดยยังไม่มี deploy หรือ
 การเปลี่ยน secret ดูขั้นตอนที่ `docs/SEB_CONFIG_RELEASE_RUNBOOK.md`
 
-อัปเดต 23 กันยายน 2026: เพิ่ม encrypted Staging revision `korkru-staging-v1-d85fd70...`
-สำหรับ Windows native integration โดยแยกจาก production candidate ทุก policy/build/evidence
-ยังเป็น `pending` และยังไม่ถือว่า S2 หรือ S5 ผ่าน
+อัปเดต 23 กันยายน 2026: retire encrypted Staging revision `korkru-staging-v1-d85fd70...`
+หลัง physical check พบ opening password และ key ของ revision นั้นปรากฏใน screenshot ส่วนไฟล์
+plaintext no-entry-password รอบถัดมาถูกปฏิเสธก่อนขึ้น registry เพราะ Quit/Unlock Password ไม่ผ่าน
+strength policy ไฟล์ดังกล่าวไม่ถูกเก็บใน repository, ห้าม enroll key ของทั้งสองรอบ และยังไม่ถือว่า
+S2 หรือ S5 ผ่าน
 
 **Agent ทำ**
 
@@ -171,6 +173,9 @@ browser ปกติออกจาก native SEB ตามจริง แล�
     config/build หรือ protocol/server/native worker ที่พิสูจน์ได้
 - ห้ามอ้างว่า static Quit URL ที่ซ่อนปุ่มไว้เป็น authorization, ห้ามเปิด CK-only และห้าม merge
   vault/migration เก่าจนผ่านการทบทวน ledger, key recovery, tenant isolation และ BEK lifecycle ใหม่
+- Staging revision ถัดไปต้องตั้ง native Quit URL เป็น `/exam/quit`; หน้าผลการส่งแสดงลิงก์นี้เฉพาะ attempt ของ
+  นักเรียนที่ถูกตรวจ SEB แล้ว ลิงก์เป็นเพียงทางออกหลัง submit ไม่ใช่ authorization boundary และ
+  ยังต้องผ่าน native test ว่าปิดโดยไม่ถามรหัสจริง
 
 **เจ้าของผลิตภัณฑ์มีส่วนร่วม:**
 
