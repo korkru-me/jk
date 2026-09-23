@@ -216,9 +216,29 @@ organization → reservation โดยหยุดทันทีเมื่อ
 fixture ต้องปิด browser session ก่อนล้าง resource และลบ Auth เป็นขั้นสุดท้ายเสมอ ชุด focused tests
 หลังเพิ่ม cleanup และ authorization-role regression ผ่าน 139 tests
 
-ยังไม่มี concrete browser/data/native/expiry adapters และ cleanup participants ตัวจริง, final `.seb` +
-CK/BEK จาก Windows หรือ authenticated Staging evidence จาก source/deployment/config เดียวกัน จึงยัง
-เป็น **NOT READY** และห้ามเริ่ม S6
+อัปเดต 24 กันยายน 2026: ตรวจ canonical Staging แบบอ่านอย่างเดียวผ่าน browser session ที่ผู้ใช้
+ยืนยันตัวตนแล้ว พบ source revision `bc31bb7a11c4bac0b1ef7b84f04020b8b0ed99ca`, root marker
+`data-deployment-environment="staging"`, ป้าย `STAGING · ระบบทดสอบ` และ robots
+`noindex, nofollow, nocache` ตรงกัน การตรวจนี้เป็นหลักฐาน manual เฉพาะ deployment ปัจจุบัน
+ไม่ใช้แทน exact automated preflight; automation ยังต้องรับ Deployment Protection bypass จาก
+secret manager โดยไม่พิมพ์หรือส่งค่าผ่าน client ก่อนเริ่ม live mock
+
+อัปเดตฐานความปลอดภัยรอบถัดมาในวันเดียวกัน: เพิ่ม browser-session/runtime ที่ใช้ Chrome แบบ isolated,
+browser/data adapter, private run ledger, cleanup participants/runtime, narrow Supabase driver และ durable
+evidence sink ที่เขียนแบบ directory-relative + immutable โดยไม่บันทึก credential/release identity ตรง ๆ
+ทุก operation ที่ timeout ต้อง quiesce ก่อน cleanup และ preflight ต้องปิด resource สำเร็จก่อน reservation
+หรือ mutation แรก ส่วน cleanup รองรับ object กำพร้าจากการเขียนฐานไม่สำเร็จแต่ยังตรวจ exact reserved run,
+บัญชี/องค์กรสังเคราะห์, path, owner, เวลา, MIME, size และ hash; FK drift guard ครอบคลุม direct และ
+transitive cascade graph Migration `20260923201848_seb_s5_atomic_cleanup_rpcs.sql` apply เฉพาะ Korkru
+Staging แล้ว, ledger local/remote ตรงกัน และ database lint ไม่มี error ใหม่ ชุด S5 ผ่าน 17 files / 474 tests,
+ทั้งโครงการผ่าน 155 files / 2,191 tests และ TypeScript/syntax checks ผ่าน
+
+ยังไม่อนุญาต live mock เพราะ product Server Actions สร้าง UUID จริงภายใน server แต่ browser/data contract
+รอบนี้ยังต้องรู้ target ID ก่อน UI mutation ขั้นถัดไปต้องเปลี่ยนเป็น plan-with-marker → browser mutation →
+service-role attest actual ID แบบ exactly-one และย้าย answer ownership ให้ตรงกับ `startSubmission` ก่อนสร้าง
+concrete operation runtime นอกจากนี้ยังขาด native/expiry capabilities, final `.seb` + CK/BEK จาก Windows,
+automation bypass แบบ server-only และ authenticated durable evidence จาก source/deployment/config เดียวกัน
+จึงยังเป็น **NOT READY**, ห้ามเริ่ม S6 และ Production ไม่เปลี่ยน
 
 **Agent ทำ**
 

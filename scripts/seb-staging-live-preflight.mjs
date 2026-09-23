@@ -42,6 +42,8 @@ const MAX_VERCEL_DEPLOYMENT_BYTES = 256 * 1024
 const MAX_VERCEL_ALIAS_BYTES = 64 * 1024
 const MAX_STAGING_HTML_BYTES = 2 * 1024 * 1024
 const BLOCKED_MESSAGE = 'SEB Staging live preflight blocked'
+const CLOSE_PASSED = Object.freeze({ status: 'passed' })
+const CLOSE_FAILED = Object.freeze({ status: 'failed' })
 
 const SCHEMA_PROBES = Object.freeze([
   Object.freeze({
@@ -77,14 +79,22 @@ function blocked() {
   throw new SebStagingLivePreflightBlockedError()
 }
 
+function exactPassed(value) {
+  return hasExactFields(value, ['status']) && value.status === 'passed'
+}
+
 function isDataRecord(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null) return false
-  return Object.values(Object.getOwnPropertyDescriptors(value)).every(descriptor => (
-    Object.hasOwn(descriptor, 'value')
-    && descriptor.enumerable === true
-  ))
+  try {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) return false
+    return Object.values(Object.getOwnPropertyDescriptors(value)).every(descriptor => (
+      Object.hasOwn(descriptor, 'value')
+      && descriptor.enumerable === true
+    ))
+  } catch {
+    return false
+  }
 }
 
 function hasExactFields(value, fields) {
@@ -170,29 +180,41 @@ function boundedContentLength(response, maximumBytes) {
   return /^[0-9]+$/.test(value) && Number(value) <= maximumBytes
 }
 
-async function readBoundedText(response, maximumBytes) {
+async function readBoundedText(response, maximumBytes, lifecycle, bodyLease) {
+  const reader = bodyLease?.reader
+  const readMethod = bodyLease?.readMethod
+  const cancelMethod = bodyLease?.cancelMethod
+  const cleanupObligation = bodyLease?.cleanupObligation
+  if (!reader || typeof readMethod !== 'function' || typeof cancelMethod !== 'function'
+    || !cleanupObligation) blocked()
   if (!boundedContentLength(response, maximumBytes)) blocked()
-  const reader = response?.body?.getReader?.()
-  if (!reader || typeof reader.read !== 'function') blocked()
 
   const chunks = []
   let totalBytes = 0
+  let fullyRead = false
   while (true) {
-    const result = await reader.read()
+    const result = await readMethod.call(reader)
     if (!isDataRecord(result) || typeof result.done !== 'boolean') blocked()
-    if (result.done) break
+    if (result.done) {
+      fullyRead = true
+      lifecycle.releaseResource(cleanupObligation)
+      break
+    }
     if (!(result.value instanceof Uint8Array)) blocked()
     totalBytes += result.value.byteLength
     if (totalBytes > maximumBytes) {
       try {
-        await reader.cancel()
+        await cancelMethod.call(reader)
+        lifecycle.releaseResource(cleanupObligation)
       } catch {
-        // The response has already been rejected. Cancellation is best effort.
+        // Keep the reader registered so closeAll() must retry cancellation.
       }
       blocked()
     }
     chunks.push(result.value)
   }
+
+  if (!fullyRead) blocked()
 
   const bytes = new Uint8Array(totalBytes)
   let offset = 0
@@ -207,33 +229,13 @@ async function readBoundedText(response, maximumBytes) {
   }
 }
 
-async function readBoundedJson(response, maximumBytes) {
-  const text = await readBoundedText(response, maximumBytes)
+async function readBoundedJson(response, maximumBytes, lifecycle, bodyLease) {
+  const text = await readBoundedText(response, maximumBytes, lifecycle, bodyLease)
   try {
     const parsed = JSON.parse(text)
     return isDataRecord(parsed) ? parsed : blocked()
   } catch {
     blocked()
-  }
-}
-
-async function withinTimeout(operation) {
-  const controller = new AbortController()
-  let timer = null
-  const timeout = new Promise((resolve, reject) => {
-    timer = setTimeout(() => {
-      controller.abort()
-      reject(new SebStagingLivePreflightBlockedError())
-    }, REQUEST_TIMEOUT_MS)
-  })
-
-  try {
-    return await Promise.race([
-      Promise.resolve().then(() => operation(controller.signal)),
-      timeout,
-    ])
-  } finally {
-    if (timer !== null) clearTimeout(timer)
   }
 }
 
@@ -244,8 +246,8 @@ function vercelHeaders(token) {
   })
 }
 
-async function fetchVercelJson(fetchImpl, token, url, maximumBytes) {
-  return withinTimeout(async signal => {
+async function fetchVercelJson(fetchImpl, token, url, maximumBytes, lifecycle) {
+  return lifecycle.runBoundary(async signal => {
     const response = await fetchImpl(url, {
       method: 'GET',
       headers: vercelHeaders(token),
@@ -253,11 +255,12 @@ async function fetchVercelJson(fetchImpl, token, url, maximumBytes) {
       cache: 'no-store',
       signal,
     })
+    const bodyLease = lifecycle.retainResponseBody(response)
     if (response?.status !== 200
       || response?.ok !== true
       || !exactUrl(response.url, url)
       || !responseContentType(response, 'application/json')) blocked()
-    return readBoundedJson(response, maximumBytes)
+    return readBoundedJson(response, maximumBytes, lifecycle, bodyLease)
   })
 }
 
@@ -373,9 +376,14 @@ function exactStagingHtml(html, expectedSourceRevision) {
   return false
 }
 
-async function fetchCanonicalStagingHtml(fetchImpl, protectionBypass, expectedSourceRevision) {
+async function fetchCanonicalStagingHtml(
+  fetchImpl,
+  protectionBypass,
+  expectedSourceRevision,
+  lifecycle,
+) {
   const url = `${OFFICIAL_STAGING_SITE_ORIGIN}${OFFICIAL_STAGING_PREFLIGHT_PATH}`
-  await withinTimeout(async signal => {
+  await lifecycle.runBoundary(async signal => {
     const response = await fetchImpl(url, {
       method: 'GET',
       headers: Object.freeze({
@@ -386,11 +394,17 @@ async function fetchCanonicalStagingHtml(fetchImpl, protectionBypass, expectedSo
       cache: 'no-store',
       signal,
     })
+    const bodyLease = lifecycle.retainResponseBody(response)
     if (response?.status !== 200
       || response?.ok !== true
       || !exactUrl(response.url, url)
       || !responseContentType(response, 'text/html')) blocked()
-    const html = await readBoundedText(response, MAX_STAGING_HTML_BYTES)
+    const html = await readBoundedText(
+      response,
+      MAX_STAGING_HTML_BYTES,
+      lifecycle,
+      bodyLease,
+    )
     if (!exactStagingHtml(html, expectedSourceRevision)) blocked()
   })
 }
@@ -407,14 +421,28 @@ function exactProbeResult(value) {
   return isDataRecord(value) && value.error === null
 }
 
-async function probeOfficialStagingSchema(adminClientFactory) {
+async function probeOfficialStagingSchema(adminClientFactory, lifecycle) {
   const factoryRequest = Object.freeze({
     schemaVersion: 1,
     targetOrigin: OFFICIAL_STAGING_SUPABASE_ORIGIN,
     projectRef: OFFICIAL_STAGING_SUPABASE_PROJECT_REF,
     access: 'read-only-schema-probe',
   })
-  const attestation = await withinTimeout(signal => adminClientFactory(factoryRequest, signal))
+  const attestation = await lifecycle.runBoundary(async signal => {
+    const candidate = await adminClientFactory(factoryRequest, signal)
+    const cleanupResource = lifecycle.retainFactoryResource(candidate)
+    let exact = false
+    try {
+      exact = exactAdminAttestation(candidate)
+    } catch {
+      exact = false
+    }
+    if (!exact) {
+      if (!cleanupResource) lifecycle.retainUncloseableFactoryResult()
+      blocked()
+    }
+    return candidate
+  })
   if (!exactAdminAttestation(attestation)) blocked()
 
   let publicSchema = null
@@ -426,7 +454,7 @@ async function probeOfficialStagingSchema(adminClientFactory) {
   if (!publicSchema || typeof publicSchema.from !== 'function') blocked()
 
   for (const probe of SCHEMA_PROBES) {
-    const result = await withinTimeout(signal => {
+    const result = await lifecycle.runBoundary(signal => {
       const table = publicSchema.from(probe.table)
       if (!table || typeof table.select !== 'function') blocked()
       const query = table.select(probe.columns, { head: true })
@@ -451,6 +479,274 @@ function safeAttestation(expected) {
   })
 }
 
+function createPreflightLifecycle() {
+  const pendingOperations = new Set()
+  const activeAttestations = new Set()
+  const cleanupResources = new Set()
+  const cleanupTasks = new Set()
+  let cleanupStarted = false
+  let closed = false
+  let closePromise = null
+  let uncloseableFactoryResult = false
+
+  function addCleanupResource(owner, methodName, resultKind) {
+    if ((owner === null || (typeof owner !== 'object' && typeof owner !== 'function'))
+      || typeof methodName !== 'string') return null
+    let method
+    try {
+      method = owner[methodName]
+    } catch {
+      return null
+    }
+    if (typeof method !== 'function') return null
+    const existing = [...cleanupResources].find(entry => (
+      entry.owner === owner && entry.methodName === methodName && entry.method === method
+    ))
+    if (existing) return existing
+    const entry = {
+      owner,
+      methodName,
+      method,
+      resultKind,
+      inFlight: null,
+    }
+    cleanupResources.add(entry)
+    return entry
+  }
+
+  function retainFactoryResource(candidate) {
+    try {
+      if (candidate !== null && (typeof candidate === 'object' || typeof candidate === 'function')) {
+        const direct = addCleanupResource(candidate, 'close', 'exact-passed')
+        if (direct) return direct
+        return addCleanupResource(candidate.client, 'close', 'exact-passed')
+      }
+    } catch {
+      return null
+    }
+    return null
+  }
+
+  function retainUncloseableFactoryResult() {
+    uncloseableFactoryResult = true
+  }
+
+  function retainReader(reader) {
+    const entry = addCleanupResource(reader, 'cancel', 'settled')
+    if (!entry) {
+      retainUncloseableFactoryResult()
+      blocked()
+    }
+    return entry
+  }
+
+  function retainResponseBody(response) {
+    let body
+    try {
+      body = response?.body
+    } catch {
+      retainUncloseableFactoryResult()
+      blocked()
+    }
+    if (body === null || (typeof body !== 'object' && typeof body !== 'function')) {
+      retainUncloseableFactoryResult()
+      blocked()
+    }
+    let reader
+    try {
+      reader = body.getReader?.()
+    } catch {
+      const fallback = addCleanupResource(body, 'cancel', 'settled')
+      if (!fallback) retainUncloseableFactoryResult()
+      blocked()
+    }
+    if (!reader || (typeof reader !== 'object' && typeof reader !== 'function')) {
+      const fallback = addCleanupResource(body, 'cancel', 'settled')
+      if (!fallback) retainUncloseableFactoryResult()
+      blocked()
+    }
+    const cleanupObligation = retainReader(reader)
+    let readMethod
+    try {
+      readMethod = reader.read
+    } catch {
+      blocked()
+    }
+    if (typeof readMethod !== 'function') blocked()
+    return Object.freeze({
+      reader,
+      readMethod,
+      cancelMethod: cleanupObligation.method,
+      cleanupObligation,
+    })
+  }
+
+  function releaseResource(entry) {
+    if (entry) cleanupResources.delete(entry)
+  }
+
+  function runBoundary(operation) {
+    if (typeof operation !== 'function' || cleanupStarted || closed) {
+      return Promise.reject(new SebStagingLivePreflightBlockedError())
+    }
+    const controller = new AbortController()
+    let rejectVisible
+    let visibleAborted = false
+    const aborted = new Promise((_, reject) => {
+      rejectVisible = reject
+    })
+    const entry = {
+      controller,
+      settled: null,
+      abort() {
+        if (!controller.signal.aborted) controller.abort()
+        if (!visibleAborted) {
+          visibleAborted = true
+          rejectVisible(new SebStagingLivePreflightBlockedError())
+        }
+      },
+    }
+    const underlying = Promise.resolve().then(() => operation(controller.signal))
+    entry.settled = underlying
+      .then(() => undefined, () => undefined)
+      .finally(() => pendingOperations.delete(entry))
+    pendingOperations.add(entry)
+    const timeout = setTimeout(() => entry.abort(), REQUEST_TIMEOUT_MS)
+
+    return Promise.race([underlying, aborted])
+      .then(value => {
+        if (controller.signal.aborted) blocked()
+        return value
+      })
+      .catch(() => {
+        entry.abort()
+        blocked()
+      })
+      .finally(() => clearTimeout(timeout))
+  }
+
+  function trackAttestation(operation) {
+    if (typeof operation !== 'function' || cleanupStarted || closed) {
+      return Promise.reject(new SebStagingLivePreflightBlockedError())
+    }
+    const task = Promise.resolve().then(operation)
+    activeAttestations.add(task)
+    task.finally(() => activeAttestations.delete(task)).catch(() => {})
+    return task
+  }
+
+  function startResourceCleanup(entry) {
+    if (entry.inFlight) return entry.inFlight.promise
+    const controller = new AbortController()
+    const state = { controller, promise: null }
+    const task = Promise.resolve()
+      .then(async () => {
+        let currentMethod
+        try {
+          currentMethod = entry.owner[entry.methodName]
+        } catch {
+          return false
+        }
+        if (currentMethod !== entry.method) return false
+        const result = entry.resultKind === 'settled'
+          ? await entry.method.call(entry.owner)
+          : await entry.method.call(entry.owner, Object.freeze({ signal: controller.signal }))
+        return entry.resultKind === 'settled' || exactPassed(result)
+      })
+      .catch(() => false)
+      .then(success => {
+        if (success) cleanupResources.delete(entry)
+        return success
+      })
+      .finally(() => {
+        cleanupTasks.delete(task)
+        if (entry.inFlight === state) entry.inFlight = null
+      })
+    state.promise = task
+    entry.inFlight = state
+    cleanupTasks.add(task)
+    return task
+  }
+
+  async function waitForTasks(tasks, deadline) {
+    if (tasks.length === 0) return true
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) return false
+    let timeout = null
+    try {
+      return await Promise.race([
+        Promise.allSettled(tasks).then(() => true),
+        new Promise(resolve => {
+          timeout = setTimeout(() => resolve(false), remaining)
+        }),
+      ])
+    } finally {
+      if (timeout !== null) clearTimeout(timeout)
+    }
+  }
+
+  async function closeToQuiescence() {
+    const deadline = Date.now() + REQUEST_TIMEOUT_MS
+    const attemptedResources = new Set()
+    try {
+      while (true) {
+        for (const entry of pendingOperations) entry.abort()
+        for (const entry of cleanupResources) {
+          if (attemptedResources.has(entry)) continue
+          attemptedResources.add(entry)
+          startResourceCleanup(entry)
+        }
+
+        const tasks = [
+          ...[...pendingOperations].map(entry => entry.settled),
+          ...activeAttestations,
+          ...cleanupTasks,
+        ]
+        if (tasks.length === 0) {
+          if (pendingOperations.size === 0
+            && activeAttestations.size === 0
+            && cleanupTasks.size === 0
+            && cleanupResources.size === 0
+            && !uncloseableFactoryResult) {
+            closed = true
+            return CLOSE_PASSED
+          }
+          return CLOSE_FAILED
+        }
+        if (!await waitForTasks(tasks, deadline)) {
+          for (const resource of cleanupResources) resource.inFlight?.controller.abort()
+          return CLOSE_FAILED
+        }
+      }
+    } catch {
+      return CLOSE_FAILED
+    }
+  }
+
+  function closeAll() {
+    if (closed) return Promise.resolve(CLOSE_PASSED)
+    if (closePromise) return closePromise
+    cleanupStarted = true
+    const attempt = closeToQuiescence()
+    const wrapped = attempt.finally(() => {
+      if (closePromise === wrapped) closePromise = null
+    })
+    closePromise = wrapped
+    return closePromise
+  }
+
+  return Object.freeze({
+    runBoundary,
+    trackAttestation,
+    retainFactoryResource,
+    retainUncloseableFactoryResult,
+    retainReader,
+    retainResponseBody,
+    releaseResource,
+    closeAll,
+  })
+}
+
 /**
  * Create a closure-private read-only capability for the exact S5 preflight
  * step. Vercel credentials and the Supabase admin client stay inside caller-
@@ -468,13 +764,15 @@ export function createSebStagingLivePreflight({
     || typeof fetchImpl !== 'function'
     || typeof adminClientFactory !== 'function') blocked()
 
-  const capability = Object.freeze({
-    async attest(request) {
+  const lifecycle = createPreflightLifecycle()
+
+  function attest(request) {
+    return lifecycle.trackAttestation(async () => {
       try {
         const expected = parsePreflightRequest(request)
         if (!expected) blocked()
 
-        const token = await withinTimeout(() => readVercelToken())
+        const token = await lifecycle.runBoundary(signal => readVercelToken(signal))
         if (typeof token !== 'string'
           || token !== token.trim()
           || !VERCEL_TOKEN.test(token)) blocked()
@@ -490,6 +788,7 @@ export function createSebStagingLivePreflight({
           token,
           deploymentUrl.href,
           MAX_VERCEL_DEPLOYMENT_BYTES,
+          lifecycle,
         )
         if (!exactDeployment(deployment, expected)) blocked()
 
@@ -503,10 +802,11 @@ export function createSebStagingLivePreflight({
           token,
           aliasUrl.href,
           MAX_VERCEL_ALIAS_BYTES,
+          lifecycle,
         )
         if (!exactAlias(alias, deployment)) blocked()
 
-        const protectionBypass = await withinTimeout(() => readProtectionBypass())
+        const protectionBypass = await lifecycle.runBoundary(signal => readProtectionBypass(signal))
         if (typeof protectionBypass !== 'string'
           || protectionBypass !== protectionBypass.trim()
           || !VERCEL_PROTECTION_BYPASS.test(protectionBypass)) blocked()
@@ -515,6 +815,7 @@ export function createSebStagingLivePreflight({
           fetchImpl,
           protectionBypass,
           expected.sourceRevision,
+          lifecycle,
         )
 
         const aliasAfterHtml = await fetchVercelJson(
@@ -522,15 +823,20 @@ export function createSebStagingLivePreflight({
           token,
           aliasUrl.href,
           MAX_VERCEL_ALIAS_BYTES,
+          lifecycle,
         )
         if (!exactAlias(aliasAfterHtml, deployment)) blocked()
 
-        await probeOfficialStagingSchema(adminClientFactory)
+        await probeOfficialStagingSchema(adminClientFactory, lifecycle)
         return safeAttestation(expected)
       } catch {
         blocked()
       }
-    },
+    })
+  }
+
+  return Object.freeze({
+    attest,
+    closeAll: lifecycle.closeAll,
   })
-  return capability
 }

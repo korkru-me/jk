@@ -343,6 +343,7 @@ describe('SEB Staging DB-backed run reservation', () => {
           branchRef: 'staging',
           readyState: 'READY',
         }),
+        closeAll: async () => Object.freeze({ status: 'passed' }),
       }),
       fixtureAdapter: normalCapability,
       browserDataCapability: normalCapability,

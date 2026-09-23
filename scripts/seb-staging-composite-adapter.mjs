@@ -12,6 +12,8 @@ const DEPLOYMENT_ID = /^dpl_[A-Za-z0-9]{16,64}$/
 const RELEASE_ID = /^asr-[0-9a-f]{32}-r([1-9][0-9]{0,9})-([0-9a-f]{16})$/
 const ARTIFACT_SHA256 = /^[a-f0-9]{64}$/
 const MAX_ASSIGNMENT_CONFIG_REVISION = 2_147_483_646
+const PREFLIGHT_CLOSE_MAX_ATTEMPTS = 3
+const PREFLIGHT_CLOSE_TIMEOUT_MS = 6_000
 const BLOCKED_MESSAGE = 'SEB Staging composite adapter blocked'
 
 const STEP_CONTRACTS = Object.freeze([
@@ -102,7 +104,14 @@ function validExecutableCapability(value) {
 }
 
 function validPreflightCapability(value) {
-  return isDataRecord(value) && typeof value.attest === 'function'
+  try {
+    return hasExactFields(value, ['attest', 'closeAll'])
+      && Object.isFrozen(value)
+      && typeof value.attest === 'function'
+      && typeof value.closeAll === 'function'
+  } catch {
+    return false
+  }
 }
 
 function blocked() {
@@ -211,6 +220,10 @@ function exactPreflightAttestation(value, identity) {
     && value.readyState === READY_STATE
 }
 
+function exactPassedCloseResult(value) {
+  return hasExactFields(value, ['status']) && value.status === 'passed'
+}
+
 function exactNormalResult(value, stepId) {
   return hasExactFields(value, ['stepId', 'status'])
     && value.stepId === stepId
@@ -252,6 +265,9 @@ export function createSebStagingCompositeAdapter({
     blocked()
   }
 
+  const preflightAttest = preflightCapability.attest
+  const preflightCloseAll = preflightCapability.closeAll
+
   const attemptedSteps = new Set()
   let baseIdentity = null
   let declaredReleaseIdentity = null
@@ -262,14 +278,46 @@ export function createSebStagingCompositeAdapter({
   let nextJourneyIndex = 0
   let busy = false
 
-  async function executePreflight(request, identity) {
-    let attestation
+  async function closePreflightAttempt() {
+    let timeout = null
+    const settled = Promise.resolve()
+      .then(() => preflightCloseAll.call(preflightCapability))
+      .then(
+        value => Object.freeze({ state: 'settled', value }),
+        () => Object.freeze({ state: 'rejected', value: null }),
+      )
+    const deadline = new Promise(resolve => {
+      timeout = setTimeout(() => {
+        resolve(Object.freeze({ state: 'timed-out', value: null }))
+      }, PREFLIGHT_CLOSE_TIMEOUT_MS)
+    })
+
     try {
-      attestation = await preflightCapability.attest(request)
-    } catch {
-      return redactedResult(request.stepId, 'failed')
+      return await Promise.race([settled, deadline])
+    } finally {
+      if (timeout !== null) clearTimeout(timeout)
     }
-    if (!exactPreflightAttestation(attestation, identity)) {
+  }
+
+  async function closePreflightToQuiescence() {
+    for (let attempt = 0; attempt < PREFLIGHT_CLOSE_MAX_ATTEMPTS; attempt += 1) {
+      const outcome = await closePreflightAttempt()
+      if (outcome.state === 'timed-out') return false
+      if (outcome.state === 'settled' && exactPassedCloseResult(outcome.value)) return true
+    }
+    return false
+  }
+
+  async function executePreflight(request, identity) {
+    let attestation = null
+    try {
+      attestation = await preflightAttest.call(preflightCapability, request)
+    } catch {
+      // The lifecycle still owns any late-settling operation. Closing it is
+      // mandatory even when the visible attestation has already failed.
+    }
+    const quiesced = await closePreflightToQuiescence()
+    if (!quiesced || !exactPreflightAttestation(attestation, identity)) {
       return redactedResult(request.stepId, 'failed')
     }
     preflightPassed = true
@@ -335,6 +383,9 @@ export function createSebStagingCompositeAdapter({
       return redactedResult(request.stepId, 'failed')
     }
     if (journeyFailed && request.stepId !== CLEANUP_STEP_ID) {
+      return redactedResult(request.stepId, 'failed')
+    }
+    if (request.stepId === CLEANUP_STEP_ID && !preflightPassed) {
       return redactedResult(request.stepId, 'failed')
     }
     if (request.stepId !== PREFLIGHT_STEP_ID && request.stepId !== CLEANUP_STEP_ID && !preflightPassed) {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildSebStagingMockHarnessPlan } from './seb-staging-mock-harness-core.mjs'
 import {
@@ -6,27 +6,43 @@ import {
   createSebStagingFixtureAdapter,
 } from './seb-staging-fixture-adapter.mjs'
 import { runSebStagingLiveHarness } from './seb-staging-live-runner.mjs'
+import { createSebStagingPrivateRunLedger } from './seb-staging-private-run-ledger.mjs'
 
-const OFFICIAL_STAGING_SUPABASE_ORIGIN = 'https://dyuxkrzeveknqgtuzpbh.supabase.co'
+const SITE_ORIGIN = 'https://staging.korkru.com'
+const SUPABASE_ORIGIN = 'https://dyuxkrzeveknqgtuzpbh.supabase.co'
+const NOW = '2026-09-23T06:00:00.000Z'
+const NOT_BEFORE = '2026-09-23T05:00:00.000Z'
+const NOT_AFTER = '2026-09-23T07:00:00.000Z'
+const SOURCE_REVISION = 'b'.repeat(40)
+const DEPLOYMENT_ID = `dpl_${'C'.repeat(24)}`
+const ARTIFACT_SHA256 = 'a'.repeat(64)
 const ACCOUNT_STEP_IDS = [
   'provision-synthetic-teacher',
   'provision-unrelated-teacher',
   'provision-synthetic-student',
   'provision-secondary-student',
 ]
+const ALIASES = [
+  'teacher-primary',
+  'teacher-unrelated',
+  'student-primary',
+  'student-secondary',
+]
 const CLEANUP_STEP_ID = 'cleanup-synthetic-fixture'
-const AUTHENTICATE_TEACHER_STEP_ID = 'authenticate-teacher'
-const ARTIFACT_SHA256 = 'a'.repeat(64)
-const BLOCKED_ERROR_PATTERN = /SEB Staging fixture adapter blocked/
+const DEFAULT_ADMIN_RESPONSE = Symbol('default-admin-response')
 let runSequence = 0
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 function validEnvironment(overrides = {}) {
   return {
     KORKRU_DEPLOYMENT_ENV: 'staging',
     EXAM_QA_ENVIRONMENT: 'staging',
     VERCEL_ENV: 'preview',
-    NEXT_PUBLIC_SITE_URL: 'https://staging.korkru.com',
-    NEXT_PUBLIC_SUPABASE_URL: OFFICIAL_STAGING_SUPABASE_ORIGIN,
+    NEXT_PUBLIC_SITE_URL: SITE_ORIGIN,
+    NEXT_PUBLIC_SUPABASE_URL: SUPABASE_ORIGIN,
     EXAM_QA_PRODUCTION_SITE_URL: 'https://www.korkru.com',
     EXAM_QA_PRODUCTION_SUPABASE_URL: 'https://production-project.supabase.co',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon-key-long-enough-for-staging',
@@ -45,155 +61,31 @@ function nextRunId(label = 'run') {
 }
 
 function uuid(index) {
-  return `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+  return `${String(index).padStart(8, '0')}-0000-4000-8000-${String(index).padStart(12, '0')}`
 }
 
-function deterministicRandomBytes() {
-  let call = 0
-  return vi.fn(size => {
-    call += 1
-    return new Uint8Array(size).fill(call)
-  })
-}
-
-function authUserFromAttributes(id, attributes, overrides = {}) {
+function runIdentity(runId, overrides = {}) {
   return {
-    id,
-    email: attributes.email,
-    user_metadata: structuredClone(attributes.user_metadata),
-    app_metadata: structuredClone(attributes.app_metadata),
+    runId,
+    sourceRevision: SOURCE_REVISION,
+    deploymentId: DEPLOYMENT_ID,
+    creationWindow: {
+      notBefore: NOT_BEFORE,
+      notAfter: NOT_AFTER,
+    },
     ...overrides,
   }
 }
 
-function authApiError(code, status, message = 'AUTH_SECRET_SENTINEL') {
-  const error = new Error(message)
-  error.code = code
-  error.status = status
-  return error
-}
-
-function adminHarness({
-  createOverride,
-  listOverride,
-  getOverride,
-  deleteOverride,
-  targetOrigin = OFFICIAL_STAGING_SUPABASE_ORIGIN,
-} = {}) {
-  const createCalls = []
-  const listCalls = []
-  const getCalls = []
-  const deleteCalls = []
-  const events = []
-  const users = new Map()
-  let createIndex = 0
-
-  const client = {
-    supabaseUrl: targetOrigin,
-    auth: {
-      admin: {
-        createUser: vi.fn(async attributes => {
-          createIndex += 1
-          createCalls.push(structuredClone(attributes))
-          events.push(`create:${createIndex}`)
-          let response = null
-          if (createOverride) response = await createOverride({ attributes, createIndex, users })
-          if (!response) {
-            response = {
-              data: {
-                user: {
-                  id: uuid(createIndex),
-                  email: attributes.email,
-                  user_metadata: structuredClone(attributes.user_metadata),
-                  app_metadata: structuredClone(attributes.app_metadata),
-                },
-              },
-              error: null,
-            }
-          }
-          if (response?.data?.user?.id) {
-            users.set(response.data.user.id, structuredClone(response.data.user))
-          }
-          return response
-        }),
-        listUsers: vi.fn(async params => {
-          listCalls.push(structuredClone(params))
-          events.push(`list:${params?.page}`)
-          if (listOverride) {
-            const response = await listOverride({ params, users, listCalls })
-            if (response) return response
-          }
-          const page = params?.page ?? 1
-          const perPage = params?.perPage ?? 50
-          const allUsers = [...users.values()]
-          const start = (page - 1) * perPage
-          const pageUsers = allUsers.slice(start, start + perPage)
-          return {
-            data: {
-              users: structuredClone(pageUsers),
-              total: allUsers.length,
-              nextPage: start + perPage < allUsers.length ? page + 1 : null,
-              lastPage: Math.max(1, Math.ceil(allUsers.length / perPage)),
-            },
-            error: null,
-          }
-        }),
-        getUserById: vi.fn(async id => {
-          getCalls.push(id)
-          events.push(`get:${id}`)
-          if (getOverride) {
-            const response = await getOverride({ id, users })
-            if (response) return response
-          }
-          const user = users.get(id)
-          return user
-            ? { data: { user: structuredClone(user) }, error: null }
-            : { data: { user: null }, error: { code: 'user_not_found' } }
-        }),
-        deleteUser: vi.fn(async id => {
-          deleteCalls.push(id)
-          events.push(`delete:${id}`)
-          if (deleteOverride) {
-            const response = await deleteOverride({ id, users, deleteCalls })
-            if (response) return response
-          }
-          users.delete(id)
-          return { data: { user: null }, error: null }
-        }),
-      },
-    },
-  }
-  const attestation = { targetOrigin, client }
-  return {
-    attestation,
-    client,
-    createCalls,
-    listCalls,
-    getCalls,
-    deleteCalls,
-    events,
-    users,
-  }
-}
-
-function identity(runId) {
+function requestIdentity(runId) {
   return {
     runId,
-    sourceRevision: 'b'.repeat(40),
-    deploymentId: `dpl_${'C'.repeat(24)}`,
+    sourceRevision: SOURCE_REVISION,
+    deploymentId: DEPLOYMENT_ID,
     releaseId: `asr-${'1'.repeat(32)}-r3-${ARTIFACT_SHA256.slice(0, 16)}`,
     releaseRevision: 3,
     artifactSha256: ARTIFACT_SHA256,
   }
-}
-
-function executablePlan(runId) {
-  return buildSebStagingMockHarnessPlan({
-    environment: validEnvironment(),
-    mode: 'execute',
-    runId,
-    writeConfirmation: 'CONFIRM_SYNTHETIC_SEB_STAGING_WRITE',
-  })
 }
 
 function stepRequest(stepId, runId) {
@@ -204,7 +96,7 @@ function stepRequest(stepId, runId) {
     phase: cleanup ? 'cleanup' : 'fixture',
     actor: 'fixture-admin',
     mutates: true,
-    identity: identity(runId),
+    identity: requestIdentity(runId),
   }
 }
 
@@ -225,72 +117,334 @@ function authenticationRequest(stepId, runId) {
     phase: spec?.[0],
     actor: spec?.[1],
     mutates: false,
-    identity: identity(runId),
+    identity: requestIdentity(runId),
   }
+}
+
+function deterministicRandomBytes() {
+  let call = 0
+  return vi.fn(size => new Uint8Array(size).fill(++call))
+}
+
+function authoritative(matches) {
+  return { schemaVersion: 1, authoritative: true, matches }
+}
+
+function ledgerCandidate(criteria, targetId, createdAt = NOW) {
+  return {
+    schemaVersion: 1,
+    targetKey: criteria.targetKey,
+    kind: criteria.kind,
+    identity: structuredClone(criteria.identity),
+    targetId,
+    namespace: criteria.namespace,
+    ownerId: criteria.ownerId,
+    organizationId: criteria.organizationId,
+    resourceType: criteria.resourceType,
+    createdAt,
+  }
+}
+
+function userFromAttributes(id, attributes, createdAt = NOW) {
+  return {
+    id,
+    email: attributes.email,
+    created_at: createdAt,
+    user_metadata: structuredClone(attributes.user_metadata),
+    app_metadata: structuredClone(attributes.app_metadata),
+  }
+}
+
+function deferred() {
+  let resolve
+  let reject
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+function adminHarness({
+  createOverride,
+  listOverride,
+  getOverride,
+  deleteOverride,
+  organizationMode = 'one',
+  targetOrigin = SUPABASE_ORIGIN,
+} = {}) {
+  const users = new Map()
+  const organizations = new Map()
+  const createCalls = []
+  const listCalls = []
+  const getCalls = []
+  const deleteCalls = []
+  const signals = []
+  const events = []
+  let createIndex = 0
+
+  function commitUser(attributes, id = uuid(createIndex), createdAt = NOW) {
+    const user = userFromAttributes(id, attributes, createdAt)
+    users.set(id, structuredClone(user))
+    if (organizationMode !== 'missing') {
+      const count = organizationMode === 'multiple' ? 2 : 1
+      organizations.set(id, Array.from({ length: count }, (_, offset) => ({
+        organizationId: uuid(100 + createIndex * 10 + offset),
+        membershipId: uuid(200 + createIndex * 10 + offset),
+        createdAt,
+      })))
+    }
+    return user
+  }
+
+  const admin = {
+    createUser: vi.fn(async (attributes, options) => {
+      createIndex += 1
+      createCalls.push(structuredClone(attributes))
+      signals.push(options?.signal)
+      events.push(`create:${createIndex}`)
+      if (createOverride) {
+        const overridden = await createOverride({
+          attributes,
+          createIndex,
+          users,
+          organizations,
+          commitUser,
+          signal: options?.signal,
+        })
+        if (overridden !== undefined) return overridden
+      }
+      const user = commitUser(attributes)
+      return { data: { user: structuredClone(user) }, error: null }
+    }),
+    listUsers: vi.fn(async (params, options) => {
+      listCalls.push(structuredClone(params))
+      signals.push(options?.signal)
+      events.push(`list:${params?.page}`)
+      if (listOverride) {
+        const overridden = await listOverride({ params, users, signal: options?.signal })
+        if (overridden !== undefined) return overridden
+      }
+      const page = params?.page ?? 1
+      const perPage = params?.perPage ?? 50
+      const values = [...users.values()]
+      const start = (page - 1) * perPage
+      return {
+        data: {
+          users: structuredClone(values.slice(start, start + perPage)),
+          total: values.length,
+          nextPage: start + perPage < values.length ? page + 1 : null,
+          lastPage: Math.max(1, Math.ceil(values.length / perPage)),
+        },
+        error: null,
+      }
+    }),
+    getUserById: vi.fn(async (id, options) => {
+      getCalls.push(id)
+      signals.push(options?.signal)
+      events.push(`get:${id}`)
+      if (getOverride) {
+        const overridden = await getOverride({ id, users, signal: options?.signal })
+        if (overridden !== undefined) return overridden
+      }
+      const user = users.get(id)
+      return user
+        ? { data: { user: structuredClone(user) }, error: null }
+        : { data: { user: null }, error: { code: 'user_not_found' } }
+    }),
+    deleteUser: vi.fn(async (id, shouldSoftDelete, options) => {
+      deleteCalls.push(id)
+      signals.push(options?.signal)
+      events.push(`delete:${id}`)
+      if (deleteOverride) {
+        const overridden = await deleteOverride({
+          id,
+          users,
+          shouldSoftDelete,
+          signal: options?.signal,
+        })
+        if (overridden !== DEFAULT_ADMIN_RESPONSE) return overridden
+      }
+      users.delete(id)
+      return { data: { user: null }, error: null }
+    }),
+  }
+  const client = { supabaseUrl: targetOrigin, auth: { admin } }
+  const attestation = {
+    targetOrigin,
+    credentialKind: 'service-role',
+    client,
+  }
+  return {
+    admin,
+    attestation,
+    client,
+    users,
+    organizations,
+    createCalls,
+    listCalls,
+    getCalls,
+    deleteCalls,
+    signals,
+    events,
+    commitUser,
+  }
+}
+
+function defaultReconciliationLookup(harness) {
+  return vi.fn(async (criteria, options) => {
+    if (options?.signal?.aborted) throw new Error('aborted')
+    if (criteria.kind === 'account') {
+      const alias = criteria.targetKey.replace(/^account-/, '')
+      const matches = [...harness.users.values()]
+        .filter(user => user.app_metadata?.qa_namespace === criteria.namespace
+          && user.app_metadata?.qa_alias === alias
+          && user.app_metadata?.qa_role === criteria.resourceType)
+        .map(user => ledgerCandidate(criteria, user.id, user.created_at))
+      return authoritative(matches)
+    }
+    if (criteria.kind === 'personalOrganization') {
+      const organizations = harness.organizations.get(criteria.ownerId) ?? []
+      return authoritative(organizations.map(value => ledgerCandidate(
+        criteria,
+        `${value.organizationId}:${value.membershipId}`,
+        value.createdAt,
+      )))
+    }
+    return authoritative([])
+  })
+}
+
+function createPrivateLedger({
+  identity,
+  readEnvironment,
+  harness,
+  reconciliationLookup,
+  ledgerClock = () => new Date(NOW),
+} = {}) {
+  const lookup = reconciliationLookup ?? defaultReconciliationLookup(harness)
+  const ledger = createSebStagingPrivateRunLedger({
+    schemaVersion: 1,
+    identity,
+    namespace: `qa:${identity.runId}`,
+    readEnvironment,
+    reconciliationClient: {
+      targetOrigin: SUPABASE_ORIGIN,
+      credentialKind: 'service-role',
+      client: {
+        supabaseUrl: SUPABASE_ORIGIN,
+        findExactRunTargets: lookup,
+      },
+    },
+    reconciliationTimeoutMs: 100,
+    clock: ledgerClock,
+  })
+  return { ledger, reconciliationLookup: lookup }
 }
 
 function createAdapter({
   environmentState,
   runId,
+  identity: identityOverride,
   harness,
   randomBytes,
-  clock,
+  clock = () => new Date(NOW),
+  ledgerClock,
+  privateRunLedger,
+  reconciliationLookup,
   factoryOverride,
   browserSessionCapability,
+  browserDataLifecycleCapability,
   resourceCleanupCapability,
+  authBoundaryTimeoutMs = 50,
 } = {}) {
   const resolvedRunId = runId ?? nextRunId()
   const state = environmentState ?? { current: validEnvironment() }
+  const resolvedIdentity = identityOverride ?? runIdentity(resolvedRunId)
   const resolvedHarness = harness ?? adminHarness()
   const readEnvironment = vi.fn(() => state.current)
-  const adminClientFactory = vi.fn(async request => (
-    factoryOverride
+  const ledgerHarness = privateRunLedger
+    ? { ledger: privateRunLedger, reconciliationLookup }
+    : createPrivateLedger({
+        identity: resolvedIdentity,
+        readEnvironment,
+        harness: resolvedHarness,
+        reconciliationLookup,
+        ledgerClock,
+      })
+  const factoryCalls = []
+  const adminClientFactory = vi.fn(async request => {
+    factoryCalls.push(request)
+    return factoryOverride
       ? factoryOverride({ request, harness: resolvedHarness })
       : resolvedHarness.attestation
-  ))
-  const resolvedResourceCleanupCapability = resourceCleanupCapability ?? {
-    cleanupRun: vi.fn(async () => ({ status: 'passed' })),
+  })
+  const cleanupCapability = resourceCleanupCapability ?? {
+    cleanupRun: vi.fn(async () => Object.freeze({ status: 'passed' })),
   }
+  const browserDataLifecycle = browserDataLifecycleCapability ?? Object.freeze({
+    executeStep: vi.fn(),
+    closeAll: vi.fn(async () => Object.freeze({ status: 'passed' })),
+  })
   const adapter = createSebStagingFixtureAdapter({
     readEnvironment,
     runId: resolvedRunId,
+    runIdentity: resolvedIdentity,
+    privateRunLedger: ledgerHarness.ledger,
     adminClientFactory,
     browserSessionCapability,
-    resourceCleanupCapability: resolvedResourceCleanupCapability,
+    browserDataLifecycleCapability: browserDataLifecycle,
+    resourceCleanupCapability: cleanupCapability,
     randomBytes: randomBytes ?? deterministicRandomBytes(),
-    clock: clock ?? (() => new Date('2026-09-23T06:00:00.000Z')),
+    clock,
+    authBoundaryTimeoutMs,
   })
   return {
     adapter,
     adminClientFactory,
+    factoryCalls,
     environmentState: state,
     harness: resolvedHarness,
+    identity: resolvedIdentity,
+    privateRunLedger: ledgerHarness.ledger,
+    reconciliationLookup: ledgerHarness.reconciliationLookup,
     readEnvironment,
-    resourceCleanupCapability: resolvedResourceCleanupCapability,
+    browserDataLifecycleCapability: browserDataLifecycle,
+    resourceCleanupCapability: cleanupCapability,
     runId: resolvedRunId,
   }
 }
 
 async function provisionAll(adapter, runId) {
-  const results = []
+  const output = []
   for (const stepId of ACCOUNT_STEP_IDS) {
-    results.push(await adapter.executeStep(stepRequest(stepId, runId)))
+    output.push(await adapter.executeStep(stepRequest(stepId, runId)))
   }
-  return results
+  return output
 }
 
-function expectRedactedResult(result, stepId) {
-  expect(result).toEqual({ stepId, status: expect.stringMatching(/^(passed|failed)$/) })
+function expectRedacted(result, stepId, status = 'passed') {
+  expect(result).toEqual({ stepId, status })
   expect(Object.keys(result)).toEqual(['stepId', 'status'])
-  expect(JSON.stringify(result)).not.toMatch(/@|https?:|supabase|00000000-|password|token|secret/i)
   expect(Object.isFrozen(result)).toBe(true)
+  expect(JSON.stringify(result)).not.toMatch(/@|https?:|supabase|00000000-|password|token|secret/i)
+}
+
+function executablePlan(runId) {
+  return buildSebStagingMockHarnessPlan({
+    environment: validEnvironment(),
+    mode: 'execute',
+    runId,
+    writeConfirmation: 'CONFIRM_SYNTHETIC_SEB_STAGING_WRITE',
+  })
 }
 
 function liveCompositeAdapter(fixtureAdapter, calls, failAt = 'authenticate-teacher') {
   return {
     async executeStep(request) {
       calls.push(request.stepId)
-      if (request.stepId === 'verify-staging-isolation') {
+      if (request.stepId === 'verify-staging-isolation'
+        || request.stepId === 'reserve-unique-run-id') {
         return { stepId: request.stepId, status: 'passed' }
       }
       if (ACCOUNT_STEP_IDS.includes(request.stepId) || request.stepId === CLEANUP_STEP_ID) {
@@ -305,225 +459,50 @@ function liveCompositeAdapter(fixtureAdapter, calls, failAt = 'authenticate-teac
 }
 
 describe('SEB Staging synthetic fixture adapter', () => {
-  it('blocks non-official targets, unsafe run IDs, and environment-reader exceptions before client construction', () => {
-    const environments = [
-      validEnvironment({ KORKRU_DEPLOYMENT_ENV: 'production', VERCEL_ENV: 'production' }),
-      validEnvironment({ NEXT_PUBLIC_SITE_URL: 'https://staging.korkru.com/' }),
-      validEnvironment({ NEXT_PUBLIC_SUPABASE_URL: 'https://production-project.supabase.co' }),
-      validEnvironment({ EXAM_QA_DATA_POLICY: 'copied-production' }),
-      validEnvironment({ EXAM_QA_COPY_PRODUCTION_DATA: 'true' }),
-      validEnvironment({ EXAM_QA_ALLOW_SYNTHETIC_WRITES: 'false' }),
-    ]
-
-    for (const environment of environments) {
-      const adminClientFactory = vi.fn()
-      expect(() => createSebStagingFixtureAdapter({
-        readEnvironment: () => environment,
-        runId: nextRunId('blocked'),
-        adminClientFactory,
-        randomBytes: deterministicRandomBytes(),
-        clock: () => new Date('2026-09-23T06:00:00.000Z'),
-      })).toThrow(SebStagingFixtureAdapterBlockedError)
-      expect(adminClientFactory).not.toHaveBeenCalled()
-    }
-
-    expect(() => createSebStagingFixtureAdapter({
-      readEnvironment: () => { throw new Error('ENV_SECRET_SENTINEL') },
-      runId: nextRunId('reader'),
-      adminClientFactory: vi.fn(),
-      randomBytes: deterministicRandomBytes(),
-      clock: () => new Date('2026-09-23T06:00:00.000Z'),
-    })).toThrow(BLOCKED_ERROR_PATTERN)
-
-    for (const runId of ['seb-s5-preview', 'seb-s5-production-copy', 'seb-s5-real-students']) {
-      expect(() => createSebStagingFixtureAdapter({
-        readEnvironment: () => validEnvironment(),
-        runId,
-        adminClientFactory: vi.fn(),
-        randomBytes: deterministicRandomBytes(),
-        clock: () => new Date('2026-09-23T06:00:00.000Z'),
-      })).toThrow(SebStagingFixtureAdapterBlockedError)
-    }
-  })
-
-  it('creates exactly one account per exact issued step and never returns credentials or IDs', async () => {
-    const { adapter, adminClientFactory, harness, runId } = createAdapter()
-    const results = await provisionAll(adapter, runId)
+  it('provisions the four exact accounts and personal organizations without exposing private material', async () => {
+    const fixture = createAdapter()
+    const results = await provisionAll(fixture.adapter, fixture.runId)
 
     expect(results.map(result => result.status)).toEqual(['passed', 'passed', 'passed', 'passed'])
-    expect(adminClientFactory).toHaveBeenCalledTimes(1)
-    expect(adminClientFactory).toHaveBeenCalledWith({
-      targetOrigin: OFFICIAL_STAGING_SUPABASE_ORIGIN,
-    })
-    expect(harness.createCalls).toHaveLength(4)
-    expect(harness.createCalls.map(value => value.user_metadata.qa_alias)).toEqual([
-      'teacher-primary',
-      'teacher-unrelated',
-      'student-primary',
-      'student-secondary',
-    ])
-    expect(harness.createCalls.map(value => value.user_metadata.role)).toEqual([
-      'teacher',
-      'teacher',
-      'student',
-      'student',
-    ])
-    for (let index = 0; index < results.length; index += 1) {
-      expectRedactedResult(results[index], ACCOUNT_STEP_IDS[index])
+    expect(fixture.harness.createCalls).toHaveLength(4)
+    expect(fixture.reconciliationLookup).toHaveBeenCalledTimes(4)
+    expect(fixture.reconciliationLookup.mock.calls.map(call => call[0].targetKey)).toEqual(
+      ALIASES.map(alias => `personal-organization-${alias}`),
+    )
+    expect(fixture.factoryCalls).toHaveLength(1)
+    expect(fixture.factoryCalls[0].targetOrigin).toBe(SUPABASE_ORIGIN)
+    expect(fixture.factoryCalls[0].credentialKind).toBe('service-role')
+    expect(fixture.factoryCalls[0].signal).toBeInstanceOf(AbortSignal)
+    expect(fixture.harness.signals.every(signal => signal instanceof AbortSignal)).toBe(true)
+    results.forEach((result, index) => expectRedacted(result, ACCOUNT_STEP_IDS[index]))
+    for (const alias of ALIASES) {
+      expect(fixture.privateRunLedger.readCleanupTarget({
+        schemaVersion: 1,
+        targetKey: `account-${alias}`,
+        kind: 'account',
+      })).toMatchObject({ status: 'passed', state: 'committed', snapshots: [{
+        targetKey: `account-${alias}`,
+      }] })
+      expect(fixture.privateRunLedger.readCleanupTarget({
+        schemaVersion: 1,
+        targetKey: `personal-organization-${alias}`,
+        kind: 'personalOrganization',
+      })).toMatchObject({ status: 'passed', state: 'committed', snapshots: [{
+        targetKey: `personal-organization-${alias}`,
+      }] })
     }
-    const serialized = JSON.stringify({ adapter, results })
-    for (const call of harness.createCalls) {
-      expect(serialized).not.toContain(call.email)
-      expect(serialized).not.toContain(call.password)
-      expect(serialized).not.toContain(call.user_metadata.qa_namespace)
-    }
+    const serialized = JSON.stringify({ adapter: fixture.adapter, results })
+    expect(serialized).not.toMatch(/@qa\.staging\.korkru\.com|Aa1!|00000000-/)
   })
 
-  it('authenticates inside the same closure without returning credentials or session details', async () => {
-    const capturedPayloads = []
-    const browserSessionCapability = {
-      authenticate: vi.fn(async payload => {
-        capturedPayloads.push(payload)
-        expect(payload.credentials.email).toMatch(/^seb-s5-tp-/)
-        expect(payload.credentials.password).toMatch(/^Aa1!/)
-        return {
-          targetOrigin: 'https://staging.korkru.com',
-          authenticatedUserId: uuid(1),
-          appMetadata: {
-            qa_fixture: 'seb-s5',
-            qa_namespace: payload.namespace,
-            qa_role: payload.role,
-            qa_alias: payload.alias,
-            role: payload.role,
-            qa_schema_version: 1,
-          },
-          ignoredSecret: 'BROWSER_SESSION_SECRET_SENTINEL',
-        }
-      }),
-      closeAll: vi.fn(async () => {}),
-    }
-    const { adapter, runId } = createAdapter({ browserSessionCapability })
-    await provisionAll(adapter, runId)
-
-    const result = await adapter.executeStep(authenticationRequest(AUTHENTICATE_TEACHER_STEP_ID, runId))
-    expectRedactedResult(result, AUTHENTICATE_TEACHER_STEP_ID)
-    expect(result.status).toBe('passed')
-    expect(browserSessionCapability.authenticate).toHaveBeenCalledTimes(1)
-    expect(capturedPayloads[0].credentials).toEqual({ email: '', password: '' })
-    expect(JSON.stringify(result)).not.toContain('BROWSER_SESSION_SECRET_SENTINEL')
-
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(browserSessionCapability.closeAll).toHaveBeenCalledTimes(1)
-  })
-
-  it('rejects wrong browser identity attestation and never retries that auth step', async () => {
-    const browserSessionCapability = {
-      authenticate: vi.fn(async payload => ({
-        targetOrigin: 'https://staging.korkru.com',
-        authenticatedUserId: uuid(2),
-        appMetadata: {
-          qa_fixture: 'seb-s5',
-          qa_namespace: payload.namespace,
-          qa_role: payload.role,
-          qa_alias: payload.alias,
-          role: payload.role,
-          qa_schema_version: 1,
-        },
-      })),
-      closeAll: vi.fn(async () => {}),
-    }
-    const { adapter, runId } = createAdapter({ browserSessionCapability })
-    await provisionAll(adapter, runId)
-
-    expect((await adapter.executeStep(authenticationRequest(AUTHENTICATE_TEACHER_STEP_ID, runId))).status).toBe('failed')
-    expect((await adapter.executeStep(authenticationRequest(AUTHENTICATE_TEACHER_STEP_ID, runId))).status).toBe('failed')
-    expect(browserSessionCapability.authenticate).toHaveBeenCalledTimes(1)
-  })
-
-  it.each([undefined, 'admin'])(
-    'rejects a browser attestation with authorization role %s',
-    async authorizationRole => {
-      const browserSessionCapability = {
-        authenticate: vi.fn(async payload => ({
-          targetOrigin: 'https://staging.korkru.com',
-          authenticatedUserId: uuid(1),
-          appMetadata: {
-            ...(authorizationRole === undefined ? {} : { role: authorizationRole }),
-            qa_fixture: 'seb-s5',
-            qa_namespace: payload.namespace,
-            qa_role: payload.role,
-            qa_alias: payload.alias,
-            qa_schema_version: 1,
-            providers: ['email'],
-          },
-        })),
-        closeAll: vi.fn(async () => {}),
-      }
-      const { adapter, runId } = createAdapter({ browserSessionCapability })
-      await provisionAll(adapter, runId)
-
-      const result = await adapter.executeStep(authenticationRequest(
-        AUTHENTICATE_TEACHER_STEP_ID,
-        runId,
-      ))
-      expect(result).toEqual({
-        stepId: AUTHENTICATE_TEACHER_STEP_ID,
-        status: 'failed',
-      })
-      expect(browserSessionCapability.authenticate).toHaveBeenCalledTimes(1)
-    },
-  )
-
-  it('rejects out-of-order, repeated, or wrong-run requests without another mutation', async () => {
-    const { adapter, harness, runId } = createAdapter()
-    const outOfOrder = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[1], runId))
-    expect(outOfOrder.status).toBe('failed')
-    expect(harness.createCalls).toHaveLength(0)
-
-    // A rejected out-of-order step is not consumed; the exact first step can proceed.
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('failed')
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[1], 'seb-s5-wrong-run'))).status).toBe('failed')
-    expect(harness.createCalls).toHaveLength(1)
-  })
-
-  it('requires an exact attested Staging client target before the first mutation', async () => {
-    const harness = adminHarness({ targetOrigin: 'https://production-project.supabase.co' })
-    const { adapter, runId } = createAdapter({ harness })
-    const result = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))
-
-    expect(result.status).toBe('failed')
-    expect(harness.createCalls).toEqual([])
-    expectRedactedResult(result, ACCOUNT_STEP_IDS[0])
-  })
-
-  it('rejects a factory that claims Staging while its client is bound to another origin', async () => {
-    const harness = adminHarness()
-    harness.client.supabaseUrl = 'https://production-project.supabase.co'
-    const { adapter, runId } = createAdapter({ harness })
-    const result = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))
-
-    expect(result.status).toBe('failed')
-    expect(harness.createCalls).toEqual([])
-  })
-
-  it('requires the bounded Auth directory lookup method in the attested client', async () => {
-    const harness = adminHarness()
-    delete harness.client.auth.admin.listUsers
-    const { adapter, runId } = createAdapter({ harness })
-
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('failed')
-    expect(harness.createCalls).toEqual([])
-  })
-
-  it('runs the four exact fixture steps through the real live runner and cleans up on the next failure', async () => {
+  it('runs the fixture slice through the real live runner and cleans up on the next failure', async () => {
     const runId = nextRunId('integrated')
-    const { adapter, harness } = createAdapter({ runId })
+    const fixture = createAdapter({ runId })
     const calls = []
     const output = await runSebStagingLiveHarness({
       plan: executablePlan(runId),
-      identity: identity(runId),
-      adapter: liveCompositeAdapter(adapter, calls),
+      identity: requestIdentity(runId),
+      adapter: liveCompositeAdapter(fixture.adapter, calls),
     })
 
     expect(output.status).toBe('failed')
@@ -534,489 +513,734 @@ describe('SEB Staging synthetic fixture adapter', () => {
       'authenticate-teacher',
     ])
     expect(calls.at(-1)).toBe(CLEANUP_STEP_ID)
-    for (const stepId of ACCOUNT_STEP_IDS) expect(output.stepEvidence[stepId]).toBe('passed')
     expect(output.stepEvidence[CLEANUP_STEP_ID]).toBe('passed')
-    expect(harness.createCalls).toHaveLength(4)
-    expect(harness.getCalls).toEqual([uuid(4), uuid(3), uuid(2), uuid(1)])
-    expect(harness.deleteCalls).toEqual([uuid(4), uuid(3), uuid(2), uuid(1)])
+    expect(fixture.harness.deleteCalls).toEqual([uuid(4), uuid(3), uuid(2), uuid(1)])
   })
 
-  it.each([1, 2, 3, 4])(
-    'cleans every previously created exact account when provisioning step %i fails',
-    async failedCreateIndex => {
-      const runId = nextRunId(`partial-${failedCreateIndex}`)
-      const harness = adminHarness({
-        createOverride: ({ createIndex }) => createIndex === failedCreateIndex
-          ? {
-              data: { user: null },
-              error: authApiError('validation_failed', 422, 'CREATE_SECRET_SENTINEL'),
-            }
-          : null,
-      })
-      const { adapter } = createAdapter({ runId, harness })
-      const output = await runSebStagingLiveHarness({
-        plan: executablePlan(runId),
-        identity: identity(runId),
-        adapter: liveCompositeAdapter(adapter, []),
-      })
+  it('keeps browser authentication closure-private and rejects the wrong identity', async () => {
+    const captured = []
+    const browserSessionCapability = {
+      authenticate: vi.fn(async payload => {
+        captured.push(payload)
+        return {
+          targetOrigin: SITE_ORIGIN,
+          authenticatedUserId: uuid(1),
+          appMetadata: {
+            role: payload.role,
+            qa_fixture: 'seb-s5',
+            qa_namespace: payload.namespace,
+            qa_role: payload.role,
+            qa_alias: payload.alias,
+            qa_schema_version: 1,
+          },
+        }
+      }),
+      closeAll: vi.fn(async () => Object.freeze({ status: 'passed' })),
+    }
+    const fixture = createAdapter({ browserSessionCapability })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+    expectRedacted(
+      await fixture.adapter.executeStep(authenticationRequest('authenticate-teacher', fixture.runId)),
+      'authenticate-teacher',
+    )
+    expect(captured[0].credentials).toEqual({ email: '', password: '' })
+  })
 
-      expect(output.status).toBe('failed')
-      expect(harness.createCalls).toHaveLength(failedCreateIndex)
-      expect(harness.deleteCalls).toEqual(
-        Array.from({ length: failedCreateIndex - 1 }, (_, index) => uuid(failedCreateIndex - 1 - index)),
-      )
-      expect(JSON.stringify(output)).not.toContain('CREATE_SECRET_SENTINEL')
+  it.each(['missing', 'multiple'])(
+    'fails provisioning when the trigger-created personal organization is %s',
+    async organizationMode => {
+      const fixture = createAdapter({ harness: adminHarness({ organizationMode }) })
+      const result = await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))
+
+      expectRedacted(result, ACCOUNT_STEP_IDS[0], 'failed')
+      expect(fixture.harness.createCalls).toHaveLength(1)
+      if (organizationMode === 'missing') {
+        expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+          .toBe('passed')
+        expect(fixture.harness.deleteCalls).toEqual([uuid(1)])
+      } else {
+        expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+          .toBe('failed')
+        expect(fixture.harness.deleteCalls).toEqual([])
+      }
     },
   )
 
-  it('rechecks the environment before every create and permits cleanup after writes are disabled', async () => {
-    const state = { current: validEnvironment() }
-    const { adapter, harness, runId } = createAdapter({ environmentState: state })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
+  it('leaves an ambiguous create uncertain, then reconciles its exact account and organization during cleanup', async () => {
+    const committedId = uuid(701)
+    const harness = adminHarness({
+      createOverride: ({ attributes, commitUser }) => {
+        commitUser(attributes, committedId)
+        throw new Error('AMBIGUOUS_CREATE_SECRET_SENTINEL')
+      },
+    })
+    const fixture = createAdapter({ harness })
 
-    state.current = validEnvironment({ EXAM_QA_ALLOW_SYNTHETIC_WRITES: 'false' })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[1], runId))).status).toBe('failed')
-    expect(harness.createCalls).toHaveLength(1)
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(harness.deleteCalls).toEqual([uuid(1)])
+    expectRedacted(
+      await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId)),
+      ACCOUNT_STEP_IDS[0],
+      'failed',
+    )
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(fixture.reconciliationLookup.mock.calls.map(call => call[0].kind))
+      .toEqual(['account', 'personalOrganization'])
+    expect(harness.listCalls).toEqual([{ page: 1, perPage: 100 }])
+    expect(harness.deleteCalls).toEqual([committedId])
   })
 
-  it('blocks cleanup if the environment no longer points to exact official Staging', async () => {
-    const state = { current: validEnvironment() }
-    const { adapter, harness, runId } = createAdapter({ environmentState: state })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
+  it.each(['none', 'multiple', 'metadata-mismatch'])(
+    'fails cleanup when ambiguous create reconciliation is %s',
+    async scenario => {
+      const reconciliationLookup = vi.fn(async criteria => {
+        if (criteria.kind !== 'account') return authoritative([])
+        if (scenario === 'none') return authoritative([])
+        if (scenario === 'multiple') {
+          return authoritative([
+            ledgerCandidate(criteria, uuid(710)),
+            ledgerCandidate(criteria, uuid(711)),
+          ])
+        }
+        return authoritative([{
+          ...ledgerCandidate(criteria, uuid(712)),
+          resourceType: 'student',
+        }])
+      })
+      const harness = adminHarness({
+        createOverride: () => { throw new Error('AMBIGUOUS_SECRET_SENTINEL') },
+      })
+      const fixture = createAdapter({ harness, reconciliationLookup })
+      expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+        .toBe('failed')
+      const cleanup = await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))
 
-    state.current = validEnvironment({ NEXT_PUBLIC_SUPABASE_URL: 'https://production-project.supabase.co' })
-    const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-    expect(cleanup.status).toBe('failed')
-    expect(harness.getCalls).toEqual([])
+      if (scenario === 'none') {
+        expect(cleanup.status).toBe('passed')
+      } else {
+        expect(cleanup.status).toBe('failed')
+      }
+      expect(harness.deleteCalls).toEqual([])
+      expect(JSON.stringify(cleanup)).not.toContain('AMBIGUOUS_SECRET_SENTINEL')
+    },
+  )
+
+  it('rejects an account created outside the exact run creation window', async () => {
+    const harness = adminHarness({
+      createOverride: ({ attributes, commitUser }) => ({
+        data: { user: commitUser(attributes, uuid(801), '2026-09-23T07:00:00.001Z') },
+        error: null,
+      }),
+    })
+    const fixture = createAdapter({ harness })
+    expectRedacted(
+      await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId)),
+      ACCOUNT_STEP_IDS[0],
+      'failed',
+    )
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
     expect(harness.deleteCalls).toEqual([])
   })
 
-  it('revalidates exact ID, email, namespace, role, alias, and schema before every delete', async () => {
-    const { adapter, harness, runId } = createAdapter()
-    await provisionAll(adapter, runId)
-    const changed = harness.users.get(uuid(3))
-    harness.users.set(uuid(3), {
-      ...changed,
-      app_metadata: { ...changed.app_metadata, qa_namespace: 'qa:other-run' },
+  it('rejects mismatched or overlong run identities before constructing an Auth client', () => {
+    const runId = nextRunId('identity')
+    const base = runIdentity(runId)
+    const cases = [
+      { ...base, runId: nextRunId('other') },
+      { ...base, sourceRevision: 'C'.repeat(40) },
+      {
+        ...base,
+        creationWindow: {
+          notBefore: NOT_BEFORE,
+          notAfter: '2026-09-24T05:00:00.001Z',
+        },
+      },
+    ]
+    for (const identity of cases) {
+      const harness = adminHarness()
+      const readEnvironment = () => validEnvironment()
+      const { ledger } = createPrivateLedger({
+        identity: base,
+        readEnvironment,
+        harness,
+      })
+      const factory = vi.fn()
+      expect(() => createSebStagingFixtureAdapter({
+        readEnvironment,
+        runId,
+        runIdentity: identity,
+        privateRunLedger: ledger,
+        adminClientFactory: factory,
+        resourceCleanupCapability: { cleanupRun: vi.fn() },
+        randomBytes: deterministicRandomBytes(),
+        clock: () => new Date(NOW),
+        authBoundaryTimeoutMs: 50,
+      })).toThrow(SebStagingFixtureAdapterBlockedError)
+      expect(factory).not.toHaveBeenCalled()
+    }
+  })
+
+  it('fails before Auth mutation when any required ledger transition fails', async () => {
+    const harness = adminHarness()
+    const runId = nextRunId('ledgerfail')
+    const identity = runIdentity(runId)
+    const readEnvironment = () => validEnvironment()
+    const { ledger } = createPrivateLedger({ identity, readEnvironment, harness })
+    const brokenLedger = Object.freeze({
+      planTarget: vi.fn(() => ({ status: 'failed' })),
+      adoptDerivedTarget: ledger.adoptDerivedTarget,
+      markUncertain: ledger.markUncertain,
+      commitTarget: ledger.commitTarget,
+      reconcileTarget: ledger.reconcileTarget,
+      readCleanupTarget: ledger.readCleanupTarget,
+      markDeleted: ledger.markDeleted,
+    })
+    const fixture = createAdapter({ runId, identity, harness, privateRunLedger: brokenLedger })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status)
+      .toBe('failed')
+    expect(harness.createCalls).toEqual([])
+  })
+
+  it('leaves an exact returned account uncertain when ledger commit fails and reconciles it only in cleanup', async () => {
+    const harness = adminHarness()
+    const runId = nextRunId('commitfail')
+    const identity = runIdentity(runId)
+    const readEnvironment = () => validEnvironment()
+    const { ledger } = createPrivateLedger({ identity, readEnvironment, harness })
+    let firstCommit = true
+    const guardedLedger = Object.freeze({
+      planTarget: ledger.planTarget,
+      adoptDerivedTarget: ledger.adoptDerivedTarget,
+      markUncertain: ledger.markUncertain,
+      commitTarget: vi.fn((...args) => {
+        if (firstCommit) {
+          firstCommit = false
+          return { status: 'failed' }
+        }
+        return ledger.commitTarget(...args)
+      }),
+      reconcileTarget: ledger.reconcileTarget,
+      readCleanupTarget: ledger.readCleanupTarget,
+      markDeleted: ledger.markDeleted,
+    })
+    const fixture = createAdapter({ runId, identity, harness, privateRunLedger: guardedLedger })
+
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status)
+      .toBe('failed')
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status)
+      .toBe('passed')
+    expect(harness.listCalls).toEqual([{ page: 1, perPage: 100 }])
+    expect(harness.deleteCalls).toEqual([uuid(1)])
+  })
+
+  it.each([
+    ['wrong target', () => adminHarness({ targetOrigin: 'https://production.supabase.co' })],
+    ['wrong credential', () => {
+      const harness = adminHarness()
+      harness.attestation.credentialKind = 'anon'
+      return harness
+    }],
+    ['extra attestation field', () => {
+      const harness = adminHarness()
+      harness.attestation.secret = 'ATTESTATION_SECRET_SENTINEL'
+      return harness
+    }],
+  ])('requires an exact service-role Staging attestation: %s', async (_label, makeHarness) => {
+    const fixture = createAdapter({ harness: makeHarness() })
+    const result = await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))
+    expectRedacted(result, ACCOUNT_STEP_IDS[0], 'failed')
+    expect(fixture.harness.createCalls).toEqual([])
+  })
+
+  it('fails closed when the attested client or method drifts during a boundary', async () => {
+    let harness
+    harness = adminHarness({
+      createOverride: ({ attributes, commitUser }) => {
+        const user = commitUser(attributes)
+        harness.client.auth.admin.listUsers = vi.fn()
+        return { data: { user }, error: null }
+      },
+    })
+    const fixture = createAdapter({ harness })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('failed')
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(harness.deleteCalls).toEqual([])
+  })
+
+  it('adopts the trigger-derived organization when an Auth create settles after the creation window', async () => {
+    vi.useFakeTimers()
+    const late = deferred()
+    let logicalNow = NOW
+    let pendingAttributes
+    let capturedSignal
+    const harness = adminHarness({
+      createOverride: ({ attributes, signal }) => {
+        pendingAttributes = attributes
+        capturedSignal = signal
+        return late.promise
+      },
+    })
+    const logicalClock = () => new Date(logicalNow)
+    const fixture = createAdapter({
+      harness,
+      clock: logicalClock,
+      ledgerClock: logicalClock,
+      authBoundaryTimeoutMs: 20,
     })
 
-    const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-    expect(cleanup.status).toBe('failed')
-    expect(harness.getCalls).toEqual([uuid(4), uuid(3), uuid(2), uuid(1)])
-    expect(harness.deleteCalls).toEqual([uuid(4), uuid(2), uuid(1)])
-    expect(harness.users.has(uuid(3))).toBe(true)
+    const creationPromise = fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))
+    await vi.advanceTimersByTimeAsync(21)
+    expectRedacted(await creationPromise, ACCOUNT_STEP_IDS[0], 'failed')
+    expect(capturedSignal.aborted).toBe(true)
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(fixture.resourceCleanupCapability.cleanupRun).not.toHaveBeenCalled()
+
+    logicalNow = '2026-09-23T07:00:00.001Z'
+    const user = harness.commitUser(pendingAttributes, uuid(901), NOW)
+    late.resolve({ data: { user }, error: null })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(harness.deleteCalls).toEqual([uuid(901)])
+    expect(fixture.privateRunLedger.readCleanupTarget({
+      schemaVersion: 1,
+      targetKey: 'personal-organization-teacher-primary',
+      kind: 'personalOrganization',
+    }).state).toBe('committed')
   })
 
-  it('performs get-before-delete in exact reverse order and cleanup stays idempotent', async () => {
-    const { adapter, harness, runId } = createAdapter()
-    await provisionAll(adapter, runId)
+  it('tracks a timed-out client factory until it settles before cleanup can pass', async () => {
+    vi.useFakeTimers()
+    const lateFactory = deferred()
+    let factorySignal
+    const fixture = createAdapter({
+      factoryOverride: ({ request }) => {
+        factorySignal = request.signal
+        return lateFactory.promise
+      },
+      authBoundaryTimeoutMs: 20,
+    })
+    const creationPromise = fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))
+    await vi.advanceTimersByTimeAsync(21)
+    expect((await creationPromise).status).toBe('failed')
+    expect(factorySignal.aborted).toBe(true)
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
 
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(harness.events.slice(-8)).toEqual([
-      `get:${uuid(4)}`, `delete:${uuid(4)}`,
-      `get:${uuid(3)}`, `delete:${uuid(3)}`,
-      `get:${uuid(2)}`, `delete:${uuid(2)}`,
-      `get:${uuid(1)}`, `delete:${uuid(1)}`,
-    ])
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(harness.getCalls).toHaveLength(4)
-    expect(harness.deleteCalls).toHaveLength(4)
+    lateFactory.resolve(fixture.harness.attestation)
+    await vi.advanceTimersByTimeAsync(0)
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(fixture.harness.createCalls).toEqual([])
+    expect(fixture.harness.deleteCalls).toEqual([])
   })
 
-  it('closes sessions, cleans exact run resources, then deletes Auth accounts without exposing credentials', async () => {
-    const harness = adminHarness()
-    const browserSessionCapability = {
-      authenticate: vi.fn(),
-      closeAll: vi.fn(async () => { harness.events.push('close-sessions') }),
-    }
+  it('stops a four-account reverse-delete pass at a timed-out delete until its late mutation settles', async () => {
+    vi.useFakeTimers()
+    const late = deferred()
+    let deleteAttempt = 0
+    let capturedSignal
+    const harness = adminHarness({
+      deleteOverride: ({ id, users, signal }) => {
+        deleteAttempt += 1
+        if (deleteAttempt !== 1) return DEFAULT_ADMIN_RESPONSE
+        capturedSignal = signal
+        return late.promise.then(result => {
+          users.delete(id)
+          return result
+        })
+      },
+    })
+    const fixture = createAdapter({ harness, authBoundaryTimeoutMs: 20 })
+    expect((await provisionAll(fixture.adapter, fixture.runId)).map(result => result.status))
+      .toEqual(['passed', 'passed', 'passed', 'passed'])
+
+    const cleanupPromise = fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))
+    await vi.advanceTimersByTimeAsync(21)
+    expect((await cleanupPromise).status).toBe('failed')
+    expect(capturedSignal.aborted).toBe(true)
+    expect(harness.getCalls).toEqual([uuid(4)])
+    expect(harness.deleteCalls).toEqual([uuid(4)])
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(harness.getCalls).toEqual([uuid(4)])
+    expect(harness.deleteCalls).toEqual([uuid(4)])
+
+    late.resolve({ data: { user: null }, error: null })
+    await vi.advanceTimersByTimeAsync(0)
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(harness.deleteCalls).toEqual([uuid(4), uuid(3), uuid(2), uuid(1)])
+  })
+
+  it('stops a four-account reverse-delete pass at a timed-out get until the read settles', async () => {
+    vi.useFakeTimers()
+    const late = deferred()
+    let getAttempt = 0
+    let capturedSignal
+    const harness = adminHarness({
+      getOverride: ({ id, users, signal }) => {
+        getAttempt += 1
+        if (getAttempt !== 1) return undefined
+        capturedSignal = signal
+        return late.promise.then(() => ({
+          data: { user: structuredClone(users.get(id)) },
+          error: null,
+        }))
+      },
+    })
+    const fixture = createAdapter({ harness, authBoundaryTimeoutMs: 20 })
+    expect((await provisionAll(fixture.adapter, fixture.runId)).map(result => result.status))
+      .toEqual(['passed', 'passed', 'passed', 'passed'])
+
+    const cleanupPromise = fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))
+    await vi.advanceTimersByTimeAsync(21)
+    expect((await cleanupPromise).status).toBe('failed')
+    expect(capturedSignal.aborted).toBe(true)
+    expect(harness.getCalls).toEqual([uuid(4)])
+    expect(harness.deleteCalls).toEqual([])
+
+    late.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(harness.deleteCalls).toEqual([uuid(4), uuid(3), uuid(2), uuid(1)])
+  })
+
+  it('keeps account ledger targets committed until resource cleanup passes', async () => {
+    let attempt = 0
     const captured = []
     const resourceCleanupCapability = {
       cleanupRun: vi.fn(async request => {
-        harness.events.push('cleanup-resources')
         captured.push(request)
-        return { status: 'passed' }
+        attempt += 1
+        return Object.freeze({ status: attempt === 1 ? 'failed' : 'passed' })
       }),
     }
-    const { adapter, runId } = createAdapter({
-      harness,
-      browserSessionCapability,
-      resourceCleanupCapability,
+    const fixture = createAdapter({ resourceCleanupCapability })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    const accountState = fixture.privateRunLedger.readCleanupTarget({
+      schemaVersion: 1,
+      targetKey: 'account-teacher-primary',
+      kind: 'account',
     })
-    await provisionAll(adapter, runId)
+    expect(accountState.state).toBe('committed')
+    expect(fixture.harness.deleteCalls).toEqual([])
 
-    const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-
-    expect(cleanup).toEqual({ stepId: CLEANUP_STEP_ID, status: 'passed' })
-    expect(harness.events.slice(-10)).toEqual([
-      'close-sessions',
-      'cleanup-resources',
-      `get:${uuid(4)}`, `delete:${uuid(4)}`,
-      `get:${uuid(3)}`, `delete:${uuid(3)}`,
-      `get:${uuid(2)}`, `delete:${uuid(2)}`,
-      `get:${uuid(1)}`, `delete:${uuid(1)}`,
-    ])
-    expect(captured).toHaveLength(1)
-    expect(Object.isFrozen(captured[0])).toBe(true)
-    expect(captured[0].accounts).toHaveLength(4)
-    expect(captured[0].accounts.every(account => Object.isFrozen(account))).toBe(true)
-    expect(JSON.stringify(captured[0])).not.toMatch(/@qa\.staging\.korkru\.com|Aa1!|password|secret/i)
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(captured).toHaveLength(2)
+    expect(captured[1]).toBe(captured[0])
+    expect(captured[0].accounts).toEqual([{
+      id: uuid(1),
+      alias: 'teacher-primary',
+      role: 'teacher',
+      namespace: `qa:${fixture.runId}`,
+    }])
+    expect(fixture.privateRunLedger.readCleanupTarget({
+      schemaVersion: 1,
+      targetKey: 'account-teacher-primary',
+      kind: 'account',
+    }).state).toBe('deleted')
   })
 
-  it('does not clean resources or Auth until every browser session is closed', async () => {
+  it('does exact get-before-delete in reverse order and confirms ambiguous delete by readback', async () => {
+    let first = true
+    const harness = adminHarness({
+      deleteOverride: ({ id, users }) => {
+        if (!first) return DEFAULT_ADMIN_RESPONSE
+        first = false
+        users.delete(id)
+        return { data: { user: null }, error: new Error('DELETE_SECRET_SENTINEL') }
+      },
+    })
+    const fixture = createAdapter({ harness })
+    await provisionAll(fixture.adapter, fixture.runId)
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(harness.deleteCalls[0]).toBe(uuid(4))
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(harness.deleteCalls).toEqual([uuid(4), uuid(3), uuid(2), uuid(1)])
+    expect(JSON.stringify(await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))))
+      .not.toContain('DELETE_SECRET_SENTINEL')
+  })
+
+  it.each([
+    ['undefined', undefined],
+    ['extra response field', { data: { user: null }, error: null, extra: true }],
+    ['extra data field', { data: { user: null, secret: true }, error: null }],
+    ['non-null error', { data: { user: null }, error: { code: 'transport_error' } }],
+  ])('keeps the account committed when delete resolves with %s', async (_name, deletion) => {
+    const harness = adminHarness({ deleteOverride: () => deletion })
+    const fixture = createAdapter({ harness })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(harness.users.has(uuid(1))).toBe(true)
+    expect(fixture.privateRunLedger.readCleanupTarget({
+      schemaVersion: 1,
+      targetKey: 'account-teacher-primary',
+      kind: 'account',
+    }).state).toBe('committed')
+  })
+
+  it('requires authoritative post-delete absence before marking the ledger target deleted', async () => {
+    let deleteAttempt = 0
+    const harness = adminHarness({
+      deleteOverride: () => {
+        deleteAttempt += 1
+        return deleteAttempt === 1
+          ? { data: { user: null }, error: null }
+          : DEFAULT_ADMIN_RESPONSE
+      },
+    })
+    const fixture = createAdapter({ harness })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(harness.users.has(uuid(1))).toBe(true)
+    expect(harness.getCalls).toEqual([uuid(1), uuid(1)])
+    expect(fixture.privateRunLedger.readCleanupTarget({
+      schemaVersion: 1,
+      targetKey: 'account-teacher-primary',
+      kind: 'account',
+    }).state).toBe('committed')
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(harness.getCalls).toEqual([uuid(1), uuid(1), uuid(1), uuid(1)])
+    expect(fixture.privateRunLedger.readCleanupTarget({
+      schemaVersion: 1,
+      targetKey: 'account-teacher-primary',
+      kind: 'account',
+    }).state).toBe('deleted')
+  })
+
+  it('refuses deletion if authoritative account metadata changed', async () => {
+    const fixture = createAdapter()
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+    const user = fixture.harness.users.get(uuid(1))
+    user.app_metadata.qa_namespace = 'qa:other-run'
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(fixture.harness.deleteCalls).toEqual([])
+  })
+
+  it('closes browser sessions and browser-data planning before resources and Auth', async () => {
+    const events = []
     let closeAttempt = 0
     const browserSessionCapability = {
       authenticate: vi.fn(),
       closeAll: vi.fn(async () => {
+        events.push('close')
         closeAttempt += 1
-        if (closeAttempt === 1) throw new Error('SESSION_CLOSE_SECRET_SENTINEL')
+        if (closeAttempt === 1) throw new Error('CLOSE_SECRET_SENTINEL')
+        return Object.freeze({ status: 'passed' })
       }),
     }
     const resourceCleanupCapability = {
-      cleanupRun: vi.fn(async () => ({ status: 'passed' })),
+      cleanupRun: vi.fn(async () => {
+        events.push('resources')
+        return Object.freeze({ status: 'passed' })
+      }),
     }
-    const { adapter, harness, runId } = createAdapter({
+    const browserDataLifecycleCapability = Object.freeze({
+      executeStep: vi.fn(),
+      closeAll: vi.fn(async () => {
+        events.push('browser-data')
+        return Object.freeze({ status: 'passed' })
+      }),
+    })
+    const harness = adminHarness()
+    harness.events = events
+    const fixture = createAdapter({
+      harness,
       browserSessionCapability,
+      browserDataLifecycleCapability,
       resourceCleanupCapability,
     })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
 
-    const first = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-    expect(first).toEqual({ stepId: CLEANUP_STEP_ID, status: 'failed' })
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
     expect(resourceCleanupCapability.cleanupRun).not.toHaveBeenCalled()
-    expect(harness.deleteCalls).toEqual([])
-    expect(JSON.stringify(first)).not.toContain('SESSION_CLOSE_SECRET_SENTINEL')
-
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(browserSessionCapability.closeAll).toHaveBeenCalledTimes(2)
-    expect(resourceCleanupCapability.cleanupRun).toHaveBeenCalledTimes(1)
-    expect(harness.deleteCalls).toEqual([uuid(1)])
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(events.slice(0, 4)).toEqual(['close', 'close', 'browser-data', 'resources'])
   })
 
-  it('defers Auth cleanup until resource cleanup passes and retries only the unresolved resource cleanup', async () => {
-    let cleanupAttempt = 0
-    const captured = []
-    const resourceCleanupCapability = {
-      cleanupRun: vi.fn(async request => {
-        captured.push(request)
-        cleanupAttempt += 1
-        return { status: cleanupAttempt === 1 ? 'failed' : 'passed' }
+  it('blocks resource cleanup until browser-data planning is quiescent and retries close', async () => {
+    const events = []
+    let closeAttempt = 0
+    const browserSessionCapability = {
+      authenticate: vi.fn(),
+      closeAll: vi.fn(async () => {
+        events.push('sessions')
+        return Object.freeze({ status: 'passed' })
       }),
     }
-    const { adapter, harness, runId } = createAdapter({ resourceCleanupCapability })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
-
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('failed')
-    expect(harness.deleteCalls).toEqual([])
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(resourceCleanupCapability.cleanupRun).toHaveBeenCalledTimes(2)
-    expect(captured[1]).toBe(captured[0])
-    expect(captured[1].accounts).toHaveLength(1)
-    expect(harness.deleteCalls).toEqual([uuid(1)])
-  })
-
-  it('fails closed on cleanup capability exceptions or non-exact responses without leaking details', async () => {
-    const throwing = {
-      cleanupRun: vi.fn(async () => { throw new Error('RESOURCE_SECRET_SENTINEL') }),
+    const browserDataLifecycleCapability = Object.freeze({
+      executeStep: vi.fn(),
+      closeAll: vi.fn(async () => {
+        events.push('browser-data')
+        closeAttempt += 1
+        return Object.freeze({ status: closeAttempt === 1 ? 'failed' : 'passed' })
+      }),
+    })
+    const resourceCleanupCapability = {
+      cleanupRun: vi.fn(async () => {
+        events.push('resources')
+        return Object.freeze({ status: 'passed' })
+      }),
     }
-    const first = createAdapter({ resourceCleanupCapability: throwing })
-    expect((await first.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], first.runId))).status).toBe('passed')
-    const failed = await first.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, first.runId))
-    expect(failed).toEqual({ stepId: CLEANUP_STEP_ID, status: 'failed' })
-    expect(JSON.stringify(failed)).not.toContain('RESOURCE_SECRET_SENTINEL')
-    expect(first.harness.deleteCalls).toEqual([])
-
-    const extraFields = createAdapter({
-      resourceCleanupCapability: {
-        cleanupRun: vi.fn(async () => ({ status: 'passed', secret: 'SHOULD_NOT_PASS' })),
-      },
+    const fixture = createAdapter({
+      browserSessionCapability,
+      browserDataLifecycleCapability,
+      resourceCleanupCapability,
     })
-    expect((await extraFields.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, extraFields.runId))).status).toBe('failed')
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(events).toEqual(['sessions', 'browser-data'])
+    expect(resourceCleanupCapability.cleanupRun).not.toHaveBeenCalled()
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('passed')
+    expect(events).toEqual(['sessions', 'browser-data', 'browser-data', 'resources'])
+    expect(browserSessionCapability.closeAll).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects extra request or identity fields before forwarding cleanup material', async () => {
-    const fixture = createAdapter()
-    const cleanup = stepRequest(CLEANUP_STEP_ID, fixture.runId)
-    cleanup.identity.password = 'IDENTITY_SECRET_SENTINEL'
-    expect(await fixture.adapter.executeStep(cleanup)).toEqual({
-      stepId: CLEANUP_STEP_ID,
-      status: 'failed',
-    })
-    expect(fixture.resourceCleanupCapability.cleanupRun).not.toHaveBeenCalled()
-
-    const account = stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId)
-    account.token = 'REQUEST_SECRET_SENTINEL'
-    expect(await fixture.adapter.executeStep(account)).toEqual({
-      stepId: ACCOUNT_STEP_IDS[0],
-      status: 'failed',
-    })
-    expect(fixture.harness.createCalls).toEqual([])
+  it('requires the exact frozen browser-data execute/close capability', () => {
+    const executeStep = vi.fn()
+    const closeAll = vi.fn()
+    for (const browserDataLifecycleCapability of [
+      { executeStep, closeAll },
+      Object.freeze({ closeAll }),
+      Object.freeze({ executeStep, closeAll, secret: 'CAPABILITY_SECRET_SENTINEL' }),
+    ]) {
+      expect(() => createAdapter({ browserDataLifecycleCapability }))
+        .toThrow(SebStagingFixtureAdapterBlockedError)
+    }
   })
 
-  it('never resumes creation after cleanup has started', async () => {
-    const { adapter, harness, runId } = createAdapter()
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
+  it.each([
+    undefined,
+    { status: 'failed' },
+    { status: 'passed', extra: 'CLOSE_SECRET_SENTINEL' },
+    Object.freeze({ status: 'failed' }),
+  ])('requires an exact frozen passed result before treating browser sessions as closed', async closeResult => {
+    const resourceCleanupCapability = {
+      cleanupRun: vi.fn(async () => Object.freeze({ status: 'passed' })),
+    }
+    const browserSessionCapability = {
+      authenticate: vi.fn(),
+      closeAll: vi.fn(async () => closeResult),
+    }
+    const fixture = createAdapter({ browserSessionCapability, resourceCleanupCapability })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
 
-    const resumed = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[1], runId))
-    expect(resumed.status).toBe('failed')
-    expect(harness.createCalls).toHaveLength(1)
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(resourceCleanupCapability.cleanupRun).not.toHaveBeenCalled()
+    expect(fixture.harness.deleteCalls).toEqual([])
   })
 
-  it('fails closed if the captured client attestation changes before cleanup', async () => {
+  it.each([
+    undefined,
+    { status: 'passed' },
+    Object.freeze({ status: 'failed' }),
+    Object.freeze({ status: 'passed', extra: 'PLANNER_SECRET_SENTINEL' }),
+  ])('requires an exact frozen passed result before treating browser-data planning as closed', async closeResult => {
+    const browserDataLifecycleCapability = Object.freeze({
+      executeStep: vi.fn(),
+      closeAll: vi.fn(async () => closeResult),
+    })
+    const resourceCleanupCapability = {
+      cleanupRun: vi.fn(async () => Object.freeze({ status: 'passed' })),
+    }
+    const fixture = createAdapter({ browserDataLifecycleCapability, resourceCleanupCapability })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+
+    expect((await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))).status)
+      .toBe('failed')
+    expect(resourceCleanupCapability.cleanupRun).not.toHaveBeenCalled()
+    expect(fixture.harness.deleteCalls).toEqual([])
+  })
+
+  it.each([
+    undefined,
+    { status: 'passed' },
+    Object.freeze({ status: 'failed' }),
+    Object.freeze({ status: 'passed', extra: 'RESOURCE_SECRET_SENTINEL' }),
+  ])('requires an exact frozen passed result before treating resource cleanup as complete', async cleanupResult => {
+    const resourceCleanupCapability = {
+      cleanupRun: vi.fn(async () => cleanupResult),
+    }
+    const fixture = createAdapter({ resourceCleanupCapability })
+    expect((await fixture.adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId))).status)
+      .toBe('passed')
+
+    const result = await fixture.adapter.executeStep(stepRequest(CLEANUP_STEP_ID, fixture.runId))
+    expectRedacted(result, CLEANUP_STEP_ID, 'failed')
+    expect(fixture.harness.deleteCalls).toEqual([])
+    expect(fixture.privateRunLedger.readCleanupTarget({
+      schemaVersion: 1,
+      targetKey: 'account-teacher-primary',
+      kind: 'account',
+    }).state).toBe('committed')
+  })
+
+  it('blocks an unsafe environment and malformed request without constructing or leaking a client', async () => {
+    const runId = nextRunId('blocked')
+    const identity = runIdentity(runId)
     const harness = adminHarness()
-    const { adapter, runId } = createAdapter({ harness })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
-    harness.attestation.targetOrigin = 'https://production-project.supabase.co'
-
-    const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-    expect(cleanup.status).toBe('failed')
-    expect(harness.getCalls).toEqual([])
-    expect(harness.deleteCalls).toEqual([])
-  })
-
-  it('reconciles and deletes an exact account after create committed but transport threw', async () => {
-    const committedId = uuid(701)
-    const harness = adminHarness({
-      createOverride: ({ attributes, users }) => {
-        users.set(committedId, authUserFromAttributes(committedId, attributes))
-        throw new Error('AMBIGUOUS_CREATE_SECRET_SENTINEL')
-      },
+    const ledgerReadEnvironment = () => validEnvironment()
+    const { ledger } = createPrivateLedger({
+      identity,
+      readEnvironment: ledgerReadEnvironment,
+      harness,
     })
-    const { adapter, runId } = createAdapter({ harness })
+    const factory = vi.fn()
+    expect(() => createSebStagingFixtureAdapter({
+      readEnvironment: () => validEnvironment({ NEXT_PUBLIC_SITE_URL: 'https://www.korkru.com' }),
+      runId,
+      runIdentity: identity,
+      privateRunLedger: ledger,
+      adminClientFactory: factory,
+      resourceCleanupCapability: { cleanupRun: vi.fn() },
+      randomBytes: deterministicRandomBytes(),
+      clock: () => new Date(NOW),
+      authBoundaryTimeoutMs: 50,
+    })).toThrow(SebStagingFixtureAdapterBlockedError)
+    expect(factory).not.toHaveBeenCalled()
 
-    const creation = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))
-    const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-
-    expect(creation).toEqual({ stepId: ACCOUNT_STEP_IDS[0], status: 'failed' })
-    expect(cleanup).toEqual({ stepId: CLEANUP_STEP_ID, status: 'passed' })
-    expect(harness.listCalls).toEqual([{ page: 1, perPage: 100 }])
-    expect(harness.getCalls).toEqual([committedId])
-    expect(harness.deleteCalls).toEqual([committedId])
-    expect(harness.users.has(committedId)).toBe(false)
-    expect(JSON.stringify({ creation, cleanup })).not.toMatch(
-      /AMBIGUOUS_CREATE_SECRET_SENTINEL|@example\.invalid|Aa1!|00000000-/,
-    )
-  })
-
-  it('reconciles and deletes an exact account after create committed but returned a 5xx error', async () => {
-    const committedId = uuid(705)
-    const harness = adminHarness({
-      createOverride: ({ attributes, users }) => {
-        users.set(committedId, authUserFromAttributes(committedId, attributes))
-        return {
-          data: { user: null },
-          error: authApiError('unexpected_failure', 500, 'AMBIGUOUS_5XX_SECRET_SENTINEL'),
-        }
-      },
-    })
-    const { adapter, runId } = createAdapter({ harness })
-
-    const creation = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))
-    const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-
-    expect(creation).toEqual({ stepId: ACCOUNT_STEP_IDS[0], status: 'failed' })
-    expect(cleanup).toEqual({ stepId: CLEANUP_STEP_ID, status: 'passed' })
-    expect(harness.listCalls).toEqual([{ page: 1, perPage: 100 }])
-    expect(harness.deleteCalls).toEqual([committedId])
-    expect(harness.users.has(committedId)).toBe(false)
-    expect(JSON.stringify({ creation, cleanup })).not.toContain('AMBIGUOUS_5XX_SECRET_SENTINEL')
-  })
-
-  it.each(['zero', 'metadata-mismatch', 'multiple'])(
-    'fails closed when ambiguous create reconciliation yields %s exact matches',
-    async scenario => {
-      const harness = adminHarness({
-        createOverride: ({ attributes, users }) => {
-          if (scenario === 'metadata-mismatch') {
-            const id = uuid(711)
-            const user = authUserFromAttributes(id, attributes)
-            user.app_metadata.qa_alias = 'student-primary'
-            users.set(id, user)
-          }
-          if (scenario === 'multiple') {
-            users.set(uuid(712), authUserFromAttributes(uuid(712), attributes))
-            users.set(uuid(713), authUserFromAttributes(uuid(713), attributes))
-          }
-          throw new Error('AMBIGUOUS_LOOKUP_SECRET_SENTINEL')
-        },
-      })
-      const { adapter, runId } = createAdapter({ harness })
-      const creation = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))
-      const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-
-      expect(creation.status).toBe('failed')
-      expect(cleanup).toEqual({ stepId: CLEANUP_STEP_ID, status: 'failed' })
-      expect(harness.listCalls).toEqual([{ page: 1, perPage: 100 }])
-      expect(harness.getCalls).toEqual([])
-      expect(harness.deleteCalls).toEqual([])
-      expect(JSON.stringify(cleanup)).not.toMatch(
-        /AMBIGUOUS_LOOKUP_SECRET_SENTINEL|@example\.invalid|Aa1!|00000000-/,
-      )
-    },
-  )
-
-  it('retries only unresolved ambiguous creation lookup until an exact account appears', async () => {
-    const recoveredId = uuid(721)
-    let plannedUser = null
-    const harness = adminHarness({
-      createOverride: ({ attributes }) => {
-        plannedUser = authUserFromAttributes(recoveredId, attributes)
-        throw new Error('AMBIGUOUS_RETRY_SECRET_SENTINEL')
-      },
-    })
-    const { adapter, runId } = createAdapter({ harness })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('failed')
-
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('failed')
-    harness.users.set(recoveredId, plannedUser)
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-
-    expect(harness.listCalls).toEqual([
-      { page: 1, perPage: 100 },
-      { page: 1, perPage: 100 },
-    ])
-    expect(harness.getCalls).toEqual([recoveredId])
-    expect(harness.deleteCalls).toEqual([recoveredId])
-  })
-
-  it('binds resource cleanup only after ambiguous accounts resolve and retains earlier account targets', async () => {
-    const recoveredId = uuid(731)
-    let secondPlannedUser = null
-    const harness = adminHarness({
-      createOverride: ({ attributes, createIndex }) => {
-        if (createIndex !== 2) return null
-        secondPlannedUser = authUserFromAttributes(recoveredId, attributes)
-        throw new Error('AMBIGUOUS_LEDGER_SECRET_SENTINEL')
-      },
-    })
-    const captured = []
-    const resourceCleanupCapability = {
-      cleanupRun: vi.fn(async request => {
-        captured.push(request)
-        return { status: 'passed' }
-      }),
-    }
-    const { adapter, runId } = createAdapter({ harness, resourceCleanupCapability })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[1], runId))).status).toBe('failed')
-
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('failed')
-    expect(resourceCleanupCapability.cleanupRun).not.toHaveBeenCalled()
-    expect(harness.deleteCalls).toEqual([])
-
-    harness.users.set(recoveredId, secondPlannedUser)
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(captured).toHaveLength(1)
-    expect(captured[0].accounts.map(account => account.id)).toEqual([uuid(1), recoveredId])
-    expect(harness.deleteCalls).toEqual([recoveredId, uuid(1)])
-  })
-
-  it('stops ambiguous Auth reconciliation at the strict directory scan bound', async () => {
-    const harness = adminHarness({
-      createOverride: () => { throw new Error('AMBIGUOUS_BOUND_SECRET_SENTINEL') },
-      listOverride: ({ params }) => ({
-        data: {
-          users: Array.from({ length: 100 }, (_, index) => ({
-            id: uuid(params.page * 100 + index + 1),
-            email: `unrelated-${params.page}-${index}@example.invalid`,
-          })),
-          total: 1_000,
-          nextPage: params.page + 1,
-          lastPage: 10,
-        },
-        error: null,
-      }),
-    })
-    const { adapter, runId } = createAdapter({ harness })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('failed')
-
-    const cleanup = await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-
-    expect(cleanup).toEqual({ stepId: CLEANUP_STEP_ID, status: 'failed' })
-    expect(harness.listCalls).toEqual(
-      Array.from({ length: 10 }, (_, index) => ({ page: index + 1, perPage: 100 })),
-    )
-    expect(harness.getCalls).toEqual([])
-    expect(harness.deleteCalls).toEqual([])
-    expect(JSON.stringify(cleanup)).not.toContain('AMBIGUOUS_BOUND_SECRET_SENTINEL')
-  })
-
-  it('times out a stalled ambiguous Auth reconciliation without exposing lookup data', async () => {
-    const harness = adminHarness({
-      createOverride: () => { throw new Error('AMBIGUOUS_TIMEOUT_SECRET_SENTINEL') },
-      listOverride: () => new Promise(() => {}),
-    })
-    const { adapter, runId } = createAdapter({ harness })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('failed')
-
-    vi.useFakeTimers()
-    try {
-      const cleanupPromise = adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))
-      await vi.advanceTimersByTimeAsync(5_001)
-      const cleanup = await cleanupPromise
-      expect(cleanup).toEqual({ stepId: CLEANUP_STEP_ID, status: 'failed' })
-      expect(harness.listCalls).toEqual([{ page: 1, perPage: 100 }])
-      expect(harness.getCalls).toEqual([])
-      expect(harness.deleteCalls).toEqual([])
-      expect(JSON.stringify(cleanup)).not.toContain('AMBIGUOUS_TIMEOUT_SECRET_SENTINEL')
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('reacquires the attested client immediately before delete', async () => {
-    let originalHarness
-    const replacementHarness = adminHarness()
-    originalHarness = adminHarness({
-      getOverride: ({ id, users }) => {
-        const user = users.get(id)
-        originalHarness.client.supabaseUrl = 'https://production-project.supabase.co'
-        originalHarness.attestation.client = replacementHarness.client
-        return { data: { user: structuredClone(user) }, error: null }
-      },
-    })
-    const { adapter, runId } = createAdapter({ harness: originalHarness })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
-
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(originalHarness.deleteCalls).toEqual([])
-    expect(replacementHarness.deleteCalls).toEqual([uuid(1)])
-  })
-
-  it('confirms exact not-found on retry after an uncertain delete response', async () => {
-    let firstDelete = true
-    const harness = adminHarness({
-      deleteOverride: ({ id, users }) => {
-        if (!firstDelete) return null
-        firstDelete = false
-        users.delete(id)
-        return { data: { user: null }, error: new Error('DELETE_TRANSPORT_SENTINEL') }
-      },
-    })
-    const { adapter, runId } = createAdapter({ harness })
-    expect((await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))).status).toBe('passed')
-
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('failed')
-    expect((await adapter.executeStep(stepRequest(CLEANUP_STEP_ID, runId))).status).toBe('passed')
-    expect(harness.deleteCalls).toEqual([uuid(1)])
-  })
-
-  it('validates the clock and random source without leaking exception details', async () => {
-    expect(() => createAdapter({ clock: () => new Date('invalid') })).toThrow(
-      SebStagingFixtureAdapterBlockedError,
-    )
-    expect(() => createAdapter({
-      clock: () => { throw new Error('CLOCK_SECRET_SENTINEL') },
-    })).toThrow(BLOCKED_ERROR_PATTERN)
-
-    const { adapter, adminClientFactory, runId } = createAdapter({
-      randomBytes: () => { throw new Error('RANDOM_SECRET_SENTINEL') },
-    })
-    const result = await adapter.executeStep(stepRequest(ACCOUNT_STEP_IDS[0], runId))
-    expect(result.status).toBe('failed')
-    expect(adminClientFactory).not.toHaveBeenCalled()
-    expect(JSON.stringify(result)).not.toContain('RANDOM_SECRET_SENTINEL')
+    const fixture = createAdapter()
+    const malformed = stepRequest(ACCOUNT_STEP_IDS[0], fixture.runId)
+    malformed.identity.secret = 'IDENTITY_SECRET_SENTINEL'
+    const result = await fixture.adapter.executeStep(malformed)
+    expectRedacted(result, ACCOUNT_STEP_IDS[0], 'failed')
+    expect(fixture.harness.createCalls).toEqual([])
   })
 })

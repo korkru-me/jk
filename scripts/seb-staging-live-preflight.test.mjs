@@ -14,6 +14,7 @@ const DEPLOYMENT_URL = 'jk-staging-safe-korkru-mes-projects.vercel.app'
 const PROJECT_ID = `prj_${'P'.repeat(24)}`
 const TOKEN = `vcp_${'t'.repeat(36)}`
 const PROTECTION_BYPASS = `bypass_${'s'.repeat(36)}`
+const REQUEST_TIMEOUT_FOR_TESTS = 5_001
 const STAGING_PREFLIGHT_URL = `${SITE_ORIGIN}/exam-screen-lab/seb?view=launch&configured=0`
 const BLOCKED = /SEB Staging live preflight blocked/
 const PROBE_COLUMNS = Object.freeze({
@@ -217,6 +218,26 @@ async function captureRejection(promise) {
     return error
   }
   throw new Error('EXPECTED_REJECTION_SENTINEL')
+}
+
+function deferred() {
+  let resolve
+  let reject
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+async function expectPending(promise) {
+  let settled = false
+  promise.then(
+    () => { settled = true },
+    () => { settled = true },
+  )
+  await Promise.resolve()
+  expect(settled).toBe(false)
 }
 
 afterEach(() => {
@@ -440,6 +461,85 @@ describe('SEB Staging live preflight', () => {
     await expect(wrongType.capability.attest(preflightRequest())).rejects.toThrow(BLOCKED)
   })
 
+  it('retains and cancels an invalid response body before closeAll can report quiescence', async () => {
+    const cancel = vi.fn(async () => undefined)
+    const reader = {
+      read: vi.fn(async () => new Promise(() => {})),
+      cancel,
+    }
+    const harness = createHarness({
+      fetchOverride: ({ url }) => {
+        if (new URL(url).pathname.startsWith('/v13/deployments/')) {
+          return {
+            status: 403,
+            ok: false,
+            url,
+            headers: { get: vi.fn(() => 'application/json') },
+            body: { getReader: vi.fn(() => reader) },
+          }
+        }
+      },
+    })
+
+    await expect(harness.capability.attest(preflightRequest())).rejects.toThrow(BLOCKED)
+    expect(cancel).not.toHaveBeenCalled()
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'passed' })
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('never reports closed for a malformed factory result without a close capability', async () => {
+    const harness = createHarness({
+      factoryOverride: () => ({
+        targetOrigin: SUPABASE_ORIGIN,
+        projectRef: PROJECT_REF,
+        client: { supabaseUrl: SUPABASE_ORIGIN },
+      }),
+    })
+
+    await expect(harness.capability.attest(preflightRequest())).rejects.toThrow(BLOCKED)
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'failed' })
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'failed' })
+  })
+
+  it('never reports closed when malformed factory validation itself throws', async () => {
+    const malformed = new Proxy({}, {
+      getPrototypeOf() {
+        throw new Error('MALFORMED_FACTORY_PROXY_SENTINEL')
+      },
+    })
+    const harness = createHarness({ factoryOverride: () => malformed })
+
+    await expect(harness.capability.attest(preflightRequest())).rejects.toThrow(BLOCKED)
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'failed' })
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'failed' })
+  })
+
+  it('never reports closed after acquiring a response reader without a cancel capability', async () => {
+    const malformedReader = {}
+    Object.defineProperty(malformedReader, 'read', {
+      get() {
+        throw new Error('MALFORMED_READER_SENTINEL')
+      },
+    })
+    const harness = createHarness({
+      fetchOverride: ({ url }) => {
+        if (new URL(url).pathname.startsWith('/v13/deployments/')) {
+          return {
+            status: 200,
+            ok: true,
+            url,
+            headers: { get: vi.fn(() => 'application/json') },
+            body: { getReader: vi.fn(() => malformedReader) },
+          }
+        }
+      },
+    })
+
+    await expect(harness.capability.attest(preflightRequest())).rejects.toThrow(BLOCKED)
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'failed' })
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'failed' })
+  })
+
   it.each([
     ['wrong origin', adminHarness({ targetOrigin: 'https://production-project.supabase.co' })],
     ['wrong project ref', adminHarness({ projectRef: 'production-project' })],
@@ -542,7 +642,7 @@ describe('SEB Staging live preflight', () => {
       }
     }
     expect(consoleSpies.every(spy => spy.mock.calls.length === 0)).toBe(true)
-    expect(Object.keys(tokenFailure.capability)).toEqual(['attest'])
+    expect(Object.keys(tokenFailure.capability)).toEqual(['attest', 'closeAll'])
     expect(JSON.stringify(tokenFailure.capability)).not.toContain(TOKEN)
     expect(JSON.stringify(tokenFailure.capability)).not.toContain(PROTECTION_BYPASS)
   })
@@ -559,5 +659,132 @@ describe('SEB Staging live preflight', () => {
       fetchImpl: vi.fn(),
       adminClientFactory: vi.fn(),
     })).toThrow(BLOCKED)
+  })
+
+  it('keeps a timed-out secret provider tracked until its ignored-abort late resolve settles', async () => {
+    vi.useFakeTimers()
+    const gate = deferred()
+    const entered = deferred()
+    let providerSignal = null
+    const harness = createHarness({
+      tokenReader: signal => {
+        providerSignal = signal
+        entered.resolve()
+        return gate.promise
+      },
+    })
+    const attestation = harness.capability.attest(preflightRequest())
+    const blockedAttestation = expect(attestation).rejects.toThrow(BLOCKED)
+    await entered.promise
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_FOR_TESTS)
+    await blockedAttestation
+    expect(providerSignal).toBeInstanceOf(AbortSignal)
+    expect(providerSignal.aborted).toBe(true)
+
+    const close = harness.capability.closeAll()
+    await expectPending(close)
+    gate.resolve(TOKEN)
+    await expect(close).resolves.toEqual({ status: 'passed' })
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'passed' })
+    await expect(harness.capability.attest(preflightRequest())).rejects.toThrow(BLOCKED)
+  })
+
+  it('keeps a timed-out provider tracked through a late rejection without leaking it', async () => {
+    vi.useFakeTimers()
+    const sentinel = 'LATE_PROVIDER_SECRET_SENTINEL'
+    const gate = deferred()
+    const entered = deferred()
+    const harness = createHarness({
+      protectionBypassReader: signal => {
+        entered.resolve(signal)
+        return gate.promise
+      },
+    })
+    const attestation = harness.capability.attest(preflightRequest())
+    const errorPromise = captureRejection(attestation)
+    const providerSignal = await entered.promise
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_FOR_TESTS)
+    const error = await errorPromise
+    expect(error).toBeInstanceOf(SebStagingLivePreflightBlockedError)
+    expect(String(error)).not.toContain(sentinel)
+    expect(providerSignal.aborted).toBe(true)
+
+    const close = harness.capability.closeAll()
+    await expectPending(close)
+    gate.reject(new Error(sentinel))
+    await expect(close).resolves.toEqual({ status: 'passed' })
+  })
+
+  it('fails close while an abort-ignoring fetch is unsettled, then succeeds after late settlement', async () => {
+    vi.useFakeTimers()
+    const gate = deferred()
+    const entered = deferred()
+    let fetchSignal = null
+    const harness = createHarness({
+      fetchOverride: ({ url, options }) => {
+        if (new URL(url).pathname.startsWith('/v13/deployments/')) {
+          fetchSignal = options.signal
+          entered.resolve()
+          return gate.promise
+        }
+      },
+    })
+    const attestation = harness.capability.attest(preflightRequest())
+    const blockedAttestation = expect(attestation).rejects.toThrow(BLOCKED)
+    await entered.promise
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_FOR_TESTS)
+    await blockedAttestation
+    expect(fetchSignal.aborted).toBe(true)
+
+    const firstClose = harness.capability.closeAll()
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_FOR_TESTS)
+    await expect(firstClose).resolves.toEqual({ status: 'failed' })
+    gate.resolve(jsonResponse(
+      `https://api.vercel.com/v13/deployments/${DEPLOYMENT_ID}?withGitRepoInfo=true&slug=korkru-mes-projects`,
+      deployment(),
+    ))
+    await Promise.resolve()
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'passed' })
+  })
+
+  it('retains a malformed late factory resource and retries its exact close obligation', async () => {
+    vi.useFakeTimers()
+    const gate = deferred()
+    const entered = deferred()
+    const closeResource = vi.fn()
+      .mockResolvedValueOnce({ status: 'failed' })
+      .mockResolvedValueOnce({ status: 'passed' })
+    const malformedClient = {
+      supabaseUrl: 'https://production-project.supabase.co',
+      schema: vi.fn(),
+      close: closeResource,
+    }
+    const harness = createHarness({
+      factoryOverride: ({ signal }) => {
+        entered.resolve(signal)
+        return gate.promise
+      },
+    })
+    const attestation = harness.capability.attest(preflightRequest())
+    const blockedAttestation = expect(attestation).rejects.toThrow(BLOCKED)
+    const factorySignal = await entered.promise
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_FOR_TESTS)
+    await blockedAttestation
+    expect(factorySignal.aborted).toBe(true)
+
+    const firstClose = harness.capability.closeAll()
+    await expectPending(firstClose)
+    gate.resolve({
+      targetOrigin: 'https://production-project.supabase.co',
+      projectRef: 'production-project',
+      client: malformedClient,
+    })
+    await expect(firstClose).resolves.toEqual({ status: 'failed' })
+    expect(closeResource).toHaveBeenCalledTimes(1)
+    expect(closeResource.mock.contexts[0]).toBe(malformedClient)
+    expect(closeResource.mock.calls[0]).toEqual([{ signal: expect.any(AbortSignal) }])
+
+    await expect(harness.capability.closeAll()).resolves.toEqual({ status: 'passed' })
+    expect(closeResource).toHaveBeenCalledTimes(2)
   })
 })

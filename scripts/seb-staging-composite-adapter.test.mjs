@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildSebStagingMockHarnessPlan } from './seb-staging-mock-harness-core.mjs'
 import { runSebStagingLiveHarness } from './seb-staging-live-runner.mjs'
@@ -82,8 +82,17 @@ function attestation(overrides = {}) {
   }
 }
 
+function deferred() {
+  let resolve
+  const promise = new Promise(resolvePromise => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 function harness({
   preflightOverride,
+  preflightCloseOverride,
   fixtureOverride,
   browserOverride,
   nativeOverride,
@@ -92,6 +101,8 @@ function harness({
 } = {}) {
   const calls = {
     preflight: [],
+    preflightClose: [],
+    timeline: [],
     fixture: [],
     browser: [],
     native: [],
@@ -101,17 +112,24 @@ function harness({
   const capability = (route, override) => ({
     executeStep: vi.fn(async value => {
       calls[route].push(value.stepId)
+      calls.timeline.push(`${route}:${value.stepId}`)
       return override
         ? override(value)
         : { stepId: value.stepId, status: 'passed' }
     }),
   })
-  const preflightCapability = {
+  const preflightCapability = Object.freeze({
     attest: vi.fn(async value => {
       calls.preflight.push(value.stepId)
+      calls.timeline.push(`preflight:${value.stepId}`)
       return preflightOverride ? preflightOverride(value) : attestation()
     }),
-  }
+    closeAll: vi.fn(async () => {
+      calls.preflightClose.push('closeAll')
+      calls.timeline.push('preflight:closeAll')
+      return preflightCloseOverride ? preflightCloseOverride() : { status: 'passed' }
+    }),
+  })
   const adapter = createSebStagingCompositeAdapter({
     preflightCapability,
     fixtureAdapter: capability('fixture', fixtureOverride),
@@ -126,6 +144,10 @@ function harness({
   })
   return { adapter, calls, preflightCapability }
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('SEB Staging composite adapter', () => {
   it('covers every canonical plan step with an exact immutable route contract', () => {
@@ -163,6 +185,12 @@ describe('SEB Staging composite adapter', () => {
     }
 
     expect(calls.preflight).toEqual(['verify-staging-isolation'])
+    expect(calls.preflightClose).toEqual(['closeAll'])
+    expect(calls.timeline.slice(0, 3)).toEqual([
+      'preflight:verify-staging-isolation',
+      'preflight:closeAll',
+      'reservation:reserve-unique-run-id',
+    ])
     expect(calls.reservation).toEqual(['reserve-unique-run-id'])
     expect(calls.native).toEqual(['register-assignment-seb-release'])
     expect(calls.expiry).toEqual([
@@ -212,6 +240,88 @@ describe('SEB Staging composite adapter', () => {
     expect(calls.native).toEqual([])
     expect(calls.expiry).toEqual([])
     expect(calls.reservation).toEqual([])
+    expect(calls.preflightClose).toEqual(['closeAll'])
+  })
+
+  it('retries a settled failed close and advances only after exact quiescence', async () => {
+    const runId = nextRunId()
+    const issued = plan(runId)
+    const closeResults = [
+      { status: 'failed' },
+      { status: 'passed' },
+    ]
+    const { adapter, calls } = harness({
+      preflightCloseOverride: () => closeResults.shift(),
+    })
+
+    expect(await adapter.executeStep(request(issued.steps[0], runId))).toEqual({
+      stepId: 'verify-staging-isolation',
+      status: 'passed',
+    })
+    expect(calls.preflight).toEqual(['verify-staging-isolation'])
+    expect(calls.preflightClose).toEqual(['closeAll', 'closeAll'])
+    expect((await adapter.executeStep(request(issued.steps[1], runId))).status).toBe('passed')
+  })
+
+  it('rejects malformed close evidence and blocks reservation and cleanup', async () => {
+    const runId = nextRunId()
+    const issued = plan(runId)
+    const { adapter, calls } = harness({
+      preflightCloseOverride: () => ({
+        status: 'passed',
+        detail: 'CLOSE_SECRET_SENTINEL',
+      }),
+    })
+
+    expect((await adapter.executeStep(request(issued.steps[0], runId))).status).toBe('failed')
+    expect(calls.preflightClose).toEqual(['closeAll', 'closeAll', 'closeAll'])
+    expect((await adapter.executeStep(request(issued.steps[1], runId))).status).toBe('failed')
+    expect((await adapter.executeStep(request(issued.steps.at(-1), runId))).status).toBe('failed')
+    expect(calls.reservation).toEqual([])
+    expect(calls.fixture).toEqual([])
+  })
+
+  it('times out a non-settling close and never permits a later mutation', async () => {
+    vi.useFakeTimers()
+    const runId = nextRunId()
+    const issued = plan(runId)
+    const closeGate = deferred()
+    const { adapter, calls } = harness({
+      preflightCloseOverride: () => closeGate.promise,
+    })
+
+    const preflight = adapter.executeStep(request(issued.steps[0], runId))
+    await vi.runAllTimersAsync()
+    await expect(preflight).resolves.toEqual({
+      stepId: 'verify-staging-isolation',
+      status: 'failed',
+    })
+    expect(calls.preflightClose).toEqual(['closeAll'])
+    expect((await adapter.executeStep(request(issued.steps[1], runId))).status).toBe('failed')
+    expect((await adapter.executeStep(request(issued.steps.at(-1), runId))).status).toBe('failed')
+    expect(calls.reservation).toEqual([])
+    expect(calls.fixture).toEqual([])
+
+    closeGate.resolve({ status: 'passed' })
+    await Promise.resolve()
+    expect((await adapter.executeStep(request(issued.steps[1], runId))).status).toBe('failed')
+  })
+
+  it('always closes after an attestation exception before returning a coarse failure', async () => {
+    const runId = nextRunId()
+    const issued = plan(runId)
+    const { adapter, calls } = harness({
+      preflightOverride: () => {
+        throw new Error('PREFLIGHT_SECRET_SENTINEL')
+      },
+    })
+
+    expect(await adapter.executeStep(request(issued.steps[0], runId))).toEqual({
+      stepId: 'verify-staging-isolation',
+      status: 'failed',
+    })
+    expect(calls.preflightClose).toEqual(['closeAll'])
+    expect(JSON.stringify(calls)).not.toContain('PREFLIGHT_SECRET_SENTINEL')
   })
 
   it('rejects wrong request shape, role, mutation bit, unknown steps, and cross-run identity', async () => {
@@ -408,5 +518,31 @@ describe('SEB Staging composite adapter', () => {
     expect(() => createSebStagingCompositeAdapter({})).toThrow(
       SebStagingCompositeAdapterBlockedError,
     )
+
+    const executable = Object.freeze({
+      executeStep: async requestValue => ({
+        stepId: requestValue.stepId,
+        status: 'passed',
+      }),
+    })
+    expect(() => createSebStagingCompositeAdapter({
+      preflightCapability: Object.freeze({ attest: async () => attestation() }),
+      fixtureAdapter: executable,
+      browserDataCapability: executable,
+      nativeOperatorCapability: executable,
+      expiryControlCapability: executable,
+      runReservationCapability: executable,
+    })).toThrow(SebStagingCompositeAdapterBlockedError)
+    expect(() => createSebStagingCompositeAdapter({
+      preflightCapability: {
+        attest: async () => attestation(),
+        closeAll: async () => ({ status: 'passed' }),
+      },
+      fixtureAdapter: executable,
+      browserDataCapability: executable,
+      nativeOperatorCapability: executable,
+      expiryControlCapability: executable,
+      runReservationCapability: executable,
+    })).toThrow(SebStagingCompositeAdapterBlockedError)
   })
 })

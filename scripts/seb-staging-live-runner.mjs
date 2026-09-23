@@ -22,6 +22,7 @@ const DEPLOYMENT_ID = /^dpl_[A-Za-z0-9]{16,64}$/
 const RELEASE_ID = /^asr-[0-9a-f]{32}-r([1-9][0-9]{0,9})-([0-9a-f]{16})$/
 const ARTIFACT_SHA256 = /^[a-f0-9]{64}$/
 const MAX_ASSIGNMENT_CONFIG_REVISION = 2_147_483_646
+const TRUSTED_LIVE_RESULTS = new WeakSet()
 
 function isDataRecord(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
@@ -186,10 +187,12 @@ function result(identity, status, evidence) {
     status,
     stepEvidence: frozenEvidence,
   }
-  return Object.freeze({
+  const trusted = Object.freeze({
     ...output,
     bindingSha256: evidenceBinding(identity, status, frozenEvidence),
   })
+  TRUSTED_LIVE_RESULTS.add(trusted)
+  return trusted
 }
 
 function blockedResult(evidence = {}) {
@@ -199,6 +202,23 @@ function blockedResult(evidence = {}) {
 function safeInspect(plan, evidence) {
   try {
     return inspectSebStagingMockHarnessEvidence(plan, evidence)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Return a result only when this module actually issued that exact object.
+ * The capability is intentionally object-identity based: copying every public
+ * field (including the caller-computable hash) does not copy provenance.
+ */
+export function inspectTrustedSebStagingLiveHarnessResult(value) {
+  try {
+    return value !== null
+      && typeof value === 'object'
+      && TRUSTED_LIVE_RESULTS.has(value)
+      ? value
+      : null
   } catch {
     return null
   }

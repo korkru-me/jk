@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildSebStagingMockHarnessPlan } from './seb-staging-mock-harness-core.mjs'
-import { runSebStagingLiveHarness } from './seb-staging-live-runner.mjs'
+import {
+  inspectTrustedSebStagingLiveHarnessResult,
+  runSebStagingLiveHarness,
+} from './seb-staging-live-runner.mjs'
 
 const ARTIFACT_SHA256 = 'a'.repeat(64)
 
@@ -108,6 +111,8 @@ describe('SEB Staging live runner', () => {
     expect(Object.isFrozen(output)).toBe(true)
     expect(Object.isFrozen(output.identity)).toBe(true)
     expect(Object.isFrozen(output.stepEvidence)).toBe(true)
+    expect(inspectTrustedSebStagingLiveHarnessResult(output)).toBe(output)
+    expect(inspectTrustedSebStagingLiveHarnessResult({ ...output })).toBeNull()
   })
 
   it('stops on the first mutating failure and still attempts only exact cleanup', async () => {
