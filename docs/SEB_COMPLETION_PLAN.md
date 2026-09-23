@@ -108,6 +108,10 @@ platform/version/build และ session ผูก revision, evidence/candidate 
 แล้ว รอบ `r8` ถูกเก็บเป็นประวัติและเปิด `seb-v1-uat-r1` แบบ pending โดยยังไม่มี deploy หรือ
 การเปลี่ยน secret ดูขั้นตอนที่ `docs/SEB_CONFIG_RELEASE_RUNBOOK.md`
 
+อัปเดต 23 กันยายน 2026: เพิ่ม encrypted Staging revision `korkru-staging-v1-d85fd70...`
+สำหรับ Windows native integration โดยแยกจาก production candidate ทุก policy/build/evidence
+ยังเป็น `pending` และยังไม่ถือว่า S2 หรือ S5 ผ่าน
+
 **Agent ทำ**
 
 - ตรวจไฟล์ production config, canonical start URL, download path, content/navigation filters,

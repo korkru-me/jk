@@ -110,6 +110,57 @@ describe('SEB environment and version validation', () => {
     }, releaseRegistry())?.browserExamKeys).toHaveLength(1)
   })
 
+  it('accepts a revision-bound staging candidate without marking it publish-ready', () => {
+    const stagingRevision = `staging-v1-${'d'.repeat(64)}`
+    const registry = releaseRegistry()
+    registry.revisions.push({
+      revision: stagingRevision,
+      lifecycle: 'candidate',
+      policy: {
+        startUrl: 'pending',
+        navigationFilters: 'pending',
+        uploads: 'pending',
+        quitPassword: 'pending',
+        adminPassword: 'pending',
+        distribution: 'pending',
+      },
+      builds: [
+        { target: 'windows', runtimePlatform: 'windows', versionString: '3.10.2', buildNumber: '920', approval: 'pending' },
+        { target: 'macos', runtimePlatform: 'macos', versionString: '3.7', buildNumber: 'pending', approval: 'pending' },
+        { target: 'ipados', runtimePlatform: 'ios', versionString: '3.6.2', buildNumber: 'pending', approval: 'pending' },
+        { target: 'ios', runtimePlatform: 'ios', versionString: '3.7.1', buildNumber: 'pending', approval: 'pending' },
+      ],
+    })
+    const environment = {
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_SITE_URL: 'https://staging.example',
+      NEXT_PUBLIC_SEB_CONFIG_URL: 'https://staging.example/korkru-staging-v1.seb',
+      SEB_SESSION_SECRET: SECRET,
+      SEB_CONFIG_KEY: CONFIG_KEY,
+      SEB_CONFIG_REVISION: stagingRevision,
+      SEB_BROWSER_EXAM_KEY_REGISTRY: JSON.stringify({
+        schemaVersion: 1,
+        configRevision: stagingRevision,
+        entries: [{
+          platform: 'windows',
+          versionString: '3.10.2',
+          buildNumber: '920',
+          key: BROWSER_KEY,
+        }],
+      }),
+    }
+
+    expect(readSebEnvironment(environment, registry)).not.toBeNull()
+    expect(inspectSebReadiness(environment, registry)).toMatchObject({
+      publishReady: false,
+      configRevisionReady: true,
+      releaseRegistryReady: false,
+      browserExamKeyRegistryReady: true,
+      browserExamKeyCoverageReady: false,
+      browserExamKeyCount: 1,
+    })
+  })
+
   it('rejects malformed, duplicate, or revision-mismatched BEK registries', () => {
     const base = {
       SEB_SESSION_SECRET: SECRET,

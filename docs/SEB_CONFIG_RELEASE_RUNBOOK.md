@@ -20,6 +20,27 @@
 เข้ารหัส** จนกว่าเจ้าของจะเปิดไฟล์เดียวกันใน Config Tool/native SEB และตรวจรายการด้านล่าง
 ห้ามบันทึกไฟล์ซ้ำระหว่างเก็บ CK/BEK เพราะการบันทึกใหม่ทำให้ revision/key เปลี่ยน
 
+### Staging revision สำหรับ integration รอบปัจจุบัน
+
+ไฟล์ที่เจ้าของผลิตภัณฑ์สร้างจาก Windows SEB 3.10.2 build 920 ถูกเก็บแยกจาก production
+candidate เพื่อทดสอบบน `https://staging.korkru.com` เท่านั้น:
+
+- config id: `korkru-staging-v1`
+- immutable revision:
+  `korkru-staging-v1-d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a`
+- public path: `/exam/korkru-staging-v1.seb`
+- SHA-256: `d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a`
+- canonical start URL: `https://staging.korkru.com/assignments`
+
+ไฟล์นี้เป็น password-encrypted SEB settings (`pswd`) ไม่ใช่ plaintext XML แต่ policy,
+Windows build approval, BEK registration, mock exam และ physical UAT ยังเป็น `pending` จนกว่า
+จะเปิด bytes ชุดนี้โดยไม่บันทึกซ้ำและทดสอบ native flow สำเร็จ ห้ามนำผลจาก revision นี้ไปนับเป็น
+production evidence และ top-level `candidateRevision` ยังคงชี้ production candidate เดิม
+
+Staging runtime สามารถผูก `SEB_CONFIG_REVISION` กับ revision นี้และลงทะเบียนเฉพาะ Windows BEK
+เพื่อทำ native integration ทีละ platform ได้ แต่ teacher publish gate จะยังไม่ READY เพราะ policy,
+build matrix และ BEK coverage ยังไม่ครบทุก target ตามที่ออกแบบไว้
+
 `config/seb-release-registry.json` เป็น fixed-schema metadata ที่ไม่เก็บ secret ส่วน
 `config/seb-platform-evidence.json` เก็บสถานะหลักฐานและอ้าง `buildId` จาก revision เดียวกัน
 ตัวตรวจจะไม่ยอมรวมหลักฐานเก่าที่มีเพียง config id หรือรุ่นแบบกว้าง ๆ

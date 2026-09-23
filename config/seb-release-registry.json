@@ -60,6 +60,64 @@
           "approval": "pending"
         }
       ]
+    },
+    {
+      "revision": "korkru-staging-v1-d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a",
+      "configId": "korkru-staging-v1",
+      "lifecycle": "candidate",
+      "artifactPath": "/exam/korkru-staging-v1.seb",
+      "artifactSha256": "d85fd70bbdc53cbda9e3c1c19cb09479f277f3f507f5232c263c6810bc591f6a",
+      "canonicalStartUrl": "https://staging.korkru.com/assignments",
+      "supersedes": null,
+      "rollbackRevision": null,
+      "rollbackStrategy": "restore-deployment-and-secrets",
+      "retiredAt": null,
+      "policy": {
+        "startUrl": "pending",
+        "navigationFilters": "pending",
+        "uploads": "pending",
+        "quitPassword": "pending",
+        "adminPassword": "pending",
+        "distribution": "pending"
+      },
+      "builds": [
+        {
+          "id": "staging-macos-3.7-build-pending",
+          "target": "macos",
+          "runtimePlatform": "macos",
+          "osVersion": "record during final UAT",
+          "versionString": "3.7",
+          "buildNumber": "record during final UAT",
+          "approval": "pending"
+        },
+        {
+          "id": "staging-ipados-3.6.2-build-pending",
+          "target": "ipados",
+          "runtimePlatform": "ios",
+          "osVersion": "iPadOS 26.5.2",
+          "versionString": "3.6.2",
+          "buildNumber": "record during final UAT",
+          "approval": "pending"
+        },
+        {
+          "id": "staging-ios-3.7.1-build-pending",
+          "target": "ios",
+          "runtimePlatform": "ios",
+          "osVersion": "record during final UAT",
+          "versionString": "3.7.1",
+          "buildNumber": "record during final UAT",
+          "approval": "pending"
+        },
+        {
+          "id": "staging-windows-3.10.2-920",
+          "target": "windows",
+          "runtimePlatform": "windows",
+          "osVersion": "Windows 11 x64",
+          "versionString": "3.10.2",
+          "buildNumber": "920",
+          "approval": "pending"
+        }
+      ]
     }
   ]
 }
