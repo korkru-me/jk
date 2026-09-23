@@ -192,8 +192,19 @@ const STEP_CONTRACTS = Object.freeze([
     'student',
     true,
     'student-primary',
-    [target('submission-primary', 'submission', 'seb_required', 'student-primary')],
-    scopedGuards('student-primary', [ASSIGNMENT, CONFIG, RELEASE, CHECK_IN]),
+    [
+      target('submission-primary', 'submission', 'seb_required', 'student-primary'),
+      target('answer-written', 'answer', 'essay', 'student-primary'),
+      target('answer-upload', 'answer', 'file_upload', 'student-primary'),
+    ],
+    scopedGuards('student-primary', [
+      ASSIGNMENT,
+      CONFIG,
+      RELEASE,
+      CHECK_IN,
+      QUESTION_WRITTEN,
+      QUESTION_UPLOAD,
+    ]),
   ),
   contract(
     'reject-replayed-seb-session',
@@ -210,8 +221,8 @@ const STEP_CONTRACTS = Object.freeze([
     'student',
     true,
     'student-primary',
-    [target('answer-written', 'answer', 'essay', 'student-primary')],
-    scopedGuards('student-primary', [SUBMISSION, QUESTION_WRITTEN]),
+    [],
+    scopedGuards('student-primary', [SUBMISSION, QUESTION_WRITTEN, ANSWER_WRITTEN]),
   ),
   contract(
     'retry-autosave-after-transient-failure',
@@ -237,11 +248,8 @@ const STEP_CONTRACTS = Object.freeze([
     'student',
     true,
     'student-primary',
-    [
-      target('answer-upload', 'answer', 'file_upload', 'student-primary'),
-      target('answer-storage', 'answerStorageObject', 'submission_file', 'student-primary'),
-    ],
-    scopedGuards('student-primary', [SUBMISSION, QUESTION_UPLOAD]),
+    [target('answer-storage', 'answerStorageObject', 'submission_file', 'student-primary')],
+    scopedGuards('student-primary', [SUBMISSION, QUESTION_UPLOAD, ANSWER_UPLOAD]),
   ),
   contract(
     'retry-upload-after-transient-failure',
@@ -262,7 +270,7 @@ const STEP_CONTRACTS = Object.freeze([
       target('proctor-connection', 'proctorConnection', 'heartbeat', 'student-primary'),
       target('proctor-event', 'proctorEvent', 'monitoring_started', 'student-primary'),
     ],
-    scopedGuards('student-primary', [SUBMISSION]),
+    scopedGuards('student-primary', [ASSIGNMENT, SUBMISSION]),
   ),
   contract(
     'student-denied-teacher-result',
@@ -634,32 +642,119 @@ function parsePreparedStep(value, contractValue, namespace, binding, ownerBindin
     || !isExactFrozenArray(value.targets, contractValue.targets.length)) return null
 
   const parsedTargets = []
-  const targetIds = new Set()
   for (let index = 0; index < contractValue.targets.length; index += 1) {
     const expected = contractValue.targets[index]
     const actual = value.targets[index]
     const owner = ownerBindings.get(expected.ownerAlias)
+    const descriptorFields = [
+      'schemaVersion', 'targetKey', 'kind', 'ownerId', 'organizationId',
+      'resourceType',
+    ]
     if (!owner
       || !Object.isFrozen(actual)
-      || !hasExactFields(actual, [
-        'schemaVersion', 'targetKey', 'kind', 'ownerId', 'organizationId',
-        'resourceType', 'targetId',
-      ])
+      || !hasExactFields(actual, descriptorFields)
       || actual.schemaVersion !== 1
       || actual.targetKey !== expected.targetKey
       || actual.kind !== expected.kind
       || actual.ownerId !== owner.expectedUserId
       || actual.organizationId !== organizationId
-      || actual.resourceType !== expected.resourceType
-      || !validTargetId(actual.kind, actual.targetId)
-      || targetIds.has(`${actual.kind}\u0000${actual.targetId}`)) return null
-    targetIds.add(`${actual.kind}\u0000${actual.targetId}`)
+      || actual.resourceType !== expected.resourceType) return null
     parsedTargets.push(freezeInput({ ...actual }))
   }
   return Object.freeze(parsedTargets)
 }
 
-function parseOperationAttestation(value, contractValue, preparedTargets, runIdentity) {
+function sameOrderedIds(actual, expected) {
+  return isExactFrozenArray(actual, expected.length)
+    && actual.every((value, index) => value === expected[index])
+}
+
+function targetIdFrom(values, targetKey) {
+  const value = values?.[targetKey]
+  return typeof value?.targetId === 'string' ? value.targetId : null
+}
+
+function validAttestedLineage(target, attestedByKey, guardSnapshots) {
+  const guardId = targetKey => targetIdFrom(guardSnapshots, targetKey)
+  const sameStepId = targetKey => targetIdFrom(attestedByKey, targetKey)
+  let parentId = null
+  let relatedIds = []
+
+  switch (target.targetKey) {
+    case 'classroom-primary':
+    case 'question-written':
+    case 'question-upload':
+      break
+    case 'membership-primary':
+    case 'membership-secondary':
+      parentId = guardId('classroom-primary')
+      break
+    case 'assignment-primary':
+      parentId = guardId('classroom-primary')
+      relatedIds = [guardId('question-written'), guardId('question-upload')]
+      break
+    case 'config-primary':
+      parentId = sameStepId('assignment-primary')
+      break
+    case 'check-in-primary': {
+      parentId = guardId('assignment-primary')
+      if (target.targetId !== `${parentId}:${target.ownerId}`) return false
+      break
+    }
+    case 'submission-primary':
+      parentId = guardId('assignment-primary')
+      relatedIds = [guardId('config-primary')]
+      break
+    case 'answer-written':
+      parentId = sameStepId('submission-primary')
+      relatedIds = [guardId('question-written')]
+      break
+    case 'answer-upload':
+      parentId = sameStepId('submission-primary')
+      relatedIds = [guardId('question-upload')]
+      break
+    case 'answer-storage': {
+      parentId = guardId('answer-upload')
+      const submissionId = guardId('submission-primary')
+      relatedIds = [submissionId]
+      const [ownerId, encodedSubmissionId, answerId, objectName, ...rest] =
+        target.targetId.split('/')
+      if (rest.length !== 0
+        || ownerId !== target.ownerId
+        || encodedSubmissionId !== submissionId
+        || answerId !== parentId
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|pdf|png|webp)$/.test(objectName)) return false
+      break
+    }
+    case 'proctor-connection': {
+      parentId = guardId('submission-primary')
+      relatedIds = [guardId('assignment-primary')]
+      const [encodedSubmissionId, clientId, ...rest] = target.targetId.split(':')
+      if (rest.length !== 0
+        || encodedSubmissionId !== parentId
+        || !UUID.test(clientId)) return false
+      break
+    }
+    case 'proctor-event':
+      parentId = guardId('submission-primary')
+      relatedIds = [guardId('assignment-primary')]
+      break
+    default:
+      return false
+  }
+
+  if ((parentId !== null && typeof parentId !== 'string')
+    || relatedIds.some(value => typeof value !== 'string')) return false
+  return target.parentId === parentId && sameOrderedIds(target.relatedIds, relatedIds)
+}
+
+function parseOperationAttestation(
+  value,
+  contractValue,
+  preparedTargets,
+  guardSnapshots,
+  runIdentity,
+) {
   if (!Object.isFrozen(value)
     || !hasExactFields(value, ['schemaVersion', 'stepId', 'status', 'targets'])
     || value.schemaVersion !== 1
@@ -669,25 +764,53 @@ function parseOperationAttestation(value, contractValue, preparedTargets, runIde
   const notBefore = Date.parse(runIdentity.creationWindow.notBefore)
   const notAfter = Date.parse(runIdentity.creationWindow.notAfter)
   const parsed = []
+  const targetIds = new Set()
   for (let index = 0; index < preparedTargets.length; index += 1) {
     const prepared = preparedTargets[index]
     const actual = value.targets[index]
-    const createdAt = canonicalTimestamp(actual?.createdAt)
     if (!Object.isFrozen(actual)
-      || !hasExactFields(actual, ['targetKey', 'kind', 'targetId', 'createdAt'])
+      || !hasExactFields(actual, ['targetKey', 'kind', 'matches'])
       || actual.targetKey !== prepared.targetKey
       || actual.kind !== prepared.kind
-      || actual.targetId !== prepared.targetId
+      || !isExactFrozenArray(actual.matches, 1)) return null
+    const match = actual.matches[0]
+    const createdAt = canonicalTimestamp(match?.createdAt)
+    const targetIdentity = `${prepared.kind}\u0000${match?.targetId}`
+    if (!Object.isFrozen(match)
+      || !hasExactFields(match, [
+        'targetId', 'createdAt', 'ownerId', 'organizationId', 'resourceType',
+        'parentId', 'relatedIds',
+      ])
+      || !validTargetId(prepared.kind, match.targetId)
+      || match.ownerId !== prepared.ownerId
+      || match.organizationId !== prepared.organizationId
+      || match.resourceType !== prepared.resourceType
+      || !(match.parentId === null || typeof match.parentId === 'string')
+      || !Array.isArray(match.relatedIds)
+      || !isExactFrozenArray(match.relatedIds, match.relatedIds.length)
+      || targetIds.has(targetIdentity)
       || !createdAt
       || createdAt.timestamp < notBefore
       || createdAt.timestamp > notAfter) return null
+    targetIds.add(targetIdentity)
     parsed.push(Object.freeze({
       targetKey: prepared.targetKey,
       kind: prepared.kind,
-      targetId: prepared.targetId,
+      targetId: match.targetId,
       createdAt: createdAt.iso,
+      ownerId: prepared.ownerId,
+      parentId: match.parentId,
+      relatedIds: match.relatedIds,
     }))
   }
+  const attestedByKey = Object.freeze(Object.fromEntries(
+    parsed.map(targetValue => [targetValue.targetKey, targetValue]),
+  ))
+  if (!parsed.every(targetValue => validAttestedLineage(
+    targetValue,
+    attestedByKey,
+    guardSnapshots,
+  ))) return null
   return Object.freeze(parsed)
 }
 
@@ -714,7 +837,7 @@ function ledgerCandidate(runIdentity, namespace, targetValue, attestedTarget) {
     targetKey: targetValue.targetKey,
     kind: targetValue.kind,
     identity: runIdentity,
-    targetId: targetValue.targetId,
+    targetId: attestedTarget.targetId,
     namespace,
     ownerId: targetValue.ownerId,
     organizationId: targetValue.organizationId,
@@ -782,8 +905,9 @@ function releaseMatchesAssignment(binding, releaseIdentity, releaseTargetId) {
  * Bind the browser-owned S5 harness steps to one frozen browser broker and one
  * private deterministic resource plan. The public request never carries a
  * credential or resource id. Creation targets are entered into the private
- * ledger before the browser can mutate, and the trusted runner's private
- * attestation supplies only the exact created-at value needed to commit them.
+ * ledger before the browser can mutate. After mutation, the trusted
+ * service-role planner must reconcile exactly one database/storage match and
+ * supply its actual id and created-at value before the ledger can commit it.
  */
 export function createSebStagingBrowserDataAdapter({
   readEnvironment,
@@ -1043,23 +1167,6 @@ export function createSebStagingBrowserDataAdapter({
     )
     if (!targets) blocked()
 
-    let assignmentBindingCandidate = null
-    if (contractValue.stepId === 'create-seb-assignment-draft-with-quit-password') {
-      const assignmentTarget = targets.find(value => value.targetKey === 'assignment-primary')
-      const configTarget = targets.find(value => value.targetKey === 'config-primary')
-      assignmentBindingCandidate = assignmentRevisionBinding(
-        assignmentTarget?.targetId,
-        configTarget?.targetId,
-      )
-      if (!assignmentBindingCandidate
-        || (boundReleaseIdentity
-          && !releaseMatchesAssignment(
-            assignmentBindingCandidate,
-            boundReleaseIdentity,
-            boundReleaseIdentity.releaseId,
-          ))) blocked()
-    }
-
     const assignmentSnapshot = guardSnapshots.get('assignment-primary')
     const configSnapshot = guardSnapshots.get('config-primary')
     const releaseSnapshot = guardSnapshots.get('release-primary')
@@ -1085,7 +1192,11 @@ export function createSebStagingBrowserDataAdapter({
       && assignmentSnapshot.targetId !== assignmentBinding.assignmentId) {
       blocked()
     }
-    return Object.freeze({ binding, targets, assignmentBindingCandidate })
+    return Object.freeze({
+      binding,
+      targets,
+      guardSnapshots: freezeInput(Object.fromEntries(guardSnapshots)),
+    })
   }
 
   async function reconcileTargets(references) {
@@ -1127,7 +1238,7 @@ export function createSebStagingBrowserDataAdapter({
     }
   }
 
-  async function attestOperation(contractValue, preparedTargets) {
+  async function attestOperation(contractValue, preparedTargets, guardSnapshots) {
     const response = await resourcePlanCall('attestStep', freezeInput({
       schemaVersion: 1,
       targetOrigin: OFFICIAL_STAGING_SITE_ORIGIN,
@@ -1139,6 +1250,7 @@ export function createSebStagingBrowserDataAdapter({
       response,
       contractValue,
       preparedTargets,
+      guardSnapshots,
       runIdentity,
     )
     if (!parsed) blocked()
@@ -1162,21 +1274,47 @@ export function createSebStagingBrowserDataAdapter({
         operationId: contractValue.stepId,
         payload: {},
       }))
-      const attestedTargets = await attestOperation(contractValue, stepPlan.targets)
+      const attestedTargets = await attestOperation(
+        contractValue,
+        stepPlan.targets,
+        stepPlan.guardSnapshots,
+      )
+      let assignmentBindingCandidate = null
+      if (contractValue.stepId === 'create-seb-assignment-draft-with-quit-password') {
+        const assignmentTarget = attestedTargets.find(
+          value => value.targetKey === 'assignment-primary',
+        )
+        const configTarget = attestedTargets.find(
+          value => value.targetKey === 'config-primary',
+        )
+        assignmentBindingCandidate = assignmentRevisionBinding(
+          assignmentTarget?.targetId,
+          configTarget?.targetId,
+        )
+        if (!assignmentBindingCandidate
+          || (boundReleaseIdentity
+            && !releaseMatchesAssignment(
+              assignmentBindingCandidate,
+              boundReleaseIdentity,
+              boundReleaseIdentity.releaseId,
+            ))) blocked()
+      }
       for (let index = 0; index < stepPlan.targets.length; index += 1) {
         const targetValue = stepPlan.targets[index]
+        const attestedTarget = attestedTargets[index]
         if (!exactPassed(ledgerCall(
           'commitTarget',
           ledgerReference(targetValue.kind, targetValue.targetKey),
-          ledgerCandidate(runIdentity, namespace, targetValue, attestedTargets[index]),
+          ledgerCandidate(runIdentity, namespace, targetValue, attestedTarget),
         ))) blocked()
         const committed = readLedger(targetValue)
         if (!committed
           || committed.state !== 'committed'
           || committed.snapshots.length !== 1
-          || committed.snapshots[0].targetId !== targetValue.targetId
-          || committed.snapshots[0].createdAt !== attestedTargets[index].createdAt) blocked()
+          || committed.snapshots[0].targetId !== attestedTarget.targetId
+          || committed.snapshots[0].createdAt !== attestedTarget.createdAt) blocked()
       }
+      if (assignmentBindingCandidate) assignmentBinding = assignmentBindingCandidate
       return true
     } catch {
       // Once the browser operation has started, its timeout/rejection does
@@ -1257,7 +1395,11 @@ export function createSebStagingBrowserDataAdapter({
         bindings.get('student-secondary'),
       )
       if (!teacherPassed || !studentPassed) return false
-      const targets = await attestOperation(contractValue, stepPlan.targets)
+      const targets = await attestOperation(
+        contractValue,
+        stepPlan.targets,
+        stepPlan.guardSnapshots,
+      )
       return targets.length === 0
     } catch {
       return false
@@ -1302,9 +1444,6 @@ export function createSebStagingBrowserDataAdapter({
       passed = contractValue.alias === null
         ? await executeCrossAccountStep(contractValue, stepPlan)
         : await executeNormalStep(contractValue, stepPlan)
-      if (passed && stepPlan.assignmentBindingCandidate) {
-        assignmentBinding = stepPlan.assignmentBindingCandidate
-      }
       currentEnvironment()
     } catch {
       passed = false

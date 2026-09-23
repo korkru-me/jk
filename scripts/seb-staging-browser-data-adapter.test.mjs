@@ -176,6 +176,55 @@ function candidate(runIdentity, namespace, value, createdAt = NOW) {
   })
 }
 
+function operationLineage(targetKey) {
+  switch (targetKey) {
+    case 'classroom-primary':
+    case 'question-written':
+    case 'question-upload':
+      return { parentId: null, relatedIds: [] }
+    case 'membership-primary':
+    case 'membership-secondary':
+      return { parentId: IDS.classroom, relatedIds: [] }
+    case 'assignment-primary':
+      return {
+        parentId: IDS.classroom,
+        relatedIds: [IDS.writtenQuestion, IDS.uploadQuestion],
+      }
+    case 'config-primary':
+      return { parentId: IDS.assignment, relatedIds: [] }
+    case 'check-in-primary':
+      return { parentId: IDS.assignment, relatedIds: [] }
+    case 'submission-primary':
+      return {
+        parentId: IDS.assignment,
+        relatedIds: [`${IDS.assignment}:r1`],
+      }
+    case 'answer-written':
+      return { parentId: IDS.submission, relatedIds: [IDS.writtenQuestion] }
+    case 'answer-upload':
+      return { parentId: IDS.submission, relatedIds: [IDS.uploadQuestion] }
+    case 'answer-storage':
+      return { parentId: IDS.uploadAnswer, relatedIds: [IDS.submission] }
+    case 'proctor-connection':
+    case 'proctor-event':
+      return { parentId: IDS.submission, relatedIds: [IDS.assignment] }
+    default:
+      throw new Error('Unexpected test target')
+  }
+}
+
+function operationMatch(targetKey, value, overrides = {}) {
+  return freeze({
+    targetId: value.targetId,
+    createdAt: NOW,
+    ownerId: BINDINGS.get(value.ownerAlias).id,
+    organizationId: IDS.teacherOrganization,
+    resourceType: value.resourceType,
+    ...operationLineage(targetKey),
+    ...overrides,
+  })
+}
+
 function exactPassed() {
   return Object.freeze({ status: 'passed' })
 }
@@ -202,6 +251,7 @@ function makeHarness({
   prepareOverride,
   attestOverride,
   failPlanTargetKey = null,
+  failCommitTargetKey = null,
   resourcePlanTimeoutMs = 1_000,
   clock = () => new Date(NOW),
 } = {}) {
@@ -298,7 +348,6 @@ function makeHarness({
           ownerId: BINDINGS.get(value.ownerAlias).id,
           organizationId: IDS.teacherOrganization,
           resourceType: value.resourceType,
-          targetId: value.targetId,
         })
       })
       const prepared = freeze({
@@ -321,18 +370,20 @@ function makeHarness({
         schemaVersion: 1,
         stepId: input.stepId,
         status: 'passed',
-        targets: prepared.targets.map(value => ({
-          targetKey: value.targetKey,
-          kind: value.kind,
-          targetId: value.targetId,
-          createdAt: NOW,
-        })),
+        targets: prepared.targets.map(value => {
+          const fixture = TARGETS.get(value.targetKey)
+          return {
+            targetKey: value.targetKey,
+            kind: value.kind,
+            matches: [operationMatch(value.targetKey, fixture)],
+          }
+        }),
       })
       return attestOverride ? attestOverride(attestation, input, options) : attestation
     }),
   })
   const browser = makeBrowser(events, browserOverrides)
-  const ledgerCapability = failPlanTargetKey === null
+  const ledgerCapability = failPlanTargetKey === null && failCommitTargetKey === null
     ? ledger
     : Object.freeze({
         planTarget: value => {
@@ -343,7 +394,12 @@ function makeHarness({
         },
         adoptDerivedTarget: (...args) => ledger.adoptDerivedTarget(...args),
         markUncertain: (...args) => ledger.markUncertain(...args),
-        commitTarget: (...args) => ledger.commitTarget(...args),
+        commitTarget: (targetReference, ...args) => {
+          events.push(`commit:${targetReference.targetKey}`)
+          return targetReference.targetKey === failCommitTargetKey
+            ? Object.freeze({ status: 'failed' })
+            : ledger.commitTarget(targetReference, ...args)
+        },
         reconcileTarget: (...args) => ledger.reconcileTarget(...args),
         readCleanupTarget: (...args) => ledger.readCleanupTarget(...args),
         markDeleted: (...args) => ledger.markDeleted(...args),
@@ -442,6 +498,17 @@ describe('SEB Staging browser/data adapter', () => {
       expect(Object.isFrozen(value)).toBe(true)
       expect(Object.isFrozen(value.targetKeys)).toBe(true)
     }
+
+    const targetsByStep = new Map(contracts.map(value => [value.stepId, value.targetKeys]))
+    expect(targetsByStep.get('start-revision-bound-attempt')).toEqual([
+      'submission-primary',
+      'answer-written',
+      'answer-upload',
+    ])
+    expect(targetsByStep.get('autosave-synthetic-answer')).toEqual([])
+    expect(targetsByStep.get('upload-synthetic-attachment')).toEqual([
+      'answer-storage',
+    ])
   })
 
   it('runs the full browser journey with closure-private ids and only coarse frozen evidence', async () => {
@@ -469,9 +536,22 @@ describe('SEB Staging browser/data adapter', () => {
     expect(harness.events).toContain('restore:student-primary')
   })
 
-  it('places every creation in uncertain state before browser mutation and commits only after private attestation', async () => {
+  it('plans without a target id, marks uncertainty before mutation, and commits the exactly-one attested id', async () => {
     let harness
     harness = makeHarness({
+      prepareOverride(prepared) {
+        expect(prepared.targets).toHaveLength(1)
+        expect(Object.keys(prepared.targets[0])).toEqual([
+          'schemaVersion',
+          'targetKey',
+          'kind',
+          'ownerId',
+          'organizationId',
+          'resourceType',
+        ])
+        expect(Object.hasOwn(prepared.targets[0], 'targetId')).toBe(false)
+        return prepared
+      },
       browserOverrides: {
         execute(input) {
           if (input.operationId === 'create-subject-classroom') {
@@ -489,9 +569,143 @@ describe('SEB Staging browser/data adapter', () => {
     expect(result).toEqual({ stepId: 'create-subject-classroom', status: 'passed' })
     expect(harness.ledger.readCleanupTarget(
       reference('classroom', 'classroom-primary'),
-    )).toMatchObject({ state: 'committed' })
+    )).toMatchObject({
+      state: 'committed',
+      snapshots: [{ targetId: IDS.classroom }],
+    })
     expect(harness.events.indexOf('execute:create-subject-classroom'))
       .toBeLessThan(harness.events.indexOf('attest:create-subject-classroom'))
+  })
+
+  it.each([
+    [
+      'zero matches',
+      attestation => freeze({
+        ...attestation,
+        targets: attestation.targets.map((value, index) => (
+          index === 0 ? { ...value, matches: [] } : value
+        )),
+      }),
+    ],
+    [
+      'duplicate matches',
+      attestation => freeze({
+        ...attestation,
+        targets: attestation.targets.map((value, index) => (
+          index === 0 ? { ...value, matches: [value.matches[0], value.matches[0]] } : value
+        )),
+      }),
+    ],
+    [
+      'a wrong owner',
+      attestation => freeze({
+        ...attestation,
+        targets: attestation.targets.map((value, index) => (
+          index === 0
+            ? { ...value, matches: [{ ...value.matches[0], ownerId: IDS.unrelatedTeacher }] }
+            : value
+        )),
+      }),
+    ],
+    [
+      'a wrong organization',
+      attestation => freeze({
+        ...attestation,
+        targets: attestation.targets.map((value, index) => (
+          index === 0
+            ? { ...value, matches: [{ ...value.matches[0], organizationId: uuid(95) }] }
+            : value
+        )),
+      }),
+    ],
+    [
+      'a creation timestamp outside the run window',
+      attestation => freeze({
+        ...attestation,
+        targets: attestation.targets.map((value, index) => (
+          index === 0
+            ? { ...value, matches: [{
+                ...value.matches[0],
+                createdAt: '2026-09-24T04:00:00.001Z',
+              }] }
+            : value
+        )),
+      }),
+    ],
+  ])('fails closed after mutation when private attestation returns %s', async (_label, attestOverride) => {
+    const harness = makeHarness({ attestOverride })
+    const [result] = await runThrough(harness, 'create-subject-classroom')
+
+    expect(result).toEqual({
+      stepId: 'create-subject-classroom',
+      status: 'failed',
+    })
+    expect(harness.browser.execute).toHaveBeenCalledTimes(1)
+    expect(harness.resourcePlan.attestStep).toHaveBeenCalledTimes(1)
+    expect(harness.events).not.toContain('reconcile:classroom-primary')
+    expect(harness.ledger.readCleanupTarget(
+      reference('classroom', 'classroom-primary'),
+    )).toEqual({ status: 'passed', state: 'uncertain', snapshots: [] })
+  })
+
+  it.each([
+    [
+      'a membership from another classroom',
+      'join-synthetic-student-to-classroom',
+      'membership-primary',
+      match => ({ ...match, parentId: uuid(91) }),
+    ],
+    [
+      'an assignment with reordered questions',
+      'create-seb-assignment-draft-with-quit-password',
+      'assignment-primary',
+      match => ({ ...match, relatedIds: [...match.relatedIds].reverse() }),
+    ],
+    [
+      'an answer from another submission',
+      'start-revision-bound-attempt',
+      'answer-written',
+      match => ({ ...match, parentId: uuid(92) }),
+    ],
+    [
+      'an attachment path from another submission',
+      'upload-synthetic-attachment',
+      'answer-storage',
+      match => ({
+        ...match,
+        targetId: `${IDS.student}/${uuid(93)}/${IDS.uploadAnswer}/${IDS.uploadObject}.pdf`,
+      }),
+    ],
+    [
+      'a proctor event from another assignment',
+      'record-proctor-heartbeat',
+      'proctor-event',
+      match => ({ ...match, relatedIds: [uuid(94)] }),
+    ],
+  ])('rejects lineage mismatch: %s', async (_label, lastStepId, targetKey, mutateMatch) => {
+    const harness = makeHarness({
+      attestOverride(attestation) {
+        if (attestation.stepId !== lastStepId) return attestation
+        return freeze({
+          ...attestation,
+          targets: attestation.targets.map(target => (
+            target.targetKey === targetKey
+              ? { ...target, matches: [mutateMatch(target.matches[0])] }
+              : target
+          )),
+        })
+      },
+    })
+
+    const results = await runThrough(harness, lastStepId)
+    expect(results.slice(0, -1).every(value => value.status === 'passed')).toBe(true)
+    expect(results.at(-1)).toEqual({ stepId: lastStepId, status: 'failed' })
+    const failedContract = harness.contracts.find(value => value.stepId === lastStepId)
+    for (const plannedTargetKey of failedContract.targetKeys) {
+      const value = TARGETS.get(plannedTargetKey)
+      expect(harness.ledger.readCleanupTarget(reference(value.kind, plannedTargetKey)))
+        .toEqual({ status: 'passed', state: 'uncertain', snapshots: [] })
+    }
   })
 
   it('keeps a possibly-created target uncertain until browser quiescence and cleanup', async () => {
@@ -526,6 +740,74 @@ describe('SEB Staging browser/data adapter', () => {
     expect(harness.ledger.readCleanupTarget(
       reference('classroom', 'classroom-primary'),
     )).toMatchObject({ state: 'uncertain', snapshots: [] })
+  })
+
+  it('lets cleanup delete attempt-created answers before their submission after an ambiguous start failure', async () => {
+    let harness
+    const startTargetKeys = [
+      'submission-primary',
+      'answer-written',
+      'answer-upload',
+    ]
+    harness = makeHarness({
+      browserOverrides: {
+        execute(input) {
+          if (input.operationId === 'start-revision-bound-attempt') {
+            for (const targetKey of startTargetKeys) {
+              const value = TARGETS.get(targetKey)
+              harness.reconciliationMatches.set(targetKey, [candidate(
+                harness.runIdentity,
+                harness.namespace,
+                {
+                  targetKey,
+                  kind: value.kind,
+                  ownerId: BINDINGS.get(value.ownerAlias).id,
+                  organizationId: IDS.teacherOrganization,
+                  resourceType: value.resourceType,
+                  targetId: value.targetId,
+                },
+              )])
+            }
+            return Object.freeze({ status: 'failed' })
+          }
+          return exactPassed()
+        },
+      },
+    })
+
+    const results = await runThrough(harness, 'start-revision-bound-attempt')
+    expect(results.slice(0, -1).every(value => value.status === 'passed')).toBe(true)
+    expect(results.at(-1)).toEqual({
+      stepId: 'start-revision-bound-attempt',
+      status: 'failed',
+    })
+    for (const targetKey of startTargetKeys) {
+      const value = TARGETS.get(targetKey)
+      expect(harness.ledger.readCleanupTarget(reference(value.kind, targetKey)))
+        .toEqual({ status: 'passed', state: 'uncertain', snapshots: [] })
+      expect(await harness.ledger.reconcileTarget(reference(value.kind, targetKey)))
+        .toEqual({ status: 'passed' })
+    }
+
+    for (const targetKey of ['answer-written', 'answer-upload']) {
+      const value = TARGETS.get(targetKey)
+      expect(harness.ledger.markDeleted(reference(value.kind, targetKey), {
+        schemaVersion: 1,
+        targetId: value.targetId,
+      })).toEqual({ status: 'passed' })
+      expect(harness.ledger.readCleanupTarget(reference(value.kind, targetKey)))
+        .toEqual({ status: 'passed', state: 'deleted', snapshots: [] })
+    }
+
+    const submission = TARGETS.get('submission-primary')
+    expect(harness.ledger.readCleanupTarget(reference(
+      submission.kind,
+      'submission-primary',
+    ))).toMatchObject({ state: 'committed' })
+    expect(harness.ledger.markDeleted(reference(submission.kind, 'submission-primary'), {
+      schemaVersion: 1,
+      targetId: submission.targetId,
+    })).toEqual({ status: 'passed' })
   })
 
   it('bounds an abort-ignoring private prepare without starting a browser mutation', async () => {
@@ -644,6 +926,41 @@ describe('SEB Staging browser/data adapter', () => {
       .toMatchObject({ state: 'unplanned', snapshots: [] })
   })
 
+  it.each([
+    [
+      'create-seb-assignment-draft-with-quit-password',
+      'config-primary',
+      ['assignment-primary'],
+      ['config-primary'],
+    ],
+    [
+      'start-revision-bound-attempt',
+      'answer-written',
+      ['submission-primary'],
+      ['answer-written', 'answer-upload'],
+    ],
+  ])(
+    'keeps partial multi-target commit failure cleanup-safe at %s',
+    async (lastStepId, failCommitTargetKey, committedKeys, uncertainKeys) => {
+      const harness = makeHarness({ failCommitTargetKey })
+      const results = await runThrough(harness, lastStepId)
+
+      expect(results.slice(0, -1).every(value => value.status === 'passed')).toBe(true)
+      expect(results.at(-1)).toEqual({ stepId: lastStepId, status: 'failed' })
+      for (const targetKey of committedKeys) {
+        const value = TARGETS.get(targetKey)
+        expect(harness.ledger.readCleanupTarget(reference(value.kind, targetKey)))
+          .toMatchObject({ state: 'committed', snapshots: [{ targetId: value.targetId }] })
+      }
+      for (const targetKey of uncertainKeys) {
+        const value = TARGETS.get(targetKey)
+        expect(harness.ledger.readCleanupTarget(reference(value.kind, targetKey)))
+          .toEqual({ status: 'passed', state: 'uncertain', snapshots: [] })
+      }
+      expect(harness.events).toContain(`commit:${failCommitTargetKey}`)
+    },
+  )
+
   it('reconciles an uncertain native release before allowing publish retry semantics', async () => {
     const harness = makeHarness()
     const results = await runThrough(harness, 'publish-seb-assignment', {
@@ -678,15 +995,18 @@ describe('SEB Staging browser/data adapter', () => {
 
   it('rejects a config target whose assignment id differs from the paired assignment target', async () => {
     const harness = makeHarness({
-      prepareOverride(prepared) {
-        if (prepared.stepId !== 'create-seb-assignment-draft-with-quit-password') {
-          return prepared
+      attestOverride(attestation) {
+        if (attestation.stepId !== 'create-seb-assignment-draft-with-quit-password') {
+          return attestation
         }
         return freeze({
-          ...prepared,
-          targets: prepared.targets.map(value => (
+          ...attestation,
+          targets: attestation.targets.map(value => (
             value.targetKey === 'config-primary'
-              ? { ...value, targetId: `${uuid(92)}:r1` }
+              ? {
+                  ...value,
+                  matches: [{ ...value.matches[0], targetId: `${uuid(92)}:r1` }],
+                }
               : value
           )),
         })
@@ -700,7 +1020,11 @@ describe('SEB Staging browser/data adapter', () => {
       stepId: 'create-seb-assignment-draft-with-quit-password',
       status: 'failed',
     })
-    expect(harness.events).not.toContain('execute:create-seb-assignment-draft-with-quit-password')
+    expect(harness.events).toContain('execute:create-seb-assignment-draft-with-quit-password')
+    expect(harness.ledger.readCleanupTarget(reference('assignment', 'assignment-primary')))
+      .toMatchObject({ state: 'uncertain', snapshots: [] })
+    expect(harness.ledger.readCleanupTarget(reference('configRevision', 'config-primary')))
+      .toMatchObject({ state: 'uncertain', snapshots: [] })
   })
 
   it('restores a replaced account context even when the private read probe fails', async () => {
@@ -762,7 +1086,7 @@ describe('SEB Staging browser/data adapter', () => {
       .toEqual({ stepId: first.stepId, status: 'passed' })
   })
 
-  it('fails closed when a private plan adds fields, changes ownership, or invents a target id', async () => {
+  it('fails closed when a private plan adds fields, changes ownership, or preselects any target id', async () => {
     for (const prepareOverride of [
       prepared => freeze({ ...prepared, secret: 'PRIVATE_PLAN_SECRET_SENTINEL' }),
       prepared => {
@@ -777,7 +1101,7 @@ describe('SEB Staging browser/data adapter', () => {
       }),
       prepared => freeze({
         ...prepared,
-        targets: prepared.targets.map(value => ({ ...value, targetId: 'not-a-uuid' })),
+        targets: prepared.targets.map(value => ({ ...value, targetId: IDS.classroom })),
       }),
     ]) {
       const harness = makeHarness({ prepareOverride })
@@ -794,7 +1118,10 @@ describe('SEB Staging browser/data adapter', () => {
       attestation => freeze({ ...attestation, secret: 'RUNNER_SECRET_SENTINEL' }),
       attestation => freeze({
         ...attestation,
-        targets: attestation.targets.map(value => ({ ...value, targetId: uuid(99) })),
+        targets: attestation.targets.map(value => ({
+          ...value,
+          targetKey: 'question-written',
+        })),
       }),
       attestation => freeze({ ...attestation, status: 'failed' }),
     ]) {

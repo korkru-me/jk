@@ -230,13 +230,16 @@ evidence sink ที่เขียนแบบ directory-relative + immutable �
 หรือ mutation แรก ส่วน cleanup รองรับ object กำพร้าจากการเขียนฐานไม่สำเร็จแต่ยังตรวจ exact reserved run,
 บัญชี/องค์กรสังเคราะห์, path, owner, เวลา, MIME, size และ hash; FK drift guard ครอบคลุม direct และ
 transitive cascade graph Migration `20260923201848_seb_s5_atomic_cleanup_rpcs.sql` apply เฉพาะ Korkru
-Staging แล้ว, ledger local/remote ตรงกัน และ database lint ไม่มี error ใหม่ ชุด S5 ผ่าน 17 files / 474 tests,
-ทั้งโครงการผ่าน 155 files / 2,191 tests และ TypeScript/syntax checks ผ่าน
+Staging แล้ว, ledger local/remote ตรงกัน และ database lint ไม่มี error ใหม่ รอบถัดมาแก้ browser/data contract
+เป็น plan-with-marker → browser mutation → service-role attest actual ID แบบ exactly-one แล้ว โดยขั้น prepare
+ห้ามมี target ID ทุกกรณี, attestation ต้องผูก parent/related lineage และ path encoding ให้ตรงก่อน commit ใด ๆ,
+assignment/config ผูกหลัง commit ครบเท่านั้น และ `startSubmission` เป็นเจ้าของ submission กับ answer rows
+ทั้งสองตามพฤติกรรมจริง ชุด S5 ผ่าน 17 files / 487 tests, ทั้งโครงการผ่าน 155 files / 2,204 tests
+และ TypeScript/syntax checks ผ่าน
 
-ยังไม่อนุญาต live mock เพราะ product Server Actions สร้าง UUID จริงภายใน server แต่ browser/data contract
-รอบนี้ยังต้องรู้ target ID ก่อน UI mutation ขั้นถัดไปต้องเปลี่ยนเป็น plan-with-marker → browser mutation →
-service-role attest actual ID แบบ exactly-one และย้าย answer ownership ให้ตรงกับ `startSubmission` ก่อนสร้าง
-concrete operation runtime นอกจากนี้ยังขาด native/expiry capabilities, final `.seb` + CK/BEK จาก Windows,
+ยังไม่อนุญาต live mock จนกว่าจะมี concrete operation runtime ที่ทำ marker และตรวจความสัมพันธ์ของรายการจริง
+แบบ step-specific โดยไม่เปิด Page, credential หรือ service-role client ออกจาก private closure นอกจากนี้ยังขาด
+native/expiry capabilities, final `.seb` + CK/BEK จาก Windows,
 automation bypass แบบ server-only และ authenticated durable evidence จาก source/deployment/config เดียวกัน
 จึงยังเป็น **NOT READY**, ห้ามเริ่ม S6 และ Production ไม่เปลี่ยน
 
