@@ -188,7 +188,8 @@ exit ยังไม่ผ่าน ให้ปิด capability นั้น�
 
 ## เฟส S5 — Staging integration และ mock exam อัตโนมัติ
 
-**สถานะ: โค้ด S5 รอบปัจจุบันอยู่ใน branch เท่านั้น; ยังไม่ deploy/apply และยังไม่ผ่าน live mock** —
+**สถานะ: composite/preflight/reservation/cleanup รอบปัจจุบัน deploy/apply เฉพาะ isolated Staging แล้ว;
+ยังไม่ผ่าน live mock** —
 operator สำหรับสร้าง seed และ enroll exact assignment artifact ยังคง fail closed, dry-run เป็นค่าเริ่มต้น,
 รับ CK/BEK ทาง stdin เท่านั้น และใช้เฉพาะ canonical site + allowlisted Supabase Staging ส่วน pure
 mock-harness ใช้ synthetic fixture เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup
@@ -207,7 +208,9 @@ challenge/session ใช้ operator-side offline control เท่านั้�
 ที่ผูก exact Vercel Staging project/deployment, canonical alias และ Git SHA เดียวกัน ใช้ Deployment
 Protection bypass ได้เฉพาะ secret header, อ่าน alias ซ้ำหลังโหลดหน้า และ probe schema ที่จำเป็นแบบ
 อ่านอย่างเดียว เพิ่ม durable cross-process run-ID reservation บนฐานข้อมูลแบบ service-role-only,
-RLS/forced RLS และเก็บ tombstone ไม่ให้นำ ID กลับมาใช้ซ้ำ โดย migration ยังอยู่ local และยังไม่ apply
+RLS/forced RLS และเก็บ tombstone ไม่ให้นำ ID กลับมาใช้ซ้ำ Migration apply เฉพาะฐาน Staging แล้ว
+และ ledger local/remote ตรงกัน ส่วน application commit `7030b3c` deploy Staging สำเร็จ แต่ exact canonical
+DOM preflight ยัง pending เพราะต้องใช้ automation bypass แบบ server-only ผ่าน header เท่านั้น
 รวมทั้ง aggregate cleanup ตามลำดับ answer storage → artifact storage → database fixture → personal
 organization → reservation โดยหยุดทันทีเมื่อ participant ใดล้มเหลวและ retry ต่อจากจุดเดิม; ภายใน
 fixture ต้องปิด browser session ก่อนล้าง resource และลบ Auth เป็นขั้นสุดท้ายเสมอ ชุด focused tests
