@@ -25,6 +25,12 @@ const FIXTURE = Object.freeze({
     }),
     Object.freeze({ kind: 'classroom', alias: 'classroom-primary', count: 1, classroomType: 'subject' }),
     Object.freeze({
+      kind: 'question',
+      aliases: Object.freeze(['question-written', 'question-upload']),
+      count: 2,
+      questionTypes: Object.freeze(['essay', 'file_upload']),
+    }),
+    Object.freeze({
       kind: 'assignment',
       alias: 'assignment-primary',
       count: 1,
@@ -33,6 +39,7 @@ const FIXTURE = Object.freeze({
       initialStatus: 'draft',
       entryPassword: 'forbidden',
       quitPassword: 'teacher-owned-runtime-secret',
+      questionAliases: Object.freeze(['question-written', 'question-upload']),
     }),
   ]),
 })
@@ -52,15 +59,23 @@ const STEPS = Object.freeze([
     'ยืนยันว่า session เป็นครูสังเคราะห์ exact account'),
   step('create-subject-classroom', 'teacher-setup', 'teacher', true, ['authenticate-teacher'],
     'สร้างห้องเรียนรายวิชาสังเคราะห์หนึ่งห้อง'),
-  step('enrol-synthetic-student', 'teacher-setup', 'teacher', true, ['create-subject-classroom'],
-    'เพิ่มนักเรียนสังเคราะห์ exact account เข้า exact classroom'),
-  step('enrol-secondary-student', 'teacher-setup', 'teacher', true, ['enrol-synthetic-student'],
-    'เพิ่มนักเรียนคนที่สองเข้า exact classroom โดยยังไม่มีสิทธิ์ใน attempt ของนักเรียนหลัก'),
-  step('create-seb-assignment-draft', 'teacher-setup', 'teacher', true, ['enrol-secondary-student'],
-    'สร้างข้อสอบ SEB แบบ draft หนึ่งรายการโดยไม่มีรหัสก่อนเข้า'),
-  step('set-teacher-quit-password', 'teacher-setup', 'teacher', true, ['create-seb-assignment-draft'],
-    'ส่งรหัสออกผ่านช่องทาง write-only และยืนยันว่า response ไม่มี plaintext หรือ hash'),
-  step('register-assignment-seb-release', 'teacher-setup', 'native-operator', true, ['set-teacher-quit-password'],
+  step('create-synthetic-written-question', 'teacher-setup', 'teacher', true, ['create-subject-classroom'],
+    'สร้างโจทย์อัตนัยสังเคราะห์หนึ่งข้อในคลังของครูเจ้าของ'),
+  step('create-synthetic-upload-question', 'teacher-setup', 'teacher', true, ['create-synthetic-written-question'],
+    'สร้างโจทย์ส่งไฟล์สังเคราะห์หนึ่งข้อเพื่อใช้ทดสอบ upload จริง'),
+  step('authenticate-student-for-enrolment', 'student-enrolment', 'student', false, ['create-synthetic-upload-question'],
+    'สลับเป็นนักเรียนหลัก exact account ก่อนเข้าห้องด้วยรหัสใน UI'),
+  step('join-synthetic-student-to-classroom', 'student-enrolment', 'student', true, ['authenticate-student-for-enrolment'],
+    'นักเรียนหลักเข้าร่วม exact classroom ด้วยเส้นทาง self-join จริง'),
+  step('authenticate-secondary-student-for-enrolment', 'student-enrolment', 'student-secondary', false, ['join-synthetic-student-to-classroom'],
+    'สลับเป็นนักเรียนคนที่สอง exact account ก่อนเข้าห้องด้วยตนเอง'),
+  step('join-secondary-student-to-classroom', 'student-enrolment', 'student-secondary', true, ['authenticate-secondary-student-for-enrolment'],
+    'นักเรียนคนที่สองเข้าร่วม exact classroom โดยยังไม่มีสิทธิ์ใน attempt ของนักเรียนหลัก'),
+  step('authenticate-teacher-for-assignment', 'teacher-setup', 'teacher', false, ['join-secondary-student-to-classroom'],
+    'สลับกลับเป็นครูเจ้าของ exact account เพื่อสร้างข้อสอบ'),
+  step('create-seb-assignment-draft-with-quit-password', 'teacher-setup', 'teacher', true, ['authenticate-teacher-for-assignment'],
+    'สร้างข้อสอบ SEB แบบ draft พร้อมรหัสออกแบบ write-only ไม่มีรหัสก่อนเข้า และ response ไม่มี plaintext/hash'),
+  step('register-assignment-seb-release', 'teacher-setup', 'native-operator', true, ['create-seb-assignment-draft-with-quit-password'],
     'ผูก private artifact, digest, CK และ exact BEK กับ revision โดยไม่บันทึกค่าเหล่านี้ใน evidence'),
   step('publish-seb-assignment', 'teacher-setup', 'teacher', true, ['register-assignment-seb-release'],
     'เผยแพร่ได้เฉพาะเมื่อ exact assignment revision มี release ที่พร้อม'),
@@ -68,16 +83,16 @@ const STEPS = Object.freeze([
     'ยืนยันว่า session เป็นนักเรียนสังเคราะห์ exact account'),
   step('reject-invalid-seb-challenge', 'negative-session', 'student', false, ['authenticate-student'],
     'ปฏิเสธ challenge ที่ลายเซ็นหรือ purpose ไม่ถูกต้องโดยไม่สร้าง check-in หรือ attempt'),
-  step('reject-expired-seb-challenge', 'negative-session', 'student', false, ['reject-invalid-seb-challenge'],
-    'ปฏิเสธ challenge ที่หมดอายุโดยไม่สร้าง check-in หรือ attempt'),
+  step('reject-expired-seb-challenge', 'negative-session', 'staging-qa-control', false, ['reject-invalid-seb-challenge'],
+    'ใช้ QA seam ที่จำกัดเฉพาะ synthetic Staging เพื่อยืนยันว่า challenge หมดอายุถูกปฏิเสธโดยไม่รอจริงหรือเปิด signing oracle'),
   step('verify-seb-system-check', 'student-journey', 'student', true, ['reject-expired-seb-challenge'],
     'ผ่าน SEB system check โดยยังไม่สร้าง attempt หรือเริ่มจับเวลา'),
   step('reject-replayed-seb-challenge', 'negative-session', 'student', false, ['verify-seb-system-check'],
     'ปฏิเสธ challenge ที่ถูก replay ข้ามผู้ใช้ ข้อสอบ หรือ revision โดยไม่สร้าง check-in หรือ attempt เพิ่ม'),
   step('reject-invalid-seb-session', 'negative-session', 'student', false, ['reject-replayed-seb-challenge'],
     'ปฏิเสธ secure session ที่ถูกแก้ไขหรือผูกคน/ข้อสอบผิด'),
-  step('reject-expired-seb-session', 'negative-session', 'student', false, ['reject-invalid-seb-session'],
-    'ปฏิเสธ secure session ที่หมดอายุโดยไม่สร้าง attempt'),
+  step('reject-expired-seb-session', 'negative-session', 'staging-qa-control', false, ['reject-invalid-seb-session'],
+    'ใช้ QA seam ที่จำกัดเฉพาะ synthetic Staging เพื่อยืนยันว่า secure session หมดอายุถูกปฏิเสธโดยไม่สร้าง attempt'),
   step('start-revision-bound-attempt', 'student-journey', 'student', true, ['reject-expired-seb-session'],
     'สร้าง attempt ที่ผูก exact SEB config revision และ access mode'),
   step('reject-replayed-seb-session', 'negative-session', 'student', false, ['start-revision-bound-attempt'],
@@ -161,6 +176,8 @@ function fixtureDescriptor(runId) {
     entities: Object.freeze(FIXTURE.entities.map(value => Object.freeze({
       ...value,
       ...(Array.isArray(value.aliases) ? { aliases: Object.freeze([...value.aliases]) } : {}),
+      ...(Array.isArray(value.questionTypes) ? { questionTypes: Object.freeze([...value.questionTypes]) } : {}),
+      ...(Array.isArray(value.questionAliases) ? { questionAliases: Object.freeze([...value.questionAliases]) } : {}),
     }))),
   })
 }
@@ -219,6 +236,10 @@ export function buildSebStagingMockHarnessPlan({
     checks.push(writeEnabled && confirmationMatches && uniqueRun
       ? { status: 'pass', field: 'synthetic write authorization', message: 'ได้รับ opt-in สองชั้นสำหรับ fixture run ที่ระบุ' }
       : { status: 'blocker', field: 'synthetic write authorization', message: 'execute ต้องเปิด synthetic writes, ยืนยัน exact phrase และใช้ run id เฉพาะ' })
+
+    checks.push(clean(environment.EXAM_QA_SEB_TIME_CONTROL) === 'true'
+      ? { status: 'pass', field: 'Staging expiry control', message: 'เปิด QA seam สำหรับ expired challenge/session บน synthetic Staging เท่านั้น' }
+      : { status: 'blocker', field: 'Staging expiry control', message: 'execute ต้องเปิด QA seam ที่ fail closed ก่อนทดสอบ token หมดอายุ' })
   }
 
   const ready = checks.every(check => check.status !== 'blocker')

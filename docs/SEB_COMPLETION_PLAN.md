@@ -193,8 +193,21 @@ exit ยังไม่ผ่าน ให้ปิด capability นั้น�
 dry-run, รับ CK/BEK ทาง stdin เท่านั้น, ผูกกับ canonical site + allowlisted Supabase Staging,
 ตรวจ native Windows 3.10.2 build 920 และรองรับ passwordless plist ทั้ง XML, gzip XML และ
 `gzip(plnd + gzip(XML))` โดยไม่พิมพ์ secret เพิ่ม pure mock-harness plan ที่ใช้ synthetic fixture
-เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup แต่ยังไม่มี live adapter, final
-`.seb` + CK/BEK จาก Windows หรือ authenticated live-mock/cleanup evidence จึงยังไม่ถือว่าเกณฑ์ผ่าน S5 สำเร็จ
+เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup
+
+อัปเดต 23 กันยายน 2026: เพิ่ม fail-closed live runner และ Auth fixture bridge แล้ว โดย runner
+รับ release identity หลังขั้น register จริงแทนการเดา assignment UUID ล่วงหน้า, ตรวจ revision ตาม
+ขอบเขต database, หยุดทันทีเมื่อ step แรก fail และเรียก exact cleanup หลัง mutation ส่วน fixture
+สร้างบัญชีสังเคราะห์สี่บทบาทด้วย credential ใน closure, ส่งเข้า browser-session capability ภายใน
+trust boundary เดียวกัน, ตรวจ app metadata/user id กลับ และอ่าน target/environment ซ้ำก่อนทุก create,
+login และ delete การสร้างที่ผลลัพธ์ไม่แน่นอนจะไม่รายงาน cleanup ว่าผ่าน และ uncertain delete รองรับ
+confirmed not-found แบบ exact ID โดยไม่เปิด credential/ID ใน evidence ลำดับ mock แก้ให้ตรง UI จริง:
+สร้างโจทย์สองชนิด, นักเรียน self-join, ครูสร้าง assignment + quit password แบบ atomic และ expired
+challenge/session ใช้ operator-side offline control เท่านั้น ไม่เพิ่ม signing endpoint บนเว็บ
+
+ยังไม่มี browser/data/native composite ตัวจริง, DB run reservation, aggregate cleanup ของ Storage
+และ private artifact, final `.seb` + CK/BEK จาก Windows หรือ authenticated Staging evidence จาก
+source/deployment/config เดียวกัน จึงยังไม่ถือว่าเกณฑ์ผ่าน S5 สำเร็จและห้ามเริ่ม S6
 
 **Agent ทำ**
 

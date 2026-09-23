@@ -18,13 +18,17 @@ function validEnvironment(overrides = {}) {
     SUPABASE_SERVICE_ROLE_KEY: 'service-role-long-enough-for-staging',
     EXAM_QA_DATA_POLICY: 'synthetic-only',
     EXAM_QA_COPY_PRODUCTION_DATA: 'false',
+    EXAM_QA_SEB_TIME_CONTROL: 'false',
     ...overrides,
   }
 }
 
 function executablePlan(overrides = {}) {
   return buildSebStagingMockHarnessPlan({
-    environment: validEnvironment({ EXAM_QA_ALLOW_SYNTHETIC_WRITES: 'true' }),
+    environment: validEnvironment({
+      EXAM_QA_ALLOW_SYNTHETIC_WRITES: 'true',
+      EXAM_QA_SEB_TIME_CONTROL: 'true',
+    }),
     mode: 'execute',
     runId: 'seb-s5-run-20260923',
     writeConfirmation: 'CONFIRM_SYNTHETIC_SEB_STAGING_WRITE',
@@ -61,6 +65,9 @@ describe('SEB Staging synthetic mock harness', () => {
       { writeConfirmation: '' },
       { runId: 'seb-s5-preview' },
       { environment: validEnvironment() },
+      {
+        environment: validEnvironment({ EXAM_QA_ALLOW_SYNTHETIC_WRITES: 'true' }),
+      },
     ]) {
       const plan = executablePlan(override)
       expect(plan.ready).toBe(false)
@@ -132,7 +139,7 @@ describe('SEB Staging synthetic mock harness', () => {
     }
   })
 
-  it('plans isolated owner and outsider accounts plus one classroom and SEB assignment', () => {
+  it('plans isolated accounts, classroom, questions, and one SEB assignment', () => {
     const plan = buildSebStagingMockHarnessPlan({ environment: validEnvironment() })
     expect(plan.fixture.policy).toBe('synthetic-only')
     expect(plan.fixture.credentials).toBe('runtime-only')
@@ -140,12 +147,19 @@ describe('SEB Staging synthetic mock harness', () => {
       ['teacher', 2],
       ['student', 2],
       ['classroom', 1],
+      ['question', 2],
       ['assignment', 1],
     ])
     expect(plan.fixture.entities[0].aliases).toEqual(['teacher-primary', 'teacher-unrelated'])
     expect(plan.fixture.entities[1].aliases).toEqual(['student-primary', 'student-secondary'])
     expect(Object.isFrozen(plan.fixture.entities[0].aliases)).toBe(true)
     expect(Object.isFrozen(plan.fixture.entities[1].aliases)).toBe(true)
+    expect(plan.fixture.entities[3]).toMatchObject({
+      aliases: ['question-written', 'question-upload'],
+      questionTypes: ['essay', 'file_upload'],
+    })
+    expect(Object.isFrozen(plan.fixture.entities[3].aliases)).toBe(true)
+    expect(Object.isFrozen(plan.fixture.entities[3].questionTypes)).toBe(true)
     expect(plan.fixture.entities.at(-1)).toMatchObject({
       secureBrowserMode: 'seb_required',
       initialStatus: 'draft',
@@ -160,6 +174,14 @@ describe('SEB Staging synthetic mock harness', () => {
 
     expect(ids).toEqual(expect.arrayContaining([
       'authenticate-student',
+      'create-synthetic-written-question',
+      'create-synthetic-upload-question',
+      'authenticate-student-for-enrolment',
+      'join-synthetic-student-to-classroom',
+      'authenticate-secondary-student-for-enrolment',
+      'join-secondary-student-to-classroom',
+      'authenticate-teacher-for-assignment',
+      'create-seb-assignment-draft-with-quit-password',
       'reject-invalid-seb-challenge',
       'reject-expired-seb-challenge',
       'verify-seb-system-check',
@@ -184,6 +206,19 @@ describe('SEB Staging synthetic mock harness', () => {
       'verify-cross-account-boundaries',
       'cleanup-synthetic-fixture',
     ]))
+    expect(ids).not.toEqual(expect.arrayContaining([
+      'enrol-synthetic-student',
+      'enrol-secondary-student',
+      'create-seb-assignment-draft',
+      'set-teacher-quit-password',
+    ]))
+
+    const steps = Object.fromEntries(plan.steps.map(step => [step.id, step]))
+    expect(steps['join-synthetic-student-to-classroom'].actor).toBe('student')
+    expect(steps['join-secondary-student-to-classroom'].actor).toBe('student-secondary')
+    expect(steps['create-seb-assignment-draft-with-quit-password'].actor).toBe('teacher')
+    expect(steps['reject-expired-seb-challenge'].actor).toBe('staging-qa-control')
+    expect(steps['reject-expired-seb-session'].actor).toBe('staging-qa-control')
     expect(new Set(ids).size).toBe(ids.length)
     expect(plan.steps.at(-1)).toMatchObject({
       id: 'cleanup-synthetic-fixture',
@@ -250,14 +285,14 @@ describe('SEB Staging synthetic mock harness', () => {
 
   it('stops a failed journey and exposes only scoped cleanup after data exists', () => {
     const plan = executablePlan()
-    const evidence = passedEvidenceThrough(plan, 'create-subject-classroom')
-    evidence['enrol-synthetic-student'] = 'failed'
+    const evidence = passedEvidenceThrough(plan, 'authenticate-student-for-enrolment')
+    evidence['join-synthetic-student-to-classroom'] = 'failed'
 
     const state = inspectSebStagingMockHarnessEvidence(plan, evidence)
     expect(state.ready).toBe(false)
     expect(state.status).toBe('cleanup-required')
     expect(state.nextStepIds).toEqual(['cleanup-synthetic-fixture'])
-    expect(state.failedStepIds).toEqual(['enrol-synthetic-student'])
+    expect(state.failedStepIds).toEqual(['join-synthetic-student-to-classroom'])
   })
 
   it('does not report an inspect-only all-passed snapshot as complete', () => {
