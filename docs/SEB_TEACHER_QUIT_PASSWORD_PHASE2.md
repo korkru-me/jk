@@ -38,9 +38,10 @@ an attempt that commits first is observed and blocks rotation; a rotation that
 commits first becomes the current revision before the attempt can proceed.
 
 This lock does not by itself bind an earlier SEB session verification to a
-later attempt insert. Before rotation is exposed to teachers, the artifact and
-attempt phase must bind the exact configuration revision to the signed session
-and recheck that revision inside the same database transaction that creates the
+later attempt insert. Phase 3 adds a branch-only teacher workflow, but it must
+not be deployed as a completed student workflow until the artifact and attempt
+phase binds the exact configuration revision to the signed session and
+rechecks that revision inside the same database transaction that creates the
 attempt. A real two-transaction PostgreSQL/Staging race test is also required
 before claiming end-to-end concurrency evidence; the Phase 2 suite verifies
 the lock design and invariants in PGlite but does not claim that live evidence.
@@ -68,10 +69,10 @@ exact owner/organization/eligibility checks, immutable history and parent
 cascade deletion. Unit tests cover the server RPC arguments, SQLSTATE mapping,
 malformed input/response rejection and secret-safe failures.
 
-Phase 2 is still not a “ready” SEB configuration. Phase 3 may add the
-teacher-facing workflow. A later artifact phase must bind the exact immutable
-revision into a generated `.seb` file and register its CK/BEK before students
-can receive it.
+Phase 2 is still not a “ready” SEB configuration. Phase 3 adds the
+teacher-facing workflow on the branch only. A later artifact phase must bind
+the exact immutable revision into a generated `.seb` file and register its
+CK/BEK before students can receive it.
 
 ## Deployment status
 

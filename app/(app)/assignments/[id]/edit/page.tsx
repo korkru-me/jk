@@ -7,6 +7,7 @@ import { ChevronLeft } from 'lucide-react'
 import { EditAssignmentForm } from '@/components/assignments/edit-assignment-form'
 import type { EditableAssignment, EditableAssignmentQuestion } from '@/components/assignments/edit-assignment-form'
 import type { CountableQuestion } from '@/lib/question-parts'
+import { readSebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
 
 export const metadata = { title: 'แก้ไขชุดข้อสอบ — KorKru' }
 
@@ -27,7 +28,7 @@ export default async function EditAssignmentPage({
   // unauthorized and is handled by notFound() below.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('id, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode')
+    .select('id, org_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode')
     .eq('id', id)
     .maybeSingle()
 
@@ -44,7 +45,7 @@ export default async function EditAssignmentPage({
   // assignment, so one read serves both the list and the "เพิ่มโจทย์" picker.
   // A question shared by a teammate can be in the assignment without being in
   // this teacher's own bank, so those are still read by id.
-  const [bank, { data: questionRows }, { data: startedSubmission }] = await Promise.all([
+  const [bank, { data: questionRows }, { data: startedSubmission }, sebQuitPasswordSetup] = await Promise.all([
     fetchBankQuestions(supabase, user.id),
     supabase
       .from('questions')
@@ -59,6 +60,7 @@ export default async function EditAssignmentPage({
       .eq('assignment_id', id)
       .limit(1)
       .maybeSingle(),
+    readSebQuitPasswordSetupState(id, user.id),
   ])
 
   // Preserve the assignment's own question order rather than whatever the
@@ -89,6 +91,7 @@ export default async function EditAssignmentPage({
         questions={questions}
         bank={bank}
         hasSubmissions={!!startedSubmission}
+        sebQuitPasswordSetup={sebQuitPasswordSetup}
       />
     </div>
   )

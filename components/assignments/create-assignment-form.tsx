@@ -37,6 +37,10 @@ import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
+import {
+  SebQuitPasswordFields,
+  getSebQuitPasswordClientError,
+} from '@/components/assignments/seb-quit-password-settings'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -158,6 +162,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
   const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>('browser')
   const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>('blocked')
+  const [sebQuitPassword, setSebQuitPassword] = useState('')
+  const [sebQuitPasswordConfirmation, setSebQuitPasswordConfirmation] = useState('')
   // เงื่อนไขจบงาน. The three choices a teacher sees are a view over two stored
   // values — 'fixed' + no threshold, 'fixed' + a threshold, or 'streak' — so
   // that turning a threshold on and choosing to end on a run are visibly the
@@ -338,6 +344,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     // the teacher reads the reason next to the field that caused it rather
     // than as an error after ยืนยัน three screens later.
     if (step === 2) return !(streakOn && streakBlocked)
+    if (step === 3 && assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
+      return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
+    }
     return true
   }
 
@@ -460,6 +469,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         exam_watermark_enabled: examWatermarkEnabled,
         secure_browser_mode: secureBrowserMode,
         android_exam_mode: androidExamMode,
+        ...(secureBrowserMode === 'seb_required' ? {
+          seb_quit_password: {
+            password: sebQuitPassword,
+            confirmation: sebQuitPasswordConfirmation,
+          },
+        } : {}),
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -572,6 +587,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   type="button"
                   onClick={() => {
                     setAssignmentType(t)
+                    if (t !== 'exam') {
+                      setSecureBrowserMode('browser')
+                      setAndroidExamMode('blocked')
+                      setSebQuitPassword('')
+                      setSebQuitPasswordConfirmation('')
+                    }
                     if (attemptsAuto) {
                       setMaxAttempts(t === 'exam' ? '1' : '')
                       setRetryScope(t === 'exam' ? 'all' : 'wrong_only')
@@ -1234,7 +1255,11 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   onChange={event => {
                     const enabled = event.target.checked
                     setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
-                    if (!enabled) setAndroidExamMode('blocked')
+                    if (!enabled) {
+                      setAndroidExamMode('blocked')
+                      setSebQuitPassword('')
+                      setSebQuitPasswordConfirmation('')
+                    }
                     if (enabled) setProctoringEnabled(true)
                   }}
                   className="accent-primary w-4 h-4 shrink-0"
@@ -1270,6 +1295,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                       Android monitored ตรวจการสลับแอป/ออกจากหน้าและการเชื่อมต่อ แต่เว็บห้ามหรือตรวจ screenshot ของระบบไม่ได้ จึงมีความมั่นใจต่ำกว่า SEB
                     </p>
                   )}
+                  <SebQuitPasswordFields
+                    idPrefix="create-seb-quit"
+                    password={sebQuitPassword}
+                    confirmation={sebQuitPasswordConfirmation}
+                    onPasswordChange={setSebQuitPassword}
+                    onConfirmationChange={setSebQuitPasswordConfirmation}
+                    disabled={isPending}
+                  />
                 </div>
               )}
             </div>
@@ -1515,6 +1548,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   : []),
                 ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
                   ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
+                  : []),
+                ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
+                  ? [{ label: 'รหัสออก SEB', value: 'ครูกำหนดแล้ว · ระบบไม่แสดงค่า' }]
                   : []),
                 ...(assignmentType === 'exam' && androidExamMode === 'monitored'
                   ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]

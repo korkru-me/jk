@@ -28,6 +28,8 @@ import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
+import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-password-settings'
+import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -43,11 +45,15 @@ interface Props {
   bank: BankQuestion[]
   /** True once anyone has started an attempt — the question set is then frozen. */
   hasSubmissions: boolean
+  sebQuitPasswordSetup: SebQuitPasswordSetupState
 }
 
 export type EditableAssignment = Pick<
   Assignment,
   | 'id'
+  | 'org_id'
+  | 'created_by'
+  | 'status'
   | 'title'
   | 'description'
   | 'question_ids'
@@ -90,7 +96,7 @@ export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'questi
   default_points: number
 }
 
-export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions }: Props) {
+export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions, sebQuitPasswordSetup }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -364,29 +370,38 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               ตรวจความพร้อม SEB
             </Link>
             {hasSubmissions ? ' · ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำข้อสอบ' : ''}
+            {a.secure_browser_mode !== 'seb_required' && secureBrowserMode === 'seb_required'
+              ? ' · เมื่อบันทึก ระบบจะเก็บข้อสอบเป็นร่างจนกว่าครูเจ้าของจะตั้งรหัสออก'
+              : ''}
           </p>
           {secureBrowserMode === 'seb_required' && (
-            <label className={`ml-11 flex items-start justify-between gap-4 rounded-lg border border-warning/30 bg-warning/5 p-3 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
-              <div className="flex items-start gap-3">
-                <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูตรวจเครื่อง</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    นักเรียนต้องขออนุมัติหน้าห้องสอบ ระบบแจ้งเมื่อออกจากหน้า แต่เว็บป้องกันการแคปหน้าจอระดับระบบไม่ได้
-                  </p>
+            <>
+              <label className={`ml-11 flex items-start justify-between gap-4 rounded-lg border border-warning/30 bg-warning/5 p-3 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
+                <div className="flex items-start gap-3">
+                  <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูตรวจเครื่อง</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      นักเรียนต้องขออนุมัติหน้าห้องสอบ ระบบแจ้งเมื่อออกจากหน้า แต่เว็บป้องกันการแคปหน้าจอระดับระบบไม่ได้
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={androidExamMode === 'monitored'}
-                disabled={hasSubmissions}
-                onChange={event => {
-                  setAndroidExamMode(event.target.checked ? 'monitored' : 'blocked')
-                  if (event.target.checked) setProctoringEnabled(true)
-                }}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                <input
+                  type="checkbox"
+                  checked={androidExamMode === 'monitored'}
+                  disabled={hasSubmissions}
+                  onChange={event => {
+                    setAndroidExamMode(event.target.checked ? 'monitored' : 'blocked')
+                    if (event.target.checked) setProctoringEnabled(true)
+                  }}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                />
+              </label>
+              <SebQuitPasswordSettings
+                assignmentId={a.id}
+                initialState={sebQuitPasswordSetup}
               />
-            </label>
+            </>
           )}
         </Card>
       )}

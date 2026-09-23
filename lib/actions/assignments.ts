@@ -10,6 +10,15 @@ import { decideCompletion, streakForcedSettings } from '@/lib/streak-completion'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 import { inspectSebReadiness } from '@/lib/seb'
 import { resolveNewAssignmentMathTools } from '@/lib/assignment-math-tools'
+import {
+  SebQuitPasswordError,
+  assertStrongSebQuitPassword,
+  toSafeSebQuitPasswordError,
+} from '@/lib/seb-quit-password-core.server'
+import {
+  createSebQuitPasswordRevisionForOwner,
+  hasSebQuitPasswordRevision,
+} from '@/lib/seb-quit-password-service.server'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -26,6 +35,7 @@ function normalizeQuestionsPerPage(mode: string, value: number | null | undefine
 }
 
 const SEB_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ เพราะระบบตั้งค่าไม่ครบ กรุณาตรวจที่ การตั้งค่า > ตั้งค่าข้อสอบเริ่มต้น'
+const SEB_QUIT_PASSWORD_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ กรุณาให้ครูเจ้าของข้อสอบตั้งรหัสออกก่อน'
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -87,6 +97,11 @@ interface CreateAssignmentData {
   exam_watermark_enabled?: boolean
   secure_browser_mode?: SecureBrowserMode
   android_exam_mode?: AndroidExamMode
+  /** Sent once to the trusted Server Action. Never stored or returned. */
+  seb_quit_password?: {
+    password: string
+    confirmation: string
+  }
   status?: AssignmentStatus
 }
 
@@ -168,6 +183,33 @@ export async function createAssignment(data: CreateAssignmentData) {
     && secureBrowserMode === 'seb_required'
     && !await isSebPublishingReady(supabase)
   ) return { error: SEB_NOT_READY_ERROR }
+
+  let sebQuitPassword: { password: string; confirmation: string } | null = null
+  if (secureBrowserMode === 'seb_required') {
+    const input = data.seb_quit_password as unknown
+    if (
+      typeof input !== 'object'
+      || input === null
+      || Array.isArray(input)
+      || Reflect.ownKeys(input).length !== 2
+      || !Object.prototype.hasOwnProperty.call(input, 'password')
+      || !Object.prototype.hasOwnProperty.call(input, 'confirmation')
+      || typeof (input as { password?: unknown }).password !== 'string'
+      || typeof (input as { confirmation?: unknown }).confirmation !== 'string'
+    ) {
+      return { error: toSafeSebQuitPasswordError(new SebQuitPasswordError('SEB_QUIT_PASSWORD_INVALID_COMMAND')).message }
+    }
+    sebQuitPassword = {
+      password: (input as { password: string }).password,
+      confirmation: (input as { confirmation: string }).confirmation,
+    }
+    try {
+      // Reject weak or mismatched values before creating any assignment row.
+      assertStrongSebQuitPassword(sebQuitPassword.password, sebQuitPassword.confirmation)
+    } catch (error) {
+      return { error: toSafeSebQuitPasswordError(error).message }
+    }
+  }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled === true || secureBrowserMode === 'seb_required')
   // Re-asking only the missed questions needs an online attempt to re-open
@@ -281,7 +323,10 @@ export async function createAssignment(data: CreateAssignmentData) {
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled === true,
       secure_browser_mode: secureBrowserMode,
       android_exam_mode: androidExamMode,
-      status: data.status ?? 'draft',
+      // A new SEB exam remains private until its password revision has been
+      // appended successfully below. This avoids a published-but-unusable
+      // window between the assignment insert and the revision RPC.
+      status: secureBrowserMode === 'seb_required' ? 'draft' : (data.status ?? 'draft'),
     })
     .select('id')
     .single()
@@ -292,7 +337,42 @@ export async function createAssignment(data: CreateAssignmentData) {
     .from('assignment_classrooms')
     .insert(data.classroom_ids.map(classroom_id => ({ assignment_id: assignment.id, classroom_id })))
 
-  if (linkError) return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนนี้' }
+  if (linkError) {
+    await supabase.from('assignments').delete().eq('id', assignment.id).eq('created_by', user.id)
+    return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนนี้' }
+  }
+
+  if (secureBrowserMode === 'seb_required' && sebQuitPassword) {
+    try {
+      await createSebQuitPasswordRevisionForOwner({
+        assignmentId: assignment.id,
+        expectedRevision: 0,
+        password: sebQuitPassword.password,
+        confirmation: sebQuitPassword.confirmation,
+      }, user.id)
+    } catch (passwordError) {
+      // This assignment was created by this request and has never been shown
+      // to the caller. Best-effort cleanup keeps a failed password write from
+      // leaving an incomplete draft behind; the DB cascade also removes a
+      // revision if the transport failed after its transaction committed.
+      await supabase.from('assignments').delete().eq('id', assignment.id).eq('created_by', user.id)
+      return { error: toSafeSebQuitPasswordError(passwordError).message }
+    }
+
+    if (data.status === 'published') {
+      const { data: publishedAssignment, error: publishError } = await supabase
+        .from('assignments')
+        .update({ status: 'published' })
+        .eq('id', assignment.id)
+        .eq('created_by', user.id)
+        .select('id')
+        .maybeSingle()
+      if (publishError || !publishedAssignment) {
+        await supabase.from('assignments').delete().eq('id', assignment.id).eq('created_by', user.id)
+        return { error: 'สร้างข้อสอบ SEB ไม่สำเร็จ กรุณาลองใหม่' }
+      }
+    }
+  }
 
   revalidatePath('/assignments')
   redirect(`/assignments/${assignment.id}`)
@@ -315,6 +395,12 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
       && !await isSebPublishingReady(supabase)
     ) {
       return { error: SEB_NOT_READY_ERROR }
+    }
+    if (
+      assignment?.secure_browser_mode === 'seb_required'
+      && !await hasSebQuitPasswordRevision(id)
+    ) {
+      return { error: SEB_QUIT_PASSWORD_NOT_READY_ERROR }
     }
   }
 
@@ -465,11 +551,19 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     && data.android_exam_mode === 'monitored'
       ? 'monitored'
       : 'blocked'
+  const enablingSeb = secureBrowserMode === 'seb_required'
+    && (existing.secure_browser_mode ?? 'browser') !== 'seb_required'
   if (
     existing.status === 'published'
     && secureBrowserMode === 'seb_required'
     && !await isSebPublishingReady(supabase)
   ) return { error: SEB_NOT_READY_ERROR }
+  if (
+    existing.status === 'published'
+    && secureBrowserMode === 'seb_required'
+    && !enablingSeb
+    && !await hasSebQuitPasswordRevision(id)
+  ) return { error: SEB_QUIT_PASSWORD_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled || secureBrowserMode === 'seb_required')
   // Same rule as createAssignment: only an online งาน that can be reopened
@@ -648,6 +742,10 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled,
       secure_browser_mode: secureBrowserMode,
       android_exam_mode: androidExamMode,
+      // Turning SEB on is a two-step owner flow for an existing exam: first
+      // make the assignment private and eligible, then set the password and
+      // publish. Students must never see an SEB exam between those steps.
+      ...(enablingSeb ? { status: 'draft' } : {}),
       ...(data.require_work_image === undefined ? {} : { require_work_image: data.require_work_image }),
       ...(data.calculator_enabled === undefined
         ? {}
