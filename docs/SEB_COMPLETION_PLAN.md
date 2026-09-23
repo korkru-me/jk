@@ -158,6 +158,8 @@ browser ปกติออกจาก native SEB ตามจริง แล�
 
 ## เฟส S4 — ทางออก, พักสอบ และรหัสรายครู
 
+**สถานะ: server/database binding เสร็จใน branch SEB; ยังไม่ apply migration/deploy และยังรอ native artifact enrollment** — ครูเจ้าของตั้งรหัสออกต่อ assignment, การหมุนรหัสคืนข้อสอบเป็น draft, release registry ผูก private artifact + CK/BEK กับ exact revision และ session/attempt ตรวจ revision + access mode เดิมทุก boundary รายละเอียดอยู่ที่ `docs/SEB_ASSIGNMENT_ARTIFACT_PHASE4.md`
+
 นโยบายเดิมที่ยืนยันไว้คือ เมื่อครูอนุญาตให้ออกกลางคัน ให้กลับมาทำ attempt เดิมได้และเวลาไม่หยุด
 แต่ implementation ต้องแยก “สิทธิ์ในเว็บ” ออกจาก “native SEB ปิดจริง”
 

@@ -20,6 +20,8 @@ export interface SebChallengeClaims {
   kind: 'seb_challenge'
   userId: string
   assignmentId: string
+  configRevision: string
+  assignmentConfigRevision: number
   purpose: SebChallengePurpose
   nonce: string
   issuedAt: number
@@ -31,6 +33,7 @@ export interface SebSessionClaims {
   userId: string
   assignmentId: string
   configRevision: string
+  assignmentConfigRevision: number
   platform: SebPlatform
   version: string
   issuedAt: number
@@ -71,6 +74,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const MAX_VERSION_LENGTH = 240
 const SAFE_METADATA_PATTERN = /^[A-Za-z0-9.+-]{1,40}$/
 const SAFE_REVISION_PATTERN = /^[A-Za-z0-9._-]{1,120}$/
+const MAX_ASSIGNMENT_CONFIG_REVISION = 2_147_483_646
 const SEB_KEY_REGISTRY_FIELDS = new Set(['schemaVersion', 'configRevision', 'entries'])
 const SEB_KEY_ENTRY_FIELDS = new Set(['platform', 'versionString', 'buildNumber', 'key'])
 
@@ -92,6 +96,20 @@ function normalizedHash(value: string | undefined) {
 function validConfigRevision(value: string | undefined) {
   const trimmed = value?.trim() ?? ''
   return SAFE_REVISION_PATTERN.test(trimmed) ? trimmed : null
+}
+
+function validAssignmentConfigRevision(value: unknown): value is number {
+  return Number.isInteger(value)
+    && (value as number) >= 1
+    && (value as number) <= MAX_ASSIGNMENT_CONFIG_REVISION
+}
+
+/** Session signing is shared infrastructure; assignment CK/BEKs are not. */
+export function readSebSessionSecret(
+  environment: Record<string, string | undefined> = process.env,
+) {
+  const secret = environment.SEB_SESSION_SECRET?.trim() ?? ''
+  return secret.length >= 32 ? secret : null
 }
 
 function parseSebBrowserExamKeyRegistry(
@@ -338,7 +356,7 @@ export function readSebEnvironment(
 }
 
 export function selectSebBrowserExamKeys(
-  entries: SebBrowserExamKeyEntry[],
+  entries: readonly SebBrowserExamKeyEntry[],
   version: SebVersionInfo,
 ) {
   return entries
@@ -449,6 +467,8 @@ export function verifySebClaims(token: string, secret: string, now = Date.now())
         (parsed.purpose !== 'take' && parsed.purpose !== 'system_check')
         || typeof parsed.nonce !== 'string'
         || !/^[0-9a-f]{32}$/.test(parsed.nonce)
+        || !validConfigRevision(parsed.configRevision)
+        || !validAssignmentConfigRevision(parsed.assignmentConfigRevision)
       ) return null
       return parsed as SebChallengeClaims
     }
@@ -458,6 +478,7 @@ export function verifySebClaims(token: string, secret: string, now = Date.now())
     if (
       (sessionClaims.platform !== 'windows' && sessionClaims.platform !== 'macos' && sessionClaims.platform !== 'ios')
       || !validConfigRevision(sessionClaims.configRevision)
+      || !validAssignmentConfigRevision(sessionClaims.assignmentConfigRevision)
       || !sessionVersion
       || sessionVersion.platform !== sessionClaims.platform
     ) return null
@@ -470,6 +491,8 @@ export function verifySebClaims(token: string, secret: string, now = Date.now())
 export function createSebChallengeClaims(
   userId: string,
   assignmentId: string,
+  configRevision: string,
+  assignmentConfigRevision: number,
   purpose: SebChallengePurpose = 'take',
   now = Date.now(),
 ): SebChallengeClaims {
@@ -477,6 +500,8 @@ export function createSebChallengeClaims(
     kind: 'seb_challenge',
     userId,
     assignmentId,
+    configRevision,
+    assignmentConfigRevision,
     purpose,
     nonce: randomBytes(16).toString('hex'),
     issuedAt: now,
@@ -488,6 +513,7 @@ export function createSebSessionClaims(input: {
   userId: string
   assignmentId: string
   configRevision: string
+  assignmentConfigRevision: number
   platform: SebPlatform
   version: string
   now?: number
@@ -498,6 +524,7 @@ export function createSebSessionClaims(input: {
     userId: input.userId,
     assignmentId: input.assignmentId,
     configRevision: input.configRevision,
+    assignmentConfigRevision: input.assignmentConfigRevision,
     platform: input.platform,
     version: input.version,
     issuedAt: now,

@@ -23,10 +23,11 @@ fields are required before the teacher can leave the settings step. The
 client-side checks mirror the server contract for immediate feedback, while
 the server remains authoritative.
 
-The assignment is first inserted as `draft`. Classroom links are then created,
-revision 1 is appended through the Phase 2 service-only boundary, and only
-then may a requested `published` status be applied. Failure in any of these
-steps does not leave a published SEB assignment without a password revision.
+The assignment is first inserted as `draft`. Classroom links are then created
+and revision 1 is appended through the Phase 2 service-only boundary. A create
+form that requested `published` still remains `draft`: Phase 4 must register the
+exact `.seb` artifact, CK and BEKs for that revision before publication is
+allowed. Failure in any step therefore cannot expose an incomplete SEB exam.
 Plaintext is sent only to the trusted Server Action and is never included in
 the confirmation summary.
 
@@ -44,9 +45,10 @@ do not learn whether a revision exists. Rotation remains blocked for a closed
 assignment or while any attempt is `in_progress`.
 
 If an existing published browser exam is changed to require SEB, the update
-returns it to `draft`. The owner must set a quit password before publishing it
-again. Publishing an SEB assignment fails closed when either global SEB
-readiness or an assignment-specific password revision is missing.
+returns it to `draft`. The owner must set a quit password and the exact Phase 4
+artifact release must be registered before publishing it again. Publishing an
+SEB assignment fails closed when either shared signing/canonical URL readiness
+or the current assignment-specific release is missing.
 
 ## Server boundary
 
@@ -83,8 +85,10 @@ must:
 3. bind that exact config revision into the signed SEB session; and
 4. recheck it in the same database transaction that creates the attempt.
 
-Until those conditions and native platform evidence are complete, the teacher
-UI is a branch-only workflow and the assignment remains not ready for release.
+Phase 4 now implements the server/database binding described above; see
+[`SEB_ASSIGNMENT_ARTIFACT_PHASE4.md`](./SEB_ASSIGNMENT_ARTIFACT_PHASE4.md).
+Native artifact generation/enrollment and supported-platform evidence remain
+required before an assignment can be released.
 
 ## Deployment status
 

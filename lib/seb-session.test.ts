@@ -12,6 +12,7 @@ const OTHER_USER = '22222222-2222-4222-8222-222222222222'
 const ASSIGNMENT = '33333333-3333-4333-8333-333333333333'
 const OTHER_ASSIGNMENT = '44444444-4444-4444-8444-444444444444'
 const CONFIG_REVISION = 'korkru-production-v1-ce946d68df1f9a127b63a8cd16ad3f04a1d93c5e2c82c3b77b09174ae6e14cec'
+const ASSIGNMENT_CONFIG_REVISION = 3
 const originalEnvironment = { ...process.env }
 
 describe('SEB challenge context boundary', () => {
@@ -37,23 +38,61 @@ describe('SEB challenge context boundary', () => {
 
   it('accepts only the exact user, assignment and purpose', () => {
     const token = signSebClaims(
-      createSebChallengeClaims(USER, ASSIGNMENT, 'system_check'),
+      createSebChallengeClaims(
+        USER,
+        ASSIGNMENT,
+        CONFIG_REVISION,
+        ASSIGNMENT_CONFIG_REVISION,
+        'system_check',
+      ),
       SECRET,
     )
-    expect(validateSebChallenge(token, USER, ASSIGNMENT, 'system_check')).not.toBeNull()
-    expect(validateSebChallenge(token, OTHER_USER, ASSIGNMENT, 'system_check')).toBeNull()
-    expect(validateSebChallenge(token, USER, OTHER_ASSIGNMENT, 'system_check')).toBeNull()
-    expect(validateSebChallenge(token, USER, ASSIGNMENT, 'take')).toBeNull()
+    expect(validateSebChallenge(
+      token, USER, ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION, 'system_check',
+    )).not.toBeNull()
+    expect(validateSebChallenge(
+      token, OTHER_USER, ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION, 'system_check',
+    )).toBeNull()
+    expect(validateSebChallenge(
+      token, USER, OTHER_ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION, 'system_check',
+    )).toBeNull()
+    expect(validateSebChallenge(
+      token, USER, ASSIGNMENT, 'different-release', ASSIGNMENT_CONFIG_REVISION, 'system_check',
+    )).toBeNull()
+    expect(validateSebChallenge(
+      token, USER, ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION + 1, 'system_check',
+    )).toBeNull()
+    expect(validateSebChallenge(
+      token, USER, ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION, 'take',
+    )).toBeNull()
   })
 
   it('rejects missing, expired and tampered tokens', () => {
-    expect(validateSebChallenge(undefined, USER, ASSIGNMENT)).toBeNull()
+    expect(validateSebChallenge(
+      undefined, USER, ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION,
+    )).toBeNull()
     const expired = signSebClaims(
-      createSebChallengeClaims(USER, ASSIGNMENT, 'take', 1_000),
+      createSebChallengeClaims(
+        USER,
+        ASSIGNMENT,
+        CONFIG_REVISION,
+        ASSIGNMENT_CONFIG_REVISION,
+        'take',
+        1_000,
+      ),
       SECRET,
     )
-    expect(validateSebChallenge(expired, USER, ASSIGNMENT)).toBeNull()
-    const live = signSebClaims(createSebChallengeClaims(USER, ASSIGNMENT), SECRET)
-    expect(validateSebChallenge(`${live}x`, USER, ASSIGNMENT)).toBeNull()
+    expect(validateSebChallenge(
+      expired, USER, ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION,
+    )).toBeNull()
+    const live = signSebClaims(createSebChallengeClaims(
+      USER,
+      ASSIGNMENT,
+      CONFIG_REVISION,
+      ASSIGNMENT_CONFIG_REVISION,
+    ), SECRET)
+    expect(validateSebChallenge(
+      `${live}x`, USER, ASSIGNMENT, CONFIG_REVISION, ASSIGNMENT_CONFIG_REVISION,
+    )).toBeNull()
   })
 })

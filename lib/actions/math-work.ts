@@ -117,7 +117,7 @@ async function loadWritableStudentArtifactContext(
       id, org_id, submission_id,
       questions(question_type, answer_parts),
       submissions(
-        id, org_id, student_id, status, started_at, assignment_id,
+        id, org_id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
         assignments(
           id, org_id, mode, duration_minutes, end_at, require_work_image,
           scratchpad_enabled, secure_browser_mode, android_exam_mode
@@ -164,6 +164,10 @@ async function loadWritableStudentArtifactContext(
       studentId,
       submission.assignment_id,
       assignment.android_exam_mode === 'monitored',
+      submission.seb_config_revision,
+      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+        ? submission.exam_access_mode
+        : null,
     )
   ) {
     return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' }

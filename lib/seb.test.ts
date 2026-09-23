@@ -7,6 +7,7 @@ import {
   normalizeSebRequestUrl,
   parseSebVersion,
   readSebEnvironment,
+  readSebSessionSecret,
   selectSebBrowserExamKeys,
   signSebClaims,
   verifySebClaims,
@@ -19,6 +20,7 @@ const CONFIG_REVISION = `production-v1-${'c'.repeat(64)}`
 const SECRET = 'phase-one-seb-session-secret-for-tests'
 const USER_ID = '11111111-1111-4111-8111-111111111111'
 const ASSIGNMENT_ID = '22222222-2222-4222-8222-222222222222'
+const ASSIGNMENT_CONFIG_REVISION = 7
 const REQUEST_URL = `https://exam.example/assignments/${ASSIGNMENT_ID}/take?sebChallenge=token#ignored`
 const WINDOWS_VERSION = 'SEB_Windows_3.10.2_920_org.safeexambrowser.SafeExamBrowser'
 const ALL_KEY_ENTRIES = [
@@ -101,6 +103,8 @@ describe('SEB request verification', () => {
 
 describe('SEB environment and version validation', () => {
   it('rejects incomplete secret/key configuration', () => {
+    expect(readSebSessionSecret({ SEB_SESSION_SECRET: SECRET })).toBe(SECRET)
+    expect(readSebSessionSecret({ SEB_SESSION_SECRET: 'short' })).toBeNull()
     expect(readSebEnvironment({ SEB_SESSION_SECRET: 'short' })).toBeNull()
     expect(readSebEnvironment({
       SEB_SESSION_SECRET: SECRET,
@@ -285,7 +289,14 @@ describe('SEB environment and version validation', () => {
 
 describe('signed SEB claims', () => {
   it('binds a short-lived challenge to one user and assignment', () => {
-    const claims = createSebChallengeClaims(USER_ID, ASSIGNMENT_ID, 'system_check', 1_000)
+    const claims = createSebChallengeClaims(
+      USER_ID,
+      ASSIGNMENT_ID,
+      CONFIG_REVISION,
+      ASSIGNMENT_CONFIG_REVISION,
+      'system_check',
+      1_000,
+    )
     const token = signSebClaims(claims, SECRET)
     expect(verifySebClaims(token, SECRET, 2_000)).toMatchObject({
       kind: 'seb_challenge', userId: USER_ID, assignmentId: ASSIGNMENT_ID, purpose: 'system_check',
@@ -294,7 +305,14 @@ describe('signed SEB claims', () => {
   })
 
   it('rejects a challenge without a recognized purpose', () => {
-    const claims = createSebChallengeClaims(USER_ID, ASSIGNMENT_ID, 'take', 1_000)
+    const claims = createSebChallengeClaims(
+      USER_ID,
+      ASSIGNMENT_ID,
+      CONFIG_REVISION,
+      ASSIGNMENT_CONFIG_REVISION,
+      'take',
+      1_000,
+    )
     const token = signSebClaims({ ...claims, purpose: 'other' } as never, SECRET)
     expect(verifySebClaims(token, SECRET, 2_000)).toBeNull()
   })
@@ -304,6 +322,7 @@ describe('signed SEB claims', () => {
       userId: USER_ID,
       assignmentId: ASSIGNMENT_ID,
       configRevision: CONFIG_REVISION,
+      assignmentConfigRevision: ASSIGNMENT_CONFIG_REVISION,
       platform: 'windows',
       version: WINDOWS_VERSION,
       now: 1_000,
@@ -311,6 +330,7 @@ describe('signed SEB claims', () => {
     expect(verifySebClaims(token, SECRET, 2_000)).toMatchObject({
       kind: 'seb_session',
       configRevision: CONFIG_REVISION,
+      assignmentConfigRevision: ASSIGNMENT_CONFIG_REVISION,
     })
     expect(verifySebClaims(`${token}x`, SECRET, 2_000)).toBeNull()
   })
@@ -320,6 +340,7 @@ describe('signed SEB claims', () => {
       userId: USER_ID,
       assignmentId: ASSIGNMENT_ID,
       configRevision: CONFIG_REVISION,
+      assignmentConfigRevision: ASSIGNMENT_CONFIG_REVISION,
       platform: 'windows',
       version: WINDOWS_VERSION,
       now: 1_000,

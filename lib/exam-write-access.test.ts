@@ -30,6 +30,8 @@ function answerRow(overrides: Record<string, unknown> = {}) {
       status: 'in_progress',
       started_at: new Date(Date.now() - 60_000).toISOString(),
       assignment_id: ASSIGNMENT,
+      seb_config_revision: 4,
+      exam_access_mode: 'seb',
       current_streak: 0,
       best_streak: 0,
       streak_reached: false,
@@ -134,7 +136,7 @@ describe('writable exam answer boundary', () => {
     mocks.getExamAccessSession.mockResolvedValue(null)
     expect(await getWritableStudentAnswer(admin(answerRow()) as never, 'answer', STUDENT))
       .toEqual({ error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' })
-    expect(mocks.getExamAccessSession).toHaveBeenCalledWith(STUDENT, ASSIGNMENT, false)
+    expect(mocks.getExamAccessSession).toHaveBeenCalledWith(STUDENT, ASSIGNMENT, false, 4, 'seb')
   })
 
   it('passes Android monitored allowance without treating a normal exam as SEB', async () => {
@@ -145,7 +147,7 @@ describe('writable exam answer boundary', () => {
       },
     })
     expect('error' in await getWritableStudentAnswer(admin(monitored) as never, 'answer', STUDENT)).toBe(false)
-    expect(mocks.getExamAccessSession).toHaveBeenCalledWith(STUDENT, ASSIGNMENT, true)
+    expect(mocks.getExamAccessSession).toHaveBeenCalledWith(STUDENT, ASSIGNMENT, true, 4, 'seb')
 
     mocks.getExamAccessSession.mockClear()
     const browser = answerRow({

@@ -21,6 +21,10 @@ import { buildAnswerFeedback, type FeedbackQuestion } from '@/lib/answer-feedbac
 import type { Question } from '@/lib/types'
 import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
+import {
+  createAssignmentSebSignedDownloadUrl,
+  readCurrentAssignmentSebRelease,
+} from '@/lib/seb-assignment-release.server'
 import { parseMathInputModes } from '@/lib/math/input-mode'
 import { hasCompleteWorkEvidence } from '@/lib/math-work'
 import { getWritableStudentAnswer } from '@/lib/exam-write-access'
@@ -59,7 +63,7 @@ export async function startSubmission(
       .maybeSingle(),
     admin
       .from('submissions')
-      .select('id, status, attempt_number, started_at')
+      .select('id, status, attempt_number, started_at, exam_access_mode, seb_config_revision')
       .eq('assignment_id', assignmentId)
       .eq('student_id', user.id)
       .order('attempt_number', { ascending: false })
@@ -106,25 +110,63 @@ export async function startSubmission(
   // teacher approves that exact student and assignment in the proctor room.
   const secureBrowserRequired = assignment.secure_browser_mode === 'seb_required'
   const androidMonitoredAllowed = assignment.android_exam_mode === 'monitored'
+  const currentSebRelease = secureBrowserRequired
+    ? await readCurrentAssignmentSebRelease(assignmentId)
+    : null
+  const existing = existingRes.data
+  const expectedSebRevision = existing?.status === 'in_progress'
+    && typeof existing.seb_config_revision === 'number'
+      ? existing.seb_config_revision
+      : currentSebRelease?.revision
+  const expectedAccessMode = existing?.status === 'in_progress'
+    ? existing.exam_access_mode === 'seb' || existing.exam_access_mode === 'android_monitored'
+      ? existing.exam_access_mode
+      : null
+    : undefined
   const examAccess = secureBrowserRequired
-    ? await getExamAccessSession(user.id, assignmentId, androidMonitoredAllowed)
+    ? await getExamAccessSession(
+        user.id,
+        assignmentId,
+        androidMonitoredAllowed,
+        expectedSebRevision,
+        expectedAccessMode,
+      )
     : null
   if (secureBrowserRequired && !examAccess) {
-    const reusableChallenge = validateSebChallenge(sebChallenge, user.id, assignmentId, 'take')
-    const challenge = reusableChallenge
-      ? sebChallenge!
-      : createSebChallenge(user.id, assignmentId, 'take')
+    const reusableChallenge = currentSebRelease
+      ? validateSebChallenge(
+          sebChallenge,
+          user.id,
+          assignmentId,
+          currentSebRelease.releaseId,
+          currentSebRelease.revision,
+          'take',
+        )
+      : null
+    const challenge = !currentSebRelease
+      ? null
+      : reusableChallenge
+        ? sebChallenge!
+        : createSebChallenge(
+            user.id,
+            assignmentId,
+            currentSebRelease.releaseId,
+            currentSebRelease.revision,
+            'take',
+          )
+    const configUrl = currentSebRelease && challenge
+      ? await createAssignmentSebSignedDownloadUrl(currentSebRelease)
+      : null
     return {
       requiresSecureBrowser: true as const,
-      sebConfigured: challenge !== null,
+      sebConfigured: challenge !== null && configUrl !== null,
       androidMonitoredAllowed,
-      challenge,
+      challenge: configUrl ? challenge : null,
+      configUrl,
     }
   }
 
   // Return existing in-progress submission, or decide on a retry
-  const existing = existingRes.data
-
   let attemptNumber = 1
   // Set to the attempt a wrong-only retry rebuilds from. Null on a first
   // attempt and whenever the งาน re-asks everything, which is the default.
@@ -132,6 +174,12 @@ export async function startSubmission(
   if (existing) {
     if (existing.status === 'in_progress') {
       if (!isAttemptExpired(existing.started_at, assignment.duration_minutes)) {
+        if (
+          examAccess?.mode === 'seb'
+          && existing.seb_config_revision !== examAccess.assignmentConfigRevision
+        ) {
+          return { error: 'ไฟล์ตั้งค่าของรอบสอบนี้ไม่ตรงกัน กรุณาแจ้งครูผู้คุมสอบ' }
+        }
         if (examAccess) {
           await admin.from('submissions').update(examAccess.mode === 'seb'
             ? {
@@ -254,33 +302,65 @@ export async function startSubmission(
   // they have a personal workspace it is not the assignment's tenant.
   const orgId = assignment.org_id
 
-  // Create submission with correct total max_score
-  const { data: submission, error: subError } = await admin
-    .from('submissions')
-    .insert({
-      org_id: orgId,
-      assignment_id: assignmentId,
-      student_id: user.id,
-      max_score: totalMaxScore,
-      status: 'in_progress',
-      attempt_number: attemptNumber,
-      exam_access_mode: examAccess?.mode ?? 'browser',
-      secure_browser_verified_at: examAccess?.mode === 'seb'
-        ? new Date(examAccess.issuedAt).toISOString()
-        : null,
-      secure_browser_platform: examAccess?.mode === 'seb' ? examAccess.platform : null,
-      secure_browser_version: examAccess?.mode === 'seb' ? examAccess.version : null,
-      android_approved_at: examAccess?.mode === 'android_monitored'
-        ? new Date(examAccess.approvedAt).toISOString()
-        : null,
-      android_approved_by: examAccess?.mode === 'android_monitored'
-        ? examAccess.approvedBy
-        : null,
+  // A new SEB attempt crosses one database transaction that locks the
+  // assignment and re-checks the exact current immutable release revision.
+  // Browser and teacher-approved Android attempts keep their existing path.
+  let submission: { id: string } | null = null
+  let subError: { message: string } | null = null
+  if (examAccess?.mode === 'seb') {
+    const created = await admin.rpc('create_seb_submission_with_revision', {
+      p_org_id: orgId,
+      p_assignment_id: assignmentId,
+      p_student_id: user.id,
+      p_max_score: totalMaxScore,
+      p_attempt_number: attemptNumber,
+      p_verified_at: new Date(examAccess.issuedAt).toISOString(),
+      p_platform: examAccess.platform,
+      p_version: examAccess.version,
+      p_config_revision: examAccess.assignmentConfigRevision,
     })
-    .select('id')
-    .single()
+    const row = Array.isArray(created.data) && created.data.length === 1
+      ? created.data[0] as Record<string, unknown>
+      : null
+    if (
+      created.error
+      || !row
+      || Reflect.ownKeys(row).length !== 2
+      || typeof row.submission_id !== 'string'
+      || row.seb_config_revision !== examAccess.assignmentConfigRevision
+    ) {
+      subError = { message: created.error?.message ?? 'สร้างรอบสอบ SEB ไม่สำเร็จ กรุณาเปิดข้อสอบใหม่' }
+    } else {
+      submission = { id: row.submission_id }
+    }
+  } else {
+    const created = await admin
+      .from('submissions')
+      .insert({
+        org_id: orgId,
+        assignment_id: assignmentId,
+        student_id: user.id,
+        max_score: totalMaxScore,
+        status: 'in_progress',
+        attempt_number: attemptNumber,
+        exam_access_mode: examAccess?.mode ?? 'browser',
+        secure_browser_verified_at: null,
+        secure_browser_platform: null,
+        secure_browser_version: null,
+        android_approved_at: examAccess?.mode === 'android_monitored'
+          ? new Date(examAccess.approvedAt).toISOString()
+          : null,
+        android_approved_by: examAccess?.mode === 'android_monitored'
+          ? examAccess.approvedBy
+          : null,
+      })
+      .select('id')
+      .single()
+    submission = created.data
+    subError = created.error
+  }
 
-  if (subError) return { error: subError.message }
+  if (subError || !submission) return { error: subError?.message ?? 'สร้างรอบสอบไม่สำเร็จ' }
 
   // A streak attempt opens with neither, and an empty insert is not worth
   // asking the database about.
@@ -307,7 +387,15 @@ export async function startSubmission(
  */
 async function attemptWriteBlocked(
   admin: ReturnType<typeof createAdminClient>,
-  submission: { id: string; student_id: string; status: string; started_at: string; assignment_id: string },
+  submission: {
+    id: string
+    student_id: string
+    status: string
+    started_at: string
+    assignment_id: string
+    seb_config_revision: number | null
+    exam_access_mode: string
+  },
   assignment: {
     duration_minutes?: number | null
     end_at?: string | null
@@ -343,6 +431,10 @@ async function attemptWriteBlocked(
       studentId,
       submission.assignment_id,
       assignment.android_exam_mode === 'monitored',
+      submission.seb_config_revision,
+      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+        ? submission.exam_access_mode
+        : null,
     )
   ) {
     return 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่'
@@ -668,7 +760,7 @@ export async function drawNextStreakQuestion(
   const { data: submission } = await admin
     .from('submissions')
     .select(`
-      id, student_id, status, started_at, assignment_id,
+      id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
       current_streak, best_streak, streak_reached,
       assignments(
         id, org_id, question_ids, question_points, shuffle_options, mode, duration_minutes, end_at,
@@ -707,6 +799,10 @@ export async function drawNextStreakQuestion(
       status: submission.status as string,
       started_at: submission.started_at as string,
       assignment_id: submission.assignment_id as string,
+      seb_config_revision: typeof submission.seb_config_revision === 'number'
+        ? submission.seb_config_revision
+        : null,
+      exam_access_mode: submission.exam_access_mode as string,
     },
     assignment,
     user.id,
@@ -924,6 +1020,10 @@ async function gradeAndFinalizeSubmission(
       studentId,
       submission.assignment_id,
       assignment.android_exam_mode === 'monitored',
+      typeof submission.seb_config_revision === 'number' ? submission.seb_config_revision : null,
+      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+        ? submission.exam_access_mode
+        : null,
     )
   ) {
     return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' }

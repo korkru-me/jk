@@ -35,6 +35,8 @@ export interface WritableExamSubmission {
   status: string
   started_at: string
   assignment_id: string
+  seb_config_revision: number | null
+  exam_access_mode: string
   current_streak: number | null
   best_streak: number | null
   streak_reached: boolean | null
@@ -78,7 +80,7 @@ export async function getWritableStudentAnswer(
       id, submission_id, student_answer, work_images, carried_over, check_count,
       questions(question_type, answer_parts),
       submissions(
-        id, student_id, status, started_at, assignment_id,
+        id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
         current_streak, best_streak, streak_reached,
         assignments(
           id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode,
@@ -123,6 +125,10 @@ export async function getWritableStudentAnswer(
       studentId,
       submission.assignment_id,
       assignment.android_exam_mode === 'monitored',
+      submission.seb_config_revision,
+      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+        ? submission.exam_access_mode
+        : null,
     )
   ) {
     return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' as const }

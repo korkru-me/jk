@@ -62,7 +62,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   // query, which reads here as an attempt that cannot be opened at all.
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, started_at, assignment_id, student_id, status, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled, scratchpad_enabled, completion_rule, streak_target, streak_question_cap)')
+    .select('id, started_at, assignment_id, student_id, status, exam_access_mode, seb_config_revision, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled, scratchpad_enabled, completion_rule, streak_target, streak_question_cap)')
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -78,6 +78,10 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
         user.id,
         submission.assignment_id,
         assignment.android_exam_mode === 'monitored',
+        submission.seb_config_revision,
+        submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+          ? submission.exam_access_mode
+          : null,
       )
     : null
   if (assignment.secure_browser_mode === 'seb_required' && !examAccess) return null

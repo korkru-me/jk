@@ -365,13 +365,13 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             />
           </label>
           <p className="pl-11 text-xs leading-5 text-warning">
-            เผยแพร่ได้เฉพาะเมื่อ exact build และกุญแจของระบบเป้าหมายผ่าน readiness แล้ว · Android ใช้ monitored mode ด้านล่างได้ ·{' '}
+            เผยแพร่ได้เมื่อรหัสออกและไฟล์ SEB เฉพาะข้อสอบ revision เดียวกันผ่านการตรวจแล้ว · Android ใช้ monitored mode ด้านล่างได้ ·{' '}
             <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
               ตรวจความพร้อม SEB
             </Link>
             {hasSubmissions ? ' · ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำข้อสอบ' : ''}
             {a.secure_browser_mode !== 'seb_required' && secureBrowserMode === 'seb_required'
-              ? ' · เมื่อบันทึก ระบบจะเก็บข้อสอบเป็นร่างจนกว่าครูเจ้าของจะตั้งรหัสออก'
+              ? ' · เมื่อบันทึก ระบบจะเก็บข้อสอบเป็นร่างจนกว่ารหัสออกและไฟล์ SEB รุ่นนี้จะพร้อม'
               : ''}
           </p>
           {secureBrowserMode === 'seb_required' && (

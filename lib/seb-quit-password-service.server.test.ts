@@ -43,6 +43,7 @@ function adminWith(overrides: Partial<Record<string, Result>> = {}) {
     users: { data: { id: OWNER_ID, role: 'teacher', status: 'active' }, error: null },
     organization_members: { data: { org_id: ORG_ID }, error: null },
     assignment_seb_config_revisions: { data: { revision: 1, created_at: CREATED_AT }, error: null },
+    assignment_seb_config_releases: { data: null, error: null },
     submissions: { data: null, error: null },
     ...overrides,
   }
@@ -77,6 +78,8 @@ describe('SEB quit-password owner service', () => {
     await expect(readSebQuitPasswordSetupState(ASSIGNMENT_ID, OWNER_ID)).resolves.toEqual({
       currentRevision: 1,
       configuredAt: CREATED_AT,
+      releaseRevision: null,
+      artifactStatus: 'pending_native_evidence',
       canManage: true,
       blockedReason: null,
     })
@@ -103,8 +106,25 @@ describe('SEB quit-password owner service', () => {
     await expect(readSebQuitPasswordSetupState(ASSIGNMENT_ID, OTHER_ID)).resolves.toEqual({
       currentRevision: null,
       configuredAt: null,
+      releaseRevision: null,
+      artifactStatus: 'not_configured',
       canManage: false,
       blockedReason: 'owner_only',
+    })
+  })
+
+  it('reports ready only when the current password revision has an exact release', async () => {
+    mocks.createAdminClient.mockReturnValue(adminWith({
+      assignment_seb_config_releases: {
+        data: { revision: 1, security_mode: 'x509_encrypted' },
+        error: null,
+      },
+    }))
+
+    await expect(readSebQuitPasswordSetupState(ASSIGNMENT_ID, OWNER_ID)).resolves.toMatchObject({
+      currentRevision: 1,
+      releaseRevision: 1,
+      artifactStatus: 'ready',
     })
   })
 

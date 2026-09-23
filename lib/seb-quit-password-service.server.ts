@@ -11,6 +11,7 @@ import {
   persistSebQuitPasswordRevision,
   type PersistedSebQuitPasswordRevision,
 } from '@/lib/seb-quit-password-persistence.server'
+import { assignmentSebSecurityModeAllowed } from '@/lib/seb-assignment-release.server'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -24,6 +25,8 @@ export type SebQuitPasswordBlockReason =
 export type SebQuitPasswordSetupState = Readonly<{
   currentRevision: number | null
   configuredAt: string | null
+  releaseRevision: number | null
+  artifactStatus: 'not_configured' | 'pending_native_evidence' | 'ready'
   canManage: boolean
   blockedReason: SebQuitPasswordBlockReason | null
 }>
@@ -47,7 +50,11 @@ function assertUuid(value: unknown): asserts value is string {
 async function loadOwnerContext(
   assignmentId: string,
   actorId: string,
-): Promise<{ context: SebQuitPasswordOwnerContext; configuredAt: string | null }> {
+): Promise<{
+  context: SebQuitPasswordOwnerContext
+  configuredAt: string | null
+  releaseRevision: number | null
+}> {
   assertUuid(assignmentId)
   assertUuid(actorId)
 
@@ -66,7 +73,13 @@ async function loadOwnerContext(
   }
   const assignment = assignmentData as AssignmentRow
 
-  const [actorResult, membershipResult, revisionResult, activeAttemptResult] = await Promise.all([
+  const [
+    actorResult,
+    membershipResult,
+    revisionResult,
+    releaseResult,
+    activeAttemptResult,
+  ] = await Promise.all([
     admin
       .from('users')
       .select('id, role, status')
@@ -86,6 +99,13 @@ async function loadOwnerContext(
       .limit(1)
       .maybeSingle(),
     admin
+      .from('assignment_seb_config_releases')
+      .select('revision, security_mode')
+      .eq('assignment_id', assignmentId)
+      .order('revision', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', assignmentId)
@@ -98,6 +118,7 @@ async function loadOwnerContext(
     actorResult.error
     || membershipResult.error
     || revisionResult.error
+    || releaseResult.error
     || activeAttemptResult.error
     || !actorResult.data
   ) {
@@ -127,7 +148,18 @@ async function loadOwnerContext(
       hasActiveAttempt: !!activeAttemptResult.data,
     },
     configuredAt: revisionResult.data?.created_at ?? null,
+    releaseRevision: typeof releaseResult.data?.revision === 'number'
+      && (releaseResult.data.security_mode === 'x509_encrypted'
+        || releaseResult.data.security_mode === 'test_plaintext')
+      && assignmentSebSecurityModeAllowed(releaseResult.data.security_mode)
+      ? releaseResult.data.revision
+      : null,
   }
+}
+
+function artifactStatus(currentRevision: number, releaseRevision: number | null) {
+  if (currentRevision < 1) return 'not_configured' as const
+  return releaseRevision === currentRevision ? 'ready' as const : 'pending_native_evidence' as const
 }
 
 /**
@@ -145,35 +177,47 @@ export async function readSebQuitPasswordSetupState(
     return Object.freeze({
       currentRevision: null,
       configuredAt: null,
+      releaseRevision: null,
+      artifactStatus: 'not_configured',
       canManage: false,
       blockedReason: 'owner_only',
     })
   }
 
-  const { context, configuredAt } = loaded
+  const { context, configuredAt, releaseRevision } = loaded
+  const safeArtifactStatus = artifactStatus(context.currentRevision, releaseRevision)
   if (context.assignment.createdBy !== context.actor.id || !context.memberOrgIds.includes(context.assignment.orgId)) {
-    return Object.freeze({ currentRevision: null, configuredAt: null, canManage: false, blockedReason: 'owner_only' })
+    return Object.freeze({
+      currentRevision: null,
+      configuredAt: null,
+      releaseRevision: null,
+      artifactStatus: 'not_configured',
+      canManage: false,
+      blockedReason: 'owner_only',
+    })
   }
   if (context.actor.role !== 'teacher' || context.actor.status !== 'active') {
-    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, canManage: false, blockedReason: 'inactive_owner' })
+    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, releaseRevision, artifactStatus: safeArtifactStatus, canManage: false, blockedReason: 'inactive_owner' })
   }
   if (
     context.assignment.mode !== 'online'
     || context.assignment.type !== 'exam'
     || context.assignment.secureBrowserMode !== 'seb_required'
   ) {
-    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, canManage: false, blockedReason: 'not_eligible' })
+    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, releaseRevision, artifactStatus: safeArtifactStatus, canManage: false, blockedReason: 'not_eligible' })
   }
   if (context.assignment.status === 'closed') {
-    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, canManage: false, blockedReason: 'closed' })
+    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, releaseRevision, artifactStatus: safeArtifactStatus, canManage: false, blockedReason: 'closed' })
   }
   if (context.hasActiveAttempt) {
-    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, canManage: false, blockedReason: 'active_attempt' })
+    return Object.freeze({ currentRevision: context.currentRevision, configuredAt, releaseRevision, artifactStatus: safeArtifactStatus, canManage: false, blockedReason: 'active_attempt' })
   }
 
   return Object.freeze({
     currentRevision: context.currentRevision,
     configuredAt,
+    releaseRevision,
+    artifactStatus: safeArtifactStatus,
     canManage: true,
     blockedReason: null,
   })

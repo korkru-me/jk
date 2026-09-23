@@ -156,6 +156,7 @@ export function SebQuitPasswordSettings({ assignmentId, initialState }: Settings
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [revision, setRevision] = useState(initialState.currentRevision)
+  const artifactReady = revision !== null && initialState.releaseRevision === revision
   const validationError = getSebQuitPasswordClientError(password, confirmation)
 
   function save() {
@@ -185,7 +186,11 @@ export function SebQuitPasswordSettings({ assignmentId, initialState }: Settings
       }
 
       setRevision(result.revision)
-      toast.success(revision ? 'เปลี่ยนรหัสออกแล้ว' : 'ตั้งรหัสออกแล้ว')
+      toast.success(
+        revision
+          ? 'เปลี่ยนรหัสออกแล้ว · ข้อสอบกลับเป็นร่างเพื่อเตรียมไฟล์รุ่นใหม่'
+          : 'ตั้งรหัสออกแล้ว · กำลังรอเตรียมไฟล์ SEB',
+      )
       router.refresh()
     })
   }
@@ -197,16 +202,30 @@ export function SebQuitPasswordSettings({ assignmentId, initialState }: Settings
           <p className="text-sm font-medium text-foreground">การตั้งค่ารหัสออก</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {revision
-              ? `ตั้งค่าแล้ว · revision ${revision}`
+              ? `ตั้งรหัสแล้ว · revision ${revision} · ${artifactReady ? 'ไฟล์พร้อม' : 'รอเตรียมไฟล์รุ่นนี้'}`
               : 'ยังไม่ได้ตั้งรหัสออกสำหรับข้อสอบนี้'}
           </p>
         </div>
-        {revision ? (
+        {artifactReady ? (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-xs font-medium text-success-foreground">
-            <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" /> ตั้งค่าแล้ว
+            <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" /> พร้อมเผยแพร่
+          </span>
+        ) : revision ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-medium text-foreground">
+            <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" /> รอไฟล์ SEB
           </span>
         ) : null}
       </div>
+
+      {revision && !artifactReady ? (
+        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-foreground">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground" aria-hidden="true" />
+          <p>
+            บันทึกรหัสออกแล้ว แต่ข้อสอบจะยังเป็นร่างจนกว่าไฟล์ SEB รุ่นนี้จะผ่านการเตรียมและตรวจสอบครบ
+            นักเรียนจึงยังไม่เห็นไฟล์ที่ไม่พร้อมใช้งาน
+          </p>
+        </div>
+      ) : null}
 
       {!initialState.canManage ? (
         <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-warning">

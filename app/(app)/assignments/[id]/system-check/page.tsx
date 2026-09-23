@@ -41,7 +41,7 @@ export default async function SebSystemCheckPage({
       assignmentTitle={result.assignmentTitle}
       challenge={result.challenge ?? ''}
       configured={result.sebConfigured}
-      configUrl={process.env.NEXT_PUBLIC_SEB_CONFIG_URL?.trim() || null}
+      configUrl={result.configUrl}
     />
   )
 }

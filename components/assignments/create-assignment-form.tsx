@@ -1266,7 +1266,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 />
               </label>
               <p className="pl-11 text-xs leading-5 text-warning">
-                ระบบจะยอมเผยแพร่เมื่อ exact build และกุญแจของระบบเป้าหมายผ่าน readiness แล้ว นักเรียนต้องตรวจเครื่องก่อนสอบ{' '}
+                หลังสร้าง ข้อสอบจะอยู่เป็นร่างก่อน ระบบจะยอมเผยแพร่เมื่อไฟล์ SEB รุ่นของข้อสอบและ exact build ผ่านการตรวจครบ นักเรียนต้องตรวจเครื่องก่อนสอบ{' '}
                 <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
                   ตรวจความพร้อม SEB
                 </Link>
@@ -1550,7 +1550,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
                   : []),
                 ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
-                  ? [{ label: 'รหัสออก SEB', value: 'ครูกำหนดแล้ว · ระบบไม่แสดงค่า' }]
+                  ? [{ label: 'รหัสออก SEB', value: 'ครูกำหนดแล้ว · รอเตรียมไฟล์เฉพาะข้อสอบ' }]
                   : []),
                 ...(assignmentType === 'exam' && androidExamMode === 'monitored'
                   ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]

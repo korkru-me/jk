@@ -5,7 +5,6 @@ import { AccessCodeForm } from '@/components/exam/access-code-form'
 import { parseSections } from '@/lib/question-set-sections'
 import { getExamTakingData } from '@/lib/exam-taking'
 import { SecureExamLaunchGate } from '@/components/exam/secure-exam-launch-gate'
-import { readSebEnvironment } from '@/lib/seb'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
 
@@ -39,8 +38,8 @@ export default async function TakeExamPage({
       <SecureExamLaunchGate
         assignmentId={id}
         challenge={result.challenge ?? ''}
-        configUrl={process.env.NEXT_PUBLIC_SEB_CONFIG_URL?.trim() || null}
-        configured={result.sebConfigured === true && readSebEnvironment() !== null}
+        configUrl={result.configUrl ?? null}
+        configured={result.sebConfigured === true}
         androidMonitoredAllowed={result.androidMonitoredAllowed === true}
       />
     )

@@ -289,12 +289,12 @@ export function AssignmentDetailClient({
             <div>
               <p className="font-medium text-foreground">ตรวจความพร้อม SEB ก่อนเผยแพร่</p>
               <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                ระบบจะปฏิเสธการเผยแพร่ หาก revision, exact build, CK หรือ BEK ที่อนุมัติยังไม่ครบ
+                ระบบจะปฏิเสธการเผยแพร่ หากรหัสออกและไฟล์ SEB เฉพาะข้อสอบยังไม่ตรง revision หรือยังตรวจ exact build ไม่ครบ
               </p>
             </div>
           </div>
-          <Link href="/settings/exam-defaults" className="shrink-0 font-medium text-primary hover:underline">
-            ไปหน้าตรวจความพร้อม
+          <Link href={`/assignments/${a.id}/edit`} className="shrink-0 font-medium text-primary hover:underline">
+            ดูสถานะการตั้งค่า
           </Link>
         </div>
       )}

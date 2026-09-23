@@ -8,7 +8,8 @@ import { filterSectionsToQuestions, parseSections, type QuestionSetSection } fro
 import type { AndroidExamMode, AssignmentMode, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { decideCompletion, streakForcedSettings } from '@/lib/streak-completion'
 import { normalizeSetSections } from '@/lib/question-set-sections'
-import { inspectSebReadiness } from '@/lib/seb'
+import { inspectSebReadiness, readSebSessionSecret } from '@/lib/seb'
+import { hasCurrentAssignmentSebRelease } from '@/lib/seb-assignment-release.server'
 import { resolveNewAssignmentMathTools } from '@/lib/assignment-math-tools'
 import {
   SebQuitPasswordError,
@@ -17,7 +18,6 @@ import {
 } from '@/lib/seb-quit-password-core.server'
 import {
   createSebQuitPasswordRevisionForOwner,
-  hasSebQuitPasswordRevision,
 } from '@/lib/seb-quit-password-service.server'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
@@ -35,21 +35,13 @@ function normalizeQuestionsPerPage(mode: string, value: number | null | undefine
 }
 
 const SEB_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ เพราะระบบตั้งค่าไม่ครบ กรุณาตรวจที่ การตั้งค่า > ตั้งค่าข้อสอบเริ่มต้น'
-const SEB_QUIT_PASSWORD_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ กรุณาให้ครูเจ้าของข้อสอบตั้งรหัสออกก่อน'
+const SEB_RELEASE_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ รหัสออกถูกบันทึกแล้ว แต่ไฟล์ SEB รุ่นปัจจุบันยังรอตรวจและผูกกับระบบ'
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
-async function isSebPublishingReady(supabase: ServerSupabaseClient) {
-  if (!inspectSebReadiness().publishReady) return false
-
-  // Probe the newest required table. If it exists, the earlier SEB, Android,
-  // and proctor-review migrations must also have been applied in order. RLS
-  // may return zero rows, but a missing/partial schema returns an error.
-  const { error } = await supabase
-    .from('exam_seb_checkins')
-    .select('assignment_id')
-    .limit(1)
-  return !error
+function isSebPublishingReady() {
+  const readiness = inspectSebReadiness()
+  return readSebSessionSecret() !== null && readiness.siteUrlReady
 }
 
 interface CreateAssignmentData {
@@ -178,12 +170,6 @@ export async function createAssignment(data: CreateAssignmentData) {
     && data.android_exam_mode === 'monitored'
       ? 'monitored'
       : 'blocked'
-  if (
-    data.status === 'published'
-    && secureBrowserMode === 'seb_required'
-    && !await isSebPublishingReady(supabase)
-  ) return { error: SEB_NOT_READY_ERROR }
-
   let sebQuitPassword: { password: string; confirmation: string } | null = null
   if (secureBrowserMode === 'seb_required') {
     const input = data.seb_quit_password as unknown
@@ -359,19 +345,9 @@ export async function createAssignment(data: CreateAssignmentData) {
       return { error: toSafeSebQuitPasswordError(passwordError).message }
     }
 
-    if (data.status === 'published') {
-      const { data: publishedAssignment, error: publishError } = await supabase
-        .from('assignments')
-        .update({ status: 'published' })
-        .eq('id', assignment.id)
-        .eq('created_by', user.id)
-        .select('id')
-        .maybeSingle()
-      if (publishError || !publishedAssignment) {
-        await supabase.from('assignments').delete().eq('id', assignment.id).eq('created_by', user.id)
-        return { error: 'สร้างข้อสอบ SEB ไม่สำเร็จ กรุณาลองใหม่' }
-      }
-    }
+    // A password revision is only the first half of a publishable release.
+    // Native SEB must produce and enroll the exact artifact/CK/BEKs next, so
+    // even a create form that requested publish remains draft here.
   }
 
   revalidatePath('/assignments')
@@ -392,15 +368,15 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
     if (assignmentError) return { error: 'ตรวจสอบความพร้อม Safe Exam Browser ไม่สำเร็จ กรุณาตรวจว่า apply migration แล้ว' }
     if (
       assignment?.secure_browser_mode === 'seb_required'
-      && !await isSebPublishingReady(supabase)
+      && !isSebPublishingReady()
     ) {
       return { error: SEB_NOT_READY_ERROR }
     }
     if (
       assignment?.secure_browser_mode === 'seb_required'
-      && !await hasSebQuitPasswordRevision(id)
+      && !await hasCurrentAssignmentSebRelease(id)
     ) {
-      return { error: SEB_QUIT_PASSWORD_NOT_READY_ERROR }
+      return { error: SEB_RELEASE_NOT_READY_ERROR }
     }
   }
 
@@ -556,14 +532,15 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   if (
     existing.status === 'published'
     && secureBrowserMode === 'seb_required'
-    && !await isSebPublishingReady(supabase)
+    && !enablingSeb
+    && !isSebPublishingReady()
   ) return { error: SEB_NOT_READY_ERROR }
   if (
     existing.status === 'published'
     && secureBrowserMode === 'seb_required'
     && !enablingSeb
-    && !await hasSebQuitPasswordRevision(id)
-  ) return { error: SEB_QUIT_PASSWORD_NOT_READY_ERROR }
+    && !await hasCurrentAssignmentSebRelease(id)
+  ) return { error: SEB_RELEASE_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled || secureBrowserMode === 'seb_required')
   // Same rule as createAssignment: only an online งาน that can be reopened
