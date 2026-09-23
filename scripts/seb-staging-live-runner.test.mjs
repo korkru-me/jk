@@ -125,6 +125,7 @@ describe('SEB Staging live runner', () => {
 
     expect(calls).toEqual([
       'verify-staging-isolation',
+      'reserve-unique-run-id',
       'provision-synthetic-teacher',
       'cleanup-synthetic-fixture',
     ])
@@ -176,7 +177,7 @@ describe('SEB Staging live runner', () => {
     expect(Object.values(output.stepEvidence)).toEqual(expect.arrayContaining(['failed', 'passed', 'pending']))
   })
 
-  it('discards adapter payload fields instead of copying them into evidence', async () => {
+  it('rejects adapter payload fields instead of copying them into evidence', async () => {
     const secretSentinel = 'ADAPTER_PAYLOAD_SECRET_SENTINEL'
     const output = await runSebStagingLiveHarness({
       plan: executablePlan(),
@@ -195,9 +196,10 @@ describe('SEB Staging live runner', () => {
       },
     })
 
-    expect(output.status).toBe('complete')
+    expect(output.status).toBe('failed')
     expect(JSON.stringify(output)).not.toContain(secretSentinel)
-    expect(new Set(Object.values(output.stepEvidence))).toEqual(new Set(['passed']))
+    expect(output.stepEvidence['verify-staging-isolation']).toBe('failed')
+    expect(output.stepEvidence['reserve-unique-run-id']).toBe('pending')
   })
 
   it('rejects a wrong step result without advancing out of order', async () => {
@@ -275,7 +277,7 @@ describe('SEB Staging live runner', () => {
     }
   })
 
-  it('records cleanup failure without retrying it or exposing adapter details', async () => {
+  it('bounds cleanup retries and records a persistent failure without exposing adapter details', async () => {
     const plan = executablePlan()
     const calls = []
     const output = await runSebStagingLiveHarness({
@@ -288,9 +290,33 @@ describe('SEB Staging live runner', () => {
       )),
     })
 
-    expect(calls.filter(stepId => stepId === plan.cleanupStepId)).toHaveLength(1)
+    expect(calls.filter(stepId => stepId === plan.cleanupStepId)).toHaveLength(3)
     expect(output.status).toBe('cleanup-failed')
     expect(output.stepEvidence[plan.cleanupStepId]).toBe('failed')
+  })
+
+  it('recovers from a transient cleanup failure inside the same run', async () => {
+    const plan = executablePlan()
+    const calls = []
+    let cleanupAttempt = 0
+    const output = await runSebStagingLiveHarness({
+      plan,
+      identity: identity(),
+      adapter: passingAdapter(calls, request => {
+        if (request.stepId !== plan.cleanupStepId) {
+          return { stepId: request.stepId, status: 'passed' }
+        }
+        cleanupAttempt += 1
+        return {
+          stepId: request.stepId,
+          status: cleanupAttempt === 1 ? 'failed' : 'passed',
+        }
+      }),
+    })
+
+    expect(calls.filter(stepId => stepId === plan.cleanupStepId)).toHaveLength(2)
+    expect(output.status).toBe('complete')
+    expect(output.stepEvidence[plan.cleanupStepId]).toBe('passed')
   })
 
   it('does not require or invoke an adapter in inspect-only mode', async () => {

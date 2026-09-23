@@ -20,6 +20,9 @@ const geistMono = Geist_Mono({
 
 const deployment = assertDeploymentEnvironment(process.env)
 const isStaging = deployment.tier === 'staging'
+const sourceRevision = /^[a-f0-9]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA ?? '')
+  ? process.env.VERCEL_GIT_COMMIT_SHA
+  : undefined
 
 export const metadata: Metadata = {
   title: 'KorKru — กอการเรียนรู้ โดยครู',
@@ -39,6 +42,7 @@ export default function RootLayout({
       // Style preset — see [data-style] at the bottom of app/globals.css.
       data-style="playful"
       data-deployment-environment={deployment.tier}
+      data-source-revision={isStaging ? sourceRevision : undefined}
       className={`${ibmPlexSansThai.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">

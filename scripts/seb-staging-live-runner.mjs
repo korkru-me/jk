@@ -14,6 +14,7 @@ const RELEASE_IDENTITY_FIELDS = Object.freeze([
 ])
 const FULL_IDENTITY_FIELDS = Object.freeze([...RUN_IDENTITY_FIELDS, ...RELEASE_IDENTITY_FIELDS])
 const REGISTER_RELEASE_STEP_ID = 'register-assignment-seb-release'
+const CLEANUP_MAX_ATTEMPTS = 3
 const SAFE_RUN_ID = /^seb-s5-[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/
 const FORBIDDEN_RUN_ID_TERMS = /(prod(?:uction)?|live|real|customer)/
 const SOURCE_REVISION = /^[a-f0-9]{40}$/
@@ -103,14 +104,25 @@ function validAdapter(adapter) {
 }
 
 function adapterStepResult(result, expectedStepId) {
-  if (!isDataRecord(result) || result.stepId !== expectedStepId) {
+  if (!isDataRecord(result)
+    || result.stepId !== expectedStepId
+    || (result.status !== 'passed' && result.status !== 'failed')) {
     return Object.freeze({ state: 'failed', releaseIdentity: null })
   }
-  const state = result.status === 'passed' ? 'passed' : 'failed'
-  const releaseIdentity = expectedStepId === REGISTER_RELEASE_STEP_ID && state === 'passed'
-    ? parseReleaseIdentity(result.releaseIdentity)
-    : null
-  return Object.freeze({ state, releaseIdentity })
+  if (expectedStepId === REGISTER_RELEASE_STEP_ID && result.status === 'passed') {
+    if (!hasExactFields(result, ['stepId', 'status', 'releaseIdentity'])) {
+      return Object.freeze({ state: 'failed', releaseIdentity: null })
+    }
+    const releaseIdentity = parseReleaseIdentity(result.releaseIdentity)
+    return Object.freeze({
+      state: releaseIdentity ? 'passed' : 'failed',
+      releaseIdentity,
+    })
+  }
+  if (!hasExactFields(result, ['stepId', 'status'])) {
+    return Object.freeze({ state: 'failed', releaseIdentity: null })
+  }
+  return Object.freeze({ state: result.status, releaseIdentity: null })
 }
 
 async function executeAdapterStep(adapter, step, identity) {
@@ -128,6 +140,15 @@ async function executeAdapterStep(adapter, step, identity) {
   } catch {
     return Object.freeze({ state: 'failed', releaseIdentity: null })
   }
+}
+
+async function executeCleanupWithRetries(adapter, step, identity) {
+  let execution = Object.freeze({ state: 'failed', releaseIdentity: null })
+  for (let attempt = 0; attempt < CLEANUP_MAX_ATTEMPTS; attempt += 1) {
+    execution = await executeAdapterStep(adapter, step, identity)
+    if (execution.state === 'passed') break
+  }
+  return execution
 }
 
 function sameReleaseIdentity(left, right) {
@@ -229,7 +250,9 @@ export async function runSebStagingLiveHarness({ plan, identity, adapter } = {})
     if (step.id === plan.cleanupStepId) cleanupAttempted = true
     else if (step.mutates) mutationAttempted = true
 
-    const execution = await executeAdapterStep(adapter, step, activeIdentity)
+    const execution = step.id === plan.cleanupStepId
+      ? await executeCleanupWithRetries(adapter, step, activeIdentity)
+      : await executeAdapterStep(adapter, step, activeIdentity)
     let state = execution.state
     if (stepId === REGISTER_RELEASE_STEP_ID && state === 'passed') {
       const matchesDeclared = !declaredReleaseIdentity
@@ -260,7 +283,7 @@ export async function runSebStagingLiveHarness({ plan, identity, adapter } = {})
     }
 
     cleanupAttempted = true
-    const cleanupExecution = await executeAdapterStep(
+    const cleanupExecution = await executeCleanupWithRetries(
       adapter,
       cleanupStep,
       activeIdentity,

@@ -188,12 +188,10 @@ exit ยังไม่ผ่าน ให้ปิด capability นั้น�
 
 ## เฟส S5 — Staging integration และ mock exam อัตโนมัติ
 
-**สถานะ: tooling ฝั่ง Agent deploy เฉพาะ isolated Staging แล้ว; ยังไม่ผ่าน live mock** —
-เพิ่ม operator สองขั้นสำหรับสร้าง seed และ enroll exact assignment artifact โดยค่าเริ่มต้นเป็น
-dry-run, รับ CK/BEK ทาง stdin เท่านั้น, ผูกกับ canonical site + allowlisted Supabase Staging,
-ตรวจ native Windows 3.10.2 build 920 และรองรับ passwordless plist ทั้ง XML, gzip XML และ
-`gzip(plnd + gzip(XML))` โดยไม่พิมพ์ secret เพิ่ม pure mock-harness plan ที่ใช้ synthetic fixture
-เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup
+**สถานะ: โค้ด S5 รอบปัจจุบันอยู่ใน branch เท่านั้น; ยังไม่ deploy/apply และยังไม่ผ่าน live mock** —
+operator สำหรับสร้าง seed และ enroll exact assignment artifact ยังคง fail closed, dry-run เป็นค่าเริ่มต้น,
+รับ CK/BEK ทาง stdin เท่านั้น และใช้เฉพาะ canonical site + allowlisted Supabase Staging ส่วน pure
+mock-harness ใช้ synthetic fixture เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup
 
 อัปเดต 23 กันยายน 2026: เพิ่ม fail-closed live runner และ Auth fixture bridge แล้ว โดย runner
 รับ release identity หลังขั้น register จริงแทนการเดา assignment UUID ล่วงหน้า, ตรวจ revision ตาม
@@ -205,9 +203,19 @@ confirmed not-found แบบ exact ID โดยไม่เปิด credential
 สร้างโจทย์สองชนิด, นักเรียน self-join, ครูสร้าง assignment + quit password แบบ atomic และ expired
 challenge/session ใช้ operator-side offline control เท่านั้น ไม่เพิ่ม signing endpoint บนเว็บ
 
-ยังไม่มี browser/data/native composite ตัวจริง, DB run reservation, aggregate cleanup ของ Storage
-และ private artifact, final `.seb` + CK/BEK จาก Windows หรือ authenticated Staging evidence จาก
-source/deployment/config เดียวกัน จึงยังไม่ถือว่าเกณฑ์ผ่าน S5 สำเร็จและห้ามเริ่ม S6
+รอบปัจจุบันเพิ่ม composite coordinator ที่บังคับลำดับทุกขั้นและหยุดเมื่อขั้นใดล้มเหลว พร้อม live preflight
+ที่ผูก exact Vercel Staging project/deployment, canonical alias และ Git SHA เดียวกัน ใช้ Deployment
+Protection bypass ได้เฉพาะ secret header, อ่าน alias ซ้ำหลังโหลดหน้า และ probe schema ที่จำเป็นแบบ
+อ่านอย่างเดียว เพิ่ม durable cross-process run-ID reservation บนฐานข้อมูลแบบ service-role-only,
+RLS/forced RLS และเก็บ tombstone ไม่ให้นำ ID กลับมาใช้ซ้ำ โดย migration ยังอยู่ local และยังไม่ apply
+รวมทั้ง aggregate cleanup ตามลำดับ answer storage → artifact storage → database fixture → personal
+organization → reservation โดยหยุดทันทีเมื่อ participant ใดล้มเหลวและ retry ต่อจากจุดเดิม; ภายใน
+fixture ต้องปิด browser session ก่อนล้าง resource และลบ Auth เป็นขั้นสุดท้ายเสมอ ชุด focused tests
+หลังเพิ่ม cleanup และ authorization-role regression ผ่าน 139 tests
+
+ยังไม่มี concrete browser/data/native/expiry adapters และ cleanup participants ตัวจริง, final `.seb` +
+CK/BEK จาก Windows หรือ authenticated Staging evidence จาก source/deployment/config เดียวกัน จึงยัง
+เป็น **NOT READY** และห้ามเริ่ม S6
 
 **Agent ทำ**
 

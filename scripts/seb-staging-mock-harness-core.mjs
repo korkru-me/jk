@@ -46,8 +46,10 @@ const FIXTURE = Object.freeze({
 
 const STEPS = Object.freeze([
   step('verify-staging-isolation', 'preflight', 'harness', false, [],
-    'ยืนยัน Staging badge, origin และ Supabase isolation โดยไม่เรียก network'),
-  step('provision-synthetic-teacher', 'fixture', 'fixture-admin', true, ['verify-staging-isolation'],
+    'ยืนยัน deployment READY, branch staging, source revision, Staging badge, canonical origin และ Supabase schema แบบ read-only'),
+  step('reserve-unique-run-id', 'fixture', 'fixture-admin', true, ['verify-staging-isolation'],
+    'จอง run id และ source/deployment binding ในฐานข้อมูลเพื่อกันการใช้ namespace ซ้ำข้าม process'),
+  step('provision-synthetic-teacher', 'fixture', 'fixture-admin', true, ['reserve-unique-run-id'],
     'สร้างบัญชีครูเจ้าของสังเคราะห์โดยไม่คืน credential ในผลลัพธ์'),
   step('provision-unrelated-teacher', 'fixture', 'fixture-admin', true, ['provision-synthetic-teacher'],
     'สร้างบัญชีครูสังเคราะห์ที่ไม่เกี่ยวข้องเพื่อทดสอบ horizontal isolation'),

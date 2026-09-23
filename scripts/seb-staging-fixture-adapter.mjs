@@ -4,8 +4,21 @@ const SAFE_RUN_ID = /^seb-s5-[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/
 const FORBIDDEN_RUN_ID_TERMS = /(prod(?:uction)?|live|real|customer)/
 const BLOCKED_MESSAGE = 'SEB Staging fixture adapter blocked'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+const SOURCE_REVISION = /^[a-f0-9]{40}$/
+const DEPLOYMENT_ID = /^dpl_[A-Za-z0-9]{16,64}$/
+const RELEASE_ID = /^asr-[0-9a-f]{32}-r([1-9][0-9]{0,9})-([0-9a-f]{16})$/
+const SHA256 = /^[a-f0-9]{64}$/
+const MAX_ASSIGNMENT_CONFIG_REVISION = 2_147_483_646
 const QA_SCHEMA_VERSION = 1
 const RANDOM_BYTE_COUNT = 32
+const AUTH_RECONCILIATION_PER_PAGE = 100
+const AUTH_RECONCILIATION_MAX_PAGES = 10
+const AUTH_RECONCILIATION_TIMEOUT_MS = 5_000
+const CONFIRMED_NON_CREATING_AUTH_ERRORS = Object.freeze(new Map([
+  ['email_address_invalid', Object.freeze(new Set([400, 422]))],
+  ['validation_failed', Object.freeze(new Set([400, 422]))],
+  ['weak_password', Object.freeze(new Set([400, 422]))],
+]))
 const USED_RUN_IDS = new Set()
 
 const ACCOUNT_STEPS = Object.freeze([
@@ -65,8 +78,72 @@ function clean(value) {
 
 function isDataRecord(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
-  const prototype = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
+  try {
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) return false
+    return Reflect.ownKeys(value).every(key => {
+      if (typeof key !== 'string') return false
+      const descriptor = Object.getOwnPropertyDescriptor(value, key)
+      return descriptor !== undefined
+        && Object.hasOwn(descriptor, 'value')
+        && descriptor.enumerable === true
+    })
+  } catch {
+    return false
+  }
+}
+
+function hasExactFields(value, fields) {
+  if (!isDataRecord(value)) return false
+  const actual = Object.keys(value).sort()
+  const expected = [...fields].sort()
+  return actual.length === expected.length
+    && actual.every((field, index) => field === expected[index])
+}
+
+function parseRequestIdentity(identity, runId) {
+  const runOnly = hasExactFields(identity, ['runId', 'sourceRevision', 'deploymentId'])
+  const releaseBound = hasExactFields(identity, [
+    'runId',
+    'sourceRevision',
+    'deploymentId',
+    'releaseId',
+    'releaseRevision',
+    'artifactSha256',
+  ])
+  if (!runOnly && !releaseBound) return null
+  if (identity.runId !== runId
+    || typeof identity.sourceRevision !== 'string'
+    || !SOURCE_REVISION.test(identity.sourceRevision)
+    || typeof identity.deploymentId !== 'string'
+    || !DEPLOYMENT_ID.test(identity.deploymentId)) {
+    return null
+  }
+
+  const parsed = {
+    runId,
+    sourceRevision: identity.sourceRevision,
+    deploymentId: identity.deploymentId,
+  }
+  if (releaseBound) {
+    const releaseMatch = typeof identity.releaseId === 'string'
+      ? RELEASE_ID.exec(identity.releaseId)
+      : null
+    if (releaseMatch === null
+      || !Number.isInteger(identity.releaseRevision)
+      || identity.releaseRevision < 1
+      || identity.releaseRevision > MAX_ASSIGNMENT_CONFIG_REVISION
+      || Number(releaseMatch[1]) !== identity.releaseRevision
+      || typeof identity.artifactSha256 !== 'string'
+      || !SHA256.test(identity.artifactSha256)
+      || releaseMatch[2] !== identity.artifactSha256.slice(0, 16)) {
+      return null
+    }
+    parsed.releaseId = identity.releaseId
+    parsed.releaseRevision = identity.releaseRevision
+    parsed.artifactSha256 = identity.artifactSha256
+  }
+  return Object.freeze(parsed)
 }
 
 function hasOfficialStagingPolicy(environment) {
@@ -106,6 +183,15 @@ function redactedResult(stepId, status) {
   return Object.freeze({ stepId, status })
 }
 
+function isConfirmedNonCreatingAuthError(error) {
+  try {
+    const statuses = CONFIRMED_NON_CREATING_AUTH_ERRORS.get(error?.code)
+    return statuses?.has(error?.status) === true
+  } catch {
+    return false
+  }
+}
+
 function bytesToHex(bytes) {
   let value = ''
   for (const byte of bytes) value += byte.toString(16).padStart(2, '0')
@@ -117,7 +203,7 @@ function runtimeAccountInput(spec, index, namespace, createdAt, randomBytes) {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength !== RANDOM_BYTE_COUNT) blocked()
 
   const token = bytesToHex(bytes)
-  const email = `seb-s5-${spec.emailAlias}-${token.slice(0, 20)}@example.invalid`
+  const email = `seb-s5-${spec.emailAlias}-${token.slice(0, 20)}@qa.staging.korkru.com`
   const password = `Aa1!${token}${index}`
   const userMetadata = Object.freeze({
     full_name: spec.fullName,
@@ -158,26 +244,39 @@ function runtimeAccountInput(spec, index, namespace, createdAt, randomBytes) {
   }
 }
 
+function hasPlannedMetadata(actual, planned) {
+  if (!isDataRecord(actual) || !isDataRecord(planned)) return false
+  const plannedEntries = Object.entries(planned)
+  if (!plannedEntries.every(([key, value]) => actual[key] === value)) return false
+
+  const plannedQaFields = Object.keys(planned).filter(key => key.startsWith('qa_')).sort()
+  const actualQaFields = Object.keys(actual).filter(key => key.startsWith('qa_')).sort()
+  return plannedQaFields.length === actualQaFields.length
+    && plannedQaFields.every((key, index) => key === actualQaFields[index])
+}
+
 function hasExpectedMetadata(user, expected) {
   const userMetadata = user?.user_metadata
   const appMetadata = user?.app_metadata
   return clean(user?.id).toLowerCase() === expected.id
     && user?.email === expected.email
-    && isDataRecord(userMetadata)
-    && isDataRecord(appMetadata)
-    && userMetadata.qa_fixture === 'seb-s5'
-    && userMetadata.qa_namespace === expected.namespace
-    && userMetadata.qa_role === expected.role
-    && userMetadata.qa_alias === expected.alias
-    && userMetadata.role === expected.role
-    && userMetadata.survey_role === expected.role
-    && userMetadata.qa_schema_version === QA_SCHEMA_VERSION
-    && appMetadata.qa_fixture === 'seb-s5'
-    && appMetadata.qa_namespace === expected.namespace
-    && appMetadata.qa_role === expected.role
-    && appMetadata.qa_alias === expected.alias
-    && appMetadata.role === expected.role
-    && appMetadata.qa_schema_version === QA_SCHEMA_VERSION
+    && hasPlannedMetadata(userMetadata, expected.userMetadata)
+    && hasPlannedMetadata(appMetadata, expected.appMetadata)
+}
+
+function recordFromPlannedUser(user, planned) {
+  const id = clean(user?.id).toLowerCase()
+  const record = Object.freeze({
+    id,
+    stepId: planned.stepId,
+    email: planned.email,
+    alias: planned.alias,
+    role: planned.role,
+    namespace: planned.namespace,
+    userMetadata: planned.userMetadata,
+    appMetadata: planned.appMetadata,
+  })
+  return UUID.test(id) && hasExpectedMetadata(user, record) ? record : null
 }
 
 function isAttestedAdminClient(value) {
@@ -186,16 +285,23 @@ function isAttestedAdminClient(value) {
     && value.targetOrigin === OFFICIAL_STAGING_SUPABASE_ORIGIN
     && client?.supabaseUrl === OFFICIAL_STAGING_SUPABASE_ORIGIN
     && typeof client?.auth?.admin?.createUser === 'function'
+    && typeof client?.auth?.admin?.listUsers === 'function'
     && typeof client?.auth?.admin?.getUserById === 'function'
     && typeof client?.auth?.admin?.deleteUser === 'function'
 }
 
 function isExactStepRequest(request, runId, spec = null) {
-  if (!isDataRecord(request)
+  if (!hasExactFields(request, [
+    'schemaVersion',
+    'stepId',
+    'phase',
+    'actor',
+    'mutates',
+    'identity',
+  ])
     || request.schemaVersion !== 1
     || request.mutates !== true
-    || !isDataRecord(request.identity)
-    || request.identity.runId !== runId) {
+    || !parseRequestIdentity(request.identity, runId)) {
     return false
   }
 
@@ -211,14 +317,20 @@ function isExactStepRequest(request, runId, spec = null) {
 }
 
 function isExactAuthenticationRequest(request, runId, spec) {
-  return isDataRecord(request)
+  return hasExactFields(request, [
+    'schemaVersion',
+    'stepId',
+    'phase',
+    'actor',
+    'mutates',
+    'identity',
+  ])
     && request.schemaVersion === 1
     && request.stepId === spec.stepId
     && request.phase === spec.phase
     && request.actor === spec.actor
     && request.mutates === false
-    && isDataRecord(request.identity)
-    && request.identity.runId === runId
+    && parseRequestIdentity(request.identity, runId) !== null
 }
 
 function validBrowserSessionCapability(value) {
@@ -227,6 +339,16 @@ function validBrowserSessionCapability(value) {
     && typeof value.authenticate === 'function'
     && typeof value.closeAll === 'function'
   )
+}
+
+function validResourceCleanupCapability(value) {
+  return isDataRecord(value) && typeof value.cleanupRun === 'function'
+}
+
+function exactCleanupResult(value) {
+  return isDataRecord(value)
+    && Object.keys(value).length === 1
+    && value.status === 'passed'
 }
 
 function hasExpectedSessionAttestation(attestation, record) {
@@ -239,21 +361,24 @@ function hasExpectedSessionAttestation(attestation, record) {
     && appMetadata.qa_namespace === record.namespace
     && appMetadata.qa_role === record.role
     && appMetadata.qa_alias === record.alias
+    && appMetadata.role === record.role
     && appMetadata.qa_schema_version === QA_SCHEMA_VERSION
 }
 
 /**
  * Build a single-use, closure-private fixture adapter for official KorKru
- * Staging. It handles only the four Auth provisioning steps and the exact
- * cleanup step from the issued S5 plan. A later composite adapter must retain
- * browser login inside the same trust boundary; credentials are never exposed
- * by this public interface.
+ * Staging. It handles the four Auth provisioning steps, closure-private browser
+ * authentication, and the exact cleanup step from the issued S5 plan. The
+ * injected resource cleanup capability must retain its planned target ledger
+ * privately; it runs after sessions close and before Auth deletion. Credentials
+ * are never exposed by this public interface.
  */
 export function createSebStagingFixtureAdapter({
   readEnvironment,
   runId,
   adminClientFactory,
   browserSessionCapability,
+  resourceCleanupCapability,
   randomBytes,
   clock,
 } = {}) {
@@ -269,6 +394,7 @@ export function createSebStagingFixtureAdapter({
     || !isUniqueSafeRunId(normalizedRunId)
     || typeof adminClientFactory !== 'function'
     || !validBrowserSessionCapability(browserSessionCapability)
+    || !validResourceCleanupCapability(resourceCleanupCapability)
     || typeof randomBytes !== 'function'
     || typeof clock !== 'function') {
     blocked()
@@ -289,7 +415,9 @@ export function createSebStagingFixtureAdapter({
   const namespace = `qa:${normalizedRunId}`
   const createdAt = createdAtDate.toISOString()
   const manifest = []
+  const accountCleanupLedger = []
   const credentialVault = new Map()
+  const plannedCreations = new Map()
   const attemptedSteps = new Set()
   const attemptedAuthenticationSteps = new Set()
   const unresolvedCreations = new Set()
@@ -299,6 +427,8 @@ export function createSebStagingFixtureAdapter({
   let busy = false
   let cleanupStarted = false
   let sessionsClosed = false
+  let resourcesCleaned = false
+  let resourceCleanupRequest = null
 
   function currentEnvironment(kind) {
     let environment
@@ -328,6 +458,85 @@ export function createSebStagingFixtureAdapter({
     return assertAttestedTarget()
   }
 
+  async function findExactPlannedUser(planned) {
+    let timedOut = false
+    let timeoutHandle = null
+    const scan = (async () => {
+      const matches = []
+      let expectedTotal = null
+      for (let page = 1; page <= AUTH_RECONCILIATION_MAX_PAGES; page += 1) {
+        if (timedOut) blocked()
+        currentEnvironment('cleanup')
+        const client = assertAttestedTarget()
+        const response = await client.auth.admin.listUsers(Object.freeze({
+          page,
+          perPage: AUTH_RECONCILIATION_PER_PAGE,
+        }))
+        if (timedOut) blocked()
+        currentEnvironment('cleanup')
+        assertAttestedTarget()
+
+        const users = response?.data?.users
+        const total = response?.data?.total
+        const nextPage = response?.data?.nextPage
+        if (response?.error
+          || !Array.isArray(users)
+          || users.length > AUTH_RECONCILIATION_PER_PAGE
+          || !Number.isInteger(total)
+          || total < 0
+          || total > AUTH_RECONCILIATION_PER_PAGE * AUTH_RECONCILIATION_MAX_PAGES
+          || (nextPage !== null && !Number.isInteger(nextPage))) {
+          blocked()
+        }
+        if (expectedTotal === null) expectedTotal = total
+        if (total !== expectedTotal) blocked()
+
+        for (const user of users) {
+          if (user?.email !== planned.email) continue
+          const record = recordFromPlannedUser(user, planned)
+          if (!record) blocked()
+          matches.push(record)
+          if (matches.length > 1) blocked()
+        }
+
+        const scannedCount = (page - 1) * AUTH_RECONCILIATION_PER_PAGE + users.length
+        if (scannedCount > total) blocked()
+        if (scannedCount === total) {
+          if (nextPage !== null) blocked()
+          return matches.length === 1 ? matches[0] : null
+        }
+        if (users.length !== AUTH_RECONCILIATION_PER_PAGE || nextPage !== page + 1) blocked()
+      }
+      // A full final page means there could be another matching account beyond
+      // the scan boundary. Never infer uniqueness from a truncated directory.
+      blocked()
+    })()
+
+    const timeout = new Promise((resolve, reject) => {
+      timeoutHandle = setTimeout(() => {
+        timedOut = true
+        reject(new SebStagingFixtureAdapterBlockedError())
+      }, AUTH_RECONCILIATION_TIMEOUT_MS)
+    })
+    try {
+      return await Promise.race([scan, timeout])
+    } finally {
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle)
+    }
+  }
+
+  async function reconcileUnresolvedCreations() {
+    for (const stepId of [...unresolvedCreations].reverse()) {
+      const planned = plannedCreations.get(stepId)
+      if (!planned) blocked()
+      const record = await findExactPlannedUser(planned)
+      if (!record || accountCleanupLedger.some(value => value.id === record.id)) blocked()
+      manifest.push(record)
+      accountCleanupLedger.push(record)
+      unresolvedCreations.delete(stepId)
+    }
+  }
+
   async function provisionAccount(request, spec, accountIndex) {
     if (busy
       || cleanupStarted
@@ -343,6 +552,16 @@ export function createSebStagingFixtureAdapter({
     try {
       currentEnvironment('create')
       input = runtimeAccountInput(spec, accountIndex, namespace, createdAt, randomBytes)
+      const planned = Object.freeze({
+        stepId: spec.stepId,
+        email: input.expected.email,
+        alias: input.expected.alias,
+        role: input.expected.role,
+        namespace: input.expected.namespace,
+        userMetadata: input.attributes.user_metadata,
+        appMetadata: input.attributes.app_metadata,
+      })
+      plannedCreations.set(spec.stepId, planned)
       credentialVault.set(spec.alias, Object.freeze({
         email: input.expected.email,
         password: input.password,
@@ -354,25 +573,21 @@ export function createSebStagingFixtureAdapter({
       unresolvedCreations.add(spec.stepId)
       const response = await client.auth.admin.createUser(input.attributes)
       const returnedUser = response?.data?.user
-      const returnedId = clean(returnedUser?.id).toLowerCase()
-      const record = Object.freeze({
-        id: returnedId,
-        email: input.expected.email,
-        alias: input.expected.alias,
-        role: input.expected.role,
-        namespace: input.expected.namespace,
-      })
-      const idIsValid = UUID.test(returnedId)
-      const idIsUnique = idIsValid && !manifest.some(value => value.id === returnedId)
+      const record = recordFromPlannedUser(returnedUser, planned)
+      const idIsUnique = record !== null && !manifest.some(value => value.id === record.id)
 
       if (idIsUnique) {
         manifest.push(record)
+        accountCleanupLedger.push(record)
         unresolvedCreations.delete(spec.stepId)
-      } else if (response?.error && !returnedUser) {
-        // A normal, explicit Auth error is a confirmed non-create. A thrown
-        // transport failure remains unresolved because the server may have
-        // committed before the connection failed.
+      } else if (response?.error
+        && !returnedUser
+        && isConfirmedNonCreatingAuthError(response.error)) {
+        // Only pre-mutation validation errors are confirmed non-creates. A
+        // transport, 5xx, conflict, or unclassified error may have committed
+        // before the response was lost and must be reconciled during cleanup.
         unresolvedCreations.delete(spec.stepId)
+        plannedCreations.delete(spec.stepId)
       }
       if (response?.error
         || !idIsUnique
@@ -458,11 +673,56 @@ export function createSebStagingFixtureAdapter({
         }
         currentEnvironment('cleanup')
       }
+      if (browserSessionCapability && !sessionsClosed) {
+        return redactedResult(CLEANUP_STEP_ID, 'failed')
+      }
+      if (unresolvedCreations.size > 0) {
+        try {
+          await reconcileUnresolvedCreations()
+        } catch {
+          failed = true
+        }
+        currentEnvironment('cleanup')
+      }
+      if (unresolvedCreations.size > 0) {
+        return redactedResult(CLEANUP_STEP_ID, 'failed')
+      }
+      if (!resourcesCleaned && unresolvedCreations.size === 0) {
+        if (!resourceCleanupRequest) {
+          const cleanupIdentity = parseRequestIdentity(request.identity, normalizedRunId)
+          if (!cleanupIdentity) blocked()
+          const accounts = Object.freeze(accountCleanupLedger.map(record => Object.freeze({
+            id: record.id,
+            alias: record.alias,
+            role: record.role,
+            namespace: record.namespace,
+          })))
+          resourceCleanupRequest = Object.freeze({
+            schemaVersion: 1,
+            runId: normalizedRunId,
+            namespace,
+            identity: cleanupIdentity,
+            accounts,
+          })
+        }
+        try {
+          currentEnvironment('cleanup')
+          const cleanupResult = await resourceCleanupCapability.cleanupRun(resourceCleanupRequest)
+          resourcesCleaned = exactCleanupResult(cleanupResult)
+          if (!resourcesCleaned) failed = true
+        } catch {
+          failed = true
+        }
+        currentEnvironment('cleanup')
+      }
+      if (!resourcesCleaned) {
+        return redactedResult(CLEANUP_STEP_ID, 'failed')
+      }
       if (manifest.length === 0) {
         credentialVault.clear()
         return redactedResult(
           CLEANUP_STEP_ID,
-          !failed && unresolvedCreations.size === 0 ? 'passed' : 'failed',
+          !failed && resourcesCleaned && unresolvedCreations.size === 0 ? 'passed' : 'failed',
         )
       }
 
@@ -480,6 +740,7 @@ export function createSebStagingFixtureAdapter({
             manifest.splice(index, 1)
             uncertainDeletes.delete(record.id)
             credentialVault.delete(record.alias)
+            plannedCreations.delete(record.stepId)
             continue
           }
           if (readBack?.error || !hasExpectedMetadata(readBack?.data?.user, record)) {
@@ -498,6 +759,7 @@ export function createSebStagingFixtureAdapter({
           uncertainDeletes.delete(record.id)
           manifest.splice(index, 1)
           credentialVault.delete(record.alias)
+          plannedCreations.delete(record.stepId)
         } catch {
           failed = true
         }
@@ -506,7 +768,9 @@ export function createSebStagingFixtureAdapter({
       if (manifest.length === 0) credentialVault.clear()
       return redactedResult(
         CLEANUP_STEP_ID,
-        failed || manifest.length > 0 || unresolvedCreations.size > 0 ? 'failed' : 'passed',
+        failed || !resourcesCleaned || manifest.length > 0 || unresolvedCreations.size > 0
+          ? 'failed'
+          : 'passed',
       )
     } catch {
       return redactedResult(CLEANUP_STEP_ID, 'failed')
