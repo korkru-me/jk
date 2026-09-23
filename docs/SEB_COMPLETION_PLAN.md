@@ -188,6 +188,14 @@ exit ยังไม่ผ่าน ให้ปิด capability นั้น�
 
 ## เฟส S5 — Staging integration และ mock exam อัตโนมัติ
 
+**สถานะ: tooling ฝั่ง Agent พร้อมใน branch SEB; ยังไม่ apply/deploy และยังไม่ผ่าน live mock** —
+เพิ่ม operator สองขั้นสำหรับสร้าง seed และ enroll exact assignment artifact โดยค่าเริ่มต้นเป็น
+dry-run, รับ CK/BEK ทาง stdin เท่านั้น, ผูกกับ canonical site + allowlisted Supabase Staging,
+ตรวจ native Windows 3.10.2 build 920 และรองรับ passwordless plist ทั้ง XML, gzip XML และ
+`gzip(plnd + gzip(XML))` โดยไม่พิมพ์ secret เพิ่ม pure mock-harness plan ที่ใช้ synthetic fixture
+เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup แต่ยังไม่มี live adapter เพราะต้อง
+deploy Phase 4 และสร้าง final `.seb` + CK/BEK บน Windows ก่อน จึงยังไม่ถือว่าเกณฑ์ผ่าน S5 สำเร็จ
+
 **Agent ทำ**
 
 - ตรวจ Staging isolation/bootstrap โดยใช้ secret ที่ฉีดจาก Keychain/CI และไม่พิมพ์ค่า

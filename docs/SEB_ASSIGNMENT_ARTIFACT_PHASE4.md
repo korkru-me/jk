@@ -110,3 +110,8 @@ only. They are not applied to Staging or Production and the application is not
 deployed. A real assignment remains unpublished until a native operator/pipeline
 creates and registers its exact artifact and CK/BEK evidence. Automated tests
 are not a substitute for native SEB verification on every supported exact build.
+
+The temporary, Staging-only two-step operator procedure is documented in
+[`SEB_ASSIGNMENT_ARTIFACT_OPERATOR.md`](./SEB_ASSIGNMENT_ARTIFACT_OPERATOR.md).
+It defaults to local dry-run, accepts native CK/BEK evidence through stdin only,
+and does not publish the assignment.

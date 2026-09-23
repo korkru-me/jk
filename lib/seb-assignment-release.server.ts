@@ -1,8 +1,8 @@
 import 'server-only'
 
-import { createHash } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { SebBrowserExamKeyEntry } from '@/lib/seb'
+import { verifyStoredAssignmentSebArtifactAndRegister } from '@/lib/seb-assignment-release-registration.mjs'
 
 export const ASSIGNMENT_SEB_CONFIG_BUCKET = 'assignment-seb-configs'
 
@@ -360,28 +360,15 @@ export async function registerAssignmentSebRelease(
     throw new Error('SEB_ASSIGNMENT_RELEASE_SECURITY_MODE_BLOCKED')
   }
   const admin = createAdminClient()
-  const { data: artifact, error: artifactError } = await admin.storage
-    .from(ASSIGNMENT_SEB_CONFIG_BUCKET)
-    .download(parsed.artifactPath)
-  if (artifactError || !artifact) throw new Error('SEB_ASSIGNMENT_RELEASE_ARTIFACT_MISSING')
-
-  const bytes = Buffer.from(await artifact.arrayBuffer())
-  if (
-    bytes.length !== parsed.artifactSizeBytes
-    || createHash('sha256').update(bytes).digest('hex') !== parsed.artifactSha256
-  ) throw new Error('SEB_ASSIGNMENT_RELEASE_ARTIFACT_MISMATCH')
-
-  const { data, error } = await admin.rpc('register_assignment_seb_config_release', {
-    p_assignment_id: parsed.assignmentId,
-    p_revision: parsed.revision,
-    p_artifact_storage_path: parsed.artifactPath,
-    p_artifact_sha256: parsed.artifactSha256,
-    p_artifact_size_bytes: parsed.artifactSizeBytes,
-    p_config_key: parsed.configKey,
-    p_browser_exam_keys: parsed.browserExamKeys,
-    p_security_mode: parsed.securityMode,
-  })
-  if (error || !Array.isArray(data) || data.length !== 1 || !isPlainRecord(data[0])) {
+  const registration = await verifyStoredAssignmentSebArtifactAndRegister(admin, parsed)
+  if (registration.code === 'artifact_missing') {
+    throw new Error('SEB_ASSIGNMENT_RELEASE_ARTIFACT_MISSING')
+  }
+  if (registration.code === 'artifact_mismatch') {
+    throw new Error('SEB_ASSIGNMENT_RELEASE_ARTIFACT_MISMATCH')
+  }
+  const { data, error } = registration
+  if (registration.code !== 'ok' || error || !Array.isArray(data) || data.length !== 1 || !isPlainRecord(data[0])) {
     throw new Error('SEB_ASSIGNMENT_RELEASE_PERSISTENCE_FAILED')
   }
 
