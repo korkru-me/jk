@@ -1,6 +1,6 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
-อัปเดต: 22 กันยายน 2026
+อัปเดต: 23 กันยายน 2026
 
 เอกสารนี้กำหนดลำดับงาน SEB/Exam ต่อจาก `origin/master` ที่ commit
 `15be506d38e06449a9a2d40242a2b9a0d919fa91` โดยแยกขอบเขตจาก Drawing Board
@@ -158,7 +158,7 @@ browser ปกติออกจาก native SEB ตามจริง แล�
 
 ## เฟส S4 — ทางออก, พักสอบ และรหัสรายครู
 
-**สถานะ: server/database binding เสร็จใน branch SEB; ยังไม่ apply migration/deploy และยังรอ native artifact enrollment** — ครูเจ้าของตั้งรหัสออกต่อ assignment, การหมุนรหัสคืนข้อสอบเป็น draft, release registry ผูก private artifact + CK/BEK กับ exact revision และ session/attempt ตรวจ revision + access mode เดิมทุก boundary รายละเอียดอยู่ที่ `docs/SEB_ASSIGNMENT_ARTIFACT_PHASE4.md`
+**สถานะ: server/database binding deploy เฉพาะ isolated Staging แล้ว; ยังรอ native artifact enrollment** — migration ledger/dry-run ตรง, application เปิดผ่าน `staging.korkru.com`, ครูเจ้าของตั้งรหัสออกต่อ assignment, การหมุนรหัสคืนข้อสอบเป็น draft, release registry ผูก private artifact + CK/BEK กับ exact revision และ session/attempt ตรวจ revision + access mode เดิมทุก boundary โดย Production application/database ไม่เปลี่ยน รายละเอียดอยู่ที่ `docs/SEB_ASSIGNMENT_ARTIFACT_PHASE4.md`
 
 นโยบายเดิมที่ยืนยันไว้คือ เมื่อครูอนุญาตให้ออกกลางคัน ให้กลับมาทำ attempt เดิมได้และเวลาไม่หยุด
 แต่ implementation ต้องแยก “สิทธิ์ในเว็บ” ออกจาก “native SEB ปิดจริง”
@@ -188,13 +188,13 @@ exit ยังไม่ผ่าน ให้ปิด capability นั้น�
 
 ## เฟส S5 — Staging integration และ mock exam อัตโนมัติ
 
-**สถานะ: tooling ฝั่ง Agent พร้อมใน branch SEB; ยังไม่ apply/deploy และยังไม่ผ่าน live mock** —
+**สถานะ: tooling ฝั่ง Agent deploy เฉพาะ isolated Staging แล้ว; ยังไม่ผ่าน live mock** —
 เพิ่ม operator สองขั้นสำหรับสร้าง seed และ enroll exact assignment artifact โดยค่าเริ่มต้นเป็น
 dry-run, รับ CK/BEK ทาง stdin เท่านั้น, ผูกกับ canonical site + allowlisted Supabase Staging,
 ตรวจ native Windows 3.10.2 build 920 และรองรับ passwordless plist ทั้ง XML, gzip XML และ
 `gzip(plnd + gzip(XML))` โดยไม่พิมพ์ secret เพิ่ม pure mock-harness plan ที่ใช้ synthetic fixture
-เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup แต่ยังไม่มี live adapter เพราะต้อง
-deploy Phase 4 และสร้าง final `.seb` + CK/BEK บน Windows ก่อน จึงยังไม่ถือว่าเกณฑ์ผ่าน S5 สำเร็จ
+เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup แต่ยังไม่มี live adapter, final
+`.seb` + CK/BEK จาก Windows หรือ authenticated live-mock/cleanup evidence จึงยังไม่ถือว่าเกณฑ์ผ่าน S5 สำเร็จ
 
 **Agent ทำ**
 

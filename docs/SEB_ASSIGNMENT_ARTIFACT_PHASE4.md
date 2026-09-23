@@ -105,11 +105,12 @@ exactly `staging.korkru.com`. Production never accepts that mode.
 
 ## Deployment boundary
 
-The Phase 4 migration and application changes are on the SEB completion branch
-only. They are not applied to Staging or Production and the application is not
-deployed. A real assignment remains unpublished until a native operator/pipeline
-creates and registers its exact artifact and CK/BEK evidence. Automated tests
-are not a substitute for native SEB verification on every supported exact build.
+The Phase 4 migration and the matching application version are deployed to the
+isolated Korkru Staging database and `staging.korkru.com` only. They are not
+applied or deployed to Production. A real assignment remains unpublished until
+a native operator/pipeline creates and registers its exact artifact and CK/BEK
+evidence. Automated tests are not a substitute for native SEB verification on
+every supported exact build.
 
 The temporary, Staging-only two-step operator procedure is documented in
 [`SEB_ASSIGNMENT_ARTIFACT_OPERATOR.md`](./SEB_ASSIGNMENT_ARTIFACT_OPERATOR.md).
