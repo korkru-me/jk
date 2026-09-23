@@ -41,6 +41,11 @@ Staging runtime สามารถผูก `SEB_CONFIG_REVISION` กับ revi
 เพื่อทำ native integration ทีละ platform ได้ แต่ teacher publish gate จะยังไม่ READY เพราะ policy,
 build matrix และ BEK coverage ยังไม่ครบทุก target ตามที่ออกแบบไว้
 
+วันที่ 23 กันยายน 2026 เจ้าของผลิตภัณฑ์กรอก Staging-scoped session secret, CK และ Windows BEK
+registry ลง Vercel โดยตรง พร้อมผูก public site/config URL และ config revision กับ branch `staging`
+Agent ไม่ได้เห็นหรือรับค่า secret ใด ๆ ขั้นตอนนี้เป็นเพียงการ enrollment; native system check,
+mock exam และ physical UAT ยังรอทดสอบและยังห้ามเปลี่ยนสถานะเป็นผ่าน
+
 `config/seb-release-registry.json` เป็น fixed-schema metadata ที่ไม่เก็บ secret ส่วน
 `config/seb-platform-evidence.json` เก็บสถานะหลักฐานและอ้าง `buildId` จาก revision เดียวกัน
 ตัวตรวจจะไม่ยอมรวมหลักฐานเก่าที่มีเพียง config id หรือรุ่นแบบกว้าง ๆ
