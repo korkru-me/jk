@@ -13,8 +13,16 @@ const FIXTURE = Object.freeze({
   policy: 'synthetic-only',
   credentials: 'runtime-only',
   entities: Object.freeze([
-    Object.freeze({ kind: 'teacher', alias: 'teacher-primary', count: 1 }),
-    Object.freeze({ kind: 'student', alias: 'student-primary', count: 1 }),
+    Object.freeze({
+      kind: 'teacher',
+      aliases: Object.freeze(['teacher-primary', 'teacher-unrelated']),
+      count: 2,
+    }),
+    Object.freeze({
+      kind: 'student',
+      aliases: Object.freeze(['student-primary', 'student-secondary']),
+      count: 2,
+    }),
     Object.freeze({ kind: 'classroom', alias: 'classroom-primary', count: 1, classroomType: 'subject' }),
     Object.freeze({
       kind: 'assignment',
@@ -33,16 +41,22 @@ const STEPS = Object.freeze([
   step('verify-staging-isolation', 'preflight', 'harness', false, [],
     'ยืนยัน Staging badge, origin และ Supabase isolation โดยไม่เรียก network'),
   step('provision-synthetic-teacher', 'fixture', 'fixture-admin', true, ['verify-staging-isolation'],
-    'สร้างบัญชีครูสังเคราะห์หนึ่งบัญชีโดยไม่คืน credential ในผลลัพธ์'),
-  step('provision-synthetic-student', 'fixture', 'fixture-admin', true, ['provision-synthetic-teacher'],
-    'สร้างบัญชีนักเรียนสังเคราะห์หนึ่งบัญชีโดยไม่คืน credential ในผลลัพธ์'),
-  step('authenticate-teacher', 'teacher-setup', 'teacher', false, ['provision-synthetic-student'],
+    'สร้างบัญชีครูเจ้าของสังเคราะห์โดยไม่คืน credential ในผลลัพธ์'),
+  step('provision-unrelated-teacher', 'fixture', 'fixture-admin', true, ['provision-synthetic-teacher'],
+    'สร้างบัญชีครูสังเคราะห์ที่ไม่เกี่ยวข้องเพื่อทดสอบ horizontal isolation'),
+  step('provision-synthetic-student', 'fixture', 'fixture-admin', true, ['provision-unrelated-teacher'],
+    'สร้างบัญชีนักเรียนหลักสังเคราะห์โดยไม่คืน credential ในผลลัพธ์'),
+  step('provision-secondary-student', 'fixture', 'fixture-admin', true, ['provision-synthetic-student'],
+    'สร้างบัญชีนักเรียนคนที่สองเพื่อทดสอบ horizontal isolation'),
+  step('authenticate-teacher', 'teacher-setup', 'teacher', false, ['provision-secondary-student'],
     'ยืนยันว่า session เป็นครูสังเคราะห์ exact account'),
   step('create-subject-classroom', 'teacher-setup', 'teacher', true, ['authenticate-teacher'],
     'สร้างห้องเรียนรายวิชาสังเคราะห์หนึ่งห้อง'),
   step('enrol-synthetic-student', 'teacher-setup', 'teacher', true, ['create-subject-classroom'],
     'เพิ่มนักเรียนสังเคราะห์ exact account เข้า exact classroom'),
-  step('create-seb-assignment-draft', 'teacher-setup', 'teacher', true, ['enrol-synthetic-student'],
+  step('enrol-secondary-student', 'teacher-setup', 'teacher', true, ['enrol-synthetic-student'],
+    'เพิ่มนักเรียนคนที่สองเข้า exact classroom โดยยังไม่มีสิทธิ์ใน attempt ของนักเรียนหลัก'),
+  step('create-seb-assignment-draft', 'teacher-setup', 'teacher', true, ['enrol-secondary-student'],
     'สร้างข้อสอบ SEB แบบ draft หนึ่งรายการโดยไม่มีรหัสก่อนเข้า'),
   step('set-teacher-quit-password', 'teacher-setup', 'teacher', true, ['create-seb-assignment-draft'],
     'ส่งรหัสออกผ่านช่องทาง write-only และยืนยันว่า response ไม่มี plaintext หรือ hash'),
@@ -52,17 +66,33 @@ const STEPS = Object.freeze([
     'เผยแพร่ได้เฉพาะเมื่อ exact assignment revision มี release ที่พร้อม'),
   step('authenticate-student', 'student-journey', 'student', false, ['publish-seb-assignment'],
     'ยืนยันว่า session เป็นนักเรียนสังเคราะห์ exact account'),
-  step('verify-seb-system-check', 'student-journey', 'student', true, ['authenticate-student'],
+  step('reject-invalid-seb-challenge', 'negative-session', 'student', false, ['authenticate-student'],
+    'ปฏิเสธ challenge ที่ลายเซ็นหรือ purpose ไม่ถูกต้องโดยไม่สร้าง check-in หรือ attempt'),
+  step('reject-expired-seb-challenge', 'negative-session', 'student', false, ['reject-invalid-seb-challenge'],
+    'ปฏิเสธ challenge ที่หมดอายุโดยไม่สร้าง check-in หรือ attempt'),
+  step('verify-seb-system-check', 'student-journey', 'student', true, ['reject-expired-seb-challenge'],
     'ผ่าน SEB system check โดยยังไม่สร้าง attempt หรือเริ่มจับเวลา'),
-  step('start-revision-bound-attempt', 'student-journey', 'student', true, ['verify-seb-system-check'],
+  step('reject-replayed-seb-challenge', 'negative-session', 'student', false, ['verify-seb-system-check'],
+    'ปฏิเสธ challenge ที่ถูก replay ข้ามผู้ใช้ ข้อสอบ หรือ revision โดยไม่สร้าง check-in หรือ attempt เพิ่ม'),
+  step('reject-invalid-seb-session', 'negative-session', 'student', false, ['reject-replayed-seb-challenge'],
+    'ปฏิเสธ secure session ที่ถูกแก้ไขหรือผูกคน/ข้อสอบผิด'),
+  step('reject-expired-seb-session', 'negative-session', 'student', false, ['reject-invalid-seb-session'],
+    'ปฏิเสธ secure session ที่หมดอายุโดยไม่สร้าง attempt'),
+  step('start-revision-bound-attempt', 'student-journey', 'student', true, ['reject-expired-seb-session'],
     'สร้าง attempt ที่ผูก exact SEB config revision และ access mode'),
-  step('autosave-synthetic-answer', 'student-journey', 'student', true, ['start-revision-bound-attempt'],
+  step('reject-replayed-seb-session', 'negative-session', 'student', false, ['start-revision-bound-attempt'],
+    'ปฏิเสธ session ที่ replay ข้ามผู้ใช้ ข้อสอบ หรือ revision จาก attempt ที่ผูกไว้'),
+  step('autosave-synthetic-answer', 'student-journey', 'student', true, ['reject-replayed-seb-session'],
     'บันทึกคำตอบสังเคราะห์และอ่านกลับได้จาก exact attempt'),
-  step('resume-same-attempt', 'student-journey', 'student', false, ['autosave-synthetic-answer'],
+  step('retry-autosave-after-transient-failure', 'failure-retry', 'student', true, ['autosave-synthetic-answer'],
+    'จำลอง autosave ล้มเหลวชั่วคราวแล้ว retry โดยไม่สร้างคำตอบซ้ำหรือข้าม attempt'),
+  step('resume-same-attempt', 'student-journey', 'student', false, ['retry-autosave-after-transient-failure'],
     'login/resume แล้วได้ attempt, revision และคำตอบชุดเดิมโดยไม่สุ่มใหม่'),
   step('upload-synthetic-attachment', 'student-journey', 'student', true, ['resume-same-attempt'],
     'อัปโหลดไฟล์สังเคราะห์ผ่าน signed target ที่ผูก exact answer'),
-  step('record-proctor-heartbeat', 'student-journey', 'student', true, ['upload-synthetic-attachment'],
+  step('retry-upload-after-transient-failure', 'failure-retry', 'student', true, ['upload-synthetic-attachment'],
+    'จำลอง upload ล้มเหลวชั่วคราวแล้ว retry โดยไม่บันทึก object/reference ซ้ำ'),
+  step('record-proctor-heartbeat', 'student-journey', 'student', true, ['retry-upload-after-transient-failure'],
     'บันทึก heartbeat ของ exact attempt โดยไม่เก็บ secret หรือ browser key ใน evidence'),
   step('student-denied-teacher-result', 'authorization', 'student', false, ['record-proctor-heartbeat'],
     'นักเรียนถูกปฏิเสธเมื่อเรียกเส้นทางผลสอบของครู'),
@@ -72,8 +102,16 @@ const STEPS = Object.freeze([
     'สลับกลับเป็น session ครูสังเคราะห์ exact account'),
   step('teacher-read-submitted-result', 'teacher-result', 'teacher', false, ['authenticate-teacher-for-result'],
     'ครูอ่านผลของ exact assignment และเห็นคำตอบ/ไฟล์สังเคราะห์ที่ส่งแล้ว'),
-  step('verify-cross-account-boundaries', 'authorization', 'harness', false, ['teacher-read-submitted-result'],
-    'สลับ session แล้วพิสูจน์ว่าครูแก้ attempt นักเรียนไม่ได้และนักเรียนอ่านหน้าครูไม่ได้'),
+  step('authenticate-secondary-student', 'authorization', 'student-secondary', false, ['teacher-read-submitted-result'],
+    'ยืนยันว่า session เป็นนักเรียนคนที่สอง exact account'),
+  step('secondary-student-denied-primary-attempt', 'authorization', 'student-secondary', false, ['authenticate-secondary-student'],
+    'นักเรียนคนที่สองอ่านหรือแก้ attempt ของนักเรียนหลักไม่ได้'),
+  step('authenticate-unrelated-teacher', 'authorization', 'teacher-unrelated', false, ['secondary-student-denied-primary-attempt'],
+    'ยืนยันว่า session เป็นครูที่ไม่เกี่ยวข้อง exact account'),
+  step('unrelated-teacher-denied-assignment-result', 'authorization', 'teacher-unrelated', false, ['authenticate-unrelated-teacher'],
+    'ครูที่ไม่เกี่ยวข้องอ่านหรือแก้ assignment/result ของครูเจ้าของไม่ได้'),
+  step('verify-cross-account-boundaries', 'authorization', 'harness', false, ['unrelated-teacher-denied-assignment-result'],
+    'ยืนยัน role และ horizontal isolation ครบทั้งครูและนักเรียน'),
   Object.freeze({
     id: 'cleanup-synthetic-fixture',
     phase: 'cleanup',
@@ -120,7 +158,10 @@ function fixtureDescriptor(runId) {
   return Object.freeze({
     ...FIXTURE,
     namespace: isSafeRunId(runId) ? `qa:${runId}` : null,
-    entities: Object.freeze(FIXTURE.entities.map(value => Object.freeze({ ...value }))),
+    entities: Object.freeze(FIXTURE.entities.map(value => Object.freeze({
+      ...value,
+      ...(Array.isArray(value.aliases) ? { aliases: Object.freeze([...value.aliases]) } : {}),
+    }))),
   })
 }
 
@@ -258,12 +299,23 @@ export function inspectSebStagingMockHarnessEvidence(plan, evidence = {}) {
     ? { status: 'pass', field: 'failed steps', message: 'ยังไม่มีขั้นที่ล้มเหลว' }
     : { status: 'blocker', field: 'failed steps', message: 'มีขั้นล้มเหลว; หยุด journey และอนุญาตเฉพาะ cleanup ที่จำกัดขอบเขต' })
 
-  const structuralReady = planShapeReady && evidenceShapeReady && orderingReady
   const journeyFailed = JOURNEY_STEPS.some(value => states[value.id] === 'failed')
   const cleanupFailed = states[CLEANUP_STEP.id] === 'failed'
   const allJourneyPassed = JOURNEY_STEPS.every(value => states[value.id] === 'passed')
   const allStepsPassed = allJourneyPassed && states[CLEANUP_STEP.id] === 'passed'
   const createdSyntheticData = JOURNEY_STEPS.some(value => value.mutates && states[value.id] === 'passed')
+  const cleanupPassed = states[CLEANUP_STEP.id] === 'passed'
+  const cleanupOrderingReady = !cleanupPassed
+    || allJourneyPassed
+    || (journeyFailed && createdSyntheticData)
+  checks.push(cleanupOrderingReady
+    ? { status: 'pass', field: 'cleanup ordering', message: 'cleanup อยู่หลัง journey ที่สำเร็จหรือหลัง failure ที่สร้างข้อมูลแล้ว' }
+    : { status: 'blocker', field: 'cleanup ordering', message: 'cleanup ถูกทำเครื่องหมายผ่านก่อนจบ journey; ห้ามทำ mutation ต่อ' })
+
+  const structuralReady = planShapeReady
+    && evidenceShapeReady
+    && orderingReady
+    && cleanupOrderingReady
 
   const plannedNextStepIds = []
   if (structuralReady && !cleanupFailed) {
@@ -286,15 +338,21 @@ export function inspectSebStagingMockHarnessEvidence(plan, evidence = {}) {
     && plan?.ready === true
     && structuralReady
   const nextStepIds = executionAuthorized ? plannedNextStepIds : []
+  const runComplete = executionAuthorized
+    && allStepsPassed
+    && !journeyFailed
+    && !cleanupFailed
 
   return {
     ready: executionAuthorized && !journeyFailed && !cleanupFailed,
-    status: allStepsPassed
+    status: runComplete
       ? 'complete'
       : !structuralReady || cleanupFailed
         ? 'blocked'
         : journeyFailed
-          ? 'cleanup-required'
+          ? cleanupPassed
+            ? 'blocked'
+            : 'cleanup-required'
           : executionAuthorized
             ? 'ready'
             : 'inspect-only',

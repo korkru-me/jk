@@ -83,8 +83,10 @@ describe('SEB Staging synthetic mock harness', () => {
       ready: true,
       executionAuthorized: true,
     }
-    const state = inspectSebStagingMockHarnessEvidence(forged)
+    const allPassed = Object.fromEntries(inspectPlan.steps.map(value => [value.id, 'passed']))
+    const state = inspectSebStagingMockHarnessEvidence(forged, allPassed)
     expect(state.status).toBe('blocked')
+    expect(state.ready).toBe(false)
     expect(state.nextStepIds).toEqual([])
   })
 
@@ -130,16 +132,20 @@ describe('SEB Staging synthetic mock harness', () => {
     }
   })
 
-  it('plans exactly one synthetic teacher, student, classroom and SEB assignment', () => {
+  it('plans isolated owner and outsider accounts plus one classroom and SEB assignment', () => {
     const plan = buildSebStagingMockHarnessPlan({ environment: validEnvironment() })
     expect(plan.fixture.policy).toBe('synthetic-only')
     expect(plan.fixture.credentials).toBe('runtime-only')
     expect(plan.fixture.entities.map(value => [value.kind, value.count])).toEqual([
-      ['teacher', 1],
-      ['student', 1],
+      ['teacher', 2],
+      ['student', 2],
       ['classroom', 1],
       ['assignment', 1],
     ])
+    expect(plan.fixture.entities[0].aliases).toEqual(['teacher-primary', 'teacher-unrelated'])
+    expect(plan.fixture.entities[1].aliases).toEqual(['student-primary', 'student-secondary'])
+    expect(Object.isFrozen(plan.fixture.entities[0].aliases)).toBe(true)
+    expect(Object.isFrozen(plan.fixture.entities[1].aliases)).toBe(true)
     expect(plan.fixture.entities.at(-1)).toMatchObject({
       secureBrowserMode: 'seb_required',
       initialStatus: 'draft',
@@ -154,15 +160,27 @@ describe('SEB Staging synthetic mock harness', () => {
 
     expect(ids).toEqual(expect.arrayContaining([
       'authenticate-student',
+      'reject-invalid-seb-challenge',
+      'reject-expired-seb-challenge',
       'verify-seb-system-check',
+      'reject-replayed-seb-challenge',
+      'reject-invalid-seb-session',
+      'reject-expired-seb-session',
       'start-revision-bound-attempt',
+      'reject-replayed-seb-session',
       'autosave-synthetic-answer',
+      'retry-autosave-after-transient-failure',
       'resume-same-attempt',
       'upload-synthetic-attachment',
+      'retry-upload-after-transient-failure',
       'record-proctor-heartbeat',
       'submit-attempt',
       'teacher-read-submitted-result',
       'student-denied-teacher-result',
+      'authenticate-secondary-student',
+      'secondary-student-denied-primary-attempt',
+      'authenticate-unrelated-teacher',
+      'unrelated-teacher-denied-assignment-result',
       'verify-cross-account-boundaries',
       'cleanup-synthetic-fixture',
     ]))
@@ -209,7 +227,7 @@ describe('SEB Staging synthetic mock harness', () => {
       passedEvidenceThrough(plan, 'provision-synthetic-student'),
     )
     expect(partial.ready).toBe(true)
-    expect(partial.nextStepIds).toEqual(['authenticate-teacher'])
+    expect(partial.nextStepIds).toEqual(['provision-secondary-student'])
   })
 
   it('blocks malformed or out-of-order evidence without echoing unknown values', () => {
@@ -240,6 +258,32 @@ describe('SEB Staging synthetic mock harness', () => {
     expect(state.status).toBe('cleanup-required')
     expect(state.nextStepIds).toEqual(['cleanup-synthetic-fixture'])
     expect(state.failedStepIds).toEqual(['enrol-synthetic-student'])
+  })
+
+  it('does not report an inspect-only all-passed snapshot as complete', () => {
+    const plan = buildSebStagingMockHarnessPlan({ environment: validEnvironment() })
+    const evidence = Object.fromEntries(plan.steps.map(value => [value.id, 'passed']))
+
+    const state = inspectSebStagingMockHarnessEvidence(plan, evidence)
+    expect(state.ready).toBe(false)
+    expect(state.status).toBe('inspect-only')
+    expect(state.nextStepIds).toEqual([])
+  })
+
+  it('blocks cleanup recorded before the journey and never exposes a later mutation', () => {
+    const plan = executablePlan()
+    const evidence = { 'cleanup-synthetic-fixture': 'passed' }
+
+    const beforeJourney = inspectSebStagingMockHarnessEvidence(plan, evidence)
+    expect(beforeJourney.ready).toBe(false)
+    expect(beforeJourney.status).toBe('blocked')
+    expect(beforeJourney.nextStepIds).toEqual([])
+
+    evidence['verify-staging-isolation'] = 'passed'
+    const afterReadOnlyPreflight = inspectSebStagingMockHarnessEvidence(plan, evidence)
+    expect(afterReadOnlyPreflight.ready).toBe(false)
+    expect(afterReadOnlyPreflight.status).toBe('blocked')
+    expect(afterReadOnlyPreflight.nextStepIds).toEqual([])
   })
 
   it('finishes only after every journey step and cleanup have passed', () => {
