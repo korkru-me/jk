@@ -73,5 +73,13 @@ teacher-facing workflow. A later artifact phase must bind the exact immutable
 revision into a generated `.seb` file and register its CK/BEK before students
 can receive it.
 
+## Deployment status
+
+Migration `20260923073215_persist_seb_quit_password_revisions.sql` was applied
+only to the isolated Korkru Staging database on 23 September 2026. The remote
+migration ledger matches this branch, a post-apply dry-run reports no pending
+migrations, and linked database lint reports no errors. No application build
+or teacher UI from this phase was deployed, and Production was not changed.
+
 The Base16 representation follows the official SEB developer specification:
 <https://safeexambrowser.org/developer/seb-config-key.html>.
