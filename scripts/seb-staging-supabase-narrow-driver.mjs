@@ -10,6 +10,31 @@ const MAX_RECONCILIATION_MATCHES = 8
 const MAX_QUERY_LIMIT = MAX_RECONCILIATION_MATCHES + 1
 const MAX_PREDICATES = 12
 const MAX_JSON_STRING = 50_000
+const SAFE_RPC_DIAGNOSTIC_MESSAGES = new Map([
+  ['SEB S5 closure cardinality changed', 'closure-cardinality'],
+  ['SEB S5 closure graph mismatch', 'closure-graph'],
+  ['SEB S5 foreign-key graph drifted', 'foreign-key-graph'],
+  ['SEB S5 exact parent is missing', 'parent-missing'],
+  ['SEB S5 owner lineage mismatch', 'owner-lineage'],
+  ['SEB S5 exact parent deletion failed', 'parent-delete'],
+  ['SEB S5 organization cascade failed', 'organization-cascade'],
+  ['invalid SEB S5 cleanup request', 'invalid-request'],
+  ['invalid SEB S5 atomic closure', 'invalid-closure'],
+  ['invalid SEB S5 closure cardinality', 'invalid-closure-cardinality'],
+  ['invalid SEB S5 closure predicate', 'invalid-closure-predicate'],
+  ['invalid SEB S5 closure requirement', 'invalid-closure-requirement'],
+  ['invalid SEB S5 creation window', 'invalid-window'],
+  ['invalid SEB S5 target identity', 'invalid-target-identity'],
+  ['invalid SEB S5 target predicate', 'invalid-target-predicate'],
+  ['invalid UUID closure predicate', 'invalid-uuid-closure'],
+  ['invalid organization target predicates', 'invalid-organization-predicates'],
+  ['invalid timestamp closure predicate', 'invalid-timestamp-closure'],
+  ['closure predicate is not parent-bound', 'closure-not-parent-bound'],
+  ['SEB S5 cascade declaration mismatch', 'cascade-declaration'],
+  ['SEB S5 run reservation mismatch', 'reservation-mismatch'],
+  ['unsupported SEB S5 closure field', 'unsupported-closure-field'],
+  ['unsupported SEB S5 closure requirement', 'unsupported-closure'],
+])
 const SERVICE_ROLE_CREDENTIAL_FIELDS = Object.freeze([
   'schemaVersion', 'targetOrigin', 'credentialKind', 'namespace', 'serviceRoleKey',
 ])
@@ -816,6 +841,23 @@ function createCredentialTransport(options) {
       cache: 'no-store',
       signal,
     }))
+    if (isResponseLike(response)
+      && !expectedStatuses.includes(response.status)
+      && process.env.SEB_S5_DIAGNOSTIC === '1'
+      && expectedUrl.includes('/rest/v1/rpc/seb_s5_')) {
+      let category = 'unclassified'
+      let postgresCode = 'unknown'
+      try {
+        const diagnostic = await response.clone().json()
+        if (diagnostic && typeof diagnostic === 'object') {
+          category = SAFE_RPC_DIAGNOSTIC_MESSAGES.get(diagnostic.message) ?? category
+          if (typeof diagnostic.code === 'string' && /^[0-9A-Z]{5}$/.test(diagnostic.code)) {
+            postgresCode = diagnostic.code
+          }
+        }
+      } catch {}
+      process.stderr.write(`SEB Staging database RPC blocked (${response.status}:${postgresCode}:${category})\n`)
+    }
     if (!isResponseLike(response)
       || !expectedStatuses.includes(response.status)
       || response.ok !== true

@@ -930,7 +930,7 @@ export function createSebStagingResourceCleanupRuntime({
         && row.id === input.targetId
         && row.created_by === relation.ownerId
         && row.org_id === relation.organizationId
-        && row.question_type === (input.resourceType === 'essay' ? 'written' : 'file_upload')
+        && row.question_type === input.resourceType
         && timestampInWindow(row.created_at, input.identity)
     } else if (input.kind === 'classroomMembership') {
       table = 'classroom_students'
@@ -1271,9 +1271,10 @@ export function createSebStagingResourceCleanupRuntime({
       key.startsWith('config-primary\u0000')
       && key.slice(key.indexOf('\u0000') + 1).startsWith(`${input.targetId}:r`)
     ))
-    if (configEntries.length !== 1) blocked()
-    const configMatch = CONFIG_REVISION_ID.exec(configEntries[0][1].input.targetId)
-    if (!configMatch) blocked()
+    const releaseEntries = [...enumerated.entries()].filter(([key]) => key.startsWith('release-primary\u0000'))
+    if (configEntries.length > 1
+      || releaseEntries.length > 1
+      || releaseEntries.length > configEntries.length) blocked()
     const configRows = await databaseRows(
       attestation,
       signal,
@@ -1282,16 +1283,6 @@ export function createSebStagingResourceCleanupRuntime({
       ['assignment_id', 'revision', 'org_id', 'owner_id', 'created_at'],
       [predicate('assignment_id', 'eq', input.targetId)],
     )
-    if (configRows.length !== 1
-      || !exactRow(configRows[0], ['assignment_id', 'revision', 'org_id', 'owner_id', 'created_at'])
-      || configRows[0].assignment_id !== input.targetId
-      || configRows[0].revision !== Number(configMatch[2])
-      || configRows[0].owner_id !== input.relationship.ownerId
-      || configRows[0].org_id !== input.relationship.organizationId
-      || !timestampInWindow(configRows[0].created_at, input.identity)) blocked()
-
-    const releaseEntries = [...enumerated.entries()].filter(([key]) => key.startsWith('release-primary\u0000'))
-    if (releaseEntries.length !== 1) blocked()
     const releaseRows = await databaseRows(
       attestation,
       signal,
@@ -1304,6 +1295,86 @@ export function createSebStagingResourceCleanupRuntime({
       ],
       [predicate('assignment_id', 'eq', input.targetId)],
     )
+    if (configEntries.length === 0) {
+      if (configRows.length !== 0 || releaseRows.length !== 0) blocked()
+      await proveZeroDependencies(
+        attestation, signal, 'assignment-closure:unexpected',
+        ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId,
+      )
+      return atomicClosure(
+        [
+          ...absentRequirements(ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId),
+          closureRequirement('assignment_seb_config_revisions', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 0),
+          closureRequirement('assignment_seb_config_releases', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 0),
+        ],
+        [
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 1),
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+            predicate('classroom_id', 'eq', input.relationship.parentId),
+            predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
+            predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
+          ], 1),
+        ],
+        ['assignment_classrooms'],
+      )
+    }
+
+    const configMatch = CONFIG_REVISION_ID.exec(configEntries[0][1].input.targetId)
+    if (!configMatch) blocked()
+    if (configRows.length !== 1
+      || !exactRow(configRows[0], ['assignment_id', 'revision', 'org_id', 'owner_id', 'created_at'])
+      || configRows[0].assignment_id !== input.targetId
+      || configRows[0].revision !== Number(configMatch[2])
+      || configRows[0].owner_id !== input.relationship.ownerId
+      || configRows[0].org_id !== input.relationship.organizationId
+      || !timestampInWindow(configRows[0].created_at, input.identity)) blocked()
+
+    if (releaseEntries.length === 0) {
+      if (releaseRows.length !== 0) blocked()
+      await proveZeroDependencies(
+        attestation, signal, 'assignment-closure:unexpected',
+        ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId,
+      )
+      return atomicClosure(
+        [
+          ...absentRequirements(ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId),
+          closureRequirement('assignment_seb_config_releases', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 0),
+        ],
+        [
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 1),
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+            predicate('classroom_id', 'eq', input.relationship.parentId),
+            predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
+            predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
+          ], 1),
+          closureRequirement('assignment_seb_config_revisions', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 1),
+          closureRequirement('assignment_seb_config_revisions', [
+            predicate('assignment_id', 'eq', input.targetId),
+            predicate('revision', 'eq', Number(configMatch[2])),
+            predicate('org_id', 'eq', input.relationship.organizationId),
+            predicate('owner_id', 'eq', input.relationship.ownerId),
+            predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
+            predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
+          ], 1),
+        ],
+        ['assignment_classrooms', 'assignment_seb_config_revisions'],
+      )
+    }
+
     if (releaseRows.length !== 1
       || !exactRow(releaseRows[0], [
         'assignment_id', 'revision', 'org_id', 'owner_id', 'release_id',
@@ -1473,7 +1544,10 @@ export function createSebStagingResourceCleanupRuntime({
   }
 
   async function enumeratePersonalOrganization(attestation, signal, input) {
+    let diagnosticStage = 'encoding'
+    try {
     if (!validateTargetEncoding(input)) blocked()
+    diagnosticStage = 'query'
     const [organizationId, membershipId] = input.targetId.split(':')
     const orgColumns = ['id', 'is_personal', 'subscription_tier', 'deleted_at', 'created_at']
     const memberColumns = ['id', 'org_id', 'user_id', 'org_role', 'joined_at']
@@ -1488,6 +1562,7 @@ export function createSebStagingResourceCleanupRuntime({
       ),
     ])
     if (organizations.length === 0 && memberships.length === 0) return Object.freeze([])
+    diagnosticStage = 'shape'
     if (organizations.length !== 1
       || memberships.length !== 1
       || !exactRow(organizations[0], orgColumns)
@@ -1505,17 +1580,27 @@ export function createSebStagingResourceCleanupRuntime({
     const publicAttestation = makeAttestation(input, createdAt)
     remember(input, publicAttestation)
     return Object.freeze([publicAttestation])
+    } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging personal organization enumerate blocked (${diagnosticStage})\n`)
+      }
+      blocked()
+    }
   }
 
   async function deletePersonalOrganization(attestation, signal, input) {
+    let diagnosticStage = 'remembered'
+    try {
     requireRemembered(input)
     const [organizationId, membershipId] = input.targetId.split(':')
     for (const table of ORGANIZATION_CHILD_TABLES) {
+      diagnosticStage = `child-closure:${table}`
       await expectNoRows(
         attestation, signal, `personal-organization-closure:${table}`,
         table, 'org_id', organizationId,
       )
     }
+    diagnosticStage = 'owner-membership'
     const members = await databaseRows(
       attestation,
       signal,
@@ -1528,6 +1613,7 @@ export function createSebStagingResourceCleanupRuntime({
       || members[0].id !== membershipId
       || members[0].user_id !== input.relationship.ownerId
       || members[0].org_role !== 'owner') blocked()
+    diagnosticStage = 'delete'
     await deleteDatabase(
       attestation, signal, 'personal-organization:delete-organization',
       'organizations', [
@@ -1560,6 +1646,7 @@ export function createSebStagingResourceCleanupRuntime({
         ['organization_members'],
       ),
     )
+    diagnosticStage = 'verify'
     await expectNoRows(
       attestation, signal, 'personal-organization:verify-organization',
       'organizations', 'id', organizationId,
@@ -1569,6 +1656,12 @@ export function createSebStagingResourceCleanupRuntime({
       'organization_members', 'id', membershipId,
     )
     return Object.freeze({ status: 'passed' })
+    } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging personal organization delete blocked (${diagnosticStage})\n`)
+      }
+      blocked()
+    }
   }
 
   function parseStorageObject(row, input) {

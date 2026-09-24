@@ -289,10 +289,16 @@ export function createSebStagingAggregateCleanupCapability({
           if (exactPassedResult(result)) {
             completed.add(name)
           } else {
+            if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+              process.stderr.write(`SEB Staging aggregate cleanup failed (${name})\n`)
+            }
             failed = true
             break
           }
         } catch {
+          if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+            process.stderr.write(`SEB Staging aggregate cleanup blocked (${name})\n`)
+          }
           failed = true
           break
         }

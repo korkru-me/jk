@@ -169,7 +169,7 @@ function rowMap() {
       created_at: CREATED_AT,
     }]],
     ['questions', [
-      { id: IDS.writtenQuestion, created_by: IDS.teacher, org_id: IDS.teacherOrg, question_type: 'written', created_at: CREATED_AT },
+      { id: IDS.writtenQuestion, created_by: IDS.teacher, org_id: IDS.teacherOrg, question_type: 'essay', created_at: CREATED_AT },
       { id: IDS.uploadQuestion, created_by: IDS.teacher, org_id: IDS.teacherOrg, question_type: 'file_upload', created_at: CREATED_AT },
     ]],
     ['classroom_students', [
@@ -821,6 +821,71 @@ describe('SEB Staging exact resource cleanup runtime', () => {
     expect(harness.rows.get('assignment_seb_config_releases')).toEqual([])
     expect((await harness.enumerate(harness.runtime.databaseClient, 'config-primary')).matches).toEqual([])
     expect((await harness.enumerate(harness.runtime.databaseClient, 'release-primary')).matches).toEqual([])
+  })
+
+  it('allows a partial-run assignment only when both config and release are absent', async () => {
+    const harness = createHarness()
+    clearAssignmentOrdinaryDependencies(harness)
+    harness.rows.set('assignment_seb_config_revisions', [])
+    harness.rows.set('assignment_seb_config_releases', [])
+    await harness.enumerate(harness.runtime.databaseClient, 'assignment-primary')
+
+    expect(await harness.remove(harness.runtime.databaseClient, 'assignment-primary'))
+      .toEqual({ status: 'passed' })
+    const request = harness.events.find(event => (
+      event.type === 'deleteDatabase' && event.request.table === 'assignments'
+    )).request
+    expect(request.atomicClosure.allowedCascadeTables).toEqual(['assignment_classrooms'])
+    expect(request.atomicClosure.requireAbsent).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: 'assignment_seb_config_revisions', expectedCount: 0 }),
+      expect.objectContaining({ table: 'assignment_seb_config_releases', expectedCount: 0 }),
+    ]))
+    expect(harness.rows.get('assignments')).toEqual([])
+    expect(harness.rows.get('assignment_classrooms')).toEqual([])
+  })
+
+  it('allows a partial-run assignment with one attested config revision and no release', async () => {
+    const harness = createHarness()
+    clearAssignmentOrdinaryDependencies(harness)
+    harness.rows.set('assignment_seb_config_releases', [])
+    await harness.enumerate(harness.runtime.databaseClient, 'assignment-primary')
+    await harness.enumerate(harness.runtime.databaseClient, 'config-primary')
+
+    expect(await harness.remove(harness.runtime.databaseClient, 'assignment-primary'))
+      .toEqual({ status: 'passed' })
+    const request = harness.events.find(event => (
+      event.type === 'deleteDatabase' && event.request.table === 'assignments'
+    )).request
+    expect(request.atomicClosure.allowedCascadeTables).toEqual([
+      'assignment_classrooms',
+      'assignment_seb_config_revisions',
+    ])
+    expect(request.atomicClosure.requireAbsent).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: 'assignment_seb_config_releases', expectedCount: 0 }),
+    ]))
+    expect(request.atomicClosure.requireExact).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: 'assignment_seb_config_revisions', expectedCount: 1 }),
+    ]))
+    expect(harness.rows.get('assignments')).toEqual([])
+    expect(harness.rows.get('assignment_classrooms')).toEqual([])
+    expect(harness.rows.get('assignment_seb_config_revisions')).toEqual([])
+  })
+
+  it('blocks a partial-run assignment when unremembered config or release exists', async () => {
+    for (const survivingTable of [
+      'assignment_seb_config_revisions',
+      'assignment_seb_config_releases',
+    ]) {
+      const harness = createHarness()
+      clearAssignmentOrdinaryDependencies(harness)
+      const otherTable = survivingTable === 'assignment_seb_config_revisions'
+        ? 'assignment_seb_config_releases'
+        : 'assignment_seb_config_revisions'
+      harness.rows.set(otherTable, [])
+      await harness.enumerate(harness.runtime.databaseClient, 'assignment-primary')
+      await expectBlocked(harness.remove(harness.runtime.databaseClient, 'assignment-primary'))
+      expect(harness.rows.get('assignments')).toHaveLength(1)
+    }
   })
 
   it('blocks assignment deletion on extra joins, missing immutable rows, or any unexpected dependent', async () => {
