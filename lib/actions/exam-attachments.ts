@@ -57,6 +57,8 @@ export async function prepareExamAttachmentUpload(input: {
   submissionAnswerId: string
   kind: string
   partIndex?: number
+  uploadId?: string
+  retry?: boolean
   name: string
   mimeType: string
   size: number
@@ -65,6 +67,13 @@ export async function prepareExamAttachmentUpload(input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!UUID_PATTERN.test(input.submissionAnswerId)) return { error: 'คำตอบไม่ถูกต้อง' }
+  if (input.uploadId !== undefined && !UUID_PATTERN.test(input.uploadId)) {
+    return { error: 'ไฟล์อัปโหลดไม่ถูกต้อง' }
+  }
+  if (input.retry !== undefined && typeof input.retry !== 'boolean') {
+    return { error: 'คำขออัปโหลดไม่ถูกต้อง' }
+  }
+  if (input.retry && !input.uploadId) return { error: 'ไฟล์อัปโหลดไม่ถูกต้อง' }
   if (!isExamAttachmentKind(input.kind)) return { error: 'ประเภทไฟล์ไม่ถูกต้อง' }
   const kind = input.kind
   const file = validateExamAttachmentFile({ ...input, kind })
@@ -76,7 +85,7 @@ export async function prepareExamAttachmentUpload(input: {
   const contextError = attachmentContextError(kind, writable, input.partIndex)
   if (contextError) return { error: contextError }
 
-  const uploadId = crypto.randomUUID()
+  const uploadId = input.uploadId ?? crypto.randomUUID()
   const path = buildExamAttachmentPath({
     studentId: user.id,
     submissionId: writable.submission.id,
@@ -85,11 +94,39 @@ export async function prepareExamAttachmentUpload(input: {
     extension: file.extension,
   })
   const definition = examAttachmentDefinition(kind)
-  const target = await admin.storage.from(definition.bucket).createSignedUploadUrl(path)
+  const bucket = admin.storage.from(definition.bucket)
+
+  // A signed upload can commit even when its browser response is lost. A retry
+  // therefore inspects the same deterministic path before issuing another
+  // upload target. Valid bytes are reused; invalid/partial bytes are removed
+  // before the same path is offered again. This keeps one logical file at one
+  // object key without granting browser upsert permission.
+  if (input.retry) {
+    const inspected = await inspectStoredExamAttachment(admin, {
+      kind,
+      path,
+      expectedMimeType: file.mimeType,
+      expectedSize: file.size,
+    })
+    if (!('error' in inspected)) {
+      const { data: { publicUrl } } = bucket.getPublicUrl(path)
+      return {
+        success: true as const,
+        reused: true as const,
+        uploadId,
+        file: { url: publicUrl, name: file.name, type: inspected.mimeType },
+      }
+    }
+    const removed = await bucket.remove([path])
+    if (removed.error) return { error: 'เตรียมอัปโหลดไฟล์เดิมอีกครั้งไม่สำเร็จ กรุณาลองใหม่' }
+  }
+
+  const target = await bucket.createSignedUploadUrl(path)
   if (target.error) return { error: 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ กรุณาลองใหม่' }
 
   return {
     success: true as const,
+    reused: false as const,
     uploadId,
     path,
     token: target.data.token,

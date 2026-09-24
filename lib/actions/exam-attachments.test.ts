@@ -138,6 +138,73 @@ describe('exam attachment Server Actions', () => {
     ))
   })
 
+  it('binds a client retry id to the same exact answer path', async () => {
+    const result = await prepareExamAttachmentUpload({
+      submissionAnswerId: ANSWER,
+      kind: 'submission_file',
+      uploadId: UPLOAD,
+      retry: false,
+      name: 'answer.pdf',
+      mimeType: 'application/pdf',
+      size: 128,
+    })
+    expect(result).toMatchObject({ success: true, reused: false, uploadId: UPLOAD })
+    expect(mocks.createSignedUploadUrl).toHaveBeenCalledWith(
+      `${STUDENT}/${SUBMISSION}/${ANSWER}/${UPLOAD}.pdf`,
+    )
+  })
+
+  it('reuses the same valid storage object when a retry lost the prior response', async () => {
+    const result = await prepareExamAttachmentUpload({
+      submissionAnswerId: ANSWER,
+      kind: 'submission_file',
+      uploadId: UPLOAD,
+      retry: true,
+      name: 'answer.pdf',
+      mimeType: 'application/pdf',
+      size: 128,
+    })
+    expect(result).toMatchObject({
+      success: true,
+      reused: true,
+      uploadId: UPLOAD,
+      file: { name: 'answer.pdf', type: 'application/pdf' },
+    })
+    expect(mocks.createSignedUploadUrl).not.toHaveBeenCalled()
+    expect(mocks.remove).not.toHaveBeenCalled()
+  })
+
+  it('clears a partial retry object before issuing a target for the same path', async () => {
+    mocks.inspectStoredExamAttachment.mockResolvedValue({ error: 'ไม่พบไฟล์ที่อัปโหลด กรุณาแนบใหม่' })
+    const result = await prepareExamAttachmentUpload({
+      submissionAnswerId: ANSWER,
+      kind: 'submission_file',
+      uploadId: UPLOAD,
+      retry: true,
+      name: 'answer.pdf',
+      mimeType: 'application/pdf',
+      size: 128,
+    })
+    const path = `${STUDENT}/${SUBMISSION}/${ANSWER}/${UPLOAD}.pdf`
+    expect(result).toMatchObject({ success: true, reused: false, uploadId: UPLOAD, path })
+    expect(mocks.remove).toHaveBeenCalledWith([path])
+    expect(mocks.createSignedUploadUrl).toHaveBeenCalledWith(path)
+  })
+
+  it('rejects a malformed retry id before issuing a signed target', async () => {
+    await expect(prepareExamAttachmentUpload({
+      submissionAnswerId: ANSWER,
+      kind: 'submission_file',
+      uploadId: '../another-object',
+      retry: true,
+      name: 'answer.pdf',
+      mimeType: 'application/pdf',
+      size: 128,
+    })).resolves.toEqual({ error: 'ไฟล์อัปโหลดไม่ถูกต้อง' })
+    expect(mocks.getWritableStudentAnswer).not.toHaveBeenCalled()
+    expect(mocks.createSignedUploadUrl).not.toHaveBeenCalled()
+  })
+
   it('removes an uploaded object when server-side inspection rejects it', async () => {
     mocks.inspectStoredExamAttachment.mockResolvedValue({ error: 'เนื้อหาไฟล์ไม่ตรงกับชนิดไฟล์' })
     await expect(completeExamAttachmentUpload({

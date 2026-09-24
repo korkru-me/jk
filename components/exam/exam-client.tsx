@@ -16,6 +16,7 @@ import type { GradedAnswer } from '@/lib/assignment-attempt'
 import type { AnswerFeedback } from '@/lib/answer-feedback'
 import { isInstantCheckable } from '@/lib/grading'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
+import { resolveAnswerAutosaveStatus } from '@/lib/exam-autosave-policy'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
 import { useExamTimer } from '@/hooks/use-exam-timer'
@@ -481,14 +482,16 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   })
 
   // ── Auto-sync whatever went unsaved while offline ───────────────────────────
+  const syncPendingAnswers = useCallback(async () => {
+    if (pendingCount === 0) return
+    toast.info(`กำลังซิงก์คำตอบ ${pendingCount} ข้อ...`)
+    const synced = await retryPending()
+    if (synced.ok) toast.success('ซิงก์คำตอบสำเร็จ ✓')
+    else toast.warning(synced.error ?? 'ยังมีบางคำตอบที่รอซิงก์ กดลองอีกครั้งได้โดยคำตอบยังอยู่ในเครื่อง')
+  }, [pendingCount, retryPending])
+
   const isOnline = useOnlineStatus({
-    onOnline: async () => {
-      if (pendingCount === 0) return
-      toast.info(`กำลังซิงก์คำตอบ ${pendingCount} ข้อ...`)
-      const synced = await retryPending()
-      if (synced.ok) toast.success('ซิงก์คำตอบสำเร็จ ✓')
-      else toast.warning(synced.error ?? 'ยังมีบางคำตอบที่รอซิงก์ ระบบจะลองอีกครั้งเมื่อเชื่อมต่อใหม่')
-    },
+    onOnline: syncPendingAnswers,
     onOffline: () => {
       toast.warning('อินเทอร์เน็ตหลุด — บันทึกในเครื่องแล้ว จะซิงก์อัตโนมัติเมื่อเน็ตกลับมา')
     },
@@ -1653,12 +1656,15 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <Flag size={9} className="fill-flag" /> {flaggedCount}
               </span>
             )}
-            {saving && <span className="ml-auto animate-pulse">กำลังบันทึก...</span>}
-            {!isOnline && (
-              <span className="flex items-center gap-0.5 text-warning ml-auto">
-                <WifiOff size={9} /> ออฟไลน์
-              </span>
-            )}
+            <span className="ml-auto">
+              <AutosaveStatus
+                saving={saving}
+                isOnline={isOnline}
+                pendingSync={pendingCount}
+                onRetryPending={syncPendingAnswers}
+                compact
+              />
+            </span>
           </div>
         </Card>
         )}
@@ -1778,6 +1784,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             saving={saving}
             isOnline={isOnline}
             pendingSync={pendingCount}
+            onRetryPending={syncPendingAnswers}
             tabSwitchCount={tabSwitchCount}
             config={config}
             proctorStatus={proctorStatus}
@@ -1890,6 +1897,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 style={{ width: `${progress}%` }}
               />
             </div>
+            {(saving || pendingCount > 0 || !isOnline) && (
+              <div className="border-t px-3 py-1.5 text-xs sm:px-6">
+                <AutosaveStatus
+                  saving={saving}
+                  isOnline={isOnline}
+                  pendingSync={pendingCount}
+                  onRetryPending={syncPendingAnswers}
+                  compact
+                />
+              </div>
+            )}
           </div>
 
           <div className="mx-auto w-full max-w-6xl flex-1 overflow-hidden p-2 sm:p-6">
@@ -2370,8 +2388,73 @@ function PreviewResultSummary({
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
+function AutosaveStatus({
+  saving,
+  isOnline,
+  pendingSync,
+  onRetryPending,
+  compact = false,
+}: {
+  saving: boolean
+  isOnline: boolean
+  pendingSync: number
+  onRetryPending: () => void
+  compact?: boolean
+}) {
+  const status = resolveAnswerAutosaveStatus({ saving, pendingCount: pendingSync, isOnline })
+  const iconSize = compact ? 9 : 11
+
+  if (status === 'syncing') {
+    return (
+      <span className="flex items-center gap-1 text-muted-foreground" role="status">
+        <Loader2 size={iconSize} className="animate-spin" aria-hidden />
+        กำลังซิงก์ {pendingSync}
+      </span>
+    )
+  }
+  if (status === 'pending') {
+    return (
+      <span
+        className="flex flex-wrap items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]"
+        role="status"
+      >
+        <AlertTriangle size={iconSize} aria-hidden /> รอซิงก์ {pendingSync}
+        {isOnline && (
+          <button
+            type="button"
+            className="rounded underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={onRetryPending}
+          >
+            ลองอีกครั้ง
+          </button>
+        )}
+      </span>
+    )
+  }
+  if (status === 'saving') {
+    return (
+      <span className="flex items-center gap-1 text-muted-foreground" role="status">
+        <Loader2 size={iconSize} className="animate-spin" aria-hidden /> บันทึก...
+      </span>
+    )
+  }
+  if (status === 'saved') {
+    return (
+      <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">
+        <Wifi size={iconSize} aria-hidden /> บันทึกอัตโนมัติ
+      </span>
+    )
+  }
+  return (
+    <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
+      <WifiOff size={iconSize} aria-hidden /> ออฟไลน์
+    </span>
+  )
+}
+
 function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
+  onRetryPending,
   proctorStatus,
   proctorActiveConnectionCount,
   config, calculatorOpen, onToggleCalculator, scratchpadOpen, onToggleScratchpad, onFocusMode,
@@ -2380,6 +2463,7 @@ function ExamToolbar({
   saving: boolean
   isOnline: boolean
   pendingSync: number
+  onRetryPending: () => void
   tabSwitchCount: number
   proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
   proctorActiveConnectionCount: number
@@ -2399,21 +2483,12 @@ function ExamToolbar({
     <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
       {/* Status indicators */}
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
-        {saving ? (
-          <span className="text-muted-foreground animate-pulse">บันทึก...</span>
-        ) : pendingSync > 0 ? (
-          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
-            <WifiOff size={11} /> รอซิงก์ {pendingSync}
-          </span>
-        ) : isOnline ? (
-          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">
-            <Wifi size={11} /> บันทึกอัตโนมัติ
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
-            <WifiOff size={11} /> ออฟไลน์
-          </span>
-        )}
+        <AutosaveStatus
+          saving={saving}
+          isOnline={isOnline}
+          pendingSync={pendingSync}
+          onRetryPending={onRetryPending}
+        />
         {tabSwitchCount > 0 && (
           <span className="text-destructive flex items-center gap-1">
             <ShieldAlert size={11} /> สลับแท็บ {tabSwitchCount}×

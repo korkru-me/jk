@@ -4,6 +4,11 @@ import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { FileUp, FileText, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  mergeSubmittedFiles,
+  uploadSubmissionCandidate,
+  type SubmissionUploadCandidate,
+} from '@/lib/exam-submission-upload'
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 import type { SubmittedFile } from '@/lib/types'
@@ -39,13 +44,45 @@ function isImageType(type: string) {
   return type.startsWith('image/')
 }
 
+interface FailedSubmissionUpload extends SubmissionUploadCandidate<File> {
+  error: string
+}
+
 // Student-side multi-file submission uploader for `file_upload` questions —
 // mirrors WorkImageUpload's storage-upload pattern but keeps an array (like
 // the teacher-side QuestionImageUpload) instead of a single slot, and
 // accepts PDFs alongside images.
 export function FileSubmissionUpload({ submissionAnswerId, value, onChange, localOnly }: FileSubmissionUploadProps) {
   const [uploading, setUploading] = useState(false)
+  const [activeUploadId, setActiveUploadId] = useState<string | null>(null)
+  const [failedUploads, setFailedUploads] = useState<FailedSubmissionUpload[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+
+  async function uploadCandidate(candidate: SubmissionUploadCandidate<File>, retry: boolean) {
+    if (!submissionAnswerId) throw new Error('ไม่พบคำตอบสำหรับแนบไฟล์ กรุณาโหลดข้อสอบใหม่')
+    const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/actions/exam-attachments')
+    return uploadSubmissionCandidate({ submissionAnswerId, candidate, retry }, {
+      prepare: prepareExamAttachmentUpload,
+      upload: async (target, file, mimeType) => {
+        const supabase = await browserSupabase()
+        return supabase.storage
+          .from(target.bucket)
+          .uploadToSignedUrl(target.path, target.token, file, {
+            contentType: mimeType,
+            cacheControl: '300',
+          })
+      },
+      complete: completeExamAttachmentUpload,
+    })
+  }
+
+  function rememberFailure(candidate: SubmissionUploadCandidate<File>, error: string) {
+    setFailedUploads(current => {
+      const previous = current.find(item => item.uploadId === candidate.uploadId)
+      if (!previous) return [...current, { ...candidate, error }]
+      return current.map(item => item.uploadId === candidate.uploadId ? { ...item, error } : item)
+    })
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -66,48 +103,57 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
     }
     setUploading(true)
     const uploaded: SubmittedFile[] = []
-    for (const original of files) {
-      // Same reason as the work-photo slot: a student attaching their answer is
-      // usually attaching a photo of it, from a phone, while a timer runs. PDFs
-      // pass through untouched.
-      const file = await downscaleImage(original)
-      try {
-        const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/actions/exam-attachments')
-        const prepared = await prepareExamAttachmentUpload({
-          submissionAnswerId,
-          kind: 'submission_file',
+    try {
+      for (const original of files) {
+        // Same reason as the work-photo slot: a student attaching their answer is
+        // usually attaching a photo of it, from a phone, while a timer runs. PDFs
+        // pass through untouched.
+        const file = await downscaleImage(original)
+        const candidate: SubmissionUploadCandidate<File> = {
+          uploadId: crypto.randomUUID(),
+          file,
           name: original.name,
           mimeType: file.type,
           size: file.size,
-        })
-        if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
-        const supabase = await browserSupabase()
-        const sent = await supabase.storage
-          .from(prepared.bucket)
-          .uploadToSignedUrl(prepared.path, prepared.token, file, {
-            contentType: file.type,
-            cacheControl: '300',
-          })
-        if (sent.error) throw sent.error
-        const completed = await completeExamAttachmentUpload({
-          submissionAnswerId,
-          kind: 'submission_file',
-          uploadId: prepared.uploadId,
-          name: original.name,
-          mimeType: file.type,
-          size: file.size,
-        })
-        if (!completed || 'error' in completed) throw new Error(completed?.error ?? 'ตรวจสอบไฟล์ไม่สำเร็จ')
-        uploaded.push(completed.file)
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'
-        toast.error(uploadErrorMessage(message, original.name, SUBMISSION_FILE_MAX_MB))
+        }
+        setActiveUploadId(candidate.uploadId)
+        try {
+          uploaded.push(await uploadCandidate(candidate, false))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'
+          const displayError = uploadErrorMessage(message, original.name, SUBMISSION_FILE_MAX_MB)
+          rememberFailure(candidate, displayError)
+          toast.error(displayError)
+        }
       }
+      if (uploaded.length > 0) onChange(mergeSubmittedFiles(value, uploaded))
+    } finally {
+      setActiveUploadId(null)
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
     }
+  }
 
-    onChange([...value, ...uploaded])
-    setUploading(false)
-    if (inputRef.current) inputRef.current.value = ''
+  async function retryUpload(uploadId: string) {
+    const candidate = failedUploads.find(item => item.uploadId === uploadId)
+    if (!candidate || !submissionAnswerId || uploading) return
+
+    setUploading(true)
+    setActiveUploadId(uploadId)
+    try {
+      const file = await uploadCandidate(candidate, true)
+      setFailedUploads(current => current.filter(item => item.uploadId !== uploadId))
+      onChange(mergeSubmittedFiles(value, [file]))
+      toast.success(`อัปโหลด “${candidate.name}” สำเร็จแล้ว`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'
+      const displayError = uploadErrorMessage(message, candidate.name, SUBMISSION_FILE_MAX_MB)
+      rememberFailure(candidate, displayError)
+      toast.error(displayError)
+    } finally {
+      setActiveUploadId(null)
+      setUploading(false)
+    }
   }
 
   async function removeFile(url: string) {
@@ -138,6 +184,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
         <input
           ref={inputRef}
           type="file"
+          aria-label="เลือกไฟล์คำตอบ"
           accept="image/*,application/pdf"
           multiple
           className="hidden"
@@ -158,6 +205,37 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
             : 'รูปภาพหรือ PDF — สูงสุด 10 MB ต่อไฟล์'}
         </span>
       </div>
+
+      {failedUploads.length > 0 && (
+        <div className="space-y-2" aria-live="polite">
+          {failedUploads.map(item => {
+            const retrying = activeUploadId === item.uploadId
+            return (
+              <div
+                key={item.uploadId}
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-foreground">{item.name}</p>
+                  <p className="text-[11px] text-destructive">{item.error}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploading}
+                  aria-label={`ลองอัปโหลดไฟล์ ${item.name} อีกครั้ง`}
+                  onClick={() => retryUpload(item.uploadId)}
+                >
+                  {retrying && <Loader2 className="animate-spin" />}
+                  {retrying ? 'กำลังลองอีกครั้ง...' : 'ลองอีกครั้ง'}
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {value.length > 0 && (
         <div className="flex flex-wrap gap-3">

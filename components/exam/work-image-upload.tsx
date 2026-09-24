@@ -88,6 +88,7 @@ export function WorkImageUpload({
         size: file.size,
       })
       if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
+      if (prepared.reused) throw new Error('สถานะอัปโหลดรูปวิธีทำไม่ถูกต้อง กรุณาลองใหม่')
       const supabase = await browserSupabase()
       const sent = await supabase.storage
         .from(prepared.bucket)

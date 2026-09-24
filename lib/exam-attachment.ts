@@ -144,6 +144,7 @@ export function parseSubmittedFiles(value: unknown): SubmittedFile[] | null {
   }
   if (!Array.isArray(parsed) || parsed.length > 20) return null
   const files: SubmittedFile[] = []
+  const filesByUrl = new Map<string, SubmittedFile>()
   for (const item of parsed) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return null
     const row = item as Record<string, unknown>
@@ -155,7 +156,17 @@ export function parseSubmittedFiles(value: unknown): SubmittedFile[] | null {
       || !SAFE_FILE_NAME.test(row.name.trim())
       || !DEFINITIONS.submission_file.mimeExtensions[row.type.toLowerCase()]
     ) return null
-    files.push({ url: row.url, name: row.name.trim(), type: row.type.toLowerCase() })
+    const file = { url: row.url, name: row.name.trim(), type: row.type.toLowerCase() }
+    const existing = filesByUrl.get(file.url)
+    if (existing) {
+      // A retry may replay the same reference, but one object must never become
+      // two answer entries. Conflicting metadata for one URL is ambiguous and
+      // remains invalid rather than being silently rewritten.
+      if (existing.name !== file.name || existing.type !== file.type) return null
+      continue
+    }
+    filesByUrl.set(file.url, file)
+    files.push(file)
   }
   return files
 }

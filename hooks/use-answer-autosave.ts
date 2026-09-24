@@ -13,7 +13,12 @@ import {
   type PendingAnswerPayload,
 } from '@/lib/math/answer-backup'
 import type { MathInputMode } from '@/lib/types'
-import { shouldPersistExamAnswerLocally } from '@/lib/exam-autosave-policy'
+import {
+  createSingleFlight,
+  hasActiveAnswerSave,
+  shouldPersistExamAnswerLocally,
+  type SingleFlight,
+} from '@/lib/exam-autosave-policy'
 
 const LS_KEY = (submissionId: string) => `korkru_exam_${submissionId}`
 const DEBOUNCE_MS = 500
@@ -65,6 +70,10 @@ export function useAnswerAutosave({
   const pendingRef = useRef<Map<string, PendingAnswerPayload>>(new Map())
   const inFlightRef = useRef<Map<string, Promise<SaveOutcome>>>(new Map())
   const backupRef = useRef<Map<string, PendingAnswerPayload>>(new Map())
+  const pendingSyncRef = useRef<Set<string>>(new Set())
+  const retryFlightRef = useRef<SingleFlight<SaveOutcome> | null>(null)
+  if (!retryFlightRef.current) retryFlightRef.current = createSingleFlight<SaveOutcome>()
+  const retryFlight = retryFlightRef.current
 
   const currentPayload = useCallback((answerId: string): PendingAnswerPayload => ({
     value: localAnswersRef.current[answerId] ?? '',
@@ -83,11 +92,28 @@ export function useAnswerAutosave({
   }, [persistenceEnabled, submissionId])
 
   const refreshSavingState = useCallback(() => {
-    setSaving(
-      saveTimersRef.current.size > 0
-      || pendingRef.current.size > 0
-      || inFlightRef.current.size > 0,
-    )
+    setSaving(hasActiveAnswerSave(saveTimersRef.current.size, inFlightRef.current.size))
+  }, [])
+
+  const addPendingSync = useCallback((answerIds: Iterable<string>) => {
+    const next = new Set(pendingSyncRef.current)
+    let changed = false
+    for (const answerId of answerIds) {
+      if (next.has(answerId)) continue
+      next.add(answerId)
+      changed = true
+    }
+    if (!changed) return
+    pendingSyncRef.current = next
+    setPendingSync(next)
+  }, [])
+
+  const removePendingSync = useCallback((answerId: string) => {
+    if (!pendingSyncRef.current.has(answerId) || pendingRef.current.has(answerId)) return
+    const next = new Set(pendingSyncRef.current)
+    next.delete(answerId)
+    pendingSyncRef.current = next
+    setPendingSync(next)
   }, [])
 
   const flushAnswer = useCallback((answerId: string): Promise<SaveOutcome> => {
@@ -103,12 +129,7 @@ export function useAnswerAutosave({
     const markSaved = (): SaveOutcome => {
       const queued = pendingRef.current.get(answerId)
       if (sameAnswerPayload(queued, payload)) pendingRef.current.delete(answerId)
-      setPendingSync(previous => {
-        if (!previous.has(answerId) || pendingRef.current.has(answerId)) return previous
-        const next = new Set(previous)
-        next.delete(answerId)
-        return next
-      })
+      removePendingSync(answerId)
       if (sameAnswerPayload(backupRef.current.get(answerId), payload) && !pendingRef.current.has(answerId)) {
         backupRef.current.delete(answerId)
         persistPendingBackup()
@@ -121,7 +142,7 @@ export function useAnswerAutosave({
       if (!pendingRef.current.has(answerId)) pendingRef.current.set(answerId, latest)
       backupRef.current.set(answerId, latest)
       persistPendingBackup()
-      setPendingSync(previous => new Set(previous).add(answerId))
+      addPendingSync([answerId])
       return { ok: false, error }
     }
 
@@ -147,7 +168,7 @@ export function useAnswerAutosave({
     inFlightRef.current.set(answerId, task)
     setSaving(true)
     return task
-  }, [currentPayload, persistPendingBackup, previewMode, refreshSavingState])
+  }, [addPendingSync, currentPayload, persistPendingBackup, previewMode, refreshSavingState, removePendingSync])
 
   const scheduleSave = useCallback((answerId: string, payload: PendingAnswerPayload) => {
     if (!persistenceEnabled) return
@@ -159,7 +180,7 @@ export function useAnswerAutosave({
     if (existingTimer) clearTimeout(existingTimer)
 
     if (!navigator.onLine) {
-      setPendingSync(previous => new Set(previous).add(answerId))
+      addPendingSync([answerId])
       saveTimersRef.current.delete(answerId)
       refreshSavingState()
       return
@@ -171,7 +192,7 @@ export function useAnswerAutosave({
       void flushAnswer(answerId)
     }, DEBOUNCE_MS)
     saveTimersRef.current.set(answerId, timer)
-  }, [flushAnswer, persistPendingBackup, persistenceEnabled, refreshSavingState])
+  }, [addPendingSync, flushAnswer, persistPendingBackup, persistenceEnabled, refreshSavingState])
 
   const flushQueuedAnswers = useCallback(async (): Promise<SaveOutcome> => {
     const queuedIds = [...pendingRef.current.keys()]
@@ -199,13 +220,19 @@ export function useAnswerAutosave({
     scheduleSave(answerId, currentPayload(answerId))
   }, [currentPayload, scheduleSave])
 
-  const retryPending = useCallback(async (): Promise<SaveOutcome> => {
-    const ids = [...pendingSync]
+  const retryPending = useCallback((): Promise<SaveOutcome> => retryFlight.run(async () => {
+    const ids = [...pendingSyncRef.current]
     if (ids.length === 0) return SAVED
-    setPendingSync(new Set())
-    for (const id of ids) pendingRef.current.set(id, currentPayload(id))
+
+    for (const id of ids) {
+      // A submit/check flush may already own this answer. Share that request
+      // instead of queueing the same payload behind it a second time.
+      if (!pendingRef.current.has(id) && !inFlightRef.current.has(id)) {
+        pendingRef.current.set(id, currentPayload(id))
+      }
+    }
     return combineOutcomes(await Promise.all(ids.map(id => flushAnswer(id))))
-  }, [currentPayload, flushAnswer, pendingSync])
+  }), [currentPayload, flushAnswer, retryFlight])
 
   const clearSavedAnswers = useCallback(() => {
     if (!persistenceEnabled) return
@@ -250,11 +277,11 @@ export function useAnswerAutosave({
 
       if (navigator.onLine) void Promise.all(restoredIds.map(id => flushAnswer(id)))
       else {
-        setPendingSync(previous => new Set([...previous, ...restoredIds]))
+        addPendingSync(restoredIds)
         refreshSavingState()
       }
     } catch { /* ignore corrupt data */ }
-  }, [flushAnswer, persistPendingBackup, persistenceEnabled, refreshSavingState, submissionId])
+  }, [addPendingSync, flushAnswer, persistPendingBackup, persistenceEnabled, refreshSavingState, submissionId])
 
   useEffect(() => () => {
     for (const timer of saveTimersRef.current.values()) clearTimeout(timer)

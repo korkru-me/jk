@@ -237,7 +237,10 @@ assignment/config ผูกหลัง commit ครบเท่านั้น
 ทั้งสองตามพฤติกรรมจริง เพิ่ม closure-private browser operation runtime สำหรับ 24 operation ที่ผูก alias
 ตายตัว, ใช้ one-shot ticket, ตรวจ write gate ซ้ำชิด mutation, บังคับ native prerequisite ก่อนออก ticket,
 sanitize error และคง unresolved cleanup obligation แบบมี deadline/retry โดยไม่คืน Page/credential/ID
-ชุด S5 ผ่าน 18 files / 522 tests, ทั้งโครงการผ่าน 156 files / 2,239 tests และ TypeScript/syntax checks ผ่าน
+ระหว่างตรวจ selector จริงพบและแก้ recovery gap สองจุด: autosave ที่ล้มเหลวหยุดสถานะกำลังบันทึกแต่ยังคง
+คำตอบไว้รอซิงก์พร้อมปุ่มลองใหม่แบบ single-flight และไฟล์คำตอบใช้ upload ID เดิมเมื่อ retry เพื่อคืน object
+ที่อัปโหลดสำเร็จแต่ response หายโดยไม่สร้าง path ซ้ำ ชุด S5 ผ่าน 18 files / 522 tests, ทั้งโครงการผ่าน
+157 files / 2,253 tests และ TypeScript/syntax/runtime checks ผ่าน
 
 ยังไม่อนุญาต live mock จนกว่าจะมี concrete private ticket/selector provider ที่ทำ marker และตรวจความสัมพันธ์
 ของรายการจริงแบบ step-specific และต่อ operation runtime เข้ากับ live runner โดยไม่เปิด Page, credential หรือ

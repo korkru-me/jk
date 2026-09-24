@@ -67,6 +67,12 @@ describe('exam attachment policy', () => {
     expect(parseSubmittedFiles('[{"url":"x","name":"x","type":"text/html"}]')).toBeNull()
   })
 
+  it('deduplicates an idempotent file reference and rejects conflicting metadata', () => {
+    const file = { url: 'https://example.test/file.pdf', name: 'answer.pdf', type: 'application/pdf' }
+    expect(parseSubmittedFiles([file, file])).toEqual([file])
+    expect(parseSubmittedFiles([file, { ...file, name: 'other.pdf' }])).toBeNull()
+  })
+
   it('checks signatures rather than trusting a client MIME label', () => {
     expect(hasExamAttachmentSignature(new Uint8Array([0xff, 0xd8, 0xff, 0x00]), 'image/jpeg')).toBe(true)
     expect(hasExamAttachmentSignature(new TextEncoder().encode('%PDF-1.7'), 'application/pdf')).toBe(true)
