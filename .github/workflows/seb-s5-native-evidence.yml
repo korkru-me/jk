@@ -1,0 +1,78 @@
+name: SEB S5 Windows native evidence
+
+on:
+  push:
+    branches:
+      - 'seb-s5-native-*'
+    paths:
+      - '.github/seb-s5/request.json'
+      - '.github/scripts/seb-s5-native-evidence.ps1'
+      - '.github/workflows/seb-s5-native-evidence.yml'
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: Redacted S5 request identifier
+        required: true
+        type: string
+      assignment_id:
+        description: Synthetic Staging assignment identifier
+        required: true
+        type: string
+      revision:
+        description: Synthetic Staging assignment revision
+        required: true
+        type: string
+      seed_sha256:
+        description: SHA-256 of the exact plaintext Staging seed
+        required: true
+        type: string
+      payload_iv:
+        description: AES-GCM IV for the encrypted gzip seed
+        required: true
+        type: string
+      payload_tag:
+        description: AES-GCM tag for the encrypted gzip seed
+        required: true
+        type: string
+      payload_ciphertext:
+        description: AES-GCM encrypted gzip seed
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seb-s5-native-${{ inputs.request_id || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  calculate-native-evidence:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      SEB_S5_REQUEST_ID: ${{ inputs.request_id || '' }}
+      SEB_S5_ASSIGNMENT_ID: ${{ inputs.assignment_id || '' }}
+      SEB_S5_REVISION: ${{ inputs.revision || '' }}
+      SEB_S5_SEED_SHA256: ${{ inputs.seed_sha256 || '' }}
+      SEB_S5_PAYLOAD_IV: ${{ inputs.payload_iv || '' }}
+      SEB_S5_PAYLOAD_TAG: ${{ inputs.payload_tag || '' }}
+      SEB_S5_PAYLOAD_CIPHERTEXT: ${{ inputs.payload_ciphertext || '' }}
+      SEB_S5_AUTOMATION_KEY_B64: ${{ secrets.SEB_S5_NATIVE_AUTOMATION_KEY_B64 }}
+    steps:
+      - name: Check out the exact workflow revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Calculate and encrypt native Windows evidence
+        id: native
+        shell: pwsh
+        run: .github/scripts/seb-s5-native-evidence.ps1
+
+      - name: Upload encrypted evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: seb-s5-native-evidence-${{ steps.native.outputs.request_id }}
+          path: ${{ runner.temp }}/seb-s5-native/evidence.enc.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
