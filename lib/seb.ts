@@ -1,10 +1,10 @@
 import {
   createHash,
-  createHmac,
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto'
 import sebReleaseRegistry from '@/config/seb-release-registry.json'
+import { signSebClaimsCore, verifySebClaimsCore } from '@/lib/seb-claims-core.mjs'
 
 export type SebPlatform = 'windows' | 'macos' | 'ios'
 export type SebChallengePurpose = 'take' | 'system_check'
@@ -429,63 +429,12 @@ export function parseSebVersion(value: unknown): SebVersionInfo | null {
   }
 }
 
-function encodeClaims(claims: SebClaims) {
-  return Buffer.from(JSON.stringify(claims), 'utf8').toString('base64url')
-}
-
-function tokenSignature(encodedClaims: string, secret: string) {
-  return createHmac('sha256', secret).update(encodedClaims, 'utf8').digest('base64url')
-}
-
 export function signSebClaims(claims: SebClaims, secret: string) {
-  if (secret.length < 32) throw new Error('SEB session secret is too short')
-  const encodedClaims = encodeClaims(claims)
-  return `${encodedClaims}.${tokenSignature(encodedClaims, secret)}`
+  return signSebClaimsCore(claims, secret)
 }
 
 export function verifySebClaims(token: string, secret: string, now = Date.now()): SebClaims | null {
-  if (secret.length < 32 || token.length > 2_000) return null
-  const [encodedClaims, receivedSignature, extra] = token.split('.')
-  if (!encodedClaims || !receivedSignature || extra) return null
-  if (!safeEqual(receivedSignature, tokenSignature(encodedClaims, secret))) return null
-
-  try {
-    const parsed = JSON.parse(Buffer.from(encodedClaims, 'base64url').toString('utf8')) as Partial<SebClaims>
-    if (
-      (parsed.kind !== 'seb_challenge' && parsed.kind !== 'seb_session')
-      || !UUID_PATTERN.test(parsed.userId ?? '')
-      || !UUID_PATTERN.test(parsed.assignmentId ?? '')
-      || !Number.isInteger(parsed.issuedAt)
-      || !Number.isInteger(parsed.expiresAt)
-      || (parsed.issuedAt as number) > now + 60_000
-      || (parsed.expiresAt as number) <= now
-      || (parsed.expiresAt as number) <= (parsed.issuedAt as number)
-    ) return null
-
-    if (parsed.kind === 'seb_challenge') {
-      if (
-        (parsed.purpose !== 'take' && parsed.purpose !== 'system_check')
-        || typeof parsed.nonce !== 'string'
-        || !/^[0-9a-f]{32}$/.test(parsed.nonce)
-        || !validConfigRevision(parsed.configRevision)
-        || !validAssignmentConfigRevision(parsed.assignmentConfigRevision)
-      ) return null
-      return parsed as SebChallengeClaims
-    }
-
-    const sessionClaims = parsed as Partial<SebSessionClaims>
-    const sessionVersion = parseSebVersion(sessionClaims.version)
-    if (
-      (sessionClaims.platform !== 'windows' && sessionClaims.platform !== 'macos' && sessionClaims.platform !== 'ios')
-      || !validConfigRevision(sessionClaims.configRevision)
-      || !validAssignmentConfigRevision(sessionClaims.assignmentConfigRevision)
-      || !sessionVersion
-      || sessionVersion.platform !== sessionClaims.platform
-    ) return null
-    return sessionClaims as SebSessionClaims
-  } catch {
-    return null
-  }
+  return verifySebClaimsCore(token, secret, now) as SebClaims | null
 }
 
 export function createSebChallengeClaims(

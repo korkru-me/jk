@@ -71,7 +71,12 @@ describe('SEB Staging private classroom stack', () => {
     const input = options()
     const stack = await createSebStagingPrivateClassroomStack(input)
     expect(Object.isFrozen(stack)).toBe(true)
-    expect(Object.keys(stack).sort()).toEqual(['browserDataCapability', 'closeAll'])
+    expect(Object.keys(stack).sort()).toEqual([
+      'browserDataCapability',
+      'browserDataLifecycleCapability',
+      'browserSessionCapability',
+      'closeAll',
+    ])
     expect(Object.keys(stack.browserDataCapability)).toEqual(['executeStep'])
     expect(JSON.stringify(stack)).not.toContain('serviceRoleCredentialProvider')
     expect(JSON.stringify(stack)).not.toContain('secretProvider')

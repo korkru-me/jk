@@ -20,6 +20,8 @@
     "check:seb-readiness": "node scripts/check-seb-readiness.mjs",
     "seb:artifact:prepare": "node scripts/prepare-assignment-seb-artifact.mjs",
     "seb:artifact:enroll": "node scripts/enroll-assignment-seb-artifact.mjs",
+    "seb:s5:key:setup": "node scripts/setup-seb-s5-native-key.mjs",
+    "seb:s5:staging:live": "node scripts/run-seb-staging-private-live.mjs",
     "lint:tokens": "node scripts/check-design-tokens.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -370,14 +370,20 @@ export function createSebStagingBrowserOperationRuntime(options = {}) {
   }
 
   async function runOperation(parsed) {
-    // A native-required operation must not even acquire a browser ticket when
-    // the native boundary is unavailable. Ticket issuance is designed to be
-    // side-effect free, but rejecting before that boundary keeps the failure
-    // both observable and provably mutation-free.
+    // Install the native-SEB boundary before ticket issue and, critically,
+    // before navigation. A /take navigation can create an attempt server-side;
+    // installing or invalidating the SEB session afterwards would make a
+    // negative-session test mutate before it proves rejection.
     if (parsed.operation.requiresNative && !nativeAttestation) blocked()
     let entry = null
     let finished = false
     try {
+      if (parsed.operation.requiresNative) {
+        if (cleanupStarted || closed) blocked()
+        currentEnvironment()
+        assertCapabilitiesStable()
+        await runNative(parsed)
+      }
       const ticket = await issueTicket(parsed)
       entry = Object.freeze({ ticket, page: parsed.page })
       openTickets.add(entry)
@@ -393,12 +399,6 @@ export function createSebStagingBrowserOperationRuntime(options = {}) {
         currentEnvironment()
         assertCapabilitiesStable()
         await ticketCall(ticket, 'beginMutation', parsed.page, parsed.signal)
-      }
-      if (parsed.operation.requiresNative) {
-        if (cleanupStarted || closed) blocked()
-        currentEnvironment()
-        assertCapabilitiesStable()
-        await runNative(parsed)
       }
       await ticketCall(ticket, 'finish', parsed.page, parsed.signal)
       finished = true

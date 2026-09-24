@@ -107,8 +107,15 @@ describe('SEB Staging private browser data stack', () => {
   it('exposes only a redacted browser-data facade and one cleanup capability', async () => {
     const harness = makeHarness()
     expect(Object.isFrozen(harness.stack)).toBe(true)
-    expect(Object.keys(harness.stack).sort()).toEqual(['browserDataCapability', 'closeAll'])
+    expect(Object.keys(harness.stack).sort()).toEqual([
+      'browserDataCapability',
+      'browserDataLifecycleCapability',
+      'browserSessionCapability',
+      'closeAll',
+    ])
     expect(Object.keys(harness.stack.browserDataCapability)).toEqual(['executeStep'])
+    expect(Object.keys(harness.stack.browserSessionCapability).sort()).toEqual(['authenticate', 'closeAll'])
+    expect(Object.keys(harness.stack.browserDataLifecycleCapability).sort()).toEqual(['closeAll', 'executeStep'])
     expect(JSON.stringify(harness.stack)).not.toContain('privateDataBoundary')
     expect(JSON.stringify(harness.stack)).not.toContain('secretProvider')
 

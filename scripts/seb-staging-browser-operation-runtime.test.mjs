@@ -392,13 +392,13 @@ describe('SEB Staging browser operation runtime', () => {
     )).resolves.toEqual({ status: 'passed' })
     expect(harness.executeNativeOperation).toHaveBeenCalledTimes(1)
     expect(harness.events).toEqual([
+      'native:verify-seb-system-check',
       'issue:verify-seb-system-check',
       'navigate',
       'applyMarkers',
       'applySecrets',
       'applyUploads',
       'beginMutation',
-      'native:verify-seb-system-check',
       'finish',
     ])
   })

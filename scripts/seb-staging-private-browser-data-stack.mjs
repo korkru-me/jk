@@ -166,6 +166,13 @@ export function createSebStagingPrivateBrowserDataStack(options = {}) {
     return browserDataAdapter.executeStep(request)
   }
 
+  function authenticate(request) {
+    if (cleanupStarted || closed) {
+      return Promise.reject(new SebStagingPrivateBrowserDataStackBlockedError())
+    }
+    return browserRuntime.authenticate(request)
+  }
+
   async function closeAll() {
     cleanupStarted = true
     if (closed) return passed()
@@ -190,5 +197,15 @@ export function createSebStagingPrivateBrowserDataStack(options = {}) {
   }
 
   const browserDataCapability = Object.freeze({ executeStep })
-  return Object.freeze({ browserDataCapability, closeAll })
+  // These two views stay inside the private live composition.  The fixture
+  // adapter needs authentication and lifecycle shutdown, but neither view
+  // exposes the browser, Page, cookies, credentials, or raw operation plan.
+  const browserSessionCapability = Object.freeze({ authenticate, closeAll })
+  const browserDataLifecycleCapability = Object.freeze({ executeStep, closeAll })
+  return Object.freeze({
+    browserDataCapability,
+    browserSessionCapability,
+    browserDataLifecycleCapability,
+    closeAll,
+  })
 }
