@@ -38,7 +38,12 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { RichText } from '@/components/ui/rich-text'
 import type { Question } from '@/lib/types'
-import type { TeachingBoardOperation, TeachingBoardView } from '@/lib/math-work'
+import {
+  isTeachingBoardSlot,
+  TEACHING_BOARD_SLOT_COUNT,
+  type TeachingBoardOperation,
+  type TeachingBoardView,
+} from '@/lib/math-work'
 import type { ScratchpadScene } from '@/lib/scratchpad'
 import type { FingerInputMode } from '@/lib/drawing-board-input'
 import {
@@ -88,10 +93,12 @@ interface Props {
   initialBoardsError?: string
 }
 
+/** The ช่อง a new เฉลย can be saved into. */
+const SAVE_SLOTS = Array.from({ length: TEACHING_BOARD_SLOT_COUNT }, (_, index) => index + 1)
+
 function firstAvailableSlot(boards: TeachingBoardView[], userId: string): number {
   const used = new Set(boards.filter(board => board.createdBy === userId).map(board => board.slot))
-  for (let slot = 1; slot <= 5; slot++) if (!used.has(slot)) return slot
-  return 1
+  return SAVE_SLOTS.find(slot => !used.has(slot)) ?? 1
 }
 
 function interpolateValues(text: string, values: Record<string, number>): string {
@@ -324,7 +331,7 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
 }
 
 /**
- * The five slots that belong to one ข้อ, shown under that ข้อ.
+ * The saved เฉลย that belong to one ข้อ, shown under that ข้อ.
  *
  * `active` marks the ข้อ whose board is open on the right: only that one can
  * highlight a slot as selected, and pressing a slot on any other ข้อ moves
@@ -350,12 +357,15 @@ function TeachingBoardSlots({
 }) {
   const ownBoards = boards.filter(board => board.createdBy === currentUserId)
   const sharedBoards = boards.filter(board => board.createdBy !== currentUserId)
+  // A board saved into ช่อง 4–5 before the cap came down to three keeps its
+  // tile until it is deleted, rather than dropping out of sight.
+  const slots = [...new Set([...SAVE_SLOTS, ...ownBoards.map(board => board.slot)])].sort((a, b) => a - b)
 
   return (
     <div className="space-y-3 border-t border-border pt-3">
       <div className="flex items-center gap-2">
         <Presentation className="size-4 text-primary" />
-        <h3 className="text-sm font-semibold">กระดานที่บันทึกไว้</h3>
+        <h3 className="text-sm font-semibold">เฉลยที่บันทึกไว้</h3>
         {loading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
         <Button type="button" variant="ghost" size="xs" className="ml-auto" onClick={onHide}>
           <PanelLeftClose /> ซ่อน
@@ -363,8 +373,8 @@ function TeachingBoardSlots({
       </div>
 
       {canManage ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {Array.from({ length: 5 }, (_, index) => index + 1).map(slot => {
+        <div className="grid max-w-md grid-cols-3 gap-2">
+          {slots.map(slot => {
             const saved = ownBoards.find(board => board.slot === slot) ?? null
             const selected = active && selectedSlot === slot
               && (!selectedBoardId || saved?.id === selectedBoardId)
@@ -1074,7 +1084,9 @@ export function TeachingModeClient({
       [questionId]: adoptSavedTeachingBoard({
         boards: current[questionId] ?? [],
         boardId,
-        previousBoardId: expectedTarget.boardId,
+        // A board opened from ช่อง 4–5 was saved into a free ช่อง rather than
+        // over itself, so it stays in the list.
+        previousBoardId: expectedTarget.slot === slot ? expectedTarget.boardId : null,
         slot,
         currentUserId,
       }),
@@ -1196,18 +1208,24 @@ export function TeachingModeClient({
   /**
    * Where the board about to be saved should land.
    *
-   * A ข้อ holds five saved boards. While there is room the next free ช่อง is
-   * taken without asking; once all five are full the teacher picks which one
+   * A ข้อ holds three saved เฉลย. While there is room the next free ช่อง is
+   * taken without asking; once all three are full the teacher picks which one
    * this replaces, and saving over it removes the old picture and scene — the
    * cap is what keeps a lesson's worth of boards from piling up in storage.
    */
   const resolveSaveSlot = async (questionId: string, label: string) => {
-    const saved = (boardsByQuestion[questionId] ?? []).filter(board => board.createdBy === currentUserId)
+    // Only ช่อง 1–3 take a save, so a board left in 4–5 is neither counted
+    // nor offered for replacing.
+    const saved = (boardsByQuestion[questionId] ?? []).filter(board => (
+      board.createdBy === currentUserId && isTeachingBoardSlot(board.slot)
+    ))
 
     // A board opened from a ช่อง saves back over itself, even while other free
     // slots remain. Creating another copy here would quietly detach the parked
-    // scene from the slot shown in the header.
-    const open = questionId === question.id && selectedBoard?.createdBy === currentUserId ? selectedBoard : null
+    // scene from the slot shown in the header. One opened from ช่อง 4–5 has
+    // no ช่อง to go back to, so it lands like a new board below.
+    const open = questionId === question.id && selectedBoard?.createdBy === currentUserId
+      && isTeachingBoardSlot(selectedBoard.slot) ? selectedBoard : null
     if (open) {
       const ok = await confirm({
         title: `บันทึกทับกระดาน ${label} ช่อง ${open.slot}?`,
@@ -1218,9 +1236,9 @@ export function TeachingModeClient({
     }
 
     const used = new Set(saved.map(board => board.slot))
-    const free = [1, 2, 3, 4, 5].find(slot => !used.has(slot))
+    const free = SAVE_SLOTS.find(slot => !used.has(slot))
 
-    // All five taken — the teacher says which picture this one replaces, and
+    // All three taken — the teacher says which picture this one replaces, and
     // saving over it deletes that picture and its scene.
     if (free === undefined) {
       const picked = await new Promise<number | null>(resolve => {
@@ -1424,8 +1442,8 @@ export function TeachingModeClient({
                 variant="outline"
                 size="icon-lg"
                 className="rounded-xl"
-                title="กระดานที่บันทึกไว้"
-                aria-label="กระดานที่บันทึกไว้"
+                title="เฉลยที่บันทึกไว้"
+                aria-label="เฉลยที่บันทึกไว้"
                 onClick={() => setShowBoards(true)}
               >
                 <Presentation />
@@ -1585,12 +1603,12 @@ export function TeachingModeClient({
       <Dialog open={slotChoice !== null} onOpenChange={open => { if (!open) slotChoice?.resolve(null) }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>ข้อนี้เก็บกระดานครบ 5 ช่องแล้ว</DialogTitle>
+            <DialogTitle>ข้อนี้เก็บเฉลยครบ {TEACHING_BOARD_SLOT_COUNT} ช่องแล้ว</DialogTitle>
             <DialogDescription>
               เลือกช่องที่จะบันทึกทับ — ภาพและไฟล์ต้นฉบับเดิมของช่องนั้นจะถูกลบออกไป
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="grid grid-cols-3 gap-2">
             {(slotChoice?.boards ?? []).map(board => (
               <Button
                 key={board.id}

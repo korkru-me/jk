@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 22 กันยายน 2026
+อัปเดตล่าสุด: 25 กันยายน 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -129,7 +129,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - board เก่าที่ผสม SVG กับ raster ต้อง full-validate ฉากหลังแปลงก่อน แล้ว re-claim retained raster ทุกไฟล์จาก exact decoded bytes และ full-validate ด้วยลายเซ็นจริงอีกครั้ง ห้ามสร้าง partial legacy trust จากฉากที่ยัง invalid
 - Server Action body limit เป็น 4 MiB เพื่อรับ scene ที่มี envelope overhead แต่ policy ยังคงจำกัด scene จริงที่ 2 MiB; ห้ามขยาย policy limit ตาม transport limit
 - หลังส่งต้องปฏิเสธการแก้ scene, preview และ metadata แม้ client ยังถือ URL หรือ local copy อยู่
-- `student_work_artifacts` แก้/ลบได้เฉพาะเจ้าของที่ submission ยัง `in_progress`; `teaching_boards` อ่านได้เฉพาะครูที่มีสิทธิ์ใน assignment และแก้/ลบได้เฉพาะผู้สร้าง เพดาน 5 slots บังคับด้วย constraint เพื่อกัน concurrent request
+- `student_work_artifacts` แก้/ลบได้เฉพาะเจ้าของที่ submission ยัง `in_progress`; `teaching_boards` อ่านได้เฉพาะครูที่มีสิทธิ์ใน assignment และแก้/ลบได้เฉพาะผู้สร้าง unique slot กับ CHECK 1–5 เป็นเพดานของฐานที่กัน concurrent request ส่วนเพดาน 3 ช่องต่อข้อของแอป (25 กันยายน 2026) Server Action เป็นผู้บังคับ — ผู้สร้างที่ยิง API ตรงผ่าน RLS ยังสร้างแถวช่อง 4–5 ในขอบเขตงานของตัวเองได้ แต่ไม่มีไฟล์รองรับและไม่ข้ามผู้ใช้/tenant; ถ้าต้องการให้ฐานบังคับ 3 ด้วยให้ทำ migration แยก
 - การ finalize งานที่บังคับแนบวิธีทำตรวจ exact answer/part ฝั่ง server และยอมรับเฉพาะ artifact reference หรือ `work_images` รุ่นเก่าที่มีอยู่จริงใน answer; หน้าผลลัพธ์ sign เฉพาะ preview path ที่ได้จากคำตอบซึ่งผ่าน result-visibility/RLS แล้วและไม่เปิด scene
 - การแทนที่หรือลบต้องเปลี่ยน database reference ก่อนแล้วจึงลบไฟล์แบบ best effort; scheduled orphan cleanup เว้น grace period 7 วัน ลบเฉพาะ path ที่ตรงกับ builder ใต้ `students/`/`teachers/` หลังตรวจ exact path จากทั้งสอง reference tables ซ้ำ และหยุดก่อนเริ่มลบเมื่อ listing/reference scan ไม่ครบหรือเกินเพดาน
 - Cleanup route ใช้ Bearer `CRON_SECRET` อย่างน้อย 32 ตัวอักษรและเปรียบเทียบแบบ constant-time ก่อนสร้าง admin client; response/log มีเฉพาะ aggregate/error code ไม่ส่ง path, URL หรือข้อมูลนักเรียน และ deployment ที่ไม่มี secret จะ fail closed ด้วย 503

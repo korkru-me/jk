@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 22 กันยายน 2026
+อัปเดตล่าสุด: 25 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -131,7 +131,7 @@ Invariant สำคัญ:
 - Assignment flags แยกการอนุญาตเครื่องคิดเลขกับกระดาษทด งานเก่าอ่านเป็นปิด แบบฝึกหัดออนไลน์ใหม่เริ่มเปิด และข้อสอบออนไลน์ใหม่เริ่มปิดจาก create action
 - Metadata มุม `DEG`/`RAD` อยู่ใน `submission_answers.math_input_modes` ผูกกับ logical numeric input หรือข้อย่อย ค่า object ว่าง/ไม่มี key อ่านเป็น `DEG`; autosave เขียน object นี้พร้อม `student_answer` ใน update เดียวเพื่อไม่ให้สมการกับหน่วยมุมเหลื่อมกัน
 - `student_work_artifacts` อ้าง exact `submission_answer`, part identity, `org_id`, student owner, source type, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(submission_answer_id, part_key)` ทำให้ logical slot หนึ่งตำแหน่งมี artifact ปัจจุบันได้หนึ่งรายการ
-- `teaching_boards` อ้าง assignment, question, creator, slot 1–5, `org_id`, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(assignment_id, question_id, created_by, slot)` กับ check `slot BETWEEN 1 AND 5` เป็นผู้บังคับเพดานจริง
+- `teaching_boards` อ้าง assignment, question, creator, slot 1–5, `org_id`, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(assignment_id, question_id, created_by, slot)` กับ check `slot BETWEEN 1 AND 5` เป็นเพดานของฐาน ส่วนเพดานของแอปคือ 3 ช่องต่อข้อ (`TEACHING_BOARD_SLOT_COUNT`/`isTeachingBoardSlot` ใน `lib/math-work.ts`) ซึ่ง Server Action และ upload path builder บังคับตั้งแต่ 25 กันยายน 2026 — unique slot ทำให้ save พร้อมกันเกินเพดานไม่ได้ และ CHECK ที่ยังเป็น 1–5 ทำให้แถวเดิมในช่อง 4–5 ยังถูกต้อง
 - Path ใหม่อยู่ใน private Storage และ database เก็บ path ไม่เก็บ signed URL ซึ่งมีอายุสั้น Preview ลงท้ายได้เฉพาะ `preview.webp` หรือ `preview.png`; migration `20260921185046` ทำให้ CHECK ของ artifact/board และ student scope trigger ใช้ allowlist เดียวกัน โดยคง `scene.json`, namespace และ ownership เดิม
 
 Local-only scratch scene ไม่ใช่ row ในฐานข้อมูล อยู่ใน IndexedDB keyed by user/submission/answer/part, จำกัด 2 MiB/10,000 elements และห้ามถูกนับเป็น submission attachment เมื่อผู้ใช้กดแนบจึงสร้าง WebP หรือ PNG fallback คู่กับ scene และการอัปโหลดไฟล์ยังไม่ถือว่าเป็นหลักฐานจน Server Action ที่ตรวจไฟล์กับสิทธิ์บันทึก reference สำเร็จ; `part_key` ใช้ `answer` สำหรับคำตอบเดียวและ `part:N` สำหรับข้อย่อยตามตำแหน่ง เฟส drawing-board 3 เพิ่ม optional local metadata ใน record เดิม ได้แก่ semantic `editRevision`/`savedRevision`/fingerprint, snapshot identity ของ artifact ที่แนบ และ one-step recovery; metadata นี้ไม่ใช่ row หรือ server authority, record รุ่นเก่าที่ยังไม่มี metadata ยังอ่าน scene ได้ และต้องถือ attachment เป็น unverified จนเทียบหรือแนบใหม่

@@ -45,6 +45,7 @@ import {
 } from '@/components/exam/drawing-board-utils'
 import {
   CURRENT_WORK_FORMAT_VERSION,
+  isTeachingBoardSlot,
   MATH_WORK_BUCKET,
   type TeachingBoardOperation,
   type TeachingBoardView,
@@ -123,8 +124,8 @@ interface Props {
   /** This ข้อ's pictures, offered on the board itself as well as in the card. */
   questionImages?: string[]
   /**
-   * Where a new board should be saved: the next free ช่อง, or — when all five
-   * are taken — the one the teacher chose to write over. Null cancels.
+   * Where a new board should be saved: the next free ช่อง, or — when all of
+   * them are taken — the one the teacher chose to write over. Null cancels.
    */
   onResolveSaveSlot?: () => Promise<{ slot: number; replacing: boolean } | null>
   /** A รูปประกอบโจทย์ the teacher asked to drop onto this board. */
@@ -316,6 +317,9 @@ export default function TeachingBoardEditor({
     && sceneReady
     && !operationPending
   const canReset = canManage && (!board || board.editable)
+  // A board left in ช่อง 4–5 from before the cap came down cannot be saved
+  // back there — the parent sends it to a free ช่อง — so it is not บันทึกทับ.
+  const savesOverBoard = board !== null && isTeachingBoardSlot(board.slot)
 
   const reportDraftState = useCallback((
     nextState: TeacherQuestionDraftState,
@@ -749,7 +753,7 @@ export default function TeachingBoardEditor({
     const resolveEpoch = loadRequestRef.current
 
     // Which ช่อง this lands in belongs to the parent: it is the side that
-    // knows all five, and the one that asks when they are all taken.
+    // knows every ช่อง, and the one that asks when they are all taken.
     let target = { slot, replacing: Boolean(board) }
     if (onResolveSaveSlot) {
       const resolved = await onResolveSaveSlot()
@@ -976,7 +980,7 @@ export default function TeachingBoardEditor({
               {editable && (
                 <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || duplicating || !dirty}>
                   {saving ? <Loader2 className="animate-spin" /> : <Save />}
-                  {saving ? 'กำลังบันทึก...' : board ? 'บันทึกทับ' : 'บันทึก'}
+                  {saving ? 'กำลังบันทึก...' : savesOverBoard ? 'บันทึกทับ' : 'บันทึกเฉลย'}
                 </Button>
               )}
               {onHide && (

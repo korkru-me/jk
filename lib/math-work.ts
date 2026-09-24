@@ -21,6 +21,19 @@ export const MAX_WORK_SCENE_BYTES = 2 * 1024 * 1024
 export const MAX_WORK_ELEMENTS = 10_000
 export const CURRENT_WORK_FORMAT_VERSION = 1
 
+/**
+ * How many เฉลย one teacher keeps per ข้อ in โหมดสอน.
+ *
+ * The table's CHECK still reads 1–5, from before the cap came down to three,
+ * so a board saved into ช่อง 4 or 5 back then stays valid: it can still be
+ * opened and deleted, but nothing new is saved there.
+ */
+export const TEACHING_BOARD_SLOT_COUNT = 3
+
+export function isTeachingBoardSlot(slot: number): boolean {
+  return Number.isInteger(slot) && slot >= 1 && slot <= TEACHING_BOARD_SLOT_COUNT
+}
+
 export type WorkArtifactSource = 'scratchpad' | 'photo'
 
 /** Signed, client-safe view. Storage paths never cross the server boundary. */
@@ -155,8 +168,8 @@ export function buildTeachingBoardUploadPaths(input: {
   assertUuid('assignmentId', input.assignmentId)
   assertUuid('questionId', input.questionId)
   assertUuid('uploadId', input.uploadId)
-  if (!Number.isInteger(input.slot) || input.slot < 1 || input.slot > 5) {
-    throw new Error('slot must be an integer from 1 to 5')
+  if (!isTeachingBoardSlot(input.slot)) {
+    throw new Error(`slot must be an integer from 1 to ${TEACHING_BOARD_SLOT_COUNT}`)
   }
 
   const prefix = [
