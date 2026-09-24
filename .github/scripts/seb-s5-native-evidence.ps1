@@ -110,23 +110,15 @@ if ($Extract.ExitCode -ne 0 -and $Extract.ExitCode -ne 3010) {
 }
 
 $Candidates = @(
-  (Join-Path $ExtractRoot 'SafeExamBrowser\Application\SebWindowsConfig.exe'),
-  (Join-Path $ExtractRoot 'Program Files\SafeExamBrowser\Application\SebWindowsConfig.exe'),
-  (Join-Path $ExtractRoot 'Program Files (x86)\SafeExamBrowser\Application\SebWindowsConfig.exe')
+  (Join-Path $ExtractRoot 'SafeExamBrowser\Application\SEBConfigTool.exe'),
+  (Join-Path $ExtractRoot 'Program Files\SafeExamBrowser\Application\SEBConfigTool.exe'),
+  (Join-Path $ExtractRoot 'Program Files (x86)\SafeExamBrowser\Application\SEBConfigTool.exe')
 )
 $ConfigTool = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $ConfigTool) {
   $ConfigTool = Get-ChildItem -Path $ExtractRoot `
-    -Filter 'SebWindowsConfig.exe' -File -Recurse -ErrorAction SilentlyContinue |
+    -Filter 'SEBConfigTool.exe' -File -Recurse -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $ConfigTool) {
-  Write-Host 'SEB_S5_NATIVE_STAGE:config-tool-not-found'
-  Get-ChildItem -Path $ExtractRoot -Filter '*.exe' -File -Recurse -ErrorAction SilentlyContinue |
-    Select-Object -ExpandProperty FullName |
-    ForEach-Object {
-      Write-Host ('SEB_S5_NATIVE_PACKAGE_EXECUTABLE:' + [IO.Path]::GetFileName($_))
-    }
 }
 Assert-Input (-not [string]::IsNullOrWhiteSpace($ConfigTool))
 
