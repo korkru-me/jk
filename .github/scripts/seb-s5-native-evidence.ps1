@@ -43,28 +43,44 @@ if ($env:GITHUB_EVENT_NAME -eq 'push') {
   $env:SEB_S5_PAYLOAD_CIPHERTEXT = [string]$Request.payloadCiphertext
 }
 
-function Read-AutomationValue {
+function Read-AutomationValues {
   param(
-    [System.Windows.Automation.AutomationElement]$Root,
-    [string]$AutomationId
+    [System.Windows.Automation.AutomationElement]$Root
   )
-  $Condition = New-Object System.Windows.Automation.PropertyCondition(
+  $ConfigurationCondition = New-Object System.Windows.Automation.PropertyCondition(
     [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
-    $AutomationId
+    'textBoxConfigurationKey'
+  )
+  $BrowserExamCondition = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+    'textBoxBrowserExamKey'
   )
   $Deadline = [DateTime]::UtcNow.AddMinutes(2)
   do {
-    $Element = $Root.FindFirst(
+    $ConfigurationElement = $Root.FindFirst(
       [System.Windows.Automation.TreeScope]::Descendants,
-      $Condition
+      $ConfigurationCondition
     )
-    if ($null -ne $Element) {
+    $BrowserExamElement = $Root.FindFirst(
+      [System.Windows.Automation.TreeScope]::Descendants,
+      $BrowserExamCondition
+    )
+    if ($null -ne $ConfigurationElement -and $null -ne $BrowserExamElement) {
       try {
-        $Pattern = $Element.GetCurrentPattern(
+        $ConfigurationPattern = $ConfigurationElement.GetCurrentPattern(
           [System.Windows.Automation.ValuePattern]::Pattern
         )
-        $Value = $Pattern.Current.Value
-        if ($Value -match $Sha256Pattern) { return $Value.ToLowerInvariant() }
+        $BrowserExamPattern = $BrowserExamElement.GetCurrentPattern(
+          [System.Windows.Automation.ValuePattern]::Pattern
+        )
+        $ConfigurationValue = $ConfigurationPattern.Current.Value
+        $BrowserExamValue = $BrowserExamPattern.Current.Value
+        if ($ConfigurationValue -match $Sha256Pattern -and $BrowserExamValue -match $Sha256Pattern) {
+          return @{
+            ConfigurationKey = $ConfigurationValue.ToLowerInvariant()
+            BrowserExamKey = $BrowserExamValue.ToLowerInvariant()
+          }
+        }
       } catch { }
     }
     Start-Sleep -Milliseconds 250
@@ -147,27 +163,12 @@ Assert-Input (-not [string]::IsNullOrWhiteSpace($ConfigTool))
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 $LaunchProcess = Start-Process -FilePath $ConfigTool -ArgumentList @($SeedPath) -PassThru
-$WindowProcess = $null
 try {
-  $Deadline = [DateTime]::UtcNow.AddMinutes(2)
-  do {
-    Start-Sleep -Milliseconds 250
-    $Candidates = @(Get-Process -Name 'SebWindowsConfig' -ErrorAction SilentlyContinue)
-    foreach ($Candidate in $Candidates) {
-      try {
-        $Candidate.Refresh()
-        if ($Candidate.MainWindowHandle -ne 0) {
-          $WindowProcess = $Candidate
-          break
-        }
-      } catch { }
-    }
-  } while ($null -eq $WindowProcess -and [DateTime]::UtcNow -lt $Deadline)
-  Assert-Input ($null -ne $WindowProcess -and $WindowProcess.MainWindowHandle -ne 0)
-  $Window = [System.Windows.Automation.AutomationElement]::FromHandle($WindowProcess.MainWindowHandle)
-  Assert-Input ($null -ne $Window)
-  $ConfigurationKey = Read-AutomationValue $Window 'textBoxConfigurationKey'
-  $BrowserExamKey = Read-AutomationValue $Window 'textBoxBrowserExamKey'
+  Write-Host 'SEB_S5_NATIVE_STAGE:awaiting-key-controls'
+  $Values = Read-AutomationValues ([System.Windows.Automation.AutomationElement]::RootElement)
+  $ConfigurationKey = $Values.ConfigurationKey
+  $BrowserExamKey = $Values.BrowserExamKey
+  Write-Host 'SEB_S5_NATIVE_STAGE:key-controls-ready'
 } finally {
   foreach ($Candidate in @(Get-Process -Name 'SebWindowsConfig' -ErrorAction SilentlyContinue)) {
     try { if (-not $Candidate.HasExited) { $Candidate.Kill() } } catch { }
