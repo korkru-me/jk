@@ -13,6 +13,7 @@ internal static class SebS5NativeKeyReader
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool SetDllDirectory(string path);
 
+    [STAThread]
     private static int Main(string[] args)
     {
         if (args == null || args.Length != 3)
@@ -52,7 +53,9 @@ internal static class SebS5NativeKeyReader
 
     private static int Calculate(string inputPath, string outputPath)
     {
+        Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:set-paths");
         SebWindowsConfig.Utilities.SEBClientInfo.SetSebPaths();
+        Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:init-logger");
         SebWindowsConfig.Utilities.Logger.InitLogger(
             SebWindowsConfig.Utilities.SEBClientInfo.SebClientLogFileDirectory,
             Path.Combine(
@@ -60,12 +63,14 @@ internal static class SebS5NativeKeyReader
                 "SebConfig.log"
             )
         );
+        Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:restore-defaults");
         SebWindowsConfig.SEBSettings.RestoreDefaultAndCurrentSettings();
         SebWindowsConfig.SEBSettings.AddDefaultProhibitedProcesses();
 
         string filePassword = null;
         bool passwordIsHash = false;
         X509Certificate2 certificate = null;
+        Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:read-config");
         if (!SebWindowsConfig.SEBSettings.ReadSebConfigurationFile(
             inputPath,
             true,
@@ -77,13 +82,16 @@ internal static class SebS5NativeKeyReader
             return 21;
         }
 
+        Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:configuration-key");
         var configurationKey = SebWindowsConfig.Utilities.SEBProtectionController.ComputeConfigurationKey();
+        Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:browser-exam-key");
         var browserExamKey = SebWindowsConfig.Utilities.SEBProtectionController.ComputeBrowserExamKey();
         if (!Sha256.IsMatch(configurationKey ?? "") || !Sha256.IsMatch(browserExamKey ?? ""))
         {
             return 22;
         }
 
+        Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:write-evidence");
         File.WriteAllLines(
             outputPath,
             new[] { configurationKey, browserExamKey },
