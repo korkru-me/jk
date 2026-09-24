@@ -43,51 +43,6 @@ if ($env:GITHUB_EVENT_NAME -eq 'push') {
   $env:SEB_S5_PAYLOAD_CIPHERTEXT = [string]$Request.payloadCiphertext
 }
 
-function Read-AutomationValues {
-  param(
-    [System.Windows.Automation.AutomationElement]$Root
-  )
-  $ConfigurationCondition = New-Object System.Windows.Automation.PropertyCondition(
-    [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
-    'textBoxConfigurationKey'
-  )
-  $BrowserExamCondition = New-Object System.Windows.Automation.PropertyCondition(
-    [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
-    'textBoxBrowserExamKey'
-  )
-  $Deadline = [DateTime]::UtcNow.AddMinutes(2)
-  do {
-    $ConfigurationElement = $Root.FindFirst(
-      [System.Windows.Automation.TreeScope]::Descendants,
-      $ConfigurationCondition
-    )
-    $BrowserExamElement = $Root.FindFirst(
-      [System.Windows.Automation.TreeScope]::Descendants,
-      $BrowserExamCondition
-    )
-    if ($null -ne $ConfigurationElement -and $null -ne $BrowserExamElement) {
-      try {
-        $ConfigurationPattern = $ConfigurationElement.GetCurrentPattern(
-          [System.Windows.Automation.ValuePattern]::Pattern
-        )
-        $BrowserExamPattern = $BrowserExamElement.GetCurrentPattern(
-          [System.Windows.Automation.ValuePattern]::Pattern
-        )
-        $ConfigurationValue = $ConfigurationPattern.Current.Value
-        $BrowserExamValue = $BrowserExamPattern.Current.Value
-        if ($ConfigurationValue -match $Sha256Pattern -and $BrowserExamValue -match $Sha256Pattern) {
-          return @{
-            ConfigurationKey = $ConfigurationValue.ToLowerInvariant()
-            BrowserExamKey = $BrowserExamValue.ToLowerInvariant()
-          }
-        }
-      } catch { }
-    }
-    Start-Sleep -Milliseconds 250
-  } while ([DateTime]::UtcNow -lt $Deadline)
-  throw 'SEB_S5_NATIVE_KEY_UNAVAILABLE'
-}
-
 Assert-Input ($env:SEB_S5_REQUEST_ID -match $RequestPattern)
 Assert-Input ($env:SEB_S5_ASSIGNMENT_ID -match $UuidPattern)
 $Revision = 0
@@ -160,23 +115,25 @@ if (-not $ConfigTool) {
 }
 Assert-Input (-not [string]::IsNullOrWhiteSpace($ConfigTool))
 
-Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
-$LaunchProcess = Start-Process -FilePath $ConfigTool -ArgumentList @($SeedPath) -PassThru
-try {
-  Write-Host 'SEB_S5_NATIVE_STAGE:awaiting-key-controls'
-  $Values = Read-AutomationValues ([System.Windows.Automation.AutomationElement]::RootElement)
-  $ConfigurationKey = $Values.ConfigurationKey
-  $BrowserExamKey = $Values.BrowserExamKey
-  Write-Host 'SEB_S5_NATIVE_STAGE:key-controls-ready'
-} finally {
-  foreach ($Candidate in @(Get-Process -Name 'SebWindowsConfig' -ErrorAction SilentlyContinue)) {
-    try { if (-not $Candidate.HasExited) { $Candidate.Kill() } } catch { }
-    try { $Candidate.Dispose() } catch { }
-  }
-  try { if (-not $LaunchProcess.HasExited) { $LaunchProcess.Kill() } } catch { }
-  $LaunchProcess.Dispose()
-}
+Write-Host 'SEB_S5_NATIVE_STAGE:compile-key-reader'
+$ReaderSource = Join-Path $env:GITHUB_WORKSPACE '.github\scripts\SebS5NativeKeyReader.cs'
+$ReaderExecutable = Join-Path $Root 'SebS5NativeKeyReader.exe'
+$ReaderOutput = Join-Path $Root 'native-keys.txt'
+$Compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+Assert-Input (Test-Path -LiteralPath $ReaderSource -PathType Leaf)
+Assert-Input (Test-Path -LiteralPath $Compiler -PathType Leaf)
+& $Compiler /nologo /target:exe /platform:x64 "/out:$ReaderExecutable" "/reference:$ConfigTool" $ReaderSource
+Assert-Input ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $ReaderExecutable -PathType Leaf))
+Write-Host 'SEB_S5_NATIVE_STAGE:calculate-keys-headless'
+& $ReaderExecutable $SeedPath $ReaderOutput (Split-Path -Parent $ConfigTool)
+Assert-Input ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $ReaderOutput -PathType Leaf))
+$NativeKeys = @(Get-Content -LiteralPath $ReaderOutput -Encoding utf8)
+Assert-Input ($NativeKeys.Count -eq 2)
+$ConfigurationKey = $NativeKeys[0]
+$BrowserExamKey = $NativeKeys[1]
+Assert-Input ($ConfigurationKey -match $Sha256Pattern -and $BrowserExamKey -match $Sha256Pattern)
+Remove-Item -LiteralPath $ReaderOutput -Force
+Write-Host 'SEB_S5_NATIVE_STAGE:key-reader-ready'
 
 $Evidence = [ordered]@{
   schemaVersion = 1
