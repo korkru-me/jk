@@ -6,6 +6,7 @@ on:
       - 'seb-s5-native-*'
     paths:
       - '.github/seb-s5/request.json'
+      - '.github/scripts/SebS5NativeKeyReader.cs'
       - '.github/scripts/seb-s5-native-evidence.ps1'
       - '.github/workflows/seb-s5-native-evidence.yml'
   workflow_dispatch:
