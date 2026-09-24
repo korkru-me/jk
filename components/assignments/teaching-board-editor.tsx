@@ -15,11 +15,11 @@ import type {
 } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ChevronUp,
   ImagePlus,
   LibraryBig,
   Loader2,
   PackagePlus,
-  PanelRightClose,
   PenLine,
   RotateCcw,
   Save,
@@ -144,7 +144,7 @@ interface Props {
   sessionLibraryItems: readonly DrawingBoardSessionLibraryItem[]
   onSessionLibraryItemAdd: (item: DrawingBoardSessionLibraryItem) => void
   onSessionLibraryItemRemove: (itemId: string) => void
-  /** Given when the board can be put away. */
+  /** Given when the board can be folded away to its heading. */
   onHide?: () => void
 }
 
@@ -984,8 +984,8 @@ export default function TeachingBoardEditor({
                 </Button>
               )}
               {onHide && (
-                <Button type="button" variant="ghost" size="xs" onClick={onHide} disabled={saving}>
-                  <PanelRightClose /> ซ่อน
+                <Button type="button" variant="ghost" size="xs" aria-expanded={true} onClick={onHide} disabled={saving}>
+                  <ChevronUp /> ซ่อน
                 </Button>
               )}
             </div>
