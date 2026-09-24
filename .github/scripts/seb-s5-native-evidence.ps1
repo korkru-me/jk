@@ -146,21 +146,35 @@ Assert-Input (-not [string]::IsNullOrWhiteSpace($ConfigTool))
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
-$Process = Start-Process -FilePath $ConfigTool -ArgumentList @($SeedPath) -PassThru
+$LaunchProcess = Start-Process -FilePath $ConfigTool -ArgumentList @($SeedPath) -PassThru
+$WindowProcess = $null
 try {
   $Deadline = [DateTime]::UtcNow.AddMinutes(2)
   do {
     Start-Sleep -Milliseconds 250
-    $Process.Refresh()
-  } while ($Process.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $Deadline)
-  Assert-Input ($Process.MainWindowHandle -ne 0)
-  $Window = [System.Windows.Automation.AutomationElement]::FromHandle($Process.MainWindowHandle)
+    $Candidates = @(Get-Process -Name 'SebWindowsConfig' -ErrorAction SilentlyContinue)
+    foreach ($Candidate in $Candidates) {
+      try {
+        $Candidate.Refresh()
+        if ($Candidate.MainWindowHandle -ne 0) {
+          $WindowProcess = $Candidate
+          break
+        }
+      } catch { }
+    }
+  } while ($null -eq $WindowProcess -and [DateTime]::UtcNow -lt $Deadline)
+  Assert-Input ($null -ne $WindowProcess -and $WindowProcess.MainWindowHandle -ne 0)
+  $Window = [System.Windows.Automation.AutomationElement]::FromHandle($WindowProcess.MainWindowHandle)
   Assert-Input ($null -ne $Window)
   $ConfigurationKey = Read-AutomationValue $Window 'textBoxConfigurationKey'
   $BrowserExamKey = Read-AutomationValue $Window 'textBoxBrowserExamKey'
 } finally {
-  if (-not $Process.HasExited) { $Process.Kill() }
-  $Process.Dispose()
+  foreach ($Candidate in @(Get-Process -Name 'SebWindowsConfig' -ErrorAction SilentlyContinue)) {
+    try { if (-not $Candidate.HasExited) { $Candidate.Kill() } } catch { }
+    try { $Candidate.Dispose() } catch { }
+  }
+  try { if (-not $LaunchProcess.HasExited) { $LaunchProcess.Kill() } } catch { }
+  $LaunchProcess.Dispose()
 }
 
 $Evidence = [ordered]@{
