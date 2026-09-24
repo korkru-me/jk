@@ -242,11 +242,13 @@ sanitize error และคง unresolved cleanup obligation แบบมี dea
 ที่อัปโหลดสำเร็จแต่ response หายโดยไม่สร้าง path ซ้ำ เพิ่ม concrete private ticket/selector provider
 ชุดแรกสำหรับ `create-subject-classroom` ที่เก็บ Page/marker/target ไว้ใน closure, ผูก full creation window,
 บังคับ selector ตามหน้าจริง และจะรายงาน abort ผ่านต่อเมื่อ private data boundary ยืนยัน reconciliation แล้ว
-ชุด S5 ผ่าน 19 files / 533 tests, ทั้งโครงการผ่าน 158 files / 2,264 tests และ
+ประกอบ provider → operation runtime → isolated browser runtime → browser/data adapter เป็น closure เดียวแล้ว
+โดย public surface เหลือเฉพาะ `executeStep` และ cleanup ไล่จาก browser edge เข้าหา private boundary แบบ retryable
+ชุด S5 ผ่าน 20 files / 537 tests, ทั้งโครงการผ่าน 159 files / 2,268 tests และ
 TypeScript/syntax/runtime checks ผ่าน
 
 ยังไม่อนุญาต live mock จนกว่าจะขยาย concrete private ticket/selector provider จากขั้นสร้างห้องเรียน
-ให้ครบ operation ที่เหลือและต่อ operation runtime เข้ากับ live runner โดยไม่เปิด Page, credential หรือ
+ให้ครบ operation ที่เหลือและนำ browser-data facade ที่ประกอบแล้วต่อเข้ากับ live runner โดยไม่เปิด Page, credential หรือ
 service-role client ออกจาก private closure นอกจากนี้ยังขาด
 native/expiry capabilities, final `.seb` + CK/BEK จาก Windows,
 automation bypass แบบ server-only และ authenticated durable evidence จาก source/deployment/config เดียวกัน
