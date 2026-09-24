@@ -43,35 +43,6 @@ if ($env:GITHUB_EVENT_NAME -eq 'push') {
   $env:SEB_S5_PAYLOAD_CIPHERTEXT = [string]$Request.payloadCiphertext
 }
 
-function Read-AutomationValue {
-  param(
-    [System.Windows.Automation.AutomationElement]$Root,
-    [string]$AutomationId
-  )
-  $Condition = New-Object System.Windows.Automation.PropertyCondition(
-    [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
-    $AutomationId
-  )
-  $Deadline = [DateTime]::UtcNow.AddMinutes(2)
-  do {
-    $Element = $Root.FindFirst(
-      [System.Windows.Automation.TreeScope]::Descendants,
-      $Condition
-    )
-    if ($null -ne $Element) {
-      try {
-        $Pattern = $Element.GetCurrentPattern(
-          [System.Windows.Automation.ValuePattern]::Pattern
-        )
-        $Value = $Pattern.Current.Value
-        if ($Value -match $Sha256Pattern) { return $Value.ToLowerInvariant() }
-      } catch { }
-    }
-    Start-Sleep -Milliseconds 250
-  } while ([DateTime]::UtcNow -lt $Deadline)
-  throw 'SEB_S5_NATIVE_KEY_UNAVAILABLE'
-}
-
 Assert-Input ($env:SEB_S5_REQUEST_ID -match $RequestPattern)
 Assert-Input ($env:SEB_S5_ASSIGNMENT_ID -match $UuidPattern)
 $Revision = 0
@@ -124,44 +95,52 @@ $SeedPath = Join-Path $Root 'assignment.seb'
 [Array]::Clear($SeedBytes, 0, $SeedBytes.Length)
 
 $InstallerPath = Join-Path $Root 'seb-x64.msi'
+Write-Host 'SEB_S5_NATIVE_STAGE:download-pinned-package'
 Invoke-WebRequest -Uri $InstallerUrl -OutFile $InstallerPath -UseBasicParsing
 $InstallerHash = (Get-FileHash -Path $InstallerPath -Algorithm SHA256).Hash.ToLowerInvariant()
 Assert-Input ($InstallerHash -eq $ExpectedInstallerSha256)
-$Install = Start-Process msiexec.exe -ArgumentList @(
-  '/i', ('"{0}"' -f $InstallerPath), '/qn', '/norestart'
+Write-Host 'SEB_S5_NATIVE_STAGE:extract-pinned-package'
+$ExtractRoot = Join-Path $Root 'application'
+$Extract = Start-Process msiexec.exe -ArgumentList @(
+  '/a', ('"{0}"' -f $InstallerPath), '/qn', '/norestart',
+  ('TARGETDIR="{0}"' -f $ExtractRoot)
 ) -Wait -PassThru
-Assert-Input ($Install.ExitCode -eq 0 -or $Install.ExitCode -eq 3010)
+if ($Extract.ExitCode -ne 0 -and $Extract.ExitCode -ne 3010) {
+  throw "SEB_S5_NATIVE_EXTRACT_FAILED_$($Extract.ExitCode)"
+}
 
 $Candidates = @(
-  (Join-Path $env:ProgramFiles 'SafeExamBrowser\Application\SebWindowsConfig.exe'),
-  (Join-Path ${env:ProgramFiles(x86)} 'SafeExamBrowser\Application\SebWindowsConfig.exe')
+  (Join-Path $ExtractRoot 'SafeExamBrowser\Application\SEBConfigTool.exe'),
+  (Join-Path $ExtractRoot 'Program Files\SafeExamBrowser\Application\SEBConfigTool.exe'),
+  (Join-Path $ExtractRoot 'Program Files (x86)\SafeExamBrowser\Application\SEBConfigTool.exe')
 )
 $ConfigTool = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $ConfigTool) {
-  $ConfigTool = Get-ChildItem -Path $env:ProgramFiles, ${env:ProgramFiles(x86)} `
-    -Filter 'SebWindowsConfig.exe' -File -Recurse -ErrorAction SilentlyContinue |
+  $ConfigTool = Get-ChildItem -Path $ExtractRoot `
+    -Filter 'SEBConfigTool.exe' -File -Recurse -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty FullName
 }
 Assert-Input (-not [string]::IsNullOrWhiteSpace($ConfigTool))
 
-Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
-$Process = Start-Process -FilePath $ConfigTool -ArgumentList @($SeedPath) -PassThru
-try {
-  $Deadline = [DateTime]::UtcNow.AddMinutes(2)
-  do {
-    Start-Sleep -Milliseconds 250
-    $Process.Refresh()
-  } while ($Process.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $Deadline)
-  Assert-Input ($Process.MainWindowHandle -ne 0)
-  $Window = [System.Windows.Automation.AutomationElement]::FromHandle($Process.MainWindowHandle)
-  Assert-Input ($null -ne $Window)
-  $ConfigurationKey = Read-AutomationValue $Window 'textBoxConfigurationKey'
-  $BrowserExamKey = Read-AutomationValue $Window 'textBoxBrowserExamKey'
-} finally {
-  if (-not $Process.HasExited) { $Process.Kill() }
-  $Process.Dispose()
-}
+Write-Host 'SEB_S5_NATIVE_STAGE:compile-key-reader'
+$ReaderSource = Join-Path $env:GITHUB_WORKSPACE '.github\scripts\SebS5NativeKeyReader.cs'
+$ReaderExecutable = Join-Path $Root 'SebS5NativeKeyReader.exe'
+$ReaderOutput = Join-Path $Root 'native-keys.txt'
+$Compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+Assert-Input (Test-Path -LiteralPath $ReaderSource -PathType Leaf)
+Assert-Input (Test-Path -LiteralPath $Compiler -PathType Leaf)
+& $Compiler /nologo /target:exe /platform:x64 "/out:$ReaderExecutable" "/reference:$ConfigTool" $ReaderSource
+Assert-Input ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $ReaderExecutable -PathType Leaf))
+Write-Host 'SEB_S5_NATIVE_STAGE:calculate-keys-headless'
+& $ReaderExecutable $SeedPath $ReaderOutput (Split-Path -Parent $ConfigTool)
+Assert-Input ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $ReaderOutput -PathType Leaf))
+$NativeKeys = @(Get-Content -LiteralPath $ReaderOutput -Encoding utf8)
+Assert-Input ($NativeKeys.Count -eq 2)
+$ConfigurationKey = $NativeKeys[0]
+$BrowserExamKey = $NativeKeys[1]
+Assert-Input ($ConfigurationKey -match $Sha256Pattern -and $BrowserExamKey -match $Sha256Pattern)
+Remove-Item -LiteralPath $ReaderOutput -Force
+Write-Host 'SEB_S5_NATIVE_STAGE:key-reader-ready'
 
 $Evidence = [ordered]@{
   schemaVersion = 1
