@@ -246,7 +246,9 @@ sanitize error และคง unresolved cleanup obligation แบบมี dea
 โดย public surface เหลือเฉพาะ `executeStep` และ cleanup ไล่จาก browser edge เข้าหา private boundary แบบ retryable
 เพิ่ม service-role classroom data boundary ที่อ่าน owner/organization จาก committed private ledger,
 query เฉพาะ safe marker fields และยอมรับ exact candidate ได้ไม่เกินหนึ่งรายการก่อน attest/abort
-ชุด S5 ผ่าน 21 files / 545 tests, ทั้งโครงการผ่าน 160 files / 2,276 tests และ
+จากนั้นห่อ dedicated query driver + service-role provider เข้า async classroom stack โดย factory output
+ยังเหลือเพียง browser-data `executeStep` กับ `closeAll` และปิด driver ทันทีหาก constructor ชั้นถัดไปล้มเหลว
+ชุด S5 ผ่าน 22 files / 548 tests, ทั้งโครงการผ่าน 161 files / 2,279 tests และ
 TypeScript/syntax/runtime checks ผ่าน
 
 ยังไม่อนุญาต live mock จนกว่าจะขยาย concrete private ticket/selector provider จากขั้นสร้างห้องเรียน
