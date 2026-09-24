@@ -156,7 +156,11 @@ describe('SEB Staging private setup material capability', () => {
       expectedUserId: TEACHER_ID,
     }), options())
     const password = values.get('#create-seb-quit-password')
-    expect(password).toMatch(/^[A-Za-z0-9_-]{32}$/)
+    expect(password).toMatch(/^A1a![A-Za-z0-9_-]{32}$/)
+    expect(password).toMatch(/[A-Z]/)
+    expect(password).toMatch(/[a-z]/)
+    expect(password).toMatch(/[0-9]/)
+    expect(password).toMatch(/[^A-Za-z0-9]/)
     expect(values.get('#create-seb-quit-confirmation')).toBe(password)
     expect(result).toEqual({ status: 'passed' })
     expect(JSON.stringify(result)).not.toContain(password)

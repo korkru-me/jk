@@ -131,6 +131,10 @@ class FakePage {
     this.currentUrl = url
   }
 
+  async waitForFunction(_callback, selector) {
+    this.events.push(['hydrated', selector])
+  }
+
   locator(selector) {
     return {
       fill: async value => {
@@ -139,6 +143,7 @@ class FakePage {
       },
       count: async () => {
         if (selector === 'button[aria-pressed="false"]') return 1
+        if (selector === 'button[aria-pressed="true"]') return 0
         if (selector === 'input[type="checkbox"]') return 2
         return 1
       },
@@ -159,8 +164,11 @@ class FakePage {
     if (role === 'button' && options.name === 'ถัดไป') {
       return { click: async () => this.events.push(['click', options.name]) }
     }
-    if (role === 'button' && options.name === 'ข้อสอบ') {
-      return { click: async () => this.events.push(['click', options.name]) }
+    if (role === 'button' && options.name instanceof RegExp && options.name.test('ข้อสอบ')) {
+      return {
+        count: async () => 1,
+        click: async () => this.events.push(['click', 'ข้อสอบ']),
+      }
     }
     if (role === 'button' && options.name === 'สร้างชุดข้อสอบ') {
       return { click: async () => this.events.push(['click', options.name]) }
@@ -206,6 +214,7 @@ class FakePage {
     return {
       waitFor: async () => {
         this.events.push(['text', value])
+        if (this.flow === 'membership') return
         if (value === 'เผยแพร่แล้ว'
           && this.events.some(event => event[0] === 'click' && event[1] === 'เผยแพร่')) return
         if (this.values.get('#cls-name') !== value && this.values.get('#title') !== value) {
@@ -429,6 +438,7 @@ describe('SEB Staging private operation ticket provider', () => {
     expect(attested.status).toBe('passed')
     expect(harness.captured.marker).toMatch(/^SEB S5 seb-s5-provider-1 [a-f0-9]{24}$/)
     expect(page.values.get('#cls-name')).toBe(harness.captured.marker)
+    expect(page.events).toContainEqual(['hydrated', '#cls-name'])
     expect(harness.captured.attest.marker).toBe(harness.captured.marker)
     expect(JSON.stringify(harness.provider)).not.toContain(harness.captured.marker)
     expect(JSON.stringify(ticket)).not.toContain(harness.captured.marker)
@@ -535,7 +545,7 @@ describe('SEB Staging private operation ticket provider', () => {
       issueRequest({ alias, operationId }),
       callOptions(),
     )
-    const page = new FakePage()
+    const page = new FakePage({ flow: 'membership' })
     await finishTicket(ticket, page)
     expect(page.values.get('input[placeholder="รหัส 6 หลัก เช่น AB3X7Y"]')).toBe('ABC123')
     expect(page.events).toContainEqual(['click', 'เข้าร่วม'])

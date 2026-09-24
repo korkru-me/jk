@@ -180,7 +180,7 @@ export async function createSebStagingPrivateLiveStack({
   fetchImplementation = globalThis.fetch,
   clock = () => new Date(),
   randomBytes = nodeRandomBytes,
-  userScopedReadProbe = undefined,
+  userScopedReadProbe,
 } = {}) {
   let initialEnvironment
   try { initialEnvironment = typeof readEnvironment === 'function' ? readEnvironment() : null } catch { blocked() }
@@ -201,7 +201,7 @@ export async function createSebStagingPrivateLiveStack({
     || typeof fetchImplementation !== 'function'
     || typeof clock !== 'function'
     || typeof randomBytes !== 'function'
-    || (userScopedReadProbe !== undefined && typeof userScopedReadProbe !== 'function')) blocked()
+    || typeof userScopedReadProbe !== 'function') blocked()
 
   const namespace = `qa:${runIdentity.runId}`
   const plan = buildSebStagingMockHarnessPlan({
@@ -211,10 +211,16 @@ export async function createSebStagingPrivateLiveStack({
     writeConfirmation: 'CONFIRM_SYNTHETIC_SEB_STAGING_WRITE',
   })
   if (!plan.executionAuthorized) blocked()
+  const runOnlyIdentity = Object.freeze({
+    runId: runIdentity.runId,
+    sourceRevision: runIdentity.sourceRevision,
+    deploymentId: runIdentity.deploymentId,
+  })
 
   let classroom = null
   let cleanupRuntime = null
   let evidenceSink = null
+  let diagnosticStage = 'reconciliation-client'
   try {
     const reconciliationClient = createSebStagingSupabaseLedgerReconciliationAttestation({
       readEnvironment,
@@ -222,6 +228,7 @@ export async function createSebStagingPrivateLiveStack({
       serviceRoleCredentialProvider,
       fetchImplementation,
     })
+    diagnosticStage = 'private-run-ledger'
     const privateRunLedger = createSebStagingPrivateRunLedger({
       schemaVersion: 1,
       identity: runIdentity,
@@ -231,18 +238,22 @@ export async function createSebStagingPrivateLiveStack({
       reconciliationTimeoutMs: 5_000,
       clock,
     })
+    diagnosticStage = 'cleanup-topology'
     const topology = createSebStagingResourceCleanupTopology(runIdentity)
+    diagnosticStage = 'narrow-driver'
     const narrowFactory = createSebStagingSupabaseNarrowDriverFactory({
       readEnvironment,
       serviceRoleCredentialProvider,
       fetchImplementation,
     })
+    diagnosticStage = 'cleanup-runtime'
     cleanupRuntime = createSebStagingResourceCleanupRuntime({
       readEnvironment,
       topology,
       serviceRoleCredentialProvider: narrowFactory.serviceRoleCredentialProvider,
       createServiceRoleClient: narrowFactory.createServiceRoleClient,
     })
+    diagnosticStage = 'cleanup-participants'
     const participants = createSebStagingResourceCleanupParticipants({
       readEnvironment,
       topology,
@@ -252,13 +263,16 @@ export async function createSebStagingPrivateLiveStack({
       databaseClient: cleanupRuntime.databaseClient,
       personalOrganizationsClient: cleanupRuntime.personalOrganizationsClient,
     })
+    diagnosticStage = 'service-boundaries'
     const boundaries = createPrivateServiceBoundaries(serviceRoleCredentialProvider, namespace)
+    diagnosticStage = 'run-reservation'
     const runReservationCapability = createSebStagingRunReservation({
       readEnvironment,
-      identity: runIdentity,
+      identity: runOnlyIdentity,
       serviceRoleClientFactory: boundaries.reservationClientFactory,
       randomBytes,
     })
+    diagnosticStage = 'aggregate-cleanup'
     const aggregateCleanup = createSebStagingAggregateCleanupCapability({
       readEnvironment,
       ...participants,
@@ -276,18 +290,21 @@ export async function createSebStagingPrivateLiveStack({
       },
     })
 
+    diagnosticStage = 'release-material'
     const releaseMaterialProvider = createSebStagingPrivateReleaseMaterialProvider({
       runIdentity,
       readEnvironment,
       serviceRoleCredentialProvider,
       fetchImplementation,
     })
+    diagnosticStage = 'native-browser'
     const nativeSebCapability = createSebStagingPrivateNativeBrowserCapability({
       runIdentity,
       readEnvironment,
       privateRunLedger,
       releaseMaterialProvider,
     })
+    diagnosticStage = 'classroom-stack'
     classroom = await createSebStagingPrivateClassroomStack({
       runIdentity,
       readEnvironment,
@@ -299,6 +316,7 @@ export async function createSebStagingPrivateLiveStack({
       nativeSebCapability,
       fetchImplementation,
     })
+    diagnosticStage = 'fixture-adapter'
     const fixtureAdapter = createSebStagingFixtureAdapter({
       readEnvironment,
       runId: runIdentity.runId,
@@ -311,6 +329,7 @@ export async function createSebStagingPrivateLiveStack({
       randomBytes,
       clock,
     })
+    diagnosticStage = 'native-artifact-exchange'
     const nativeArtifactProvider = createSebStagingPrivateNativeArtifactExchange({
       runIdentity,
       readEnvironment,
@@ -320,6 +339,7 @@ export async function createSebStagingPrivateLiveStack({
       exchangeDirectory: nativeExchangeDirectory,
       onRequestReady: onNativeRequestReady,
     })
+    diagnosticStage = 'native-operator'
     const nativeOperatorCapability = createSebStagingPrivateNativeOperatorCapability({
       runIdentity,
       readEnvironment,
@@ -327,6 +347,7 @@ export async function createSebStagingPrivateLiveStack({
       serviceRoleCredentialProvider,
       nativeArtifactProvider,
     })
+    diagnosticStage = 'expiry-control'
     const expiryControlCapability = createSebStagingPrivateExpiryControl({
       runIdentity,
       readEnvironment,
@@ -334,25 +355,24 @@ export async function createSebStagingPrivateLiveStack({
       sessionSecretProvider,
       clock,
     })
+    diagnosticStage = 'preflight'
     const preflightCapability = createSebStagingLivePreflight({
       readVercelToken,
       readProtectionBypass,
       fetchImpl: fetchImplementation,
       adminClientFactory: boundaries.preflightAdminFactory,
     })
+    diagnosticStage = 'evidence-sink'
     evidenceSink = await createSebStagingDurableEvidenceSink({
       readEnvironment,
       outputDirectory: evidenceDirectory,
       clock,
       randomBytes,
     })
+    diagnosticStage = 'live-harness'
     return createSebStagingPrivateLiveHarness({
       plan,
-      identity: Object.freeze({
-        runId: runIdentity.runId,
-        sourceRevision: runIdentity.sourceRevision,
-        deploymentId: runIdentity.deploymentId,
-      }),
+      identity: runOnlyIdentity,
       preflightCapability,
       fixtureAdapter,
       browserDataCapability: classroom.browserDataCapability,
@@ -362,6 +382,9 @@ export async function createSebStagingPrivateLiveStack({
       evidenceSink,
     })
   } catch {
+    if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+      process.stderr.write(`SEB Staging private live stack blocked (${diagnosticStage})\n`)
+    }
     try { await classroom?.closeAll() } catch { /* redacted */ }
     try { await cleanupRuntime?.closeAll() } catch { /* redacted */ }
     try { await evidenceSink?.closeAll() } catch { /* redacted */ }

@@ -377,6 +377,7 @@ export function createSebStagingBrowserOperationRuntime(options = {}) {
     if (parsed.operation.requiresNative && !nativeAttestation) blocked()
     let entry = null
     let finished = false
+    let diagnosticStage = 'native'
     try {
       if (parsed.operation.requiresNative) {
         if (cleanupStarted || closed) blocked()
@@ -384,12 +385,17 @@ export function createSebStagingBrowserOperationRuntime(options = {}) {
         assertCapabilitiesStable()
         await runNative(parsed)
       }
+      diagnosticStage = 'issue-ticket'
       const ticket = await issueTicket(parsed)
       entry = Object.freeze({ ticket, page: parsed.page })
       openTickets.add(entry)
+      diagnosticStage = 'navigate'
       await ticketCall(ticket, 'navigate', parsed.page, parsed.signal)
+      diagnosticStage = 'markers'
       await ticketCall(ticket, 'applyMarkers', parsed.page, parsed.signal)
+      diagnosticStage = 'secrets'
       await ticketCall(ticket, 'applySecrets', parsed.page, parsed.signal)
+      diagnosticStage = 'uploads'
       await ticketCall(ticket, 'applyUploads', parsed.page, parsed.signal)
       if (parsed.operation.mutates) {
         // Re-authorize writes at the last possible instant. The environment
@@ -398,13 +404,18 @@ export function createSebStagingBrowserOperationRuntime(options = {}) {
         if (cleanupStarted || closed) blocked()
         currentEnvironment()
         assertCapabilitiesStable()
+        diagnosticStage = 'begin-mutation'
         await ticketCall(ticket, 'beginMutation', parsed.page, parsed.signal)
       }
+      diagnosticStage = 'finish'
       await ticketCall(ticket, 'finish', parsed.page, parsed.signal)
       finished = true
       openTickets.delete(entry)
       return passed()
     } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging browser operation blocked (${parsed.operationId}:${diagnosticStage})\n`)
+      }
       if (!finished && entry) {
         try {
           await abortOpenTicket(entry)

@@ -281,6 +281,14 @@ function canonicalTimestamp(value) {
     : null
 }
 
+function validWizardClassroomDescription(value, marker) {
+  if (typeof value !== 'string' || typeof marker !== 'string') return false
+  const prefix = `Synthetic-only SEB Staging fixture ${marker}\n`
+  if (!value.startsWith(prefix)) return false
+  const metadata = value.slice(prefix.length)
+  return /^หน้าปก: blue · ภาคเรียน: [12]\/\d{4} · การเข้าร่วม: เปิดรับอิสระ$/.test(metadata)
+}
+
 function parseIdentity(value) {
   if (!hasExactFields(value, ['runId', 'sourceRevision', 'deploymentId', 'creationWindow'])
     || !hasExactFields(value.creationWindow, ['notBefore', 'notAfter'])) return null
@@ -746,9 +754,7 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
   async function enumerateOperation(signal, { cleanup = false } = {}) {
     assertStable(cleanup)
     const binding = operation.binding
-    const questionType = operation.spec.resourceType === 'essay'
-      ? 'written'
-      : operation.spec.resourceType
+    const questionType = operation.spec.resourceType
     const columns = operation.spec.table === 'classrooms'
       ? [
           'id', 'teacher_id', 'org_id', 'classroom_type', 'name', 'description',
@@ -800,8 +806,18 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
     if (!Object.isFrozen(result)
       || !hasExactFields(result, ['rows'])
       || !Object.isFrozen(result.rows)
-      || result.rows.length > 1) blocked()
-    if (result.rows.length === 0) return null
+      || result.rows.length > 1) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging operation attestation blocked (${operation.stepId}:response-shape)\n`)
+      }
+      blocked()
+    }
+    if (result.rows.length === 0) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging operation attestation failed (${operation.stepId}:no-match)\n`)
+      }
+      return null
+    }
     const row = result.rows[0]
     const createdAt = canonicalTimestamp(
       operation.spec.table === 'classroom_students' ? row?.joined_at : row?.created_at,
@@ -817,7 +833,7 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
         && row.teacher_id === binding.expectedUserId
         && row.classroom_type === 'subject'
         && row.name === operation.marker
-        && row.description === `Synthetic-only SEB Staging fixture ${operation.marker}`
+        && validWizardClassroomDescription(row.description, operation.marker)
       : operation.spec.table === 'questions'
         ? row.org_id === operation.target.organizationId
           && row.created_by === binding.expectedUserId
@@ -827,7 +843,13 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
           && row.question_text.includes(`Synthetic-only SEB Staging fixture ${operation.marker}`)
         : row.classroom_id === operation.classroomId
           && row.student_id === binding.expectedUserId
-    if (!commonValid || !resourceValid) blocked()
+    if (!commonValid || !resourceValid) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        const stage = !commonValid ? 'common-shape' : `${operation.spec.table}-shape`
+        process.stderr.write(`SEB Staging operation attestation blocked (${operation.stepId}:${stage})\n`)
+      }
+      blocked()
+    }
     return Object.freeze({ row, createdAt: createdAt.iso })
   }
 

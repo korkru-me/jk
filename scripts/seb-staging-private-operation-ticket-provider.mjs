@@ -162,20 +162,20 @@ const OPERATION_SPECS = Object.freeze(new Map([
     markerFields: [],
     submitLabel: 'เผยแพร่',
   })],
-  ['reject-invalid-seb-challenge', studentOperation('/system-check', 'ตรวจความพร้อมก่อนสอบ')],
-  ['verify-seb-system-check', studentOperation('/system-check', 'ตรวจความพร้อมก่อนสอบ', [{
+  ['reject-invalid-seb-challenge', studentOperation('/system-check', 'Safe Exam Browser system check')],
+  ['verify-seb-system-check', studentOperation('/system-check', 'Safe Exam Browser system check', [{
     targetKey: 'check-in-primary',
     kind: 'checkIn',
     resourceType: 'windows',
   }])],
-  ['reject-replayed-seb-challenge', studentOperation('/system-check', 'ตรวจความพร้อมก่อนสอบ')],
-  ['reject-invalid-seb-session', studentOperation('/take', 'เข้าสอบผ่าน Safe Exam Browser')],
+  ['reject-replayed-seb-challenge', studentOperation('/system-check', 'Safe Exam Browser system check')],
+  ['reject-invalid-seb-session', studentOperation('/take', 'ข้อสอบนี้ใช้ Safe Exam Browser')],
   ['start-revision-bound-attempt', studentOperation('/take', null, [
     { targetKey: 'submission-primary', kind: 'submission', resourceType: 'seb_required' },
     { targetKey: 'answer-written', kind: 'answer', resourceType: 'essay' },
     { targetKey: 'answer-upload', kind: 'answer', resourceType: 'file_upload' },
   ])],
-  ['reject-replayed-seb-session', studentOperation('/take', 'เข้าสอบผ่าน Safe Exam Browser')],
+  ['reject-replayed-seb-session', studentOperation('/take', 'ข้อสอบนี้ใช้ Safe Exam Browser')],
   ['autosave-synthetic-answer', studentOperation('/take', null)],
   ['retry-autosave-after-transient-failure', studentOperation('/take', null)],
   ['resume-same-attempt', studentOperation('/take', null)],
@@ -452,6 +452,7 @@ function validPage(value) {
       && typeof value.getByRole === 'function'
       && typeof value.getByText === 'function'
       && typeof value.waitForURL === 'function'
+      && typeof value.waitForFunction === 'function'
   } catch {
     return false
   }
@@ -950,6 +951,21 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
     }
   }
 
+  async function waitForReactHydration(page, selector) {
+    if (typeof selector !== 'string' || selector.length === 0) blocked()
+    try {
+      await page.waitForFunction((controlSelector) => {
+        const control = document.querySelector(controlSelector)
+        if (!(control instanceof HTMLElement)) return false
+        return Object.keys(control).some(key => (
+          key.startsWith('__reactProps$') || key.startsWith('__reactFiber$')
+        ))
+      }, selector, { timeout: boundaryTimeoutMs })
+    } catch {
+      blocked()
+    }
+  }
+
   function assertTicketPage(parsed) {
     if (!plan) blocked()
     if (plan.page === null) plan.page = parsed.page
@@ -1003,6 +1019,8 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
           })
           await waitForVisible(heading)
         }
+        const hydrationSelector = plan.spec.markerFields[0]?.selector ?? 'button'
+        await waitForReactHydration(page, hydrationSelector)
       })
     }
 
@@ -1024,40 +1042,72 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
           }
         }
         if (plan.stepId === 'create-seb-assignment-draft-with-quit-password') {
-          const classroomChoices = page.locator('button[aria-pressed="false"]')
-          if (!exactLocator(classroomChoices, ['count', 'first'])) blocked()
-          let classroomCount
-          try { classroomCount = await classroomChoices.count() } catch { blocked() }
-          if (classroomCount !== 1) blocked()
-          const classroomChoice = classroomChoices.first()
-          const examChoice = page.getByRole('button', { name: 'ข้อสอบ', exact: true })
-          if (!exactLocator(classroomChoice, ['click'])
-            || !exactLocator(examChoice, ['click'])) blocked()
+          let diagnosticStage = 'classroom-controls'
           try {
-            await classroomChoice.click({ timeout: boundaryTimeoutMs })
+          const selectedClassrooms = page.locator('button[aria-pressed="true"]')
+          const availableClassrooms = page.locator('button[aria-pressed="false"]')
+          if (!exactLocator(selectedClassrooms, ['count'])
+            || !exactLocator(availableClassrooms, ['count', 'first'])) blocked()
+          let selectedClassroomCount
+          let availableClassroomCount
+          try {
+            selectedClassroomCount = await selectedClassrooms.count()
+            availableClassroomCount = await availableClassrooms.count()
+          } catch { blocked() }
+          if (selectedClassroomCount === 0 && availableClassroomCount === 1) {
+            try {
+              await availableClassrooms.first().click({ timeout: boundaryTimeoutMs })
+            } catch { blocked() }
+          } else if (selectedClassroomCount !== 1 || availableClassroomCount !== 0) {
+            blocked()
+          }
+          diagnosticStage = 'exam-control'
+          const examChoice = page.getByRole('button', { name: /ข้อสอบ/ })
+          if (!exactLocator(examChoice, ['count', 'click'])) blocked()
+          let examChoiceCount
+          try { examChoiceCount = await examChoice.count() } catch { blocked() }
+          if (examChoiceCount !== 1) blocked()
+          diagnosticStage = 'exam-click'
+          try {
             await examChoice.click({ timeout: boundaryTimeoutMs })
           } catch { blocked() }
+          diagnosticStage = 'step-one-next'
           const next = page.getByRole('button', { name: 'ถัดไป', exact: true })
           if (!exactLocator(next, ['click'])) blocked()
           try { await next.click({ timeout: boundaryTimeoutMs }) } catch { blocked() }
           if (signal.aborted) blocked()
+          diagnosticStage = 'question-step-ready'
+          await waitForVisible(page.getByRole('heading', { name: 'เลือกโจทย์', exact: true }))
+          diagnosticStage = 'question-controls'
           const questionChoices = page.locator('input[type="checkbox"]')
           if (!exactLocator(questionChoices, ['count', 'nth'])) blocked()
           let questionCount
           try { questionCount = await questionChoices.count() } catch { blocked() }
           if (questionCount !== 2) blocked()
+          diagnosticStage = 'question-selection'
           for (let index = 0; index < questionCount; index += 1) {
             const choice = questionChoices.nth(index)
             if (!exactLocator(choice, ['check'])) blocked()
             try { await choice.check({ timeout: boundaryTimeoutMs }) } catch { blocked() }
           }
-          for (let index = 0; index < 2; index += 1) {
-            try { await next.click({ timeout: boundaryTimeoutMs }) } catch { blocked() }
-            if (signal.aborted) blocked()
-          }
+          diagnosticStage = 'score-step'
+          try { await next.click({ timeout: boundaryTimeoutMs }) } catch { blocked() }
+          if (signal.aborted) blocked()
+          await waitForVisible(page.getByRole('heading', { name: 'คะแนนแต่ละข้อ', exact: true }))
+          diagnosticStage = 'settings-step'
+          try { await next.click({ timeout: boundaryTimeoutMs }) } catch { blocked() }
+          if (signal.aborted) blocked()
+          await waitForVisible(page.getByRole('heading', { name: 'ตั้งค่าการสอบ', exact: true }))
+          diagnosticStage = 'seb-control'
           const sebRequired = page.locator('#create-seb-required')
           if (!exactLocator(sebRequired, ['check'])) blocked()
           try { await sebRequired.check({ timeout: boundaryTimeoutMs }) } catch { blocked() }
+          } catch {
+            if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+              process.stderr.write(`SEB Staging assignment markers blocked (${diagnosticStage})\n`)
+            }
+            blocked()
+          }
         }
       })
     }
@@ -1159,21 +1209,28 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
         }
         if (['verify-seb-system-check', 'record-proctor-heartbeat'].includes(plan.stepId)) return
         if (plan.stepId === 'create-subject-classroom') {
-          const nextButton = page.getByRole('button', { name: 'ถัดไป', exact: true })
-          if (!exactLocator(nextButton, ['click'])) blocked()
+          let diagnosticStage = 'next-control'
           try {
+            const nextButton = page.getByRole('button', { name: 'ถัดไป', exact: true })
+            if (!exactLocator(nextButton, ['click'])) blocked()
+            diagnosticStage = 'next-click'
             await nextButton.click({ timeout: boundaryTimeoutMs })
+            if (signal.aborted) blocked()
+            diagnosticStage = 'step-heading'
+            const stepHeading = page.getByRole('heading', {
+              name: 'การเข้าร่วมและระยะเวลา',
+              exact: true,
+            })
+            await waitForVisible(stepHeading)
           } catch {
+            if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+              process.stderr.write(`SEB Staging classroom mutation blocked (${diagnosticStage})\n`)
+            }
             blocked()
           }
-          if (signal.aborted) blocked()
-          const stepHeading = page.getByRole('heading', {
-            name: 'การเข้าร่วมและระยะเวลา',
-            exact: true,
-          })
-          await waitForVisible(stepHeading)
         }
         if (plan.stepId === 'create-seb-assignment-draft-with-quit-password') {
+          let diagnosticStage = 'controls'
           const nextButton = page.getByRole('button', { name: 'ถัดไป', exact: true })
           const createButton = page.getByRole('button', {
             name: plan.spec.submitLabel,
@@ -1181,17 +1238,33 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
           })
           if (!exactLocator(nextButton, ['click']) || !exactLocator(createButton, ['click'])) blocked()
           try {
+            diagnosticStage = 'schedule-next'
             await nextButton.click({ timeout: boundaryTimeoutMs })
+            diagnosticStage = 'schedule-ready'
+            await waitForVisible(page.getByRole('heading', {
+              name: /กำหนดการสอบ/,
+            }))
+            diagnosticStage = 'create-dialog'
             await createButton.click({ timeout: boundaryTimeoutMs })
-          } catch { blocked() }
-          if (signal.aborted) blocked()
-          const draftButton = page.getByRole('button', {
-            name: 'ยังไม่เผยแพร่ (เก็บไว้เป็นร่าง)',
-            exact: true,
-          })
-          if (!exactLocator(draftButton, ['click'])) blocked()
-          try { await draftButton.click({ timeout: boundaryTimeoutMs }) } catch { blocked() }
-          return
+            if (signal.aborted) blocked()
+            await waitForVisible(page.getByRole('heading', {
+              name: 'เผยแพร่ข้อสอบนี้เมื่อไหร่?',
+              exact: true,
+            }))
+            diagnosticStage = 'save-draft'
+            const draftButton = page.getByRole('button', {
+              name: 'ยังไม่เผยแพร่ (เก็บไว้เป็นร่าง)',
+              exact: true,
+            })
+            if (!exactLocator(draftButton, ['click'])) blocked()
+            await draftButton.click({ timeout: boundaryTimeoutMs })
+            return
+          } catch {
+            if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+              process.stderr.write(`SEB Staging assignment mutation blocked (${diagnosticStage})\n`)
+            }
+            blocked()
+          }
         }
         if (plan.stepId === 'publish-seb-assignment') {
           const publishButton = page.getByRole('button', {
@@ -1224,16 +1297,23 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
         : 'UPLOADS_APPLIED'
       return runTicketMethod(expectedState, 'FINISHED', ticketInput, async ({ page, signal }) => {
         if (plan.stepId === 'create-seb-assignment-draft-with-quit-password') {
+          let diagnosticStage = 'detail-route'
           try {
             await page.waitForURL(url => (
               url.origin === OFFICIAL_STAGING_SITE_ORIGIN
                 && /^\/assignments\/[0-9a-f-]{36}$/.test(url.pathname)
             ), { timeout: boundaryTimeoutMs })
-          } catch { blocked() }
-          if (signal.aborted) blocked()
-          const marker = page.getByText(plan.marker, { exact: true })
-          await waitForVisible(marker)
-          return
+            if (signal.aborted) blocked()
+            diagnosticStage = 'detail-title'
+            const marker = page.getByRole('heading', { name: plan.marker, exact: true })
+            await waitForVisible(marker)
+            return
+          } catch {
+            if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+              process.stderr.write(`SEB Staging assignment finish blocked (${diagnosticStage})\n`)
+            }
+            blocked()
+          }
         }
         if (plan.stepId === 'publish-seb-assignment') {
           if (!pathIs(page.url(), plan.route)) blocked()
@@ -1317,10 +1397,12 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
           blocked()
         }
         if (signal.aborted || !pathIs(page.url(), expectedPath)) blocked()
-        if (plan.spec.target.kind !== 'classroomMembership') {
-          const marker = page.getByText(plan.marker, { exact: true })
-          await waitForVisible(marker)
-        }
+        const visibleMarker = plan.spec.target.kind === 'classroomMembership'
+          ? '1 ห้องเรียน'
+          : plan.marker
+        if (typeof visibleMarker !== 'string') blocked()
+        const marker = page.getByText(visibleMarker, { exact: true })
+        await waitForVisible(marker)
       })
     }
 

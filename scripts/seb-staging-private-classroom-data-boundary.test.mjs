@@ -218,7 +218,7 @@ function classroomRow(overrides = {}) {
     org_id: ORGANIZATION_ID,
     classroom_type: 'subject',
     name: MARKER,
-    description: `Synthetic-only SEB Staging fixture ${MARKER}`,
+    description: `Synthetic-only SEB Staging fixture ${MARKER}\nหน้าปก: blue · ภาคเรียน: 1/2569 · การเข้าร่วม: เปิดรับอิสระ`,
     created_at: NOW,
     ...overrides,
   })
@@ -410,7 +410,7 @@ describe('SEB Staging private classroom data boundary', () => {
       stepId: 'create-synthetic-written-question',
       targetKey: 'question-written',
       resourceType: 'essay',
-      storedType: 'written',
+      storedType: 'essay',
     },
     {
       stepId: 'create-synthetic-upload-question',
@@ -676,6 +676,7 @@ describe('SEB Staging private classroom data boundary', () => {
   it('rejects a row whose marker, relationship or creation window drifts', async () => {
     for (const row of [
       classroomRow({ name: 'wrong' }),
+      classroomRow({ description: `Synthetic-only SEB Staging fixture ${MARKER}\nหน้าปก: red · ภาคเรียน: 1/2569 · การเข้าร่วม: เปิดรับอิสระ` }),
       classroomRow({ teacher_id: '00000000-0000-4000-8000-000000000009' }),
       classroomRow({ created_at: '2026-09-24T05:00:00.000Z' }),
     ]) {

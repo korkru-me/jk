@@ -807,15 +807,19 @@ export function createSebStagingBrowserRuntime(options = {}) {
   }
 
   async function attestBrowserSession(input) {
+    let diagnosticStage = 'input'
     if (!hasExactFields(input, ATTESTATION_INPUT_FIELDS)
       || input.namespace !== namespace
       || !isAbortSignal(input.signal)
       || input.signal.aborted) {
       blocked()
     }
+    diagnosticStage = 'cookies'
     const cookiePairs = parseCookiePairs(input.cookies)
     if (!cookiePairs) blocked()
+    diagnosticStage = 'environment'
     readBoundEnvironment()
+    diagnosticStage = 'secrets'
     const before = await readSecrets(input.signal)
     let setCookieAttempted = false
     let targetDriftAttempted = false
@@ -874,6 +878,7 @@ export function createSebStagingBrowserRuntime(options = {}) {
 
     let client = null
     try {
+      diagnosticStage = 'auth-client'
       client = await runCooperativeBoundary(
         deadlines.authClient,
         input.signal,
@@ -897,6 +902,7 @@ export function createSebStagingBrowserRuntime(options = {}) {
         blocked()
       }
 
+      diagnosticStage = 'auth-user'
       const verified = await runCooperativeBoundary(
         deadlines.authGetUser,
         input.signal,
@@ -914,10 +920,14 @@ export function createSebStagingBrowserRuntime(options = {}) {
       const after = await readSecrets(input.signal)
       if (!sameSecrets(before, after)) blocked()
       readBoundEnvironment()
+      diagnosticStage = 'verified-user'
       const attestation = sanitizeVerifiedUser(verified, namespace)
       if (!attestation) blocked()
       return attestation
     } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging browser attestation blocked (${diagnosticStage})\n`)
+      }
       blocked()
     }
   }

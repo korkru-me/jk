@@ -72,6 +72,7 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
   let materialDriver = null
   let boundary = null
   let materialCapability = null
+  let diagnosticStage = 'classroom-driver'
   try {
     driver = await createSebStagingSupabaseNarrowDriver({
       readEnvironment: options.readEnvironment,
@@ -84,6 +85,7 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
         ? {}
         : { boundaryTimeoutMs: options.boundaryTimeoutMs }),
     })
+    diagnosticStage = 'classroom-boundary'
     boundary = createSebStagingPrivateClassroomDataBoundary({
       namespace,
       identity: options.runIdentity,
@@ -91,6 +93,7 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
       privateRunLedger: options.privateRunLedger,
       supabaseDriver: driver,
     })
+    diagnosticStage = 'material-driver'
     materialDriver = await createSebStagingSupabaseNarrowDriver({
       readEnvironment: options.readEnvironment,
       namespace,
@@ -102,6 +105,7 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
         ? {}
         : { boundaryTimeoutMs: options.boundaryTimeoutMs }),
     })
+    diagnosticStage = 'material-capability'
     materialCapability = createSebStagingPrivateSetupMaterialCapability({
       namespace,
       identity: options.runIdentity,
@@ -109,6 +113,7 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
       privateRunLedger: options.privateRunLedger,
       supabaseDriver: materialDriver,
     })
+    diagnosticStage = 'browser-data-stack'
     return createSebStagingPrivateBrowserDataStack({
       runIdentity: options.runIdentity,
       readEnvironment: options.readEnvironment,
@@ -139,6 +144,9 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
         : { brokerDeadlinesMs: options.brokerDeadlinesMs }),
     })
   } catch {
+    if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+      process.stderr.write(`SEB Staging private classroom stack blocked (${diagnosticStage})\n`)
+    }
     if (materialCapability) {
       try { await materialCapability.closeAll() } catch { /* redacted */ }
     } else if (materialDriver) {

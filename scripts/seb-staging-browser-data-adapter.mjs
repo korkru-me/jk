@@ -1264,6 +1264,7 @@ export function createSebStagingBrowserDataAdapter({
     // so authorize the actual browser mutation at the last possible instant.
     // This also covers mutating steps with no ledger targets of their own.
     if (contractValue.mutates && !creationWindowIsActive()) return false
+    let diagnosticStage = 'browser-operation'
     try {
       await browserCall('execute', freezeInput({
         targetOrigin: OFFICIAL_STAGING_SITE_ORIGIN,
@@ -1274,6 +1275,7 @@ export function createSebStagingBrowserDataAdapter({
         operationId: contractValue.stepId,
         payload: {},
       }))
+      diagnosticStage = 'resource-attestation'
       const attestedTargets = await attestOperation(
         contractValue,
         stepPlan.targets,
@@ -1299,6 +1301,7 @@ export function createSebStagingBrowserDataAdapter({
               boundReleaseIdentity.releaseId,
             ))) blocked()
       }
+      diagnosticStage = 'ledger-commit'
       for (let index = 0; index < stepPlan.targets.length; index += 1) {
         const targetValue = stepPlan.targets[index]
         const attestedTarget = attestedTargets[index]
@@ -1317,6 +1320,9 @@ export function createSebStagingBrowserDataAdapter({
       if (assignmentBindingCandidate) assignmentBinding = assignmentBindingCandidate
       return true
     } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging browser data step blocked (${contractValue.stepId}:${diagnosticStage})\n`)
+      }
       // Once the browser operation has started, its timeout/rejection does
       // not prove that the underlying runner has quiesced. Keep every planned
       // target uncertain. Aggregate cleanup must first close the browser
@@ -1438,14 +1444,20 @@ export function createSebStagingBrowserDataAdapter({
 
     busy = true
     let passed = false
+    let diagnosticStage = 'environment'
     try {
       currentEnvironment()
+      diagnosticStage = 'step-plan'
       const stepPlan = await resolveStepPlan(contractValue)
+      diagnosticStage = 'step-execution'
       passed = contractValue.alias === null
         ? await executeCrossAccountStep(contractValue, stepPlan)
         : await executeNormalStep(contractValue, stepPlan)
       currentEnvironment()
     } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging browser data adapter blocked (${contractValue.stepId}:${diagnosticStage})\n`)
+      }
       passed = false
     } finally {
       busy = false

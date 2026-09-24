@@ -11,6 +11,7 @@ const SYNTHETIC_EMAIL = /^[a-z0-9][a-z0-9._-]{0,63}@qa\.staging\.korkru\.com$/
 const MAX_COOKIE_COUNT = 64
 const MAX_COOKIE_NAME_LENGTH = 256
 const MAX_COOKIE_VALUE_LENGTH = 16_384
+const SUPABASE_AUTH_COOKIE = /^sb-dyuxkrzeveknqgtuzpbh-auth-token(?:\.[0-9]+)?$/
 const MIN_DEADLINE_MS = 50
 const MAX_DEADLINE_MS = 120_000
 
@@ -293,11 +294,24 @@ function validatePage(value) {
       && typeof value.locator === 'function'
       && typeof value.getByRole === 'function'
       && typeof value.waitForURL === 'function'
+      && typeof value.waitForFunction === 'function'
       && typeof value.evaluate === 'function'
       && (typeof value.isClosed !== 'function' || value.isClosed() === false)
   } catch {
     return false
   }
+}
+
+async function waitForHydratedLogin(page, signal) {
+  assertNotAborted(signal)
+  await page.waitForFunction(() => {
+    const control = document.querySelector('button[type="submit"]')
+    if (!(control instanceof HTMLButtonElement)) return false
+    return Object.keys(control).some(key => (
+      key.startsWith('__reactProps$') || key.startsWith('__reactFiber$')
+    ))
+  })
+  assertNotAborted(signal)
 }
 
 function validateResponse(response, expectedUrl = null) {
@@ -437,7 +451,7 @@ function cloneCookie(cookie) {
     || (cookie.domain !== 'staging.korkru.com' && cookie.domain !== '.staging.korkru.com')
     || typeof cookie.path !== 'string'
     || !cookie.path.startsWith('/')
-    || cookie.secure !== true) {
+    || typeof cookie.secure !== 'boolean') {
     return null
   }
 
@@ -446,6 +460,8 @@ function cloneCookie(cookie) {
     value: cookie.value,
     domain: cookie.domain,
     path: cookie.path,
+    // The deployed SSR client may omit Secure. This private snapshot is only
+    // accepted from the exact HTTPS Staging page and is upgraded before reuse.
     secure: true,
   }
   if (typeof cookie.expires === 'number' && Number.isFinite(cookie.expires)) {
@@ -461,11 +477,58 @@ function cloneCookie(cookie) {
   return Object.freeze(clone)
 }
 
+function validStagingCookieEnvelope(cookie) {
+  return isDataRecord(cookie)
+    && typeof cookie.name === 'string'
+    && cookie.name.length >= 1
+    && cookie.name.length <= MAX_COOKIE_NAME_LENGTH
+    && typeof cookie.value === 'string'
+    && cookie.value.length <= MAX_COOKIE_VALUE_LENGTH
+    && (cookie.domain === 'staging.korkru.com' || cookie.domain === '.staging.korkru.com')
+    && typeof cookie.path === 'string'
+    && cookie.path.startsWith('/')
+    && typeof cookie.secure === 'boolean'
+}
+
+function cookieSnapshotDiagnostic(cookies) {
+  if (!Array.isArray(cookies)) return 'not-array'
+  if (cookies.length < 1) return 'empty'
+  if (cookies.length > MAX_COOKIE_COUNT) return 'too-many'
+  const authCookies = cookies.filter(cookie => (
+    isDataRecord(cookie)
+    && typeof cookie.name === 'string'
+    && SUPABASE_AUTH_COOKIE.test(cookie.name)
+  ))
+  if (authCookies.length < 1) return 'auth-missing'
+  for (const cookie of authCookies) {
+    if (!validStagingCookieEnvelope(cookie)) {
+      if (typeof cookie.value !== 'string') return 'value-type'
+      if (cookie.value.length > MAX_COOKIE_VALUE_LENGTH) return 'value-size'
+      if (cookie.domain !== 'staging.korkru.com'
+        && cookie.domain !== '.staging.korkru.com') return 'domain'
+      if (typeof cookie.path !== 'string' || !cookie.path.startsWith('/')) return 'path'
+      if (typeof cookie.secure !== 'boolean') return 'secure'
+      return 'record'
+    }
+  }
+  if (authCookies.some(cookie => cookie.value.length < 1)) return 'auth-empty'
+  const identities = authCookies.map(cookie => `${cookie.name}\u0000${cookie.domain}\u0000${cookie.path}`)
+  if (new Set(identities).size !== identities.length) return 'duplicate'
+  return 'unknown'
+}
+
 function parseCookieSnapshot(cookies) {
   if (!Array.isArray(cookies) || cookies.length < 1 || cookies.length > MAX_COOKIE_COUNT) return null
+  const authCookies = cookies.filter(cookie => (
+    isDataRecord(cookie)
+    && typeof cookie.name === 'string'
+    && SUPABASE_AUTH_COOKIE.test(cookie.name)
+  ))
+  if (authCookies.length < 1) return null
+  if (authCookies.some(cookie => !validStagingCookieEnvelope(cookie))) return null
   const identities = new Set()
   const snapshot = []
-  for (const cookie of cookies) {
+  for (const cookie of authCookies) {
     const clone = cloneCookie(cookie)
     const identity = clone ? `${clone.name}\u0000${clone.domain}\u0000${clone.path}` : null
     if (!clone || identities.has(identity)) return null
@@ -822,31 +885,49 @@ export function createSebStagingBrowserSessionBroker({
   }
 
   async function attestBrowserSession(session, expectedBinding) {
-    assertSinglePage(session)
-    if (!validateExactPage(session.page)) blocked()
-    await runTrackedTask('staging-marker', deadlines.action, signal => (
-      assertStagingMarker(session.page, signal)
-    ), { resource: session.context })
-    return runTrackedTask('attestation', deadlines.attestation, async signal => {
-      assertNotAborted(signal)
-      const rawCookies = await session.context.cookies([OFFICIAL_STAGING_SITE_ORIGIN])
-      assertNotAborted(signal)
-      const cookies = parseCookieSnapshot(rawCookies)
-      if (!cookies) blocked()
-      assertNotAborted(signal)
-      const privateCookies = copyCookieSnapshot(cookies, { freeze: true })
-      assertNotAborted(signal)
-      const attestation = await attestSession(Object.freeze({
-        namespace: boundNamespace,
-        cookies: privateCookies,
-        signal,
-      }))
-      assertNotAborted(signal)
-      const sanitized = sanitizeAttestation(attestation, expectedBinding)
-      if (!sanitized) blocked()
-      currentEnvironment()
-      return sanitized
-    }, { resource: session.context })
+    let diagnosticStage = 'page'
+    try {
+      assertSinglePage(session)
+      if (!validateExactPage(session.page)) blocked()
+      diagnosticStage = 'staging-marker'
+      await runTrackedTask('staging-marker', deadlines.action, signal => (
+        assertStagingMarker(session.page, signal)
+      ), { resource: session.context })
+      diagnosticStage = 'cookies'
+      return await runTrackedTask('attestation', deadlines.attestation, async signal => {
+        assertNotAborted(signal)
+        const rawCookies = await session.context.cookies([OFFICIAL_STAGING_SITE_ORIGIN])
+        assertNotAborted(signal)
+        const cookies = parseCookieSnapshot(rawCookies)
+        if (!cookies) {
+          if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+            process.stderr.write(`SEB Staging cookie snapshot blocked (${cookieSnapshotDiagnostic(rawCookies)})\n`)
+          }
+          blocked()
+        }
+        diagnosticStage = 'private-cookies'
+        assertNotAborted(signal)
+        const privateCookies = copyCookieSnapshot(cookies, { freeze: true })
+        assertNotAborted(signal)
+        diagnosticStage = 'runtime-attestation'
+        const attestation = await attestSession(Object.freeze({
+          namespace: boundNamespace,
+          cookies: privateCookies,
+          signal,
+        }))
+        assertNotAborted(signal)
+        diagnosticStage = 'sanitize'
+        const sanitized = sanitizeAttestation(attestation, expectedBinding)
+        if (!sanitized) blocked()
+        currentEnvironment()
+        return sanitized
+      }, { resource: session.context })
+    } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging browser session attestation blocked (${diagnosticStage})\n`)
+      }
+      blocked()
+    }
   }
 
   async function reloadAndAttest(session, binding) {
@@ -865,21 +946,26 @@ export function createSebStagingBrowserSessionBroker({
     busy = true
     let session = null
     let success = false
+    let diagnosticStage = 'validation'
     const credentials = {
       email: binding.email,
       password: binding.password,
     }
     try {
+      diagnosticStage = 'environment'
       currentEnvironment()
+      diagnosticStage = 'session'
       session = existingSession(binding) ?? await createSession(binding)
       cookieSnapshots.delete(binding.alias)
       session.cookieState = 'native'
       session.replacedFrom = null
+      diagnosticStage = 'clear-cookies'
       await runTrackedTask('auth-clear-cookies', deadlines.action, async signal => {
         await session.context.clearCookies()
         assertNotAborted(signal)
       }, { resource: session.context })
 
+      diagnosticStage = 'login-navigation'
       const response = await runTrackedTask('auth-goto', deadlines.navigation, async signal => {
         const result = await session.page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' })
         assertNotAborted(signal)
@@ -889,6 +975,7 @@ export function createSebStagingBrowserSessionBroker({
         || !validateExactPage(session.page, '/login')) {
         blocked()
       }
+      diagnosticStage = 'clear-storage'
       await runTrackedTask('auth-storage-clear', deadlines.action, async signal => {
         await session.page.evaluate(() => {
           window.localStorage.clear()
@@ -896,10 +983,17 @@ export function createSebStagingBrowserSessionBroker({
         })
         assertNotAborted(signal)
       }, { resource: session.context })
+      diagnosticStage = 'staging-marker'
       await runTrackedTask('auth-staging-marker', deadlines.action, signal => (
         assertStagingMarker(session.page, signal)
       ), { resource: session.context })
 
+      diagnosticStage = 'hydration'
+      await runTrackedTask('auth-hydration', deadlines.action, signal => (
+        waitForHydratedLogin(session.page, signal)
+      ), { resource: session.context })
+
+      diagnosticStage = 'controls'
       const email = await runTrackedTask('auth-email-control', deadlines.action, signal => (
         exactVisibleLocator(session.page, '#email', 'email', signal)
       ), { resource: session.context })
@@ -914,28 +1008,36 @@ export function createSebStagingBrowserSessionBroker({
         || typeof submit.click !== 'function') {
         blocked()
       }
+      diagnosticStage = 'fill-email'
       await runTrackedTask('auth-email-fill', deadlines.action, async signal => {
         await email.fill(credentials.email)
         assertNotAborted(signal)
       }, { resource: session.context })
+      diagnosticStage = 'fill-password'
       await runTrackedTask('auth-password-fill', deadlines.action, async signal => {
         await password.fill(credentials.password)
         assertNotAborted(signal)
       }, { resource: session.context })
+      diagnosticStage = 'submit'
       await runTrackedTask('auth-submit-click', deadlines.navigation, async signal => {
         await submit.click()
         assertNotAborted(signal)
       }, { resource: session.context })
+      diagnosticStage = 'dashboard-navigation'
       await runTrackedTask('auth-wait-for-dashboard', deadlines.navigation, async signal => {
         await session.page.waitForURL(DASHBOARD_URL, { waitUntil: 'domcontentloaded' })
         assertNotAborted(signal)
       }, { resource: session.context })
       if (!validateExactPage(session.page, '/dashboard')) blocked()
 
+      diagnosticStage = 'attestation'
       const attestation = await attestBrowserSession(session, binding)
       success = true
       return attestation
     } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging browser authentication blocked (${diagnosticStage})\n`)
+      }
       blocked()
     } finally {
       credentials.email = ''

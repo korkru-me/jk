@@ -203,7 +203,12 @@ export function createSebStagingPrivateSetupMaterialCapability(options = {}) {
       assertStable()
       if (request.operationId === ASSIGNMENT_OPERATION) {
         let password
-        try { password = randomBytes(24).toString('base64url') } catch { blocked() }
+        try {
+          // Prefix every random value with one character from each class the
+          // product requires. A raw base64url value can legitimately contain
+          // no '-' or '_' and would leave the wizard's Next button disabled.
+          password = `A1a!${randomBytes(24).toString('base64url')}`
+        } catch { blocked() }
         if (password.length < 20 || password.length > 64) blocked()
         const passwordInput = request.page.locator('#create-seb-quit-password')
         const confirmationInput = request.page.locator('#create-seb-quit-confirmation')

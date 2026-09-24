@@ -231,6 +231,11 @@ class FakePage {
     }
   }
 
+  async waitForFunction(callback) {
+    expect(callback).toBeTypeOf('function')
+    return true
+  }
+
   async evaluate(callback) {
     expect(callback).toBeTypeOf('function')
   }
@@ -814,6 +819,38 @@ describe('SEB Staging browser session broker', () => {
     await expect(authenticate(harness.broker, harness.accounts[0]))
       .rejects.toBeInstanceOf(SebStagingBrowserSessionBlockedError)
     expect(harness.browser.contexts[0].closed).toBe(true)
+  })
+
+  it('ignores non-auth Staging cookies without copying them into the private auth snapshot', async () => {
+    const value = account(ACCOUNT_SPECS[0])
+    const harness = createHarness({
+      browserOptions: {
+        cookieOverride: [
+          {
+            name: 'vercel-non-auth-cookie',
+            value: '',
+            domain: 'staging.korkru.com',
+            path: '/',
+            secure: true,
+          },
+          {
+            name: 'sb-dyuxkrzeveknqgtuzpbh-auth-token',
+            value: `session:${value.alias}`,
+            domain: 'staging.korkru.com',
+            path: '/',
+            secure: false,
+          },
+        ],
+      },
+    })
+
+    await expect(authenticate(harness.broker, value)).resolves.toMatchObject({
+      authenticatedUserId: value.id,
+    })
+    expect(harness.attestSession.mock.calls[0][0].cookies).toHaveLength(1)
+    expect(harness.attestSession.mock.calls[0][0].cookies[0].name)
+      .toBe('sb-dyuxkrzeveknqgtuzpbh-auth-token')
+    expect(harness.attestSession.mock.calls[0][0].cookies[0].secure).toBe(true)
   })
 
   it('fails active operations after environment drift but still closes when writes are disabled', async () => {
