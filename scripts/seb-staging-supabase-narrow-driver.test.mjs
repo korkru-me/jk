@@ -346,6 +346,50 @@ describe('SEB Staging Supabase narrow driver', () => {
     expect(Object.isFrozen(response.rows[0])).toBe(true)
   })
 
+  it('allows only the non-secret classroom marker fields needed for exact attestation', async () => {
+    const marker = 'SEB S5 seb-s5-narrow-driver-1 aaaaaaaaaaaaaaaaaaaaaaaa'
+    const row = {
+      id: uuid(9),
+      teacher_id: IDS.teacher,
+      org_id: IDS.organization,
+      classroom_type: 'subject',
+      name: marker,
+      description: `Synthetic-only SEB Staging fixture ${marker}`,
+      created_at: CREATED_AT,
+    }
+    const fetchImplementation = vi.fn(async url => {
+      const parsed = new URL(url)
+      expect(parsed.pathname).toBe('/rest/v1/classrooms')
+      expect(parsed.searchParams.get('select')).toBe(
+        'id,teacher_id,org_id,classroom_type,name,description,created_at',
+      )
+      expect(parsed.searchParams.get('name')).toBe(`eq.${marker}`)
+      return jsonResponse([row])
+    })
+    const driver = await createSebStagingSupabaseNarrowDriver(
+      createHarness({ fetchImplementation }).options,
+    )
+
+    await expect(driver.enumerateDatabase({
+      schemaVersion: 1,
+      operationId: 'attest:create-subject-classroom',
+      table: 'classrooms',
+      columns: [
+        'id', 'teacher_id', 'org_id', 'classroom_type', 'name', 'description',
+        'created_at',
+      ],
+      predicates: [
+        { column: 'teacher_id', operator: 'eq', value: IDS.teacher },
+        { column: 'org_id', operator: 'eq', value: IDS.organization },
+        { column: 'classroom_type', operator: 'eq', value: 'subject' },
+        { column: 'name', operator: 'eq', value: marker },
+        { column: 'created_at', operator: 'gte', value: IDENTITY.creationWindow.notBefore },
+        { column: 'created_at', operator: 'lte', value: IDENTITY.creationWindow.notAfter },
+      ],
+      limit: 2,
+    }, options())).resolves.toEqual({ rows: [row] })
+  })
+
   it('normalizes only safe numeric bigint values and rejects precision loss', async () => {
     for (const id of [42, Number.MAX_SAFE_INTEGER + 1]) {
       const fetchImplementation = vi.fn(async () => jsonResponse([eventRow({ id })]))

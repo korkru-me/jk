@@ -244,7 +244,9 @@ sanitize error และคง unresolved cleanup obligation แบบมี dea
 บังคับ selector ตามหน้าจริง และจะรายงาน abort ผ่านต่อเมื่อ private data boundary ยืนยัน reconciliation แล้ว
 ประกอบ provider → operation runtime → isolated browser runtime → browser/data adapter เป็น closure เดียวแล้ว
 โดย public surface เหลือเฉพาะ `executeStep` และ cleanup ไล่จาก browser edge เข้าหา private boundary แบบ retryable
-ชุด S5 ผ่าน 20 files / 537 tests, ทั้งโครงการผ่าน 159 files / 2,268 tests และ
+เพิ่ม service-role classroom data boundary ที่อ่าน owner/organization จาก committed private ledger,
+query เฉพาะ safe marker fields และยอมรับ exact candidate ได้ไม่เกินหนึ่งรายการก่อน attest/abort
+ชุด S5 ผ่าน 21 files / 545 tests, ทั้งโครงการผ่าน 160 files / 2,276 tests และ
 TypeScript/syntax/runtime checks ผ่าน
 
 ยังไม่อนุญาต live mock จนกว่าจะขยาย concrete private ticket/selector provider จากขั้นสร้างห้องเรียน

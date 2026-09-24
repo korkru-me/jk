@@ -83,7 +83,10 @@ const TABLES = Object.freeze(new Map([
     [], 'rpc', ['id'],
   )],
   ['classrooms', tableProfile(
-    ['id', 'teacher_id', 'org_id', 'classroom_type', 'created_at'], [], 'rpc', ['id'],
+    [
+      'id', 'teacher_id', 'org_id', 'classroom_type', 'name', 'description',
+      'created_at',
+    ], [], 'rpc', ['id'],
   )],
   ['questions', tableProfile(
     ['id', 'created_by', 'org_id', 'question_type', 'created_at'],
