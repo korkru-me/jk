@@ -120,6 +120,14 @@ if (-not $ConfigTool) {
     -Filter 'SebWindowsConfig.exe' -File -Recurse -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty FullName
 }
+if (-not $ConfigTool) {
+  Write-Host 'SEB_S5_NATIVE_STAGE:config-tool-not-found'
+  Get-ChildItem -Path $ExtractRoot -File -Recurse -ErrorAction SilentlyContinue |
+    Select-Object -First 80 -ExpandProperty FullName |
+    ForEach-Object {
+      Write-Host ('SEB_S5_NATIVE_PACKAGE_FILE:' + [IO.Path]::GetFileName($_))
+    }
+}
 Assert-Input (-not [string]::IsNullOrWhiteSpace($ConfigTool))
 
 Write-Host 'SEB_S5_NATIVE_STAGE:compile-key-reader'
