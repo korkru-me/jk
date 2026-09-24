@@ -7,6 +7,8 @@ $UuidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 $Sha256Pattern = '^[0-9a-f]{64}$'
 $RequestPattern = '^seb-s5-native-[a-z0-9]{12,48}$'
 
+Write-Host 'SEB_S5_NATIVE_STAGE:reader-trace-v1'
+
 function Assert-Input {
   param([bool]$Condition)
   if (-not $Condition) { throw 'SEB_S5_NATIVE_INPUT_INVALID' }
