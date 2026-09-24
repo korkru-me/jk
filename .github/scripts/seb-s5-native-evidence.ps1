@@ -95,21 +95,28 @@ $SeedPath = Join-Path $Root 'assignment.seb'
 [Array]::Clear($SeedBytes, 0, $SeedBytes.Length)
 
 $InstallerPath = Join-Path $Root 'seb-x64.msi'
+Write-Host 'SEB_S5_NATIVE_STAGE:download-pinned-package'
 Invoke-WebRequest -Uri $InstallerUrl -OutFile $InstallerPath -UseBasicParsing
 $InstallerHash = (Get-FileHash -Path $InstallerPath -Algorithm SHA256).Hash.ToLowerInvariant()
 Assert-Input ($InstallerHash -eq $ExpectedInstallerSha256)
-$Install = Start-Process msiexec.exe -ArgumentList @(
-  '/i', ('"{0}"' -f $InstallerPath), '/qn', '/norestart'
+Write-Host 'SEB_S5_NATIVE_STAGE:extract-pinned-package'
+$ExtractRoot = Join-Path $Root 'application'
+$Extract = Start-Process msiexec.exe -ArgumentList @(
+  '/a', ('"{0}"' -f $InstallerPath), '/qn', '/norestart',
+  ('TARGETDIR="{0}"' -f $ExtractRoot)
 ) -Wait -PassThru
-Assert-Input ($Install.ExitCode -eq 0 -or $Install.ExitCode -eq 3010)
+if ($Extract.ExitCode -ne 0 -and $Extract.ExitCode -ne 3010) {
+  throw "SEB_S5_NATIVE_EXTRACT_FAILED_$($Extract.ExitCode)"
+}
 
 $Candidates = @(
-  (Join-Path $env:ProgramFiles 'SafeExamBrowser\Application\SebWindowsConfig.exe'),
-  (Join-Path ${env:ProgramFiles(x86)} 'SafeExamBrowser\Application\SebWindowsConfig.exe')
+  (Join-Path $ExtractRoot 'SafeExamBrowser\Application\SebWindowsConfig.exe'),
+  (Join-Path $ExtractRoot 'Program Files\SafeExamBrowser\Application\SebWindowsConfig.exe'),
+  (Join-Path $ExtractRoot 'Program Files (x86)\SafeExamBrowser\Application\SebWindowsConfig.exe')
 )
 $ConfigTool = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $ConfigTool) {
-  $ConfigTool = Get-ChildItem -Path $env:ProgramFiles, ${env:ProgramFiles(x86)} `
+  $ConfigTool = Get-ChildItem -Path $ExtractRoot `
     -Filter 'SebWindowsConfig.exe' -File -Recurse -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty FullName
 }
