@@ -79,17 +79,20 @@ function tableProfile(select, predicates, deleteMode = 'none', deleteIdentity = 
 // particular, the three SEB secret-derived columns are deliberately absent.
 const TABLES = Object.freeze(new Map([
   ['assignments', tableProfile(
-    ['id', 'classroom_id', 'created_by', 'org_id', 'type', 'secure_browser_mode', 'question_ids', 'created_at'],
+    [
+      'id', 'classroom_id', 'created_by', 'org_id', 'type', 'status', 'title',
+      'description', 'secure_browser_mode', 'question_ids', 'created_at',
+    ],
     [], 'rpc', ['id'],
   )],
   ['classrooms', tableProfile(
     [
       'id', 'teacher_id', 'org_id', 'classroom_type', 'name', 'description',
-      'created_at',
+      'class_code', 'created_at',
     ], [], 'rpc', ['id'],
   )],
   ['questions', tableProfile(
-    ['id', 'created_by', 'org_id', 'question_type', 'created_at'],
+    ['id', 'created_by', 'org_id', 'question_type', 'title', 'question_text', 'created_at'],
     ['parent_question_id'], 'rpc', ['id'],
   )],
   ['classroom_students', tableProfile(
@@ -116,7 +119,8 @@ const TABLES = Object.freeze(new Map([
   ['submissions', tableProfile(
     [
       'id', 'assignment_id', 'student_id', 'org_id', 'secure_browser_verified_at',
-      'secure_browser_platform', 'seb_config_revision', 'created_at',
+      'secure_browser_platform', 'seb_config_revision', 'status', 'submitted_at',
+      'created_at',
     ],
     [], 'rpc', ['id'],
   )],

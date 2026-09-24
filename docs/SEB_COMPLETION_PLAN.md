@@ -251,9 +251,13 @@ query เฉพาะ safe marker fields และยอมรับ exact candi
 ชุด S5 ผ่าน 22 files / 548 tests, ทั้งโครงการผ่าน 161 files / 2,279 tests และ
 TypeScript/syntax/runtime checks ผ่าน
 
-ยังไม่อนุญาต live mock จนกว่าจะขยาย concrete private ticket/selector provider จากขั้นสร้างห้องเรียน
-ให้ครบ operation ที่เหลือและนำ browser-data facade ที่ประกอบแล้วต่อเข้ากับ live runner โดยไม่เปิด Page, credential หรือ
-service-role client ออกจาก private closure นอกจากนี้ยังขาด
+อัปเดต 24 กันยายน 2026 รอบล่าสุด: concrete private ticket/selector provider และ service-role attestation
+ขยายครบ teacher setup กับ student browser journey แล้ว รวม system check, attempt/revision, autosave/retry/resume,
+in-memory PDF upload, heartbeat, submit/result และ denial ข้ามบัญชี โดยไม่เปิด Page, credential, fixture bytes,
+รหัสออกหรือ service-role client ออกจาก private closure ชุดทั้งโครงการผ่าน 162 files / 2,295 tests,
+TypeScript และ webpack production build 64 routes ผ่าน
+
+ยังไม่อนุญาต live mock จนกว่าจะนำ browser-data facade ที่ประกอบแล้วต่อเข้ากับ live runner และเติม
 native/expiry capabilities, final `.seb` + CK/BEK จาก Windows,
 automation bypass แบบ server-only และ authenticated durable evidence จาก source/deployment/config เดียวกัน
 จึงยังเป็น **NOT READY**, ห้ามเริ่ม S6 และ Production ไม่เปลี่ยน

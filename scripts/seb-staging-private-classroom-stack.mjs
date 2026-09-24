@@ -1,5 +1,6 @@
 import { createSebStagingPrivateBrowserDataStack } from './seb-staging-private-browser-data-stack.mjs'
 import { createSebStagingPrivateClassroomDataBoundary } from './seb-staging-private-classroom-data-boundary.mjs'
+import { createSebStagingPrivateSetupMaterialCapability } from './seb-staging-private-setup-material-capability.mjs'
 import { createSebStagingSupabaseNarrowDriver } from './seb-staging-supabase-narrow-driver.mjs'
 
 const BLOCKED_MESSAGE = 'SEB Staging private classroom stack blocked'
@@ -58,18 +59,9 @@ function hasOnlyFields(value, required, optional) {
     && Object.keys(value).every(field => allowed.has(field))
 }
 
-function createNoMaterialCapability() {
-  const unexpected = async () => blocked()
-  return Object.freeze({
-    applySecretInputs: unexpected,
-    applySyntheticUpload: unexpected,
-    closeAll: async () => Object.freeze({ status: 'passed' }),
-  })
-}
-
 /**
- * Create the first end-to-end private browser-data slice. The dedicated raw
- * Supabase driver and its service-role credential stay inside this async
+ * Create the private setup browser-data slice. Dedicated raw Supabase drivers
+ * and their service-role credentials stay inside this async
  * factory; callers receive only the same redacted executeStep/closeAll stack
  * used by the composite live runner.
  */
@@ -77,7 +69,9 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
   if (!hasOnlyFields(options, REQUIRED_OPTIONS, OPTIONAL_OPTIONS)) blocked()
   const namespace = `qa:${options.runIdentity?.runId ?? ''}`
   let driver = null
+  let materialDriver = null
   let boundary = null
+  let materialCapability = null
   try {
     driver = await createSebStagingSupabaseNarrowDriver({
       readEnvironment: options.readEnvironment,
@@ -97,12 +91,30 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
       privateRunLedger: options.privateRunLedger,
       supabaseDriver: driver,
     })
+    materialDriver = await createSebStagingSupabaseNarrowDriver({
+      readEnvironment: options.readEnvironment,
+      namespace,
+      serviceRoleCredentialProvider: options.serviceRoleCredentialProvider,
+      ...(options.fetchImplementation === undefined
+        ? {}
+        : { fetchImplementation: options.fetchImplementation }),
+      ...(options.boundaryTimeoutMs === undefined
+        ? {}
+        : { boundaryTimeoutMs: options.boundaryTimeoutMs }),
+    })
+    materialCapability = createSebStagingPrivateSetupMaterialCapability({
+      namespace,
+      identity: options.runIdentity,
+      readEnvironment: options.readEnvironment,
+      privateRunLedger: options.privateRunLedger,
+      supabaseDriver: materialDriver,
+    })
     return createSebStagingPrivateBrowserDataStack({
       runIdentity: options.runIdentity,
       readEnvironment: options.readEnvironment,
       privateRunLedger: options.privateRunLedger,
       privateDataBoundary: boundary,
-      privateMaterialCapability: createNoMaterialCapability(),
+      privateMaterialCapability: materialCapability,
       clock: options.clock,
       secretProvider: options.secretProvider,
       userScopedReadProbe: options.userScopedReadProbe,
@@ -127,6 +139,13 @@ export async function createSebStagingPrivateClassroomStack(options = {}) {
         : { brokerDeadlinesMs: options.brokerDeadlinesMs }),
     })
   } catch {
+    if (materialCapability) {
+      try { await materialCapability.closeAll() } catch { /* redacted */ }
+    } else if (materialDriver) {
+      try {
+        await materialDriver.close(Object.freeze({ signal: new AbortController().signal }))
+      } catch { /* redacted */ }
+    }
     if (boundary) {
       try { await boundary.closeAll() } catch { /* redacted */ }
     } else if (driver) {

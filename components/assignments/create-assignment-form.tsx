@@ -1250,6 +1250,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   </div>
                 </div>
                 <input
+                  id="create-seb-required"
                   type="checkbox"
                   checked={secureBrowserMode === 'seb_required'}
                   onChange={event => {
