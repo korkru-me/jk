@@ -73,7 +73,7 @@ internal static class SebS5NativeKeyReader
         Console.Error.WriteLine("SEB_S5_NATIVE_READER_STAGE:read-config");
         if (!SebWindowsConfig.SEBSettings.ReadSebConfigurationFile(
             inputPath,
-            true,
+            false,
             ref filePassword,
             ref passwordIsHash,
             ref certificate
