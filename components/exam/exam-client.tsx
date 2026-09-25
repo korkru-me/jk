@@ -40,7 +40,8 @@ import {
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { SolutionFiles } from '@/components/questions/solution-files'
-import { containsMath, renderMathInHtml } from '@/lib/math/latex'
+import { containsMath } from '@/lib/math/latex'
+import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
@@ -3675,7 +3676,7 @@ function interpolateValues(text: string, values: Record<string, number>, variabl
 
 function UnitDisplay({ html }: { html: string }) {
   return /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
-    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
+    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(html) }} />
     : <span className="text-sm text-muted-foreground">{html}</span>
 }
 
@@ -3685,7 +3686,7 @@ function QuestionText({ text }: { text: string }) {
     return (
       <div
         className="leading-relaxed rich-text-content text-base [&_math]:my-1 [&_math]:inline-block"
-        dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }}
+        dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }}
       />
     )
   }

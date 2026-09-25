@@ -14,7 +14,8 @@ import { IMAGE_LABEL_PREFIX, parseImageLabelAnswer, parseImageLabelKey } from '@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
-import { containsMath, renderMathInHtml } from '@/lib/math/latex'
+import { containsMath } from '@/lib/math/latex'
+import { renderRichTextHtml } from '@/lib/rich-text-html'
 
 export interface SubmittedRow {
   id: string
@@ -748,7 +749,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
 function QuestionText({ text }: { text: string }) {
   const isHtml = /<[a-z][\s\S]*>/i.test(text) || containsMath(text)
   if (isHtml) {
-    return <div className="rich-text-content text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
+    return <div className="rich-text-content text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }} />
   }
   return <p className="whitespace-pre-line text-sm text-muted-foreground">{text}</p>
 }

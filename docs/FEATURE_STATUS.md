@@ -92,6 +92,7 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 ### คลังโจทย์ — มีโค้ดรองรับ
 
 - มี create/edit/list/preview/delete, tags, categories, visibility และ sharing
+- **HTML ของครูถูกตัดเหลือเฉพาะสิ่งที่ editor เขียนก่อนแสดงทุกจุด (25 กันยายน 2026)** — เดิมโจทย์/เฉลย/ตัวเลือกที่เก็บไว้เข้า `dangerouslySetInnerHTML` ตรง ๆ ครูที่ส่ง `<img src=x onerror=…>` เข้า Server Action หรือเขียนแถวเองผ่าน RLS จึงรันสคริปต์ในเบราว์เซอร์ของนักเรียนทุกคนบนหน้าข้อสอบ ตอนนี้ `RichText` และทุกจุดที่เคยเรียก `renderMathInHtml` ตรง ๆ ผ่าน `renderRichTextHtml` (`lib/rich-text-html.ts`; allow-list เขียนเองใน `lib/rich-text-sanitize.ts` ไม่ใช้ jsdom) และ `lib/text-blank.ts` parse ใน document แยกที่ไม่โหลดรูป · `question_text`/`solution_text` ถูก sanitize ตอนบันทึกด้วย · รูปในข้อความรับเฉพาะ bucket `question-images` ของโปรเจกต์นี้ (และ `blob:` ใน development build สำหรับ QA lab) · เพิ่ม JS ของ `/assignments/[id]/take` 811,527 → 816,530 bytes raw / 249,035 → 251,225 bytes gzip (17 chunks เท่าเดิม ต่ำกว่า gate 256,828) · กติกาเต็มอยู่ใน `docs/SECURITY.md` หัวข้อ "HTML ที่ครูเขียน"
 - **ประเภทโจทย์ใหม่ "ตารางจำแนก" (`classify`) วันที่ 12 กันยายน 2026** — ใบงานตารางหนึ่งใบเป็นโจทย์หนึ่งข้อ
   แถวคือสิ่งที่ให้จำแนก (มีรูปประกอบต่อแถวได้) คอลัมน์คือมิติการจำแนก แต่ละช่องนักเรียนเลือก 1 ตัวเลือก ·
   รายละเอียดการตัดสินใจ กติกา และข้อจำกัดอยู่ที่ `docs/CLASSIFY_QUESTION_TYPE.md`
@@ -370,6 +371,7 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 - โจทย์ `random` ของ Moodle เป็น placeholder ระดับ quiz ไม่ใช่โจทย์ จึงถูกข้าม
 - `varsglobal` ของ Moodle ที่เป็นค่าคงที่แปลงเป็นตัวแปรคงที่ ที่คำนวณต่อจากตัวแปรสุ่มแปลงเป็น `Variable.formula`
 - หมวดหมู่ของ Moodle ไม่ถูกสร้างโดยการนำเข้า ต้องให้ admin วางรายการที่ `/admin/categories` ก่อน (ดู `bulkCreateCategories`)
+- HTML ของ Moodle เก็บลงฐานตามต้นฉบับ แต่ตอนแสดงผ่าน allow-list ของ rich text (25 กันยายน 2026): สี ขนาดตัวอักษร และ attribute ทั้งหมดหาย ส่วน `div` ตาราง และหัวข้อเหลือเป็นข้อความทีละบรรทัด (เซลล์คั่นด้วยช่องว่าง) — ยังไม่ได้ตรวจว่าในฐานจริงมีโจทย์จาก Moodle ที่ใช้ตารางอยู่กี่ข้อ ถ้ามีและต้องการให้เป็นตาราง ต้องเพิ่ม `table/tr/td` ใน allow-list ของ `lib/rich-text-sanitize.ts`
 
 ### โจทย์สุ่มตัวเลข — มีโค้ดรองรับ
 

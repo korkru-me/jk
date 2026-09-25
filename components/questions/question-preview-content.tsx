@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { gradeValue, naturalMaxScore } from '@/lib/assignment-attempt'
-import { containsMath, renderMathInHtml } from '@/lib/math/latex'
+import { containsMath } from '@/lib/math/latex'
+import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { RichText } from '@/components/ui/rich-text'
 import { Button } from '@/components/ui/button'
 import { WorkImageUpload } from '@/components/exam/work-image-upload'
@@ -80,7 +81,7 @@ function substituteVars(text: string, values: Record<string, number>) {
 }
 
 function renderUnit(unit: string) {
-  if (isHtml(unit)) return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(unit) }} />
+  if (isHtml(unit)) return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(unit) }} />
   return <span>{unit}</span>
 }
 
@@ -98,7 +99,7 @@ function RenderText({ text }: { text: string }) {
   if (!text) return <p className="text-muted-foreground italic text-[15px]">ยังไม่มีเนื้อหาโจทย์</p>
   if (isHtml(text)) return (
     <div className="text-foreground leading-relaxed text-[15px] rich-text-content"
-      dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
+      dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }} />
   )
   return <p className="text-foreground leading-relaxed whitespace-pre-line text-[15px]">{text}</p>
 }
