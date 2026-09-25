@@ -4,7 +4,6 @@ import {
   CaptureUpdateAction,
   convertToExcalidrawElements,
   FONT_FAMILY,
-  viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type {
@@ -17,26 +16,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronUp,
   ImagePlus,
-  LibraryBig,
   Loader2,
-  PackagePlus,
   PenLine,
   RotateCcw,
   Save,
-  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { NativeSelect } from '@/components/ui/native-select'
 import { DrawingBoardCore } from '@/components/drawing-board/drawing-board-core'
 import { TeacherDrawingToolbar } from '@/components/drawing-board/drawing-board-toolbar'
+import { SessionLibraryBar } from '@/components/drawing-board/session-library-bar'
 import type {
   DrawingBoardCommandState,
   DrawingBoardController,
 } from '@/components/drawing-board/drawing-board-controller'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
+  BOARD_SHEET_HEIGHT,
+  BOARD_SHEET_WIDTH,
   createDrawingPreview,
   DRAWING_DEFAULT_ITEM_STATE,
   drawingBackgroundStyle,
@@ -77,12 +75,7 @@ import {
   type TeachingBoardTarget,
 } from '@/lib/teaching-board-draft-state'
 import { scratchpadHasMeaningfulDraft } from '@/lib/scratchpad-state'
-import {
-  createDrawingBoardSessionLibraryItem,
-  insertDrawingBoardSessionLibraryItem,
-  MAX_DRAWING_SESSION_LIBRARY_ITEMS,
-  type DrawingBoardSessionLibraryItem,
-} from '@/lib/drawing-board-session-library'
+import type { DrawingBoardSessionLibraryItem } from '@/lib/drawing-board-session-library'
 
 interface Props {
   assignmentId: string
@@ -147,17 +140,6 @@ interface Props {
   /** Given when the board can be folded away to its heading. */
   onHide?: () => void
 }
-
-/**
- * The sheet the board writes on, in scene units.
- *
- * Excalidraw's canvas is endless, which on a blank board reads as "nothing is
- * happening" while panning and makes it easy to end up lost in white space.
- * A sheet of a fixed size is something to aim at: it moves and scales with the
- * scene, and the scroll wheel hands the page back once its edge is reached.
- */
-const PAGE_WIDTH = 1600
-const PAGE_HEIGHT = 1100
 
 function contentSignature(elements: readonly OrderedExcalidrawElement[]): string {
   return elements.map(element => `${element.id}:${element.version}:${element.isDeleted ? 1 : 0}`).join('|')
@@ -228,7 +210,6 @@ export default function TeachingBoardEditor({
   const sceneMutationEpochRef = useRef(0)
   const savingRef = useRef(false)
   const releasePersistenceOnReadyRef = useRef(false)
-  const pendingLibrarySelectionRef = useRef<Set<string> | null>(null)
   const sceneRef = useRef<ScratchpadScene>(safeInitialScene)
   const contentSignatureRef = useRef(
     contentSignature(safeInitialScene.elements as readonly OrderedExcalidrawElement[]),
@@ -290,15 +271,7 @@ export default function TeachingBoardEditor({
   const [policyReadOnlyMessage, setPolicyReadOnlyMessage] = useState<string | null>(initialPolicyMessage)
   const [editorScene, setEditorScene] = useState<ScratchpadScene>(safeInitialScene)
   const [editorRevision, setEditorRevision] = useState(0)
-  const [selectedLibraryItemId, setSelectedLibraryItemId] = useState('')
   const [confirm, confirmDialog] = useConfirm()
-
-  useEffect(() => {
-    if (
-      selectedLibraryItemId
-      && !sessionLibraryItems.some(item => item.id === selectedLibraryItemId)
-    ) setSelectedLibraryItemId(sessionLibraryItems.at(-1)?.id ?? '')
-  }, [selectedLibraryItemId, sessionLibraryItems])
 
   useEffect(() => {
     mountedRef.current = true
@@ -600,13 +573,13 @@ export default function TeachingBoardEditor({
       const state = api.getAppState()
       const box = surfaceRef.current?.getBoundingClientRect()
       const zoom = state.zoom.value
-      const viewWidth = (box?.width ?? PAGE_WIDTH) / zoom
-      const viewHeight = (box?.height ?? PAGE_HEIGHT) / zoom
+      const viewWidth = (box?.width ?? BOARD_SHEET_WIDTH) / zoom
+      const viewHeight = (box?.height ?? BOARD_SHEET_HEIGHT) / zoom
       const fit = Math.min(
         1,
         (viewWidth * 0.7) / prepared.width,
         (viewHeight * 0.7) / prepared.height,
-        (PAGE_WIDTH * 0.8) / prepared.width,
+        (BOARD_SHEET_WIDTH * 0.8) / prepared.width,
       )
       const width = Math.round(prepared.width * fit)
       const height = Math.round(prepared.height * fit)
@@ -663,11 +636,11 @@ export default function TeachingBoardEditor({
     const api = apiRef.current
     const box = surfaceRef.current?.getBoundingClientRect()
     if (!api || !box || box.width === 0) return
-    const zoom = Math.min(box.width / (PAGE_WIDTH + 80), box.height / (PAGE_HEIGHT + 80))
+    const zoom = Math.min(box.width / (BOARD_SHEET_WIDTH + 80), box.height / (BOARD_SHEET_HEIGHT + 80))
     api.updateScene({
       appState: {
-        scrollX: box.width / (2 * zoom) - PAGE_WIDTH / 2,
-        scrollY: box.height / (2 * zoom) - PAGE_HEIGHT / 2,
+        scrollX: box.width / (2 * zoom) - BOARD_SHEET_WIDTH / 2,
+        scrollY: box.height / (2 * zoom) - BOARD_SHEET_HEIGHT / 2,
         zoom: { value: zoom as AppState['zoom']['value'] },
       },
     })
@@ -873,88 +846,6 @@ export default function TeachingBoardEditor({
     resetCanvas(Boolean(board))
   }
 
-  const storeSelectionInSessionLibrary = () => {
-    const api = apiRef.current
-    if (!api || !editable || presentationLocked) return
-    const selectedElementIds = pendingLibrarySelectionRef.current ?? new Set(
-      Object.entries(api.getAppState().selectedElementIds)
-        .filter(([, selected]) => selected)
-        .map(([elementId]) => elementId),
-    )
-    pendingLibrarySelectionRef.current = null
-    const nextNumber = sessionLibraryItems.length + 1
-    const result = createDrawingBoardSessionLibraryItem({
-      scene: snapshotDrawingScene(sceneRef.current),
-      selectedElementIds,
-      id: crypto.randomUUID(),
-      label: `รายการ ${nextNumber}`,
-    })
-    if (!result.ok) {
-      const message = result.reason === 'empty-selection'
-        ? 'เลือกเส้น รูปทรง หรือข้อความก่อนเก็บในคลังชั่วคราว'
-        : result.reason === 'unsupported-selection'
-          ? 'คลังชั่วคราวเก็บได้เฉพาะเส้น รูปทรง และข้อความ ไม่รวมรูปหรือกรอบ'
-          : result.reason === 'too-many-elements' || result.reason === 'too-large'
-            ? 'ส่วนที่เลือกมีขนาดใหญ่เกินไป กรุณาเลือกให้น้อยลง'
-            : 'ส่วนที่เลือกมีข้อมูลที่คลังชั่วคราวไม่รองรับ'
-      toast.error(message)
-      return
-    }
-    const evicted = sessionLibraryItems.length >= MAX_DRAWING_SESSION_LIBRARY_ITEMS
-    onSessionLibraryItemAdd(result.item)
-    setSelectedLibraryItemId(result.item.id)
-    toast.success(evicted
-      ? 'เก็บในคลังชั่วคราวแล้ว และนำรายการเก่าสุดออก'
-      : 'เก็บส่วนที่เลือกในคลังชั่วคราวแล้ว')
-  }
-
-  const insertSessionLibraryItem = () => {
-    const api = apiRef.current
-    const surface = surfaceRef.current
-    const item = sessionLibraryItems.find(value => value.id === selectedLibraryItemId)
-    if (!api || !surface || !item || !editable || presentationLocked) return
-    const rect = surface.getBoundingClientRect()
-    const center = viewportCoordsToSceneCoords({
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-    }, api.getAppState())
-    const inserted = insertDrawingBoardSessionLibraryItem({ item, center })
-    if (!inserted.ok) {
-      toast.error('รายการนี้ผ่านการตรวจสอบไม่สำเร็จ จึงยังไม่ถูกวางลงกระดาน')
-      return
-    }
-    const elements = [
-      ...api.getSceneElementsIncludingDeleted(),
-      ...inserted.elements,
-    ]
-    const candidate: ScratchpadScene = {
-      ...snapshotDrawingScene(sceneRef.current),
-      elements,
-    }
-    const validation = validateDrawingScene(candidate, {
-      role: 'teacher',
-      verifyTeacherImage: ({ claim }) => claim ? 'valid' : 'invalid',
-      legacyTeacherImages: legacyTeacherImagesRef.current,
-    })
-    if (!validation.ok) {
-      toast.error('วางรายการนี้ไม่ได้ เพราะกระดานจะเกินขีดจำกัดหรือมีข้อมูลไม่รองรับ')
-      return
-    }
-    const selectedElementIds = Object.fromEntries(
-      inserted.elements.flatMap(value => {
-        if (!value || typeof value !== 'object' || Array.isArray(value)) return []
-        const elementId = (value as Record<string, unknown>).id
-        return typeof elementId === 'string' ? [[elementId, true] as const] : []
-      }),
-    )
-    api.updateScene({
-      elements: validation.scene.elements as readonly OrderedExcalidrawElement[],
-      appState: { selectedElementIds },
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-    })
-    toast.success(`วาง ${item.label} ลงกระดานแล้ว`)
-  }
-
   return (
     <>
       <Card role="region" aria-label="กระดานสอน" className="flex h-[70dvh] min-h-[560px] min-w-0 max-w-full flex-col overflow-hidden lg:h-full">
@@ -1034,78 +925,17 @@ export default function TeachingBoardEditor({
         )}
 
         {canManage && (
-          <div
-            role="group"
-            aria-label="คลังชั่วคราวของกระดานสอน"
-            className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-muted/30 px-3 py-1.5"
-          >
-            <LibraryBig className="size-4 shrink-0 text-primary" aria-hidden="true" />
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              className="shrink-0"
-              disabled={!editable || presentationLocked || duplicating || insertingImage}
-              onPointerDown={() => {
-                const api = apiRef.current
-                if (!api) return
-                pendingLibrarySelectionRef.current = new Set(
-                  Object.entries(api.getAppState().selectedElementIds)
-                    .filter(([, selected]) => selected)
-                    .map(([elementId]) => elementId),
-                )
-              }}
-              onPointerUp={() => {
-                // A click follows pointerup in the same browser task. Clear a
-                // capture that did not become a click before a later keyboard
-                // activation can accidentally reuse the stale selection.
-                window.setTimeout(() => { pendingLibrarySelectionRef.current = null }, 0)
-              }}
-              onPointerCancel={() => { pendingLibrarySelectionRef.current = null }}
-              onClick={storeSelectionInSessionLibrary}
-            >
-              <PackagePlus data-icon="inline-start" /> เก็บส่วนที่เลือก
-            </Button>
-            <NativeSelect
-              aria-label="รายการในคลังชั่วคราว"
-              className="h-8 w-36 shrink-0 text-xs"
-              value={selectedLibraryItemId}
-              disabled={sessionLibraryItems.length === 0}
-              onChange={event => setSelectedLibraryItemId(event.target.value)}
-            >
-              <option value="">{sessionLibraryItems.length === 0 ? 'คลังยังว่าง' : 'เลือกจากคลัง'}</option>
-              {sessionLibraryItems.map(item => (
-                <option key={item.id} value={item.id}>{item.label}</option>
-              ))}
-            </NativeSelect>
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              className="shrink-0"
-              disabled={!selectedLibraryItemId || !editable || presentationLocked || duplicating || insertingImage}
-              onClick={insertSessionLibraryItem}
-            >
-              วางลงกระดาน
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="shrink-0"
-              disabled={!selectedLibraryItemId}
-              aria-label="ลบรายการที่เลือกจากคลังชั่วคราว"
-              onClick={() => {
-                if (!selectedLibraryItemId) return
-                onSessionLibraryItemRemove(selectedLibraryItemId)
-              }}
-            >
-              <Trash2 />
-            </Button>
-            <span className="shrink-0 text-[10px] text-muted-foreground">
-              อยู่เฉพาะหน้านี้ · {sessionLibraryItems.length}/{MAX_DRAWING_SESSION_LIBRARY_ITEMS}
-            </span>
-          </div>
+          <SessionLibraryBar
+            label="คลังชั่วคราวของกระดานสอน"
+            items={sessionLibraryItems}
+            disabled={!editable || presentationLocked || duplicating || insertingImage}
+            getApi={() => apiRef.current}
+            getScene={() => sceneRef.current}
+            getSurface={() => surfaceRef.current}
+            getLegacyTeacherImages={() => legacyTeacherImagesRef.current}
+            onAdd={onSessionLibraryItemAdd}
+            onRemove={onSessionLibraryItemRemove}
+          />
         )}
 
         <TeacherDrawingToolbar
@@ -1175,7 +1005,7 @@ export default function TeachingBoardEditor({
             ref={paperRef}
             aria-hidden="true"
             className="pointer-events-none absolute left-0 top-0 origin-top-left rounded-md shadow-sm ring-1 ring-border"
-            style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT, ...drawingBackgroundStyle(background) }}
+            style={{ width: BOARD_SHEET_WIDTH, height: BOARD_SHEET_HEIGHT, ...drawingBackgroundStyle(background) }}
           />
           {(loading || operationPending) && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-overlay/20 backdrop-blur-[1px]">

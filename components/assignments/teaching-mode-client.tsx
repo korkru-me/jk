@@ -37,6 +37,7 @@ import {
 import { NativeSelect } from '@/components/ui/native-select'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { RichText } from '@/components/ui/rich-text'
+import { SolutionFiles } from '@/components/questions/solution-files'
 import type { Question } from '@/lib/types'
 import {
   isTeachingBoardSlot,
@@ -328,14 +329,7 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
             </div>
           )}
           {renderedSolution && <div className="text-sm leading-relaxed"><RichText text={renderedSolution} /></div>}
-          {(question.solution_image_urls ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {(question.solution_image_urls ?? []).map(url => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={url} src={url} alt="รูปเฉลย" className="max-h-44 rounded-xl border object-contain" />
-              ))}
-            </div>
-          )}
+          <SolutionFiles urls={question.solution_image_urls} imageClassName="max-h-44 rounded-xl border object-contain" />
         </Card>
       )}
     </div>

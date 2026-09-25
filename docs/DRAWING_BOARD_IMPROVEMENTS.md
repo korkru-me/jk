@@ -333,6 +333,7 @@ Teacher persistence: per-question memory draft ── explicit save ── priva
 - scene envelope `{ formatVersion: 1, elements, appState, files, background }`
 - IndexedDB database `korkru-math-work`, store `scratchpads` และ key `[ownerId, submissionId, answerId, localPartKey]`
 - debounce 650 ms, pointer-up save 120 ms, TTL 7 วัน, เพดาน 2 MiB/10,000 elements และ best-effort purge หลัง submit
+- **กระดานของครูมีสอง host แล้ว** (25 กันยายน 2026): กระดานสอน (`TeachingBoardEditor`) และกระดานเขียนเฉลยในหน้าสร้างโจทย์ (`SolutionBoardEditor`) ใช้ `DrawingBoardCore`, `TeacherDrawingToolbar`, `SessionLibraryBar` และขนาดแผ่น `BOARD_SHEET_*` ตัวเดียวกัน เจ้าของผลิตภัณฑ์ต้องการให้สองกระดาน "เหมือนกันทุกอย่าง" งานที่แก้ส่วนร่วมเหล่านี้จึงต้องตรวจทั้งสอง host ส่วนที่ต่างคือ persistence (ช่องของงาน vs รูปในเฉลยที่ฝัง scene) และกระดานเฉลยไม่มีรูปโจทย์
 - private Storage path, artifact uniqueness ต่อ answer/part, teacher board slots และ authorization ของ Server Actions — เจ้าของผลิตภัณฑ์ลดเพดานจาก 5 เหลือ 3 ช่องต่อข้อเมื่อ 25 กันยายน 2026 โดยคง compatibility ไว้: CHECK ของฐาน, Storage path และ cleanup ยังรับ 1–5 กระดานเดิมในช่อง 4–5 จึงยังเปิดและลบได้ มีเพียงการบันทึกใหม่ที่หยุดที่ช่อง 3
 - preview mode ที่เก็บ scene ใน memory เท่านั้น
 - lazy loading หลัง user gesture และการไม่ส่ง telemetry/server request ต่อ stroke
