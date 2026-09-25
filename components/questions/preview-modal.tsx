@@ -9,6 +9,7 @@ import { DIFF_META } from '@/lib/question-display'
 import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import { QuestionPreviewContent } from './question-preview'
 import { RichText } from '@/components/ui/rich-text'
+import { SolutionFiles } from '@/components/questions/solution-files'
 import type {
   Variable, MCQOption, MatchingPair, TrueFalseConfig, FillBlankConfig,
   OrderingConfig, FileUploadConfig, RandomQuestionConfig, CompositeConfig,
@@ -156,15 +157,7 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
         <div className="bg-warning/10 rounded-xl p-4 border border-warning/20 space-y-3">
           <p className="text-[11px] font-semibold text-warning uppercase tracking-wide mb-2">วิธีทำ / คำอธิบาย</p>
           {q.solution_text && <RichText text={q.solution_text} className="text-sm text-warning leading-relaxed block" />}
-          {(q.solution_image_urls ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-3">
-              {(q.solution_image_urls ?? []).map(url => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={url} src={url} alt="รูปประกอบเฉลย"
-                  className="max-h-40 rounded-lg border border-warning/20 object-contain" />
-              ))}
-            </div>
-          )}
+          <SolutionFiles urls={q.solution_image_urls} alt="รูปประกอบเฉลย" imageClassName="max-h-40 rounded-lg border border-warning/20 object-contain" />
         </div>
       )}
 

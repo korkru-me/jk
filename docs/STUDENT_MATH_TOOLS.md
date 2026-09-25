@@ -1,6 +1,6 @@
 # เครื่องมือคณิตศาสตร์ กระดาษทด และกระดานสอน
 
-อัปเดตล่าสุด: 21 กันยายน 2026
+อัปเดตล่าสุด: 25 กันยายน 2026
 
 สถานะ: **เครื่องมือคณิตศาสตร์เฟส 0–8 ส่งมอบแล้ว; งานปรับปรุงพื้นที่เขียนรุ่นถัดไปล็อกสเปกและ baseline เฟส 0 แล้ว**
 
@@ -62,8 +62,8 @@
 - รุ่นแรกเป็นโหมดสำหรับครูฉายหรือแชร์หน้าจอ ไม่ broadcast scene แบบ realtime ไปยังอุปกรณ์นักเรียน
 - กระดานผูกกับ assignment + question + creator ไม่เขียนกลับเข้าโจทย์กลางในคลังโดยอัตโนมัติ
 - ครูร่วมที่มีสิทธิ์อ่านงานเห็นกระดานได้ ผู้สร้างเท่านั้นที่แก้หรือลบกระดานของตน
-- ผู้สร้างมี 5 slots ต่อโจทย์ของงานนั้น บังคับด้วยฐานข้อมูล ไม่ใช่ UI อย่างเดียว
-- เมื่อครบ 5 ต้องเลือก slot และยืนยัน “แทนที่” ห้ามเขียนทับรูปเก่าสุดเงียบ ๆ
+- ผู้สร้างเก็บเฉลยได้ 3 ช่องต่อโจทย์ของงานนั้น (ลดจาก 5 ตามคำสั่งเจ้าของผลิตภัณฑ์ 25 กันยายน 2026) Server Action และ upload path builder ปฏิเสธช่องนอก 1–3 จึงไม่ใช่แค่ UI ส่วน CHECK ของฐานข้อมูลยังเป็น 1–5 เพื่อให้กระดานที่บันทึกไว้ในช่อง 4–5 ก่อนวันนั้นยังถูกต้อง — ช่องเหล่านั้นยังแสดง เปิด และลบได้ แต่บันทึกใหม่ลงไม่ได้ (แก้แล้วกดบันทึกจะลงช่องว่างใน 1–3 หรือถามว่าจะทับช่องไหน) การลดเพดานของฐานให้เหลือ 3 ต้องเป็น migration แยก
+- เมื่อครบ 3 ต้องเลือก slot และยืนยัน “แทนที่” ห้ามเขียนทับรูปเก่าสุดเงียบ ๆ
 - กระดานแต่ละ slot เก็บ preview และ scene ต้นฉบับ จึงเปิดแก้ต่อได้
 
 ## ประสบการณ์นักเรียน
@@ -127,7 +127,7 @@
 - หน้ารายละเอียดงานมีปุ่ม “โหมดสอน” แยกจาก preview นักเรียน ครูเปิดโจทย์ตามลำดับจริง แสดง/ซ่อนเฉลย และเขียนข้างโจทย์ได้โดยไม่สร้าง submission หรือแก้โจทย์ต้นฉบับ
 - กระดานสอนใช้ scene envelope, utility และพื้นกระดาษชุดเดียวกับกระดาษทด แต่ editor host ยังเป็นคนละ implementation; บันทึกเฉพาะเมื่อครูกด โดยสร้าง WebP preview หรือ PNG fallback คู่กับ versioned scene ใน private Storage และเปิด scene เดิมกลับมาแก้ได้
 - ปัจจุบันทั้งสองกระดานเรียก `setActiveTool({ locked: true })` และมีสไลเดอร์ขนาดเส้น 1–12 ที่ sync กับ property controls ของ Excalidraw แต่ native lock/คีย์ลัด `Q` ยังปิด lock ได้ และผู้ใช้ยังเห็นแหล่งปรับขนาดเส้นซ้ำ กระดานใหม่เริ่มที่ปากกา `#172554`, เส้นหนา 2, เส้นทึบ, พื้นรูปโปร่งใส และ sloppiness architect; เป้าหมายรุ่นถัดไปคือซ่อน native lock และเหลือแหล่งปรับขนาดเดียว
-- ผู้สร้างแต่ละคนมี 5 slots ต่อ assignment + question; การบันทึกทับต้องยืนยัน ผู้สร้างเท่านั้นที่แก้หรือลบ ส่วนครูร่วมที่มีสิทธิ์อ่านเปิดดูสำเนาของผู้อื่นแบบ read-only พร้อมชื่อผู้สร้างได้
+- ผู้สร้างแต่ละคนมี 5 slots ต่อ assignment + question (ภายหลังลดเหลือ 3 ช่องเมื่อ 25 กันยายน 2026 ดูหัวข้อกระดานสอนด้านบน); การบันทึกทับต้องยืนยัน ผู้สร้างเท่านั้นที่แก้หรือลบ ส่วนครูร่วมที่มีสิทธิ์อ่านเปิดดูสำเนาของผู้อื่นแบบ read-only พร้อมชื่อผู้สร้างได้
 - พฤติกรรมปัจจุบันพัก draft เมื่อเปลี่ยนข้อหรือซ่อนกระดานจึงไม่ถาม; เปิด slot อื่นทับ draft ของข้อที่เกี่ยวข้องถามยืนยัน ปุ่มกลับของแอปตรวจเฉพาะข้อที่เปิด ส่วน `beforeunload` ตรวจทุกข้อ ปุ่ม “กระดานใหม่” ล้างทันทีโดยไม่ถาม จุดต่างเหล่านี้เป็นช่องว่างที่ state machine รุ่นถัดไปต้องแก้; กระดานเปล่าไม่อัปโหลด และการลบเอาทั้ง reference, preview และ scene ออกแบบ best effort
 - authenticated browser QA ผ่านการบันทึก เปิดแก้ บันทึกทับ ลบ คำเตือนเมื่อเปิด slot อื่นทับงานค้าง และ layout desktop/mobile โดยหลัง QA ไม่มีไฟล์ทดสอบค้าง; เส้นทาง reset กับปุ่มกลับหลาย draft ยังเป็นช่องว่างตามบรรทัดก่อนหน้า
 - production bundle ของหน้า take หลังเฟส 6 ยังเท่าเดิมที่ 17 initial client chunks รวม 786,060 bytes raw / 239,718 bytes gzip (0.750/0.229 MiB); Excalidraw, mathjs, Supabase browser client และ signed-upload path ของโหมดสอนไม่อยู่ใน initial chunk union
@@ -135,7 +135,7 @@
 ของที่ส่งมอบในเฟส 7:
 
 - Vercel Cron เรียก `GET /api/internal/math-work-cleanup` วันละครั้งเวลา 02:45 Asia/Bangkok; route ทำงานเมื่อมี `CRON_SECRET` สุ่มอย่างน้อย 32 ตัวอักษรและ Bearer token ตรงกันเท่านั้น ถ้ายังไม่ตั้งค่า route ตอบ 503 และไม่แตะ Storage
-- งานล้างใช้ service role เฉพาะหลังผ่าน cron authorization, enumerate เฉพาะ namespace `students/` และ `teachers/` ใน private bucket, จำกัด 100,000 objects/100,000 folders ต่อรอบ และลบได้เฉพาะ path ที่ตรงกับ upload builder รวม slot ครู 1–5 เท่านั้น path แปลกหรือ timestamp อ่านไม่ได้ถูกเก็บไว้
+- งานล้างใช้ service role เฉพาะหลังผ่าน cron authorization, enumerate เฉพาะ namespace `students/` และ `teachers/` ใน private bucket, จำกัด 100,000 objects/100,000 folders ต่อรอบ และลบได้เฉพาะ path ที่ตรงกับ upload builder รวม slot ครู 1–5 เท่านั้น (คง 4–5 ไว้แม้แอปบันทึกได้แค่ 1–3 แล้ว เพื่อเก็บกวาดไฟล์กำพร้าของกระดานเดิม) path แปลกหรือ timestamp อ่านไม่ได้ถูกเก็บไว้
 - ไฟล์ไม่มี reference ต้องเก่าครบ 7 วันก่อนเป็น candidate และทุก candidate ถูกตรวจ exact path กับทั้ง `student_work_artifacts.preview_path/scene_path` และ `teaching_boards.preview_path/scene_path` จากฐานข้อมูลซ้ำทันทีเป็น batch ก่อนลบ ความล้มเหลวของ Storage listing หรือ reference query ยกเลิกรอบก่อนเริ่มลบ
 - route ไม่ตอบหรือ log path, signed URL, scene หรือข้อมูลนักเรียน มีเฉพาะ aggregate count/bytes และรองรับ `?dryRun=1` สำหรับตรวจ production โดยไม่ลบ
 - unit/integration-style tests ครอบคลุม path allowlist, grace boundary, timestamp ที่พิสูจน์ไม่ได้, referenced object, reference-scan failure, dry-run และ cron authorization; production server dry-run กับ Supabase ที่ผูกจริงสแกนสำเร็จ 0 objects/0 deletes
@@ -156,7 +156,7 @@
 
 หน้าสร้างและแก้ไขงานต้องแสดงสวิตช์เครื่องคิดเลขกับกระดาษทดเฉพาะงานออนไลน์ และสรุปค่าทั้งสองก่อนบันทึก การ duplicate งานคัดลอกค่าตามต้นฉบับ หน้าตัวอย่างนักเรียนต้องแสดงเครื่องมือเหมือนค่าที่ตั้งจริงโดยไม่สร้าง submission
 
-“โหมดสอน” แยกจาก preview ปัจจุบัน เพราะ preview จงใจไม่เขียน Storage โหมดสอนต้องมี authorization และ persistence ของตัวเอง ครูเปลี่ยนข้อ แสดง/ซ่อนเฉลย เขียน และจัดการ 5 slots ได้โดยไม่เปลี่ยน requirement การแนบวิธีทำของนักเรียน
+“โหมดสอน” แยกจาก preview ปัจจุบัน เพราะ preview จงใจไม่เขียน Storage โหมดสอนต้องมี authorization และ persistence ของตัวเอง ครูเปลี่ยนข้อ แสดง/ซ่อนเฉลย เขียน และจัดการเฉลยที่บันทึกไว้ 3 ช่องต่อข้อได้โดยไม่เปลี่ยน requirement การแนบวิธีทำของนักเรียน
 
 ## โครงสร้างข้อมูลจากเฟส 1
 
@@ -165,7 +165,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 - Assignment flags `scratchpad_enabled` และ `calculator_enabled`; แถวเก่าเป็นปิด ส่วน create action กำหนดค่าเริ่มต้นของงานใหม่ตามชนิด
 - `submission_answers.math_input_modes` เป็น object แยกจาก `student_answer`; object ว่างหมายถึง `DEG`
 - `student_work_artifacts` ผูก exact submission answer + part key พร้อม owner, tenant, source, private paths, ขนาด, element count และ format version
-- `teaching_boards` ผูก assignment + question + creator + slot 1–5 โดย unique/check constraint บังคับเพดานจริง
+- `teaching_boards` ผูก assignment + question + creator + slot 1–5 โดย unique/check constraint เป็นเพดานของฐาน (แอปใช้แค่ช่อง 1–3 ตั้งแต่ 25 กันยายน 2026 ดูหัวข้อกระดานสอน)
 - Private bucket `math-work-artifacts` รับเฉพาะ WebP/PNG/JSON และไม่มี `storage.objects` policy สำหรับ client; Server Action ออก path-bound signed upload token และ signed read URL อายุสั้นหลังตรวจสิทธิ์
 
 `submission_answers.work_images` และ public URLs เก่าต้องอ่านได้ต่อ ห้าม migration บังคับย้ายข้อมูลเก่าก่อนเส้นทางใหม่พร้อม กติกา “แนบวิธีทำครบ” ต้องยอมรับรูปเก่าหรือ artifact ใหม่โดยไม่เปลี่ยนคะแนนและ answer snapshot เดิม
@@ -211,7 +211,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 7. Scheduled cleanup, retention และ security hardening
 8. Authenticated browser QA, accessibility, performance และ rollout
 
-สถานะปัจจุบัน: เฟส 0–8 เสร็จในโค้ดและผ่าน rollout audit ตามขอบเขต credential/environment ที่มี แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข, กระดาษทด local-only, artifact ที่แนบ/แก้/ส่ง/อ่านในหน้าผลลัพธ์, โหมดสอนพร้อมกระดาน 5 slots และ scheduled orphan cleanup แบบ fail-closed พร้อม deploy แล้ว งานปฏิบัติการที่เหลือคือผูก deployment และตั้ง `CRON_SECRET`; automated multi-role RLS test กับ live student flow ยังเป็น production-readiness requirement ของระบบโดยรวม ไม่ใช่สิ่งที่เฟสนี้อ้างว่าผ่านแล้ว
+สถานะปัจจุบัน: เฟส 0–8 เสร็จในโค้ดและผ่าน rollout audit ตามขอบเขต credential/environment ที่มี แป้นคณิตศาสตร์, DEG/RAD, เครื่องคิดเลข, กระดาษทด local-only, artifact ที่แนบ/แก้/ส่ง/อ่านในหน้าผลลัพธ์, โหมดสอนพร้อมเฉลยที่บันทึกไว้ 3 ช่องต่อข้อ และ scheduled orphan cleanup แบบ fail-closed พร้อม deploy แล้ว งานปฏิบัติการที่เหลือคือผูก deployment และตั้ง `CRON_SECRET`; automated multi-role RLS test กับ live student flow ยังเป็น production-readiness requirement ของระบบโดยรวม ไม่ใช่สิ่งที่เฟสนี้อ้างว่าผ่านแล้ว
 
 แต่ละเฟสต้องเป็นหน่วย commit ที่ตรวจรับได้ Migration ต้องอยู่ใน commit เดียวกับโค้ดที่พึ่งพา และห้ามเปิด UI production ก่อน authorization/persistence ของเฟสนั้นพร้อม
 
@@ -221,7 +221,7 @@ Migration `20260903035839_student_math_tools_foundation.sql` แยกหน้�
 - แป้นคณิตศาสตร์ใช้ได้กับ numeric input ทุกชนิดที่รองรับ โดย DEG/RAD ให้ผลเดียวกันทั้ง preview, instant check และ final grading
 - กระดาษไม่แนบไม่ออกจากอุปกรณ์และถูกล้างตาม lifecycle
 - วิธีทำที่แนบเปิดดูและกลับมาแก้ก่อนส่งได้ โดยข้อมูลเก่ายังอ่านได้
-- ครูบันทึกกระดานสอนได้ไม่เกิน 5 slots และสิทธิ์ไม่ข้ามผู้ใช้/tenant
+- ครูบันทึกเฉลยบนกระดานสอนได้ไม่เกิน 3 ช่องต่อข้อ และสิทธิ์ไม่ข้ามผู้ใช้/tenant
 - หน้า take ยังเปิดได้บน mobile/iPad, ใช้ stylus/touch/keyboard ได้ และผ่าน bundle budget
 - RLS/Server Action tests, unit tests, TypeScript, design-token lint, production build และ authenticated browser QA ผ่าน
 

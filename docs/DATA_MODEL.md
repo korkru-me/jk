@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 22 กันยายน 2026
+อัปเดตล่าสุด: 25 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -131,7 +131,7 @@ Invariant สำคัญ:
 - Assignment flags แยกการอนุญาตเครื่องคิดเลขกับกระดาษทด งานเก่าอ่านเป็นปิด แบบฝึกหัดออนไลน์ใหม่เริ่มเปิด และข้อสอบออนไลน์ใหม่เริ่มปิดจาก create action
 - Metadata มุม `DEG`/`RAD` อยู่ใน `submission_answers.math_input_modes` ผูกกับ logical numeric input หรือข้อย่อย ค่า object ว่าง/ไม่มี key อ่านเป็น `DEG`; autosave เขียน object นี้พร้อม `student_answer` ใน update เดียวเพื่อไม่ให้สมการกับหน่วยมุมเหลื่อมกัน
 - `student_work_artifacts` อ้าง exact `submission_answer`, part identity, `org_id`, student owner, source type, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(submission_answer_id, part_key)` ทำให้ logical slot หนึ่งตำแหน่งมี artifact ปัจจุบันได้หนึ่งรายการ
-- `teaching_boards` อ้าง assignment, question, creator, slot 1–5, `org_id`, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(assignment_id, question_id, created_by, slot)` กับ check `slot BETWEEN 1 AND 5` เป็นผู้บังคับเพดานจริง
+- `teaching_boards` อ้าง assignment, question, creator, slot 1–5, `org_id`, preview/scene path, format version, ขนาด, element count และ timestamps; unique `(assignment_id, question_id, created_by, slot)` กับ check `slot BETWEEN 1 AND 5` เป็นเพดานของฐาน ส่วนเพดานของแอปคือ 3 ช่องต่อข้อ (`TEACHING_BOARD_SLOT_COUNT`/`isTeachingBoardSlot` ใน `lib/math-work.ts`) ซึ่ง Server Action และ upload path builder บังคับตั้งแต่ 25 กันยายน 2026 — unique slot ทำให้ save พร้อมกันเกินเพดานไม่ได้ และ CHECK ที่ยังเป็น 1–5 ทำให้แถวเดิมในช่อง 4–5 ยังถูกต้อง
 - Path ใหม่อยู่ใน private Storage และ database เก็บ path ไม่เก็บ signed URL ซึ่งมีอายุสั้น Preview ลงท้ายได้เฉพาะ `preview.webp` หรือ `preview.png`; migration `20260921185046` ทำให้ CHECK ของ artifact/board และ student scope trigger ใช้ allowlist เดียวกัน โดยคง `scene.json`, namespace และ ownership เดิม
 
 Local-only scratch scene ไม่ใช่ row ในฐานข้อมูล อยู่ใน IndexedDB keyed by user/submission/answer/part, จำกัด 2 MiB/10,000 elements และห้ามถูกนับเป็น submission attachment เมื่อผู้ใช้กดแนบจึงสร้าง WebP หรือ PNG fallback คู่กับ scene และการอัปโหลดไฟล์ยังไม่ถือว่าเป็นหลักฐานจน Server Action ที่ตรวจไฟล์กับสิทธิ์บันทึก reference สำเร็จ; `part_key` ใช้ `answer` สำหรับคำตอบเดียวและ `part:N` สำหรับข้อย่อยตามตำแหน่ง เฟส drawing-board 3 เพิ่ม optional local metadata ใน record เดิม ได้แก่ semantic `editRevision`/`savedRevision`/fingerprint, snapshot identity ของ artifact ที่แนบ และ one-step recovery; metadata นี้ไม่ใช่ row หรือ server authority, record รุ่นเก่าที่ยังไม่มี metadata ยังอ่าน scene ได้ และต้องถือ attachment เป็น unverified จนเทียบหรือแนบใหม่
@@ -179,7 +179,7 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 
 | bucket | ลิมิต | ชนิดที่รับ | ใครเขียน |
 | --- | --- | --- | --- |
-| `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์) และ `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้) |
+| `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์), `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้) และ `solution-attachments-field.tsx` (ไฟล์เฉลย: รูปไม่เกิน 2 MB หลังย่อ, PDF ไม่เกิน 5 MB, รูปจากกระดานเขียนเฉลย) |
 | `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย |
 | `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน |
 | `classroom-post-files` | 10 MB | รูป (PNG/JPEG/WebP/GIF), PDF, Word, Excel, PowerPoint, txt/csv, zip | `post-attach.tsx` — ไฟล์แนบในประกาศห้องเรียน |
@@ -188,6 +188,7 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 - **ลบ bucket ผ่าน migration ไม่ได้** Postgres ปฏิเสธ `DELETE FROM storage.buckets` ตรง ๆ (`Direct deletion from storage tables is not allowed`) ต้องใช้ Storage API — bucket `classroom-post-images` ที่ถูกแทนด้วย `classroom-post-files` จึงลบด้วยวิธีนั้น ส่วน policy ของมันลบใน migration ได้ตามปกติ
 - **`question-images` เคยไม่มีลิมิตและไม่จำกัดชนิดไฟล์เลย** ทั้งที่ UI เขียนว่า "สูงสุด 5 MB" เพราะเป็น bucket เดียวที่ถูกสร้างจากหน้า dashboard ก่อนโปรเจกต์ใช้ CLI — migration `20260828073436` ตั้งค่าให้ตรงกับอีกสองตัว (ลิมิตเป็น 10 MB ไม่ใช่ 5 เพราะ widget ไฟล์แนบโฆษณา 10 MB ไว้ และ PDF ย่อไม่ได้)
 - **รูปถูกย่อในเบราว์เซอร์ก่อนอัปโหลดเสมอ** (`lib/image-downscale.ts`) ลิมิตของ bucket เป็นแค่ตาข่ายรับ ไม่ใช่ทางเดินปกติ
+- **`questions.solution_image_urls` เก็บไฟล์เฉลยทุกชนิด ไม่ใช่แค่รูป** (ตั้งแต่ 25 กันยายน 2026) — รูป, PDF และรูปจากกระดานเขียนเฉลย แยกชนิดจาก URL ด้วย `solutionAttachmentKind` (`lib/solution-attachments.ts`): ลงท้าย `.pdf` = PDF, ชื่อไฟล์ `solution-board_*.png` = รูปจากกระดาน ซึ่งฝัง scene ของกระดานไว้ใน chunk `iTXt` ของ PNG เอง (`lib/solution-board-png.ts`) ชื่อคอลัมน์เก่ากว่าความหมาย แต่เลือกไม่เพิ่มคอลัมน์ เพราะทุกฟอร์ม, save action, การทำสำเนา, export และ orphan sweep พา `solution_image_urls` อยู่แล้ว — ที่ใดแสดงเฉลยต้องผ่าน `SolutionFiles` ไม่ใช่ `<img>` ตรง ๆ ไม่งั้น PDF จะกลายเป็นรูปแตก
 - **ไฟล์กำพร้าถูกเก็บกวาดสองทาง** — ลบโจทย์/โจทย์กลุ่มแล้วรูปของมันถูกลบตามทันที (`releaseQuestionFiles`) ส่วนไฟล์ที่ค้างจากการอัปแล้วปิดหน้าไปเฉยๆ ให้ครูกวาดเองที่ ตั้งค่า → พื้นที่จัดเก็บไฟล์
 - ทั้งสองทางถามคำถามเดียวกันผ่าน RPC `storage_paths_still_referenced` ซึ่งเป็น SECURITY DEFINER เพราะการทำสำเนาโจทย์คัดลอก `image_urls` ไปตรงๆ ไฟล์ในโฟลเดอร์เราจึงอาจเป็นรูปเดียวในโจทย์ส่วนตัวของเพื่อนร่วมทีมที่เรามองไม่เห็น · ฟังก์ชันรับ path เข้าไปและตอบเฉพาะ subset ของ path ที่ส่งไป และดึงโฟลเดอร์ที่จะดูจาก `auth.uid()` เอง จึงถามถึงไฟล์ของคนอื่นไม่ได้และ enumerate ไม่ได้
 - **`classroom-post-files` อยู่นอกวงกวาดนี้โดยตั้งใจ** RPC ข้างบนอ่านแค่ `questions` กับ `submission_answers` ถ้าเอา bucket นี้เข้าไปในรายการที่กวาด ไฟล์ในประกาศจะถูกรายงานว่ากำพร้าและถูกเสนอให้ลบทั้งที่ห้องเรียนยังอ่านอยู่ · การลบประกาศลบไฟล์ของตัวเองทันที (`deleteClassroomPost`) **แต่เช็คก่อนว่ามีประกาศอื่นอ้างไฟล์เดียวกันอยู่ไหม** เพราะการโพสต์ข้ามห้องใช้ไฟล์ก้อนเดียวกันหลายประกาศ — เช็คด้วย admin client เพราะสำเนาอีกใบอาจอยู่ในห้องที่คนลบไม่มีสิทธิ์อ่าน · ไฟล์ที่อัปแล้วไม่ได้โพสต์จะค้างในโฟลเดอร์ของครูคนนั้น ถ้าจะให้กวาดได้ต้องเพิ่ม `classroom_posts` เข้าไปใน RPC ก่อน แล้วค่อยเพิ่ม bucket

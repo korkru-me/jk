@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ChevronDown, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { QuestionImageUpload } from './question-image-upload'
+import { SolutionAttachmentsField, type SolutionFileStore } from './solution-attachments-field'
 
 interface SolutionSectionProps {
   text: string
@@ -15,16 +15,21 @@ interface SolutionSectionProps {
   description?: string
   placeholder?: string
   rows?: number
+  /** Where the files go — Storage unless a QA lab swaps it for memory. */
+  fileStore?: SolutionFileStore
 }
 
 // Collapsed by default — most questions don't need a written solution, so it
-// stays out of the way until the teacher explicitly opens it.
+// stays out of the way until the teacher explicitly opens it. Every question
+// type renders this one section, so a เฉลย can be typed, attached as pictures
+// or PDFs, or written on the board, whatever the type.
 export function SolutionSection({
   text, onTextChange, imageUrls, onImageUrlsChange,
   label = 'เฉลยวิธีทำ (ไม่บังคับ)',
   description,
   placeholder = 'อธิบายวิธีทำ...',
   rows = 4,
+  fileStore,
 }: SolutionSectionProps) {
   const hasContent = text.replace(/<[^>]*>/g, '').trim().length > 0 || imageUrls.length > 0
   const [open, setOpen] = useState(hasContent)
@@ -53,7 +58,7 @@ export function SolutionSection({
           <span className="block text-sm font-semibold text-foreground">{label}</span>
           {!open && (
             <span className="block text-xs text-muted-foreground truncate">
-              {hasContent ? 'มีเนื้อหาแล้ว — กดเพื่อดู/แก้ไข' : 'กดเพื่อเพิ่มเฉลยหรือรูปประกอบ'}
+              {hasContent ? 'มีเนื้อหาแล้ว — กดเพื่อดู/แก้ไข' : 'กดเพื่อพิมพ์เฉลย แนบรูปหรือ PDF หรือเขียนบนกระดาน'}
             </span>
           )}
         </span>
@@ -68,7 +73,7 @@ export function SolutionSection({
         <div className="mt-3 space-y-3 pl-1">
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
           <RichTextEditor value={text} onChange={onTextChange} placeholder={placeholder} rows={rows} />
-          <QuestionImageUpload value={imageUrls} onChange={onImageUrlsChange} />
+          <SolutionAttachmentsField value={imageUrls} onChange={onImageUrlsChange} store={fileStore} />
         </div>
       )}
     </section>

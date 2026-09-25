@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/ui/rich-text'
+import { SolutionFiles } from '@/components/questions/solution-files'
 import { adminDeleteQuestion } from '@/lib/actions/admin'
 import type { Question, QuestionCategory } from '@/lib/types'
 import Link from 'next/link'
@@ -218,14 +219,7 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
                 <div className="border rounded-lg p-3 space-y-2">
                   <p className="text-xs text-muted-foreground mb-1">เฉลย</p>
                   {preview.solution_text && <RichText text={preview.solution_text} className="text-muted-foreground whitespace-pre-line block" />}
-                  {(preview.solution_image_urls ?? []).length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {(preview.solution_image_urls ?? []).map(url => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={url} src={url} alt="รูปประกอบเฉลย" className="max-h-32 rounded-lg border object-contain" />
-                      ))}
-                    </div>
-                  )}
+                  <SolutionFiles urls={preview.solution_image_urls} alt="รูปประกอบเฉลย" imageClassName="max-h-32 rounded-lg border object-contain" />
                 </div>
               )}
               {preview.rejected_reason && (

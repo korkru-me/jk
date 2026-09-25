@@ -39,6 +39,7 @@ import {
   Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
+import { SolutionFiles } from '@/components/questions/solution-files'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
@@ -2262,14 +2263,7 @@ function InstantCheckPanel({
           {feedback.solutionText && (
             <RichText text={feedback.solutionText} className="text-sm leading-relaxed block" />
           )}
-          {(feedback.solutionImageUrls ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {(feedback.solutionImageUrls ?? []).map(url => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={url} src={url} alt="เฉลยวิธีทำ" loading="lazy" decoding="async" className="max-h-44 rounded-lg border object-contain" />
-              ))}
-            </div>
-          )}
+          <SolutionFiles urls={feedback.solutionImageUrls} alt="เฉลยวิธีทำ" imageClassName="max-h-44 rounded-lg border object-contain" />
         </Card>
       )}
 
