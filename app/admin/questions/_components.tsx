@@ -218,7 +218,7 @@ export function QuestionTable({ questions }: { questions: Row[] }) {
               {(preview.solution_text || (preview.solution_image_urls ?? []).length > 0) && (
                 <div className="border rounded-lg p-3 space-y-2">
                   <p className="text-xs text-muted-foreground mb-1">เฉลย</p>
-                  {preview.solution_text && <RichText text={preview.solution_text} className="text-muted-foreground whitespace-pre-line block" />}
+                  {preview.solution_text && <RichText text={preview.solution_text} blocks className="text-muted-foreground whitespace-pre-line" />}
                   <SolutionFiles urls={preview.solution_image_urls} alt="รูปประกอบเฉลย" imageClassName="max-h-32 rounded-lg border object-contain" />
                 </div>
               )}

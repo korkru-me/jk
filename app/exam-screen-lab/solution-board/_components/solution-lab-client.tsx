@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
+import { RichText } from '@/components/ui/rich-text'
 import { SolutionSection } from '@/components/questions/solution-section'
 import type { SolutionFileStore } from '@/components/questions/solution-attachments-field'
 import { SolutionFiles } from '@/components/questions/solution-files'
@@ -48,9 +49,9 @@ export function SolutionLabClient() {
       </Card>
       <Card padding="lg" className="space-y-3">
         <h2 className="text-sm font-semibold">เฉลยที่ผู้เรียนจะเห็น</h2>
-        {urls.length === 0
-          ? <p className="text-sm text-muted-foreground">ยังไม่มีไฟล์ในเฉลย</p>
-          : <SolutionFiles urls={urls} alt="เฉลยวิธีทำ" imageClassName="max-h-44 rounded-lg border object-contain" />}
+        {!text && urls.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีเฉลย</p>}
+        <RichText text={text} blocks className="text-sm leading-relaxed" />
+        <SolutionFiles urls={urls} alt="เฉลยวิธีทำ" imageClassName="max-h-44 rounded-lg border object-contain" />
       </Card>
     </main>
   )

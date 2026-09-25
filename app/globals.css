@@ -470,6 +470,51 @@
 .tiptap u {
   @apply underline;
 }
+
+/* Pictures typed into a เฉลย (RichTextEditor with `images`). Tiptap's
+   resizable node view draws four bare corner handles; they show only on the
+   picture being pointed at or selected, so a page of text with pictures does
+   not wear handles everywhere. */
+.tiptap [data-resize-container] {
+  @apply my-1 max-w-full;
+}
+.tiptap [data-resize-wrapper] {
+  @apply max-w-full;
+}
+/* The node view writes the saved width and height as inline pixels. On a box
+   narrower than the picture, max-width takes the width down and the height
+   has to follow, or the picture is squashed; the aspect ratio is locked
+   while resizing anyway. */
+.tiptap [data-resize-container] img {
+  @apply max-w-full rounded-md;
+  height: auto !important;
+}
+.tiptap [data-resize-container].ProseMirror-selectednode img {
+  @apply ring-2 ring-ring;
+}
+.tiptap [data-resize-handle] {
+  @apply z-10 size-3 rounded-full border-2 border-card bg-primary opacity-0 transition-opacity;
+}
+.tiptap [data-resize-container]:hover [data-resize-handle],
+.tiptap [data-resize-container].ProseMirror-selectednode [data-resize-handle] {
+  @apply opacity-100;
+}
+.tiptap [data-resize-handle="top-left"] {
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+}
+.tiptap [data-resize-handle="bottom-right"] {
+  transform: translate(50%, 50%);
+  cursor: nwse-resize;
+}
+.tiptap [data-resize-handle="top-right"] {
+  transform: translate(50%, -50%);
+  cursor: nesw-resize;
+}
+.tiptap [data-resize-handle="bottom-left"] {
+  transform: translate(-50%, 50%);
+  cursor: nesw-resize;
+}
 /* Excalidraw — the teaching board hides the library's own tool panels when the
    teacher wants a bare sheet. Its own CSS wins on specificity, hence the
    !important; our toolbar above the canvas covers pen, highlighter and eraser,

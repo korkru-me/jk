@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   checkSolutionFile,
+  isSolutionTextImageSrc,
   SOLUTION_IMAGE_MAX_BYTES,
   SOLUTION_PDF_MAX_BYTES,
   solutionAttachmentKind,
@@ -43,6 +44,21 @@ describe('solution attachments', () => {
     expect(solutionUploadPath('user-1', 'file', 'pdf', 1700, 0.25)).toBe('user-1/solution_1700_9.pdf')
     expect(solutionAttachmentKind(solutionUploadPath('u', 'board', 'png'))).toBe('board')
     expect(solutionAttachmentKind(solutionUploadPath('u', 'file', 'pdf'))).toBe('pdf')
+    // A picture typed into the text is named apart and never reads as a board.
+    expect(solutionUploadPath('user-1', 'inline', 'webp', 1700, 0.5)).toBe('user-1/solution-inline_1700_i.webp')
+    expect(solutionAttachmentKind(solutionUploadPath('u', 'inline', 'png'))).toBe('image')
+  })
+
+  it('keeps only this app’s own pictures in typed เฉลย', () => {
+    expect(isSolutionTextImageSrc(`${BUCKET}/solution-inline_1_a.webp`)).toBe(true)
+    expect(isSolutionTextImageSrc('blob:http://localhost:3010/0f3c#lab/solution-inline_1_a.png')).toBe(true)
+    // Pictures that ride in with text copied off a web page are not hot-linked.
+    expect(isSolutionTextImageSrc('https://example.com/diagram.png')).toBe(false)
+    expect(isSolutionTextImageSrc('http://project.supabase.co/storage/v1/object/public/question-images/a.png')).toBe(false)
+    expect(isSolutionTextImageSrc('https://project.supabase.co/storage/v1/object/public/work-images/a.png')).toBe(false)
+    expect(isSolutionTextImageSrc('data:image/png;base64,iVBORw0KGgo=')).toBe(false)
+    expect(isSolutionTextImageSrc('javascript:alert(1)')).toBe(false)
+    expect(isSolutionTextImageSrc('')).toBe(false)
   })
 
   it('takes a PDF up to 5 MB and a shrunk picture up to 2 MB', () => {

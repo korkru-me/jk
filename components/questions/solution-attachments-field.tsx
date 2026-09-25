@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { FileText, Loader2, Paperclip, PenLine, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import {
   SOLUTION_PDF_MAX_BYTES,
   solutionAttachmentKind,
   solutionUploadPath,
+  type SolutionUploadKind,
 } from '@/lib/solution-attachments'
 
 // Excalidraw is large and most เฉลย are typed. The board loads only when a
@@ -37,7 +38,7 @@ const SolutionBoardEditor = dynamic(() => import('./solution-board-editor'), {
 
 /** Where a เฉลย's files go. The page supplies Storage; the QA lab supplies memory. */
 export interface SolutionFileStore {
-  upload: (file: Blob, kind: 'board' | 'file', extension: string) => Promise<{ url: string } | { error: string }>
+  upload: (file: Blob, kind: SolutionUploadKind, extension: string) => Promise<{ url: string } | { error: string }>
   /** Deletes a file taken out of the เฉลย, unless a saved โจทย์ still points at it. */
   release: (url: string) => Promise<void>
   read: (url: string) => Promise<Uint8Array>
@@ -87,13 +88,41 @@ function megabytes(bytes: number) {
 }
 
 /**
+ * Puts one picture up for the เฉลย's typed text: shrunk and checked exactly
+ * like a picture attached to the เฉลย, but stored as the text's own and
+ * handed back only as a URL for the text box to show.
+ */
+export async function uploadSolutionTextImage(store: SolutionFileStore, original: File): Promise<string | null> {
+  const file = await downscaleImage(original)
+  const check = checkSolutionFile({ name: original.name, type: file.type, size: file.size })
+  if (!check.ok) {
+    toast.error(check.message)
+    return null
+  }
+  if (check.kind !== 'image') {
+    toast.error(`“${original.name}” วางในช่องพิมพ์ไม่ได้ — ช่องพิมพ์รับเฉพาะรูป ส่วน PDF ให้ใช้ปุ่มแนบรูปหรือ PDF`)
+    return null
+  }
+  const result = await store.upload(file, 'inline', check.extension)
+  if ('error' in result) {
+    toast.error(uploadErrorMessage(result.error, original.name, BUCKET_MAX_MB))
+    return null
+  }
+  return result.url
+}
+
+/**
  * The files of a เฉลย: pictures, PDFs and board pictures, all kept in the
  * one list the question saves as `solution_image_urls`.
  */
-export function SolutionAttachmentsField({ value, onChange, store = storageSolutionFiles }: {
+export function SolutionAttachmentsField({ value, onChange, store = storageSolutionFiles, leadingActions, children }: {
   value: string[]
   onChange: (urls: string[]) => void
   store?: SolutionFileStore
+  /** Buttons that sit first in the row — the section's พิมพ์ข้อความ. */
+  leadingActions?: ReactNode
+  /** Shown between the buttons and the files — the typed text, when open. */
+  children?: ReactNode
 }) {
   const [uploading, setUploading] = useState(false)
   const [openingUrl, setOpeningUrl] = useState<string | null>(null)
@@ -194,6 +223,7 @@ export function SolutionAttachmentsField({ value, onChange, store = storageSolut
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
+        {leadingActions}
         <input
           ref={inputRef}
           type="file"
@@ -220,6 +250,8 @@ export function SolutionAttachmentsField({ value, onChange, store = storageSolut
           รูปย่อให้อัตโนมัติ (ไม่เกิน {megabytes(SOLUTION_IMAGE_MAX_BYTES)}) · PDF ไม่เกิน {megabytes(SOLUTION_PDF_MAX_BYTES)}
         </span>
       </div>
+
+      {children}
 
       {items.length > 0 && (
         <ul className="flex flex-wrap gap-3">

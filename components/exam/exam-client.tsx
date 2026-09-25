@@ -2261,7 +2261,7 @@ function InstantCheckPanel({
             <Lightbulb size={13} /> วิธีทำ
           </p>
           {feedback.solutionText && (
-            <RichText text={feedback.solutionText} className="text-sm leading-relaxed block" />
+            <RichText text={feedback.solutionText} blocks className="text-sm leading-relaxed" />
           )}
           <SolutionFiles urls={feedback.solutionImageUrls} alt="เฉลยวิธีทำ" imageClassName="max-h-44 rounded-lg border object-contain" />
         </Card>

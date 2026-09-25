@@ -1,10 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Lightbulb } from 'lucide-react'
+import { ChevronDown, Lightbulb, Type } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { SolutionAttachmentsField, type SolutionFileStore } from './solution-attachments-field'
+import { isSolutionTextImageSrc } from '@/lib/solution-attachments'
+import {
+  SolutionAttachmentsField,
+  storageSolutionFiles,
+  uploadSolutionTextImage,
+  type SolutionFileStore,
+} from './solution-attachments-field'
+
+/** Typed เฉลย that holds anything: words, or only a picture placed in the text. */
+function hasTypedSolution(text: string): boolean {
+  return text.replace(/<[^>]*>/g, '').trim().length > 0 || /<img\b/i.test(text)
+}
 
 interface SolutionSectionProps {
   text: string
@@ -22,7 +34,8 @@ interface SolutionSectionProps {
 // Collapsed by default — most questions don't need a written solution, so it
 // stays out of the way until the teacher explicitly opens it. Every question
 // type renders this one section, so a เฉลย can be typed, attached as pictures
-// or PDFs, or written on the board, whatever the type.
+// or PDFs, or written on the board, whatever the type. Each of the three sits
+// behind its own button; typing opens the text box in place.
 export function SolutionSection({
   text, onTextChange, imageUrls, onImageUrlsChange,
   label = 'เฉลยวิธีทำ (ไม่บังคับ)',
@@ -31,8 +44,14 @@ export function SolutionSection({
   rows = 4,
   fileStore,
 }: SolutionSectionProps) {
-  const hasContent = text.replace(/<[^>]*>/g, '').trim().length > 0 || imageUrls.length > 0
+  const hasText = hasTypedSolution(text)
+  const hasContent = hasText || imageUrls.length > 0
   const [open, setOpen] = useState(hasContent)
+  // A เฉลย that already has text opens with it showing; otherwise the box
+  // waits for พิมพ์ข้อความ and takes the cursor when it appears.
+  const [typing, setTyping] = useState(hasText)
+  const [typingFromButton, setTypingFromButton] = useState(false)
+  const store = fileStore ?? storageSolutionFiles
 
   return (
     <section>
@@ -58,7 +77,7 @@ export function SolutionSection({
           <span className="block text-sm font-semibold text-foreground">{label}</span>
           {!open && (
             <span className="block text-xs text-muted-foreground truncate">
-              {hasContent ? 'มีเนื้อหาแล้ว — กดเพื่อดู/แก้ไข' : 'กดเพื่อพิมพ์เฉลย แนบรูปหรือ PDF หรือเขียนบนกระดาน'}
+              {hasContent ? 'มีเนื้อหาแล้ว — กดเพื่อดู/แก้ไข' : 'กดเพื่อพิมพ์ข้อความ แนบรูปหรือ PDF หรือเขียนบนกระดาน'}
             </span>
           )}
         </span>
@@ -72,8 +91,40 @@ export function SolutionSection({
       {open && (
         <div className="mt-3 space-y-3 pl-1">
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
-          <RichTextEditor value={text} onChange={onTextChange} placeholder={placeholder} rows={rows} />
-          <SolutionAttachmentsField value={imageUrls} onChange={onImageUrlsChange} store={fileStore} />
+          <SolutionAttachmentsField
+            value={imageUrls}
+            onChange={onImageUrlsChange}
+            store={fileStore}
+            leadingActions={
+              <Button
+                type="button"
+                variant={typing ? 'secondary' : 'outline'}
+                size="sm"
+                aria-expanded={typing}
+                onClick={() => {
+                  setTyping(value => !value)
+                  setTypingFromButton(true)
+                }}
+              >
+                <Type /> พิมพ์ข้อความ
+              </Button>
+            }
+          >
+            {typing ? (
+              // Pictures placed here belong to the text and are saved inside
+              // it; they never join the เฉลย's files below.
+              <RichTextEditor
+                value={text}
+                onChange={onTextChange}
+                placeholder={placeholder}
+                rows={rows}
+                autoFocus={typingFromButton}
+                images={{ upload: file => uploadSolutionTextImage(store, file), accepts: isSolutionTextImageSrc }}
+              />
+            ) : hasText ? (
+              <p className="text-xs text-muted-foreground">มีข้อความเฉลยแล้ว — กด “พิมพ์ข้อความ” เพื่อดูหรือแก้</p>
+            ) : null}
+          </SolutionAttachmentsField>
         </div>
       )}
     </section>

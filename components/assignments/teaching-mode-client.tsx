@@ -328,7 +328,7 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
               ))}
             </div>
           )}
-          {renderedSolution && <div className="text-sm leading-relaxed"><RichText text={renderedSolution} /></div>}
+          {renderedSolution && <RichText text={renderedSolution} blocks className="text-sm leading-relaxed" />}
           <SolutionFiles urls={question.solution_image_urls} imageClassName="max-h-44 rounded-xl border object-contain" />
         </Card>
       )}

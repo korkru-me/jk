@@ -59,16 +59,44 @@ export function splitSolutionAttachments(urls: readonly string[]): { images: str
   return { images, pdfs }
 }
 
+/**
+ * What a เฉลย upload is for: a file in the เฉลย's list, a board picture, or
+ * a picture placed inside the typed text — which belongs to the text, not to
+ * the list, and never shows up among the files.
+ */
+export type SolutionUploadKind = 'file' | 'board' | 'inline'
+
+const UPLOAD_STEMS: Record<SolutionUploadKind, string> = {
+  file: 'solution_',
+  board: SOLUTION_BOARD_FILE_PREFIX,
+  inline: 'solution-inline_',
+}
+
 /** A Storage key for a new เฉลย file, under the uploader's own folder. */
 export function solutionUploadPath(
   userId: string,
-  kind: 'board' | 'file',
+  kind: SolutionUploadKind,
   extension: string,
   now = Date.now(),
   random = Math.random(),
 ): string {
-  const stem = kind === 'board' ? SOLUTION_BOARD_FILE_PREFIX : 'solution_'
-  return `${userId}/${stem}${now}_${random.toString(36).slice(2, 10)}.${extension}`
+  return `${userId}/${UPLOAD_STEMS[kind]}${now}_${random.toString(36).slice(2, 10)}.${extension}`
+}
+
+/**
+ * Whether a picture may sit in a เฉลย's typed text: one of this app's own
+ * `question-images` uploads, or the QA lab's in-memory file. Anything else —
+ * a picture pasted in along with text copied from a web page — is dropped
+ * rather than hot-linked from someone else's server into a student's screen.
+ */
+export function isSolutionTextImageSrc(src: string): boolean {
+  if (src.startsWith('blob:')) return true
+  try {
+    const url = new URL(src)
+    return url.protocol === 'https:' && url.pathname.includes('/storage/v1/object/public/question-images/')
+  } catch {
+    return false
+  }
 }
 
 const EXTENSIONS: Record<(typeof SOLUTION_FILE_TYPES)[number], string> = {

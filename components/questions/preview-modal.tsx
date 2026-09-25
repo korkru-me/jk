@@ -156,7 +156,7 @@ function InteractiveTab({ q }: { q: QuestionDetailWithCategory }) {
       {(q.solution_text || (q.solution_image_urls ?? []).length > 0) && (
         <div className="bg-warning/10 rounded-xl p-4 border border-warning/20 space-y-3">
           <p className="text-[11px] font-semibold text-warning uppercase tracking-wide mb-2">วิธีทำ / คำอธิบาย</p>
-          {q.solution_text && <RichText text={q.solution_text} className="text-sm text-warning leading-relaxed block" />}
+          {q.solution_text && <RichText text={q.solution_text} blocks className="text-sm text-warning leading-relaxed" />}
           <SolutionFiles urls={q.solution_image_urls} alt="รูปประกอบเฉลย" imageClassName="max-h-40 rounded-lg border border-warning/20 object-contain" />
         </div>
       )}
