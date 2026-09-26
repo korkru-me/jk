@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
   Users, BookOpen, Copy, Check,
-  GraduationCap, UserPlus, Grid3x3, Mail, ChevronLeft,
+  GraduationCap, UserPlus, Grid3x3, ChevronLeft,
   ClipboardList, CalendarDays, Home, LayoutDashboard, ChartColumnIncreasing,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -45,11 +45,10 @@ const StudentAbilityTab = dynamic(
   () => import('./student-ability-tab').then(module => module.StudentAbilityTab),
   { loading: TabLoading },
 )
-const ParentPortal = dynamic(() => import('./parent-portal').then(module => module.ParentPortal), { loading: TabLoading })
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
-type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'ability' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents'
+type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'ability' | 'homeroom' | 'groups' | 'invite' | 'coteachers'
 
 const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
   { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
@@ -60,7 +59,6 @@ const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?:
   { key: 'groups',      label: 'กลุ่มย่อย',       icon: Grid3x3 },
   { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
   { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-  { key: 'parents',     label: 'ผู้ปกครอง',       icon: Mail },
 ]
 
 const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
@@ -69,7 +67,6 @@ const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?
   { key: 'students',    label: 'นักเรียน',        icon: Users },
   { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
   { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-  { key: 'parents',     label: 'ผู้ปกครอง',       icon: Mail },
 ]
 
 interface RealStudent { id: string; full_name: string; email: string }
@@ -337,11 +334,6 @@ export function ClassroomDetailClient({
               coTeachers={coTeachers}
               invites={invites}
             />
-          </div>
-        )}
-        {activeTab === 'parents' && (
-          <div className="max-w-xl">
-            <ParentPortal studentCount={students.length} />
           </div>
         )}
       </div>
