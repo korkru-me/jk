@@ -22,6 +22,7 @@ import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/
 import { QuestionTagsEditor } from './question-tags-editor'
 import { SubQuestionCountBadge } from './sub-question-count-badge'
 import { QuestionSetBadges, type QuestionSetRef } from './question-set-badges'
+import { SolutionButton } from './solution-button'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
@@ -108,13 +109,15 @@ interface Props {
   subQuestionCount?: number
   /** Every แฟ้มโจทย์ in view that holds this question. Absent = none of them. */
   sets?: QuestionSetRef[]
+  /** Whether it carries a เฉลย, for the ดูเฉลย button. Absent = not known, no button. */
+  hasSolution?: boolean
   /** Present only when the card is listed inside one แฟ้ม. See the type. */
   setContext?: QuestionCardSetContext
 }
 
 export function QuestionCard({
   question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, detailsLoaded = true,
-  allTags, duplicateCount, subQuestionCount, sets, setContext,
+  allTags, duplicateCount, subQuestionCount, sets, hasSolution, setContext,
 }: Props) {
   const router = useRouter()
   // The edit page carries the bank's current view back with it, so returning
@@ -357,10 +360,17 @@ export function QuestionCard({
 
           {/* Right: actions (always visible on hover) */}
           <div className="flex flex-wrap items-center justify-between @md:flex-col @md:items-end @md:justify-start gap-1.5 @md:shrink-0">
-            {/* Primary action: preview */}
-            <Button onClick={onPreview} size="sm" className="bg-primary/10 text-primary hover:bg-primary/20">
-              <Eye /> ดูตัวอย่าง
-            </Button>
+            {/* The two ways to look at a โจทย์: its เฉลย on its own, or the
+                whole of it as a student meets it. Side by side on a wide card,
+                with ดูตัวอย่าง keeping the corner it has always had; stacked
+                on a narrow one — a grid column — where side by side would
+                take its width out of the title. */}
+            <div className="flex items-center gap-1.5 @md:flex-col @md:items-end @2xl:flex-row @2xl:items-center">
+              <SolutionButton questionId={q.id} questionTitle={q.title} hasSolution={hasSolution} />
+              <Button onClick={onPreview} size="sm" className="bg-primary/10 text-primary hover:bg-primary/20">
+                <Eye /> ดูตัวอย่าง
+              </Button>
+            </div>
 
             {/* Secondary actions row */}
             <div className="flex items-center flex-wrap gap-0.5">

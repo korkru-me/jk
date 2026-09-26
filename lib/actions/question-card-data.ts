@@ -8,6 +8,7 @@ import {
   fetchDuplicateCounts,
   fetchQuestionStats,
   fetchSetMemberships,
+  fetchSolutionPresence,
   type QuestionCardData,
   type QuestionCardDetail,
 } from '@/lib/question-card-data'
@@ -72,12 +73,13 @@ export async function getQuestionCardData(questionIds: string[]): Promise<Questi
     }
   }
 
-  const [stats, subQuestionCounts, duplicateCounts, setMemberships] = await Promise.all([
+  const [stats, subQuestionCounts, duplicateCounts, setMemberships, solutionPresence] = await Promise.all([
     fetchQuestionStats(supabase, ids),
     fetchSubQuestionCounts(supabase, rows),
     fetchDuplicateCounts(supabase, user.id, rows),
     fetchSetMemberships(supabase, user.id, ids),
+    fetchSolutionPresence(supabase, rows),
   ])
 
-  return { details, stats, duplicateCounts, subQuestionCounts, setMemberships }
+  return { details, stats, duplicateCounts, subQuestionCounts, setMemberships, solutionPresence }
 }

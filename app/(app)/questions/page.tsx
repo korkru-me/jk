@@ -7,6 +7,7 @@ import {
   fetchDuplicateCounts,
   fetchQuestionStats,
   fetchSetMemberships,
+  fetchSolutionPresence,
 } from '@/lib/question-card-data'
 import { QuestionBankClient } from './_components/question-bank-client'
 import {
@@ -741,14 +742,16 @@ export default async function QuestionsPage({
 
   const ownQuestions = ownResult.questions
   // Only the questions actually on screen need stats, part counts, a แฟ้ม
-  // lookup or a duplicate check now. The duplicate badge stays an own-bank question, so it
-  // is asked about `ownQuestions` alone — a teammate's card never shows one.
+  // lookup, a duplicate check or a เฉลย check now. The duplicate badge stays
+  // an own-bank question, so it is asked about `ownQuestions` alone — a
+  // teammate's card never shows one. The ดูเฉลย button shows on both.
   const visibleQuestions = [...ownQuestions, ...teamQuestions]
-  const [stats, subQuestionCounts, duplicateCounts, setMemberships] = await Promise.all([
+  const [stats, subQuestionCounts, duplicateCounts, setMemberships, solutionPresence] = await Promise.all([
     fetchQuestionStats(supabase, visibleQuestions.map(q => q.id)),
     fetchSubQuestionCounts(supabase, visibleQuestions),
     fetchDuplicateCounts(supabase, userId, ownQuestions),
     fetchSetMemberships(supabase, userId, visibleQuestions.map(q => q.id)),
+    fetchSolutionPresence(supabase, visibleQuestions),
   ])
 
   return (
@@ -769,6 +772,7 @@ export default async function QuestionsPage({
       duplicateCounts={duplicateCounts}
       subQuestionCounts={subQuestionCounts}
       setMemberships={setMemberships}
+      solutionPresence={solutionPresence}
       perPage={QUESTIONS_PER_PAGE}
       teamFilters={teamFilters}
       teamMatchCount={teamTotal}
