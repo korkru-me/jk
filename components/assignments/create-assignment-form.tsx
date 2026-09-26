@@ -15,7 +15,7 @@ import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
-  CircleCheck, Calculator, NotebookPen,
+  CircleCheck, Calculator, NotebookPen, Hash,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -130,6 +130,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
+  // Off unless the teacher asks: every งาน before this existed gave each
+  // student their own numbers, and that is still what a โจทย์สุ่มตัวเลข is for.
+  const [sharedRandomValues, setSharedRandomValues] = useState(false)
   const [showResults, setShowResults] = useState<ShowResultsMode>('immediate')
   // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
   // before this setting existed, and one that does is a choice, not a default.
@@ -351,6 +354,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const hasWorkImageQuestions = selectedIds.some(
     id => questions.find(q => q.id === id)?.question_type === 'written'
   )
+  // Same idea for "ตัวเลขชุดเดียวกัน": only a ข้อ that actually draws numbers
+  // can differ between students, so a งาน without one never sees the switch.
+  const randomValueQuestionCount = selectedIds.filter(
+    id => questions.find(q => q.id === id)?.has_random_values
+  ).length
+  const sharedRandomOn = randomValueQuestionCount > 0 && sharedRandomValues
 
   function openPublishDialog() {
     setScheduleMode(false)
@@ -431,6 +440,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         type: assignmentType,
         shuffle_questions: shuffleQ,
         shuffle_options: shuffleA,
+        // Stored as off when nothing in the งาน draws numbers, whatever the
+        // switch was left on before the last such ข้อ was removed.
+        shared_random_values: sharedRandomOn,
         random_question_count: selectedRandomCount,
         show_results: showResults,
         show_solutions: showSolutions,
@@ -1151,6 +1163,26 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 value: shuffleA,
                 set: setShuffleA,
               },
+              ...(randomValueQuestionCount > 0 ? [{
+                label: 'ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน',
+                desc: `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — ปกติแต่ละคนได้ตัวเลขไม่ซ้ำกัน เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น`,
+                icon: Hash,
+                value: sharedRandomValues,
+                set: setSharedRandomValues,
+                footer: (sharedRandomValues ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground px-1">
+                      {maxAttempts !== '1' && 'ทำรอบใหม่ก็ยังได้ตัวเลขชุดเดิม · '}
+                      สร้างงานแล้วกด &ldquo;ดูตัวอย่าง&rdquo; เพื่อดูตัวเลขที่นักเรียนจะได้
+                    </p>
+                    {assignmentType === 'exam' && (
+                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                        ตัวเลขเหมือนกันทุกคน คำตอบที่ถูกจึงเหมือนกันทุกคนด้วย — นักเรียนบอกคำตอบกันได้ง่ายกว่าแบบต่างคนต่างสุ่ม
+                      </p>
+                    )}
+                  </div>
+                ) : null) as React.ReactNode,
+              }] : []),
               ...(hasWorkImageQuestions ? [{
                 label: 'ให้นักเรียนแนบรูปแสดงวิธีทำ',
                 desc: `${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)`,
@@ -1168,7 +1200,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               // coming back to the same ข้อ that were missed.
               ...(maxAttempts !== '1' && !randomDrawOn && !streakOn ? [{
                 label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
-                desc: 'รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ',
+                desc: `รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ${sharedRandomOn ? 'ตัวเลขในโจทย์เป็นชุดเดิม (ตั้งให้ทุกคนได้ชุดเดียวกันไว้)' : 'ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ'}`,
                 icon: RotateCcw,
                 value: retryScope === 'wrong_only',
                 set: (on: boolean) => setRetryScope(on ? 'wrong_only' : 'all'),
@@ -1532,6 +1564,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   : []),
                 ...(hasWorkImageQuestions
                   ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
+                  : []),
+                ...(randomValueQuestionCount > 0
+                  ? [{ label: 'ตัวเลขในโจทย์สุ่ม', value: sharedRandomOn ? 'ทุกคนได้ชุดเดียวกัน' : 'แต่ละคนได้ต่างกัน' }]
                   : []),
                 { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
                 { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },

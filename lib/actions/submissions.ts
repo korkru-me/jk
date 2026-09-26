@@ -697,7 +697,7 @@ export async function drawNextStreakQuestion(
       id, student_id, status, started_at, assignment_id,
       current_streak, best_streak, streak_reached,
       assignments(
-        id, org_id, question_ids, question_points, shuffle_options, mode, duration_minutes, end_at,
+        id, org_id, question_ids, question_points, shuffle_options, shared_random_seed, mode, duration_minutes, end_at,
         secure_browser_mode, android_exam_mode,
         completion_rule, streak_target, streak_question_cap, streak_recycle_pool
       )
@@ -714,6 +714,7 @@ export async function drawNextStreakQuestion(
       question_ids: string[]
       question_points: Record<string, number> | null
       shuffle_options: boolean | null
+      shared_random_seed: number | null
       mode: string
       duration_minutes: number | null
       end_at: string | null
@@ -814,6 +815,9 @@ export async function drawNextStreakQuestion(
     orderIndex: rows.length,
     shuffleOptions: assignment.shuffle_options === true,
     pointOverride: assignment.question_points?.[question.id],
+    // A ข้อ the pool hands out again comes back with the same numbers when the
+    // งาน shares them — the same rule as a retry.
+    sharedRandomSeed: assignment.shared_random_seed,
   })
 
   const { data: inserted, error: insertError } = await admin

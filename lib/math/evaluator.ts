@@ -21,10 +21,16 @@ function getPrecision(step: number): number {
   return dot === -1 ? 0 : str.length - dot - 1
 }
 
-function randomFromStep(min: number, max: number, step: number): number {
+// Every draw below takes its random numbers from `rng` rather than calling
+// Math.random itself, so a งาน that gives everyone the same numbers can pass a
+// repeatable generator instead (lib/math/shared-random.ts). Math.random stays
+// the default, which is what every other caller has always got.
+type Rng = () => number
+
+function randomFromStep(min: number, max: number, step: number, rng: Rng): number {
   if (step <= 0) step = 1
   const count = Math.round((max - min) / step)
-  const idx = Math.floor(Math.random() * (count + 1))
+  const idx = Math.floor(rng() * (count + 1))
   const value = min + idx * step
   return parseFloat(value.toFixed(getPrecision(step)))
 }
@@ -43,15 +49,15 @@ function hasValueList(v: Variable): boolean {
   return Array.isArray(v.values) && v.values.length > 0
 }
 
-function pickFromList(values: number[]): number {
-  return values[Math.floor(Math.random() * values.length)]
+function pickFromList(values: number[], rng: Rng): number {
+  return values[Math.floor(rng() * values.length)]
 }
 
 /** One sample of `v`, honouring constant → value-list → min/max/step in that order. */
-function sampleVariable(v: Variable): number {
+function sampleVariable(v: Variable, rng: Rng): number {
   if (v.is_constant) return v.constant_value ?? v.min
-  if (hasValueList(v)) return pickFromList(v.values!)
-  return randomFromStep(v.min, v.max, getStep(v))
+  if (hasValueList(v)) return pickFromList(v.values!, rng)
+  return randomFromStep(v.min, v.max, getStep(v), rng)
 }
 
 function isDerived(v: Variable): boolean {
@@ -145,22 +151,23 @@ function sampleValues(
   variables: Variable[],
   exclude: Set<string> = new Set(),
   seed: Record<string, number> = {},
+  rng: Rng = Math.random,
 ): Record<string, number> {
   const values: Record<string, number> = { ...seed }
   const derived: Variable[] = []
   for (const v of variables) {
     if (v.type === 'reference' || v.is_answer || exclude.has(v.name)) continue
     if (isDerived(v)) { derived.push(v); continue }
-    values[v.name] = sampleVariable(v)
+    values[v.name] = sampleVariable(v, rng)
   }
   resolveDerived(derived, values)
   return values
 }
 
-function samplePythagoreanValues(groups: PythagoreanGroup[]): Record<string, number> {
+function samplePythagoreanValues(groups: PythagoreanGroup[], rng: Rng = Math.random): Record<string, number> {
   const values: Record<string, number> = {}
   for (const g of groups) {
-    const triple = ALL_PYTHAGOREAN_TRIPLES[Math.floor(Math.random() * ALL_PYTHAGOREAN_TRIPLES.length)]
+    const triple = ALL_PYTHAGOREAN_TRIPLES[Math.floor(rng() * ALL_PYTHAGOREAN_TRIPLES.length)]
     values[g.a_var] = triple[0]
     values[g.b_var] = triple[1]
     values[g.c_var] = triple[2]
@@ -173,6 +180,9 @@ export interface RandomizeOptions {
   answerStep?: number
   pythagoreanGroups?: PythagoreanGroup[]
   maxAttempts?: number
+  /** Where the random numbers come from. Math.random unless the caller needs
+   *  the draw to be repeatable — see lib/math/shared-random.ts. */
+  rng?: () => number
 }
 
 // ─── randomizeVariables ───────────────────────────────────────────────────────
@@ -185,7 +195,7 @@ export function randomizeVariables(
   logicRules: LogicRule[] = [],
   options: RandomizeOptions = {}
 ): Record<string, number> {
-  const { formula, answerStep, pythagoreanGroups = [], maxAttempts = 500 } = options
+  const { formula, answerStep, pythagoreanGroups = [], maxAttempts = 500, rng = Math.random } = options
 
   const pythagoreanVarNames = new Set(pythagoreanGroups.flatMap(g => [g.a_var, g.b_var, g.c_var]))
   const hasStep = !!answerStep && answerStep > 0
@@ -194,12 +204,12 @@ export function randomizeVariables(
 
   // Fast path: no filtering needed
   if (!hasStep && !hasConstraints && !hasPythagorean) {
-    return sampleValues(variables)
+    return sampleValues(variables, undefined, undefined, rng)
   }
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const pyValues = hasPythagorean ? samplePythagoreanValues(pythagoreanGroups) : {}
-    const values = sampleValues(variables, pythagoreanVarNames, pyValues)
+    const pyValues = hasPythagorean ? samplePythagoreanValues(pythagoreanGroups, rng) : {}
+    const values = sampleValues(variables, pythagoreanVarNames, pyValues, rng)
 
     if (!checkConstraints(values, logicRules)) continue
 
@@ -214,8 +224,8 @@ export function randomizeVariables(
   }
 
   // Fallback after exhausting attempts
-  const pyValues = hasPythagorean ? samplePythagoreanValues(pythagoreanGroups) : {}
-  return sampleValues(variables, pythagoreanVarNames, pyValues)
+  const pyValues = hasPythagorean ? samplePythagoreanValues(pythagoreanGroups, rng) : {}
+  return sampleValues(variables, pythagoreanVarNames, pyValues, rng)
 }
 
 // ─── Trial runner (for preview UI) ───────────────────────────────────────────
@@ -343,7 +353,7 @@ export function evaluateMultiStep(
       } else if (isDerived(v)) {
         derived.push(v)
       } else {
-        values[v.name] = sampleVariable(v)
+        values[v.name] = sampleVariable(v, Math.random)
       }
     }
     resolveDerived(derived, values)

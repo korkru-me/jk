@@ -10,6 +10,7 @@ import { decideCompletion, streakForcedSettings } from '@/lib/streak-completion'
 import { normalizeSetSections } from '@/lib/question-set-sections'
 import { inspectSebReadiness } from '@/lib/seb'
 import { resolveNewAssignmentMathTools } from '@/lib/assignment-math-tools'
+import { createSharedRandomSeed } from '@/lib/math/shared-random'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -63,6 +64,9 @@ interface CreateAssignmentData {
   type?: 'exercise' | 'exam'
   shuffle_questions?: boolean
   shuffle_options?: boolean
+  /** Give every student the same numbers on โจทย์สุ่มตัวเลข. Only the choice
+   *  comes from the browser — the seed itself is made here. */
+  shared_random_values?: boolean
   random_question_count?: number | null
   show_results?: ShowResultsMode
   /** เฉลยวิธีทำ opens on the summary page once the student is done with the
@@ -253,6 +257,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       type: assignmentType,
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? false,
+      shared_random_seed: data.shared_random_values === true ? createSharedRandomSeed() : null,
       random_question_count: randomQuestionCount,
       show_results: showResults,
       show_solutions: data.show_solutions === true,
@@ -369,6 +374,10 @@ interface UpdateAssignmentData {
    *  have finished: it only decides whether a เฉลยวิธีทำ opens, never what
    *  anyone scored. */
   show_solutions?: boolean
+  /** "ตัวเลขชุดเดียวกัน" on or off. Omit to leave it untouched. Refused once
+   *  anyone has started, and leaving it on keeps the seed already stored — a
+   *  new one would hand the next student different numbers. */
+  shared_random_values?: boolean
   /** Only the visibility of the frozen แฟ้มย่อย is editable after the fact —
    *  the grouping itself belongs to the แฟ้มโจทย์ this งาน came from. */
   show_sections?: boolean
@@ -403,7 +412,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // authorized co-teacher, same as updateAssignmentStatus above.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, sections, type, mode, status, random_question_count, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, streak_target, streak_question_cap, streak_recycle_pool')
+    .select('question_ids, sections, type, mode, status, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -555,6 +564,24 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     if (startedSubmission) return { error: 'เปลี่ยนจำนวนข้อสุ่มไม่ได้หลังมีนักเรียนเริ่มทำข้อสอบแล้ว' }
   }
 
+  // Turning it on draws a seed once; leaving it on keeps that seed, so saving
+  // the edit page for any other reason never reshuffles anyone's numbers.
+  const sharedRandomWasOn = existing.shared_random_seed != null
+  const sharedRandomChanged = data.shared_random_values !== undefined
+    && data.shared_random_values !== sharedRandomWasOn
+  if (sharedRandomChanged) {
+    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'เปลี่ยนการให้ทุกคนได้ตัวเลขชุดเดียวกันไม่ได้หลังมีนักเรียนเริ่มทำแล้ว' }
+    }
+  }
+
   if (secureBrowserMode !== (existing.secure_browser_mode ?? 'browser')) {
     const { data: startedSubmission, error: startedSubmissionError } = await supabase
       .from('submissions')
@@ -650,6 +677,9 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       display_max_score: displayMaxScore,
       show_results: data.show_results,
       ...(data.show_solutions === undefined ? {} : { show_solutions: data.show_solutions === true }),
+      ...(sharedRandomChanged
+        ? { shared_random_seed: data.shared_random_values ? createSharedRandomSeed() : null }
+        : {}),
       random_question_count: randomQuestionCount,
       proctoring_enabled: proctoringEnabled,
       fullscreen_required: proctoringEnabled && data.fullscreen_required,
@@ -746,6 +776,9 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       type: source.type,
       shuffle_questions: source.shuffle_questions,
       shuffle_options: source.shuffle_options,
+      // The same seed, not a new one: a สำเนา is the same งาน for another
+      // class, so its students get the same numbers as the original's.
+      shared_random_seed: source.shared_random_seed ?? null,
       random_question_count: source.random_question_count ?? null,
       show_results: source.show_results,
       show_solutions: source.show_solutions ?? false,
