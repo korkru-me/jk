@@ -22,6 +22,11 @@ import type { AnswerPart, FillBlankItem } from '@/lib/types'
  * revealed, and a เฉลย the teacher chose to withhold is never in the response
  * at all rather than merely hidden by CSS.
  *
+ * The เฉลยวิธีทำ the teacher attached to the โจทย์ never travels with a check,
+ * whatever `instant_check_answer_key` says: a student still inside the
+ * attempt could copy it straight into the answer. It opens only on the summary
+ * page, once the student can no longer work on the งาน (lib/solution-release.ts).
+ *
  * It also keeps mathjs off the exam page. Deciding whether "9+1" answers 10
  * needs the evaluator (~640 KB), which the exam bundle deliberately does not
  * carry — see the import comment at the top of components/exam/exam-client.tsx.
@@ -62,8 +67,6 @@ export interface AnswerFeedback {
   revealed: boolean
   rows: FeedbackRow[]
   choices?: FeedbackChoice[]
-  solutionText?: string | null
-  solutionImageUrls?: string[]
   /** Shown above the rows when the student needs to know why there is no
    *  verdict, e.g. a ช่องกรอก their teacher marks by hand. */
   note?: string
@@ -88,8 +91,6 @@ export interface FeedbackQuestion {
     index?: number
     left_text?: string
   }> | null
-  solution_text: string | null
-  solution_image_urls: string[] | null
 }
 
 export interface FeedbackInput {
@@ -172,12 +173,6 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
     score: input.score,
     maxScore: input.maxScore,
     revealed: revealAnswerKey,
-    ...(revealAnswerKey
-      ? {
-          solutionText: question.solution_text,
-          solutionImageUrls: question.solution_image_urls ?? [],
-        }
-      : {}),
   }
 
   const reveal = (value: string) => (revealAnswerKey ? { correct: value } : {})

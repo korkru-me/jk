@@ -35,11 +35,10 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
+  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw,
   Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
-import { SolutionFiles } from '@/components/questions/solution-files'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
@@ -133,11 +132,6 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
     image_urls: string[] | null
     // Preview-only, see AnswerRow.max_score above.
     answer_tolerance?: number
-    // Preview-only as well: a real attempt's ตรวจคำตอบ gets the teacher's
-    // วิธีทำ from the server, which is the only side that may decide whether
-    // the student is allowed to see it yet.
-    solution_text?: string | null
-    solution_image_urls?: string[] | null
   }
 }
 
@@ -601,8 +595,6 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             answer_tolerance: answer.questions.answer_tolerance ?? 0.1,
             extra_data: answer.questions.extra_data,
             mcq_options: answer.questions.mcq_options,
-            solution_text: answer.questions.solution_text ?? null,
-            solution_image_urls: answer.questions.solution_image_urls ?? null,
           },
           isCorrect: graded.is_correct,
           score: graded.score,
@@ -2253,18 +2245,6 @@ function InstantCheckPanel({
             </div>
           ))}
         </div>
-      )}
-
-      {(feedback.solutionText || (feedback.solutionImageUrls ?? []).length > 0) && (
-        <Card radius="md" padding="sm" className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-            <Lightbulb size={13} /> วิธีทำ
-          </p>
-          {feedback.solutionText && (
-            <RichText text={feedback.solutionText} blocks className="text-sm leading-relaxed" />
-          )}
-          <SolutionFiles urls={feedback.solutionImageUrls} alt="เฉลยวิธีทำ" imageClassName="max-h-44 rounded-lg border object-contain" />
-        </Card>
       )}
 
       {!feedback.revealed && feedback.verdict !== 'correct' && (

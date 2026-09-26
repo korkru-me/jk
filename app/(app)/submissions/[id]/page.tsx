@@ -24,6 +24,13 @@ import { Card } from '@/components/ui/card'
 import { containsMath, renderMathInHtml } from '@/lib/math/latex'
 import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 import { MATH_WORK_BUCKET } from '@/lib/math-work'
+import { attemptItemHasSolution } from '@/lib/attempt-solutions'
+import { loadAttemptSolutionItems, loadSolutionRelease } from '@/lib/attempt-solutions-server'
+import { attemptLimitFor, type SolutionRelease } from '@/lib/solution-release'
+import {
+  AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
+} from '@/components/student/attempt-solutions'
+import { SolutionLockNotice } from '@/components/student/solution-lock-notice'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -77,7 +84,7 @@ export default async function SubmissionResultPage({
     .select(`
       id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at,
       users!submissions_student_id_fkey(full_name),
-      assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score)
+      assignments(id, title, show_results, show_solutions, end_at, duration_minutes, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score)
     `)
     .eq('id', id)
     .eq('student_id', user.id)
@@ -190,7 +197,11 @@ export default async function SubmissionResultPage({
   const answers = (submission as any).submission_answers as any[]
   const pendingManualCount = answers.filter(isPendingTeacherReview).length
 
-  const attemptsRemaining = assignment.max_attempts == null || submission.attempt_number < assignment.max_attempts
+  // The limit startSubmission enforces: a ข้อสอบ saved without max_attempts is
+  // one attempt, not unlimited — otherwise this page offered a retry the
+  // server then refused, next to a เฉลยวิธีทำ it had just opened for being done.
+  const attemptLimit = attemptLimitFor(assignment.type, assignment.max_attempts)
+  const attemptsRemaining = attemptLimit == null || submission.attempt_number < attemptLimit
 
   // A wrong-only retry only has something to reopen while a question is still
   // short of full marks. Questions waiting on the teacher are not counted:
@@ -213,7 +224,33 @@ export default async function SubmissionResultPage({
     (!assignment.end_at || new Date(assignment.end_at) > new Date()) &&
     (!isWrongOnlyRetry || (retryableCount ?? 0) > 0)
 
-  return (
+  // เฉลยวิธีทำ — the teacher's attached เฉลย, not the answer key above. Only
+  // on the student's own summary, and only when at least one ข้อ of this
+  // attempt has one: a lock promising a เฉลย that does not exist would send
+  // them back for nothing. The เฉลย is read here only to learn which ข้อ have
+  // one; nothing of it reaches the page until the viewer asks the Server
+  // Action, which decides the release again.
+  let solutionRelease: SolutionRelease = { state: 'off' }
+  let solutionAnswerIds: string[] = []
+  if (isOwnSubmission && assignment.show_solutions === true) {
+    const [release, items] = await Promise.all([
+      loadSolutionRelease(admin, {
+        id: submission.assignment_id,
+        show_solutions: true,
+        status: assignment.status,
+        type: assignment.type,
+        end_at: assignment.end_at,
+        max_attempts: assignment.max_attempts,
+        duration_minutes: assignment.duration_minutes,
+      }, user.id),
+      loadAttemptSolutionItems(admin, id),
+    ])
+    solutionAnswerIds = (items ?? []).filter(attemptItemHasSolution).map(item => item.answerId)
+    if (solutionAnswerIds.length > 0) solutionRelease = release
+  }
+  const solutionsOpen = solutionRelease.state === 'open'
+
+  const page = (
     <div className="max-w-3xl space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -335,7 +372,7 @@ export default async function SubmissionResultPage({
               </div>
               <h2 className="text-xl font-bold">ส่งคำตอบเรียบร้อยแล้ว</h2>
               <p className="text-sm text-muted-foreground mt-2 max-w-md">
-                ครูกำหนดไม่แสดงคะแนนและเฉลยสำหรับงานนี้
+                ครูกำหนดไม่แสดงคะแนนและคำตอบรายข้อสำหรับงานนี้
               </p>
             </div>
           )}
@@ -346,8 +383,11 @@ export default async function SubmissionResultPage({
             </p>
           )}
 
-          {(canRetry || assignment.classroom_id) && (
+          {(canRetry || assignment.classroom_id || solutionsOpen) && (
             <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+              {/* Never beside เริ่มทำอีกครั้ง: the เฉลย opens only once the
+                  student cannot make another attempt. */}
+              {solutionsOpen && <AttemptSolutionsButton />}
               {canRetry && (
                 <Link
                   href={`/assignments/${submission.assignment_id}/take`}
@@ -370,6 +410,14 @@ export default async function SubmissionResultPage({
               )}
             </div>
           )}
+
+          {solutionRelease.state === 'locked' && (
+            <SolutionLockNotice
+              lock={solutionRelease}
+              assignmentId={submission.assignment_id}
+              canResume={assignment.status === 'published'}
+            />
+          )}
         </div>
       </Card>
 
@@ -377,12 +425,12 @@ export default async function SubmissionResultPage({
       {!canShowAnswers && (
         <Card edge="dashed" padding="xl" className="text-center text-sm text-muted-foreground">
           {assignment.show_results === 'never' ? (
-            <>🔒 ครูกำหนดไม่แสดงคะแนนและเฉลยสำหรับงานนี้</>
+            <>🔒 ครูกำหนดไม่แสดงคะแนนและคำตอบรายข้อสำหรับงานนี้</>
           ) : assignment.show_results === 'score_only' ? (
-            <>🔒 งานนี้แสดงเฉพาะคะแนนรวม โดยไม่แสดงคำตอบรายข้อและเฉลย</>
+            <>🔒 งานนี้แสดงเฉพาะคะแนนรวม โดยไม่แสดงคำตอบรายข้อ</>
           ) : (
             <>
-              🔒 เฉลยและคะแนนรายข้อจะแสดงหลังพ้นกำหนดส่งงาน
+              🔒 คำตอบที่ถูกและคะแนนรายข้อจะแสดงหลังพ้นกำหนดส่งงาน
               {assignment.end_at && (
                 <> ({new Date(assignment.end_at).toLocaleString('th-TH')})</>
               )}
@@ -396,19 +444,31 @@ export default async function SubmissionResultPage({
             กำลังโหลดรายละเอียดคำตอบ...
           </Card>
         )}>
-          <SubmissionAnswerDetails submissionId={id} isTeacherViewer={isTeacherViewer} />
+          <SubmissionAnswerDetails
+            submissionId={id}
+            isTeacherViewer={isTeacherViewer}
+            solutionAnswerIds={solutionsOpen ? solutionAnswerIds : []}
+          />
         </Suspense>
       )}
     </div>
   )
+
+  // The viewer's code is only sent to a student who can open it.
+  return solutionsOpen
+    ? <AttemptSolutionsProvider submissionId={id}>{page}</AttemptSolutionsProvider>
+    : page
 }
 
 async function SubmissionAnswerDetails({
   submissionId,
   isTeacherViewer,
+  solutionAnswerIds,
 }: {
   submissionId: string
   isTeacherViewer: boolean
+  /** ข้อ whose เฉลยวิธีทำ this student may open — empty unless it is open. */
+  solutionAnswerIds: string[]
 }) {
   // A student reads their own answers through RLS, because that is what
   // enforces the show_results gating (can_current_user_view_submission_answers)
@@ -416,18 +476,35 @@ async function SubmissionAnswerDetails({
   // only after the page authorized them with canManageAssignment, and needs
   // the service role because submission_answers has no co-teacher policy.
   const reader = isTeacherViewer ? createAdminClient() : await createClient()
-  const { data: answers } = await reader
+  const { data: answerRows } = await reader
     .from('submission_answers')
     .select(`
-      id, correct_answer, is_correct, max_score, option_order, order_index,
+      id, question_id, correct_answer, is_correct, max_score, option_order, order_index,
       random_values, score, student_answer, work_images, carried_over, check_count,
-      questions(title, question_text, answer_parts, answer_unit, question_type, extra_data, mcq_options),
       student_work_artifacts(id, part_key, source_type, preview_path, updated_at)
     `)
     .eq('submission_id', submissionId)
     .order('order_index')
 
-  const sortedAnswers = (answers ?? []) as any[]
+  // The โจทย์ behind those answers, read with the service role for exactly
+  // the ids RLS just returned. A student may not read `questions` rows
+  // themselves: RLS grants a whole row, and the row carries the เฉลยวิธีทำ,
+  // which opens on its own terms (lib/solution-release.ts) — so only the
+  // columns this review shows are read here, and the เฉลย is not one of them.
+  const questionIds = Array.from(new Set((answerRows ?? []).map((row: any) => row.question_id as string)))
+  const { data: questionRows } = questionIds.length > 0
+    ? await createAdminClient()
+        .from('questions')
+        .select('id, title, question_text, answer_parts, answer_unit, question_type, extra_data, mcq_options')
+        .in('id', questionIds)
+    : { data: [] }
+  const questionById = new Map((questionRows ?? []).map((question: any) => [question.id as string, question]))
+  // Deleting a โจทย์ cascades to its answers, so a missing one is a row about
+  // to disappear anyway.
+  const sortedAnswers = (answerRows ?? [])
+    .map((row: any) => ({ ...row, questions: questionById.get(row.question_id) ?? null }))
+    .filter((row: any) => row.questions !== null) as any[]
+  const solutionIds = new Set(solutionAnswerIds)
   const artifactPreviewPaths = sortedAnswers.flatMap(answer => (
     (answer.student_work_artifacts ?? []).map((artifact: any) => artifact.preview_path as string)
   ))
@@ -558,6 +635,11 @@ async function SubmissionAnswerDetails({
                       previewUrl: signedArtifactUrls.get(artifact.preview_path as string) ?? null,
                     }))}
                   />
+                  {solutionIds.has(a.id) && (
+                    <div className="mt-3">
+                      <AttemptSolutionShortcut answerId={a.id} number={i + 1} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

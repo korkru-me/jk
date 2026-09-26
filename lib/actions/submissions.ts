@@ -543,7 +543,7 @@ export async function checkAnswer(submissionAnswerId: string) {
       id, correct_answer, student_answer, math_input_modes, max_score, option_order,
       questions(
         question_type, answer_unit, answer_parts, answer_tolerance, extra_data,
-        mcq_options, solution_text, solution_image_urls
+        mcq_options
       )
     `)
     .eq('id', submissionAnswerId)

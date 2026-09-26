@@ -34,6 +34,7 @@ import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
+import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
 
@@ -49,7 +50,7 @@ const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจ
 // "หลังพ้นกำหนดส่ง" — the wrong promise, on the last screen before creating.
 const SHOW_RESULTS_SUMMARY: Record<ShowResultsMode, string> = {
   immediate: 'ทันทีหลังส่ง',
-  score_only: 'คะแนน แต่ไม่แสดงเฉลย',
+  score_only: 'คะแนน แต่ไม่แสดงคำตอบ',
   after_due: 'หลังพ้นกำหนดส่ง',
   never: 'ไม่แสดงผลลัพธ์',
 }
@@ -130,6 +131,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
   const [showResults, setShowResults] = useState<ShowResultsMode>('immediate')
+  // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
+  // before this setting existed, and one that does is a choice, not a default.
+  const [showSolutions, setShowSolutions] = useState(false)
   const [maxAttempts, setMaxAttempts] = useState('')
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
@@ -429,6 +433,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         shuffle_options: shuffleA,
         random_question_count: selectedRandomCount,
         show_results: showResults,
+        show_solutions: showSolutions,
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
         // The wrong-only switch is hidden while a draw is on, so store the
@@ -991,10 +996,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 <div className="border-t border-border pt-3 space-y-1.5">
                   <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                     <div>
-                      <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                      <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                       <p className="text-xs text-muted-foreground">
                         {instantCheckAnswerKey
-                          ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำทันที เหมาะกับการฝึกให้เข้าใจ'
+                          ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ'
                           : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
                       </p>
                     </div>
@@ -1007,7 +1012,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   </label>
                   {assignmentType === 'exam' && instantCheckAnswerKey && (
                     <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                      งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือเฉลยออกไปจากห้องได้ แนะนำให้ปิด
+                      งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือคำตอบที่ถูกออกไปจากห้องได้ แนะนำให้ปิด
                     </p>
                   )}
                 </div>
@@ -1086,10 +1091,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   <div className="space-y-1.5 pl-11">
                     <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                       <div>
-                        <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                        <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                         <p className="text-xs text-muted-foreground">
                           {instantCheckAnswerKey
-                            ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำที่ครูใส่ไว้ทันที เหมาะกับการฝึกให้เข้าใจ'
+                            ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ — ส่วนเฉลยวิธีทำที่แนบไว้ ดูได้หลังจบงานตามติ๊ก "ให้นักเรียนดูเฉลยวิธีทำ"'
                             : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
                         </p>
                       </div>
@@ -1102,7 +1107,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     </label>
                     {instantCheckAnswerKey && (
                       <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                        นักเรียนเห็นเฉลยระหว่างทำ แล้วแก้คำตอบให้ถูกได้ คะแนนแบบฝึกหัดจึงสะท้อน &ldquo;ทำจนเข้าใจ&rdquo; ไม่ใช่ &ldquo;ถูกตั้งแต่แรก&rdquo; — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดูในหน้าผลรายคน
+                        นักเรียนเห็นคำตอบที่ถูกระหว่างทำ แล้วแก้คำตอบให้ถูกได้ คะแนนแบบฝึกหัดจึงสะท้อน &ldquo;ทำจนเข้าใจ&rdquo; ไม่ใช่ &ldquo;ถูกตั้งแต่แรก&rdquo; — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดูในหน้าผลรายคน
                       </p>
                     )}
                   </div>
@@ -1171,7 +1176,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   <>
                     {retryScope === 'wrong_only' && showResults === 'immediate' && (
                       <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                        ตอนนี้ตั้งให้เฉลยทันทีหลังส่ง นักเรียนจึงเห็นเฉลยก่อนกลับมาแก้ข้อที่ผิด
+                        ตอนนี้ตั้งให้แสดงคำตอบที่ถูกทันทีหลังส่ง นักเรียนจึงเห็นคำตอบก่อนกลับมาแก้ข้อที่ผิด
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground px-1">
@@ -1363,9 +1368,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {([
-                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนน+เฉลยทันที' },
-                { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงเฉลย', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
-                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนเฉลยจนกว่าจะหมดเขต' },
+                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
+                { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
+                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
                 { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
               ] as const).map(o => (
                 <button
@@ -1382,6 +1387,16 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               ))}
             </div>
           </div>
+
+          {/* Beside แสดงผลลัพธ์ because a teacher deciding what students see
+              after hand-in decides this too — but separately: that one is the
+              score and the answer key, this is the เฉลยวิธีทำ they attached. */}
+          <SolutionReleaseSetting
+            checked={showSolutions}
+            onChange={setShowSolutions}
+            assignmentType={assignmentType}
+            maxAttempts={maxAttempts}
+          />
 
           <div className="space-y-1.5">
             <Label htmlFor="attempts" className="flex items-center gap-1.5">
@@ -1521,6 +1536,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
                 { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
                 { label: 'แสดงผล',    value: SHOW_RESULTS_SUMMARY[showResults] },
+                { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">
                   <span className="text-muted-foreground">{row.label}</span>
