@@ -29,9 +29,15 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 
 const teacherNav: NavEntry[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
-  { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
-  { href: '/questions/import', label: 'นำเข้าโจทย์', icon: '📥' },
-  { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
+  {
+    label: 'จัดการโจทย์',
+    icon: '📝',
+    children: [
+      { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
+      { href: '/questions/import', label: 'นำเข้าโจทย์', icon: '📥' },
+      { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
+    ],
+  },
   { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
   {
     label: 'วิจัยการศึกษา',
