@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import {
   Users, BookOpen, Copy, Check,
   GraduationCap, UserPlus, Grid3x3, Mail, ChevronLeft,
-  ClipboardList, CalendarDays, Home, LayoutDashboard,
+  ClipboardList, CalendarDays, Home, LayoutDashboard, ChartColumnIncreasing,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
@@ -41,16 +41,21 @@ const ClassroomScoresMatrix = dynamic(
   () => import('./classroom-scores-matrix').then(module => module.ClassroomScoresMatrix),
   { loading: TabLoading },
 )
+const StudentAbilityTab = dynamic(
+  () => import('./student-ability-tab').then(module => module.StudentAbilityTab),
+  { loading: TabLoading },
+)
 const ParentPortal = dynamic(() => import('./parent-portal').then(module => module.ParentPortal), { loading: TabLoading })
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
-type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents'
+type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'ability' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents'
 
 const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
   { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
   { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
   { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
+  { key: 'ability',     label: 'ศักยภาพผู้เรียน',   icon: ChartColumnIncreasing, managerOnly: true },
   { key: 'students',    label: 'นักเรียน',        icon: Users },
   { key: 'groups',      label: 'กลุ่มย่อย',       icon: Grid3x3 },
   { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
@@ -293,6 +298,16 @@ export function ClassroomDetailClient({
             sortKey={studentSortKey}
             sortDir={studentSortDir}
             onViewStudents={() => setActiveTab('students')}
+          />
+        )}
+        {activeTab === 'ability' && canManage && (
+          <StudentAbilityTab
+            classroomId={classroom.id}
+            students={students}
+            assignments={classroomAssignments}
+            submissions={classroomSubmissions}
+            profiles={studentProfiles}
+            pendingReviewByAssignment={pendingReviewByAssignment}
           />
         )}
         {activeTab === 'homeroom' && canManage && (
