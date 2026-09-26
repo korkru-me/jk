@@ -19,7 +19,6 @@ function check(over: {
   tolerance?: number
   mcqOptions?: FeedbackQuestion['mcq_options']
   answerUnit?: string | null
-  solutionText?: string | null
   reveal?: boolean
   mathInputModes?: Record<string, 'deg' | 'rad'>
 }) {
@@ -31,8 +30,6 @@ function check(over: {
     answer_tolerance: over.tolerance ?? 0.01,
     extra_data: over.extraData ?? {},
     mcq_options: over.mcqOptions ?? null,
-    solution_text: over.solutionText ?? null,
-    solution_image_urls: null,
   }
   const graded = gradeAnswer({
     id: 'a1',
@@ -116,11 +113,32 @@ describe('buildAnswerFeedback — withholding the เฉลย', () => {
     expect(hidden.rows[0].student).toBe('7')
   })
 
-  it('withholds the teacher วิธีทำ on the same switch', () => {
-    const shown = check({ correct: '42', student: '42', solutionText: 'ใช้สูตร...' })
-    const hidden = check({ correct: '42', student: '42', solutionText: 'ใช้สูตร...', reveal: false })
-    expect(shown.solutionText).toBe('ใช้สูตร...')
-    expect(hidden.solutionText).toBeUndefined()
+  it('never carries the teacher’s เฉลยวิธีทำ, even with the answer key shown', () => {
+    // A caller holding the whole question row passes it straight through; the
+    // เฉลยวิธีทำ in it must still not reach a student who is mid-attempt.
+    const question = {
+      question_type: 'written',
+      answer_unit: null,
+      answer_parts: null,
+      answer_tolerance: 0.01,
+      extra_data: {},
+      mcq_options: null,
+      solution_text: '<p>ใช้สูตร s = ut</p>',
+      solution_image_urls: ['https://example.test/solution.png'],
+    }
+    const feedback = buildAnswerFeedback({
+      correct_answer: '42',
+      student_answer: '42',
+      question,
+      isCorrect: true,
+      score: 1,
+      maxScore: 1,
+      revealAnswerKey: true,
+    })
+    expect(feedback.revealed).toBe(true)
+    expect(feedback.rows[0].correct).toBe('42')
+    expect(JSON.stringify(feedback)).not.toContain('ใช้สูตร')
+    expect(JSON.stringify(feedback)).not.toContain('solution.png')
   })
 
   it('never marks an option as the เฉลย while the key is withheld', () => {

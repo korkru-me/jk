@@ -65,6 +65,9 @@ interface CreateAssignmentData {
   shuffle_options?: boolean
   random_question_count?: number | null
   show_results?: ShowResultsMode
+  /** เฉลยวิธีทำ opens on the summary page once the student is done with the
+   *  งาน (lib/solution-release.ts). Off unless the teacher ticks it. */
+  show_solutions?: boolean
   max_attempts?: number | null
   score_strategy?: ScoreStrategy
   retry_scope?: RetryScope
@@ -252,6 +255,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       shuffle_options: data.shuffle_options ?? false,
       random_question_count: randomQuestionCount,
       show_results: showResults,
+      show_solutions: data.show_solutions === true,
       max_attempts: data.max_attempts || null,
       score_strategy: forced?.score_strategy ?? data.score_strategy ?? 'best',
       retry_scope: forced?.retry_scope ?? retryScope,
@@ -361,6 +365,10 @@ interface UpdateAssignmentData {
   question_points?: Record<string, number> | null
   display_max_score?: number | null
   show_results: ShowResultsMode
+  /** Omit to leave it untouched. Changeable at any time, even after students
+   *  have finished: it only decides whether a เฉลยวิธีทำ opens, never what
+   *  anyone scored. */
+  show_solutions?: boolean
   /** Only the visibility of the frozen แฟ้มย่อย is editable after the fact —
    *  the grouping itself belongs to the แฟ้มโจทย์ this งาน came from. */
   show_sections?: boolean
@@ -641,6 +649,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       question_points: questionPoints,
       display_max_score: displayMaxScore,
       show_results: data.show_results,
+      ...(data.show_solutions === undefined ? {} : { show_solutions: data.show_solutions === true }),
       random_question_count: randomQuestionCount,
       proctoring_enabled: proctoringEnabled,
       fullscreen_required: proctoringEnabled && data.fullscreen_required,
@@ -739,6 +748,7 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
       shuffle_options: source.shuffle_options,
       random_question_count: source.random_question_count ?? null,
       show_results: source.show_results,
+      show_solutions: source.show_solutions ?? false,
       max_attempts: source.max_attempts,
       score_strategy: source.score_strategy,
       retry_scope: source.retry_scope ?? 'all',

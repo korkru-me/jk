@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 25 กันยายน 2026
+อัปเดตล่าสุด: 26 กันยายน 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -69,13 +69,14 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 - `questions`, `assignments` และ `submission_answers` มี secret/answer-bearing columns จึงห้ามส่ง `select('*')` จากแถวเหล่านี้เข้า Client Component ของนักเรียน
 - ระหว่างทำข้อสอบ browser รับเฉพาะ DTO จาก `lib/exam-safe.ts`; ต้องเพิ่ม field ใหม่ด้วย allowlist และ regression test ไม่ใช้ object spread จาก database row
-- student RLS ห้ามอ่าน question-bank row และ assignment row เต็ม; `assignments.access_code` ต้องอยู่ฝั่ง server เท่านั้น
+- student RLS ห้ามอ่าน question-bank row และ assignment row เต็ม; `assignments.access_code` ต้องอยู่ฝั่ง server เท่านั้น · ตั้งแต่ migration `20260926022404` นักเรียนไม่มี policy อ่าน `questions` เลย — policy เดิม (`questions_student_results_select`) เปิดทั้งแถวหลังส่งตาม `show_results` จึงพาเฉลยวิธีทำไปให้นักเรียนที่ยังเหลือรอบอ่านผ่าน API ได้ หน้าผลสอบอ่านเฉพาะคอลัมน์ที่แสดงด้วย service role สำหรับ `question_id` ที่ RLS ของ `submission_answers` คืนมาเท่านั้น
 - **เฉลยที่ไม่ให้ดู ต้องไม่ถูกส่งไปที่ browser เลย ไม่ใช่ส่งไปแล้วซ่อน** — นักเรียนที่เปิด DevTools อ่าน network response, React props, RSC payload, `localStorage` และ bundle ได้ทั้งหมด การซ่อนด้วย CSS, `hidden`, conditional render, การไม่ผูก state หรือการ obfuscate ไม่ใช่การปกป้อง ถ้าค่าอยู่ใน payload ถือว่านักเรียนอ่านได้แล้ว
-- เกณฑ์ตัดสินคือ **serialize หรือไม่** ไม่ใช่ render หรือไม่: ฟิลด์เฉลยต้องหายไปจาก object ที่ server ส่งกลับ (conditional spread/omit) ไม่ใช่ส่งเป็นค่าว่าง `null` หรือ flag ให้ client ตัดสินใจเอง — ดู `buildAnswerFeedback` ที่ตัด `solutionText`/`solutionImageUrls` ออกทั้งคีย์เมื่อ `instant_check_answer_key` ปิด และเทสต์ที่ยืนยันว่า `JSON.stringify` ของ response ไม่มีคำตอบอยู่เลย
+- เกณฑ์ตัดสินคือ **serialize หรือไม่** ไม่ใช่ render หรือไม่: ฟิลด์เฉลยต้องหายไปจาก object ที่ server ส่งกลับ (conditional spread/omit) ไม่ใช่ส่งเป็นค่าว่าง `null` หรือ flag ให้ client ตัดสินใจเอง — ดู `buildAnswerFeedback` ที่ไม่ใส่คีย์ `correct` ของแต่ละแถวเมื่อ `instant_check_answer_key` ปิด และไม่มีเฉลยวิธีทำใน response เลยไม่ว่าตั้งอะไร พร้อมเทสต์ที่ยืนยันด้วย `JSON.stringify` ของ response
 - การตัดสินถูก/ผิดทุกครั้งต้องเกิดที่ server จาก `submission_answers.correct_answer` ที่ตรึงไว้ **ห้ามส่งเฉลยลงไปให้ browser เทียบเอง** แม้จะเทียบแล้วส่งผลกลับขึ้นมาก็ตาม — ผลที่ client คำนวณหรือรายงานขึ้นมาห้ามถูกเชื่อ และห้ามใช้เขียนคะแนน สถานะ หรือตัวนับใด ๆ
 - ตัวนับที่เป็นเงื่อนไขจบงาน (`submissions.current_streak` / `best_streak` / `streak_reached`) เขียนได้จาก verdict ที่ server ตัดสินเองเท่านั้น ถ้ารับจาก browser ได้ นักเรียนจบงานจาก console ได้
 - `correct_answer` เข้า Client Component ได้เฉพาะ `previewMode` ของครู ซึ่งครูเป็นเจ้าของเฉลยนั้นอยู่แล้ว เส้นทางนักเรียน (`getExamTakingData` → `toSafeExamAnswer`) ห้ามใส่ฟิลด์นี้ และ `SafeExamAnswer` ต้องไม่มีฟิลด์นี้อยู่ใน type
-- นักเรียนอ่าน answer snapshot/เฉลยได้หลังส่งเมื่อ `show_results` เป็น `immediate` หรือ `after_due` ที่พ้นกำหนดแล้วเท่านั้น; `score_only` ห้ามอ่านคำตอบรายข้อและ `never` ห้ามอ่านคะแนนด้วย
+- นักเรียนอ่าน answer snapshot/คำตอบที่ถูกได้หลังส่งเมื่อ `show_results` เป็น `immediate` หรือ `after_due` ที่พ้นกำหนดแล้วเท่านั้น; `score_only` ห้ามอ่านคำตอบรายข้อและ `never` ห้ามอ่านคะแนนด้วย
+- เฉลยวิธีทำที่ครูแนบ (`solution_text`/`solution_image_urls`) เปิดตามกติกาของตัวเองเท่านั้น: `assignments.show_solutions` และนักเรียนคนนั้นทำงานต่อไม่ได้แล้ว โดยไม่มี attempt ที่ยังเขียนได้ค้างอยู่ (`lib/solution-release.ts`) · ทางเดียวคือ `getAttemptSolutions` ที่ตรวจเจ้าของ attempt แบบ exact แล้วตัดสินซ้ำจากฐานทุกครั้ง หน้าสรุปผลก่อนกดปุ่มรู้แค่ว่าข้อไหนมีเฉลย ไม่ได้รับเนื้อหา · ไฟล์เฉลยอยู่ใน bucket สาธารณะ `question-images` ใครได้ URL ไปแล้วเปิดได้เสมอ — การปกป้องคือไม่ส่ง URL ก่อนถึงเวลา
 - การบันทึกคำตอบ รูปวิธีทำ ไฟล์ การส่ง และการแก้คะแนนผ่าน server boundary หลังตรวจ session + exact owner/teacher + attempt status + deadline; browser role ไม่มีสิทธิ์เขียน `submissions`/`submission_answers` โดยตรง
 - `users_update_own` ใช้สำหรับโปรไฟล์เท่านั้น ต้องมี trigger ป้องกัน self-update ของ authority fields (`role`, `status`)
 - Fullscreen, tab visibility, copy/paste และ screenshot deterrence เป็นเพียงสัญญาณ/แรงเสียดทาน ไม่ใช่ security boundary และห้ามใช้แทนการปกป้องเฉลยฝั่ง server
