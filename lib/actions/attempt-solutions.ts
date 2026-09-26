@@ -16,7 +16,7 @@ export interface AttemptSolutions {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NOT_FOUND = 'ไม่พบผลงานนี้'
-const LOAD_FAILED = 'โหลดเฉลยไม่สำเร็จ — ปิดหน้าต่างนี้แล้วกด “ดูเฉลยวิธีทำ” อีกครั้ง'
+const LOAD_FAILED = 'โหลดเฉลยไม่สำเร็จ — กดลองอีกครั้ง หรือกลับมาเปิดใหม่ภายหลัง'
 
 /**
  * The เฉลยวิธีทำ behind the summary page's ดูเฉลยวิธีทำ button: every ข้อ of

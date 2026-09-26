@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 25 กันยายน 2026
+อัปเดตล่าสุด: 26 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -53,7 +53,7 @@ Invariant สำคัญ:
 
 ## งานและการส่งคำตอบ
 
-- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ, `secure_browser_mode` เป็น `browser|seb_required` และ `android_exam_mode` เป็น `blocked|monitored` สำหรับทางสำรองที่ครูตรวจเครื่อง
+- `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ, `secure_browser_mode` เป็น `browser|seb_required` และ `android_exam_mode` เป็น `blocked|monitored` สำหรับทางสำรองที่ครูตรวจเครื่อง · `show_solutions` (default `false`, migration `20260926020630`) คือครูให้นักเรียนเปิดเฉลยวิธีทำของแต่ละข้อจากหน้าสรุปผลหรือไม่ — แยกจาก `show_results` ที่คุมคะแนนและคำตอบที่ถูก
 - `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom
 - `assignment_extensions` — ขยายเวลารายคน
 - `submissions` — attempt ต่อผู้เรียน; `exam_access_mode` แยก `browser|seb|android_monitored`, SEB audit เก็บ verified time/platform/version และ Android audit เก็บ approval time/teacher เท่านั้น ไม่เก็บ CK, BEK, request hash, user-agent หรือ fingerprint
@@ -83,8 +83,10 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - หาก `android_exam_mode = 'monitored'` server ยอมรับ signed Android session แทน SEB ได้เฉพาะหลังครูที่จัดการ assignment อนุมัติ exact student ที่อยู่ใน roster; user-agent ใช้ routing UI เท่านั้น และ Android audit ห้ามถูกแสดงเป็น SEB
 - `completion_rule` เป็น `fixed` (พฤติกรรมเดิมทุกงาน: จบเมื่อทำครบตามจำนวนข้อที่ได้รับ) หรือ `streak` (จบเมื่อตอบถูกติดต่อกันครบ `streak_target` ข้อ จำนวนข้อทั้งหมดจึงไม่คงที่); `streak_question_cap` คือเพดานกันวนไม่จบ และ `streak_recycle_pool` คือทำครบคลังแล้ววนกลับมาถามใหม่ไหม · มี CHECK บังคับสามข้อ: streak ต้องมี `streak_target`, ต้องมี `instant_check = true` และต้องไม่มี `passing_type`/`passing_value` · ยอดที่นับได้อยู่ที่ `submissions.current_streak` / `best_streak` / `streak_reached` เพราะ “ติดต่อกัน” เป็นคุณสมบัติของลำดับการตอบ ไม่ใช่ของผลรวมคะแนน — `computePassed()` จึงคำนวณแทนไม่ได้
 - `random_question_count` ต้องไม่เกินจำนวน `question_ids` และ server รับเฉพาะงาน `mode = online` (ทั้ง `exam` และ `exercise` — ไม่ใช่ข้อสอบอย่างเดียวเหมือนก่อน 31 ส.ค. 2026); การแก้จำนวนถูกปิดหลังมี submission แรก และ subset จริงไม่เก็บซ้ำใน assignment แต่ดูจาก `submission_answers` ที่สร้างและตรึงไว้ต่อ attempt
-- นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows/question solution เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
-- ข้อยกเว้นเดียวของบรรทัดบนคือ `checkAnswer` ของแบบฝึกหัดที่เปิด `instant_check` ซึ่งส่งผลรายข้อ (และเฉลย ถ้า `instant_check_answer_key` เปิด) ระหว่าง attempt ยัง `in_progress` · RLS ไม่ได้ถูกผ่อน — browser ยังอ่าน `submission_answers` ระหว่างทำไม่ได้เลย ทางเดียวคือ Server Action ที่ตรวจเจ้าของ/สถานะ/เวลา/กำหนดส่ง/SEB session ซ้ำ แล้วประกอบ payload ที่เปิดเฉพาะสิ่งที่ครูอนุญาต ไม่ส่ง `correct_answer` ดิบลงไป
+- นักเรียนอ่าน submission header ระหว่างทำได้เพื่อ resume แต่ answer rows เปิดหลังส่งตาม `show_results` เท่านั้น (`score_only` ไม่เปิดรายข้อ, `never` ไม่เปิดคะแนน)
+- นักเรียนไม่มี RLS อ่านแถว `questions` เลย (policy `questions_student_results_select` ถูกถอดใน migration `20260926022404` — มันเปิดทั้งแถวรวม `solution_text`/`solution_image_urls` และ answer-bearing fields) · หน้าผลสอบอ่านเฉพาะคอลัมน์ที่แสดงด้วย service role สำหรับ `question_id` ที่ RLS ของ `submission_answers` คืนมาเท่านั้น
+- เฉลยวิธีทำ (`questions.solution_text` + `solution_image_urls`) ถึงมือนักเรียนทางเดียวคือ `getAttemptSolutions` หลัง `resolveSolutionRelease` (`lib/solution-release.ts`) ตอบว่าเปิด: `show_solutions = true` และนักเรียนคนนั้นทำต่อไม่ได้แล้ว — งาน `closed` หรือพ้นกำหนดส่งของตัวเอง (`assignment_extensions` แทน `end_at`) หรือใช้ครบ `max_attempts` (ข้อสอบที่เป็น NULL = 1 ครั้ง) — โดยไม่มี attempt `in_progress` ที่ยังเขียนได้ (ยังไม่หมด `duration_minutes` และยังไม่พ้นกำหนดส่ง) เพราะสถานะ `closed` ไม่หยุดการเขียนของ attempt ที่เปิดค้าง · ส่งเฉพาะข้อของ attempt นั้น เรียงตาม `order_index`
+- ข้อยกเว้นเดียวของเรื่อง answer rows คือ `checkAnswer` ของแบบฝึกหัดที่เปิด `instant_check` ซึ่งส่งผลรายข้อ (และคำตอบที่ถูก ถ้า `instant_check_answer_key` เปิด — ไม่มีเฉลยวิธีทำตั้งแต่ 26 กันยายน 2026) ระหว่าง attempt ยัง `in_progress` · RLS ไม่ได้ถูกผ่อน — browser ยังอ่าน `submission_answers` ระหว่างทำไม่ได้เลย ทางเดียวคือ Server Action ที่ตรวจเจ้าของ/สถานะ/เวลา/กำหนดส่ง/SEB session ซ้ำ แล้วประกอบ payload ที่เปิดเฉพาะสิ่งที่ครูอนุญาต ไม่ส่ง `correct_answer` ดิบลงไป
 
 ## วิจัยการศึกษา
 
@@ -153,7 +155,7 @@ Session Library ของครูใน drawing-board เฟส 7 ก็ไม�
 - `assignments.score_strategy` เลือก best/average/latest สำหรับหลาย attempt
 - `assignments.retry_scope` = `all` | `wrong_only` ตัดสินว่าการทำครั้งใหม่ถามซ้ำทั้งชุดหรือเฉพาะข้อที่ `score < max_score`
 - `submission_answers.carried_over` คือแถวที่คัดลอกมาจาก attempt ก่อนหน้า ไม่ได้ตอบใน attempt นี้ — นับใน `max_score`/`total_score` แต่ไม่ถูก auto-grade ซ้ำ และไม่ถูกส่งเข้าหน้าทำข้อสอบ
-- `assignments.instant_check` เปิดให้แบบฝึกหัดออนไลน์กดตรวจทีละข้อระหว่างทำ และ `instant_check_answer_key` ตัดสินว่าการตรวจนั้นเปิดเฉลยด้วยหรือบอกแค่ถูก/ผิด — ทั้งคู่ไม่มีผลกับคะแนน `submitSubmission` ยังตรวจใหม่ทั้งชุดจาก `student_answer` เหมือนเดิม คะแนนแบบฝึกหัดจึงมาจากคำตอบสุดท้ายเสมอ
+- `assignments.instant_check` เปิดให้แบบฝึกหัดออนไลน์กดตรวจทีละข้อระหว่างทำ และ `instant_check_answer_key` ตัดสินว่าการตรวจนั้นเปิดคำตอบที่ถูกด้วยหรือบอกแค่ถูก/ผิด (เฉลยวิธีทำไม่อยู่ในการตรวจนี้ ดู `show_solutions`) — ทั้งคู่ไม่มีผลกับคะแนน `submitSubmission` ยังตรวจใหม่ทั้งชุดจาก `student_answer` เหมือนเดิม คะแนนแบบฝึกหัดจึงมาจากคำตอบสุดท้ายเสมอ
 - `submission_answers.check_count` นับจำนวนครั้งที่นักเรียนกดตรวจข้อนั้นระหว่างทำ ไม่ใช้คิดคะแนนและไม่ใช้กั้นการกดตรวจ เป็นสัญญาณเดียวที่แยก "ถูกตั้งแต่แรก" ออกจาก "ตรวจแล้วแก้จนถูก" เมื่อคะแนนสองคนเท่ากัน
 
 ก่อนแก้ scoring ต้องตรวจ `lib/scoring.ts`, `lib/grading.ts`, `lib/actions/submissions.ts` และหน้าที่อ่านคะแนนทั้งหมด
