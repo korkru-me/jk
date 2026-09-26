@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
   Users, BookOpen, Copy, Check,
-  GraduationCap, UserPlus, Grid3x3, Mail, GitBranch, Activity, ChevronLeft,
+  GraduationCap, UserPlus, Grid3x3, Mail, ChevronLeft,
   ClipboardList, CalendarDays, Home, LayoutDashboard,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -42,12 +42,10 @@ const ClassroomScoresMatrix = dynamic(
   { loading: TabLoading },
 )
 const ParentPortal = dynamic(() => import('./parent-portal').then(module => module.ParentPortal), { loading: TabLoading })
-const LearningPaths = dynamic(() => import('./learning-paths').then(module => module.LearningPaths), { loading: TabLoading })
-const AuditLog = dynamic(() => import('./audit-log').then(module => module.AuditLog), { loading: TabLoading })
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
-type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents' | 'paths' | 'log'
+type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'homeroom' | 'groups' | 'invite' | 'coteachers' | 'parents'
 
 const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
   { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
@@ -58,8 +56,6 @@ const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?:
   { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
   { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
   { key: 'parents',     label: 'ผู้ปกครอง',       icon: Mail },
-  { key: 'paths',       label: 'เส้นทางการเรียน', icon: GitBranch },
-  { key: 'log',         label: 'ประวัติ',          icon: Activity },
 ]
 
 const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
@@ -69,7 +65,6 @@ const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?
   { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
   { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
   { key: 'parents',     label: 'ผู้ปกครอง',       icon: Mail },
-  { key: 'log',         label: 'ประวัติ',          icon: Activity },
 ]
 
 interface RealStudent { id: string; full_name: string; email: string }
@@ -332,16 +327,6 @@ export function ClassroomDetailClient({
         {activeTab === 'parents' && (
           <div className="max-w-xl">
             <ParentPortal studentCount={students.length} />
-          </div>
-        )}
-        {activeTab === 'paths' && (
-          <div className="max-w-2xl">
-            <LearningPaths />
-          </div>
-        )}
-        {activeTab === 'log' && (
-          <div className="max-w-2xl">
-            <AuditLog />
           </div>
         )}
       </div>
