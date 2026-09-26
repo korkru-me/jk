@@ -18,6 +18,7 @@ import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import type { StudentProfileRow } from './homeroom-overview'
 import type { SortKey as StudentTableSortKey, SortDir as StudentTableSortDir } from './student-table'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey } from '@/lib/student-sort'
+import { compareAssignmentsForDisplay } from '@/lib/student-ability'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -109,12 +110,7 @@ export function ClassroomScoresMatrix({
   const visibleAssignments = assignments
     .filter(a => typeFilter === 'all' ? true : a.type === typeFilter)
     .slice()
-    .sort((x, y) => {
-      const ox = x.display_order ?? Infinity
-      const oy = y.display_order ?? Infinity
-      if (ox !== oy) return ox - oy
-      return new Date(x.created_at).getTime() - new Date(y.created_at).getTime()
-    })
+    .sort(compareAssignmentsForDisplay)
 
   // (assignmentId, studentId) -> official submission per that assignment's score_strategy
   const subKey = (aId: string, sId: string) => `${aId}::${sId}`
