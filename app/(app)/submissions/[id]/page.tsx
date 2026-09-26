@@ -32,6 +32,15 @@ import {
 } from '@/components/student/attempt-solutions'
 import { SolutionLockNotice } from '@/components/student/solution-lock-notice'
 
+// This page renders on the server, which runs in UTC on Vercel: a bare
+// toLocaleString('th-TH') printed every time seven hours early, next to the
+// เฉลยวิธีทำ lock notice that already reads Thai time.
+const thaiDateTime = new Intl.DateTimeFormat('th-TH', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Bangkok',
+})
+
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 
@@ -379,7 +388,7 @@ export default async function SubmissionResultPage({
 
           {submission.submitted_at && (
             <p className="text-xs text-muted-foreground mt-3">
-              ส่งเมื่อ {new Date(submission.submitted_at).toLocaleString('th-TH')}
+              ส่งเมื่อ {thaiDateTime.format(new Date(submission.submitted_at))}
             </p>
           )}
 
@@ -432,7 +441,7 @@ export default async function SubmissionResultPage({
             <>
               🔒 คำตอบที่ถูกและคะแนนรายข้อจะแสดงหลังพ้นกำหนดส่งงาน
               {assignment.end_at && (
-                <> ({new Date(assignment.end_at).toLocaleString('th-TH')})</>
+                <> ({thaiDateTime.format(new Date(assignment.end_at))})</>
               )}
             </>
           )}
