@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen, Hash } from 'lucide-react'
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
@@ -78,6 +78,7 @@ export type EditableAssignment = Pick<
   | 'fullscreen_required'
   | 'block_clipboard'
   | 'random_question_count'
+  | 'shared_random_seed'
   | 'exam_watermark_enabled'
   | 'require_work_image'
   | 'calculator_enabled'
@@ -89,6 +90,8 @@ export type EditableAssignment = Pick<
 export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text' | 'question_type'> & {
   /** What this question is worth before any override — see lib/question-bank.ts. */
   default_points: number
+  /** Whether students can get different numbers on it — see lib/question-bank.ts. */
+  has_random_values: boolean
 }
 
 export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions }: Props) {
@@ -126,6 +129,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [randomQuestionCount, setRandomQuestionCount] = useState(
     a.random_question_count != null ? String(a.random_question_count) : ''
   )
+  const [sharedRandomValues, setSharedRandomValues] = useState(a.shared_random_seed != null)
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
   const [secureBrowserMode, setSecureBrowserMode] = useState(a.secure_browser_mode ?? 'browser')
   const [androidExamMode, setAndroidExamMode] = useState(a.android_exam_mode ?? 'blocked')
@@ -156,7 +160,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
   // Titles for everything that could end up in the list: the questions the
   // assignment came with, plus the bank the picker adds from.
-  const questionsById = new Map<string, { id: string; title: string; question_text: string; question_type?: string }>()
+  const questionsById = new Map<string, { id: string; title: string; question_text: string; question_type?: string; has_random_values?: boolean }>()
   for (const q of [...questions, ...bank]) questionsById.set(q.id, q)
   const orderedQuestions = questionIds.map(
     id => questionsById.get(id) ?? { id, title: 'โจทย์ที่ไม่พบ', question_text: '' }
@@ -165,6 +169,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   // Only เติมคำตอบตัวเลข has working to photograph, so the ask appears exactly
   // when this งาน holds one — and follows the list as the teacher edits it.
   const hasWorkImageQuestions = orderedQuestions.some(q => q.question_type === 'written')
+  // "ตัวเลขชุดเดียวกัน" follows the list the same way, and freezes with it:
+  // once anyone has started, their numbers are already drawn one way or the
+  // other, so switching would split the class in two.
+  const randomValueQuestionCount = orderedQuestions.filter(q => 'has_random_values' in q && q.has_random_values).length
 
   // ── เงื่อนไขจบงาน ────────────────────────────────────────────────────────
   // Same resolver as the create wizard and updateAssignment, so all three
@@ -317,6 +325,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         require_work_image: hasWorkImageQuestions && requireWorkImage,
         calculator_enabled: a.mode === 'online' && calculatorEnabled,
         scratchpad_enabled: a.mode === 'online' && scratchpadEnabled,
+        // Sent only while it can still change, like question_ids above, so
+        // saving a started งาน never trips the server's refusal.
+        ...(hasSubmissions ? {} : { shared_random_values: randomValueQuestionCount > 0 && sharedRandomValues }),
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -899,6 +910,31 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               type="checkbox"
               checked={requireWorkImage}
               onChange={e => setRequireWorkImage(e.target.checked)}
+              className="accent-primary w-4 h-4 shrink-0"
+            />
+          </label>
+        )}
+
+        {randomValueQuestionCount > 0 && (
+          <label className={`flex items-center justify-between p-3 rounded-xl border border-border transition-all ${hasSubmissions ? 'opacity-70' : 'hover:border-ring cursor-pointer'}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <Hash className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน</p>
+                <p className="text-xs text-muted-foreground">
+                  {hasSubmissions
+                    ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้'
+                    : `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น ทำรอบใหม่ก็ได้ชุดเดิม`}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={sharedRandomValues}
+              onChange={e => setSharedRandomValues(e.target.checked)}
+              disabled={hasSubmissions}
               className="accent-primary w-4 h-4 shrink-0"
             />
           </label>
