@@ -2,6 +2,57 @@ import 'server-only'
 
 import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { assignmentReachesStudent, type AssignmentLinkReach } from '@/lib/classroom-groups'
+import { getStudentGroups } from '@/lib/classroom-groups-server'
+
+/**
+ * Was this งาน handed to this student — on the roster of a linked classroom
+ * and, where the link names กลุ่มย่อย, in one of those groups?
+ *
+ * The server-side twin of get_my_visible_assignment_ids(), for the actions
+ * that run on the service role (starting an attempt, SEB, Android approval).
+ * A student with an attempt already keeps access after being moved out of
+ * the group, same as the SQL.
+ *
+ * Does not look at status or dates — callers already read the assignment row
+ * and apply their own rules to it.
+ */
+export async function studentHasAssignment(
+  admin: ReturnType<typeof createAdminClient>,
+  assignmentId: string,
+  studentId: string,
+  knownHasSubmission?: boolean,
+): Promise<boolean> {
+  const { data: linkRows } = await admin
+    .from('assignment_classrooms')
+    .select('classroom_id, group_ids')
+    .eq('assignment_id', assignmentId)
+  const links = (linkRows ?? []) as AssignmentLinkReach[]
+  if (links.length === 0) return false
+
+  const classroomIds = links.map(l => l.classroom_id)
+  const needsGroups = links.some(l => l.group_ids !== null)
+  const [{ data: memberships }, groupOf, hasSubmission] = await Promise.all([
+    admin
+      .from('classroom_students')
+      .select('classroom_id')
+      .eq('student_id', studentId)
+      .in('classroom_id', classroomIds),
+    needsGroups ? getStudentGroups(admin, studentId, classroomIds) : Promise.resolve(new Map<string, string>()),
+    knownHasSubmission !== undefined || !needsGroups
+      ? Promise.resolve(knownHasSubmission ?? false)
+      : admin
+          .from('submissions')
+          .select('id')
+          .eq('assignment_id', assignmentId)
+          .eq('student_id', studentId)
+          .limit(1)
+          .then(({ data }) => (data?.length ?? 0) > 0),
+  ])
+
+  const enrolled = new Set((memberships ?? []).map((m: { classroom_id: string }) => m.classroom_id))
+  return assignmentReachesStudent(links, enrolled, groupOf, hasSubmission)
+}
 
 /**
  * May this user act on this ชุดข้อสอบ as a teacher — read its hand-ins, and

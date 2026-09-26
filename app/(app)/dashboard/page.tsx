@@ -14,6 +14,7 @@ import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { canStudentViewScore } from '@/lib/result-visibility'
+import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 
@@ -162,7 +163,7 @@ export default async function DashboardPage() {
     ? await Promise.all([
         admin
           .from('assignments')
-          .select('id, title, question_ids, random_question_count, completion_rule, streak_target, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
+          .select('id, title, question_ids, random_question_count, completion_rule, streak_target, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id, group_ids)')
           .in('assignment_classrooms.classroom_id', classroomIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),
@@ -175,7 +176,14 @@ export default async function DashboardPage() {
       ])
     : [{ data: [] }, { data: [] }]
 
-  const allAssignments = assignmentsRes.data ?? []
+  // A งาน handed to กลุ่มย่อย the student is not in is not theirs to do.
+  const allAssignments = await filterAssignmentsForStudent(
+    admin,
+    user.id,
+    classroomIds,
+    (assignmentsRes.data ?? []) as any[],
+    new Set(allSubmissions.map((s: any) => s.assignment_id as string)),
+  )
   const recentPosts = recentPostsRes.data ?? []
 
   let pendingAssignments: any[] = []

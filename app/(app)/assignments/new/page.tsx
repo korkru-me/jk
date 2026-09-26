@@ -4,6 +4,7 @@ import { fetchBankQuestions } from '@/lib/question-bank'
 import { redirect } from 'next/navigation'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
 import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
+import type { AssignmentGroupOption } from '@/components/assignments/group-target-picker'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 
 export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
@@ -71,6 +72,34 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   }
 
   const preselectedClassroomId = classroomParam && seen.has(classroomParam) ? classroomParam : undefined
+
+  // กลุ่มย่อย of those rooms, for "มอบหมายให้". Read under RLS: the owner and
+  // any co-teacher of a room can see its groups.
+  const classroomIdList = classrooms.map(c => c.id)
+  const [{ data: groupRows }, { data: memberRows }] = classroomIdList.length > 0
+    ? await Promise.all([
+        supabase
+          .from('classroom_groups')
+          .select('id, classroom_id, name, color, position')
+          .in('classroom_id', classroomIdList)
+          .order('position')
+          .order('created_at'),
+        supabase
+          .from('classroom_group_members')
+          .select('group_id')
+          .in('classroom_id', classroomIdList),
+      ])
+    : [{ data: [] }, { data: [] }]
+  const memberCount = new Map<string, number>()
+  for (const row of (memberRows ?? []) as { group_id: string }[]) {
+    memberCount.set(row.group_id, (memberCount.get(row.group_id) ?? 0) + 1)
+  }
+  const groupsByClassroom: Record<string, AssignmentGroupOption[]> = {}
+  for (const g of (groupRows ?? []) as { id: string; classroom_id: string; name: string; color: string }[]) {
+    ;(groupsByClassroom[g.classroom_id] ??= []).push({
+      id: g.id, name: g.name, color: g.color, memberCount: memberCount.get(g.id) ?? 0,
+    })
+  }
   let preselectedSet = (preselectedSetRow ?? undefined) as AssignmentQuestionSetOption | undefined
 
   // ?sections=... — assigning only part of a แฟ้ม ("this week, projectiles
@@ -113,6 +142,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
 
       <CreateAssignmentForm
         classrooms={classrooms}
+        groupsByClassroom={groupsByClassroom}
         questions={questions}
         questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
         preselectedClassroomId={preselectedClassroomId}

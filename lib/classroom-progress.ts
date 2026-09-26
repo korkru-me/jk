@@ -137,32 +137,44 @@ export function computeAssignmentProgress(
  *
  * `assignments` should already be limited to what students can actually see
  * (published), otherwise a draft counts against everyone's rate.
+ *
+ * `audienceOf` names the students a งาน was handed to when that is less than
+ * the whole room (มอบให้เฉพาะกลุ่มย่อย) — a subset of `studentIds`; null means
+ * everyone. A student is only ever counted against work they were given.
  */
 export function summarizeClassroomProgress(
   studentIds: string[],
   assignments: ProgressAssignment[],
   submissions: ProgressSubmission[],
   now: number = Date.now(),
+  audienceOf: (assignment: ProgressAssignment) => Set<string> | null = () => null,
 ): ClassroomProgressSummary {
   const roster = new Set(studentIds)
   const grouped = groupByAssignment(submissions)
 
   const byAssignment = new Map<string, AssignmentProgress>()
   const submittedByStudent = new Map<string, number>()
+  const dueByStudent = new Map<string, number>()
   let dueAssignmentCount = 0
   let submittedTotal = 0
+  let expectedTotal = 0
 
   for (const assignment of assignments) {
+    const audience = audienceOf(assignment) ?? roster
     const { submitters, ...progress } = computeAssignmentProgress(
       assignment,
       grouped.get(assignment.id) ?? [],
-      roster,
+      audience,
     )
     byAssignment.set(assignment.id, progress)
 
     if (!isDueBy(assignment.end_at, now)) continue
     dueAssignmentCount++
     submittedTotal += progress.submitted
+    expectedTotal += audience.size
+    for (const studentId of audience) {
+      dueByStudent.set(studentId, (dueByStudent.get(studentId) ?? 0) + 1)
+    }
     for (const studentId of submitters) {
       submittedByStudent.set(studentId, (submittedByStudent.get(studentId) ?? 0) + 1)
     }
@@ -171,15 +183,15 @@ export function summarizeClassroomProgress(
   const byStudent = new Map<string, StudentProgress>()
   for (const studentId of studentIds) {
     const submitted = submittedByStudent.get(studentId) ?? 0
+    const total = dueByStudent.get(studentId) ?? 0
     byStudent.set(studentId, {
       studentId,
       submitted,
-      total: dueAssignmentCount,
-      rate: dueAssignmentCount > 0 ? Math.round((submitted / dueAssignmentCount) * 100) : 100,
+      total,
+      rate: total > 0 ? Math.round((submitted / total) * 100) : 100,
     })
   }
 
-  const expectedTotal = dueAssignmentCount * roster.size
   return {
     byAssignment,
     byStudent,

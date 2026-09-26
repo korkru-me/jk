@@ -3,6 +3,7 @@
 import { cookies, headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { studentHasAssignment } from '@/lib/auth/assignment-access'
 import {
   createSebSessionClaims,
   normalizeSebRequestUrl,
@@ -164,33 +165,19 @@ export async function getSebSystemCheckData(
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }
 
   const admin = createAdminClient()
-  const [assignmentResult, classroomLinksResult] = await Promise.all([
+  const [assignmentResult, handedToStudent] = await Promise.all([
     admin
       .from('assignments')
       .select('id, title, secure_browser_mode')
       .eq('id', assignmentId)
       .eq('status', 'published')
       .maybeSingle(),
-    admin
-      .from('assignment_classrooms')
-      .select('classroom_id')
-      .eq('assignment_id', assignmentId),
+    studentHasAssignment(admin, assignmentId, user.id),
   ])
 
   const assignment = assignmentResult.data
   if (!assignment) return { error: 'ไม่พบชุดข้อสอบที่เผยแพร่แล้ว' }
-
-  const classroomIds = (classroomLinksResult.data ?? []).map(row => row.classroom_id)
-  const { data: membership } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('id')
-        .eq('student_id', user.id)
-        .in('classroom_id', classroomIds)
-        .limit(1)
-        .maybeSingle()
-    : { data: null }
-  if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องเรียนที่ได้รับข้อสอบนี้' }
+  if (!handedToStudent) return { error: 'คุณไม่ได้อยู่ในห้องเรียนหรือกลุ่มที่ได้รับข้อสอบนี้' }
   if (assignment.secure_browser_mode !== 'seb_required') {
     return { error: 'ข้อสอบนี้ไม่ได้บังคับใช้ Safe Exam Browser' }
   }
