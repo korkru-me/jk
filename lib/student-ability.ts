@@ -180,6 +180,20 @@ export function differenceFromClass(
   return classMean === null ? null : ability.average - classMean
 }
 
+/**
+ * Which งาน to tick when the tab opens, from a remembered list. Nothing
+ * remembered means every งาน. Remembered งาน that no longer exist are
+ * dropped; if that leaves nothing although something was remembered, every
+ * งาน again — an empty page with no explanation helps nobody. A deliberately
+ * empty list (the teacher cleared it) stays empty.
+ */
+export function restoreSelection(remembered: string[] | undefined, available: string[]): string[] {
+  if (!remembered) return available
+  const known = new Set(available)
+  const still = remembered.filter(id => known.has(id))
+  return still.length === 0 && remembered.length > 0 ? available : still
+}
+
 export type AbilitySortKey = 'number' | 'name' | 'code' | 'score'
 
 export const ABILITY_SORT_LABEL: Record<AbilitySortKey, string> = {
@@ -189,6 +203,24 @@ export const ABILITY_SORT_LABEL: Record<AbilitySortKey, string> = {
   score: 'คะแนนเฉลี่ย',
 }
 
+/**
+ * A student with no value for the key (no score yet, no เลขที่, no รหัส) stays
+ * at the bottom whichever way the list runs: reversing the order is for
+ * reading the other end of the ranking, not for surfacing blanks.
+ */
+function compareNullsLast<V>(
+  av: V | null,
+  bv: V | null,
+  sortDir: StudentSortDir,
+  cmp: (x: V, y: V) => number,
+): number | null {
+  if (av === null && bv === null) return null
+  if (av === null) return 1
+  if (bv === null) return -1
+  const result = sortDir === 'asc' ? cmp(av, bv) : cmp(bv, av)
+  return result === 0 ? null : result
+}
+
 export function sortByAbility<T extends { id: string; full_name: string }>(
   students: T[],
   profiles: Record<string, SortableStudentProfile>,
@@ -196,19 +228,21 @@ export function sortByAbility<T extends { id: string; full_name: string }>(
   sortKey: AbilitySortKey,
   sortDir: StudentSortDir,
 ): T[] {
-  if (sortKey !== 'score') {
-    return students.slice().sort((a, b) => compareStudents(a, b, profiles, sortKey, sortDir))
+  if (sortKey === 'name') {
+    return students.slice().sort((a, b) => compareStudents(a, b, profiles, 'name', sortDir))
+  }
+  const valueOf = (student: T): number | string | null => {
+    if (sortKey === 'score') return abilities.get(student.id)?.average ?? null
+    if (sortKey === 'number') return profiles[student.id]?.class_number ?? null
+    return profiles[student.id]?.student_code || null
   }
   return students.slice().sort((a, b) => {
-    const av = abilities.get(a.id)?.average ?? null
-    const bv = abilities.get(b.id)?.average ?? null
-    // Students with nothing handed in stay at the bottom whichever way the
-    // list runs — they have no score to rank.
-    if (av === null && bv === null) return a.full_name.localeCompare(b.full_name, 'th')
-    if (av === null) return 1
-    if (bv === null) return -1
-    const cmp = sortDir === 'asc' ? av - bv : bv - av
-    return cmp !== 0 ? cmp : a.full_name.localeCompare(b.full_name, 'th')
+    const cmp = compareNullsLast(valueOf(a), valueOf(b), sortDir, (x, y) => (
+      typeof x === 'number' && typeof y === 'number'
+        ? x - y
+        : String(x).localeCompare(String(y), 'th', { numeric: true })
+    ))
+    return cmp ?? a.full_name.localeCompare(b.full_name, 'th')
   })
 }
 

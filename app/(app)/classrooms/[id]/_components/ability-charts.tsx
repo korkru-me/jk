@@ -36,6 +36,31 @@ const STATE_LABEL: Record<AbilityCellState, string> = {
   missing: 'ยังไม่ส่ง',
 }
 
+/**
+ * Handed in, but the งาน has no full marks to divide by. It must not wear
+ * the "not handed in" dash — the same card says it was handed in.
+ */
+export function isUnscored(d: Pick<AbilityDatum, 'state' | 'percent'>): boolean {
+  return d.state === 'done' && d.percent === null
+}
+
+const UNSCORED_LABEL = 'ส่งแล้ว ไม่มีคะแนนเต็ม'
+
+/** What a column says when it has no bar. */
+function noBarLabel(d: AbilityDatum): string {
+  return isUnscored(d) ? UNSCORED_LABEL : STATE_LABEL[d.state]
+}
+
+/** Spoken value of one column, for the keyboard and screen readers. */
+function spokenValue(d: AbilityDatum): string {
+  return d.percent !== null ? formatPercent(d.percent) : noBarLabel(d)
+}
+
+/** The mark for a handed-in งาน with no percentage: a small open ring on the baseline. */
+function UnscoredMark({ cx, baseline, r }: { cx: number; baseline: number; r: number }) {
+  return <circle cx={cx} cy={baseline - r - 1} r={r} className="fill-none stroke-muted-foreground" strokeWidth={1.5} />
+}
+
 /** A bar with a rounded data end and a square foot on the baseline. */
 function barPath(x: number, top: number, width: number, baseline: number, radius: number): string {
   const height = baseline - top
@@ -104,6 +129,8 @@ export function MiniBarChart({ data }: { data: AbilityDatum[] }) {
               // A 0% still gets a sliver, so "handed in, scored nothing" never
               // looks the same as "not handed in".
               <path d={barPath(cx - barW / 2, Math.min(y(d.percent), baseline - 2), barW, baseline, 3)} className="fill-primary" />
+            ) : isUnscored(d) ? (
+              <UnscoredMark cx={cx} baseline={baseline} r={3} />
             ) : (
               <text x={cx} y={baseline - 3} textAnchor="middle" className="fill-muted-foreground" fontSize={10}>–</text>
             )}
@@ -191,17 +218,36 @@ interface FullChartProps {
   label: string
 }
 
-function ChartTooltip({ datum, leftPct, topPct }: { datum: AbilityDatum; leftPct: number; topPct: number }) {
+/**
+ * Sits above the point it describes, slid sideways as far as needed to stay
+ * inside the chart. Centring it with a fixed clamp pushed it past the dialog
+ * edge on a phone, where the chart is narrower than the tooltip is wide.
+ */
+function ChartTooltip({ datum, x, y, containerWidth }: {
+  datum: AbilityDatum
+  /** Anchor point in the chart's own pixels. */
+  x: number
+  y: number
+  containerWidth: number
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [left, setLeft] = useState(x)
+  const maxWidth = Math.min(240, containerWidth - 8)
+  useLayoutEffect(() => {
+    const width = ref.current?.offsetWidth ?? 0
+    setLeft(Math.min(Math.max(x - width / 2, 4), Math.max(4, containerWidth - width - 4)))
+  }, [x, containerWidth, datum.key])
   return (
     <div
+      ref={ref}
       role="status"
-      className="pointer-events-none absolute z-10 w-max max-w-56 -translate-x-1/2 -translate-y-full rounded-xl bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10"
-      style={{ left: `${Math.min(86, Math.max(14, leftPct))}%`, top: `calc(${topPct}% - 10px)` }}
+      className="pointer-events-none absolute z-10 w-max -translate-y-full rounded-xl bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10"
+      style={{ left, top: y - 10, maxWidth }}
     >
       <p className="line-clamp-2 text-muted-foreground">
         <span className="font-semibold tabular-nums">{datum.index}.</span> {datum.title}
       </p>
-      {datum.state === 'done' ? (
+      {datum.percent !== null ? (
         <p className="mt-1 flex items-baseline gap-1.5">
           <span className="text-base font-bold text-foreground">{formatPercent(datum.percent)}</span>
           {datum.score !== null && datum.maxScore !== null && (
@@ -209,7 +255,7 @@ function ChartTooltip({ datum, leftPct, topPct }: { datum: AbilityDatum; leftPct
           )}
         </p>
       ) : (
-        <p className="mt-1 text-sm font-semibold text-foreground">{STATE_LABEL[datum.state]}</p>
+        <p className="mt-1 text-sm font-semibold text-foreground">{noBarLabel(datum)}</p>
       )}
       {datum.classAverage !== undefined && (
         <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">
@@ -235,6 +281,11 @@ export function AbilityBarChart({ data, activeKey, onActiveChange, label }: Full
   const barW = Math.min(26, slot * 0.55)
   const y = (p: number) => baseline - (p / 100) * plotH
   const active = data.find(d => d.key === activeKey) ?? null
+  // Narrow columns (many งาน on a phone) cannot fit "100%" over every bar or
+  // every number under it. Values then live in the tooltip and the table
+  // beside the chart, and only every n-th number is printed.
+  const showValues = slot >= 30
+  const indexStep = Math.max(1, Math.ceil(20 / slot))
 
   return (
     <div ref={ref} className="relative" onPointerLeave={() => onActiveChange(null)}>
@@ -267,14 +318,20 @@ export function AbilityBarChart({ data, activeKey, onActiveChange, label }: Full
                     d={barPath(cx - barW / 2, barTop, barW, baseline, 4)}
                     className={`fill-primary motion-safe:transition-opacity ${dim ? 'opacity-40' : ''}`}
                   />
-                  <text x={cx} y={labelY} textAnchor="middle" className="fill-foreground font-semibold tabular-nums" fontSize={12}>
-                    {formatPercent(d.percent)}
-                  </text>
+                  {(showValues || isActive) && (
+                    <text x={cx} y={labelY} textAnchor="middle" className="fill-foreground font-semibold tabular-nums" fontSize={12}>
+                      {formatPercent(d.percent)}
+                    </text>
+                  )}
                 </>
-              ) : (
+              ) : slot >= 58 ? (
                 <text x={cx} y={baseline - 8} textAnchor="middle" className="fill-muted-foreground" fontSize={11}>
-                  {slot >= 58 ? STATE_LABEL[d.state] : '–'}
+                  {isUnscored(d) ? 'ไม่มีคะแนน' : STATE_LABEL[d.state]}
                 </text>
+              ) : isUnscored(d) ? (
+                <UnscoredMark cx={cx} baseline={baseline} r={4} />
+              ) : (
+                <text x={cx} y={baseline - 8} textAnchor="middle" className="fill-muted-foreground" fontSize={11}>–</text>
               )}
               {avgY !== null && (
                 <line
@@ -288,9 +345,11 @@ export function AbilityBarChart({ data, activeKey, onActiveChange, label }: Full
                 />
               )}
               {/* Numbers only: the table beside the chart carries each full title. */}
-              <text x={cx} y={BAR_H - 12} textAnchor="middle" className={`font-semibold tabular-nums ${isActive ? 'fill-primary' : 'fill-foreground'}`} fontSize={13}>
-                {d.index}
-              </text>
+              {(i % indexStep === 0 || isActive) && (
+                <text x={cx} y={BAR_H - 12} textAnchor="middle" className={`font-semibold tabular-nums ${isActive ? 'fill-primary' : 'fill-foreground'}`} fontSize={slot < 22 ? 11 : 13}>
+                  {d.index}
+                </text>
+              )}
               {/* The whole column is the hit target, not the painted bar. */}
               <rect
                 x={x0}
@@ -299,7 +358,7 @@ export function AbilityBarChart({ data, activeKey, onActiveChange, label }: Full
                 height={BAR_H}
                 className="fill-transparent outline-none"
                 tabIndex={0}
-                aria-label={`${d.index}. ${d.title}: ${d.state === 'done' ? formatPercent(d.percent) : STATE_LABEL[d.state]}`}
+                aria-label={`${d.index}. ${d.title}: ${spokenValue(d)}`}
                 onPointerEnter={() => onActiveChange(d.key)}
                 onFocus={() => onActiveChange(d.key)}
                 onBlur={() => onActiveChange(null)}
@@ -313,7 +372,7 @@ export function AbilityBarChart({ data, activeKey, onActiveChange, label }: Full
         const cx = left + slot * i + slot / 2
         const barTop = active.percent === null ? baseline - 20 : y(active.percent)
         const avgY = active.classAverage == null ? barTop : y(active.classAverage)
-        return <ChartTooltip datum={active} leftPct={(cx / BAR_W) * 100} topPct={(Math.min(barTop, avgY) / BAR_H) * 100} />
+        return <ChartTooltip datum={active} x={cx} y={Math.min(barTop, avgY)} containerWidth={BAR_W} />
       })()}
     </div>
   )
@@ -384,7 +443,7 @@ export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: Fu
             d={wedge(i)}
             className="fill-transparent outline-none"
             tabIndex={0}
-            aria-label={`${d.index}. ${d.title}: ${d.state === 'done' ? formatPercent(d.percent) : STATE_LABEL[d.state]}`}
+            aria-label={`${d.index}. ${d.title}: ${spokenValue(d)}`}
             onPointerEnter={() => onActiveChange(d.key)}
             onFocus={() => onActiveChange(d.key)}
             onBlur={() => onActiveChange(null)}
@@ -394,7 +453,7 @@ export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: Fu
       {active && (() => {
         const i = data.indexOf(active)
         const [x, y] = active.percent === null ? polar(cx, cy, labelR, i, n) : polar(cx, cy, (R * active.percent) / 100, i, n)
-        return <ChartTooltip datum={active} leftPct={(x / RADAR_W) * 100} topPct={(y / RADAR_H) * 100} />
+        return <ChartTooltip datum={active} x={x} y={y} containerWidth={RADAR_W} />
       })()}
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronDown, Clock, Info, ListChecks, Search, UserRound, X,
 } from 'lucide-react'
@@ -16,12 +16,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   ABILITY_SORT_LABEL, assignmentAverages, buildStudentAbilities, compareAssignmentsForDisplay,
-  formatPercent, matchesStudentQuery, sortByAbility,
+  formatPercent, matchesStudentQuery, restoreSelection, sortByAbility,
   type AbilitySortKey, type StudentAbility,
 } from '@/lib/student-ability'
 import type { StudentSortDir } from '@/lib/student-sort'
 import {
-  ChartTypeToggle, MiniBarChart, MiniRadarChart, RADAR_MIN_ASSIGNMENTS,
+  ChartTypeToggle, MiniBarChart, MiniRadarChart, RADAR_MIN_ASSIGNMENTS, isUnscored,
   type AbilityChartType, type AbilityDatum,
 } from './ability-charts'
 import { StudentAbilityDialog } from './student-ability-dialog'
@@ -29,6 +29,9 @@ import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import type { StudentProfileRow } from './homeroom-overview'
 
 const PAGE_SIZE = 25
+
+/** Past this many งาน the name list folds, so a full term does not push the cards off screen. */
+const CHIPS_FOLDED = 8
 
 const TYPE_LABEL: Record<string, string> = { exercise: 'แบบฝึกหัด', exam: 'ข้อสอบ' }
 
@@ -94,22 +97,34 @@ export function StudentAbilityTab({
     [assignments],
   )
 
-  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
-    const all = usable.map(a => a.id)
-    const stored = readPrefs(classroomId).selected
-    if (!stored) return all
-    const known = new Set(all)
-    const still = stored.filter(id => known.has(id))
-    // Every remembered งาน was deleted since — start again from all of them
-    // rather than from an unexplained empty page.
-    return still.length === 0 && stored.length > 0 ? all : still
-  })
-  const [chartType, setChartType] = useState<AbilityChartType>(() => readPrefs(classroomId).chart ?? 'bar')
+  // The first render uses the defaults on server and client alike; the
+  // remembered choice is applied before the browser paints. Reading storage
+  // during render made a server-rendered tab fail hydration.
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => usable.map(a => a.id))
+  const [chartType, setChartType] = useState<AbilityChartType>('bar')
+  useLayoutEffect(() => {
+    const prefs = readPrefs(classroomId)
+    setSelectedIds(restoreSelection(prefs.selected, usable.map(a => a.id)))
+    if (prefs.chart) setChartType(prefs.chart)
+    // Once per classroom: later changes to the list must not undo what the
+    // teacher ticks while the tab is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classroomId])
   const [sortKey, setSortKey] = useState<AbilitySortKey>('number')
   const [sortDir, setSortDir] = useState<StudentSortDir>('asc')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [chipsOpen, setChipsOpen] = useState(false)
+  // Card buttons by student, so closing the full view can hand focus to the
+  // student last shown — ← → may have moved far from the card that opened it.
+  const cardButtons = useRef(new Map<string, HTMLButtonElement>())
+  const lastShownId = useRef<string | null>(null)
+
+  function showStudent(id: string) {
+    lastShownId.current = id
+    setOpenId(id)
+  }
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const selected = useMemo(() => usable.filter(a => selectedSet.has(a.id)), [usable, selectedSet])
@@ -126,6 +141,11 @@ export function StudentAbilityTab({
     [students, profiles, abilities, sortKey, sortDir, query],
   )
 
+  // Only explain the ○ mark when a ticked งาน actually has one.
+  const hasUnscored = useMemo(
+    () => Array.from(abilities.values()).some(ability => ability.cells.some(cell => isUnscored(cell))),
+    [abilities],
+  )
   const radarAllowed = selected.length >= RADAR_MIN_ASSIGNMENTS
   const effectiveChart: AbilityChartType = chartType === 'radar' && radarAllowed ? 'radar' : 'bar'
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
@@ -161,7 +181,7 @@ export function StudentAbilityTab({
   function openAt(index: number) {
     const student = visible[index]
     if (!student) return
-    setOpenId(student.id)
+    showStudent(student.id)
     setPage(Math.floor(index / PAGE_SIZE) + 1)
   }
 
@@ -278,8 +298,8 @@ export function StudentAbilityTab({
 
       {selected.length > 0 && (
         <div className="space-y-2">
-          <ol className="flex flex-wrap gap-1.5" aria-label="งานที่นำมาเทียบ">
-            {selected.map((a, i) => {
+          <ol id="ability-chips" className="flex flex-wrap items-center gap-1.5" aria-label="งานที่นำมาเทียบ">
+            {(chipsOpen ? selected : selected.slice(0, CHIPS_FOLDED)).map((a, i) => {
               const pending = pendingReviewByAssignment[a.id] ?? 0
               return (
                 <li key={a.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted py-1 pr-2.5 pl-1 text-xs">
@@ -297,10 +317,25 @@ export function StudentAbilityTab({
                 </li>
               )
             })}
+            {selected.length > CHIPS_FOLDED && (
+              <li>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  aria-expanded={chipsOpen}
+                  aria-controls="ability-chips"
+                  onClick={() => setChipsOpen(open => !open)}
+                  className="text-primary"
+                >
+                  {chipsOpen ? 'ย่อรายชื่องาน' : `ดูอีก ${selected.length - CHIPS_FOLDED} งาน`}
+                </Button>
+              </li>
+            )}
           </ol>
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-            ตัวเลขคือเปอร์เซ็นต์ของคะแนนเต็มแต่ละงาน ไม่ใช่คะแนนดิบ · ขีด – คือยังไม่ส่ง และไม่นำมาคิดค่าเฉลี่ย · กดการ์ดเพื่อดูแบบเต็มจอ
+            ตัวเลขคือเปอร์เซ็นต์ของคะแนนเต็มแต่ละงาน ไม่ใช่คะแนนดิบ · ขีด – คือยังไม่ส่ง และไม่นำมาคิดค่าเฉลี่ย
+            {hasUnscored && ' · วงกลม ○ คือส่งแล้วแต่งานนั้นไม่มีคะแนนเต็ม'} · กดการ์ดเพื่อดูแบบเต็มจอ
           </p>
         </div>
       )}
@@ -335,7 +370,11 @@ export function StudentAbilityTab({
                     data={cardData(abilities.get(student.id))}
                     chart={effectiveChart}
                     total={selected.length}
-                    onOpen={() => setOpenId(student.id)}
+                    onOpen={() => showStudent(student.id)}
+                    buttonRef={el => {
+                      if (el) cardButtons.current.set(student.id, el)
+                      else cardButtons.current.delete(student.id)
+                    }}
                   />
                 </li>
               ))}
@@ -358,6 +397,7 @@ export function StudentAbilityTab({
         onPrev={() => openAt(openIndex - 1)}
         onNext={() => openAt(openIndex + 1)}
         onClose={() => setOpenId(null)}
+        returnFocusTo={() => (lastShownId.current ? cardButtons.current.get(lastShownId.current) ?? null : null)}
         chartType={chartType}
         onChartTypeChange={changeChart}
         radarAllowed={radarAllowed}
@@ -366,7 +406,7 @@ export function StudentAbilityTab({
   )
 }
 
-function StudentCard({ student, profile, ability, data, chart, total, onOpen }: {
+function StudentCard({ student, profile, ability, data, chart, total, onOpen, buttonRef }: {
   student: RealStudent
   profile: StudentProfileRow | undefined
   ability: StudentAbility | undefined
@@ -374,6 +414,7 @@ function StudentCard({ student, profile, ability, data, chart, total, onOpen }: 
   chart: AbilityChartType
   total: number
   onOpen: () => void
+  buttonRef: (el: HTMLButtonElement | null) => void
 }) {
   const classNumber = profile?.class_number ?? null
   const average = ability?.average ?? null
@@ -405,6 +446,7 @@ function StudentCard({ student, profile, ability, data, chart, total, onOpen }: 
       {/* The whole card opens the student; the button sits over it so the
           chart inside keeps its own layout instead of a button's. */}
       <Button
+        ref={buttonRef}
         variant="ghost"
         onClick={onOpen}
         aria-label={`${student.full_name}${classNumber !== null ? ` เลขที่ ${classNumber}` : ''} เฉลี่ย ${formatPercent(average)} ส่ง ${submitted} จาก ${total} งาน — ดูแบบเต็มจอ`}

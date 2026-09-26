@@ -6,6 +6,7 @@ import {
   differenceFromClass,
   formatPercent,
   matchesStudentQuery,
+  restoreSelection,
   sortByAbility,
   type AbilityAssignment,
   type AbilitySubmission,
@@ -125,10 +126,18 @@ describe('sortByAbility', () => {
     expect(sortByAbility(students, {}, abilities, 'score', 'asc').map(s => s.id)).toEqual(['s1', 's2', 's3'])
   })
 
-  it('falls back to the shared roster order for the other keys', () => {
+  it('orders by เลขที่, รหัส and name', () => {
     const profiles = { s1: { class_number: 2 }, s2: { class_number: 3 }, s3: { class_number: 1 } }
     expect(sortByAbility(students, profiles, abilities, 'number', 'asc').map(s => s.id)).toEqual(['s3', 's1', 's2'])
     expect(sortByAbility(students, {}, abilities, 'name', 'asc').map(s => s.id)).toEqual(['s2', 's1', 's3'])
+    expect(sortByAbility(students, {}, abilities, 'name', 'desc').map(s => s.id)).toEqual(['s3', 's1', 's2'])
+  })
+
+  it('keeps students without เลขที่ or รหัส last in both directions', () => {
+    const profiles = { s1: { class_number: 2, student_code: 'A-2' }, s2: { class_number: null, student_code: null }, s3: { class_number: 1, student_code: 'A-10' } }
+    expect(sortByAbility(students, profiles, abilities, 'number', 'desc').map(s => s.id)).toEqual(['s1', 's3', 's2'])
+    expect(sortByAbility(students, profiles, abilities, 'code', 'asc').map(s => s.id)).toEqual(['s1', 's3', 's2'])
+    expect(sortByAbility(students, profiles, abilities, 'code', 'desc').map(s => s.id)).toEqual(['s3', 's1', 's2'])
   })
 })
 
@@ -167,5 +176,25 @@ describe('formatPercent', () => {
   it('rounds to a whole percent and shows a dash for no value', () => {
     expect(formatPercent(72.5)).toBe('73%')
     expect(formatPercent(null)).toBe('–')
+  })
+})
+
+describe('restoreSelection', () => {
+  const available = ['a1', 'a2', 'a3']
+
+  it('ticks every งาน when nothing was remembered', () => {
+    expect(restoreSelection(undefined, available)).toEqual(available)
+  })
+
+  it('keeps the remembered งาน that still exist', () => {
+    expect(restoreSelection(['a3', 'gone', 'a1'], available)).toEqual(['a3', 'a1'])
+  })
+
+  it('falls back to every งาน when all remembered ones were deleted', () => {
+    expect(restoreSelection(['gone'], available)).toEqual(available)
+  })
+
+  it('respects a list the teacher emptied on purpose', () => {
+    expect(restoreSelection([], available)).toEqual([])
   })
 })

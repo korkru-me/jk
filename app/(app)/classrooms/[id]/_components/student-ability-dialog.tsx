@@ -11,7 +11,7 @@ import {
   type AssignmentAverage, type StudentAbility,
 } from '@/lib/student-ability'
 import {
-  AbilityBarChart, AbilityRadarChart, ChartTypeToggle,
+  AbilityBarChart, AbilityRadarChart, ChartTypeToggle, isUnscored,
   type AbilityChartType, type AbilityDatum,
 } from './ability-charts'
 import type { StudentProfileRow } from './homeroom-overview'
@@ -33,13 +33,15 @@ interface Props {
   onPrev: () => void
   onNext: () => void
   onClose: () => void
+  /** Where focus lands on close: the card of the student last shown, which may not be the one that opened the dialog. */
+  returnFocusTo: () => HTMLElement | null
   chartType: AbilityChartType
   onChartTypeChange: (value: AbilityChartType) => void
   radarAllowed: boolean
 }
 
 export function StudentAbilityDialog(props: Props) {
-  const { student, onClose, onPrev, onNext, position, total } = props
+  const { student, onClose, onPrev, onNext, position, total, returnFocusTo } = props
 
   // ← / → step through the list without closing, unless a control that uses
   // the arrow keys itself (the chart switch) has focus.
@@ -53,7 +55,11 @@ export function StudentAbilityDialog(props: Props) {
 
   return (
     <Dialog open={student !== null} onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent className="max-w-[calc(100%-1rem)] gap-0 p-0 sm:max-w-6xl" onKeyDown={handleKeyDown}>
+      <DialogContent
+        className="max-w-[calc(100%-1rem)] gap-0 p-0 sm:max-w-6xl"
+        onKeyDown={handleKeyDown}
+        finalFocus={() => returnFocusTo() ?? true}
+      >
         {/* Keyed by student so hover state never carries over to the next one. */}
         {student && <DialogBody key={student.id} {...props} student={student} />}
       </DialogContent>
@@ -207,9 +213,13 @@ function DialogBody({
                         {d.state === 'done' && d.score !== null ? `${d.score}/${d.maxScore}` : ''}
                       </td>
                       <td className="px-2 py-2.5 text-right align-top font-semibold tabular-nums whitespace-nowrap">
-                        {d.state === 'done'
+                        {d.percent !== null
                           ? formatPercent(d.percent)
-                          : <span className="text-xs font-normal text-muted-foreground">{d.state === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'}</span>}
+                          : (
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {isUnscored(d) ? 'ไม่มีคะแนน' : d.state === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'}
+                            </span>
+                          )}
                       </td>
                       <td className="px-3 py-2.5 text-right align-top text-muted-foreground tabular-nums">
                         {formatPercent(d.classAverage ?? null)}
