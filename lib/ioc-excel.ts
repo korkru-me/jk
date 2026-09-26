@@ -7,6 +7,7 @@
  */
 
 import ExcelJS from 'exceljs'
+import { formatThaiDateTime } from '@/lib/thai-time'
 
 export interface IocExcelRow {
   itemLabel: string
@@ -134,7 +135,7 @@ export async function buildIocSummaryWorkbook(
 
   sheet.addRow([])
   const note = sheet.addRow([
-    `ออกจาก KorKru เมื่อ ${generatedAt.toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' })}`
+    `ออกจาก KorKru เมื่อ ${formatThaiDateTime(generatedAt, { dateStyle: 'long', timeStyle: 'short' })}`
     + ' · ค่าดัชนีคำนวณจากผลที่ผู้ทรงคุณวุฒิส่งจริง',
   ])
   note.font = { italic: true, size: 10 }

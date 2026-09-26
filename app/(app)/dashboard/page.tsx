@@ -14,6 +14,7 @@ import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { canStudentViewScore } from '@/lib/result-visibility'
+import { formatThaiDate, thaiHour } from '@/lib/thai-time'
 import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 
@@ -269,7 +270,7 @@ function StudentDashboard({
   calendarEvents: CalendarEvent[]
   recentPosts: any[]
 }) {
-  const hour = new Date().getHours()
+  const hour = thaiHour()
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น'
 
   return (
@@ -398,7 +399,7 @@ function timeAgo(iso: string): string {
   if (hours < 24) return `${hours} ชม.ที่แล้ว`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days} วันที่แล้ว`
-  return new Date(iso).toLocaleDateString('th-TH', { dateStyle: 'short' })
+  return formatThaiDate(iso, { dateStyle: 'short' })
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -443,7 +444,7 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
   if (hours < 24) return { label: `อีก ${hours} ชม.`, urgent: true, color: 'text-flag dark:text-flag' }
   if (days <= 2) return { label: `อีก ${days} วัน`, urgent: true, color: 'text-warning' }
   return {
-    label: new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' }),
+    label: formatThaiDate(endAt, { dateStyle: 'short' }),
     urgent: false,
     color: 'text-muted-foreground',
   }

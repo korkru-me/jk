@@ -98,6 +98,20 @@ describe('buildIocSummaryWorkbook', () => {
     expect(unjudged.getCell(7).value).toBe('ยังไม่มีผล')
   })
 
+  // Vercel builds this file in UTC; 03:00 UTC must still read as 10:00 in Thailand.
+  it('stamps the Thai time it was made, even on a UTC server', async () => {
+    const previous = process.env.TZ
+    process.env.TZ = 'UTC'
+    try {
+      const sheet = await readBack(await buildIocSummaryWorkbook(input()))
+      expect(String(sheet.getRow(sheet.rowCount).getCell(1).value))
+        .toContain('ออกจาก KorKru เมื่อ 14 กันยายน 2569 เวลา 10:00')
+    } finally {
+      if (previous === undefined) delete process.env.TZ
+      else process.env.TZ = previous
+    }
+  })
+
   it('refuses a form with nothing to summarize', async () => {
     await expect(buildIocSummaryWorkbook(input({ rows: [] }))).rejects.toThrow(IocExcelError)
   })
