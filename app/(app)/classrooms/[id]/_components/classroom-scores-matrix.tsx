@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
 import { setAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { computePassed } from '@/lib/grading'
+import { describeGroupTarget } from '@/lib/classroom-groups'
 import { officialSubmissionsByStudent } from '@/lib/scoring'
 import { downloadTextFile, toCsv, safeFilenamePart } from '@/lib/utils'
 import {
@@ -18,6 +19,7 @@ import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import type { StudentProfileRow } from './homeroom-overview'
 import type { SortKey as StudentTableSortKey, SortDir as StudentTableSortDir } from './student-table'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey } from '@/lib/student-sort'
+import { compareAssignmentsForDisplay } from '@/lib/student-ability'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -57,6 +59,9 @@ interface Props {
   submissions: SubmissionRow[]
   extensions: ExtensionRow[]
   profiles?: Record<string, StudentProfileRow>
+  /** The students each กลุ่มย่อย-only งาน was handed to, keyed by assignment id. */
+  audienceByAssignment?: Map<string, Set<string>>
+  groupNameById?: Map<string, string>
   /** Same sort state driving the "นักเรียน" tab, so both tabs show
    *  students in the same order. Falls back to name when the active sort
    *  is one of that tab's local-only columns (score/status — sample data
@@ -72,7 +77,7 @@ function isSyncableSortKey(key: StudentTableSortKey): key is StudentSortKey {
 
 export function ClassroomScoresMatrix({
   classroomId, classroomName, students, assignments, submissions, extensions, profiles = {},
-  sortKey, sortDir, onViewStudents,
+  audienceByAssignment, groupNameById = new Map(), sortKey, sortDir, onViewStudents,
 }: Props) {
   const [reminding, setReminding] = useState<string | null>(null)
   const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
@@ -109,12 +114,7 @@ export function ClassroomScoresMatrix({
   const visibleAssignments = assignments
     .filter(a => typeFilter === 'all' ? true : a.type === typeFilter)
     .slice()
-    .sort((x, y) => {
-      const ox = x.display_order ?? Infinity
-      const oy = y.display_order ?? Infinity
-      if (ox !== oy) return ox - oy
-      return new Date(x.created_at).getTime() - new Date(y.created_at).getTime()
-    })
+    .sort(compareAssignmentsForDisplay)
 
   // (assignmentId, studentId) -> official submission per that assignment's score_strategy
   const subKey = (aId: string, sId: string) => `${aId}::${sId}`
@@ -148,8 +148,15 @@ export function ClassroomScoresMatrix({
     })
   }
 
+  /** This งาน went to some กลุ่มย่อย only, and this student is in none of them. */
+  function notGiven(assignmentId: string, studentId: string) {
+    const audience = audienceByAssignment?.get(assignmentId)
+    return audience !== undefined && !audience.has(studentId) && !bestSubmission.has(subKey(assignmentId, studentId))
+  }
+
   function cellText(assignmentId: string, studentId: string) {
     const sub = bestSubmission.get(subKey(assignmentId, studentId))
+    if (notGiven(assignmentId, studentId)) return 'ไม่ได้มอบหมาย'
     if (!sub || (sub.status !== 'submitted' && sub.status !== 'graded')) {
       return ''
     }
@@ -183,7 +190,7 @@ export function ClassroomScoresMatrix({
       const extension = extensionMap.get(subKey(assignment.id, s.id))
       return [
         i + 1, s.full_name, s.email,
-        sub ? (STATUS_LABEL[sub.status] ?? sub.status) : 'ยังไม่ทำ',
+        sub ? (STATUS_LABEL[sub.status] ?? sub.status) : notGiven(assignment.id, s.id) ? 'ไม่ได้มอบหมาย' : 'ยังไม่ทำ',
         submitted ? sub!.total_score ?? 0 : '',
         submitted ? sub!.max_score : '',
         passed === null ? '' : (passed ? 'ผ่าน' : 'ไม่ผ่าน'),
@@ -291,6 +298,7 @@ export function ClassroomScoresMatrix({
               </th>
               {visibleAssignments.map(a => {
                 const hasNonSubmitter = orderedStudents.some(s => {
+                  if (notGiven(a.id, s.id)) return false
                   const sub = bestSubmission.get(subKey(a.id, s.id))
                   return !sub || (sub.status !== 'submitted' && sub.status !== 'graded')
                 })
@@ -310,6 +318,11 @@ export function ClassroomScoresMatrix({
                     <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
                       {a.title}
                     </Link>
+                    {a.group_ids && (
+                      <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-tint-1" title={describeGroupTarget(a.group_ids, groupNameById)}>
+                        เฉพาะ {describeGroupTarget(a.group_ids, groupNameById)}
+                      </p>
+                    )}
                     <button
                       onClick={() => handleRemind(a.id)}
                       disabled={!hasNonSubmitter || reminding === a.id}
@@ -345,6 +358,14 @@ export function ClassroomScoresMatrix({
                   const passed = submitted
                     ? computePassed(sub!.total_score, sub!.max_score, a.passing_type, a.passing_value)
                     : null
+
+                  if (notGiven(a.id, student.id)) {
+                    return (
+                      <td key={a.id} className="px-3 py-2.5 text-center border-b border-border bg-muted/40">
+                        <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
+                      </td>
+                    )
+                  }
 
                   return (
                     <td key={a.id} className="px-3 py-2.5 text-center group relative border-b border-border">

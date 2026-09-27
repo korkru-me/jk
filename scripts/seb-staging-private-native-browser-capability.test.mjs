@@ -141,6 +141,23 @@ describe('SEB Staging private native browser capability', () => {
     expect(hashes.configKey).toMatch(/^[a-f0-9]{64}$/)
   })
 
+  it.each([
+    'start-revision-bound-attempt',
+    'autosave-synthetic-answer',
+  ])('installs valid hashes for the distinct take-session challenge (%s)', async operationId => {
+    const targetPage = page()
+    await expect(harness().executeNativeOperation(
+      request(operationId, targetPage),
+    )).resolves.toEqual({ status: 'passed' })
+    const binding = targetPage.exposed.get('__korkruSebS5SecurityHashes')
+    const url = `https://staging.korkru.com/assignments/${IDS.assignment}/take?sebChallenge=x`
+    const hashes = await binding(url)
+    expect(hashes).toEqual({
+      configKey: createHash('sha256').update(`${url}${CK}`).digest('hex'),
+      browserExamKey: createHash('sha256').update(`${url}${BEK}`).digest('hex'),
+    })
+  })
+
   it('clears only the exact assignment SEB cookie before a negative session navigation', async () => {
     const targetPage = page()
     await expect(harness().executeNativeOperation(request('reject-invalid-seb-session', targetPage)))

@@ -403,9 +403,19 @@ describe('SEB Staging browser operation runtime', () => {
     ])
   })
 
+  it('requires native SEB proof before starting a revision-bound attempt', async () => {
+    const harness = makeHarness({ native: true })
+    await expect(harness.runtime.sessionOperationRunner(
+      runnerInput(harness.page, 'start-revision-bound-attempt', 'student-primary'),
+    )).resolves.toEqual({ status: 'passed' })
+    expect(harness.events[0]).toBe('native:start-revision-bound-attempt')
+    expect(harness.events[1]).toBe('issue:start-revision-bound-attempt')
+  })
+
   it('does not perform transparent retries; retry IDs receive distinct one-shot tickets', async () => {
     let ticketNumber = 0
     const harness = makeHarness({
+      native: true,
       ticketFactory: ({ events, page }) => {
         ticketNumber += 1
         return makeTicket(events, page, ticketNumber === 1

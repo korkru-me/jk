@@ -840,7 +840,20 @@ export interface Assignment {
   /** Optional per-attempt sample size from question_ids. The selected subset
    * is frozen into submission_answers, so reloading never draws a new set. */
   random_question_count: number | null
+  /** โจทย์สุ่มตัวเลข: set = every student (and every retry) gets the same
+   *  numbers, drawn from a generator seeded by this value and the question id
+   *  (lib/math/shared-random.ts). NULL = each attempt draws its own, which is
+   *  what every งาน did before this existed. Generated server-side, and frozen
+   *  once anyone has started — later students would otherwise get other
+   *  numbers from the same งาน. */
+  shared_random_seed: number | null
+  /** Scores and the answer key after hand-in — not the เฉลยวิธีทำ below. */
   show_results: ShowResultsMode
+  /** Whether a student may open the เฉลยวิธีทำ attached to each ข้อ from their
+   *  summary page, once they can no longer work on the งาน: it was closed,
+   *  their deadline passed, or they used every attempt — with no attempt left
+   *  that can still be written to. Decided in lib/solution-release.ts. */
+  show_solutions: boolean
   max_attempts: number | null
   score_strategy: ScoreStrategy
   /** What a retry re-asks. `all` rebuilds the whole attempt (the behavior
@@ -858,9 +871,9 @@ export interface Assignment {
    *  ใบงาน. Scores are still decided by the final submit, so a ข้อ checked
    *  and then fixed is banked as the fixed answer. */
   instant_check: boolean
-  /** Whether that check reveals the เฉลย (and the teacher's วิธีทำ), or only
-   *  says ถูก/ผิด and leaves the student to think again. Meaningless while
-   *  `instant_check` is false. */
+  /** Whether that check reveals the answer key, or only says ถูก/ผิด and
+   *  leaves the student to think again. The เฉลยวิธีทำ is never part of a check
+   *  — see `show_solutions`. Meaningless while `instant_check` is false. */
   instant_check_answer_key: boolean
   /** Whether the attempt ends at a fixed number of ข้อ or at a run of correct
    *  ones. `streak` is enforced structurally, not only by the form: the

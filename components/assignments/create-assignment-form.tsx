@@ -16,7 +16,7 @@ import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
-  CircleCheck, Calculator, NotebookPen,
+  CircleCheck, Calculator, NotebookPen, Hash,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -35,6 +35,11 @@ import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
+import {
+  GroupTargetPicker, groupTargetsComplete, groupTargetsFor,
+  type AssignmentGroupOption, type GroupTargets,
+} from '@/components/assignments/group-target-picker'
+import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
 import {
@@ -54,7 +59,7 @@ const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจ
 // "หลังพ้นกำหนดส่ง" — the wrong promise, on the last screen before creating.
 const SHOW_RESULTS_SUMMARY: Record<ShowResultsMode, string> = {
   immediate: 'ทันทีหลังส่ง',
-  score_only: 'คะแนน แต่ไม่แสดงเฉลย',
+  score_only: 'คะแนน แต่ไม่แสดงคำตอบ',
   after_due: 'หลังพ้นกำหนดส่ง',
   never: 'ไม่แสดงผลลัพธ์',
 }
@@ -67,13 +72,17 @@ export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'de
 
 interface Props {
   classrooms: AssignmentClassroomOption[]
+  /** กลุ่มย่อย of each classroom above, for "มอบหมายให้". */
+  groupsByClassroom?: Record<string, AssignmentGroupOption[]>
   questions: AssignmentQuestionOption[]
   questionSets?: AssignmentQuestionSetOption[]
   preselectedClassroomId?: string
   preselectedSet?: AssignmentQuestionSetOption
 }
 
-export function CreateAssignmentForm({ classrooms, questions, questionSets = [], preselectedClassroomId, preselectedSet }: Props) {
+export function CreateAssignmentForm({
+  classrooms, groupsByClassroom = {}, questions, questionSets = [], preselectedClassroomId, preselectedSet,
+}: Props) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
@@ -87,6 +96,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [classroomIds, setClassroomIds] = useState<string[]>(
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
+  // มอบหมายให้: absent/null per room = นักเรียนทุกคนในห้อง, the default.
+  const [groupTargets, setGroupTargets] = useState<GroupTargets>({})
   const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exercise')
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
@@ -134,7 +145,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
+  // Off unless the teacher asks: every งาน before this existed gave each
+  // student their own numbers, and that is still what a โจทย์สุ่มตัวเลข is for.
+  const [sharedRandomValues, setSharedRandomValues] = useState(false)
   const [showResults, setShowResults] = useState<ShowResultsMode>('immediate')
+  // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
+  // before this setting existed, and one that does is a choice, not a default.
+  const [showSolutions, setShowSolutions] = useState(false)
   const [maxAttempts, setMaxAttempts] = useState('')
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
@@ -241,6 +258,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setClassroomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
+  // "มอบหมายให้" in the summary: the whole room unless some room is limited
+  // to กลุ่มย่อย, then which groups (named when only one room is ticked).
+  const limitedRooms = classroomIds.filter(id => (groupTargets[id] ?? null) !== null)
+  const audienceSummary = limitedRooms.length === 0
+    ? 'นักเรียนทุกคนในห้อง'
+    : classroomIds.length === 1
+      ? `เฉพาะ ${(groupsByClassroom[classroomIds[0]] ?? [])
+          .filter(g => groupTargets[classroomIds[0]]?.includes(g.id))
+          .map(g => g.name)
+          .join(', ')}`
+      : `เฉพาะบางกลุ่มใน ${limitedRooms.length} ห้อง`
+
   // What survives of the แฟ้มย่อย after the teacher's own picking.
   const assignedSections = filterSectionsToQuestions(sections, selectedIds)
 
@@ -338,7 +367,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const displayMaxSet = displayMaxScore.trim() !== '' && Number(displayMaxScore) > 0
 
   function canNext() {
-    if (step === 0) return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
+    if (step === 0) {
+      return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
+        && groupTargetsComplete(groupTargets, classroomIds)
+    }
     if (step === 1) return selectedIds.length > 0
     // Refuse to leave คะแนนและเกณฑ์ with a streak the server would reject, so
     // the teacher reads the reason next to the field that caused it rather
@@ -357,6 +389,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const hasWorkImageQuestions = selectedIds.some(
     id => questions.find(q => q.id === id)?.question_type === 'written'
   )
+  // Same idea for "ตัวเลขชุดเดียวกัน": only a ข้อ that actually draws numbers
+  // can differ between students, so a งาน without one never sees the switch.
+  const randomValueQuestionCount = selectedIds.filter(
+    id => questions.find(q => q.id === id)?.has_random_values
+  ).length
+  const sharedRandomOn = randomValueQuestionCount > 0 && sharedRandomValues
 
   function openPublishDialog() {
     setScheduleMode(false)
@@ -422,6 +460,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
       const res = await createAssignment({
         classroom_ids: classroomIds,
+        group_targets: groupTargetsFor(groupTargets, classroomIds),
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
@@ -437,8 +476,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         type: assignmentType,
         shuffle_questions: shuffleQ,
         shuffle_options: shuffleA,
+        // Stored as off when nothing in the งาน draws numbers, whatever the
+        // switch was left on before the last such ข้อ was removed.
+        shared_random_values: sharedRandomOn,
         random_question_count: selectedRandomCount,
         show_results: showResults,
+        show_solutions: showSolutions,
         max_attempts: maxAttempts ? Number(maxAttempts) : null,
         score_strategy: scoreStrategy,
         // The wrong-only switch is hidden while a draw is on, so store the
@@ -556,6 +599,21 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 />
               )}
             </div>
+
+            {classroomIds.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>มอบหมายให้</Label>
+                <GroupTargetPicker
+                  classrooms={classroomIds.flatMap(id => {
+                    const c = classrooms.find(room => room.id === id)
+                    return c ? [{ id: c.id, name: c.name }] : []
+                  })}
+                  groupsByClassroom={groupsByClassroom}
+                  value={groupTargets}
+                  onChange={setGroupTargets}
+                />
+              </div>
+            )}
 
             {!preselectedSet && (
               <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
@@ -1013,10 +1071,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 <div className="border-t border-border pt-3 space-y-1.5">
                   <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                     <div>
-                      <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                      <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                       <p className="text-xs text-muted-foreground">
                         {instantCheckAnswerKey
-                          ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำทันที เหมาะกับการฝึกให้เข้าใจ'
+                          ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ'
                           : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
                       </p>
                     </div>
@@ -1029,7 +1087,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   </label>
                   {assignmentType === 'exam' && instantCheckAnswerKey && (
                     <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                      งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือเฉลยออกไปจากห้องได้ แนะนำให้ปิด
+                      งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือคำตอบที่ถูกออกไปจากห้องได้ แนะนำให้ปิด
                     </p>
                   )}
                 </div>
@@ -1108,10 +1166,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   <div className="space-y-1.5 pl-11">
                     <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                       <div>
-                        <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                        <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                         <p className="text-xs text-muted-foreground">
                           {instantCheckAnswerKey
-                            ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำที่ครูใส่ไว้ทันที เหมาะกับการฝึกให้เข้าใจ'
+                            ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ — ส่วนเฉลยวิธีทำที่แนบไว้ ดูได้หลังจบงานตามติ๊ก "ให้นักเรียนดูเฉลยวิธีทำ"'
                             : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
                         </p>
                       </div>
@@ -1124,7 +1182,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     </label>
                     {instantCheckAnswerKey && (
                       <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                        นักเรียนเห็นเฉลยระหว่างทำ แล้วแก้คำตอบให้ถูกได้ คะแนนแบบฝึกหัดจึงสะท้อน &ldquo;ทำจนเข้าใจ&rdquo; ไม่ใช่ &ldquo;ถูกตั้งแต่แรก&rdquo; — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดูในหน้าผลรายคน
+                        นักเรียนเห็นคำตอบที่ถูกระหว่างทำ แล้วแก้คำตอบให้ถูกได้ คะแนนแบบฝึกหัดจึงสะท้อน &ldquo;ทำจนเข้าใจ&rdquo; ไม่ใช่ &ldquo;ถูกตั้งแต่แรก&rdquo; — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดูในหน้าผลรายคน
                       </p>
                     )}
                   </div>
@@ -1168,6 +1226,26 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 value: shuffleA,
                 set: setShuffleA,
               },
+              ...(randomValueQuestionCount > 0 ? [{
+                label: 'ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน',
+                desc: `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — ปกติแต่ละคนได้ตัวเลขไม่ซ้ำกัน เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น`,
+                icon: Hash,
+                value: sharedRandomValues,
+                set: setSharedRandomValues,
+                footer: (sharedRandomValues ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground px-1">
+                      {maxAttempts !== '1' && 'ทำรอบใหม่ก็ยังได้ตัวเลขชุดเดิม · '}
+                      สร้างงานแล้วกด &ldquo;ดูตัวอย่าง&rdquo; เพื่อดูตัวเลขที่นักเรียนจะได้
+                    </p>
+                    {assignmentType === 'exam' && (
+                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                        ตัวเลขเหมือนกันทุกคน คำตอบที่ถูกจึงเหมือนกันทุกคนด้วย — นักเรียนบอกคำตอบกันได้ง่ายกว่าแบบต่างคนต่างสุ่ม
+                      </p>
+                    )}
+                  </div>
+                ) : null) as React.ReactNode,
+              }] : []),
               ...(hasWorkImageQuestions ? [{
                 label: 'ให้นักเรียนแนบรูปแสดงวิธีทำ',
                 desc: `${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)`,
@@ -1185,7 +1263,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               // coming back to the same ข้อ that were missed.
               ...(maxAttempts !== '1' && !randomDrawOn && !streakOn ? [{
                 label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
-                desc: 'รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ',
+                desc: `รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ${sharedRandomOn ? 'ตัวเลขในโจทย์เป็นชุดเดิม (ตั้งให้ทุกคนได้ชุดเดียวกันไว้)' : 'ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ'}`,
                 icon: RotateCcw,
                 value: retryScope === 'wrong_only',
                 set: (on: boolean) => setRetryScope(on ? 'wrong_only' : 'all'),
@@ -1193,7 +1271,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   <>
                     {retryScope === 'wrong_only' && showResults === 'immediate' && (
                       <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                        ตอนนี้ตั้งให้เฉลยทันทีหลังส่ง นักเรียนจึงเห็นเฉลยก่อนกลับมาแก้ข้อที่ผิด
+                        ตอนนี้ตั้งให้แสดงคำตอบที่ถูกทันทีหลังส่ง นักเรียนจึงเห็นคำตอบก่อนกลับมาแก้ข้อที่ผิด
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground px-1">
@@ -1401,9 +1479,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
             </Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {([
-                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนน+เฉลยทันที' },
-                { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงเฉลย', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
-                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนเฉลยจนกว่าจะหมดเขต' },
+                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
+                { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
+                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
                 { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
               ] as const).map(o => (
                 <button
@@ -1420,6 +1498,16 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               ))}
             </div>
           </div>
+
+          {/* Beside แสดงผลลัพธ์ because a teacher deciding what students see
+              after hand-in decides this too — but separately: that one is the
+              score and the answer key, this is the เฉลยวิธีทำ they attached. */}
+          <SolutionReleaseSetting
+            checked={showSolutions}
+            onChange={setShowSolutions}
+            assignmentType={assignmentType}
+            maxAttempts={maxAttempts}
+          />
 
           <div className="space-y-1.5">
             <Label htmlFor="attempts" className="flex items-center gap-1.5">
@@ -1508,6 +1596,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     ? (classrooms.find(c => c.id === classroomIds[0])?.name ?? '—')
                     : `${classrooms.find(c => c.id === classroomIds[0])?.name ?? ''} และอีก ${classroomIds.length - 1} ห้อง`,
                 },
+                { label: 'มอบหมายให้', value: audienceSummary },
                 { label: 'ประเภท',    value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
                 {
                   label: 'โจทย์',
@@ -1559,9 +1648,13 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(hasWorkImageQuestions
                   ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
                   : []),
+                ...(randomValueQuestionCount > 0
+                  ? [{ label: 'ตัวเลขในโจทย์สุ่ม', value: sharedRandomOn ? 'ทุกคนได้ชุดเดียวกัน' : 'แต่ละคนได้ต่างกัน' }]
+                  : []),
                 { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
                 { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
                 { label: 'แสดงผล',    value: SHOW_RESULTS_SUMMARY[showResults] },
+                { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-4">
                   <span className="text-muted-foreground">{row.label}</span>

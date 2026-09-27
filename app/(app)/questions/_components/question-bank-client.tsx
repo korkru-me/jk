@@ -22,6 +22,7 @@ import {
 } from '@/components/questions/question-search-groups'
 import { QuestionSortControl } from '@/components/questions/question-sort-control'
 import { SubQuestionCountBadge } from '@/components/questions/sub-question-count-badge'
+import { SolutionButton } from '@/components/questions/solution-button'
 import { Card } from '@/components/ui/card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 import type { QuestionStats } from '@/lib/question-stats'
@@ -98,6 +99,8 @@ interface Props {
   subQuestionCounts: Record<string, number>
   /** question id → every แฟ้มโจทย์ in view holding it. Absent = in no แฟ้ม. */
   setMemberships: Record<string, QuestionSetRef[]>
+  /** question id → whether it carries a เฉลย. Absent = not known, no ดูเฉลย button. */
+  solutionPresence: Record<string, boolean>
   perPage: number
   teamFilters: TeamFilters
   teamMatchCount: number
@@ -111,7 +114,7 @@ interface Props {
 export function QuestionBankClient({
   questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
   allTags, filters, matchCount, searchGroups, searchGroupCounts, totalCount, perPage, duplicateCounts,
-  subQuestionCounts, setMemberships,
+  subQuestionCounts, setMemberships, solutionPresence,
   teamFilters, teamMatchCount, teamSearchGroups, teamSearchGroupCounts, teamPaged,
 }: Props) {
   const router = useRouter()
@@ -599,6 +602,7 @@ export function QuestionBankClient({
                       duplicateCount={duplicateCounts[q.id] ?? 0}
                       subQuestionCount={subQuestionCounts[q.id]}
                       sets={setMemberships[q.id]}
+                      hasSolution={solutionPresence[q.id]}
                     />
                   ))}
                 </div>
@@ -623,6 +627,7 @@ export function QuestionBankClient({
                 duplicateCount={duplicateCounts[q.id] ?? 0}
                 subQuestionCount={subQuestionCounts[q.id]}
                 sets={setMemberships[q.id]}
+                hasSolution={solutionPresence[q.id]}
               />
             ))}
           </div>
@@ -743,7 +748,7 @@ export function QuestionBankClient({
                             />
                             <div className="space-y-2.5">
                               {result.questions.map(q => (
-                                <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} sets={setMemberships[q.id]} onPreview={() => void openPreview(q.id)} />
+                                <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} sets={setMemberships[q.id]} hasSolution={solutionPresence[q.id]} onPreview={() => void openPreview(q.id)} />
                               ))}
                             </div>
                           </section>
@@ -752,7 +757,7 @@ export function QuestionBankClient({
                     ) : (
                       <div className={cn('space-y-2.5', busyList)} aria-busy={isPending}>
                         {filteredTeam.map(q => (
-                          <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} sets={setMemberships[q.id]} onPreview={() => void openPreview(q.id)} />
+                          <TeamQuestionCard key={q.id} question={q} showTeamName={hasMultipleTeams} currentUserId={currentUserId} subQuestionCount={subQuestionCounts[q.id]} sets={setMemberships[q.id]} hasSolution={solutionPresence[q.id]} onPreview={() => void openPreview(q.id)} />
                         ))}
                       </div>
                     )}
@@ -834,7 +839,7 @@ function EmptyState() {
 // The creator can always edit their own question here; a teammate can too, but
 // only if the creator turned on "อนุญาตให้เพื่อนในทีมแก้ไข" — enforced server-side.
 
-function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestionCount, sets, onPreview }: {
+function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestionCount, sets, hasSolution, onPreview }: {
   question: QuestionWithCreator
   showTeamName: boolean
   currentUserId: string
@@ -843,6 +848,8 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestio
   /** แฟ้มโจทย์ in view holding this question. Never says "none": a teammate's
    *  own แฟ้ม may simply be private to them. */
   sets?: QuestionSetRef[]
+  /** Whether it carries a เฉลย. Absent = not known, no ดูเฉลย button. */
+  hasSolution?: boolean
   onPreview: () => void
 }) {
   // The edit page carries the bank's current view back with it, so returning
@@ -914,6 +921,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestio
               <Edit2 className="w-3.5 h-3.5" /> แก้ไข
             </Link>
           )}
+          <SolutionButton size="xs" questionId={q.id} questionTitle={q.title} hasSolution={hasSolution} canAttach={canEdit} />
           <button
             onClick={onPreview}
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/10 rounded-lg transition-all"

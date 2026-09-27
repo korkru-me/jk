@@ -192,6 +192,11 @@ class FakePage {
     if (this.currentUrl !== url) throw new Error('unexpected URL')
   }
 
+  async waitForFunction(callback) {
+    expect(callback).toBeTypeOf('function')
+    return true
+  }
+
   async evaluate() {}
 
   isClosed() {
@@ -251,7 +256,7 @@ class FakeContext {
       throw new Error('invalid login')
     }
     this.cookieList = [{
-      name: 'sb-auth-token',
+      name: 'sb-dyuxkrzeveknqgtuzpbh-auth-token',
       value: COOKIE_VALUE,
       domain: 'staging.korkru.com',
       path: '/',
@@ -417,7 +422,10 @@ function createHarness({
       }
       if (clientMode === 'throw-secret') throw new Error(BYPASS_SECRET)
       const cookies = await options.cookies.getAll()
-      expect(cookies).toEqual([{ name: 'sb-auth-token', value: COOKIE_VALUE }])
+      expect(cookies).toEqual([{
+        name: 'sb-dyuxkrzeveknqgtuzpbh-auth-token',
+        value: COOKIE_VALUE,
+      }])
       if (clientMode === 'delayed') {
         await new Promise(resolve => setTimeout(resolve, 80))
       }

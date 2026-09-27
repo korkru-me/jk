@@ -8,6 +8,7 @@ export function inspectExamReleaseReadiness({
   sebRegistryReady,
   releaseCandidateReady,
   sebPlatformsReady,
+  sebPhysicalUatReady,
   externalUatReady,
 }) {
   const checks = [
@@ -23,6 +24,9 @@ export function inspectExamReleaseReadiness({
     sebPlatformsReady
       ? { status: 'pass', field: 'SEB platforms', message: 'ทุก platform ผ่าน production-config evidence gate' }
       : { status: 'blocker', field: 'SEB platforms', message: 'หลักฐาน BEK, staging mock exam หรือ physical UAT ยังไม่ครบทุก platform' },
+    sebPhysicalUatReady
+      ? { status: 'pass', field: 'SEB physical UAT', message: 'ผ่าน 8 เคสบน Windows, macOS, iPadOS และ iOS ด้วย candidate เดียวกัน' }
+      : { status: 'blocker', field: 'SEB physical UAT', message: 'ยังไม่ผ่าน fixed physical UAT ครบสี่ระบบบน candidate เดียวกัน' },
     externalUatReady
       ? { status: 'pass', field: 'external UAT suites', message: 'responsive, authenticated, recovery และ cleanup evidence ครบ' }
       : { status: 'blocker', field: 'external UAT suites', message: 'หลักฐาน responsive, authenticated, recovery หรือ cleanup ยังไม่ครบ' },

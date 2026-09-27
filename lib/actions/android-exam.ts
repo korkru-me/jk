@@ -3,6 +3,7 @@
 import { cookies, headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { studentHasAssignment } from '@/lib/auth/assignment-access'
 import { createClient } from '@/lib/supabase/server'
 import {
   createAndroidExamSessionClaims,
@@ -38,17 +39,14 @@ async function getStudentExamContext(
   userId: string,
   assignmentId: string,
 ) {
-  const [assignmentResult, linksResult, extensionResult] = await Promise.all([
+  const [assignmentResult, handedToStudent, extensionResult] = await Promise.all([
     admin
       .from('assignments')
       .select('id, org_id, title, status, start_at, end_at, secure_browser_mode, android_exam_mode')
       .eq('id', assignmentId)
       .eq('status', 'published')
       .maybeSingle(),
-    admin
-      .from('assignment_classrooms')
-      .select('classroom_id')
-      .eq('assignment_id', assignmentId),
+    studentHasAssignment(admin, assignmentId, userId),
     admin
       .from('assignment_extensions')
       .select('extended_end_at')
@@ -64,17 +62,7 @@ async function getStudentExamContext(
     || assignment.android_exam_mode !== 'monitored'
   ) return { error: 'ข้อสอบนี้ไม่ได้เปิด Android monitored mode' as const }
 
-  const classroomIds = (linksResult.data ?? []).map(row => row.classroom_id)
-  const { data: membership } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('id')
-        .eq('student_id', userId)
-        .in('classroom_id', classroomIds)
-        .limit(1)
-        .maybeSingle()
-    : { data: null }
-  if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องที่ได้รับข้อสอบนี้' as const }
+  if (!handedToStudent) return { error: 'คุณไม่ได้อยู่ในห้องหรือกลุ่มที่ได้รับข้อสอบนี้' as const }
 
   const now = Date.now()
   if (assignment.start_at && new Date(assignment.start_at).getTime() > now) {
@@ -235,21 +223,9 @@ export async function reviewAndroidExamAccess(
   ) return { error: 'ข้อสอบนี้ไม่ได้เปิด Android monitored mode' }
 
   const admin = createAdminClient()
-  const { data: links } = await admin
-    .from('assignment_classrooms')
-    .select('classroom_id')
-    .eq('assignment_id', assignmentId)
-  const classroomIds = (links ?? []).map(row => row.classroom_id)
-  const { data: membership } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('id')
-        .eq('student_id', studentId)
-        .in('classroom_id', classroomIds)
-        .limit(1)
-        .maybeSingle()
-    : { data: null }
-  if (!membership) return { error: 'นักเรียนไม่ได้อยู่ในห้องที่ได้รับข้อสอบนี้' }
+  if (!await studentHasAssignment(admin, assignmentId, studentId)) {
+    return { error: 'นักเรียนไม่ได้อยู่ในห้องหรือกลุ่มที่ได้รับข้อสอบนี้' }
+  }
 
   const reviewedAt = new Date()
   const update = decision === 'approve'

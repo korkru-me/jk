@@ -10,6 +10,7 @@ import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { Card } from '@/components/ui/card'
 import { canStudentViewScore } from '@/lib/result-visibility'
+import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 
 export const metadata = { title: 'สรุปงานของฉัน — KorKru' }
 
@@ -103,13 +104,21 @@ export default async function MySubmissionsPage() {
 
   // Use assignment_classrooms as the authoritative relation in the same
   // query, avoiding a separate link lookup before loading published work.
-  const { data: publishedAssignments } = classroomIds.length > 0
+  const { data: linkedAssignments } = classroomIds.length > 0
     ? await admin
         .from('assignments')
-        .select('id, title, end_at, duration_minutes, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .select('id, title, end_at, duration_minutes, classrooms(name), assignment_classrooms!inner(classroom_id, group_ids)')
         .in('assignment_classrooms.classroom_id', classroomIds)
         .eq('status', 'published')
     : { data: [] }
+  // Leave out งาน handed to กลุ่มย่อย this student is not in.
+  const publishedAssignments = await filterAssignmentsForStudent(
+    admin,
+    user.id,
+    classroomIds,
+    (linkedAssignments ?? []) as any[],
+    new Set(all.map((s: any) => s.assignment_id as string)),
+  )
 
   const pendingAssignments = (publishedAssignments ?? [])
     .filter((a: any) => !doneAssignmentIds.has(a.id))

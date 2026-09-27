@@ -15,6 +15,12 @@ const MAX_REVISION = 2_147_483_646
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i
 const SAFE_METADATA_PATTERN = /^[A-Za-z0-9.+-]{1,40}$/
+const MULTI_PLATFORM_TARGETS = Object.freeze([
+  ['windows', 'windows'],
+  ['macos', 'macos'],
+  ['ipados', 'ios'],
+  ['ios', 'ios'],
+])
 const PLIST_PARSER = new XMLParser({
   preserveOrder: true,
   ignoreAttributes: false,
@@ -418,6 +424,72 @@ export function parseNativeSebEvidence(raw, assignmentId, revision) {
   })
 }
 
+/**
+ * Parse complete S6 evidence before the one immutable release registration.
+ * Target remains explicit because iPadOS and iOS both use the `ios` runtime
+ * platform; identical native builds may therefore share one BEK identity.
+ */
+export function parseMultiPlatformNativeSebEvidence(raw, assignmentId, revision) {
+  let value
+  try {
+    if (typeof raw === 'string' && raw.length > 24_000) fail('SEB_NATIVE_EVIDENCE_INVALID')
+    value = typeof raw === 'string' ? JSON.parse(raw) : raw
+  } catch {
+    fail('SEB_NATIVE_EVIDENCE_INVALID')
+  }
+  if (!exactKeys(value, [
+    'schemaVersion', 'assignmentId', 'revision', 'configKey', 'browserExamKeyBuilds',
+  ])) fail('SEB_NATIVE_EVIDENCE_INVALID')
+  if (
+    value.schemaVersion !== 2
+    || value.assignmentId !== assignmentId
+    || value.revision !== revision
+    || typeof value.configKey !== 'string'
+    || !SHA256_PATTERN.test(value.configKey)
+    || !Array.isArray(value.browserExamKeyBuilds)
+    || value.browserExamKeyBuilds.length !== MULTI_PLATFORM_TARGETS.length
+  ) fail('SEB_NATIVE_EVIDENCE_INVALID')
+
+  const expectedPlatforms = new Map(MULTI_PLATFORM_TARGETS)
+  const targets = new Set()
+  const identities = new Map()
+  for (const entry of value.browserExamKeyBuilds) {
+    if (
+      !exactKeys(entry, ['target', 'platform', 'versionString', 'buildNumber', 'key'])
+      || !expectedPlatforms.has(entry.target)
+      || entry.platform !== expectedPlatforms.get(entry.target)
+      || targets.has(entry.target)
+      || typeof entry.versionString !== 'string'
+      || !SAFE_METADATA_PATTERN.test(entry.versionString)
+      || typeof entry.buildNumber !== 'string'
+      || !SAFE_METADATA_PATTERN.test(entry.buildNumber)
+      || typeof entry.key !== 'string'
+      || !SHA256_PATTERN.test(entry.key)
+    ) fail('SEB_NATIVE_EVIDENCE_INVALID')
+    targets.add(entry.target)
+    const identity = `${entry.platform}:${entry.versionString}:${entry.buildNumber}`
+    const key = entry.key.toLowerCase()
+    const existing = identities.get(identity)
+    if (existing && existing.key !== key) fail('SEB_NATIVE_EVIDENCE_INVALID')
+    if (!existing) {
+      identities.set(identity, Object.freeze({
+        platform: entry.platform,
+        versionString: entry.versionString,
+        buildNumber: entry.buildNumber,
+        key,
+      }))
+    }
+  }
+  if (!MULTI_PLATFORM_TARGETS.every(([target]) => targets.has(target))) {
+    fail('SEB_NATIVE_EVIDENCE_INVALID')
+  }
+
+  return Object.freeze({
+    configKey: value.configKey.toLowerCase(),
+    browserExamKeys: Object.freeze([...identities.values()]),
+  })
+}
+
 export async function readAssignmentSebOperatorContext(admin, assignmentId, expectedRevision) {
   if (!validAssignmentId(assignmentId) || !validAssignmentRevision(expectedRevision)) {
     fail('SEB_OPERATOR_TARGET_INVALID')
@@ -531,20 +603,20 @@ function parseSafeRegistrationResponse(raw, expected, expectedKeyCount) {
   })
 }
 
-export async function enrollAssignmentSebStagingArtifact({
+async function enrollAssignmentSebStagingArtifactWithParser({
   admin,
   context,
   artifactBytes,
   evidence,
   environment,
-}) {
+}, parseEvidence) {
   if (!inspectAssignmentSebOperatorEnvironment(environment).ready) {
     fail('SEB_OPERATOR_ENVIRONMENT_BLOCKED')
   }
   if (context.existingRelease) fail('SEB_OPERATOR_RELEASE_EXISTS')
   inspectAssignmentSebPlaintextArtifact(artifactBytes, context.hashedQuitPassword)
   const identity = assignmentSebArtifactIdentity(artifactBytes, context.assignmentId, context.revision)
-  const nativeEvidence = parseNativeSebEvidence(evidence, context.assignmentId, context.revision)
+  const nativeEvidence = parseEvidence(evidence, context.assignmentId, context.revision)
   const uploadStatus = await ensureArtifactUploaded(admin, identity, artifactBytes)
 
   const input = {
@@ -569,6 +641,17 @@ export async function enrollAssignmentSebStagingArtifact({
   })
 }
 
+export async function enrollAssignmentSebStagingArtifact(input) {
+  return enrollAssignmentSebStagingArtifactWithParser(input, parseNativeSebEvidence)
+}
+
+export async function enrollAssignmentSebStagingMultiPlatformArtifact(input) {
+  return enrollAssignmentSebStagingArtifactWithParser(
+    input,
+    parseMultiPlatformNativeSebEvidence,
+  )
+}
+
 export function parseOperatorArguments(argv, mode) {
   const required = mode === 'prepare'
     ? ['assignment', 'revision', 'template', 'output']
@@ -578,11 +661,17 @@ export function parseOperatorArguments(argv, mode) {
   const allowed = new Set([...required, 'env-file'])
   const values = {}
   let apply = false
+  let multiplatform = false
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index]
     if (token === '--apply') {
       if (apply) fail('SEB_OPERATOR_ARGUMENTS_INVALID')
       apply = true
+      continue
+    }
+    if (token === '--multiplatform') {
+      if (mode !== 'enroll' || multiplatform) fail('SEB_OPERATOR_ARGUMENTS_INVALID')
+      multiplatform = true
       continue
     }
     if (!token.startsWith('--')) fail('SEB_OPERATOR_ARGUMENTS_INVALID')
@@ -598,5 +687,5 @@ export function parseOperatorArguments(argv, mode) {
   if (!validAssignmentId(values.assignment) || !validAssignmentRevision(revision)) {
     fail('SEB_OPERATOR_TARGET_INVALID')
   }
-  return Object.freeze({ ...values, revision, apply })
+  return Object.freeze({ ...values, revision, apply, multiplatform })
 }

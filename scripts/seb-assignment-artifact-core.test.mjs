@@ -3,11 +3,13 @@ import { gunzipSync, gzipSync } from 'node:zlib'
 import {
   assignmentSebArtifactIdentity,
   enrollAssignmentSebStagingArtifact,
+  enrollAssignmentSebStagingMultiPlatformArtifact,
   inspectAssignmentSebOperatorEnvironment,
   inspectAssignmentSebPlaintextArtifact,
   inspectAssignmentSebPlaintextTemplate,
   materializeAssignmentSebPlaintextSeed,
   parseNativeSebEvidence,
+  parseMultiPlatformNativeSebEvidence,
   parseOperatorArguments,
 } from './seb-assignment-artifact-core.mjs'
 
@@ -63,6 +65,46 @@ function evidence(overrides = {}) {
       buildNumber: '920',
       key: BROWSER_KEY,
     }],
+    ...overrides,
+  }
+}
+
+function multiPlatformEvidence(overrides = {}) {
+  return {
+    schemaVersion: 2,
+    assignmentId: ASSIGNMENT_ID,
+    revision: REVISION,
+    configKey: CONFIG_KEY,
+    browserExamKeyBuilds: [
+      {
+        target: 'windows',
+        platform: 'windows',
+        versionString: '3.10.2',
+        buildNumber: '920',
+        key: '1'.repeat(64),
+      },
+      {
+        target: 'macos',
+        platform: 'macos',
+        versionString: '3.7',
+        buildNumber: '100',
+        key: '2'.repeat(64),
+      },
+      {
+        target: 'ipados',
+        platform: 'ios',
+        versionString: '3.7',
+        buildNumber: '100',
+        key: '3'.repeat(64),
+      },
+      {
+        target: 'ios',
+        platform: 'ios',
+        versionString: '3.7',
+        buildNumber: '100',
+        key: '3'.repeat(64),
+      },
+    ],
     ...overrides,
   }
 }
@@ -187,6 +229,44 @@ describe('assignment SEB artifact operator core', () => {
       .toThrowError('SEB_NATIVE_EVIDENCE_INVALID')
   })
 
+  it('accepts complete S6 evidence and deduplicates one identical iOS runtime build', () => {
+    expect(parseMultiPlatformNativeSebEvidence(
+      multiPlatformEvidence(),
+      ASSIGNMENT_ID,
+      REVISION,
+    )).toEqual({
+      configKey: CONFIG_KEY,
+      browserExamKeys: [
+        {
+          platform: 'windows', versionString: '3.10.2', buildNumber: '920', key: '1'.repeat(64),
+        },
+        {
+          platform: 'macos', versionString: '3.7', buildNumber: '100', key: '2'.repeat(64),
+        },
+        {
+          platform: 'ios', versionString: '3.7', buildNumber: '100', key: '3'.repeat(64),
+        },
+      ],
+    })
+  })
+
+  it('rejects incomplete, mislabelled, or conflicting S6 native evidence', () => {
+    const missing = multiPlatformEvidence()
+    missing.browserExamKeyBuilds.pop()
+    expect(() => parseMultiPlatformNativeSebEvidence(missing, ASSIGNMENT_ID, REVISION))
+      .toThrowError('SEB_NATIVE_EVIDENCE_INVALID')
+
+    const mislabelled = multiPlatformEvidence()
+    mislabelled.browserExamKeyBuilds[2].platform = 'macos'
+    expect(() => parseMultiPlatformNativeSebEvidence(mislabelled, ASSIGNMENT_ID, REVISION))
+      .toThrowError('SEB_NATIVE_EVIDENCE_INVALID')
+
+    const conflicting = multiPlatformEvidence()
+    conflicting.browserExamKeyBuilds[3].key = '4'.repeat(64)
+    expect(() => parseMultiPlatformNativeSebEvidence(conflicting, ASSIGNMENT_ID, REVISION))
+      .toThrowError('SEB_NATIVE_EVIDENCE_INVALID')
+  })
+
   it('defaults commands to dry-run and provides no CK/BEK argv option', () => {
     const parsed = parseOperatorArguments([
       '--assignment', ASSIGNMENT_ID,
@@ -194,6 +274,20 @@ describe('assignment SEB artifact operator core', () => {
       '--artifact', 'final.seb',
     ], 'enroll')
     expect(parsed.apply).toBe(false)
+    expect(parsed.multiplatform).toBe(false)
+    expect(parseOperatorArguments([
+      '--assignment', ASSIGNMENT_ID,
+      '--revision', String(REVISION),
+      '--artifact', 'final.seb',
+      '--multiplatform',
+    ], 'enroll').multiplatform).toBe(true)
+    expect(() => parseOperatorArguments([
+      '--assignment', ASSIGNMENT_ID,
+      '--revision', String(REVISION),
+      '--template', 'template.seb',
+      '--output', 'final.seb',
+      '--multiplatform',
+    ], 'prepare')).toThrowError('SEB_OPERATOR_ARGUMENTS_INVALID')
     expect(() => parseOperatorArguments([
       '--assignment', ASSIGNMENT_ID,
       '--revision', String(REVISION),
@@ -252,5 +346,62 @@ describe('assignment SEB artifact operator core', () => {
     expect(result.release).toMatchObject({ assignmentId: ASSIGNMENT_ID, revision: REVISION })
     expect(JSON.stringify(result)).not.toContain(CONFIG_KEY)
     expect(JSON.stringify(result)).not.toContain(BROWSER_KEY)
+  })
+
+  it('registers complete multi-platform evidence once without returning key material', async () => {
+    const artifactBytes = materializeAssignmentSebPlaintextSeed(
+      plist(),
+      CURRENT_HASH,
+      () => Buffer.alloc(32, 11),
+    )
+    const identity = assignmentSebArtifactIdentity(artifactBytes, ASSIGNMENT_ID, REVISION)
+    const rpc = vi.fn().mockResolvedValue({
+      data: [{
+        assignment_id: ASSIGNMENT_ID,
+        revision: REVISION,
+        release_id: 'release-id',
+        artifact_storage_path: identity.storagePath,
+        artifact_sha256: identity.sha256,
+        artifact_size_bytes: identity.sizeBytes,
+        security_mode: 'test_plaintext',
+        browser_exam_key_count: 3,
+        created_at: '2026-09-27T11:00:00.000Z',
+      }],
+      error: null,
+    })
+    const admin = {
+      storage: {
+        from: vi.fn(() => ({
+          upload: vi.fn().mockResolvedValue({ data: {}, error: null }),
+          download: vi.fn().mockResolvedValue({
+            data: new Blob([artifactBytes]),
+            error: null,
+          }),
+        })),
+      },
+      rpc,
+    }
+
+    const result = await enrollAssignmentSebStagingMultiPlatformArtifact({
+      admin,
+      context: {
+        assignmentId: ASSIGNMENT_ID,
+        revision: REVISION,
+        hashedQuitPassword: CURRENT_HASH,
+        existingRelease: null,
+      },
+      artifactBytes,
+      evidence: JSON.stringify(multiPlatformEvidence()),
+      environment: validEnvironment(),
+    })
+
+    expect(rpc).toHaveBeenCalledTimes(1)
+    const input = rpc.mock.calls[0][1]
+    expect(input.p_browser_exam_keys).toHaveLength(3)
+    expect(result.release.browserExamKeyCount).toBe(3)
+    expect(JSON.stringify(result)).not.toContain(CONFIG_KEY)
+    expect(JSON.stringify(result)).not.toContain('1'.repeat(64))
+    expect(JSON.stringify(result)).not.toContain('2'.repeat(64))
+    expect(JSON.stringify(result)).not.toContain('3'.repeat(64))
   })
 })

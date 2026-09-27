@@ -132,4 +132,21 @@ describe('summarizeClassroomProgress', () => {
     expect(summary.submittedTotal).toBe(0)
     expect(summary.expectedTotal).toBe(2)
   })
+
+  it('counts a งาน for a กลุ่มย่อย only against the students it was handed to', () => {
+    const groupWork = assignment({ id: 'group', end_at: new Date(NOW - HOUR).toISOString() })
+    const summary = summarizeClassroomProgress(
+      students,
+      [assignments[0], groupWork],
+      [submission({ assignment_id: 'group', student_id: 's1' })],
+      NOW,
+      a => (a.id === 'group' ? new Set(['s1']) : null),
+    )
+
+    expect(summary.byStudent.get('s1')).toMatchObject({ submitted: 1, total: 2, rate: 50 })
+    // s2 was never given the group งาน, so it does not sit against them.
+    expect(summary.byStudent.get('s2')).toMatchObject({ submitted: 0, total: 1, rate: 0 })
+    expect(summary.expectedTotal).toBe(3)
+    expect(summary.byAssignment.get('group')).toMatchObject({ submitted: 1, missing: 0 })
+  })
 })

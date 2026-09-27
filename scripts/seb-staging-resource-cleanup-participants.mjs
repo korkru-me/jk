@@ -505,13 +505,16 @@ function exactPassed(result) {
   return hasExactFields(result, ['status']) && result.status === 'passed'
 }
 
-function exactState(result) {
+function exactState(result, node) {
   if (!hasExactFields(result, ['status', 'state', 'snapshots'])
     || result.status !== 'passed'
     || !['unplanned', 'planned', 'uncertain', 'committed', 'deleted'].includes(result.state)
     || !Array.isArray(result.snapshots)) return null
   if (result.state === 'committed') {
-    return result.snapshots.length === 1 ? result.state : null
+    const validCardinality = node?.kind === 'proctorEvent'
+      ? result.snapshots.length >= 1
+      : result.snapshots.length === 1
+    return validCardinality ? result.state : null
   }
   return result.snapshots.length === 0 ? result.state : null
 }
@@ -688,7 +691,7 @@ export function createSebStagingResourceCleanupParticipants({
   function readState(node) {
     const result = ledgerCall('readCleanupTarget', referenceFor(node))
     if (result === null) return Object.freeze({ valid: false, state: null })
-    const state = exactState(result)
+    const state = exactState(result, node)
     if (state) {
       if (result.snapshots.some(snapshot => !isDataRecord(snapshot))) {
         return Object.freeze({ valid: false, state: null })
@@ -1034,19 +1037,38 @@ export function createSebStagingResourceCleanupParticipants({
   }
 
   async function cleanupCommittedNodes(nodes, client, parsedRequest, sort = null) {
+    let diagnosticStage = 'resolve'
     const committed = await resolveCommittedNodes(nodes, parsedRequest.identity)
-    if (committed === null) return false
-    if (!await validateRequestAccounts(parsedRequest)) return false
+    if (committed === null) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging cleanup participant failed (${diagnosticStage})\n`)
+      }
+      return false
+    }
+    diagnosticStage = 'accounts'
+    if (!await validateRequestAccounts(parsedRequest)) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging cleanup participant failed (${diagnosticStage})\n`)
+      }
+      return false
+    }
 
     const preflight = new Map()
+    diagnosticStage = 'preflight-enumerate'
     for (const item of committed) {
       const matches = await enumerateTarget(client, item, parsedRequest.identity)
-      if (matches === null) return false
+      if (matches === null) {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging cleanup participant failed (${diagnosticStage}:${item.node.targetKey})\n`)
+        }
+        return false
+      }
       preflight.set(`${item.node.targetKey}\u0000${item.snapshot.targetId}`, matches.length)
     }
 
     const ordered = sort ? [...committed].sort(sort) : committed
     for (const item of ordered) {
+      diagnosticStage = 'delete'
       if (preflight.get(`${item.node.targetKey}\u0000${item.snapshot.targetId}`) === 1) {
         // A previously deleted parent may have cascaded this exact child. Do
         // not invoke a protected child DELETE; attest the live state again.
@@ -1075,7 +1097,12 @@ export function createSebStagingResourceCleanupParticipants({
         )
         if (!deletion.boundaryOk
           || !deletion.operationOk
-          || !exactPassed(deletion.value)) return false
+          || !exactPassed(deletion.value)) {
+          if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+            process.stderr.write(`SEB Staging cleanup participant failed (${diagnosticStage}:${item.node.targetKey})\n`)
+          }
+          return false
+        }
         const remaining = await enumerateTarget(client, item, parsedRequest.identity)
         if (remaining === null || remaining.length !== 0) return false
       }

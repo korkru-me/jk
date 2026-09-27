@@ -862,6 +862,43 @@ describe('SEB Staging dynamic resource cleanup participants', () => {
     }
   })
 
+  it('reconciles and deletes every exact monitoring event emitted for one proctor connection', async () => {
+    const harness = createHarness()
+    for (const key of [
+      'account-teacher-primary',
+      'account-student-primary',
+      'personal-organization-teacher-primary',
+      'classroom-primary',
+      'assignment-primary',
+      'submission-primary',
+      'proctor-connection',
+    ]) {
+      harness.materialize(key)
+    }
+    const event = harness.nodes.get('proctor-event')
+    expect(harness.ledger.markUncertain(reference(event))).toEqual({ status: 'passed' })
+    const candidates = [
+      harness.candidateFor('proctor-event'),
+      harness.candidateFor('proctor-event', { targetId: '2' }),
+    ]
+    harness.reconciliationMatches.set('proctor-event', candidates)
+    harness.stored.set('proctor-event', candidates.map(candidate => (
+      harness.attestationFor('proctor-event', { targetId: candidate.targetId })
+    )))
+    const participants = harness.makeParticipants()
+
+    expect(await participants.databaseFixture.cleanupRun(request([
+      'teacher-primary',
+      'student-primary',
+    ]))).toEqual({ status: 'passed' })
+    expect(harness.ledger.readCleanupTarget(reference(event))).toEqual({
+      status: 'passed',
+      state: 'deleted',
+      snapshots: [],
+    })
+    expect(harness.events.filter(value => value === 'database:proctor-event')).toHaveLength(2)
+  })
+
   it('retries a partial deletion and marks the target only after verified absence', async () => {
     const harness = createHarness()
     for (const key of ['account-teacher-primary', 'personal-organization-teacher-primary', 'classroom-primary', 'assignment-primary']) {

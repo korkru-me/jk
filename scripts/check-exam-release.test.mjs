@@ -11,6 +11,7 @@ describe('exam release gate', () => {
       sebRegistryReady: true,
       releaseCandidateReady: true,
       sebPlatformsReady: true,
+      sebPhysicalUatReady: true,
       externalUatReady: true,
     }).ready).toBe(true)
   })
@@ -21,10 +22,11 @@ describe('exam release gate', () => {
       sebRegistryReady: false,
       releaseCandidateReady: false,
       sebPlatformsReady: false,
+      sebPhysicalUatReady: false,
       externalUatReady: false,
     })
     expect(result.ready).toBe(false)
-    expect(result.checks.filter(check => check.status === 'blocker')).toHaveLength(5)
-    expect(formatExamReleaseReadinessReport(result.checks)).toContain('NOT READY: 5 external release blocker(s)')
+    expect(result.checks.filter(check => check.status === 'blocker')).toHaveLength(6)
+    expect(formatExamReleaseReadinessReport(result.checks)).toContain('NOT READY: 6 external release blocker(s)')
   })
 })

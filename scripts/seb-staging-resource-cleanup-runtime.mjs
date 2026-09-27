@@ -150,6 +150,7 @@ const QUESTION_ARRAY_DEPENDENCIES = Object.freeze([
 ])
 
 const CLASSROOM_UNEXPECTED_DEPENDENCIES = Object.freeze([
+  ['classroom_groups', 'classroom_id'],
   ['classroom_students', 'classroom_id'],
   ['assignment_classrooms', 'classroom_id'],
   ['assignments', 'classroom_id'],
@@ -930,7 +931,7 @@ export function createSebStagingResourceCleanupRuntime({
         && row.id === input.targetId
         && row.created_by === relation.ownerId
         && row.org_id === relation.organizationId
-        && row.question_type === (input.resourceType === 'essay' ? 'written' : 'file_upload')
+        && row.question_type === input.resourceType
         && timestampInWindow(row.created_at, input.identity)
     } else if (input.kind === 'classroomMembership') {
       table = 'classroom_students'
@@ -1193,61 +1194,132 @@ export function createSebStagingResourceCleanupRuntime({
   }
 
   async function deleteSubmission(attestation, signal, input) {
-    const dependencies = [
-      ['submission_answers', 'submission_id'],
-      ['exam_proctor_connections', 'submission_id'],
-      ['exam_proctor_events', 'submission_id'],
-      ['education_research_scores', 'submission_id'],
-    ]
-    await proveZeroDependencies(
-      attestation,
-      signal,
-      'submission-closure',
-      dependencies,
-      input.targetId,
-    )
-    const sessionColumns = ['submission_id', 'assignment_id', 'student_id', 'org_id', 'created_at']
-    const sessionRows = await databaseRows(
-      attestation,
-      signal,
-      'submission-derived-session:enumerate',
-      'exam_proctor_sessions',
-      sessionColumns,
-      [predicate('submission_id', 'eq', input.targetId)],
-    )
-    const proctorObserved = observedProctorLineage(input.targetId)
-    if (sessionRows.length > 1 || (proctorObserved && sessionRows.length !== 1)) blocked()
-    if (sessionRows.length === 1) {
-      if (!exactRow(sessionRows[0], sessionColumns)
-        || sessionRows[0].submission_id !== input.targetId
-        || sessionRows[0].assignment_id !== input.relationship.parentId
-        || sessionRows[0].student_id !== input.relationship.ownerId
-        || sessionRows[0].org_id !== input.relationship.organizationId
-        || !timestampInWindow(sessionRows[0].created_at, input.identity)) blocked()
-    }
-    const sessionExact = sessionRows.length === 1
-      ? [
-          closureRequirement('exam_proctor_sessions', [
-            predicate('submission_id', 'eq', input.targetId),
-          ], 1),
-          closureRequirement('exam_proctor_sessions', [
+    let diagnosticStage = 'dependency-proof'
+    try {
+      const zeroBeforeDeleteDependencies = [
+        ['submission_answers', 'submission_id'],
+        ['exam_proctor_connections', 'submission_id'],
+        ['education_research_scores', 'submission_id'],
+      ]
+      await proveZeroDependencies(
+        attestation,
+        signal,
+        'submission-closure',
+        zeroBeforeDeleteDependencies,
+        input.targetId,
+      )
+      // A legitimate resume reload emits another monitoring_started event.
+      // Only one event is promoted to a ledger target; any remaining events
+      // are derived children of this exact synthetic submission. Delete those
+      // rows by their exact bigint id plus full lineage/window, then let the
+      // parent RPC re-prove zero events under its transaction locks.
+      diagnosticStage = 'derived-event-query'
+      const eventColumns = [
+        'id', 'submission_id', 'assignment_id', 'student_id', 'org_id', 'event_type', 'created_at',
+      ]
+      const residualEvents = await databaseRows(
+        attestation,
+        signal,
+        'submission-derived-events:enumerate',
+        'exam_proctor_events',
+        eventColumns,
+        [predicate('submission_id', 'eq', input.targetId)],
+      )
+      diagnosticStage = `derived-event-shape-${residualEvents.length}`
+      if (residualEvents.some(row => (
+        !exactRow(row, eventColumns)
+        || !BIGINT_TEXT.test(row.id)
+        || row.submission_id !== input.targetId
+        || row.assignment_id !== input.relationship.parentId
+        || row.student_id !== input.relationship.ownerId
+        || row.org_id !== input.relationship.organizationId
+        || typeof row.event_type !== 'string'
+        || !timestampInWindow(row.created_at, input.identity)
+      ))) blocked()
+      for (let index = 0; index < residualEvents.length; index += 1) {
+        diagnosticStage = `derived-event-delete-${index}`
+        const row = residualEvents[index]
+        await deleteDatabase(
+          attestation,
+          signal,
+          `submission-derived-events:delete-${index}`,
+          'exam_proctor_events',
+          [
+            predicate('id', 'eq', row.id),
             predicate('submission_id', 'eq', input.targetId),
             predicate('assignment_id', 'eq', input.relationship.parentId),
             predicate('student_id', 'eq', input.relationship.ownerId),
             predicate('org_id', 'eq', input.relationship.organizationId),
             predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
             predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
-          ], 1),
-        ]
-      : []
-    return atomicClosure(
-      absentRequirements([
-        ...dependencies,
-        ...(sessionRows.length === 0 ? [['exam_proctor_sessions', 'submission_id']] : []),
-      ], input.targetId),
-      sessionExact,
-      sessionRows.length === 1 ? ['exam_proctor_sessions'] : [],
-    )
+          ],
+        )
+      }
+      diagnosticStage = 'derived-event-verify'
+      await expectNoRows(
+        attestation,
+        signal,
+        'submission-derived-events:verify',
+        'exam_proctor_events',
+        'submission_id',
+        input.targetId,
+      )
+      const closureDependencies = [
+        ...zeroBeforeDeleteDependencies,
+        ['exam_proctor_events', 'submission_id'],
+      ]
+      diagnosticStage = 'session-query'
+      const sessionColumns = ['submission_id', 'assignment_id', 'student_id', 'org_id', 'created_at']
+      const sessionRows = await databaseRows(
+        attestation,
+        signal,
+        'submission-derived-session:enumerate',
+        'exam_proctor_sessions',
+        sessionColumns,
+        [predicate('submission_id', 'eq', input.targetId)],
+      )
+      diagnosticStage = `session-count-${sessionRows.length}`
+      const proctorObserved = observedProctorLineage(input.targetId)
+      if (sessionRows.length > 1 || (proctorObserved && sessionRows.length !== 1)) blocked()
+      diagnosticStage = 'session-shape'
+      if (sessionRows.length === 1) {
+        if (!exactRow(sessionRows[0], sessionColumns)
+          || sessionRows[0].submission_id !== input.targetId
+          || sessionRows[0].assignment_id !== input.relationship.parentId
+          || sessionRows[0].student_id !== input.relationship.ownerId
+          || sessionRows[0].org_id !== input.relationship.organizationId
+          || !timestampInWindow(sessionRows[0].created_at, input.identity)) blocked()
+      }
+      diagnosticStage = 'closure-build'
+      const sessionExact = sessionRows.length === 1
+        ? [
+            closureRequirement('exam_proctor_sessions', [
+              predicate('submission_id', 'eq', input.targetId),
+            ], 1),
+            closureRequirement('exam_proctor_sessions', [
+              predicate('submission_id', 'eq', input.targetId),
+              predicate('assignment_id', 'eq', input.relationship.parentId),
+              predicate('student_id', 'eq', input.relationship.ownerId),
+              predicate('org_id', 'eq', input.relationship.organizationId),
+              predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
+              predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
+            ], 1),
+          ]
+        : []
+      return atomicClosure(
+        absentRequirements([
+          ...closureDependencies,
+          ...(sessionRows.length === 0 ? [['exam_proctor_sessions', 'submission_id']] : []),
+        ], input.targetId),
+        sessionExact,
+        sessionRows.length === 1 ? ['exam_proctor_sessions'] : [],
+      )
+    } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging submission cleanup blocked (${diagnosticStage})\n`)
+      }
+      blocked()
+    }
   }
 
   async function proveAssignmentClosure(attestation, signal, input) {
@@ -1271,9 +1343,10 @@ export function createSebStagingResourceCleanupRuntime({
       key.startsWith('config-primary\u0000')
       && key.slice(key.indexOf('\u0000') + 1).startsWith(`${input.targetId}:r`)
     ))
-    if (configEntries.length !== 1) blocked()
-    const configMatch = CONFIG_REVISION_ID.exec(configEntries[0][1].input.targetId)
-    if (!configMatch) blocked()
+    const releaseEntries = [...enumerated.entries()].filter(([key]) => key.startsWith('release-primary\u0000'))
+    if (configEntries.length > 1
+      || releaseEntries.length > 1
+      || releaseEntries.length > configEntries.length) blocked()
     const configRows = await databaseRows(
       attestation,
       signal,
@@ -1282,16 +1355,6 @@ export function createSebStagingResourceCleanupRuntime({
       ['assignment_id', 'revision', 'org_id', 'owner_id', 'created_at'],
       [predicate('assignment_id', 'eq', input.targetId)],
     )
-    if (configRows.length !== 1
-      || !exactRow(configRows[0], ['assignment_id', 'revision', 'org_id', 'owner_id', 'created_at'])
-      || configRows[0].assignment_id !== input.targetId
-      || configRows[0].revision !== Number(configMatch[2])
-      || configRows[0].owner_id !== input.relationship.ownerId
-      || configRows[0].org_id !== input.relationship.organizationId
-      || !timestampInWindow(configRows[0].created_at, input.identity)) blocked()
-
-    const releaseEntries = [...enumerated.entries()].filter(([key]) => key.startsWith('release-primary\u0000'))
-    if (releaseEntries.length !== 1) blocked()
     const releaseRows = await databaseRows(
       attestation,
       signal,
@@ -1304,6 +1367,86 @@ export function createSebStagingResourceCleanupRuntime({
       ],
       [predicate('assignment_id', 'eq', input.targetId)],
     )
+    if (configEntries.length === 0) {
+      if (configRows.length !== 0 || releaseRows.length !== 0) blocked()
+      await proveZeroDependencies(
+        attestation, signal, 'assignment-closure:unexpected',
+        ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId,
+      )
+      return atomicClosure(
+        [
+          ...absentRequirements(ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId),
+          closureRequirement('assignment_seb_config_revisions', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 0),
+          closureRequirement('assignment_seb_config_releases', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 0),
+        ],
+        [
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 1),
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+            predicate('classroom_id', 'eq', input.relationship.parentId),
+            predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
+            predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
+          ], 1),
+        ],
+        ['assignment_classrooms'],
+      )
+    }
+
+    const configMatch = CONFIG_REVISION_ID.exec(configEntries[0][1].input.targetId)
+    if (!configMatch) blocked()
+    if (configRows.length !== 1
+      || !exactRow(configRows[0], ['assignment_id', 'revision', 'org_id', 'owner_id', 'created_at'])
+      || configRows[0].assignment_id !== input.targetId
+      || configRows[0].revision !== Number(configMatch[2])
+      || configRows[0].owner_id !== input.relationship.ownerId
+      || configRows[0].org_id !== input.relationship.organizationId
+      || !timestampInWindow(configRows[0].created_at, input.identity)) blocked()
+
+    if (releaseEntries.length === 0) {
+      if (releaseRows.length !== 0) blocked()
+      await proveZeroDependencies(
+        attestation, signal, 'assignment-closure:unexpected',
+        ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId,
+      )
+      return atomicClosure(
+        [
+          ...absentRequirements(ASSIGNMENT_UNEXPECTED_DEPENDENCIES, input.targetId),
+          closureRequirement('assignment_seb_config_releases', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 0),
+        ],
+        [
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 1),
+          closureRequirement('assignment_classrooms', [
+            predicate('assignment_id', 'eq', input.targetId),
+            predicate('classroom_id', 'eq', input.relationship.parentId),
+            predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
+            predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
+          ], 1),
+          closureRequirement('assignment_seb_config_revisions', [
+            predicate('assignment_id', 'eq', input.targetId),
+          ], 1),
+          closureRequirement('assignment_seb_config_revisions', [
+            predicate('assignment_id', 'eq', input.targetId),
+            predicate('revision', 'eq', Number(configMatch[2])),
+            predicate('org_id', 'eq', input.relationship.organizationId),
+            predicate('owner_id', 'eq', input.relationship.ownerId),
+            predicate('created_at', 'gte', input.identity.creationWindow.notBefore),
+            predicate('created_at', 'lte', input.identity.creationWindow.notAfter),
+          ], 1),
+        ],
+        ['assignment_classrooms', 'assignment_seb_config_revisions'],
+      )
+    }
+
     if (releaseRows.length !== 1
       || !exactRow(releaseRows[0], [
         'assignment_id', 'revision', 'org_id', 'owner_id', 'release_id',
@@ -1473,7 +1616,10 @@ export function createSebStagingResourceCleanupRuntime({
   }
 
   async function enumeratePersonalOrganization(attestation, signal, input) {
+    let diagnosticStage = 'encoding'
+    try {
     if (!validateTargetEncoding(input)) blocked()
+    diagnosticStage = 'query'
     const [organizationId, membershipId] = input.targetId.split(':')
     const orgColumns = ['id', 'is_personal', 'subscription_tier', 'deleted_at', 'created_at']
     const memberColumns = ['id', 'org_id', 'user_id', 'org_role', 'joined_at']
@@ -1488,6 +1634,7 @@ export function createSebStagingResourceCleanupRuntime({
       ),
     ])
     if (organizations.length === 0 && memberships.length === 0) return Object.freeze([])
+    diagnosticStage = 'shape'
     if (organizations.length !== 1
       || memberships.length !== 1
       || !exactRow(organizations[0], orgColumns)
@@ -1505,17 +1652,27 @@ export function createSebStagingResourceCleanupRuntime({
     const publicAttestation = makeAttestation(input, createdAt)
     remember(input, publicAttestation)
     return Object.freeze([publicAttestation])
+    } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging personal organization enumerate blocked (${diagnosticStage})\n`)
+      }
+      blocked()
+    }
   }
 
   async function deletePersonalOrganization(attestation, signal, input) {
+    let diagnosticStage = 'remembered'
+    try {
     requireRemembered(input)
     const [organizationId, membershipId] = input.targetId.split(':')
     for (const table of ORGANIZATION_CHILD_TABLES) {
+      diagnosticStage = `child-closure:${table}`
       await expectNoRows(
         attestation, signal, `personal-organization-closure:${table}`,
         table, 'org_id', organizationId,
       )
     }
+    diagnosticStage = 'owner-membership'
     const members = await databaseRows(
       attestation,
       signal,
@@ -1528,6 +1685,7 @@ export function createSebStagingResourceCleanupRuntime({
       || members[0].id !== membershipId
       || members[0].user_id !== input.relationship.ownerId
       || members[0].org_role !== 'owner') blocked()
+    diagnosticStage = 'delete'
     await deleteDatabase(
       attestation, signal, 'personal-organization:delete-organization',
       'organizations', [
@@ -1560,6 +1718,7 @@ export function createSebStagingResourceCleanupRuntime({
         ['organization_members'],
       ),
     )
+    diagnosticStage = 'verify'
     await expectNoRows(
       attestation, signal, 'personal-organization:verify-organization',
       'organizations', 'id', organizationId,
@@ -1569,6 +1728,12 @@ export function createSebStagingResourceCleanupRuntime({
       'organization_members', 'id', membershipId,
     )
     return Object.freeze({ status: 'passed' })
+    } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging personal organization delete blocked (${diagnosticStage})\n`)
+      }
+      blocked()
+    }
   }
 
   function parseStorageObject(row, input) {

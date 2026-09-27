@@ -188,8 +188,13 @@ exit ยังไม่ผ่าน ให้ปิด capability นั้น�
 
 ## เฟส S5 — Staging integration และ mock exam อัตโนมัติ
 
-**สถานะ: composite/preflight/reservation/cleanup รอบปัจจุบัน deploy/apply เฉพาะ isolated Staging แล้ว;
-ยังไม่ผ่าน live mock** —
+**สถานะ: เสร็จแล้วบน isolated Staging** — live run `seb-s5-20260927av` จบสถานะ
+`complete` เมื่อ `2026-09-27T06:51:22.600Z` ผ่าน synthetic login, system check,
+revision-bound attempt, autosave/retry, reload/resume, PDF upload/retry, heartbeat,
+submit/result, cross-account denial และ cleanup โดย durable evidence เป็น local owner-only
+และไม่เก็บ credential, raw CK/BEK หรือรหัสผ่านใน Git
+
+ฐาน implementation ด้านล่างเป็นลำดับที่นำไปสู่ผลผ่านดังกล่าว —
 operator สำหรับสร้าง seed และ enroll exact assignment artifact ยังคง fail closed, dry-run เป็นค่าเริ่มต้น,
 รับ CK/BEK ทาง stdin เท่านั้น และใช้เฉพาะ canonical site + allowlisted Supabase Staging ส่วน pure
 mock-harness ใช้ synthetic fixture เท่านั้นและครอบคลุมเส้นทางจนถึงผลครู/authorization/cleanup
@@ -257,10 +262,9 @@ in-memory PDF upload, heartbeat, submit/result และ denial ข้ามบ�
 รหัสออกหรือ service-role client ออกจาก private closure ชุดทั้งโครงการผ่าน 162 files / 2,295 tests,
 TypeScript และ webpack production build 64 routes ผ่าน
 
-ยังไม่อนุญาต live mock จนกว่าจะนำ browser-data facade ที่ประกอบแล้วต่อเข้ากับ live runner และเติม
-native/expiry capabilities, final `.seb` + CK/BEK จาก Windows,
-automation bypass แบบ server-only และ authenticated durable evidence จาก source/deployment/config เดียวกัน
-จึงยังเป็น **NOT READY**, ห้ามเริ่ม S6 และ Production ไม่เปลี่ยน
+ข้อห้ามเดิมเรื่อง live mock ถูกปิดด้วย private live stack, Windows native key runner,
+server-only Deployment Protection bypass และ immutable redacted evidence แล้ว ผล S5 ไม่ได้เปลี่ยน
+Production และไม่ใช่หลักฐาน physical platform ของ S6
 
 **Agent ทำ**
 
@@ -280,6 +284,17 @@ automation bypass แบบ server-only และ authenticated durable evidence
 ## เฟส S6 — Physical platform gate
 
 ทำซ้ำบน macOS, iPadOS, iOS และ Windows ด้วย production config revision และ build ที่จะประกาศจริง
+
+**สถานะ: กำลังดำเนินการ** — เพิ่ม fixed-schema evidence แยกที่
+`config/seb-physical-uat-evidence.json`, ตัวตรวจ `npm run check:seb-physical-uat`,
+ตัวนำทีละขั้น `npm run next:seb-physical-uat` และ runbook
+[`SEB_PHASE6_PHYSICAL_UAT.md`](./SEB_PHASE6_PHYSICAL_UAT.md) แล้ว สถานะทั้งหมดจงใจเป็น
+`pending` จนกว่าจะล็อก assignment-specific artifact candidate และทดสอบอุปกรณ์จริง
+
+S6 ห้ามนำ Windows-only release จาก S5 ไปใช้ข้าม platform เพราะ release immutable และยังไม่มี
+BEK ของ macOS/iPadOS/iOS ต้องสร้าง synthetic assignment revision ใหม่ ใช้ artifact bytes เดียวกัน
+ทุกระบบ เก็บ BEK ของ exact build ทั้งหมดผ่าน local secret channel **ก่อน** registration ครั้งเดียว
+และห้าม re-save candidate ระหว่างเก็บ BEK
 
 **Agent ทำ:** เตรียม checklist ทีละขั้น, ตรวจผลที่ไม่เป็นความลับ, แก้บั๊ก, reset เฉพาะ suite ที่
 ได้รับผลกระทบ และรัน regression ก่อนออก candidate ใหม่

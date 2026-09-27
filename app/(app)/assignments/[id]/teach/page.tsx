@@ -53,7 +53,9 @@ export default async function AssignmentTeachingPage({
 
   // Teaching mode shows every authored question in assignment order. It still
   // generates one realistic set of random values and correct answers so a
-  // teacher can solve the same concrete numbers that are visible on screen.
+  // teacher can solve the same concrete numbers that are visible on screen —
+  // and when the งาน gives everyone the same numbers, `...a` carries its seed,
+  // so that set is exactly the one the class was given.
   const skeletons = buildAssignmentAttempt({
     ...a,
     shuffle_questions: false,
@@ -66,6 +68,7 @@ export default async function AssignmentTeachingPage({
     return {
       ...question,
       randomValues: skeleton?.random_values ?? {},
+      sharedRandomValues: a.shared_random_seed != null,
       correctAnswer: skeleton?.correct_answer ?? '',
     }
   })

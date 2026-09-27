@@ -10,6 +10,38 @@ const MAX_RECONCILIATION_MATCHES = 8
 const MAX_QUERY_LIMIT = MAX_RECONCILIATION_MATCHES + 1
 const MAX_PREDICATES = 12
 const MAX_JSON_STRING = 50_000
+const SAFE_RPC_DIAGNOSTIC_MESSAGES = new Map([
+  ['SEB S5 closure cardinality changed', 'closure-cardinality'],
+  ['SEB S5 closure graph mismatch', 'closure-graph'],
+  ['SEB S5 foreign-key graph drifted', 'foreign-key-graph'],
+  ['SEB S5 exact parent is missing', 'parent-missing'],
+  ['SEB S5 owner lineage mismatch', 'owner-lineage'],
+  ['SEB S5 exact parent deletion failed', 'parent-delete'],
+  ['SEB S5 organization cascade failed', 'organization-cascade'],
+  ['invalid SEB S5 cleanup request', 'invalid-request'],
+  ['invalid SEB S5 atomic closure', 'invalid-closure'],
+  ['invalid SEB S5 closure cardinality', 'invalid-closure-cardinality'],
+  ['invalid SEB S5 closure predicate', 'invalid-closure-predicate'],
+  ['invalid SEB S5 closure requirement', 'invalid-closure-requirement'],
+  ['invalid SEB S5 creation window', 'invalid-window'],
+  ['invalid SEB S5 target identity', 'invalid-target-identity'],
+  ['invalid SEB S5 target predicate', 'invalid-target-predicate'],
+  ['invalid UUID closure predicate', 'invalid-uuid-closure'],
+  ['invalid organization target predicates', 'invalid-organization-predicates'],
+  ['invalid timestamp closure predicate', 'invalid-timestamp-closure'],
+  ['closure predicate is not parent-bound', 'closure-not-parent-bound'],
+  ['SEB S5 cascade declaration mismatch', 'cascade-declaration'],
+  ['SEB S5 run reservation mismatch', 'reservation-mismatch'],
+  ['invalid SEB S5 storage attestation request', 'invalid-storage-request'],
+  ['invalid SEB S5 storage metadata', 'storage-metadata'],
+  ['invalid SEB S5 submission object path', 'submission-object-path'],
+  ['SEB S5 submission object lineage mismatch', 'submission-object-lineage'],
+  ['invalid SEB S5 assignment artifact path', 'assignment-artifact-path'],
+  ['SEB S5 assignment artifact lineage mismatch', 'assignment-artifact-lineage'],
+  ['SEB S5 storage RPC requires service_role', 'storage-service-role'],
+  ['unsupported SEB S5 closure field', 'unsupported-closure-field'],
+  ['unsupported SEB S5 closure requirement', 'unsupported-closure'],
+])
 const SERVICE_ROLE_CREDENTIAL_FIELDS = Object.freeze([
   'schemaVersion', 'targetOrigin', 'credentialKind', 'namespace', 'serviceRoleKey',
 ])
@@ -178,6 +210,7 @@ const TABLES = Object.freeze(new Map([
   ['education_research_export_events', tableProfile(['id'], ['org_id'])],
   ['assignment_extensions', tableProfile(['id'], ['assignment_id'])],
   ['classroom_invitations', tableProfile(['id'], ['classroom_id'])],
+  ['classroom_groups', tableProfile(['id'], ['classroom_id'])],
   ['classroom_co_teachers', tableProfile(['id'], ['classroom_id'])],
   ['classroom_posts', tableProfile(['id'], ['classroom_id'])],
   ['student_notes', tableProfile(['id'], ['classroom_id'])],
@@ -816,6 +849,23 @@ function createCredentialTransport(options) {
       cache: 'no-store',
       signal,
     }))
+    if (isResponseLike(response)
+      && !expectedStatuses.includes(response.status)
+      && process.env.SEB_S5_DIAGNOSTIC === '1'
+      && expectedUrl.includes('/rest/v1/rpc/seb_s5_')) {
+      let category = 'unclassified'
+      let postgresCode = 'unknown'
+      try {
+        const diagnostic = await response.clone().json()
+        if (diagnostic && typeof diagnostic === 'object') {
+          category = SAFE_RPC_DIAGNOSTIC_MESSAGES.get(diagnostic.message) ?? category
+          if (typeof diagnostic.code === 'string' && /^[0-9A-Z]{5}$/.test(diagnostic.code)) {
+            postgresCode = diagnostic.code
+          }
+        }
+      } catch {}
+      process.stderr.write(`SEB Staging database RPC blocked (${response.status}:${postgresCode}:${category})\n`)
+    }
     if (!isResponseLike(response)
       || !expectedStatuses.includes(response.status)
       || response.ok !== true
@@ -895,7 +945,7 @@ function storageMetadata(value, request) {
   if (request.bucketName === 'submission-files') {
     const path = ANSWER_PATH.exec(request.path)
     if (!path
-      || value.ownerId !== path[1]
+      || (value.ownerId !== null && value.ownerId !== path[1])
       || value.mimeType !== MIME_BY_EXTENSION[path[5]]
       || value.sizeBytes > 10 * 1024 * 1024) blocked()
   } else {
@@ -905,6 +955,13 @@ function storageMetadata(value, request) {
       || value.sizeBytes > 2_097_152) blocked()
   }
   return Object.freeze({ ...value, createdAt: canonicalTimestamp(value.createdAt).iso })
+}
+
+function validStorageDeleteReceipt(value, request) {
+  if (!Array.isArray(value) || value.length !== 1 || !isRecord(value[0])) return false
+  const receipt = value[0]
+  return receipt.name === request.path
+    && (!Object.hasOwn(receipt, 'bucket_id') || receipt.bucket_id === request.bucketName)
 }
 
 async function attestStorage(transport, key, signal, request, namespace) {
@@ -1139,9 +1196,11 @@ export async function createSebStagingSupabaseNarrowDriver(input = {}) {
           headers: jsonHeaders(key, true),
           body: JSON.stringify({ prefixes: [request.path] }),
         }, operationSignal)
-        // Storage-js documents an empty array for a successful remove. Exact
-        // post-delete attestation below is the authoritative deletion proof.
-        if (!Array.isArray(response) || response.length !== 0) blocked()
+        // The Storage API returns one FileObject for the deleted path. Fields
+        // other than name (and the optional deprecated bucket_id) vary across
+        // Storage versions, so the exact post-delete RPC below remains the
+        // authoritative deletion proof.
+        if (!validStorageDeleteReceipt(response, request)) blocked()
         const after = await attestStorage(
           transport, key, operationSignal, request, options.namespace,
         )

@@ -20,7 +20,9 @@ const OPERATION_SPECS = Object.freeze(new Map([
   ['verify-seb-system-check', Object.freeze({ alias: 'student-primary', mode: 'valid', session: false })],
   ['reject-replayed-seb-challenge', Object.freeze({ alias: 'student-primary', mode: 'invalid', session: false })],
   ['reject-invalid-seb-session', Object.freeze({ alias: 'student-primary', mode: 'invalid', session: true })],
+  ['start-revision-bound-attempt', Object.freeze({ alias: 'student-primary', mode: 'valid', session: false })],
   ['reject-replayed-seb-session', Object.freeze({ alias: 'student-primary', mode: 'invalid', session: true })],
+  ['autosave-synthetic-answer', Object.freeze({ alias: 'student-primary', mode: 'valid', session: false })],
 ]))
 
 export class SebStagingPrivateNativeBrowserCapabilityBlockedError extends Error {

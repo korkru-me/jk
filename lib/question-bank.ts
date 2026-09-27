@@ -2,6 +2,7 @@ import type { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { naturalMaxScore } from '@/lib/assignment-attempt'
 import { subQuestionCount, type CountableQuestion } from '@/lib/question-parts'
+import { drawsRandomValues } from '@/lib/math/shared-random'
 import type { Question } from '@/lib/types'
 
 /**
@@ -22,18 +23,25 @@ export type BankQuestion = BankQuestionFields & {
   sub_question_count: number
   /** What a งาน gives this question when the teacher does not say otherwise. */
   default_points: number
+  /** Whether students can get different numbers on it — what decides if the
+   *  "ตัวเลขชุดเดียวกัน" switch means anything (lib/math/shared-random.ts). */
+  has_random_values: boolean
 }
 
+/** The jsonb columns withQuestionPoints reads and then drops. */
+type ShapedQuestion = CountableQuestion & { variables?: unknown }
+
 /** The row as it comes back, before the jsonb is counted and dropped. */
-type BankRow = BankQuestionFields & CountableQuestion
+type BankRow = BankQuestionFields & ShapedQuestion
 
 const BANK_FIELDS = 'id, title, question_text, difficulty, question_type, tags'
 
-/** The jsonb a point value is counted from. `question_type` decides which of
- *  them is read, and BANK_FIELDS already asks for it. */
-const POINT_SHAPE_FIELDS = 'extra_data, answer_parts, mcq_options'
+/** The jsonb a point value — and whether the numbers are drawn at random — is
+ *  read from. `question_type` decides which of them is read, and BANK_FIELDS
+ *  already asks for it. */
+const POINT_SHAPE_FIELDS = 'extra_data, answer_parts, mcq_options, variables'
 
-/** Everything a point value needs, for a caller selecting its own narrow row. */
+/** Everything withQuestionPoints needs, for a caller selecting its own narrow row. */
 export const QUESTION_POINT_FIELDS = `question_type, ${POINT_SHAPE_FIELDS}`
 
 /**
@@ -56,12 +64,13 @@ export function defaultQuestionPoints(row: CountableQuestion): number {
 }
 
 /** Adds the counted fields to a row read with BANK_FIELDS + QUESTION_POINT_FIELDS. */
-export function withQuestionPoints<T extends CountableQuestion>(row: T) {
-  const { extra_data: _extra, answer_parts: _parts, mcq_options: _options, ...rest } = row
+export function withQuestionPoints<T extends ShapedQuestion>(row: T) {
+  const { extra_data: _extra, answer_parts: _parts, mcq_options: _options, variables: _variables, ...rest } = row
   return {
     ...rest,
     sub_question_count: subQuestionCount(row),
     default_points: defaultQuestionPoints(row),
+    has_random_values: drawsRandomValues(row),
   }
 }
 

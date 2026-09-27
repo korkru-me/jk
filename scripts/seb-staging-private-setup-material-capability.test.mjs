@@ -156,7 +156,11 @@ describe('SEB Staging private setup material capability', () => {
       expectedUserId: TEACHER_ID,
     }), options())
     const password = values.get('#create-seb-quit-password')
-    expect(password).toMatch(/^[A-Za-z0-9_-]{32}$/)
+    expect(password).toMatch(/^A1a![A-Za-z0-9_-]{32}$/)
+    expect(password).toMatch(/[A-Z]/)
+    expect(password).toMatch(/[a-z]/)
+    expect(password).toMatch(/[0-9]/)
+    expect(password).toMatch(/[^A-Za-z0-9]/)
     expect(values.get('#create-seb-quit-confirmation')).toBe(password)
     expect(result).toEqual({ status: 'passed' })
     expect(JSON.stringify(result)).not.toContain(password)
@@ -166,7 +170,14 @@ describe('SEB Staging private setup material capability', () => {
 
   it('injects one in-memory PDF for the synthetic student without exposing bytes or a path', async () => {
     let uploaded = null
+    let routeMatcher = null
+    let routeHandler = null
     const page = {
+      route: vi.fn(async (matcher, handler, options) => {
+        routeMatcher = matcher
+        routeHandler = handler
+        expect(options).toEqual({ times: 1 })
+      }),
       locator: vi.fn(selector => {
         expect(selector).toBe('input[aria-label="เลือกไฟล์คำตอบ"]')
         return { setInputFiles: vi.fn(async value => { uploaded = value }) }
@@ -184,8 +195,44 @@ describe('SEB Staging private setup material capability', () => {
     })
     expect(Buffer.isBuffer(uploaded.buffer)).toBe(true)
     expect(uploaded.buffer.length).toBeGreaterThan(0)
+    expect(routeMatcher(new URL(
+      `${SUPABASE_ORIGIN}/storage/v1/object/upload/sign/submission-files/student/answer.pdf`,
+    ))).toBe(true)
+    expect(routeMatcher(new URL(`${SUPABASE_ORIGIN}/rest/v1/submissions`))).toBe(false)
+    const response = Object.freeze({ ok: () => true })
+    const transientRoute = {
+      fetch: vi.fn(async () => response),
+      fulfill: vi.fn(),
+      abort: vi.fn(),
+    }
+    await routeHandler(transientRoute)
+    expect(transientRoute.fetch).toHaveBeenCalledTimes(1)
+    expect(transientRoute.abort).toHaveBeenCalledWith('connectionreset')
+    expect(transientRoute.fulfill).not.toHaveBeenCalled()
     expect(JSON.stringify(result)).not.toContain('seb-s5-synthetic-answer.pdf')
     expect(JSON.stringify(harness.capability)).not.toContain('seb-s5-synthetic-answer.pdf')
+  })
+
+  it('passes through a real signed-upload rejection instead of masking it as response loss', async () => {
+    let routeHandler = null
+    const page = {
+      route: vi.fn(async (_matcher, handler) => { routeHandler = handler }),
+      locator: vi.fn(() => ({ setInputFiles: vi.fn() })),
+    }
+    const harness = makeHarness()
+    await expect(harness.capability.applySyntheticUpload(request(page, {
+      operationId: 'upload-synthetic-attachment',
+    }), options())).resolves.toEqual({ status: 'passed' })
+
+    const response = Object.freeze({ ok: () => false })
+    const transientRoute = {
+      fetch: vi.fn(async () => response),
+      fulfill: vi.fn(),
+      abort: vi.fn(),
+    }
+    await routeHandler(transientRoute)
+    expect(transientRoute.fulfill).toHaveBeenCalledWith({ response })
+    expect(transientRoute.abort).not.toHaveBeenCalled()
   })
 
   it('blocks malformed codes and environment drift', async () => {

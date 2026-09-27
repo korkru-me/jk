@@ -104,6 +104,7 @@ export function createSebStagingPrivateBrowserDataStack(options = {}) {
   let operationRuntime
   let browserRuntime
   let browserDataAdapter
+  let diagnosticStage = 'operation-ticket-provider'
   try {
     provider = createSebStagingPrivateOperationTicketProvider({
       schemaVersion: 1,
@@ -115,12 +116,14 @@ export function createSebStagingPrivateBrowserDataStack(options = {}) {
       clock,
       ...(boundaryTimeoutMs === undefined ? {} : { boundaryTimeoutMs }),
     })
+    diagnosticStage = 'browser-operation-runtime'
     operationRuntime = createSebStagingBrowserOperationRuntime({
       namespace,
       readEnvironment,
       privateOperationPlanCapability: provider.operationPlanCapability,
       ...(nativeSebCapability === undefined ? {} : { nativeSebCapability }),
     })
+    diagnosticStage = 'browser-runtime'
     browserRuntime = createSebStagingBrowserRuntime({
       namespace,
       readEnvironment,
@@ -132,6 +135,7 @@ export function createSebStagingPrivateBrowserDataStack(options = {}) {
       ...(runtimeDeadlinesMs === undefined ? {} : { runtimeDeadlinesMs }),
       ...(brokerDeadlinesMs === undefined ? {} : { brokerDeadlinesMs }),
     })
+    diagnosticStage = 'browser-data-adapter'
     browserDataAdapter = createSebStagingBrowserDataAdapter({
       readEnvironment,
       runIdentity,
@@ -142,6 +146,9 @@ export function createSebStagingPrivateBrowserDataStack(options = {}) {
       ...(resourcePlanTimeoutMs === undefined ? {} : { resourcePlanTimeoutMs }),
     })
   } catch {
+    if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+      process.stderr.write(`SEB Staging private browser data stack blocked (${diagnosticStage})\n`)
+    }
     blocked()
   }
 
@@ -184,9 +191,17 @@ export function createSebStagingPrivateBrowserDataStack(options = {}) {
         try {
           result = await cleanupParticipants[closeIndex].closeAll()
         } catch {
+          if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+            process.stderr.write(`SEB Staging browser close blocked (participant-${closeIndex})\n`)
+          }
           return Object.freeze({ status: 'failed' })
         }
-        if (!exactPassed(result)) return Object.freeze({ status: 'failed' })
+        if (!exactPassed(result)) {
+          if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+            process.stderr.write(`SEB Staging browser close failed (participant-${closeIndex})\n`)
+          }
+          return Object.freeze({ status: 'failed' })
+        }
         closeIndex += 1
       }
       closed = true

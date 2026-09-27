@@ -1017,8 +1017,10 @@ export function createSebStagingFixtureAdapter({
     cleanupStarted = true
     busy = true
     let failed = false
+    let diagnosticStage = 'environment'
     try {
       currentEnvironment('cleanup')
+      diagnosticStage = 'browser-sessions'
       if (!sessionsClosed && browserSessionCapability) {
         try {
           const closeResult = await browserSessionCapability.closeAll()
@@ -1030,8 +1032,12 @@ export function createSebStagingFixtureAdapter({
         currentEnvironment('cleanup')
       }
       if (browserSessionCapability && !sessionsClosed) {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging fixture cleanup failed (${diagnosticStage})\n`)
+        }
         return redactedResult(CLEANUP_STEP_ID, 'failed')
       }
+      diagnosticStage = 'browser-data'
       if (!browserDataClosed) {
         try {
           currentEnvironment('cleanup')
@@ -1048,21 +1054,33 @@ export function createSebStagingFixtureAdapter({
         currentEnvironment('cleanup')
       }
       if (!browserDataClosed) {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging fixture cleanup failed (${diagnosticStage})\n`)
+        }
         return redactedResult(CLEANUP_STEP_ID, 'failed')
       }
+      diagnosticStage = 'privileged-quiescence'
       if (pendingPrivilegedOperations.size > 0) {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging fixture cleanup failed (${diagnosticStage})\n`)
+        }
         return redactedResult(CLEANUP_STEP_ID, 'failed')
       }
       let records
+      diagnosticStage = 'account-reconciliation'
       try {
         records = await collectCommittedAccounts()
       } catch {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging fixture cleanup blocked (${diagnosticStage})\n`)
+        }
         return redactedResult(CLEANUP_STEP_ID, 'failed')
       }
       if (pendingPrivilegedOperations.size > 0) {
         return redactedResult(CLEANUP_STEP_ID, 'failed')
       }
       if (!resourcesCleaned) {
+        diagnosticStage = 'resource-cleanup'
         if (!resourceCleanupRequest) {
           const cleanupIdentity = parseRequestIdentity(request.identity, runIdentity)
           if (!cleanupIdentity) blocked()
@@ -1092,8 +1110,14 @@ export function createSebStagingFixtureAdapter({
         }
         currentEnvironment('cleanup')
       }
-      if (!resourcesCleaned) return redactedResult(CLEANUP_STEP_ID, 'failed')
+      if (!resourcesCleaned) {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging fixture cleanup failed (${diagnosticStage})\n`)
+        }
+        return redactedResult(CLEANUP_STEP_ID, 'failed')
+      }
 
+      diagnosticStage = 'account-deletion'
       for (let index = records.length - 1; index >= 0; index -= 1) {
         const record = records[index]
         try {
@@ -1145,6 +1169,9 @@ export function createSebStagingFixtureAdapter({
           : 'passed',
       )
     } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging fixture cleanup blocked (${diagnosticStage})\n`)
+      }
       return redactedResult(CLEANUP_STEP_ID, 'failed')
     } finally {
       busy = false

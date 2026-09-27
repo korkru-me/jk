@@ -6,6 +6,7 @@ import { inspectSebPlatformEvidence } from './check-seb-platform-evidence-core.m
 import { inspectExamUatEvidence } from './check-exam-uat-evidence-core.mjs'
 import { inspectExamReleaseCandidate } from './check-exam-release-candidate-core.mjs'
 import { inspectSebReleaseRegistry } from './check-seb-release-registry-core.mjs'
+import { inspectSebPhysicalUatEvidence } from './check-seb-physical-uat-core.mjs'
 import {
   formatExamReleaseReadinessReport,
   inspectExamReleaseReadiness,
@@ -16,6 +17,7 @@ const PLATFORM_MANIFEST_URL = new URL('../config/seb-platform-evidence.json', im
 const UAT_MANIFEST_URL = new URL('../config/exam-uat-evidence.json', import.meta.url)
 const CANDIDATE_MANIFEST_URL = new URL('../config/exam-release-candidate.json', import.meta.url)
 const SEB_REGISTRY_URL = new URL('../config/seb-release-registry.json', import.meta.url)
+const PHYSICAL_UAT_URL = new URL('../config/seb-physical-uat-evidence.json', import.meta.url)
 
 async function readQaEnvironment() {
   let contents = ''
@@ -35,12 +37,13 @@ async function readJsonManifest(url) {
   }
 }
 
-const [staging, platformManifest, uatManifest, candidateManifest, sebRegistryManifest] = await Promise.all([
+const [staging, platformManifest, uatManifest, candidateManifest, sebRegistryManifest, physicalUatManifest] = await Promise.all([
   readQaEnvironment(),
   readJsonManifest(PLATFORM_MANIFEST_URL),
   readJsonManifest(UAT_MANIFEST_URL),
   readJsonManifest(CANDIDATE_MANIFEST_URL),
   readJsonManifest(SEB_REGISTRY_URL),
+  readJsonManifest(PHYSICAL_UAT_URL),
 ])
 let candidateArtifactSha256 = null
 const registryCandidate = Array.isArray(sebRegistryManifest?.revisions)
@@ -62,11 +65,15 @@ const candidate = inspectExamReleaseCandidate(candidateManifest, {
   sebConfigId: platformManifest?.configId,
   sebConfigRevision: platformManifest?.configRevision,
 })
+const physicalUat = inspectSebPhysicalUatEvidence(physicalUatManifest, {
+  releaseCandidate: candidateManifest,
+})
 const result = inspectExamReleaseReadiness({
   stagingReady: staging.ready,
   sebRegistryReady: sebRegistry.ready,
   releaseCandidateReady: candidate.ready,
   sebPlatformsReady: platforms.ready,
+  sebPhysicalUatReady: physicalUat.ready,
   externalUatReady: externalUat.ready,
 })
 

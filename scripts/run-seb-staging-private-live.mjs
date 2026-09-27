@@ -24,8 +24,68 @@ const DEFAULT_TEMPLATE_PATH = resolve(
   '/Users/korkusonmasaen/Downloads/korkru-staging-v2-no-entry-password.seb',
 )
 const DEFAULT_KEY_PATH = resolve('.local/seb-s5/native-automation-key')
+const DEFAULT_BYPASS_KEY_PATH = resolve('.local/seb-s5/vercel-protection-bypass')
 const DEFAULT_EXCHANGE_DIRECTORY = resolve('.local/seb-s5/exchange')
 const DEFAULT_EVIDENCE_DIRECTORY = resolve('.local/seb-s5/evidence')
+const NATIVE_RUNNER_FILES = Object.freeze([
+  '.github/scripts/seb-s5-native-evidence.ps1',
+  '.github/scripts/SebS5NativeKeyReader.cs',
+])
+let diagnosticStage = 'startup'
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+const QA_NAMESPACE = /^qa:seb-s5-[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/
+const ACCOUNT_ALIAS = /^(?:teacher-(?:primary|unrelated)|student-(?:primary|secondary))$/
+
+function markDiagnosticStage(stage) {
+  diagnosticStage = stage
+}
+
+function createUserScopedReadProbe() {
+  return async request => {
+    const fields = [
+      'targetOrigin', 'namespace', 'contextAlias', 'authenticatedAsAlias',
+      'authenticatedUserId', 'page', 'signal',
+    ]
+    const actualFields = request && typeof request === 'object'
+      ? Object.keys(request).sort()
+      : []
+    const expectedFields = [...fields].sort()
+    const exactFields = actualFields.length === expectedFields.length
+      && actualFields.every((field, index) => field === expectedFields[index])
+    const page = request?.page
+    const signal = request?.signal
+    if (!exactFields
+      || request.targetOrigin !== SITE_ORIGIN
+      || !QA_NAMESPACE.test(request.namespace)
+      || !ACCOUNT_ALIAS.test(request.contextAlias)
+      || !ACCOUNT_ALIAS.test(request.authenticatedAsAlias)
+      || !UUID.test(request.authenticatedUserId)
+      || !(signal instanceof AbortSignal)
+      || signal.aborted
+      || typeof page?.goto !== 'function'
+      || typeof page?.url !== 'function'
+      || typeof page?.title !== 'function') {
+      return Object.freeze({ status: 'failed' })
+    }
+    try {
+      const response = await page.goto(`${SITE_ORIGIN}/dashboard`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 20_000,
+      })
+      const finalUrl = new URL(page.url())
+      const title = await page.title()
+      const passed = !signal.aborted
+        && response !== null
+        && response.status() === 200
+        && finalUrl.origin === SITE_ORIGIN
+        && finalUrl.pathname === '/dashboard'
+        && title === 'หน้าหลัก — KorKru'
+      return Object.freeze({ status: passed ? 'passed' : 'failed' })
+    } catch {
+      return Object.freeze({ status: 'failed' })
+    }
+  }
+}
 
 function blocked() {
   throw new Error(BLOCKED_MESSAGE)
@@ -42,7 +102,7 @@ function parseArguments(argv) {
   }
   const allowed = new Set([
     '--run-id', '--source-revision', '--deployment-id', '--env', '--template',
-    '--key', '--exchange-dir', '--evidence-dir',
+    '--key', '--bypass-key', '--exchange-dir', '--evidence-dir',
   ])
   if (Object.keys(parsed).some(flag => !allowed.has(flag))) blocked()
   return Object.freeze({
@@ -52,6 +112,7 @@ function parseArguments(argv) {
     envPath: resolve(parsed['--env'] ?? DEFAULT_ENV_PATH),
     templatePath: resolve(parsed['--template'] ?? DEFAULT_TEMPLATE_PATH),
     keyPath: resolve(parsed['--key'] ?? DEFAULT_KEY_PATH),
+    bypassKeyPath: resolve(parsed['--bypass-key'] ?? DEFAULT_BYPASS_KEY_PATH),
     exchangeDirectory: resolve(parsed['--exchange-dir'] ?? DEFAULT_EXCHANGE_DIRECTORY),
     evidenceDirectory: resolve(parsed['--evidence-dir'] ?? DEFAULT_EVIDENCE_DIRECTORY),
   })
@@ -106,6 +167,12 @@ async function readAutomationKey(path) {
   return value
 }
 
+async function readProtectionBypass(path) {
+  const value = (await readFile(path, 'utf8')).trim()
+  if (!/^[\x21-\x7e]{20,512}$/.test(value)) blocked()
+  return value
+}
+
 async function createNativeRequestBranch({ requestId, exchangeDirectory, sourceRevision }) {
   if (!SAFE_BRANCH.test(requestId)) blocked()
   const requestSource = join(exchangeDirectory, 'request.json')
@@ -119,7 +186,14 @@ async function createNativeRequestBranch({ requestId, exchangeDirectory, sourceR
     const destination = join(temporaryRoot, '.github/seb-s5/request.json')
     await mkdir(dirname(destination), { recursive: true, mode: 0o700 })
     await writeFile(destination, await readFile(requestSource), { mode: 0o600 })
-    await execFile('git', ['add', '.github/seb-s5/request.json'], { cwd: temporaryRoot })
+    for (const relativePath of NATIVE_RUNNER_FILES) {
+      const runnerDestination = join(temporaryRoot, relativePath)
+      await mkdir(dirname(runnerDestination), { recursive: true, mode: 0o700 })
+      await writeFile(runnerDestination, await readFile(resolve(relativePath)), { mode: 0o600 })
+    }
+    await execFile('git', ['add', '.github/seb-s5/request.json', ...NATIVE_RUNNER_FILES], {
+      cwd: temporaryRoot,
+    })
     await execFile('git', [
       '-c', 'user.name=KorKru S5 Automation',
       '-c', 'user.email=actions@qa.staging.korkru.com',
@@ -138,6 +212,7 @@ async function createNativeRequestBranch({ requestId, exchangeDirectory, sourceR
 }
 
 async function main() {
+  markDiagnosticStage('arguments')
   const args = parseArguments(process.argv.slice(2))
   if (!RUN_ID.test(args.runId ?? '')
     || args.runId === 'seb-s5-preview'
@@ -147,14 +222,16 @@ async function main() {
     || !isAbsolute(args.exchangeDirectory)
     || !isAbsolute(args.evidenceDirectory)) blocked()
 
-  const [local, automationKey, vercelToken] = await Promise.all([
+  markDiagnosticStage('local-inputs')
+  const [local, automationKey, protectionBypass, vercelToken] = await Promise.all([
     readLocalEnvironment(args.envPath),
     readAutomationKey(args.keyPath),
+    readProtectionBypass(args.bypassKeyPath),
     readVercelToken(),
   ])
+  markDiagnosticStage('service-role')
   let serviceRoleKey = await readServiceRoleKey()
   const sessionSecret = randomBytes(48).toString('base64url')
-  const protectionBypass = randomBytes(32).toString('base64url')
   const now = Date.now()
   const runIdentity = Object.freeze({
     runId: args.runId,
@@ -183,6 +260,7 @@ async function main() {
   })
   const readEnvironment = () => environment
   const namespace = `qa:${args.runId}`
+  const runExchangeDirectory = join(args.exchangeDirectory, args.runId)
   const serviceRoleCredentialProvider = async request => Object.freeze({
     schemaVersion: 1,
     targetOrigin: SUPABASE_ORIGIN,
@@ -208,12 +286,14 @@ async function main() {
     keyBase64: automationKey,
   })
 
-  await mkdir(args.exchangeDirectory, { recursive: true, mode: 0o700 })
+  markDiagnosticStage('local-directories')
+  await mkdir(runExchangeDirectory, { recursive: true, mode: 0o700 })
   await mkdir(args.evidenceDirectory, { recursive: true, mode: 0o700 })
-  await chmod(args.exchangeDirectory, 0o700)
+  await chmod(runExchangeDirectory, 0o700)
   await chmod(args.evidenceDirectory, 0o700)
 
   try {
+    markDiagnosticStage('live-stack')
     const harness = await createSebStagingPrivateLiveStack({
       runIdentity,
       readEnvironment,
@@ -224,14 +304,16 @@ async function main() {
       readVercelToken: async () => vercelToken,
       readProtectionBypass: async () => protectionBypass,
       nativeTemplatePath: args.templatePath,
-      nativeExchangeDirectory: args.exchangeDirectory,
+      nativeExchangeDirectory: runExchangeDirectory,
       evidenceDirectory: args.evidenceDirectory,
+      userScopedReadProbe: createUserScopedReadProbe(),
       onNativeRequestReady: request => createNativeRequestBranch({
         requestId: request.requestId,
-        exchangeDirectory: args.exchangeDirectory,
+        exchangeDirectory: runExchangeDirectory,
         sourceRevision: args.sourceRevision,
       }),
     })
+    markDiagnosticStage('live-run')
     const result = await harness.run()
     process.stdout.write(`${JSON.stringify(result)}\n`)
     if (result.status !== 'passed' || result.runStatus !== 'complete') process.exitCode = 1
@@ -241,6 +323,9 @@ async function main() {
 }
 
 main().catch(() => {
-  process.stderr.write(`${BLOCKED_MESSAGE}\n`)
+  const suffix = process.env.SEB_S5_DIAGNOSTIC === '1'
+    ? ` (${diagnosticStage})`
+    : ''
+  process.stderr.write(`${BLOCKED_MESSAGE}${suffix}\n`)
   process.exitCode = 1
 })

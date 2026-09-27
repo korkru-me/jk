@@ -1,6 +1,8 @@
 const OFFICIAL_STAGING_SITE_ORIGIN = 'https://staging.korkru.com'
 const OFFICIAL_STAGING_SUPABASE_ORIGIN = 'https://dyuxkrzeveknqgtuzpbh.supabase.co'
 const BLOCKED_MESSAGE = 'SEB Staging private classroom data boundary blocked'
+const SHA256 = /^[a-f0-9]{64}$/
+const BIGINT_TEXT = /^(?:[1-9][0-9]*)$/
 const STEP_SPECS = Object.freeze(new Map([
   ['create-subject-classroom', Object.freeze({
     targetKey: 'classroom-primary',
@@ -72,10 +74,10 @@ const STEP_SPECS = Object.freeze(new Map([
   ['autosave-synthetic-answer', studentReadSpec()],
   ['retry-autosave-after-transient-failure', studentReadSpec()],
   ['resume-same-attempt', studentReadSpec()],
-  ['upload-synthetic-attachment', studentReadSpec([{
+  ['upload-synthetic-attachment', studentReadSpec()],
+  ['retry-upload-after-transient-failure', studentReadSpec([{
     targetKey: 'answer-storage', kind: 'answerStorageObject', resourceType: 'submission_file',
   }], 'storage')],
-  ['retry-upload-after-transient-failure', studentReadSpec()],
   ['record-proctor-heartbeat', studentReadSpec([
     { targetKey: 'proctor-connection', kind: 'proctorConnection', resourceType: 'heartbeat' },
     { targetKey: 'proctor-event', kind: 'proctorEvent', resourceType: 'monitoring_started' },
@@ -111,6 +113,12 @@ const RUNTIME_STEP_IDS = new Set([
   'student-denied-teacher-result', 'submit-attempt',
   'teacher-read-submitted-result', 'secondary-student-denied-primary-attempt',
   'unrelated-teacher-denied-assignment-result', 'verify-cross-account-boundaries',
+])
+const ZERO_MUTATION_SEB_DENIAL_STEP_IDS = new Set([
+  'reject-invalid-seb-challenge',
+  'reject-replayed-seb-challenge',
+  'reject-invalid-seb-session',
+  'reject-replayed-seb-session',
 ])
 const ACCOUNT_REFERENCE = Object.freeze({
   schemaVersion: 1,
@@ -279,6 +287,14 @@ function canonicalTimestamp(value) {
   return Number.isFinite(timestamp)
     ? Object.freeze({ timestamp, iso: new Date(timestamp).toISOString() })
     : null
+}
+
+function validWizardClassroomDescription(value, marker) {
+  if (typeof value !== 'string' || typeof marker !== 'string') return false
+  const prefix = `Synthetic-only SEB Staging fixture ${marker}\n`
+  if (!value.startsWith(prefix)) return false
+  const metadata = value.slice(prefix.length)
+  return /^หน้าปก: blue · ภาคเรียน: [12]\/\d{4} · การเข้าร่วม: เปิดรับอิสระ$/.test(metadata)
 }
 
 function parseIdentity(value) {
@@ -746,9 +762,7 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
   async function enumerateOperation(signal, { cleanup = false } = {}) {
     assertStable(cleanup)
     const binding = operation.binding
-    const questionType = operation.spec.resourceType === 'essay'
-      ? 'written'
-      : operation.spec.resourceType
+    const questionType = operation.spec.resourceType
     const columns = operation.spec.table === 'classrooms'
       ? [
           'id', 'teacher_id', 'org_id', 'classroom_type', 'name', 'description',
@@ -800,8 +814,18 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
     if (!Object.isFrozen(result)
       || !hasExactFields(result, ['rows'])
       || !Object.isFrozen(result.rows)
-      || result.rows.length > 1) blocked()
-    if (result.rows.length === 0) return null
+      || result.rows.length > 1) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging operation attestation blocked (${operation.stepId}:response-shape)\n`)
+      }
+      blocked()
+    }
+    if (result.rows.length === 0) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging operation attestation failed (${operation.stepId}:no-match)\n`)
+      }
+      return null
+    }
     const row = result.rows[0]
     const createdAt = canonicalTimestamp(
       operation.spec.table === 'classroom_students' ? row?.joined_at : row?.created_at,
@@ -817,7 +841,7 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
         && row.teacher_id === binding.expectedUserId
         && row.classroom_type === 'subject'
         && row.name === operation.marker
-        && row.description === `Synthetic-only SEB Staging fixture ${operation.marker}`
+        && validWizardClassroomDescription(row.description, operation.marker)
       : operation.spec.table === 'questions'
         ? row.org_id === operation.target.organizationId
           && row.created_by === binding.expectedUserId
@@ -827,7 +851,13 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
           && row.question_text.includes(`Synthetic-only SEB Staging fixture ${operation.marker}`)
         : row.classroom_id === operation.classroomId
           && row.student_id === binding.expectedUserId
-    if (!commonValid || !resourceValid) blocked()
+    if (!commonValid || !resourceValid) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        const stage = !commonValid ? 'common-shape' : `${operation.spec.table}-shape`
+        process.stderr.write(`SEB Staging operation attestation blocked (${operation.stepId}:${stage})\n`)
+      }
+      blocked()
+    }
     return Object.freeze({ row, createdAt: createdAt.iso })
   }
 
@@ -967,6 +997,22 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
     return row
   }
 
+  async function awaitPublishedAssignment(signal) {
+    const maximumAttempts = 20
+    let lastStatus = 'missing'
+    for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+      const row = await enumeratePublishedAssignment(signal)
+      if (row?.status === 'published') return row
+      lastStatus = row?.status ?? 'missing'
+      if (attempt + 1 === maximumAttempts || signal.aborted) break
+      await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+      process.stderr.write(`SEB Staging publish attestation timed out (${lastStatus})\n`)
+    }
+    return null
+  }
+
   async function databaseRows(signal, table, columns, predicates, suffix, limit = 4) {
     const result = await driver.methods.enumerateDatabase.call(
       driver.wrapper,
@@ -1021,6 +1067,12 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
       'unrelated-teacher-denied-assignment-result', 'verify-cross-account-boundaries']
       .includes(stepId)) return []
     if (!studentId || !UUID.test(studentId)) blocked()
+    // These browser steps prove that an invalid or replayed SEB credential was
+    // rejected. They intentionally create no database resource. In particular,
+    // the challenge denials run before a submission exists, so requiring the
+    // committed submission guard below would turn a successful denial into a
+    // false resource-attestation failure.
+    if (ZERO_MUTATION_SEB_DENIAL_STEP_IDS.has(stepId)) return []
 
     if (stepId === 'verify-seb-system-check') {
       const columns = ['assignment_id', 'student_id', 'org_id', 'platform', 'verified_at']
@@ -1042,16 +1094,27 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
     }
 
     if (stepId === 'start-revision-bound-attempt') {
+      const startBlocked = stage => {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging start-attempt attestation blocked (${stage})\n`)
+        }
+        blocked()
+      }
       const submissionColumns = [
         'id', 'assignment_id', 'student_id', 'org_id', 'secure_browser_verified_at',
         'secure_browser_platform', 'seb_config_revision', 'status', 'submitted_at', 'created_at',
       ]
-      const submissions = await databaseRows(signal, 'submissions', submissionColumns, [
-        { column: 'assignment_id', operator: 'eq', value: assignmentId },
-        { column: 'student_id', operator: 'eq', value: studentId },
-        { column: 'org_id', operator: 'eq', value: operation.organizationId },
-      ], 'submission', 2)
-      if (submissions.length !== 1) blocked()
+      let submissions
+      try {
+        submissions = await databaseRows(signal, 'submissions', submissionColumns, [
+          { column: 'assignment_id', operator: 'eq', value: assignmentId },
+          { column: 'student_id', operator: 'eq', value: studentId },
+          { column: 'org_id', operator: 'eq', value: operation.organizationId },
+        ], 'submission', 2)
+      } catch {
+        startBlocked('submission-query')
+      }
+      if (submissions.length !== 1) startBlocked(`submission-count-${submissions.length}`)
       const submission = submissions[0]
       if (!Object.isFrozen(submission) || !hasExactFields(submission, submissionColumns)
         || !UUID.test(submission.id)
@@ -1062,115 +1125,193 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
         || !canonicalTimestamp(submission.secure_browser_verified_at)
         || !Number.isInteger(submission.seb_config_revision)
         || !['in_progress', 'started'].includes(submission.status)
-        || submission.submitted_at !== null) blocked()
+        || submission.submitted_at !== null) startBlocked('submission-shape')
       const answerColumns = ['id', 'submission_id', 'question_id', 'org_id', 'student_answer', 'created_at']
-      const answers = await databaseRows(signal, 'submission_answers', answerColumns, [
-        { column: 'submission_id', operator: 'eq', value: submission.id },
-        { column: 'org_id', operator: 'eq', value: operation.organizationId },
-      ], 'answers', 3)
-      if (answers.length !== 2 || answers.some(row => (
+      let answers
+      try {
+        answers = await databaseRows(signal, 'submission_answers', answerColumns, [
+          { column: 'submission_id', operator: 'eq', value: submission.id },
+          { column: 'org_id', operator: 'eq', value: operation.organizationId },
+        ], 'answers', 3)
+      } catch {
+        startBlocked('answer-query')
+      }
+      if (answers.length !== 2) startBlocked(`answer-count-${answers.length}`)
+      if (answers.some(row => (
         !Object.isFrozen(row) || !hasExactFields(row, answerColumns)
         || !UUID.test(row.id) || !UUID.test(row.question_id)
         || row.submission_id !== submission.id || row.org_id !== operation.organizationId
-      ))) blocked()
-      const questionIds = QUESTION_REFERENCES.map(reference => readSingleLedgerSnapshot(
-        ledger,
-        reference,
-        value => validCommittedSnapshot(value, identity, namespace, reference),
-      ).targetId)
-      if (!questionIds.every(id => answers.some(row => row.question_id === id))) blocked()
+      ))) startBlocked('answer-shape')
+      let questionIds
+      let configRevisionId
+      try {
+        questionIds = QUESTION_REFERENCES.map(reference => readSingleLedgerSnapshot(
+          ledger,
+          reference,
+          value => validCommittedSnapshot(value, identity, namespace, reference),
+        ).targetId)
+        configRevisionId = readSingleLedgerSnapshot(
+          ledger,
+          CONFIG_REFERENCE,
+          value => validCommittedSnapshot(value, identity, namespace, CONFIG_REFERENCE),
+        ).targetId
+      } catch {
+        startBlocked('question-ledger')
+      }
+      if (!questionIds.every(id => answers.some(row => row.question_id === id))) {
+        startBlocked('question-binding')
+      }
       const essayQuestionId = questionIds[0]
       const uploadQuestionId = questionIds[1]
       const essay = answers.find(row => row.question_id === essayQuestionId)
       const upload = answers.find(row => row.question_id === uploadQuestionId)
+      if (!essay || !upload) startBlocked('answer-role-binding')
       return [
-        targetMatch(operation.spec.targets[0], submission, submission.created_at, assignmentId, questionIds),
+        targetMatch(
+          operation.spec.targets[0],
+          submission,
+          submission.created_at,
+          assignmentId,
+          [configRevisionId],
+        ),
         targetMatch(operation.spec.targets[1], essay, essay.created_at, submission.id, [essayQuestionId]),
         targetMatch(operation.spec.targets[2], upload, upload.created_at, submission.id, [uploadQuestionId]),
       ]
     }
 
     const submission = committedTarget('submission-primary', 'submission')
-    if (stepId === 'upload-synthetic-attachment') {
+    if (stepId === 'retry-upload-after-transient-failure') {
       const uploadAnswer = committedTarget('answer-upload', 'answer')
-      const rows = await databaseRows(
-        signal,
-        'submission_answers',
-        ['id', 'submission_id', 'question_id', 'org_id', 'student_answer', 'created_at'],
-        [
-          { column: 'id', operator: 'eq', value: uploadAnswer.targetId },
-          { column: 'submission_id', operator: 'eq', value: submission.targetId },
-          { column: 'org_id', operator: 'eq', value: operation.organizationId },
-        ],
-        'upload-answer',
-        2,
-      )
-      if (rows.length !== 1) blocked()
-      let files
-      try { files = JSON.parse(rows[0].student_answer) } catch { blocked() }
-      if (!Array.isArray(files) || files.length !== 1
-        || typeof files[0]?.url !== 'string'
-        || typeof files[0]?.name !== 'string') blocked()
-      const path = files[0].url.split('/submission-files/').at(-1)
-      if (typeof path !== 'string' || !path.includes('/')) blocked()
-      const storage = await driver.methods.enumerateStorage.call(
-        driver.wrapper,
-        freezeInput({
-          schemaVersion: 1,
-          operationId: `attest:${stepId}:storage`,
-          bucketName: 'submission-files',
-          path,
-          limit: 2,
-        }),
-        Object.freeze({ signal }),
-      )
-      assertStable()
-      if (!Object.isFrozen(storage) || !hasExactFields(storage, ['objects'])
-        || !Object.isFrozen(storage.objects) || storage.objects.length !== 1) blocked()
-      const object = storage.objects[0]
-      if (!Object.isFrozen(object)
-        || !hasExactFields(object, [
-          'bucketName', 'path', 'ownerId', 'createdAt', 'sizeBytes', 'mimeType',
-        ])
-        || object.bucketName !== 'submission-files'
-        || object.path !== path
-        || object.ownerId !== studentId
-        || object.sizeBytes <= 0
-        || object.mimeType !== 'application/pdf') blocked()
+      let attestedUpload = null
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const rows = await databaseRows(
+          signal,
+          'submission_answers',
+          ['id', 'submission_id', 'question_id', 'org_id', 'student_answer', 'created_at'],
+          [
+            { column: 'id', operator: 'eq', value: uploadAnswer.targetId },
+            { column: 'submission_id', operator: 'eq', value: submission.targetId },
+            { column: 'org_id', operator: 'eq', value: operation.organizationId },
+          ],
+          'upload-answer',
+          2,
+        )
+        if (rows.length !== 1) blocked()
+        const rawAnswer = rows[0].student_answer
+        if (rawAnswer !== null && rawAnswer !== '') {
+          if (typeof rawAnswer !== 'string') blocked()
+          let files
+          try { files = JSON.parse(rawAnswer) } catch { blocked() }
+          if (!Array.isArray(files) || files.length !== 1
+            || typeof files[0]?.url !== 'string'
+            || typeof files[0]?.name !== 'string') blocked()
+          const path = files[0].url.split('/submission-files/').at(-1)
+          if (typeof path !== 'string' || !path.includes('/')) blocked()
+          const storage = await driver.methods.enumerateStorage.call(
+            driver.wrapper,
+            freezeInput({
+              schemaVersion: 1,
+              operationId: `attest:${stepId}:storage`,
+              bucketName: 'submission-files',
+              path,
+              limit: 2,
+            }),
+            Object.freeze({ signal }),
+          )
+          assertStable()
+          if (!Object.isFrozen(storage) || !hasExactFields(storage, ['objects'])
+            || !Object.isFrozen(storage.objects) || storage.objects.length > 1) blocked()
+          if (storage.objects.length === 1) {
+            const object = storage.objects[0]
+            if (!Object.isFrozen(object)
+              || !hasExactFields(object, [
+                'bucketName', 'path', 'ownerId', 'createdAt', 'sizeBytes', 'mimeType', 'sha256',
+              ])
+              || object.bucketName !== 'submission-files'
+              || object.path !== path
+              || (object.ownerId !== null && object.ownerId !== studentId)
+              || object.sizeBytes <= 0
+              || object.mimeType !== 'application/pdf'
+              || !SHA256.test(object.sha256)) blocked()
+            attestedUpload = Object.freeze({ path, object })
+            break
+          }
+        }
+        if (attempt + 1 < 20 && !signal.aborted) {
+          await new Promise(resolve => setTimeout(resolve, 250))
+        }
+      }
+      if (!attestedUpload) {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write('SEB Staging upload attestation timed out\n')
+        }
+        blocked()
+      }
       return [targetMatch(operation.spec.targets[0], {
-        id: path,
-      }, object.createdAt, uploadAnswer.targetId, [submission.targetId])]
+        id: attestedUpload.path,
+      }, attestedUpload.object.createdAt, uploadAnswer.targetId, [submission.targetId])]
     }
 
     if (stepId === 'record-proctor-heartbeat') {
-      const connectionColumns = [
-        'submission_id', 'client_instance_id', 'assignment_id', 'student_id', 'org_id', 'connected_at',
-      ]
-      const connections = await databaseRows(signal, 'exam_proctor_connections', connectionColumns, [
-        { column: 'submission_id', operator: 'eq', value: submission.targetId },
-        { column: 'assignment_id', operator: 'eq', value: assignmentId },
-        { column: 'student_id', operator: 'eq', value: studentId },
-        { column: 'org_id', operator: 'eq', value: operation.organizationId },
-      ], 'proctor-connection', 2)
-      const eventColumns = [
-        'id', 'submission_id', 'assignment_id', 'student_id', 'org_id', 'event_type', 'created_at',
-      ]
-      const events = await databaseRows(signal, 'exam_proctor_events', eventColumns, [
-        { column: 'submission_id', operator: 'eq', value: submission.targetId },
-        { column: 'assignment_id', operator: 'eq', value: assignmentId },
-        { column: 'student_id', operator: 'eq', value: studentId },
-        { column: 'org_id', operator: 'eq', value: operation.organizationId },
-        { column: 'event_type', operator: 'eq', value: 'monitoring_started' },
-      ], 'proctor-event', 2)
-      if (connections.length !== 1 || events.length !== 1
-        || !UUID.test(events[0].id)
-        || typeof connections[0].client_instance_id !== 'string') blocked()
-      return [
-        targetMatch(operation.spec.targets[0], {
-          id: `${connections[0].submission_id}:${connections[0].client_instance_id}`,
-        }, connections[0].connected_at, submission.targetId),
-        targetMatch(operation.spec.targets[1], events[0], events[0].created_at, submission.targetId),
-      ]
+      let diagnosticStage = 'columns'
+      try {
+        const connectionColumns = [
+          'submission_id', 'client_instance_id', 'assignment_id', 'student_id', 'org_id', 'connected_at',
+        ]
+        const eventColumns = [
+          'id', 'submission_id', 'assignment_id', 'student_id', 'org_id', 'event_type', 'created_at',
+        ]
+        let connection = null
+        let event = null
+        let lastCounts = '0:0'
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          diagnosticStage = 'connection-query'
+          const connections = await databaseRows(signal, 'exam_proctor_connections', connectionColumns, [
+            { column: 'submission_id', operator: 'eq', value: submission.targetId },
+            { column: 'assignment_id', operator: 'eq', value: assignmentId },
+            { column: 'student_id', operator: 'eq', value: studentId },
+            { column: 'org_id', operator: 'eq', value: operation.organizationId },
+          ], 'proctor-connection', 2)
+          diagnosticStage = 'event-query'
+          const events = await databaseRows(signal, 'exam_proctor_events', eventColumns, [
+            { column: 'submission_id', operator: 'eq', value: submission.targetId },
+            { column: 'assignment_id', operator: 'eq', value: assignmentId },
+            { column: 'student_id', operator: 'eq', value: studentId },
+            { column: 'org_id', operator: 'eq', value: operation.organizationId },
+            { column: 'event_type', operator: 'eq', value: 'monitoring_started' },
+          ], 'proctor-event', 9)
+          lastCounts = `${connections.length}:${events.length}`
+          diagnosticStage = `multiplicity-${lastCounts}`
+          if (connections.length > 1 || events.length > 8) blocked()
+          if (connections.length === 1 && events.length >= 1) {
+            connection = connections[0]
+            if (events.some(row => !BIGINT_TEXT.test(row.id))) blocked()
+            event = [...events].sort((left, right) => (
+              BigInt(left.id) < BigInt(right.id) ? -1 : BigInt(left.id) > BigInt(right.id) ? 1 : 0
+            ))[0]
+            break
+          }
+          if (attempt + 1 < 12 && !signal.aborted) {
+            await new Promise(resolve => setTimeout(resolve, 250))
+          }
+        }
+        diagnosticStage = `identity-${lastCounts}`
+        if (!connection || !event
+          || !BIGINT_TEXT.test(event.id)
+          || typeof connection.client_instance_id !== 'string') blocked()
+        diagnosticStage = 'target-match'
+        return [
+          targetMatch(operation.spec.targets[0], {
+            id: `${connection.submission_id}:${connection.client_instance_id}`,
+          }, connection.connected_at, submission.targetId, [assignmentId]),
+          targetMatch(operation.spec.targets[1], event, event.created_at, submission.targetId, [assignmentId]),
+        ]
+      } catch {
+        if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+          process.stderr.write(`SEB Staging proctor attestation blocked (${diagnosticStage})\n`)
+        }
+        blocked()
+      }
     }
 
     if (['autosave-synthetic-answer', 'retry-autosave-after-transient-failure',
@@ -1217,27 +1358,52 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
       'schemaVersion', 'targetOrigin', 'namespace', 'identity', 'stepId', 'alias',
       'expectedUserId', 'marker', multiple ? 'targets' : 'target',
     ]
+    const requestOkay = operation
+      ? exactOperationRequest(request, identity, namespace, fields)
+      : false
+    const expectedUserOkay = operation
+      ? request?.expectedUserId === (binding?.expectedUserId ?? null)
+      : false
+    const markerOkay = operation ? request?.marker === operation.marker : false
+    const targetOkay = operation
+      ? (multiple
+          ? validTargets(
+              request?.targets,
+              binding?.expectedUserId ?? operation.targets[0]?.ownerId,
+              operation.organizationId,
+              operation.spec.targets,
+            )
+          : validTarget(
+              request?.target,
+              binding?.expectedUserId ?? operation.target?.ownerId,
+              operation.target.organizationId,
+              targetSpec,
+            ))
+      : false
     if (!signal
       || busy
       || closed
       || (operation?.spec?.alias !== null && !binding)
       || !operation
-      || !exactOperationRequest(request, identity, namespace, fields)
-      || request.expectedUserId !== (binding?.expectedUserId ?? null)
-      || request.marker !== operation.marker
-      || (multiple
-        ? !validTargets(
-          request.targets,
-          binding?.expectedUserId ?? operation.targets[0]?.ownerId,
-          operation.organizationId,
-          operation.spec.targets,
-        )
-        : !validTarget(
-          request.target,
-          binding?.expectedUserId ?? operation.target?.ownerId,
-          operation.target.organizationId,
-          targetSpec,
-        ))) blocked()
+      || !requestOkay
+      || !expectedUserOkay
+      || !markerOkay
+      || !targetOkay) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1'
+        && operation?.stepId === 'start-revision-bound-attempt') {
+        const stage = !signal ? 'signal'
+          : busy ? 'busy'
+            : closed ? 'closed'
+              : (operation.spec.alias !== null && !binding) ? 'binding'
+                : !requestOkay ? 'request-shape'
+                  : !expectedUserOkay ? 'expected-user'
+                    : !markerOkay ? 'marker'
+                      : !targetOkay ? 'targets'
+                        : 'unknown'
+        process.stderr.write(`SEB Staging start-attempt boundary blocked (${stage})\n`)
+      }
+      blocked()
+    }
     busy = true
     try {
       if (RUNTIME_STEP_IDS.has(operation.stepId)) {
@@ -1252,8 +1418,8 @@ export function createSebStagingPrivateClassroomDataBoundary(options = {}) {
         return response
       }
       if (operation.stepId === 'publish-seb-assignment') {
-        const match = await enumeratePublishedAssignment(signal)
-        if (!match || match.status !== 'published') blocked()
+        const match = await awaitPublishedAssignment(signal)
+        if (!match) blocked()
         operation = null
         return freezeInput({
           schemaVersion: 1,

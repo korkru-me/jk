@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Clock, MoreVertical, Copy, BarChart3, Pencil, RefreshCw, Target, Users, CheckCircle2, ClipboardCheck } from 'lucide-react'
+import { Plus, Clock, MoreVertical, Copy, BarChart3, Pencil, RefreshCw, Target, Users, CheckCircle2, ClipboardCheck, Grid3x3 } from 'lucide-react'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { toast } from 'sonner'
 import { duplicateAssignment } from '@/lib/actions/assignments'
@@ -10,6 +10,7 @@ import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { formatPassingThreshold } from '@/lib/grading'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computeAssignmentProgress } from '@/lib/classroom-progress'
+import { describeGroupTarget } from '@/lib/classroom-groups'
 import { Card } from '@/components/ui/card'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -33,6 +34,8 @@ export interface ClassroomAssignmentRow {
   max_attempts: number | null
   score_strategy: 'best' | 'average' | 'latest'
   display_order?: number | null
+  /** กลุ่มย่อย this room's link hands the งาน to; null = ทั้งห้อง. */
+  group_ids?: string[] | null
 }
 
 export interface ClassroomAssignmentSubmissionRow {
@@ -57,12 +60,18 @@ interface Props {
   assignments: ClassroomAssignmentRow[]
   submissions: ClassroomAssignmentSubmissionRow[]
   studentCount: number
+  /** The students each กลุ่มย่อย-only งาน was handed to, keyed by assignment id. */
+  audienceByAssignment?: Map<string, Set<string>>
+  groupNameById?: Map<string, string>
   /** Hand-ins still waiting for a teacher's score, keyed by assignment id. */
   pendingReviewByAssignment?: Record<string, number>
   onViewScores?: () => void
 }
 
-export function ClassroomAssignmentsTab({ classroomId, assignments, submissions, studentCount, pendingReviewByAssignment, onViewScores }: Props) {
+export function ClassroomAssignmentsTab({
+  classroomId, assignments, submissions, studentCount, audienceByAssignment, groupNameById = new Map(),
+  pendingReviewByAssignment, onViewScores,
+}: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [isPending, startTransition] = useTransition()
 
@@ -115,7 +124,10 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
               const typeCfg = TYPE_CFG[a.type] ?? TYPE_CFG.exam
               const TypeIcon = typeCfg.icon
               const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
-              const stats = computeAssignmentProgress(a, submissions)
+              // A งาน for some กลุ่มย่อย is measured against those students only.
+              const audience = audienceByAssignment?.get(a.id) ?? null
+              const stats = computeAssignmentProgress(a, submissions, audience)
+              const expected = audience?.size ?? studentCount
               const pendingReview = pendingReviewByAssignment?.[a.id] ?? 0
               // Land straight on the ตรวจ worklist when something is waiting,
               // and on the plain results page when nothing is.
@@ -134,6 +146,11 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                         <span className="text-xs text-muted-foreground">
                           {assignmentSizeLabel(a)}
                         </span>
+                        {a.group_ids && (
+                          <span className="flex items-center gap-0.5 text-xs font-medium text-tint-1">
+                            <Grid3x3 className="w-3 h-3" /> เฉพาะ {describeGroupTarget(a.group_ids, groupNameById)}
+                          </span>
+                        )}
                         {a.max_attempts != null && (
                           <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                             <RefreshCw className="w-3 h-3" /> ทำได้ {a.max_attempts} ครั้ง
@@ -157,16 +174,16 @@ export function ClassroomAssignmentsTab({ classroomId, assignments, submissions,
                         {a.status !== 'draft' && (
                           a.type === 'exercise' ? (
                             <span className="flex items-center gap-0.5 text-xs text-success">
-                              <CheckCircle2 className="w-3 h-3" /> ทำเสร็จ {stats.completed}/{studentCount} คน
+                              <CheckCircle2 className="w-3 h-3" /> ทำเสร็จ {stats.completed}/{expected} คน
                             </span>
                           ) : (
                             <>
                               <span className="flex items-center gap-0.5 text-xs text-primary">
-                                <Users className="w-3 h-3" /> เข้าทำ {stats.attempted}/{studentCount} คน
+                                <Users className="w-3 h-3" /> เข้าทำ {stats.attempted}/{expected} คน
                               </span>
                               {passingThreshold && (
                                 <span className="flex items-center gap-0.5 text-xs text-success">
-                                  <CheckCircle2 className="w-3 h-3" /> ผ่าน {stats.passed}/{studentCount} คน
+                                  <CheckCircle2 className="w-3 h-3" /> ผ่าน {stats.passed}/{expected} คน
                                 </span>
                               )}
                             </>
