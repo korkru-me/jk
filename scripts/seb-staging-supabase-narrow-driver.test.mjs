@@ -669,6 +669,28 @@ describe('SEB Staging Supabase narrow driver', () => {
     )).rejects.toBeInstanceOf(SebStagingSupabaseNarrowDriverBlockedError)
   })
 
+  it('accepts a null owner for an admin-signed upload whose exact path encodes the student', async () => {
+    const bytes = Buffer.from('synthetic PDF')
+    const path = `${IDS.student}/${IDS.submission}/${IDS.answer}/${IDS.upload}.pdf`
+    const fetchImplementation = vi.fn(async url => (
+      new URL(url).pathname.includes('/rpc/')
+        ? jsonResponse(storageMetadata('submission-files', path, bytes, { ownerId: null }))
+        : binaryResponse(bytes, 'application/pdf')
+    ))
+    const driver = await createSebStagingSupabaseNarrowDriver(
+      createHarness({ fetchImplementation }).options,
+    )
+    await expect(driver.enumerateStorage(
+      storageRequest('submission-files', path),
+      options(),
+    )).resolves.toEqual({
+      objects: [{
+        ...storageMetadata('submission-files', path, bytes, { ownerId: null }).objects[0],
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      }],
+    })
+  })
+
   it('deletes one exact storage object only after full attestation and verifies absence', async () => {
     const bytes = Buffer.from('synthetic PDF')
     const path = `${IDS.student}/${IDS.submission}/${IDS.answer}/${IDS.upload}.pdf`
@@ -683,7 +705,7 @@ describe('SEB Staging Supabase narrow driver', () => {
       }
       if (init.method === 'DELETE') {
         expect(JSON.parse(init.body)).toEqual({ prefixes: [path] })
-        return jsonResponse([])
+        return jsonResponse([{ name: path, bucket_id: 'submission-files' }])
       }
       return binaryResponse(bytes, 'application/pdf')
     })
@@ -698,6 +720,34 @@ describe('SEB Staging Supabase narrow driver', () => {
       maxObjects: 1,
     }, options())).resolves.toEqual({ status: 'passed', deletedCount: 1 })
     expect(attestations).toBe(2)
+  })
+
+  it.each([
+    [],
+    [{ name: 'other/file.pdf', bucket_id: 'submission-files' }],
+    [{ name: `${IDS.student}/${IDS.submission}/${IDS.answer}/${IDS.upload}.pdf`, bucket_id: 'wrong' }],
+    [null],
+  ])('rejects a mismatched Storage delete receipt %#', async receipt => {
+    const bytes = Buffer.from('synthetic PDF')
+    const path = `${IDS.student}/${IDS.submission}/${IDS.answer}/${IDS.upload}.pdf`
+    const fetchImplementation = vi.fn(async (url, init) => {
+      const parsed = new URL(url)
+      if (parsed.pathname.includes('/rpc/seb_s5_attest_storage_object')) {
+        return jsonResponse(storageMetadata('submission-files', path, bytes))
+      }
+      if (init.method === 'DELETE') return jsonResponse(receipt)
+      return binaryResponse(bytes, 'application/pdf')
+    })
+    const driver = await createSebStagingSupabaseNarrowDriver(
+      createHarness({ fetchImplementation }).options,
+    )
+    await expect(driver.deleteStorage({
+      schemaVersion: 1,
+      operationId: 'delete:answer-storage',
+      bucketName: 'submission-files',
+      path,
+      maxObjects: 1,
+    }, options())).rejects.toBeInstanceOf(SebStagingSupabaseNarrowDriverBlockedError)
   })
 
   it('fails closed on credential attestation extras and official environment drift', async () => {

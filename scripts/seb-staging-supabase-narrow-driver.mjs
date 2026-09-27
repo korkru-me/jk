@@ -32,6 +32,13 @@ const SAFE_RPC_DIAGNOSTIC_MESSAGES = new Map([
   ['closure predicate is not parent-bound', 'closure-not-parent-bound'],
   ['SEB S5 cascade declaration mismatch', 'cascade-declaration'],
   ['SEB S5 run reservation mismatch', 'reservation-mismatch'],
+  ['invalid SEB S5 storage attestation request', 'invalid-storage-request'],
+  ['invalid SEB S5 storage metadata', 'storage-metadata'],
+  ['invalid SEB S5 submission object path', 'submission-object-path'],
+  ['SEB S5 submission object lineage mismatch', 'submission-object-lineage'],
+  ['invalid SEB S5 assignment artifact path', 'assignment-artifact-path'],
+  ['SEB S5 assignment artifact lineage mismatch', 'assignment-artifact-lineage'],
+  ['SEB S5 storage RPC requires service_role', 'storage-service-role'],
   ['unsupported SEB S5 closure field', 'unsupported-closure-field'],
   ['unsupported SEB S5 closure requirement', 'unsupported-closure'],
 ])
@@ -203,6 +210,7 @@ const TABLES = Object.freeze(new Map([
   ['education_research_export_events', tableProfile(['id'], ['org_id'])],
   ['assignment_extensions', tableProfile(['id'], ['assignment_id'])],
   ['classroom_invitations', tableProfile(['id'], ['classroom_id'])],
+  ['classroom_groups', tableProfile(['id'], ['classroom_id'])],
   ['classroom_co_teachers', tableProfile(['id'], ['classroom_id'])],
   ['classroom_posts', tableProfile(['id'], ['classroom_id'])],
   ['student_notes', tableProfile(['id'], ['classroom_id'])],
@@ -937,7 +945,7 @@ function storageMetadata(value, request) {
   if (request.bucketName === 'submission-files') {
     const path = ANSWER_PATH.exec(request.path)
     if (!path
-      || value.ownerId !== path[1]
+      || (value.ownerId !== null && value.ownerId !== path[1])
       || value.mimeType !== MIME_BY_EXTENSION[path[5]]
       || value.sizeBytes > 10 * 1024 * 1024) blocked()
   } else {
@@ -947,6 +955,13 @@ function storageMetadata(value, request) {
       || value.sizeBytes > 2_097_152) blocked()
   }
   return Object.freeze({ ...value, createdAt: canonicalTimestamp(value.createdAt).iso })
+}
+
+function validStorageDeleteReceipt(value, request) {
+  if (!Array.isArray(value) || value.length !== 1 || !isRecord(value[0])) return false
+  const receipt = value[0]
+  return receipt.name === request.path
+    && (!Object.hasOwn(receipt, 'bucket_id') || receipt.bucket_id === request.bucketName)
 }
 
 async function attestStorage(transport, key, signal, request, namespace) {
@@ -1181,9 +1196,11 @@ export async function createSebStagingSupabaseNarrowDriver(input = {}) {
           headers: jsonHeaders(key, true),
           body: JSON.stringify({ prefixes: [request.path] }),
         }, operationSignal)
-        // Storage-js documents an empty array for a successful remove. Exact
-        // post-delete attestation below is the authoritative deletion proof.
-        if (!Array.isArray(response) || response.length !== 0) blocked()
+        // The Storage API returns one FileObject for the deleted path. Fields
+        // other than name (and the optional deprecated bucket_id) vary across
+        // Storage versions, so the exact post-delete RPC below remains the
+        // authoritative deletion proof.
+        if (!validStorageDeleteReceipt(response, request)) blocked()
         const after = await attestStorage(
           transport, key, operationSignal, request, options.namespace,
         )

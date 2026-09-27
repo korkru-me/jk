@@ -18,6 +18,9 @@ const SECONDARY_STUDENT_ID = '00000000-0000-4000-8000-000000000006'
 const WRITTEN_QUESTION_ID = '00000000-0000-4000-8000-000000000007'
 const UPLOAD_QUESTION_ID = '00000000-0000-4000-8000-000000000008'
 const ASSIGNMENT_ID = '00000000-0000-4000-8000-000000000009'
+const SUBMISSION_ID = '00000000-0000-4000-8000-000000000010'
+const WRITTEN_ANSWER_ID = '00000000-0000-4000-8000-000000000011'
+const UPLOAD_ANSWER_ID = '00000000-0000-4000-8000-000000000012'
 const RELEASE_ID = `asr-${'a'.repeat(32)}-r1-${'b'.repeat(16)}`
 const MARKER = `SEB S5 ${RUN_ID} ${'a'.repeat(24)}`
 const NOW = '2026-09-24T03:00:00.000Z'
@@ -140,6 +143,14 @@ function makeLedger() {
       TEACHER_ID,
       ORGANIZATION_ID,
       'exam',
+    )],
+    ['config-primary', snapshot(
+      'config-primary',
+      'configRevision',
+      `${ASSIGNMENT_ID}:r1`,
+      TEACHER_ID,
+      ORGANIZATION_ID,
+      'seb_required',
     )],
     ['release-primary', snapshot(
       'release-primary',
@@ -283,6 +294,34 @@ function publishedAssignmentRow(overrides = {}) {
     type: 'exam',
     status: 'published',
     secure_browser_mode: 'seb_required',
+    ...overrides,
+  })
+}
+
+function submissionRow(overrides = {}) {
+  return freeze({
+    id: SUBMISSION_ID,
+    assignment_id: ASSIGNMENT_ID,
+    student_id: STUDENT_ID,
+    org_id: ORGANIZATION_ID,
+    secure_browser_verified_at: NOW,
+    secure_browser_platform: 'windows',
+    seb_config_revision: 1,
+    status: 'in_progress',
+    submitted_at: null,
+    created_at: NOW,
+    ...overrides,
+  })
+}
+
+function answerRow(id, questionId, overrides = {}) {
+  return freeze({
+    id,
+    submission_id: SUBMISSION_ID,
+    question_id: questionId,
+    org_id: ORGANIZATION_ID,
+    student_answer: null,
+    created_at: NOW,
     ...overrides,
   })
 }
@@ -612,6 +651,31 @@ describe('SEB Staging private classroom data boundary', () => {
     })
   })
 
+  it('waits for the asynchronous publish action before attesting its database state', async () => {
+    const harness = makeHarness({
+      enumerateResponses: [
+        [publishedAssignmentRow({ status: 'draft' })],
+        [publishedAssignmentRow()],
+      ],
+    })
+    await harness.boundary.readAccountBinding(bindingRequest(), options())
+    const stepId = 'publish-seb-assignment'
+    await harness.boundary.prepareOperation(prepareRequest({ stepId }), options())
+    const attested = await harness.boundary.attestOperation(freeze({
+      schemaVersion: 1,
+      targetOrigin: SITE_ORIGIN,
+      namespace: NAMESPACE,
+      identity: identity(),
+      stepId,
+      alias: 'teacher-primary',
+      expectedUserId: TEACHER_ID,
+      marker: MARKER,
+      targets: [],
+    }), options())
+    expect(attested.status).toBe('passed')
+    expect(harness.enumerateDatabase).toHaveBeenCalledTimes(2)
+  })
+
   it('attests the exact Windows SEB check-in for the synthetic student', async () => {
     const harness = makeHarness({
       enumerateRows: [freeze({
@@ -653,6 +717,96 @@ describe('SEB Staging private classroom data boundary', () => {
       table: 'exam_seb_checkins',
       limit: 2,
     })
+  })
+
+  it.each([
+    'reject-invalid-seb-challenge',
+    'reject-replayed-seb-challenge',
+    'reject-invalid-seb-session',
+    'reject-replayed-seb-session',
+  ])('attests zero-mutation SEB denial %s before requiring a submission', async stepId => {
+    const harness = makeHarness({ enumerateRows: [] })
+    await harness.boundary.readAccountBinding(bindingRequest(), options())
+    await harness.boundary.readAccountBinding(freeze({
+      ...bindingRequest(), alias: 'student-primary', role: 'student',
+    }), options())
+    const prepared = await harness.boundary.prepareOperation(prepareRequest({
+      stepId,
+      alias: 'student-primary',
+      role: 'student',
+      expectedUserId: STUDENT_ID,
+    }), options())
+
+    expect(prepared.targets).toEqual([])
+    await expect(harness.boundary.attestOperation(freeze({
+      schemaVersion: 1,
+      targetOrigin: SITE_ORIGIN,
+      namespace: NAMESPACE,
+      identity: identity(),
+      stepId,
+      alias: 'student-primary',
+      expectedUserId: STUDENT_ID,
+      marker: MARKER,
+      targets: [],
+    }), options())).resolves.toEqual({
+      schemaVersion: 1,
+      stepId,
+      status: 'passed',
+      targets: [],
+    })
+    expect(harness.enumerateDatabase).not.toHaveBeenCalled()
+  })
+
+  it('binds a started submission to its config revision and each answer to its question', async () => {
+    const harness = makeHarness({
+      enumerateResponses: [
+        [submissionRow()],
+        [
+          answerRow(WRITTEN_ANSWER_ID, WRITTEN_QUESTION_ID),
+          answerRow(UPLOAD_ANSWER_ID, UPLOAD_QUESTION_ID),
+        ],
+      ],
+    })
+    await harness.boundary.readAccountBinding(bindingRequest(), options())
+    await harness.boundary.readAccountBinding(freeze({
+      ...bindingRequest(), alias: 'student-primary', role: 'student',
+    }), options())
+    const stepId = 'start-revision-bound-attempt'
+    const prepared = await harness.boundary.prepareOperation(prepareRequest({
+      stepId,
+      alias: 'student-primary',
+      role: 'student',
+      expectedUserId: STUDENT_ID,
+    }), options())
+    const attested = await harness.boundary.attestOperation(freeze({
+      schemaVersion: 1,
+      targetOrigin: SITE_ORIGIN,
+      namespace: NAMESPACE,
+      identity: identity(),
+      stepId,
+      alias: 'student-primary',
+      expectedUserId: STUDENT_ID,
+      marker: MARKER,
+      targets: prepared.targets,
+    }), options())
+
+    expect(attested.targets.map(targetValue => targetValue.matches[0])).toMatchObject([
+      {
+        targetId: SUBMISSION_ID,
+        parentId: ASSIGNMENT_ID,
+        relatedIds: [`${ASSIGNMENT_ID}:r1`],
+      },
+      {
+        targetId: WRITTEN_ANSWER_ID,
+        parentId: SUBMISSION_ID,
+        relatedIds: [WRITTEN_QUESTION_ID],
+      },
+      {
+        targetId: UPLOAD_ANSWER_ID,
+        parentId: SUBMISSION_ID,
+        relatedIds: [UPLOAD_QUESTION_ID],
+      },
+    ])
   })
 
   it('allows abort reconciliation for zero or one match but blocks ambiguity', async () => {

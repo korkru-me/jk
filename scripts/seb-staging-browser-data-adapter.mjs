@@ -18,7 +18,12 @@ const ANSWER_STORAGE_ID = new RegExp(
 const SAFE_TARGET_KEY = /^[a-z][a-z0-9-]{0,63}$/
 const MAX_ASSIGNMENT_CONFIG_REVISION = 2_147_483_646
 const MAX_CREATION_WINDOW_MS = 24 * 60 * 60 * 1_000
-const DEFAULT_RESOURCE_PLAN_TIMEOUT_MS = 10_000
+// A start-attempt attestation performs two independent, fail-closed database
+// reads after the Windows evidence round-trip. Each narrow-driver request may
+// legitimately consume its own five-second boundary, so a ten-second outer
+// deadline could abort a healthy second read before the provider could report
+// its result. Keep the aggregate deadline above the sum of the inner bounds.
+const DEFAULT_RESOURCE_PLAN_TIMEOUT_MS = 30_000
 const MIN_RESOURCE_PLAN_TIMEOUT_MS = 10
 const MAX_RESOURCE_PLAN_TIMEOUT_MS = 120_000
 
@@ -248,7 +253,7 @@ const STEP_CONTRACTS = Object.freeze([
     'student',
     true,
     'student-primary',
-    [target('answer-storage', 'answerStorageObject', 'submission_file', 'student-primary')],
+    [],
     scopedGuards('student-primary', [SUBMISSION, QUESTION_UPLOAD, ANSWER_UPLOAD]),
   ),
   contract(
@@ -257,8 +262,8 @@ const STEP_CONTRACTS = Object.freeze([
     'student',
     true,
     'student-primary',
-    [],
-    scopedGuards('student-primary', [SUBMISSION, ANSWER_UPLOAD, ANSWER_STORAGE]),
+    [target('answer-storage', 'answerStorageObject', 'submission_file', 'student-primary')],
+    scopedGuards('student-primary', [SUBMISSION, ANSWER_UPLOAD]),
   ),
   contract(
     'record-proctor-heartbeat',
@@ -1010,16 +1015,36 @@ export function createSebStagingBrowserDataAdapter({
   }
 
   async function resourcePlanCall(method, request) {
-    assertCapabilitiesStable()
-    currentEnvironment()
-    if (cleanupStarted || closed) blocked()
-    if (pendingResourcePlanTasks.size > 0) blocked()
+    let diagnosticStage = 'preflight'
+    try {
+      assertCapabilitiesStable()
+      currentEnvironment()
+    } catch {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging resource plan blocked (${method}:${diagnosticStage})\n`)
+      }
+      blocked()
+    }
+    if (cleanupStarted || closed) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging resource plan blocked (${method}:closed)\n`)
+      }
+      blocked()
+    }
+    if (pendingResourcePlanTasks.size > 0) {
+      if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging resource plan blocked (${method}:pending-task)\n`)
+      }
+      blocked()
+    }
     const controller = new AbortController()
     const operation = Promise.resolve()
       .then(() => {
+        diagnosticStage = 'invoke-preflight'
         currentEnvironment()
         assertCapabilitiesStable()
         if (cleanupStarted || closed || controller.signal.aborted) blocked()
+        diagnosticStage = 'provider-call'
         return resourcePlanAttestation.methods[method].call(
           privateResourcePlanCapability,
           request,
@@ -1027,17 +1052,21 @@ export function createSebStagingBrowserDataAdapter({
         )
       })
       .then(result => {
+        diagnosticStage = 'result-postflight'
         currentEnvironment()
         assertCapabilitiesStable()
         if (cleanupStarted || closed || controller.signal.aborted) blocked()
+        diagnosticStage = 'complete'
         return result
       })
       .finally(() => pendingResourcePlanTasks.delete(operation))
     pendingResourcePlanTasks.set(operation, controller)
 
     let timeoutId = null
+    let timedOut = false
     const timeout = new Promise((_, reject) => {
       timeoutId = setTimeout(() => {
+        timedOut = true
         controller.abort()
         reject(new SebStagingBrowserDataAdapterBlockedError())
       }, resourcePlanTimeoutMs)
@@ -1045,6 +1074,11 @@ export function createSebStagingBrowserDataAdapter({
     try {
       return await Promise.race([operation, timeout])
     } catch {
+      if (timedOut && process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging resource plan timed out (${method})\n`)
+      } else if (process.env.SEB_S5_DIAGNOSTIC === '1') {
+        process.stderr.write(`SEB Staging resource plan failed (${method}:${diagnosticStage})\n`)
+      }
       if (!controller.signal.aborted) controller.abort()
       blocked()
     } finally {

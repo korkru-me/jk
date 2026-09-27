@@ -505,13 +505,16 @@ function exactPassed(result) {
   return hasExactFields(result, ['status']) && result.status === 'passed'
 }
 
-function exactState(result) {
+function exactState(result, node) {
   if (!hasExactFields(result, ['status', 'state', 'snapshots'])
     || result.status !== 'passed'
     || !['unplanned', 'planned', 'uncertain', 'committed', 'deleted'].includes(result.state)
     || !Array.isArray(result.snapshots)) return null
   if (result.state === 'committed') {
-    return result.snapshots.length === 1 ? result.state : null
+    const validCardinality = node?.kind === 'proctorEvent'
+      ? result.snapshots.length >= 1
+      : result.snapshots.length === 1
+    return validCardinality ? result.state : null
   }
   return result.snapshots.length === 0 ? result.state : null
 }
@@ -688,7 +691,7 @@ export function createSebStagingResourceCleanupParticipants({
   function readState(node) {
     const result = ledgerCall('readCleanupTarget', referenceFor(node))
     if (result === null) return Object.freeze({ valid: false, state: null })
-    const state = exactState(result)
+    const state = exactState(result, node)
     if (state) {
       if (result.snapshots.some(snapshot => !isDataRecord(snapshot))) {
         return Object.freeze({ valid: false, state: null })

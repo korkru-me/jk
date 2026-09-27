@@ -12,6 +12,7 @@ const MEMBERSHIP_OPERATIONS = Object.freeze(new Map([
 const ASSIGNMENT_OPERATION = 'create-seb-assignment-draft-with-quit-password'
 const UPLOAD_OPERATION = 'upload-synthetic-attachment'
 const SYNTHETIC_UPLOAD_NAME = 'seb-s5-synthetic-answer.pdf'
+const SIGNED_SUBMISSION_UPLOAD_PREFIX = '/storage/v1/object/upload/sign/submission-files/'
 const LEDGER_METHODS = Object.freeze([
   'planTarget', 'adoptDerivedTarget', 'markUncertain', 'commitTarget',
   'reconcileTarget', 'readCleanupTarget', 'markDeleted',
@@ -283,10 +284,29 @@ export function createSebStagingPrivateSetupMaterialCapability(options = {}) {
       || request.operationId !== UPLOAD_OPERATION
       || request.alias !== 'student-primary'
       || !UUID.test(request.expectedUserId)
-      || typeof request.page?.locator !== 'function') blocked()
+      || typeof request.page?.locator !== 'function'
+      || typeof request.page?.route !== 'function') blocked()
     busy = true
     try {
       assertStable()
+      // Model the real ambiguous failure this phase promises to cover: the
+      // signed Storage upload commits, but its successful response is lost on
+      // the wire. The UI must retain the same logical candidate/uploadId and
+      // the explicit retry must reconcile that exact object instead of
+      // creating a duplicate path.
+      await request.page.route(
+        url => url.origin === SUPABASE_ORIGIN
+          && url.pathname.startsWith(SIGNED_SUBMISSION_UPLOAD_PREFIX),
+        async route => {
+          const response = await route.fetch()
+          if (!response.ok()) {
+            await route.fulfill({ response })
+            return
+          }
+          await route.abort('connectionreset')
+        },
+        { times: 1 },
+      )
       const input = request.page.locator('input[aria-label="เลือกไฟล์คำตอบ"]')
       if (!input || typeof input.setInputFiles !== 'function') blocked()
       const bytes = Buffer.from(

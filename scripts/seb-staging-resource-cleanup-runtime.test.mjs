@@ -745,6 +745,35 @@ describe('SEB Staging exact resource cleanup runtime', () => {
     })])
   })
 
+  it('proves classroom groups are absent before deleting the synthetic classroom', async () => {
+    const dependencyTables = [
+      'classroom_groups', 'classroom_students', 'assignment_classrooms',
+      'assignments', 'classroom_invitations', 'classroom_co_teachers',
+      'classroom_posts', 'notifications', 'student_notes',
+      'education_research_projects', 'ioc_forms',
+    ]
+    const harness = createHarness()
+    for (const table of dependencyTables) harness.rows.set(table, [])
+    await harness.enumerate(harness.runtime.databaseClient, 'classroom-primary')
+    expect(await harness.remove(harness.runtime.databaseClient, 'classroom-primary'))
+      .toEqual({ status: 'passed' })
+    const request = harness.events.find(event => (
+      event.type === 'deleteDatabase' && event.request.table === 'classrooms'
+    )).request
+    expect(request.atomicClosure.requireAbsent).toContainEqual({
+      table: 'classroom_groups',
+      predicates: [{ column: 'classroom_id', operator: 'eq', value: IDS.classroom }],
+      expectedCount: 0,
+    })
+
+    const blocked = createHarness()
+    for (const table of dependencyTables) blocked.rows.set(table, [])
+    blocked.rows.set('classroom_groups', [{ id: uuid(94), classroom_id: IDS.classroom }])
+    await blocked.enumerate(blocked.runtime.databaseClient, 'classroom-primary')
+    await expectBlocked(blocked.remove(blocked.runtime.databaseClient, 'classroom-primary'))
+    expect(blocked.rows.get('classrooms')).toHaveLength(1)
+  })
+
   it('deletes the exact derived proctor session atomically with the submission and verifies both absent', async () => {
     const harness = createHarness()
     await harness.enumerate(harness.runtime.databaseClient, 'config-primary')
@@ -769,6 +798,45 @@ describe('SEB Staging exact resource cleanup runtime', () => {
     ]))
     expect(harness.rows.get('exam_proctor_sessions')).toEqual([])
     expect(harness.rows.get('submissions')).toEqual([])
+  })
+
+  it('deletes additional exact resume events before the atomic submission closure', async () => {
+    const harness = createHarness()
+    harness.rows.get('exam_proctor_events').push({
+      ...harness.rows.get('exam_proctor_events')[0],
+      id: '9223372036854775805',
+    })
+    await harness.enumerate(harness.runtime.databaseClient, 'config-primary')
+    await harness.enumerate(harness.runtime.databaseClient, 'submission-primary')
+    await harness.enumerate(harness.runtime.databaseClient, 'proctor-connection')
+    await harness.enumerate(harness.runtime.databaseClient, 'proctor-event')
+    expect(await harness.remove(harness.runtime.databaseClient, 'proctor-event'))
+      .toEqual({ status: 'passed' })
+    expect(await harness.remove(harness.runtime.databaseClient, 'proctor-connection'))
+      .toEqual({ status: 'passed' })
+    harness.rows.set('submission_answers', [])
+
+    expect(await harness.remove(harness.runtime.databaseClient, 'submission-primary'))
+      .toEqual({ status: 'passed' })
+    expect(harness.rows.get('exam_proctor_events')).toEqual([])
+    expect(harness.rows.get('exam_proctor_sessions')).toEqual([])
+    expect(harness.rows.get('submissions')).toEqual([])
+    const derivedDelete = harness.events.find(event => (
+      event.type === 'deleteDatabase'
+      && event.request.operationId === 'submission-derived-events:delete-0'
+    ))
+    expect(derivedDelete.request).toMatchObject({
+      table: 'exam_proctor_events',
+      maxRows: 1,
+      atomicClosure: null,
+    })
+    expect(derivedDelete.request.predicates).toEqual(expect.arrayContaining([
+      { column: 'id', operator: 'eq', value: '9223372036854775805' },
+      { column: 'submission_id', operator: 'eq', value: IDS.submission },
+      { column: 'assignment_id', operator: 'eq', value: IDS.assignment },
+      { column: 'student_id', operator: 'eq', value: IDS.student },
+      { column: 'org_id', operator: 'eq', value: IDS.teacherOrg },
+    ]))
   })
 
   it('allows a partial-run submission with no proctor lineage and no derived session', async () => {

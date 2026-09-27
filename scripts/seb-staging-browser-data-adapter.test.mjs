@@ -506,7 +506,8 @@ describe('SEB Staging browser/data adapter', () => {
       'answer-upload',
     ])
     expect(targetsByStep.get('autosave-synthetic-answer')).toEqual([])
-    expect(targetsByStep.get('upload-synthetic-attachment')).toEqual([
+    expect(targetsByStep.get('upload-synthetic-attachment')).toEqual([])
+    expect(targetsByStep.get('retry-upload-after-transient-failure')).toEqual([
       'answer-storage',
     ])
   })
@@ -669,7 +670,7 @@ describe('SEB Staging browser/data adapter', () => {
     ],
     [
       'an attachment path from another submission',
-      'upload-synthetic-attachment',
+      'retry-upload-after-transient-failure',
       'answer-storage',
       match => ({
         ...match,

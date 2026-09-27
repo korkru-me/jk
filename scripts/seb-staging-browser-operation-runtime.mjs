@@ -18,9 +18,12 @@ const OPERATION_SPECS = Object.freeze(new Map([
   ['verify-seb-system-check', spec('student-primary', true, true)],
   ['reject-replayed-seb-challenge', spec('student-primary', false, true)],
   ['reject-invalid-seb-session', spec('student-primary', false, true)],
-  ['start-revision-bound-attempt', spec('student-primary', true)],
+  ['start-revision-bound-attempt', spec('student-primary', true, true)],
   ['reject-replayed-seb-session', spec('student-primary', false, true)],
-  ['autosave-synthetic-answer', spec('student-primary', true)],
+  // The preceding replay-denial step deliberately clears the assignment SEB
+  // cookie. Re-enter through a fresh, valid native challenge before the first
+  // continuous attempt mutation; later attempt operations reuse that page.
+  ['autosave-synthetic-answer', spec('student-primary', true, true)],
   ['retry-autosave-after-transient-failure', spec('student-primary', true, false, true)],
   ['resume-same-attempt', spec('student-primary', false)],
   ['upload-synthetic-attachment', spec('student-primary', true)],
