@@ -7,6 +7,7 @@ import {
   hasPngSignature,
   hasPreviewSignature,
   hasWebpSignature,
+  isTeachingBoardSlot,
   isWorkArtifactSource,
   isWorkPartKey,
   MAX_WORK_PREVIEW_BYTES,
@@ -95,24 +96,28 @@ describe('math work artifact helpers', () => {
       teacherId: STUDENT_ID,
       assignmentId: ASSIGNMENT_ID,
       questionId: QUESTION_ID,
-      slot: 5,
+      slot: 3,
       uploadId: UPLOAD_ID,
       previewFormat: 'webp',
     })).toEqual({
-      previewPath: `teachers/${STUDENT_ID}/${ASSIGNMENT_ID}/${QUESTION_ID}/5/${UPLOAD_ID}/preview.webp`,
-      scenePath: `teachers/${STUDENT_ID}/${ASSIGNMENT_ID}/${QUESTION_ID}/5/${UPLOAD_ID}/scene.json`,
+      previewPath: `teachers/${STUDENT_ID}/${ASSIGNMENT_ID}/${QUESTION_ID}/3/${UPLOAD_ID}/preview.webp`,
+      scenePath: `teachers/${STUDENT_ID}/${ASSIGNMENT_ID}/${QUESTION_ID}/3/${UPLOAD_ID}/scene.json`,
     })
   })
 
-  it('rejects a teaching-board slot outside the database range', () => {
+  // ช่อง 4–5 still pass the table's CHECK, so boards saved there before the
+  // cap came down stay readable — but nothing new may be uploaded into them.
+  it('allocates teaching-board uploads only inside the three-เฉลย cap', () => {
+    expect([0, 1, 2, 3, 4, 5, 1.5].map(isTeachingBoardSlot))
+      .toEqual([false, true, true, true, false, false, false])
     expect(() => buildTeachingBoardUploadPaths({
       teacherId: STUDENT_ID,
       assignmentId: ASSIGNMENT_ID,
       questionId: QUESTION_ID,
-      slot: 6,
+      slot: 4,
       uploadId: UPLOAD_ID,
       previewFormat: 'webp',
-    })).toThrow('slot must be an integer from 1 to 5')
+    })).toThrow('slot must be an integer from 1 to 3')
   })
 
   it('accepts only storage-safe logical part keys and known sources', () => {

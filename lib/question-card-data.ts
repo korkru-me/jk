@@ -1,16 +1,18 @@
 import type { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { computeQuestionStats, type GradedAnswerRow, type QuestionStats } from '@/lib/question-stats'
+import { hasSolution, type SolutionColumns } from '@/lib/question-solution'
+import type { CountablePlacement } from '@/lib/question-sub-counts'
 import type { QuestionSetRef } from '@/components/questions/question-set-badges'
 
 /**
  * The per-card reads the คลังโจทย์ list and the แฟ้มโจทย์ editor share.
  *
- * All four answer the same shape of question — "for the couple of dozen โจทย์
- * on screen, what else is true of them" — and all four are deliberately asked
- * about the visible rows only. The คลัง carries hundreds of โจทย์ and the
- * queries here are the expensive ones on the page, so they scale with what the
- * reader can actually see, never with how much they own.
+ * All of them answer the same shape of question — "for the couple of dozen
+ * โจทย์ on screen, what else is true of them" — and all of them are
+ * deliberately asked about the visible rows only. The คลัง carries hundreds of
+ * โจทย์ and the queries here are the expensive ones on the page, so they scale
+ * with what the reader can actually see, never with how much they own.
  */
 
 /** What a full card prints beyond the fields a picker already carries. */
@@ -21,17 +23,20 @@ export interface QuestionCardDetail {
   order_in_group: number | null
 }
 
-/** Everything the four reads below add up to, for one screenful of cards. */
+/** Everything the reads below add up to, for one screenful of cards. */
 export interface QuestionCardData {
   details: Record<string, QuestionCardDetail>
   stats: Record<string, QuestionStats>
   duplicateCounts: Record<string, number>
   subQuestionCounts: Record<string, number>
   setMemberships: Record<string, QuestionSetRef[]>
+  /** question id → whether it carries a เฉลย. Absent = not known. */
+  solutionPresence: Record<string, boolean>
 }
 
 export const EMPTY_CARD_DATA: QuestionCardData = {
   details: {}, stats: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {},
+  solutionPresence: {},
 }
 
 /**
@@ -267,4 +272,93 @@ export async function fetchSetMemberships(
       [...sets.values()].sort((a, b) => a.title.localeCompare(b.title, 'th')),
     ]),
   )
+}
+
+/** Ids per `in(...)` round in the เฉลย lookup — keeps the URL short. */
+const SOLUTION_LOOKUP_ID_CHUNK = 100
+
+/**
+ * Which โจทย์ on screen carry a เฉลย — typed, attached as a file, or written on
+ * the board — for the ดูเฉลย button on each card.
+ *
+ * Only a yes or no reaches the page. The เฉลย itself is read when the button is
+ * pressed (lib/actions/question-solution.ts): shipping two dozen of them with
+ * every search and page turn, to draw a button most of which nobody presses,
+ * would put the whole cost on the list for none of the use.
+ *
+ * A โจทย์หลายขั้นตอน keeps its เฉลย on the steps rather than on the row the
+ * list shows, so a group counts as having one when any step does. The steps
+ * are read alongside the listed rows, not after them — the group ids are
+ * already on the rows in hand.
+ *
+ * A read that fails leaves its rows out rather than answering "none": no
+ * button is harmless, while a greyed-out "ยังไม่แนบเฉลย" on a โจทย์ that has
+ * one would be a false statement about it.
+ */
+export async function fetchSolutionPresence(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  questions: CountablePlacement[],
+): Promise<Record<string, boolean>> {
+  if (questions.length === 0) return {}
+
+  const groupByParent = new Map<string, string>()
+  for (const question of questions) {
+    if (question.order_in_group === 0 && question.group_id) {
+      groupByParent.set(question.id, question.group_id)
+    }
+  }
+
+  const chunks = <T,>(all: T[]) => {
+    const out: T[][] = []
+    for (let i = 0; i < all.length; i += SOLUTION_LOOKUP_ID_CHUNK) {
+      out.push(all.slice(i, i + SOLUTION_LOOKUP_ID_CHUNK))
+    }
+    return out
+  }
+
+  const [rowResults, stepResults] = await Promise.all([
+    Promise.all(chunks(questions.map(question => question.id)).map(slice => supabase
+      .from('questions')
+      .select('id, solution_text, solution_image_urls')
+      .in('id', slice))),
+    Promise.all(chunks([...new Set(groupByParent.values())]).map(slice => supabase
+      .from('questions')
+      .select('group_id, solution_text, solution_image_urls')
+      .in('group_id', slice)
+      .gt('order_in_group', 0))),
+  ])
+
+  const ownSolution = new Map<string, boolean>()
+  for (const { data, error } of rowResults) {
+    if (error) {
+      // Losing the lookup costs the buttons, not the page.
+      console.error('[question-card-data] solution lookup failed:', error)
+      return {}
+    }
+    for (const row of (data ?? []) as unknown as (SolutionColumns & { id: string })[]) {
+      ownSolution.set(row.id, hasSolution(row))
+    }
+  }
+
+  let stepsRead = true
+  const groupsWithSolution = new Set<string>()
+  for (const { data, error } of stepResults) {
+    if (error) {
+      console.error('[question-card-data] group solution lookup failed:', error)
+      stepsRead = false
+      break
+    }
+    for (const row of (data ?? []) as unknown as (SolutionColumns & { group_id: string | null })[]) {
+      if (row.group_id && hasSolution(row)) groupsWithSolution.add(row.group_id)
+    }
+  }
+
+  const presence: Record<string, boolean> = {}
+  for (const [id, carriesOne] of ownSolution) {
+    const groupId = groupByParent.get(id)
+    if (carriesOne || !groupId) presence[id] = carriesOne
+    // Unread steps leave a group unanswered, not answered "none".
+    else if (stepsRead) presence[id] = groupsWithSolution.has(groupId)
+  }
+  return presence
 }

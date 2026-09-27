@@ -15,6 +15,17 @@ export const DRAWING_BACKGROUNDS: Array<{ value: ScratchpadBackground; label: st
 
 export const TRANSPARENT_CANVAS = 'transparent'
 
+/**
+ * The sheet a teacher's board writes on, in scene units.
+ *
+ * Excalidraw's canvas is endless, which on a blank board reads as "nothing is
+ * happening" while panning and makes it easy to end up lost in white space.
+ * A sheet of a fixed size is something to aim at: it moves and scales with the
+ * scene. Shared by กระดานสอน and the กระดานเขียนเฉลย so both sheets match.
+ */
+export const BOARD_SHEET_WIDTH = 1600
+export const BOARD_SHEET_HEIGHT = 1100
+
 /** Ink presets behind the ปากกา / ไฮไลต์ buttons. */
 export const PEN_INK = { color: '#172554', width: 2, opacity: 100 } as const
 export const HIGHLIGHTER_INK = { color: '#facc15', width: 4, opacity: 35 } as const
@@ -103,8 +114,8 @@ function encode(canvas: HTMLCanvasElement, type: string): Promise<Blob | null> {
  * PNG instead — so on iPad, iPhone and Safari on Mac this used to fail every
  * save. Keep the PNG that came back rather than encoding the canvas twice.
  */
-async function encodePreview(canvas: HTMLCanvasElement): Promise<DrawingPreview> {
-  const preferred = await encode(canvas, WORK_PREVIEW_MIMES.webp)
+async function encodePreview(canvas: HTMLCanvasElement, format?: WorkPreviewFormat): Promise<DrawingPreview> {
+  const preferred = await encode(canvas, WORK_PREVIEW_MIMES[format ?? 'webp'])
   if (preferred?.type === WORK_PREVIEW_MIMES.webp) return { blob: preferred, format: 'webp' }
 
   const fallback = preferred?.type === WORK_PREVIEW_MIMES.png
@@ -120,6 +131,8 @@ export async function createDrawingPreview(
   background: ScratchpadBackground,
   emptyMessage: string,
   snapshot?: Pick<ScratchpadScene, 'elements' | 'appState' | 'files'>,
+  /** PNG only — for a picture that has to carry data inside the file. */
+  format?: 'png',
 ): Promise<DrawingPreview> {
   // This utility is also imported by the teaching route before the editor is
   // opened. Excalidraw reads browser globals while its module is evaluated,
@@ -150,7 +163,7 @@ export async function createDrawingPreview(
   if (!context) throw new Error('สร้างภาพจากพื้นที่เขียนไม่สำเร็จ')
   paintPreviewBackground(context, canvas.width, canvas.height, background)
   context.drawImage(drawing, 0, 0)
-  const preview = await encodePreview(canvas)
+  const preview = await encodePreview(canvas, format)
   if (preview.blob.size > MAX_WORK_PREVIEW_BYTES) throw new Error('ภาพจากพื้นที่เขียนมีขนาดใหญ่เกิน 5 MB')
   return preview
 }

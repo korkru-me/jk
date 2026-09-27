@@ -1,6 +1,6 @@
 # แผนปรับปรุงกระดาษทดและกระดานสอน
 
-อัปเดตล่าสุด: 22 กันยายน 2026
+อัปเดตล่าสุด: 25 กันยายน 2026
 
 สถานะ: **เฟส 8 — code และ schema rollout เข้า Production แล้ว แต่ UAT gate ยัง NOT READY** `master` fast-forward ถึง `0a6904449dfdb8a007b0ada2749f5a83c64f5bf8`, migration preview PNG apply กับ Supabase Production และ Vercel Production deployment สำเร็จเมื่อ 22 กันยายน 2026 ตามคำสั่งเจ้าของผลิตภัณฑ์ แต่ canonical Staging ยังล็อกกับ Exam candidate `r8` จึงยังไม่ได้ล็อก Drawing Board candidate; authenticated student/teacher flow, cross-account authorization และ physical iPhone/iPad/desktop + stylus UAT ยังคงเป็น release blocker ตาม `docs/DRAWING_BOARD_RELEASE_UAT.md`
 
@@ -243,7 +243,7 @@ Teacher persistence: per-question memory draft ── explicit save ── priva
 - **Quick colors** เป็น swatch ที่แอปควบคุมและบอกสีที่เลือกชัดเจน การเปลี่ยนสีของ active tool อย่างเดียวไม่ทำให้ dirty แต่การใช้สีกับ selection ที่มีอยู่เป็น semantic edit สีจริงต้องมาจากชุดที่ผ่าน contrast review ในเฟส 5 ไม่ hardcode raw Tailwind palette
 - **Grid/snap** ปิดเป็นค่าเริ่มต้นและอยู่เฉพาะ session; grid display, object snap และการเปลี่ยนค่าไม่ทำให้ dirty หรือเข้า scene envelope การเปิดต้องไม่เปิด native context menu อื่นตามมา
 - **Duplicate next step** clone semantic scene/background ปัจจุบันเป็น `unsaved_new` ของโจทย์เดิม ไม่เขียน server และไม่เปลี่ยน source board ใช้ element/file IDs ชุดใหม่โดยรักษา binding/file relation ภายในให้ครบ และเริ่ม undo history ว่างเพื่อให้ undo แรกย้อนเฉพาะ edit หลัง clone
-- เมื่อบันทึก duplicate next step ให้ใช้ช่องว่างถัดไปตามกติกาปัจจุบัน ถ้าครบ 5 slots ต้องแสดงทั้ง 5 ช่องให้ครูเลือก victim แบบ exact; cancel ต้องคง draft และห้ามแทนช่องที่เก่าที่สุดหรือช่องใดเอง
+- เมื่อบันทึก duplicate next step ให้ใช้ช่องว่างถัดไปตามกติกาปัจจุบัน ถ้าครบ 3 ช่อง (เดิม 5 จนถึง 25 กันยายน 2026) ต้องแสดงทั้ง 3 ช่องให้ครูเลือก victim แบบ exact; cancel ต้องคง draft และห้ามแทนช่องที่เก่าที่สุดหรือช่องใดเอง
 - **Frame** เป็น semantic content และบันทึกได้เฉพาะครู; **laser** เป็น transient presentation state ห้ามเข้า scene, draft revision หรือไฟล์ที่บันทึก
 
 ## State model ที่ล็อกแล้ว
@@ -333,7 +333,8 @@ Teacher persistence: per-question memory draft ── explicit save ── priva
 - scene envelope `{ formatVersion: 1, elements, appState, files, background }`
 - IndexedDB database `korkru-math-work`, store `scratchpads` และ key `[ownerId, submissionId, answerId, localPartKey]`
 - debounce 650 ms, pointer-up save 120 ms, TTL 7 วัน, เพดาน 2 MiB/10,000 elements และ best-effort purge หลัง submit
-- private Storage path, artifact uniqueness ต่อ answer/part, teacher board 5 slots และ authorization ของ Server Actions
+- **กระดานของครูมีสอง host แล้ว** (25 กันยายน 2026): กระดานสอน (`TeachingBoardEditor`) และกระดานเขียนเฉลยในหน้าสร้างโจทย์ (`SolutionBoardEditor`) ใช้ `DrawingBoardCore`, `TeacherDrawingToolbar`, `SessionLibraryBar` และขนาดแผ่น `BOARD_SHEET_*` ตัวเดียวกัน เจ้าของผลิตภัณฑ์ต้องการให้สองกระดาน "เหมือนกันทุกอย่าง" งานที่แก้ส่วนร่วมเหล่านี้จึงต้องตรวจทั้งสอง host ส่วนที่ต่างคือ persistence (ช่องของงาน vs รูปในเฉลยที่ฝัง scene) และกระดานเฉลยไม่มีรูปโจทย์
+- private Storage path, artifact uniqueness ต่อ answer/part, teacher board slots และ authorization ของ Server Actions — เจ้าของผลิตภัณฑ์ลดเพดานจาก 5 เหลือ 3 ช่องต่อข้อเมื่อ 25 กันยายน 2026 โดยคง compatibility ไว้: CHECK ของฐาน, Storage path และ cleanup ยังรับ 1–5 กระดานเดิมในช่อง 4–5 จึงยังเปิดและลบได้ มีเพียงการบันทึกใหม่ที่หยุดที่ช่อง 3
 - preview mode ที่เก็บ scene ใน memory เท่านั้น
 - lazy loading หลัง user gesture และการไม่ส่ง telemetry/server request ต่อ stroke
 - stable app state ที่เก็บ style/font/arrow/pen mode และ view ตามสัญญาปัจจุบัน; undo stack ยังคงเป็น runtime-only แต่ scene เก็บ deleted-element tombstone ที่จำเป็นต่อ history ได้

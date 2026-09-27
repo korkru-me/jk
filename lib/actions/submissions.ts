@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment-access'
 import { revalidatePath } from 'next/cache'
 import { isAttemptExpired, isInstantCheckable, isStreakEligible } from '@/lib/grading'
 import {
@@ -41,20 +41,16 @@ export async function startSubmission(
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
   const admin = createAdminClient()
 
-  // Assignment metadata, classroom links, an individual extension, and the
-  // latest attempt are independent after authentication. Fetch them in one
-  // stage instead of a four-query waterfall on every exam resume.
-  const [assignmentRes, linksRes, extensionRes, existingRes] = await Promise.all([
+  // Assignment metadata, an individual extension, and the latest attempt are
+  // independent after authentication. Fetch them in one stage instead of a
+  // waterfall on every exam resume.
+  const [assignmentRes, extensionRes, existingRes] = await Promise.all([
     admin
       .from('assignments')
       .select('*')
       .eq('id', assignmentId)
       .eq('status', 'published')
       .maybeSingle(),
-    admin
-      .from('assignment_classrooms')
-      .select('classroom_id')
-      .eq('assignment_id', assignmentId),
     admin
       .from('assignment_extensions')
       .select('extended_end_at')
@@ -79,22 +75,12 @@ export async function startSubmission(
     return { error: 'ยังไม่ถึงเวลาเปิดสอบ' }
   }
 
-  // Check student is in one of the classrooms this assignment is linked to
-  // (not just the legacy single classroom_id column — an assignment may now
-  // target multiple classrooms via assignment_classrooms).
-  const links = linksRes.data
-  const classroomIds = (links ?? []).map((l: any) => l.classroom_id)
-
-  const { data: membership } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('id')
-        .eq('student_id', user.id)
-        .in('classroom_id', classroomIds)
-        .maybeSingle()
-    : { data: null }
-
-  if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องเรียนนี้' }
+  // Check the งาน was handed to this student: on the roster of one of the
+  // classrooms it is linked to (assignment_classrooms, not the legacy single
+  // classroom_id column) and, where that link names กลุ่มย่อย, in one of
+  // them. An existing attempt keeps access after a move between groups.
+  const handedToStudent = await studentHasAssignment(admin, assignmentId, user.id, existingRes.data != null)
+  if (!handedToStudent) return { error: 'งานนี้ไม่ได้มอบหมายให้คุณ' }
 
   // Check deadline — a per-student extension overrides the assignment's end_at
   const extension = extensionRes.data
@@ -609,7 +595,7 @@ export async function checkAnswer(submissionAnswerId: string) {
       id, correct_answer, student_answer, math_input_modes, max_score, option_order,
       questions(
         question_type, answer_unit, answer_parts, answer_tolerance, extra_data,
-        mcq_options, solution_text, solution_image_urls
+        mcq_options
       )
     `)
     .eq('id', submissionAnswerId)
@@ -763,7 +749,7 @@ export async function drawNextStreakQuestion(
       id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
       current_streak, best_streak, streak_reached,
       assignments(
-        id, org_id, question_ids, question_points, shuffle_options, mode, duration_minutes, end_at,
+        id, org_id, question_ids, question_points, shuffle_options, shared_random_seed, mode, duration_minutes, end_at,
         secure_browser_mode, android_exam_mode,
         completion_rule, streak_target, streak_question_cap, streak_recycle_pool
       )
@@ -780,6 +766,7 @@ export async function drawNextStreakQuestion(
       question_ids: string[]
       question_points: Record<string, number> | null
       shuffle_options: boolean | null
+      shared_random_seed: number | null
       mode: string
       duration_minutes: number | null
       end_at: string | null
@@ -884,6 +871,9 @@ export async function drawNextStreakQuestion(
     orderIndex: rows.length,
     shuffleOptions: assignment.shuffle_options === true,
     pointOverride: assignment.question_points?.[question.id],
+    // A ข้อ the pool hands out again comes back with the same numbers when the
+    // งาน shares them — the same rule as a retry.
+    sharedRandomSeed: assignment.shared_random_seed,
   })
 
   const { data: inserted, error: insertError } = await admin

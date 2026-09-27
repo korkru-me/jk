@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
 import { canStudentViewScore } from '@/lib/result-visibility'
+import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { ExamDashboard } from './_components/exam-dashboard'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
@@ -66,13 +67,23 @@ export default async function AssignmentsPage() {
   const { data: published } = cids.length > 0
     ? await admin
         .from('assignments')
-        .select('id, title, question_ids, random_question_count, completion_rule, streak_target, duration_minutes, end_at, show_results, max_attempts, score_strategy, retry_scope, display_max_score, secure_browser_mode, android_exam_mode, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .select('id, title, question_ids, random_question_count, completion_rule, streak_target, duration_minutes, end_at, show_results, max_attempts, score_strategy, retry_scope, display_max_score, secure_browser_mode, android_exam_mode, classrooms(name), assignment_classrooms!inner(classroom_id, group_ids)')
         .in('assignment_classrooms.classroom_id', cids)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
     : { data: [] }
 
-  const pList: AssignmentRow[] = (published ?? []).map((row: any) => ({
+  // Only งาน handed to this student — กลุ่มย่อย they are not in are skipped,
+  // unless they already have an attempt there.
+  const reached = await filterAssignmentsForStudent(
+    admin,
+    user.id,
+    cids,
+    (published ?? []) as any[],
+    new Set((submissionsRes.data ?? []).map((s: any) => s.assignment_id as string)),
+  )
+
+  const pList: AssignmentRow[] = reached.map((row: any) => ({
     id: row.id,
     title: row.title,
     question_ids: row.question_ids ?? [],

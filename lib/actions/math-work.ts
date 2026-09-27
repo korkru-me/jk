@@ -10,12 +10,14 @@ import {
   buildTeachingBoardUploadPaths,
   hasPreviewSignature,
   isSupportedWorkFormatVersion,
+  isTeachingBoardSlot,
   isUuid,
   isWorkArtifactSource,
   isWorkPartKey,
   isWorkPreviewFormat,
   MATH_WORK_BUCKET,
   MAX_WORK_SCENE_BYTES,
+  TEACHING_BOARD_SLOT_COUNT,
   validateStoredWorkFile,
   type WorkArtifactSource,
   type WorkPreviewFormat,
@@ -966,7 +968,7 @@ export async function prepareTeachingBoardUpload(input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
-  if (!Number.isInteger(input.slot) || input.slot < 1 || input.slot > 5) return { error: 'ช่องบันทึกต้องอยู่ระหว่าง 1–5' }
+  if (!isTeachingBoardSlot(input.slot)) return { error: `ช่องบันทึกต้องอยู่ระหว่าง 1–${TEACHING_BOARD_SLOT_COUNT}` }
   if (!isSupportedWorkFormatVersion(input.formatVersion)) return { error: 'เวอร์ชันพื้นที่เขียนไม่รองรับ' }
   if (!isWorkPreviewFormat(input.previewFormat)) return { error: 'ชนิดภาพตัวอย่างไม่รองรับ' }
 
@@ -1046,7 +1048,7 @@ export async function saveTeachingBoard(input: {
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId) || !isUuid(input.uploadId)) {
     return { error: 'กระดานสอนไม่ถูกต้อง' }
   }
-  if (!Number.isInteger(input.slot) || input.slot < 1 || input.slot > 5) return { error: 'ช่องบันทึกต้องอยู่ระหว่าง 1–5' }
+  if (!isTeachingBoardSlot(input.slot)) return { error: `ช่องบันทึกต้องอยู่ระหว่าง 1–${TEACHING_BOARD_SLOT_COUNT}` }
   if (!isSupportedWorkFormatVersion(input.formatVersion)) return { error: 'เวอร์ชันพื้นที่เขียนไม่รองรับ' }
   if (!isWorkPreviewFormat(input.previewFormat)) return { error: 'ชนิดภาพตัวอย่างไม่รองรับ' }
   const receiptSecret = uploadReceiptSecret()
