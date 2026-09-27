@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 27 กันยายน 2026 · **กำลังดำเนินการ — ยังไม่ล็อก candidate และยังไม่มีระบบใดผ่าน release gate**
+อัปเดต: 27 กันยายน 2026 · **กำลังดำเนินการ — ล็อก source/deployment แล้ว แต่ยังรอ artifact release commitment และยังไม่มีระบบใดผ่าน release gate**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -17,6 +17,16 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   assignment ID, CK, BEK หรือรหัสผ่าน
 
 หลักฐานนี้ปิด S5 แต่ไม่แทน native physical UAT ของ S6
+
+## Candidate ปัจจุบัน
+
+- candidate metadata: `seb-s6-20260927a`
+- Git source และ Vercel Staging deployment ถูกบันทึกใน fixed manifest แล้ว และ
+  `staging.korkru.com` ชี้ deployment นั้นสำเร็จ
+- `releaseCommitmentSha256` และ `lockedAt` ยังเป็น pending/null จนกว่าจะเก็บ CK/BEK
+  จาก artifact bytes เดียวครบทุก exact build แล้วลงทะเบียน immutable release
+- Vercel Authentication ยังป้องกัน Staging อยู่ การทดสอบใน native SEB จึงยังเริ่มไม่ได้
+  จนกว่าเจ้าของผลิตภัณฑ์จะอนุมัติวิธีเข้าถึงชั่วคราวที่ไม่ฝัง bypass secret ใน artifact
 
 ## ช่องว่างที่ต้องปิดก่อนทดสอบอุปกรณ์
 
