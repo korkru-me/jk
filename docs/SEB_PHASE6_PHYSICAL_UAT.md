@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 27 กันยายน 2026 · **กำลังดำเนินการ — ย้ายรอบทดสอบไป dedicated SEB UAT project และ reset candidate ตามจริง; ยังไม่มีระบบใดผ่าน release gate**
+อัปเดต: 27 กันยายน 2026 · **กำลังดำเนินการ — dedicated UAT, synthetic fixture และ assignment seed พร้อมแล้ว; รอ Windows Final Save และยังไม่มีระบบใดผ่าน release gate**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -31,11 +31,28 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 ## Candidate ปัจจุบัน
 
 - candidate metadata: `seb-s6-20260927b`
-- source/deployment ถูก reset เป็น pending จน dedicated UAT build แรกผ่าน health/isolation checks
+- source ถูกล็อกที่ `47c35d69ef21571401f02dca529f5f4024297f1d` และ dedicated UAT
+  deployment `dpl_4VGLadkUHsvCsU9e6b48vYvs5baR` อยู่สถานะ READY แล้ว
+- public health/isolation check ของ `/`, `/login`, `/exam-screen-lab`, `/exam-screen-lab/seb`
+  และ `/exam/quit` ตอบ 200 บน exact UAT origin, แสดง `STAGING · ระบบทดสอบ` และไม่พบ
+  Vercel Authentication marker
+- UAT project ใช้ session secret ที่สร้างใหม่เฉพาะ project และไม่คัดลอก global CK/BEK
+  รุ่นเก่าที่ retire แล้ว; การตรวจ assignment ใช้ release CK/BEK แบบ assignment-specific เท่านั้น
 - `releaseCommitmentSha256` และ `lockedAt` ยังเป็น pending/null จนกว่าจะเก็บ CK/BEK
   จาก artifact bytes เดียวครบทุก exact build แล้วลงทะเบียน immutable release
 - ห้ามใช้ bypass token หรือ shareable secret ใน Start URL/ไฟล์ `.seb`; dedicated UAT origin
   ต้องเข้าได้โดยตรงและยังแสดง `STAGING · ระบบทดสอบ`
+
+### Synthetic fixture รอบปัจจุบัน
+
+- สร้างบัญชีครู/นักเรียน, personal workspace, ห้องเรียน, สมาชิกห้อง และโจทย์สังเคราะห์
+  ผ่าน UAT UI จริงแล้ว; credential และ resource ID อยู่ใน local owner-only state นอก Git เท่านั้น
+- สร้างข้อสอบออนไลน์แบบ `seb_required` เป็น draft แล้ว โดยช่องรหัสผ่านเข้าทำว่าง,
+  teacher-owned Quit/Unlock Password ผ่าน policy 20–64 ตัว และ revision ปัจจุบันเป็น revision 1
+- ตรวจจาก Supabase Staging แล้วว่า revision เก็บเฉพาะ SHA-256, ไม่มี release และไม่มี attempt
+- operator ตรวจ template v2 แบบ passwordless ผ่านทั้ง dry-run และ live context check แล้ว จากนั้นสร้าง
+  assignment-specific seed ไว้ local ด้วย permission 0600 สำเร็จ ขั้นถัดไปคือ Final Save หนึ่งครั้งใน
+  Windows SEB Configuration Tool; ห้ามอัปโหลด/register ก่อนเก็บ CK/BEK ครบทุก exact build
 
 ## ช่องว่างที่ต้องปิดก่อนทดสอบอุปกรณ์
 
@@ -43,8 +60,10 @@ release ของ assignment เป็น immutable และ S5 ลงทะเ
 นั้นไปอ้างว่า Mac/iPad/iPhone ผ่านไม่ได้ สำหรับ S6 ต้องสร้าง synthetic assignment revision ใหม่
 และใช้ artifact bytes ชุดเดียวตลอดทั้งสี่ระบบ:
 
-1. ครูสังเคราะห์ตั้ง Quit/Unlock Password ใหม่ใน KorKru UAT; Settings/Exam Password ยังคงว่าง
-2. สร้าง seed/final artifact หนึ่งชุดและห้ามบันทึกซ้ำหลังจากนี้
+1. ✅ ครูสังเคราะห์ตั้ง Quit/Unlock Password ใหม่ใน KorKru UAT แล้ว; รหัสผ่านเข้าทำและ
+   Settings/Exam Password ยังคงว่าง
+2. 🟡 สร้าง seed แล้ว; รอ Final Save บน Windows หนึ่งครั้งให้เป็น candidate artifact จากนั้น
+   ห้ามบันทึกซ้ำ
 3. เปิด **ไฟล์เดียวกันโดยไม่บันทึก** ใน exact SEB build ของทุกระบบ แล้วนำ CK/BEK
    เข้าช่องทาง local secret collection เท่านั้น
 4. ลงทะเบียน CK และ BEK ทุก build พร้อมกันก่อน immutable release insert
@@ -123,8 +142,9 @@ npm run next:seb-physical-uat
 ```
 
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
-คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Evidence ปัจจุบันจงใจเป็น `pending`; การเห็น
-`NOT READY` ก่อนทดสอบจริงคือผลที่ถูกต้อง
+คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Evidence ปัจจุบันล็อก source/deployment แล้ว แต่
+release commitment และผลเครื่องจริงยังจงใจเป็น `pending`; การเห็น `NOT READY` ก่อนสร้างและ
+ลงทะเบียน artifact จริงคือผลที่ถูกต้อง
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6
