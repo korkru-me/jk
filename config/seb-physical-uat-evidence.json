@@ -4,15 +4,15 @@
     "candidateId": "seb-s6-20260927b",
     "sourceRevision": "47c35d69ef21571401f02dca529f5f4024297f1d",
     "stagingDeploymentId": "dpl_4VGLadkUHsvCsU9e6b48vYvs5baR",
-    "releaseCommitmentSha256": "pending",
-    "lockedAt": null
+    "releaseCommitmentSha256": "75f394c7e505caa6a8ecb40f7c99e42f27fd2f8c9d605e8c010131adcb0e16aa",
+    "lockedAt": "2026-09-27T15:27:43.670Z"
   },
   "platforms": [
     {
       "id": "windows",
       "label": "Windows",
-      "sebVersion": "pending",
-      "buildNumber": "pending",
+      "sebVersion": "3.10.2",
+      "buildNumber": "920",
       "osVersion": "pending",
       "cases": [
         { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
@@ -28,9 +28,9 @@
     {
       "id": "macos",
       "label": "macOS",
-      "sebVersion": "pending",
-      "buildNumber": "pending",
-      "osVersion": "pending",
+      "sebVersion": "3.7",
+      "buildNumber": "1591F",
+      "osVersion": "26.4",
       "cases": [
         { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
         { "id": "system-check", "status": "pending", "testedAt": null },
@@ -45,8 +45,8 @@
     {
       "id": "ipados",
       "label": "iPadOS",
-      "sebVersion": "pending",
-      "buildNumber": "pending",
+      "sebVersion": "3.7.1",
+      "buildNumber": "15753",
       "osVersion": "pending",
       "cases": [
         { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
@@ -62,8 +62,8 @@
     {
       "id": "ios",
       "label": "iPhone / iOS",
-      "sebVersion": "pending",
-      "buildNumber": "pending",
+      "sebVersion": "3.7.1",
+      "buildNumber": "15753",
       "osVersion": "pending",
       "cases": [
         { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
