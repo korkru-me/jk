@@ -60,6 +60,8 @@ Regression หลังเฟส 9 ผ่าน 101 test files / 1,333 tests, Ty
 
 เฟส 11 เพิ่ม fixed-schema release candidate gate ผูก UAT run กับ Git revision, staging build และ SEB config เดียวกัน ป้องกันการรวมผลผ่านจากคนละ build/config; `check:exam-candidate`, `check:exam-release` และ `next:exam-uat` ใช้กติกาเดียวกัน ปัจจุบัน candidate ถูกล็อกกับ Staging build จริงและ candidate gate ผ่านแล้ว
 
+SEB completion เฟส S6 เปลี่ยนทางเข้าทดสอบ native เป็น Vercel project แยก `korkru-seb-uat` ที่ใช้ Supabase Staging/ข้อมูลสังเคราะห์เท่านั้น เพื่อไม่ต้องปิด Vercel Authentication ของ project หลักทั้งชุด Guard ยอมรับเฉพาะ exact UAT origin/system project URL พร้อม explicit flag, test-only plaintext ยังคงถูกจำกัดที่ tier/QA environment `staging`, และ UAT deploy ใช้ config ที่ไม่มี Cron ปัจจุบัน candidate `seb-s6-20260927b` ถูก reset เป็น pending จน deploy/ตรวจ isolation และลงทะเบียน exact multi-platform artifact ใหม่ จึงยังไม่ถือว่า physical UAT ผ่าน
+
 รอบล็อก candidate ผ่าน 105 test files / 1,360 tests, TypeScript, token lint และ production build; release gate เหลือ blocker จริง 2 กลุ่มคือ SEB platform evidence และ external UAT suites
 
 Staging เฟส 2A สำรวจแบบ read-only แล้วและบันทึกใน `docs/STAGING_PHASE_2A_AUDIT.md`: Supabase migration local/remote ตรงกัน 117 รายการ, ยังไม่มี branch/deployment/database Staging และ Vercel CLI ยังไม่ link จุดสำคัญคือ fresh Supabase project ยังสร้างจาก migration folder อย่างเดียวไม่ได้ เพราะ history เริ่มที่ `002`, อาศัย `supabase/schema.sql`, `question-images` เคยสร้างจาก Dashboard และ config ชี้ `seed.sql` ที่ไม่มีอยู่ จึงห้าม `db push` ไปโปรเจกต์ใหม่จนกว่าเฟส 2B จะทำ bootstrap/runtime isolation guard แบบ versioned ก่อน เฟสนี้ไม่ได้แก้ Production, deploy, สร้างบัญชี หรือคัดลอกข้อมูลจริง

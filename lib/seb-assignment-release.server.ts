@@ -199,11 +199,16 @@ function parseSiteUrl(environment: Record<string, string | undefined>) {
   }
 }
 
+const TEST_PLAINTEXT_ORIGINS = new Set([
+  'https://staging.korkru.com',
+  'https://korkru-seb-uat.vercel.app',
+])
+
 /**
  * Plaintext assignment configs are an explicit isolated-Staging escape hatch.
  * They never become publishable merely because NODE_ENV is production (as a
- * hosted Staging build is); both the opt-in and the staging hostname must be
- * exact. Production remains X.509-only.
+ * hosted Staging build is); the opt-in, staging deployment contract and
+ * allowlisted test hostname must all be exact. Production remains X.509-only.
  */
 export function assignmentSebSecurityModeAllowed(
   securityMode: AssignmentSebSecurityMode,
@@ -212,8 +217,11 @@ export function assignmentSebSecurityModeAllowed(
   if (securityMode === 'x509_encrypted') return true
   const siteUrl = parseSiteUrl(environment)
   return environment.SEB_ALLOW_TEST_ONLY_ASSIGNMENT_CONFIGS === 'true'
+    && environment.KORKRU_DEPLOYMENT_ENV === 'staging'
+    && environment.EXAM_QA_ENVIRONMENT === 'staging'
     && siteUrl?.protocol === 'https:'
-    && siteUrl.hostname === 'staging.korkru.com'
+    && environment.NEXT_PUBLIC_SITE_URL === siteUrl.origin
+    && TEST_PLAINTEXT_ORIGINS.has(siteUrl.origin)
 }
 
 export function assignmentSebArtifactPath(

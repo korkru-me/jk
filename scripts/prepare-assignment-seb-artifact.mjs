@@ -80,7 +80,12 @@ async function main() {
   const admin = createStagingAdmin(environment)
   const context = await readAssignmentSebOperatorContext(admin, options.assignment, options.revision)
   if (context.existingRelease) throw new SebArtifactOperatorError('SEB_OPERATOR_RELEASE_EXISTS')
-  const seedBytes = materializeAssignmentSebPlaintextSeed(templateBytes, context.hashedQuitPassword)
+  const seedBytes = materializeAssignmentSebPlaintextSeed(
+    templateBytes,
+    context.hashedQuitPassword,
+    undefined,
+    environment.NEXT_PUBLIC_SITE_URL,
+  )
   await writeFile(resolve(options.output), seedBytes, { flag: 'wx', mode: 0o600 })
   printSafe({
     status: 'prepared',

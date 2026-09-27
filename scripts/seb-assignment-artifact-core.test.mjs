@@ -19,6 +19,7 @@ const OLD_HASH = 'a'.repeat(64)
 const CURRENT_HASH = 'b'.repeat(64)
 const CONFIG_KEY = 'c'.repeat(64)
 const BROWSER_KEY = 'd'.repeat(64)
+const UAT_ORIGIN = 'https://korkru-seb-uat.vercel.app'
 
 function validEnvironment(overrides = {}) {
   return {
@@ -113,6 +114,12 @@ describe('assignment SEB artifact operator core', () => {
   it('allows only the exact isolated Staging environment and explicit plaintext gate', () => {
     expect(inspectAssignmentSebOperatorEnvironment(validEnvironment()).ready).toBe(true)
     expect(inspectAssignmentSebOperatorEnvironment(validEnvironment({
+      VERCEL_ENV: 'production',
+      SEB_UAT_ISOLATED_PROJECT: 'true',
+      NEXT_PUBLIC_SITE_URL: UAT_ORIGIN,
+      NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL: 'korkru-seb-uat.vercel.app',
+    })).ready).toBe(true)
+    expect(inspectAssignmentSebOperatorEnvironment(validEnvironment({
       KORKRU_DEPLOYMENT_ENV: 'production',
       VERCEL_ENV: 'production',
       NEXT_PUBLIC_SITE_URL: 'https://www.korkru.com',
@@ -124,6 +131,31 @@ describe('assignment SEB artifact operator core', () => {
       NEXT_PUBLIC_SUPABASE_URL: 'https://production-project.supabase.co',
       EXAM_QA_PRODUCTION_SUPABASE_URL: 'https://decoy-project.supabase.co',
     })).ready).toBe(false)
+  })
+
+  it('binds dedicated UAT artifacts to the exact public UAT origin', () => {
+    const bytes = materializeAssignmentSebPlaintextSeed(
+      plist(),
+      CURRENT_HASH,
+      () => Buffer.alloc(32, 9),
+      UAT_ORIGIN,
+    )
+    expect(() => inspectAssignmentSebPlaintextArtifact(
+      bytes,
+      CURRENT_HASH,
+      UAT_ORIGIN,
+    )).not.toThrow()
+    expect(() => inspectAssignmentSebPlaintextArtifact(bytes, CURRENT_HASH))
+      .toThrowError('SEB_ARTIFACT_POLICY_INVALID')
+    expect(() => materializeAssignmentSebPlaintextSeed(
+      plist({
+        startUrl: 'https://lookalike.example/assignments',
+        quitUrl: 'https://lookalike.example/exam/quit',
+      }),
+      CURRENT_HASH,
+      undefined,
+      'https://lookalike.example',
+    )).toThrowError('SEB_ARTIFACT_POLICY_INVALID')
   })
 
   it('prepares a revision-bound seed without calculating CK or BEK', () => {

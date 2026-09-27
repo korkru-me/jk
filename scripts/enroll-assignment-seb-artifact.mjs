@@ -79,7 +79,11 @@ async function main() {
   }
 
   const artifactBytes = await readFile(resolve(options.artifact))
-  inspectAssignmentSebPlaintextArtifact(artifactBytes)
+  inspectAssignmentSebPlaintextArtifact(
+    artifactBytes,
+    undefined,
+    environment.NEXT_PUBLIC_SITE_URL,
+  )
 
   if (!options.apply) {
     printSafe({

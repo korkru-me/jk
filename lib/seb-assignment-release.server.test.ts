@@ -110,14 +110,38 @@ describe('assignment-specific SEB artifact release boundary', () => {
     expect(assignmentSebSecurityModeAllowed('x509_encrypted', {})).toBe(true)
     expect(assignmentSebSecurityModeAllowed('test_plaintext', {
       SEB_ALLOW_TEST_ONLY_ASSIGNMENT_CONFIGS: 'true',
+      KORKRU_DEPLOYMENT_ENV: 'staging',
+      EXAM_QA_ENVIRONMENT: 'staging',
       NEXT_PUBLIC_SITE_URL: 'https://staging.korkru.com',
     })).toBe(true)
     expect(assignmentSebSecurityModeAllowed('test_plaintext', {
       SEB_ALLOW_TEST_ONLY_ASSIGNMENT_CONFIGS: 'true',
+      KORKRU_DEPLOYMENT_ENV: 'staging',
+      EXAM_QA_ENVIRONMENT: 'staging',
+      NEXT_PUBLIC_SITE_URL: 'https://korkru-seb-uat.vercel.app',
+    })).toBe(true)
+    expect(assignmentSebSecurityModeAllowed('test_plaintext', {
+      SEB_ALLOW_TEST_ONLY_ASSIGNMENT_CONFIGS: 'true',
+      KORKRU_DEPLOYMENT_ENV: 'staging',
+      EXAM_QA_ENVIRONMENT: 'staging',
       NEXT_PUBLIC_SITE_URL: 'https://korkru.com',
     })).toBe(false)
     expect(assignmentSebSecurityModeAllowed('test_plaintext', {
+      KORKRU_DEPLOYMENT_ENV: 'staging',
+      EXAM_QA_ENVIRONMENT: 'staging',
       NEXT_PUBLIC_SITE_URL: 'https://staging.korkru.com',
+    })).toBe(false)
+    expect(assignmentSebSecurityModeAllowed('test_plaintext', {
+      SEB_ALLOW_TEST_ONLY_ASSIGNMENT_CONFIGS: 'true',
+      KORKRU_DEPLOYMENT_ENV: 'production',
+      EXAM_QA_ENVIRONMENT: 'staging',
+      NEXT_PUBLIC_SITE_URL: 'https://korkru-seb-uat.vercel.app',
+    })).toBe(false)
+    expect(assignmentSebSecurityModeAllowed('test_plaintext', {
+      SEB_ALLOW_TEST_ONLY_ASSIGNMENT_CONFIGS: 'true',
+      KORKRU_DEPLOYMENT_ENV: 'staging',
+      EXAM_QA_ENVIRONMENT: 'staging',
+      NEXT_PUBLIC_SITE_URL: 'https://korkru-seb-uat.vercel.app/decoy',
     })).toBe(false)
   })
 

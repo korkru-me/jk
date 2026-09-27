@@ -6,6 +6,7 @@ import { verifyStoredAssignmentSebArtifactAndRegister } from '../lib/seb-assignm
 
 export const ASSIGNMENT_SEB_BUCKET = 'assignment-seb-configs'
 export const ASSIGNMENT_SEB_STAGING_ORIGIN = 'https://staging.korkru.com'
+export const ASSIGNMENT_SEB_UAT_ORIGIN = 'https://korkru-seb-uat.vercel.app'
 export const ASSIGNMENT_SEB_STAGING_SUPABASE_ORIGIN = 'https://dyuxkrzeveknqgtuzpbh.supabase.co'
 export const WINDOWS_SEB_VERSION = '3.10.2'
 export const WINDOWS_SEB_BUILD = '920'
@@ -15,6 +16,10 @@ const MAX_REVISION = 2_147_483_646
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i
 const SAFE_METADATA_PATTERN = /^[A-Za-z0-9.+-]{1,40}$/
+const ASSIGNMENT_SEB_TEST_ORIGINS = new Set([
+  ASSIGNMENT_SEB_STAGING_ORIGIN,
+  ASSIGNMENT_SEB_UAT_ORIGIN,
+])
 const MULTI_PLATFORM_TARGETS = Object.freeze([
   ['windows', 'windows'],
   ['macos', 'macos'],
@@ -60,9 +65,9 @@ export function validAssignmentRevision(value) {
 export function inspectAssignmentSebOperatorEnvironment(environment) {
   const base = inspectExamStagingReadiness(environment)
   const checks = [...base.checks]
-  checks.push(environment.NEXT_PUBLIC_SITE_URL === ASSIGNMENT_SEB_STAGING_ORIGIN
-    ? { status: 'pass', field: 'assignment SEB site', message: 'ตรงกับ isolated Staging' }
-    : { status: 'blocker', field: 'assignment SEB site', message: 'ต้องเป็น canonical isolated Staging เท่านั้น' })
+  checks.push(ASSIGNMENT_SEB_TEST_ORIGINS.has(environment.NEXT_PUBLIC_SITE_URL)
+    ? { status: 'pass', field: 'assignment SEB site', message: 'ตรงกับ isolated Staging/SEB UAT allowlist' }
+    : { status: 'blocker', field: 'assignment SEB site', message: 'ต้องเป็น isolated Staging หรือ dedicated SEB UAT ที่ allowlist ไว้เท่านั้น' })
   checks.push(environment.NEXT_PUBLIC_SUPABASE_URL === ASSIGNMENT_SEB_STAGING_SUPABASE_ORIGIN
     ? { status: 'pass', field: 'assignment SEB database', message: 'ตรงกับ allowlisted Staging project' }
     : { status: 'blocker', field: 'assignment SEB database', message: 'ต้องเป็น Supabase Staging project ที่ allowlist ไว้เท่านั้น' })
@@ -256,9 +261,21 @@ function asPlaintextXml(bytes) {
   return decodePlaintextArtifact(bytes).xml
 }
 
-function assertCommonStagingPolicy(xml) {
-  assertScalar(xml, 'startURL', 'string', `${ASSIGNMENT_SEB_STAGING_ORIGIN}/assignments`)
-  assertScalar(xml, 'quitURL', 'string', `${ASSIGNMENT_SEB_STAGING_ORIGIN}/exam/quit`)
+function readCommonStagingOrigin(xml) {
+  const start = readScalar(xml, 'startURL')
+  const quit = readScalar(xml, 'quitURL')
+  if (start.kind !== 'string' || quit.kind !== 'string') fail('SEB_ARTIFACT_POLICY_INVALID')
+  const origin = [...ASSIGNMENT_SEB_TEST_ORIGINS].find(candidate => (
+    start.value === `${candidate}/assignments`
+    && quit.value === `${candidate}/exam/quit`
+  ))
+  if (!origin) fail('SEB_ARTIFACT_POLICY_INVALID')
+  return origin
+}
+
+function assertCommonStagingPolicy(xml, expectedOrigin = ASSIGNMENT_SEB_STAGING_ORIGIN) {
+  if (!ASSIGNMENT_SEB_TEST_ORIGINS.has(expectedOrigin)
+    || readCommonStagingOrigin(xml) !== expectedOrigin) fail('SEB_ARTIFACT_POLICY_INVALID')
   assertScalar(xml, 'sebConfigPurpose', 'integer', '0')
   assertScalar(xml, 'allowQuit', 'boolean', true)
   assertScalar(xml, 'downloadAndOpenSebConfig', 'boolean', false)
@@ -271,9 +288,13 @@ function assertCommonStagingPolicy(xml) {
   return adminHash.value.toLowerCase()
 }
 
-export function inspectAssignmentSebPlaintextArtifact(bytes, expectedQuitHash) {
+export function inspectAssignmentSebPlaintextArtifact(
+  bytes,
+  expectedQuitHash,
+  expectedOrigin = ASSIGNMENT_SEB_STAGING_ORIGIN,
+) {
   const xml = asPlaintextXml(bytes)
-  const adminHash = assertCommonStagingPolicy(xml)
+  const adminHash = assertCommonStagingPolicy(xml, expectedOrigin)
   assertScalar(xml, 'sendBrowserExamKey', 'boolean', true)
 
   const quitHash = readScalar(xml, 'hashedQuitPassword')
@@ -299,9 +320,12 @@ export function inspectAssignmentSebPlaintextArtifact(bytes, expectedQuitHash) {
 }
 
 /** Validate a local plaintext template without accepting it as a final release. */
-export function inspectAssignmentSebPlaintextTemplate(bytes) {
+export function inspectAssignmentSebPlaintextTemplate(
+  bytes,
+  expectedOrigin = ASSIGNMENT_SEB_STAGING_ORIGIN,
+) {
   const xml = asPlaintextXml(bytes)
-  const adminHash = assertCommonStagingPolicy(xml)
+  const adminHash = assertCommonStagingPolicy(xml, expectedOrigin)
 
   const quitHash = readScalar(xml, 'hashedQuitPassword')
   if (
@@ -335,17 +359,22 @@ export function materializeAssignmentSebPlaintextSeed(
   templateBytes,
   hashedQuitPassword,
   randomBytes = nodeRandomBytes,
+  expectedOrigin = ASSIGNMENT_SEB_STAGING_ORIGIN,
 ) {
   if (typeof hashedQuitPassword !== 'string' || !SHA256_PATTERN.test(hashedQuitPassword)) {
     fail('SEB_ARTIFACT_REVISION_INVALID')
   }
   const decodedTemplate = decodePlaintextArtifact(templateBytes)
   let xml = decodedTemplate.xml
-  inspectAssignmentSebPlaintextTemplate(templateBytes)
+  const templateOrigin = readCommonStagingOrigin(xml)
+  inspectAssignmentSebPlaintextTemplate(templateBytes, templateOrigin)
+  if (!ASSIGNMENT_SEB_TEST_ORIGINS.has(expectedOrigin)) fail('SEB_ARTIFACT_POLICY_INVALID')
 
   xml = replaceScalar(xml, 'hashedQuitPassword', `<string>${hashedQuitPassword.toLowerCase()}</string>`)
   xml = replaceScalar(xml, 'sendBrowserExamKey', '<true />')
   xml = replaceScalar(xml, 'examKeySalt', `<data>${randomBytes(32).toString('base64')}</data>`)
+  xml = replaceScalar(xml, 'startURL', `<string>${expectedOrigin}/assignments</string>`)
+  xml = replaceScalar(xml, 'quitURL', `<string>${expectedOrigin}/exam/quit</string>`)
   // A BEK copied from a template would describe different bytes/build. The
   // native tool derives the real value only after the final Windows save.
   xml = replaceScalar(xml, 'browserExamKey', '<string></string>')
@@ -360,7 +389,7 @@ export function materializeAssignmentSebPlaintextSeed(
     bytes = gzipSync(Buffer.concat([Buffer.from('plnd'), innerGzip]), { level: 9 })
   }
   if (bytes.length > MAX_ARTIFACT_BYTES) fail('SEB_ARTIFACT_SIZE_INVALID')
-  inspectAssignmentSebPlaintextArtifact(bytes, hashedQuitPassword)
+  inspectAssignmentSebPlaintextArtifact(bytes, hashedQuitPassword, expectedOrigin)
   return bytes
 }
 
@@ -614,7 +643,11 @@ async function enrollAssignmentSebStagingArtifactWithParser({
     fail('SEB_OPERATOR_ENVIRONMENT_BLOCKED')
   }
   if (context.existingRelease) fail('SEB_OPERATOR_RELEASE_EXISTS')
-  inspectAssignmentSebPlaintextArtifact(artifactBytes, context.hashedQuitPassword)
+  inspectAssignmentSebPlaintextArtifact(
+    artifactBytes,
+    context.hashedQuitPassword,
+    environment.NEXT_PUBLIC_SITE_URL,
+  )
   const identity = assignmentSebArtifactIdentity(artifactBytes, context.assignmentId, context.revision)
   const nativeEvidence = parseEvidence(evidence, context.assignmentId, context.revision)
   const uploadStatus = await ensureArtifactUploaded(admin, identity, artifactBytes)

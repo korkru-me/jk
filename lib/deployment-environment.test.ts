@@ -38,6 +38,31 @@ describe('deployment environment contract', () => {
     expect(result.ready).toBe(true)
   })
 
+  it('allows only the exact dedicated public SEB UAT project to host staging data', () => {
+    const result = inspectDeploymentEnvironment(stagingEnvironment({
+      VERCEL_ENV: 'production',
+      SEB_UAT_ISOLATED_PROJECT: 'true',
+      NEXT_PUBLIC_SITE_URL: 'https://korkru-seb-uat.vercel.app',
+      NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL: 'korkru-seb-uat.vercel.app',
+    }))
+    expect(result.tier).toBe('staging')
+    expect(result.ready).toBe(true)
+
+    for (const overrides of [
+      { SEB_UAT_ISOLATED_PROJECT: 'false' },
+      { NEXT_PUBLIC_SITE_URL: 'https://lookalike.example.test' },
+      { NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL: 'another-project.vercel.app' },
+    ]) {
+      expect(inspectDeploymentEnvironment(stagingEnvironment({
+        VERCEL_ENV: 'production',
+        SEB_UAT_ISOLATED_PROJECT: 'true',
+        NEXT_PUBLIC_SITE_URL: 'https://korkru-seb-uat.vercel.app',
+        NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL: 'korkru-seb-uat.vercel.app',
+        ...overrides,
+      })).ready).toBe(false)
+    }
+  })
+
   it('blocks an unlabelled preview before it can reuse production values', () => {
     const result = inspectDeploymentEnvironment({ VERCEL_ENV: 'preview' })
     expect(result.tier).toBe('unknown')

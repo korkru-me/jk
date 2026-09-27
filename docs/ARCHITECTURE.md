@@ -17,6 +17,7 @@
 
 - Production ใช้ Vercel + Supabase project ที่แยกจาก environment อื่น และ Git migration ledger ตรงกับฐานที่ link อยู่ ณ 20 กันยายน 2026
 - Staging ใช้ Vercel Preview ของ branch `staging` ที่ `https://staging.korkru.com` กับ Supabase project แยก และใช้ข้อมูล QA สังเคราะห์เท่านั้น ห้ามใช้ Production เป็นพื้นที่ QA
+- Physical SEB UAT ใช้ Vercel project แยก `korkru-seb-uat` ที่ `https://korkru-seb-uat.vercel.app` และใช้ Supabase Staging/ข้อมูลสังเคราะห์ชุดเดียวกัน โปรเจกต์นี้ไม่มี Vercel Cron และไม่มี Production credential; environment guard ยอมรับ Vercel Production target เฉพาะเมื่อ origin, system project URL และ `SEB_UAT_ISOLATED_PROJECT=true` ตรง allowlist ครบ เพื่อให้ native SEB เข้าได้โดยไม่เปิด Preview อื่นของโปรเจกต์หลัก
 - migration folder ไม่สามารถ bootstrap fresh project ได้เอง เพราะ migration เริ่มที่ `002`, อาศัย `supabase/schema.sql` และมี bucket ที่เคยสร้างนอก migration; เฟส 2B จึงกำหนด fresh-project-only bootstrap manifest แยกจาก Production migration ledger พร้อม guard ที่ `supabase/bootstrap/manifest.json`
 - `KORKRU_DEPLOYMENT_ENV` เป็น environment contract กลาง: Vercel Preview ต้องระบุ `staging` และผ่าน site/Supabase isolation ก่อน build/start ส่วน Production เดิมอนุมานจาก `VERCEL_ENV=production` ได้เพื่อไม่ทำให้ deployment ปัจจุบันหยุดโดยไม่ตั้งใจ
 - Staging render ป้ายทดสอบและ `noindex`; `next.config.ts` ตรวจ build, `instrumentation.ts` ตรวจ startup และ root layout ตรวจก่อน render โดย error ไม่พิมพ์ URL/project ref/secret

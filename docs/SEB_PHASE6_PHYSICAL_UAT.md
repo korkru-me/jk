@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 27 กันยายน 2026 · **กำลังดำเนินการ — ล็อก source/deployment แล้ว แต่ยังรอ artifact release commitment และยังไม่มีระบบใดผ่าน release gate**
+อัปเดต: 27 กันยายน 2026 · **กำลังดำเนินการ — ย้ายรอบทดสอบไป dedicated SEB UAT project และ reset candidate ตามจริง; ยังไม่มีระบบใดผ่าน release gate**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -18,15 +18,24 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 
 หลักฐานนี้ปิด S5 แต่ไม่แทน native physical UAT ของ S6
 
+## Dedicated SEB UAT boundary
+
+- origin สำหรับ physical UAT คือ `https://korkru-seb-uat.vercel.app` ใน Vercel project
+  `korkru-seb-uat` แยกจาก project หลัก `jk`
+- project นี้เปิดสาธารณะเฉพาะเพื่อ native SEB UAT แต่ใช้ Supabase Staging และข้อมูลสังเคราะห์
+  เท่านั้น ไม่มี Production credential และ deploy ด้วย `vercel.seb-uat.json` ซึ่งไม่มี Vercel Cron
+- Vercel Authentication ของ project หลักยังคงเดิม จึงไม่เปิด Preview deployment อื่นต่อสาธารณะ
+- deployment contract ยอมรับ production target ของ Vercel เฉพาะ exact UAT origin + exact
+  system project URL + `SEB_UAT_ISOLATED_PROJECT=true`; ค่าอื่น fail closed
+
 ## Candidate ปัจจุบัน
 
-- candidate metadata: `seb-s6-20260927a`
-- Git source และ Vercel Staging deployment ถูกบันทึกใน fixed manifest แล้ว และ
-  `staging.korkru.com` ชี้ deployment นั้นสำเร็จ
+- candidate metadata: `seb-s6-20260927b`
+- source/deployment ถูก reset เป็น pending จน dedicated UAT build แรกผ่าน health/isolation checks
 - `releaseCommitmentSha256` และ `lockedAt` ยังเป็น pending/null จนกว่าจะเก็บ CK/BEK
   จาก artifact bytes เดียวครบทุก exact build แล้วลงทะเบียน immutable release
-- Vercel Authentication ยังป้องกัน Staging อยู่ การทดสอบใน native SEB จึงยังเริ่มไม่ได้
-  จนกว่าเจ้าของผลิตภัณฑ์จะอนุมัติวิธีเข้าถึงชั่วคราวที่ไม่ฝัง bypass secret ใน artifact
+- ห้ามใช้ bypass token หรือ shareable secret ใน Start URL/ไฟล์ `.seb`; dedicated UAT origin
+  ต้องเข้าได้โดยตรงและยังแสดง `STAGING · ระบบทดสอบ`
 
 ## ช่องว่างที่ต้องปิดก่อนทดสอบอุปกรณ์
 
@@ -34,7 +43,7 @@ release ของ assignment เป็น immutable และ S5 ลงทะเ
 นั้นไปอ้างว่า Mac/iPad/iPhone ผ่านไม่ได้ สำหรับ S6 ต้องสร้าง synthetic assignment revision ใหม่
 และใช้ artifact bytes ชุดเดียวตลอดทั้งสี่ระบบ:
 
-1. ครูสังเคราะห์ตั้ง Quit/Unlock Password ใหม่ใน KorKru; Settings/Exam Password ยังคงว่าง
+1. ครูสังเคราะห์ตั้ง Quit/Unlock Password ใหม่ใน KorKru UAT; Settings/Exam Password ยังคงว่าง
 2. สร้าง seed/final artifact หนึ่งชุดและห้ามบันทึกซ้ำหลังจากนี้
 3. เปิด **ไฟล์เดียวกันโดยไม่บันทึก** ใน exact SEB build ของทุกระบบ แล้วนำ CK/BEK
    เข้าช่องทาง local secret collection เท่านั้น

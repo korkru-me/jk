@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "candidate": {
-    "candidateId": "seb-s6-20260927a",
-    "sourceRevision": "7fdbaf9184c855a3cac2dbd81dcd63e4def290fb",
-    "stagingDeploymentId": "dpl_PaTSnX4bAxrvy47GSRKggLC7nwTj",
+    "candidateId": "seb-s6-20260927b",
+    "sourceRevision": "pending",
+    "stagingDeploymentId": "pending",
     "releaseCommitmentSha256": "pending",
     "lockedAt": null
   },
