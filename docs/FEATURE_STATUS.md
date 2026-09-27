@@ -1,6 +1,6 @@
 # Feature status
 
-ตรวจจาก repository: 26 กันยายน 2026
+ตรวจจาก repository: 27 กันยายน 2026
 
 ## วิธีอ่านสถานะ
 
@@ -454,6 +454,8 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 
 - มี invitation และ permission `admin/manage/view`
 - Server actions และ migrations มีเส้นทางจัดการสิทธิ์
+- หน้าห้องเรียน `/classrooms/[id]` ตอบ 404 แก่ครูที่ไม่ใช่เจ้าของห้องและไม่ได้เป็นครูร่วม (แก้ 27 ก.ย. 2026) — ก่อนหน้านี้ครูคนใดก็ได้ที่รู้ UUID ของห้องเปิดดูรหัสเข้าห้อง รายชื่อ + อีเมลนักเรียนและครูร่วม และลิงก์เชิญครูร่วมของห้องคนอื่นได้ รายละเอียดใน `docs/SECURITY.md` หัวข้อ Supabase admin client
+- **ยังไม่แก้:** RLS `classroom_invitations_token_select` (และ `org_invitations_token_select` ที่เป็นต้นแบบ) อนุญาตให้ผู้ใช้ที่ล็อกอินคนใดก็ได้ SELECT คำเชิญที่ยังไม่หมดอายุ **ทุกแถว รวม token** โดยไม่ต้องรู้ token ก่อน ซึ่งเอาไปกดรับเป็นครูร่วม/สมาชิก org ได้ ต้องแก้ด้วย migration ใหม่ (เช่น อ่านคำเชิญผ่าน RPC ที่รับ token) — ตรวจจากไฟล์ migration เท่านั้น ยังไม่ได้ยืนยัน policy บนฐานจริง
 - ต้องทำ authority matrix และทดสอบทุก mutation ของ classroom/assignment
 
 ### งานและข้อสอบ — มีโค้ดรองรับ
