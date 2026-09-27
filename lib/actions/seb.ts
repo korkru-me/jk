@@ -8,12 +8,17 @@ import {
   createSebSessionClaims,
   normalizeSebRequestUrl,
   parseSebVersion,
-  readSebEnvironment,
+  readSebSessionSecret,
+  selectSebBrowserExamKeys,
   signSebClaims,
   verifySebClaims,
   verifySebRequestHashes,
   type SebChallengePurpose,
 } from '@/lib/seb'
+import {
+  createAssignmentSebSignedDownloadUrl,
+  readCurrentAssignmentSebRelease,
+} from '@/lib/seb-assignment-release.server'
 import {
   createSebChallenge,
   sebSessionCookieName,
@@ -59,12 +64,12 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     return { error: 'ประเภทการตรวจสอบ Safe Exam Browser ไม่ถูกต้อง' }
   }
 
-  const environment = readSebEnvironment()
-  if (!environment) {
+  const sessionSecret = readSebSessionSecret()
+  if (!sessionSecret) {
     return { error: 'ระบบ Safe Exam Browser ยังตั้งค่าไม่ครบ กรุณาแจ้งครูผู้สอน' }
   }
 
-  const challengeClaims = verifySebClaims(input.challenge, environment.sessionSecret)
+  const challengeClaims = verifySebClaims(input.challenge, sessionSecret)
   if (
     challengeClaims?.kind !== 'seb_challenge'
     || challengeClaims.userId !== user.id
@@ -72,6 +77,15 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     || challengeClaims.purpose !== input.purpose
   ) {
     return { error: 'ลิงก์ตรวจสอบหมดอายุ กรุณากดเริ่มใหม่' }
+  }
+
+  const release = await readCurrentAssignmentSebRelease(input.assignmentId)
+  if (
+    !release
+    || release.revision !== challengeClaims.assignmentConfigRevision
+    || release.releaseId !== challengeClaims.configRevision
+  ) {
+    return { error: 'ไฟล์ตั้งค่าข้อสอบเปลี่ยนแล้ว กรุณาเปิดข้อสอบใหม่' }
   }
 
   const version = parseSebVersion(input.version)
@@ -101,8 +115,8 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     requestUrl: normalizedRequestUrl,
     configKeyHash: input.configKeyHash,
     browserExamKeyHash: input.browserExamKeyHash,
-    configKey: environment.configKey,
-    browserExamKeys: environment.browserExamKeys,
+    configKey: release.configKey,
+    browserExamKeys: selectSebBrowserExamKeys(release.browserExamKeys, version),
   })
   if (!validHashes) {
     return { error: 'การตั้งค่า Safe Exam Browser หรือเวอร์ชันไม่ตรงกับที่โรงเรียนอนุญาต' }
@@ -111,6 +125,8 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
   const claims = createSebSessionClaims({
     userId: user.id,
     assignmentId: input.assignmentId,
+    configRevision: release.releaseId,
+    assignmentConfigRevision: release.revision,
     platform: version.platform,
     version: version.version,
   })
@@ -135,7 +151,7 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
   }
 
   const maxAge = Math.floor((claims.expiresAt - Date.now()) / 1_000)
-  ;(await cookies()).set(sebSessionCookieName(input.assignmentId), signSebClaims(claims, environment.sessionSecret), {
+  ;(await cookies()).set(sebSessionCookieName(input.assignmentId), signSebClaims(claims, sessionSecret), {
     httpOnly: true,
     sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
@@ -182,20 +198,37 @@ export async function getSebSystemCheckData(
     return { error: 'ข้อสอบนี้ไม่ได้บังคับใช้ Safe Exam Browser' }
   }
 
-  const reusableChallenge = validateSebChallenge(
-    sebChallenge,
-    user.id,
-    assignmentId,
-    'system_check',
-  )
-  const challenge = reusableChallenge
-    ? sebChallenge!
-    : createSebChallenge(user.id, assignmentId, 'system_check')
+  const release = await readCurrentAssignmentSebRelease(assignmentId)
+  const reusableChallenge = release
+    ? validateSebChallenge(
+        sebChallenge,
+        user.id,
+        assignmentId,
+        release.releaseId,
+        release.revision,
+        'system_check',
+      )
+    : null
+  const challenge = !release
+    ? null
+    : reusableChallenge
+      ? sebChallenge!
+      : createSebChallenge(
+          user.id,
+          assignmentId,
+          release.releaseId,
+          release.revision,
+          'system_check',
+        )
+  const configUrl = release && challenge
+    ? await createAssignmentSebSignedDownloadUrl(release)
+    : null
 
   return {
     success: true as const,
     assignmentTitle: assignment.title,
-    challenge,
-    sebConfigured: challenge !== null,
+    challenge: configUrl ? challenge : null,
+    configUrl,
+    sebConfigured: configUrl !== null && challenge !== null,
   }
 }
