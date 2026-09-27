@@ -34,6 +34,10 @@ import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
+import {
+  GroupTargetPicker, groupTargetsComplete, groupTargetsFor,
+  type AssignmentGroupOption, type GroupTargets,
+} from '@/components/assignments/group-target-picker'
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
@@ -63,13 +67,17 @@ export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'de
 
 interface Props {
   classrooms: AssignmentClassroomOption[]
+  /** กลุ่มย่อย of each classroom above, for "มอบหมายให้". */
+  groupsByClassroom?: Record<string, AssignmentGroupOption[]>
   questions: AssignmentQuestionOption[]
   questionSets?: AssignmentQuestionSetOption[]
   preselectedClassroomId?: string
   preselectedSet?: AssignmentQuestionSetOption
 }
 
-export function CreateAssignmentForm({ classrooms, questions, questionSets = [], preselectedClassroomId, preselectedSet }: Props) {
+export function CreateAssignmentForm({
+  classrooms, groupsByClassroom = {}, questions, questionSets = [], preselectedClassroomId, preselectedSet,
+}: Props) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
@@ -83,6 +91,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [classroomIds, setClassroomIds] = useState<string[]>(
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
+  // มอบหมายให้: absent/null per room = นักเรียนทุกคนในห้อง, the default.
+  const [groupTargets, setGroupTargets] = useState<GroupTargets>({})
   const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exercise')
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
@@ -241,6 +251,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
     setClassroomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
+  // "มอบหมายให้" in the summary: the whole room unless some room is limited
+  // to กลุ่มย่อย, then which groups (named when only one room is ticked).
+  const limitedRooms = classroomIds.filter(id => (groupTargets[id] ?? null) !== null)
+  const audienceSummary = limitedRooms.length === 0
+    ? 'นักเรียนทุกคนในห้อง'
+    : classroomIds.length === 1
+      ? `เฉพาะ ${(groupsByClassroom[classroomIds[0]] ?? [])
+          .filter(g => groupTargets[classroomIds[0]]?.includes(g.id))
+          .map(g => g.name)
+          .join(', ')}`
+      : `เฉพาะบางกลุ่มใน ${limitedRooms.length} ห้อง`
+
   // What survives of the แฟ้มย่อย after the teacher's own picking.
   const assignedSections = filterSectionsToQuestions(sections, selectedIds)
 
@@ -338,7 +360,10 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const displayMaxSet = displayMaxScore.trim() !== '' && Number(displayMaxScore) > 0
 
   function canNext() {
-    if (step === 0) return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
+    if (step === 0) {
+      return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
+        && groupTargetsComplete(groupTargets, classroomIds)
+    }
     if (step === 1) return selectedIds.length > 0
     // Refuse to leave คะแนนและเกณฑ์ with a streak the server would reject, so
     // the teacher reads the reason next to the field that caused it rather
@@ -425,6 +450,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
       const res = await createAssignment({
         classroom_ids: classroomIds,
+        group_targets: groupTargetsFor(groupTargets, classroomIds),
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
@@ -557,6 +583,21 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 />
               )}
             </div>
+
+            {classroomIds.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>มอบหมายให้</Label>
+                <GroupTargetPicker
+                  classrooms={classroomIds.flatMap(id => {
+                    const c = classrooms.find(room => room.id === id)
+                    return c ? [{ id: c.id, name: c.name }] : []
+                  })}
+                  groupsByClassroom={groupsByClassroom}
+                  value={groupTargets}
+                  onChange={setGroupTargets}
+                />
+              </div>
+            )}
 
             {!preselectedSet && (
               <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
@@ -1517,6 +1558,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     ? (classrooms.find(c => c.id === classroomIds[0])?.name ?? '—')
                     : `${classrooms.find(c => c.id === classroomIds[0])?.name ?? ''} และอีก ${classroomIds.length - 1} ห้อง`,
                 },
+                { label: 'มอบหมายให้', value: audienceSummary },
                 { label: 'ประเภท',    value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
                 {
                   label: 'โจทย์',

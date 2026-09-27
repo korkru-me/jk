@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment-access'
 import { revalidatePath } from 'next/cache'
 import { isAttemptExpired, isInstantCheckable, isStreakEligible } from '@/lib/grading'
 import {
@@ -34,20 +34,16 @@ export async function startSubmission(
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
   const admin = createAdminClient()
 
-  // Assignment metadata, classroom links, an individual extension, and the
-  // latest attempt are independent after authentication. Fetch them in one
-  // stage instead of a four-query waterfall on every exam resume.
-  const [assignmentRes, linksRes, extensionRes, existingRes] = await Promise.all([
+  // Assignment metadata, an individual extension, and the latest attempt are
+  // independent after authentication. Fetch them in one stage instead of a
+  // waterfall on every exam resume.
+  const [assignmentRes, extensionRes, existingRes] = await Promise.all([
     admin
       .from('assignments')
       .select('*')
       .eq('id', assignmentId)
       .eq('status', 'published')
       .maybeSingle(),
-    admin
-      .from('assignment_classrooms')
-      .select('classroom_id')
-      .eq('assignment_id', assignmentId),
     admin
       .from('assignment_extensions')
       .select('extended_end_at')
@@ -72,22 +68,12 @@ export async function startSubmission(
     return { error: 'ยังไม่ถึงเวลาเปิดสอบ' }
   }
 
-  // Check student is in one of the classrooms this assignment is linked to
-  // (not just the legacy single classroom_id column — an assignment may now
-  // target multiple classrooms via assignment_classrooms).
-  const links = linksRes.data
-  const classroomIds = (links ?? []).map((l: any) => l.classroom_id)
-
-  const { data: membership } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('id')
-        .eq('student_id', user.id)
-        .in('classroom_id', classroomIds)
-        .maybeSingle()
-    : { data: null }
-
-  if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องเรียนนี้' }
+  // Check the งาน was handed to this student: on the roster of one of the
+  // classrooms it is linked to (assignment_classrooms, not the legacy single
+  // classroom_id column) and, where that link names กลุ่มย่อย, in one of
+  // them. An existing attempt keeps access after a move between groups.
+  const handedToStudent = await studentHasAssignment(admin, assignmentId, user.id, existingRes.data != null)
+  if (!handedToStudent) return { error: 'งานนี้ไม่ได้มอบหมายให้คุณ' }
 
   // Check deadline — a per-student extension overrides the assignment's end_at
   const extension = extensionRes.data

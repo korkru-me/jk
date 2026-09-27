@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
@@ -21,6 +21,8 @@ import { ClassroomOverview, type OverviewTarget } from './classroom-overview'
 import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { IconButton } from '@/components/ui/icon-button'
+import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
+import type { GroupState } from './breakout-groups'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -107,6 +109,9 @@ interface Props {
   seenByPost: Record<string, string[]>
   /** Live classrooms the same announcement can be cross-posted to. */
   crossPostTargets: { id: string; name: string }[]
+  /** กลุ่มย่อย of this room, and each student's group (student id → group id). */
+  groups: ClassroomGroup[]
+  groupMembers: Record<string, string>
 }
 
 export function ClassroomDetailClient({
@@ -114,6 +119,7 @@ export function ClassroomDetailClient({
   classroomAssignments, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewCount, pendingReviewCapped, pendingReviewByAssignment, seenByPost, crossPostTargets,
+  groups, groupMembers,
 }: Props) {
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
@@ -131,6 +137,31 @@ export function ClassroomDetailClient({
   // switching tabs and both consumers stay in sync.
   const [studentSortKey, setStudentSortKey] = useState<StudentSortKey>('name')
   const [studentSortDir, setStudentSortDir] = useState<StudentSortDir>('asc')
+
+  // กลุ่มย่อย live here rather than inside their tab: the tab unmounts when
+  // another is opened, and the งาน tabs read the same arrangement to count
+  // each งาน only against the students it was handed to.
+  const [groupState, setGroupState] = useState<GroupState>({ groups, members: groupMembers })
+  const rosterIds = useMemo(() => students.map(s => s.id), [students])
+  const audienceByAssignment = useMemo(() => {
+    const groupOf = new Map(Object.entries(groupState.members))
+    const map = new Map<string, Set<string>>()
+    for (const a of classroomAssignments) {
+      if (a.group_ids) map.set(a.id, targetedStudentIds(a.group_ids, rosterIds, groupOf))
+    }
+    return map
+  }, [classroomAssignments, groupState.members, rosterIds])
+  const groupNameById = useMemo(
+    () => new Map(groupState.groups.map(g => [g.id, g.name])),
+    [groupState.groups],
+  )
+  const assignmentTitlesByGroup = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const a of classroomAssignments) {
+      for (const groupId of a.group_ids ?? []) map.set(groupId, [...(map.get(groupId) ?? []), a.title])
+    }
+    return map
+  }, [classroomAssignments])
 
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortDir(d => (studentSortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
@@ -257,6 +288,7 @@ export function ClassroomDetailClient({
             seenByPost={seenByPost}
             crossPostTargets={crossPostTargets}
             canManage={canManage}
+            audienceByAssignment={audienceByAssignment}
             onNavigate={(target: OverviewTarget) => setActiveTab(target)}
           />
         )}
@@ -279,6 +311,8 @@ export function ClassroomDetailClient({
             assignments={classroomAssignments}
             submissions={classroomSubmissions}
             studentCount={students.length}
+            audienceByAssignment={audienceByAssignment}
+            groupNameById={groupNameById}
             pendingReviewByAssignment={pendingReviewByAssignment}
             onViewScores={() => setActiveTab('scores')}
           />
@@ -292,6 +326,8 @@ export function ClassroomDetailClient({
             submissions={classroomSubmissions}
             extensions={classroomExtensions}
             profiles={studentProfiles}
+            audienceByAssignment={audienceByAssignment}
+            groupNameById={groupNameById}
             sortKey={studentSortKey}
             sortDir={studentSortDir}
             onViewStudents={() => setActiveTab('students')}
@@ -318,7 +354,14 @@ export function ClassroomDetailClient({
           />
         )}
         {activeTab === 'groups' && (
-          <BreakoutGroups students={students} />
+          <BreakoutGroups
+            classroomId={classroom.id}
+            students={students}
+            state={groupState}
+            setState={setGroupState}
+            canManage={canManage}
+            assignmentTitlesByGroup={assignmentTitlesByGroup}
+          />
         )}
         {activeTab === 'invite' && (
           <div className="max-w-lg">
