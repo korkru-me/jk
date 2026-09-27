@@ -41,6 +41,28 @@ release ของ assignment เป็น immutable และ S5 ลงทะเ
 - [SEB Integration](https://safeexambrowser.org/developer/seb-integration.html)
 - [SEB macOS manual](https://safeexambrowser.org/macosx/mac_usermanual_en.html)
 
+### ช่องทางลงทะเบียน multi-platform
+
+operator รองรับ evidence schema 2 ที่มี target ครบ `windows`, `macos`, `ipados`, `ios`
+และตรวจว่า runtime platform ตรง (`windows`, `macos`, `ios`, `ios`) หาก iPad กับ iPhone
+ใช้ native version/build เดียวกัน ต้องให้ BEK ตรงกันและ operator จะ deduplicate เป็น registry entry
+เดียว หาก key ต่างกันจะ fail closed
+
+เก็บ evidence JSON ไว้ใน local owner-only directory นอก Git แล้วส่งผ่าน stdin เท่านั้น:
+
+```bash
+node scripts/enroll-assignment-seb-artifact.mjs \
+  --assignment '<synthetic-assignment-id>' \
+  --revision '<revision>' \
+  --artifact '<absolute-path-to-unchanged-candidate.seb>' \
+  --multiplatform \
+  --apply < '<absolute-path-to-owner-only-native-evidence.json>'
+```
+
+ห้ามใส่ CK/BEK ใน argument, shell history, screenshot, commit หรือแชต คำสั่งจะคืนเฉพาะ
+metadata ของ release และจำนวน key โดยไม่คืนค่า key ใด ๆ ก่อนใช้ `--apply` ให้รันคำสั่งเดียวกัน
+โดยตัด `--apply` ออกเพื่อตรวจ environment/arguments แบบไม่อ่าน evidence และไม่ mutate
+
 ## ข้อมูลที่ห้ามส่งหรือเก็บใน Git/แชต
 
 - CK, BEK, Quit/Unlock Password, Administrator Password และ Settings Password

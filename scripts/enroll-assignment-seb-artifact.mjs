@@ -7,6 +7,7 @@ import { inspectEnvFilePermission, parseEnvFile } from './check-seb-readiness-co
 import {
   SebArtifactOperatorError,
   enrollAssignmentSebStagingArtifact,
+  enrollAssignmentSebStagingMultiPlatformArtifact,
   inspectAssignmentSebPlaintextArtifact,
   operatorEnvironmentBlockerFields,
   parseOperatorArguments,
@@ -88,6 +89,7 @@ async function main() {
       revision: options.revision,
       networkUsed: false,
       mutationUsed: false,
+      evidenceMode: options.multiplatform ? 'multiplatform' : 'windows',
     })
     return
   }
@@ -95,7 +97,10 @@ async function main() {
   const evidence = await readEvidenceFromStdin()
   const admin = createStagingAdmin(environment)
   const context = await readAssignmentSebOperatorContext(admin, options.assignment, options.revision)
-  const result = await enrollAssignmentSebStagingArtifact({
+  const enroll = options.multiplatform
+    ? enrollAssignmentSebStagingMultiPlatformArtifact
+    : enrollAssignmentSebStagingArtifact
+  const result = await enroll({
     admin,
     context,
     artifactBytes,
