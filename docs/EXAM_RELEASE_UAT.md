@@ -4,7 +4,7 @@
 
 เฟส agent-only 1–9 จบแล้ว แต่ **ยังไม่พร้อมเปิดขายระบบสอบ** จนกว่ารายการด้านล่างจะผ่านบน staging และอุปกรณ์จริง ตัวตรวจ `npm run check:exam-release` จงใจขึ้น `NOT READY` ระหว่างที่หลักฐานเหล่านี้ยังไม่ครบ
 
-ผล responsive/authenticated/recovery/cleanup บันทึกสถานะใน `config/exam-uat-evidence.json` ตาม `docs/EXAM_UAT_EVIDENCE.md`; ผล native SEB บันทึกแยกใน `config/seb-platform-evidence.json` ห้ามเก็บข้อมูลลับหรือข้อมูลนักเรียนในทั้งสองไฟล์
+ผล responsive/authenticated/recovery/cleanup บันทึกสถานะใน `config/exam-uat-evidence.json` ตาม `docs/EXAM_UAT_EVIDENCE.md`; ผล native SEB ระดับ build บันทึกใน `config/seb-platform-evidence.json` และผล 8 เคสบนอุปกรณ์จริงบันทึกแยกใน `config/seb-physical-uat-evidence.json` ตาม `docs/SEB_PHASE6_PHYSICAL_UAT.md` ห้ามเก็บข้อมูลลับหรือข้อมูลนักเรียนในทุกไฟล์
 
 หากจำไม่ได้ว่าต้องทำอะไรต่อ ให้รัน `npm run next:exam-uat` ระบบจะบอกทีละหนึ่งขั้นตามลำดับใน `docs/EXAM_UAT_NEXT_STEP.md`
 
@@ -55,7 +55,8 @@ code revision, staging build และ SEB config revision ตาม `docs/EXAM_
 - ครูอนุญาตให้ออกกลางคันแล้วนักเรียนออกได้
 - รหัสออกของครูใช้ได้เฉพาะชุดที่ตั้งไว้
 - เปิดผิดชุด/ไฟล์ถูกแก้แล้วถูกปฏิเสธ
-- บันทึก OS/SEB version และผลแบบไม่ระบุตัวบุคคลใน `config/seb-platform-evidence.json`
+- บันทึก OS/SEB version และผลแบบไม่ระบุตัวบุคคลใน `config/seb-physical-uat-evidence.json`
+- รัน `npm run next:seb-physical-uat` เพื่อรับงานถัดไปทีละหนึ่งข้อ และให้ `npm run check:seb-physical-uat` ผ่านก่อนอัปเดต platform summary
 
 ## 6. เกณฑ์ปิดงาน
 
@@ -64,6 +65,7 @@ code revision, staging build และ SEB config revision ตาม `docs/EXAM_
 - `npm run check:seb-registry` ผ่าน
 - `npm run check:exam-candidate` ผ่าน
 - `npm run check:exam-uat` ผ่าน
+- `npm run check:seb-physical-uat` ผ่าน
 - `npm run check:seb-platforms` ผ่าน
 - `npm run check:exam-release` ผ่าน
 - ไม่มี password, CK/BEK, token, request hash, ชื่อนักเรียน, คำตอบ หรือภาพข้อมูลจริงใน commit/log/เอกสาร

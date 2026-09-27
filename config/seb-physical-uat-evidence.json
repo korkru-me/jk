@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "candidateId": "pending",
+    "sourceRevision": "pending",
+    "stagingDeploymentId": "pending",
+    "releaseCommitmentSha256": "pending",
+    "lockedAt": null
+  },
+  "platforms": [
+    {
+      "id": "windows",
+      "label": "Windows",
+      "sebVersion": "pending",
+      "buildNumber": "pending",
+      "osVersion": "pending",
+      "cases": [
+        { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
+        { "id": "system-check", "status": "pending", "testedAt": null },
+        { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
+        { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
+        { "id": "wrong-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "modified-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "wrong-quit-password-rejected", "status": "pending", "testedAt": null },
+        { "id": "normal-browser-rejected", "status": "pending", "testedAt": null }
+      ]
+    },
+    {
+      "id": "macos",
+      "label": "macOS",
+      "sebVersion": "pending",
+      "buildNumber": "pending",
+      "osVersion": "pending",
+      "cases": [
+        { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
+        { "id": "system-check", "status": "pending", "testedAt": null },
+        { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
+        { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
+        { "id": "wrong-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "modified-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "wrong-quit-password-rejected", "status": "pending", "testedAt": null },
+        { "id": "normal-browser-rejected", "status": "pending", "testedAt": null }
+      ]
+    },
+    {
+      "id": "ipados",
+      "label": "iPadOS",
+      "sebVersion": "pending",
+      "buildNumber": "pending",
+      "osVersion": "pending",
+      "cases": [
+        { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
+        { "id": "system-check", "status": "pending", "testedAt": null },
+        { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
+        { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
+        { "id": "wrong-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "modified-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "wrong-quit-password-rejected", "status": "pending", "testedAt": null },
+        { "id": "normal-browser-rejected", "status": "pending", "testedAt": null }
+      ]
+    },
+    {
+      "id": "ios",
+      "label": "iPhone / iOS",
+      "sebVersion": "pending",
+      "buildNumber": "pending",
+      "osVersion": "pending",
+      "cases": [
+        { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
+        { "id": "system-check", "status": "pending", "testedAt": null },
+        { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
+        { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
+        { "id": "wrong-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "modified-config-rejected", "status": "pending", "testedAt": null },
+        { "id": "wrong-quit-password-rejected", "status": "pending", "testedAt": null },
+        { "id": "normal-browser-rejected", "status": "pending", "testedAt": null }
+      ]
+    }
+  ]
+}
