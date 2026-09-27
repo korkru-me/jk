@@ -6,6 +6,7 @@ const CREATE_CLASSROOM_PATH = '/classrooms/new'
 const CLASSROOM_LIST_PATH = '/classrooms'
 const QUESTION_LIST_PATH = '/questions'
 const BLOCKED_MESSAGE = 'SEB Staging private operation ticket provider blocked'
+const SEB_DENIAL_PATTERN = /ไม่ถูกต้อง|หมดอายุ|ใช้แล้ว|ไม่สามารถ|ปฏิเสธ|ไม่ตรง|ไม่สำเร็จ/
 const DEFAULT_BOUNDARY_TIMEOUT_MS = 10_000
 const MIN_BOUNDARY_TIMEOUT_MS = 10
 const MAX_BOUNDARY_TIMEOUT_MS = 120_000
@@ -21,6 +22,10 @@ const ANSWER_STORAGE_ID = new RegExp(
   `^${UUID.source.slice(1, -1)}/${UUID.source.slice(1, -1)}/${UUID.source.slice(1, -1)}/${UUID.source.slice(1, -1)}\\.(?:jpg|pdf|png|webp)$`,
 )
 const DECIMAL_ID = /^(?:[1-9][0-9]{0,18})$/
+
+export function isSebStagingDenialMessage(value) {
+  return typeof value === 'string' && SEB_DENIAL_PATTERN.test(value)
+}
 const MUTATING_OPERATIONS = new Set([
   'create-subject-classroom',
   'create-synthetic-written-question',
@@ -1327,7 +1332,7 @@ export function createSebStagingPrivateOperationTicketProvider(options = {}) {
         }
         if (['reject-invalid-seb-challenge', 'reject-replayed-seb-challenge',
           'reject-invalid-seb-session', 'reject-replayed-seb-session'].includes(plan.stepId)) {
-          const denial = page.getByText(/ไม่ถูกต้อง|หมดอายุ|ใช้แล้ว|ไม่สามารถ|ปฏิเสธ/)
+          const denial = page.getByText(SEB_DENIAL_PATTERN)
           await waitForVisible(denial)
           return
         }

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   SebStagingPrivateOperationTicketProviderBlockedError,
   createSebStagingPrivateOperationTicketProvider,
+  isSebStagingDenialMessage,
 } from './seb-staging-private-operation-ticket-provider.mjs'
 
 const SITE_ORIGIN = 'https://staging.korkru.com'
@@ -628,6 +629,14 @@ describe('SEB Staging private operation ticket provider', () => {
     ])
     expect(publishPage.events).toContainEqual(['click', 'เผยแพร่'])
     expect(publishPage.events).toContainEqual(['text', 'เผยแพร่แล้ว'])
+  })
+
+  it('recognizes the real invalid-key denial without weakening the negative check', async () => {
+    expect(isSebStagingDenialMessage(
+      'การตั้งค่า Safe Exam Browser หรือเวอร์ชันไม่ตรงกับที่โรงเรียนอนุญาต',
+    )).toBe(true)
+    expect(isSebStagingDenialMessage('เครื่องนี้ผ่านการตรวจสอบ')).toBe(false)
+    expect(isSebStagingDenialMessage('Safe Exam Browser system check')).toBe(false)
   })
 
   it('requires the complete run identity including its creation window', async () => {
