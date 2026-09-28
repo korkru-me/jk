@@ -66,6 +66,10 @@ export function classroomNavigationHref(
 
 const RESERVED_CLASSROOM_PATHS = new Set(['new', 'archived', 'trash'])
 
+export function isClassroomSectionPath(pathname: string): boolean {
+  return pathname === '/classrooms' || pathname.startsWith('/classrooms/')
+}
+
 export function isClassroomDetailPath(pathname: string): boolean {
   const match = pathname.match(/^\/classrooms\/([^/]+)\/?$/)
   return match !== null && !RESERVED_CLASSROOM_PATHS.has(match[1])

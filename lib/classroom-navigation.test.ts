@@ -5,6 +5,7 @@ import {
   classroomNavigationHref,
   classroomNavigationFor,
   isClassroomDetailPath,
+  isClassroomSectionPath,
   resolveClassroomNavigationKey,
 } from './classroom-navigation'
 
@@ -80,6 +81,23 @@ describe('classroom navigation', () => {
       'https://korkru.test/classrooms/room-1?view=scores&back=%2Fclassrooms',
       'overview',
     )).toBe('/classrooms/room-1?back=%2Fclassrooms')
+  })
+})
+
+describe('classroom section route detection', () => {
+  it.each([
+    '/classrooms',
+    '/classrooms/new',
+    '/classrooms/archived',
+    '/classrooms/trash',
+    '/classrooms/room-slug',
+    '/classrooms/room-slug/report',
+  ])('recognizes every route in the classroom section: %s', pathname => {
+    expect(isClassroomSectionPath(pathname)).toBe(true)
+  })
+
+  it.each(['/dashboard', '/questions', '/classroom'])('rejects routes outside the classroom section: %s', pathname => {
+    expect(isClassroomSectionPath(pathname)).toBe(false)
   })
 })
 

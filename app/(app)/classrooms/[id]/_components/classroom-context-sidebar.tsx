@@ -1,8 +1,8 @@
 'use client'
 
-import { useId, useState, type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import Link from 'next/link'
-import { BookOpen, ChevronLeft, Menu } from 'lucide-react'
+import { BookOpen, ChevronLeft, LayoutDashboard } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import type {
   ClassroomNavigationItem,
@@ -11,14 +11,6 @@ import type {
 import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
 
@@ -32,7 +24,7 @@ interface ClassroomContextSidebarProps {
   managementActions?: ReactNode
 }
 
-function ClassroomContextNavigation({
+export function ClassroomContextNavigation({
   classroom,
   backHref,
   navigationItems,
@@ -113,61 +105,16 @@ function ClassroomContextNavigation({
           {managementActions}
         </section>
       )}
-    </div>
-  )
-}
 
-export function ClassroomContextSidebar(props: ClassroomContextSidebarProps) {
-  return (
-    <aside
-      aria-label="เมนูห้องเรียน"
-      className="sticky top-0 hidden max-h-[calc(var(--app-height,100dvh)-7rem)] w-72 shrink-0 overflow-y-auto lg:block"
-    >
-      <Card padding="sm">
-        <ClassroomContextNavigation {...props} />
-      </Card>
-    </aside>
-  )
-}
-
-export function ClassroomContextDrawer(props: ClassroomContextSidebarProps) {
-  const [open, setOpen] = useState(false)
-  const activeLabel = props.navigationItems.find(item => item.key === props.activeItem)?.label ?? 'ภาพรวม'
-
-  return (
-    <div className="lg:hidden">
+      <Separator />
       <Button
-        type="button"
-        variant="outline"
-        className="w-full justify-between"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
+        variant="ghost"
+        className="w-full justify-start"
+        render={<Link href="/dashboard" onClick={onClose} />}
       >
-        <span className="flex min-w-0 items-center gap-2">
-          <Menu data-icon="inline-start" />
-          <span>เมนูห้องเรียน</span>
-        </span>
-        <span className="truncate text-muted-foreground">{activeLabel}</span>
+        <LayoutDashboard data-icon="inline-start" />
+        เมนูหลัก
       </Button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          className="inset-y-0 left-0 top-0 h-dvh max-h-none w-[min(22rem,calc(100%-2rem))] max-w-none grid-cols-[minmax(0,1fr)] content-start translate-x-0 translate-y-0 rounded-none p-4 sm:max-w-none"
-        >
-          <DialogHeader>
-            <DialogTitle>เมนูห้องเรียน</DialogTitle>
-            <DialogDescription className="sr-only">
-              เลือกหน้าที่ต้องการเปิดภายในห้องเรียน {props.classroom.name}
-            </DialogDescription>
-          </DialogHeader>
-          <ClassroomContextNavigation
-            {...props}
-            managementActions={undefined}
-            onClose={() => setOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

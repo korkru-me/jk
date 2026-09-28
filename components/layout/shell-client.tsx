@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Sidebar } from './sidebar'
+import { SidebarContextProvider } from './sidebar-context'
 import { Topbar } from './topbar'
 import { useAppViewport } from '@/hooks/use-app-viewport'
 import type { User } from '@/lib/types'
@@ -40,32 +41,34 @@ export function ShellClient({
   }
 
   return (
-    <div className="flex h-[var(--app-height,100dvh)] overflow-hidden bg-background">
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-overlay md:hidden"
-          onClick={() => setSidebarOpen(false)}
+    <SidebarContextProvider>
+      <div className="flex h-[var(--app-height,100dvh)] overflow-hidden bg-background">
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-20 bg-overlay md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <Sidebar
+          role={user.role}
+          fullName={user.full_name}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
         />
-      )}
-      <Sidebar
-        role={user.role}
-        fullName={user.full_name}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        collapsed={sidebarCollapsed}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Topbar
-          user={user}
-          initialUnreadCount={initialUnreadCount}
-          onMenuToggle={() => setSidebarOpen(o => !o)}
-          sidebarCollapsed={sidebarCollapsed}
-          onSidebarCollapseToggle={toggleSidebarCollapsed}
-        />
-        <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6">
-          {children}
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <Topbar
+            user={user}
+            initialUnreadCount={initialUnreadCount}
+            onMenuToggle={() => setSidebarOpen(o => !o)}
+            sidebarCollapsed={sidebarCollapsed}
+            onSidebarCollapseToggle={toggleSidebarCollapsed}
+          />
+          <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarContextProvider>
   )
 }

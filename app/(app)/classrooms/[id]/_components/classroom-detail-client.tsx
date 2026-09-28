@@ -26,10 +26,8 @@ import {
   type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import type { GroupState } from './breakout-groups'
-import {
-  ClassroomContextDrawer,
-  ClassroomContextSidebar,
-} from './classroom-context-sidebar'
+import { ClassroomContextNavigation } from './classroom-context-sidebar'
+import { useContextualSidebar } from '@/components/layout/sidebar-context'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -182,6 +180,23 @@ export function ClassroomDetailClient({
     return () => window.removeEventListener('popstate', syncNavigationFromHistory)
   }, [navigationItems])
 
+  const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
+    <ClassroomContextNavigation
+      classroom={classroom}
+      backHref={backHref}
+      navigationItems={navigationItems}
+      activeItem={activeTab}
+      studentCount={students.length}
+      onNavigate={navigateTo}
+      onClose={onNavigate}
+      managementActions={isOwner
+        ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
+        : undefined}
+    />
+  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, students.length])
+
+  useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar)
+
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortDir(d => (studentSortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
     setStudentSortKey(key)
@@ -196,29 +211,7 @@ export function ClassroomDetailClient({
   }
 
   return (
-    <div className="flex items-start gap-6">
-      <ClassroomContextSidebar
-        classroom={classroom}
-        backHref={backHref}
-        navigationItems={navigationItems}
-        activeItem={activeTab}
-        studentCount={students.length}
-        onNavigate={navigateTo}
-        managementActions={isOwner
-          ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
-          : undefined}
-      />
-
-      <div className="flex min-w-0 max-w-[1200px] flex-1 flex-col gap-6">
-        <ClassroomContextDrawer
-          classroom={classroom}
-          backHref={backHref}
-          navigationItems={navigationItems}
-          activeItem={activeTab}
-          studentCount={students.length}
-          onNavigate={navigateTo}
-        />
-
+    <div className="flex min-w-0 max-w-[1200px] flex-col gap-6">
       {/* Header card */}
       <div
         className={savedCover
@@ -387,7 +380,6 @@ export function ClassroomDetailClient({
             />
           </div>
         )}
-      </div>
       </div>
     </div>
   )

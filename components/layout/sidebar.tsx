@@ -4,9 +4,19 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { ChevronDown } from 'lucide-react'
+import {
+  Archive,
+  ChevronDown,
+  ChevronLeft,
+  LayoutGrid,
+  Plus,
+  School,
+  Trash2,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { isClassroomDetailPath } from '@/lib/classroom-navigation'
+import { isClassroomDetailPath, isClassroomSectionPath } from '@/lib/classroom-navigation'
+import { Separator } from '@/components/ui/separator'
+import { useSidebarContext } from './sidebar-context'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -168,6 +178,67 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
   )
 }
 
+function ClassroomSectionNavigation({ pathname, onNavigate }: {
+  pathname: string
+  onNavigate?: () => void
+}) {
+  const items = [
+    { href: '/classrooms', label: 'ห้องเรียนทั้งหมด', Icon: LayoutGrid },
+    { href: '/classrooms/new', label: 'สร้างห้องเรียน', Icon: Plus },
+    { href: '/classrooms/archived', label: 'ห้องเรียนที่เก็บถาวร', Icon: Archive },
+    { href: '/classrooms/trash', label: 'ถังขยะ', Icon: Trash2 },
+  ]
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <Link
+        href="/dashboard"
+        onClick={onNavigate}
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <ChevronLeft aria-hidden="true" className="size-4" />
+        เมนูหลัก
+      </Link>
+
+      <div className="flex items-start gap-3 px-2 py-1">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <School aria-hidden="true" className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-foreground">ห้องเรียน</p>
+          <p className="text-xs text-muted-foreground">จัดการพื้นที่การเรียนรู้</p>
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="px-2 text-xs font-medium text-muted-foreground">เมนูห้องเรียน</div>
+      <nav aria-label="เมนูจัดการห้องเรียน" className="flex flex-col gap-1">
+        {items.map(({ href, label, Icon }) => {
+          const selected = pathname === href
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              aria-current={selected ? 'page' : undefined}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                selected
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+              )}
+            >
+              <Icon aria-hidden="true" className="size-4" />
+              <span className="truncate">{label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}
+
 interface SidebarProps {
   role: UserRole
   fullName: string
@@ -179,7 +250,11 @@ interface SidebarProps {
 export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = false }: SidebarProps) {
   const pathname = usePathname()
   const navItems = role === 'teacher' || role === 'admin' ? teacherNav : studentNav
-  const compactOnDesktop = (role === 'teacher' || role === 'admin') && isClassroomDetailPath(pathname)
+  const { contextualSidebar } = useSidebarContext()
+  const usesClassroomSidebar = (role === 'teacher' || role === 'admin') && isClassroomSectionPath(pathname)
+  const contextualContent = isClassroomDetailPath(pathname) && contextualSidebar?.pathname === pathname
+    ? contextualSidebar.render(onClose)
+    : null
 
   return (
     <aside className={cn(
@@ -187,14 +262,11 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
       'fixed inset-y-0 left-0 z-30 transition-[width,transform] duration-200 ease-in-out',
       'md:static',
       isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0',
-      collapsed ? 'md:w-0 md:border-r-0' : compactOnDesktop ? 'md:w-20' : 'md:w-64',
+      collapsed ? 'md:w-0 md:border-r-0' : 'md:w-64',
     )}>
-      <div className={cn('w-64 h-full flex flex-col', compactOnDesktop && 'md:w-20')}>
+      <div className="w-64 h-full flex flex-col">
         {/* Logo */}
-        <div className={cn(
-          'h-16 flex items-center px-5 border-b shrink-0',
-          compactOnDesktop && 'md:justify-center md:px-2'
-        )}>
+        <div className="h-16 flex items-center px-5 border-b shrink-0">
           <Link href="/dashboard" onClick={onClose}>
             <Image
               src="/logo.png"
@@ -207,64 +279,63 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((entry) => (
-            isGroup(entry)
-              ? (
-                <NavGroupItem
-                  key={entry.label}
-                  group={entry}
-                  pathname={pathname}
-                  onNavigate={onClose}
-                  compactOnDesktop={compactOnDesktop}
-                />
-              )
-              : (
-                <Link
-                  key={entry.href}
-                  href={entry.href}
-                  onClick={onClose}
-                  title={compactOnDesktop ? entry.label : undefined}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                    isNavActive(pathname, entry.href)
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                    compactOnDesktop && 'md:justify-center md:px-2'
-                  )}
-                >
-                  <span className="text-base">{entry.icon}</span>
-                  <span className={cn(compactOnDesktop && 'md:sr-only')}>{entry.label}</span>
-                </Link>
-              )
-          ))}
-        </nav>
+        {usesClassroomSidebar ? (
+          <div className="flex-1 overflow-y-auto p-3">
+            {contextualContent ?? <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />}
+          </div>
+        ) : (
+          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+            {navItems.map((entry) => (
+              isGroup(entry)
+                ? (
+                  <NavGroupItem
+                    key={entry.label}
+                    group={entry}
+                    pathname={pathname}
+                    onNavigate={onClose}
+                  />
+                )
+                : (
+                  <Link
+                    key={entry.href}
+                    href={entry.href}
+                    onClick={onClose}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      isNavActive(pathname, entry.href)
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                    )}
+                  >
+                    <span className="text-base">{entry.icon}</span>
+                    <span>{entry.label}</span>
+                  </Link>
+                )
+            ))}
+          </nav>
+        )}
 
         {/* Admin link */}
-        {role === 'admin' && (
+        {role === 'admin' && !usesClassroomSidebar && (
           <div className="px-3 pb-2">
             <Link
               href="/admin"
               onClick={onClose}
-              title={compactOnDesktop ? 'Admin Panel' : undefined}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20',
-                compactOnDesktop && 'md:justify-center md:px-2'
-              )}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20"
             >
               <span className="text-base">⚙️</span>
-              <span className={cn(compactOnDesktop && 'md:sr-only')}>Admin Panel</span>
+              <span>Admin Panel</span>
             </Link>
           </div>
         )}
 
         {/* User info */}
-        <div className={cn('p-4 border-t shrink-0', compactOnDesktop && 'md:px-2')}>
-          <div className={cn('flex items-center gap-3', compactOnDesktop && 'md:justify-center')}>
+        <div className="p-4 border-t shrink-0">
+          <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
               {fullName.charAt(0)}
             </div>
-            <div className={cn('flex-1 min-w-0', compactOnDesktop && 'md:sr-only')}>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{fullName}</p>
               <p className="text-xs text-muted-foreground">
                 {role === 'teacher' ? 'ครู' : role === 'student' ? 'นักเรียน' : 'Admin'}
