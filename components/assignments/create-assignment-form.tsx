@@ -9,7 +9,12 @@ import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
 import { assignmentCreationTitle, newAssignmentTypeDefaults } from '@/lib/assignment-creation'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -56,13 +61,14 @@ import {
   SebQuitPasswordFields,
   getSebQuitPasswordClientError,
 } from '@/components/assignments/seb-quit-password-settings'
+import { cn } from '@/lib/utils'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
   { loading: () => <div className="h-96 animate-pulse rounded-2xl bg-muted" aria-label="กำลังโหลดคลังโจทย์" /> }
 )
 
-const STEPS = ['ข้อมูลพื้นฐาน', 'เลือกโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
+const STEPS = ['รายละเอียดและโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
 // สรุปก่อนสร้าง used to read the two original values only, so a งาน set to
 // แสดงคะแนนแต่ไม่แสดงเฉลย or ไม่แสดงผลลัพธ์ was summarised as
@@ -109,7 +115,7 @@ export function CreateAssignmentForm({
   const [scheduleMode, setScheduleMode] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
 
-  // Step 1
+  // Step 1: รายละเอียดและโจทย์
   const [title, setTitle] = useState(preselectedSet?.title ?? '')
   const [description, setDescription] = useState(preselectedSet?.description ?? '')
   const [classroomIds, setClassroomIds] = useState<string[]>(
@@ -126,10 +132,10 @@ export function CreateAssignmentForm({
   // questions back into the library as a new reusable set.
   const [saveAsSet, setSaveAsSet] = useState(false)
 
-  // Step 2 — filter out any question_ids that no longer resolve to a real
+  // Step 1 (continued) — filter out any question_ids that no longer resolve to a real
   // question (e.g. deleted since the set was saved). Otherwise a dangling id
   // sails through into selectedIds, gets silently dropped later by
-  // previewQuestions (step 3 can only render questions it can find), and the
+  // previewQuestions (step 2 can only render questions it can find), and the
   // teacher sees the count mysteriously shrink by however many are dangling.
   const [selectedIds, setSelectedIds] = useState<string[]>(
     (preselectedSet?.question_ids ?? []).filter(id => questions.some(q => q.id === id))
@@ -148,7 +154,7 @@ export function CreateAssignmentForm({
   // immediately after ticking the last โจทย์, not three steps later.
   const [randomQuestionCount, setRandomQuestionCount] = useState('')
 
-  // Step 3 (คะแนน) — a question starts at the point value its own structure
+  // Step 2 (คะแนน) — a question starts at the point value its own structure
   // gives it (one per ข้อย่อย); teacher can edit individual questions and the
   // total recalculates automatically.
   const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>({})
@@ -160,7 +166,7 @@ export function CreateAssignmentForm({
   // any time later from the edit page too, even after students finish.
   const [displayMaxScore, setDisplayMaxScore] = useState('')
 
-  // Step 4 (ตั้งค่า)
+  // Step 3 (ตั้งค่า)
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
@@ -213,7 +219,7 @@ export function CreateAssignmentForm({
   const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
   const [passingValue, setPassingValue] = useState('')
 
-  // Step 5 (กำหนดการสอบ)
+  // Step 4 (กำหนดการสอบ)
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
 
@@ -409,14 +415,13 @@ export function CreateAssignmentForm({
   function canNext() {
     if (step === 0) {
       return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
-        && groupTargetsComplete(groupTargets, classroomIds)
+        && groupTargetsComplete(groupTargets, classroomIds) && selectedIds.length > 0
     }
-    if (step === 1) return selectedIds.length > 0
     // Refuse to leave คะแนนและเกณฑ์ with a streak the server would reject, so
     // the teacher reads the reason next to the field that caused it rather
     // than as an error after ยืนยัน three screens later.
-    if (step === 2) return !(streakOn && streakBlocked)
-    if (step === 3 && assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
+    if (step === 1) return !(streakOn && streakBlocked)
+    if (step === 2 && assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
       return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
     }
     return true
@@ -607,7 +612,7 @@ export function CreateAssignmentForm({
             {preselectedSet && (
               <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-xl px-3 py-2.5">
                 <Layers className="w-4 h-4 shrink-0" />
-                ใช้แฟ้มโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({selectedIds.length} ข้อ) — ปรับโจทย์ที่เลือกได้ในขั้นตอนถัดไป
+                ใช้แฟ้มโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({selectedIds.length} ข้อ) — ปรับโจทย์ที่เลือกได้ด้านล่าง
               </div>
             )}
 
@@ -665,25 +670,6 @@ export function CreateAssignmentForm({
               </div>
             )}
 
-            {!preselectedSet && (
-              <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                    <Layers className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">บันทึกเป็นแฟ้มโจทย์ไว้ใช้ซ้ำ</p>
-                    <p className="text-xs text-muted-foreground">โจทย์ที่เลือกจะถูกบันทึกเป็นแฟ้มในคลังแฟ้มโจทย์ ค้นหาภายหลังด้วยชื่อแฟ้ม</p>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={saveAsSet}
-                  onChange={e => setSaveAsSet(e.target.checked)}
-                  className="accent-primary w-4 h-4 shrink-0"
-                />
-              </label>
-            )}
           </Card>
 
           {!preselectedAssignmentType && (
@@ -728,26 +714,84 @@ export function CreateAssignmentForm({
         </div>
       )}
 
-      {/* ── Step 2: เลือกโจทย์ ────────────────────────────────────────── */}
-      {step === 1 && (
+      {/* ── Step 1 continued: เลือกโจทย์ ──────────────────────────────── */}
+      {step === 0 && (
         <div className="space-y-4">
-          <QuestionPicker
-            questions={questions}
-            selectedIds={selectedIds}
-            onToggle={toggleQ}
-            search={search}
-            onSearchChange={setSearch}
-            diffFilter={diffFilter}
-            onDiffFilterChange={setDiffFilter}
-            toolbar={
-              <QuestionSetImport
-                sets={questionSets}
-                bankIds={bankIds}
-                selectedIds={selectedIds}
-                onImport={importSet}
-              />
-            }
-          />
+          <Card padding="xl" className="flex min-w-0 flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold text-foreground">เลือกโจทย์</h2>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                  {selectedIds.length} ข้อที่เลือก
+                </span>
+                {selectedIds.length > 0 && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPreviewIndex(0)}>
+                    <Eye data-icon="inline-start" />
+                    ดูตัวอย่างโจทย์ที่เลือก
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <QuestionSetImport
+              sets={questionSets}
+              bankIds={bankIds}
+              selectedIds={selectedIds}
+              onImport={importSet}
+            />
+
+            <Collapsible>
+              <CollapsibleTrigger
+                className={cn(
+                  buttonVariants({ variant: 'outline' }),
+                  'group h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5 text-left',
+                )}
+              >
+                <ListFilter className="text-muted-foreground" />
+                <span className="text-foreground">เลือกโจทย์รายข้อ</span>
+                <span className="text-xs font-normal text-muted-foreground">{questions.length} ข้อในคลัง</span>
+                <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+                <div className="pt-4">
+                  <QuestionPicker
+                    questions={questions}
+                    selectedIds={selectedIds}
+                    onToggle={toggleQ}
+                    search={search}
+                    onSearchChange={setSearch}
+                    diffFilter={diffFilter}
+                    onDiffFilterChange={setDiffFilter}
+                    showHeader={false}
+                    showSelectedFooter={false}
+                    surface="plain"
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+
+          {!preselectedSet && (
+            <Card>
+              <label className="flex cursor-pointer items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Layers className="size-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">บันทึกเป็นแฟ้มโจทย์ไว้ใช้ซ้ำ</p>
+                    <p className="text-xs text-muted-foreground">บันทึกโจทย์ที่เลือกไว้ในคลัง เพื่อค้นหาและนำกลับมาใช้ภายหลัง</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={saveAsSet}
+                  onChange={event => setSaveAsSet(event.target.checked)}
+                  className="size-4 shrink-0 accent-primary"
+                />
+              </label>
+            </Card>
+          )}
 
           {canDrawRandomSubset && (
             <Card padding="xl" className="space-y-4">
@@ -832,8 +876,8 @@ export function CreateAssignmentForm({
         </div>
       )}
 
-      {/* ── Step 3: คะแนน ────────────────────────────────────────────── */}
-      {step === 2 && (
+      {/* ── Step 2: คะแนน ────────────────────────────────────────────── */}
+      {step === 1 && (
         <div className="space-y-4">
           <Card padding="xl" className="space-y-4">
             <div className="flex items-center justify-between gap-3">
@@ -914,13 +958,6 @@ export function CreateAssignmentForm({
                 </div>
               ))}
             </div>
-
-            <QuestionPreviewDialog
-              ids={previewIds}
-              open={previewIndex !== null}
-              startIndex={previewIndex ?? 0}
-              onOpenChange={open => { if (!open) setPreviewIndex(null) }}
-            />
           </Card>
 
           <Card padding="xl" className="space-y-3">
@@ -1159,8 +1196,8 @@ export function CreateAssignmentForm({
         </div>
       )}
 
-      {/* ── Step 4: ตั้งค่า ──────────────────────────────────────────── */}
-      {step === 3 && (
+      {/* ── Step 3: ตั้งค่า ──────────────────────────────────────────── */}
+      {step === 2 && (
         <Card padding="xl" className="space-y-5">
           <h2 className="font-semibold text-foreground">ตั้งค่าการสอบ</h2>
 
@@ -1618,8 +1655,8 @@ export function CreateAssignmentForm({
         </Card>
       )}
 
-      {/* ── Step 5: กำหนดการสอบ ───────────────────────────────────────── */}
-      {step === 4 && (
+      {/* ── Step 4: กำหนดการสอบ ─────────────────────────────────────── */}
+      {step === 3 && (
         <div className="space-y-4">
           <Card padding="xl" className="space-y-4">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
@@ -1721,6 +1758,13 @@ export function CreateAssignmentForm({
           </div>
         </div>
       )}
+
+      <QuestionPreviewDialog
+        ids={previewIds}
+        open={previewIndex !== null}
+        startIndex={previewIndex ?? 0}
+        onOpenChange={open => { if (!open) setPreviewIndex(null) }}
+      />
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-2">
