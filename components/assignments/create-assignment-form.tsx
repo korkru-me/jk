@@ -645,6 +645,7 @@ export function CreateAssignmentForm({
                   classrooms={classrooms}
                   selectedIds={classroomIds}
                   onToggle={toggleClassroom}
+                  primaryClassroomId={preselectedClassroomId}
                 />
               )}
             </div>
