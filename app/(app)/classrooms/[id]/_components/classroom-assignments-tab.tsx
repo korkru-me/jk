@@ -1,20 +1,59 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Clock, MoreVertical, Copy, BarChart3, Pencil, RefreshCw, Target, Users, CheckCircle2, ClipboardCheck, Grid3x3 } from 'lucide-react'
-import { TYPE_CFG } from '@/lib/assignment-display'
+import {
+  BarChart3,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock,
+  Copy,
+  Eye,
+  Folder,
+  Grid3x3,
+  MoreVertical,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Target,
+  Users,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { TYPE_CFG } from '@/lib/assignment-display'
 import { duplicateAssignment } from '@/lib/actions/assignments'
+import { setAssignmentCategory } from '@/lib/actions/assignment-categories'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { formatPassingThreshold } from '@/lib/grading'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computeAssignmentProgress } from '@/lib/classroom-progress'
 import { describeGroupTarget } from '@/lib/classroom-groups'
-import { Card } from '@/components/ui/card'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  groupAssignmentsByCategory,
+  type AssignmentCategory,
+} from '@/lib/assignment-categories'
+import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
+import { AssignmentCategoryManager } from './assignment-category-manager'
+
+const UNCATEGORIZED_VALUE = '__uncategorized__'
 
 export interface ClassroomAssignmentRow {
   id: string
@@ -36,6 +75,8 @@ export interface ClassroomAssignmentRow {
   display_order?: number | null
   /** กลุ่มย่อย this room's link hands the งาน to; null = ทั้งห้อง. */
   group_ids?: string[] | null
+  /** หมวดของงานในห้องนี้; null = ยังไม่จัดหมวด. */
+  category_id?: string | null
 }
 
 export interface ClassroomAssignmentSubmissionRow {
@@ -50,14 +91,15 @@ export interface ClassroomAssignmentSubmissionRow {
 type TypeFilter = 'all' | 'exercise' | 'exam'
 
 const STATUS_CFG: Record<string, { label: string; bg: string; text: string }> = {
-  draft:     { label: 'ฉบับร่าง',    bg: 'bg-muted',    text: 'text-muted-foreground' },
-  published: { label: 'เผยแพร่แล้ว', bg: 'bg-success/10',  text: 'text-success' },
-  closed:    { label: 'ปิดแล้ว',     bg: 'bg-destructive/10',       text: 'text-destructive' },
+  draft: { label: 'ฉบับร่าง', bg: 'bg-muted', text: 'text-muted-foreground' },
+  published: { label: 'เผยแพร่แล้ว', bg: 'bg-success/10', text: 'text-success' },
+  closed: { label: 'ปิดแล้ว', bg: 'bg-destructive/10', text: 'text-destructive' },
 }
 
 interface Props {
   classroomId: string
   assignments: ClassroomAssignmentRow[]
+  categories: AssignmentCategory[]
   submissions: ClassroomAssignmentSubmissionRow[]
   studentCount: number
   /** The students each กลุ่มย่อย-only งาน was handed to, keyed by assignment id. */
@@ -69,174 +111,289 @@ interface Props {
 }
 
 export function ClassroomAssignmentsTab({
-  classroomId, assignments, submissions, studentCount, audienceByAssignment, groupNameById = new Map(),
-  pendingReviewByAssignment, onViewScores,
+  classroomId,
+  assignments,
+  categories: initialCategories,
+  submissions,
+  studentCount,
+  audienceByAssignment,
+  groupNameById = new Map(),
+  pendingReviewByAssignment,
+  onViewScores,
 }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [categories, setCategories] = useState(initialCategories)
+  const [categoryByAssignment, setCategoryByAssignment] = useState<Record<string, string | null>>(
+    () => Object.fromEntries(assignments.map(assignment => [assignment.id, assignment.category_id ?? null])),
+  )
   const [isPending, startTransition] = useTransition()
 
-  const filtered = assignments.filter(a => typeFilter === 'all' ? true : a.type === typeFilter)
+  const rows = useMemo(
+    () => assignments.map(assignment => ({
+      ...assignment,
+      category_id: categoryByAssignment[assignment.id] ?? null,
+    })),
+    [assignments, categoryByAssignment],
+  )
+  const filtered = rows.filter(assignment => typeFilter === 'all' || assignment.type === typeFilter)
+  const sections = groupAssignmentsByCategory(filtered, categories)
+  const assignmentCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const categoryId of Object.values(categoryByAssignment)) {
+      if (categoryId) counts.set(categoryId, (counts.get(categoryId) ?? 0) + 1)
+    }
+    return counts
+  }, [categoryByAssignment])
 
   function handleDuplicate(id: string) {
     startTransition(async () => {
-      const res = await duplicateAssignment(id, { targetClassroomIds: [classroomId] })
-      if (res?.error) toast.error(res.error)
+      const result = await duplicateAssignment(id, { targetClassroomIds: [classroomId] })
+      if (result?.error) toast.error(result.error)
     })
   }
 
+  function moveToCategory(assignmentId: string, value: string | null) {
+    if (value === null) return
+    const categoryId = value === UNCATEGORIZED_VALUE ? null : value
+    startTransition(async () => {
+      const result = await setAssignmentCategory(classroomId, assignmentId, categoryId)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      setCategoryByAssignment(current => ({ ...current, [assignmentId]: categoryId }))
+      toast.success(categoryId ? 'ย้ายงานเข้าหมวดแล้ว' : 'ย้ายงานไปยังไม่จัดหมวดแล้ว')
+    })
+  }
+
+  function handleCategoriesChange(nextCategories: AssignmentCategory[]) {
+    const known = new Set(nextCategories.map(category => category.id))
+    setCategories(nextCategories)
+    setCategoryByAssignment(current => Object.fromEntries(
+      Object.entries(current).map(([assignmentId, categoryId]) => [
+        assignmentId,
+        categoryId && known.has(categoryId) ? categoryId : null,
+      ]),
+    ))
+  }
+
   return (
-    <div className="space-y-3">
-      {/* Filter chips + create button */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {([
-          { key: 'all', label: 'ทั้งหมด' },
-          { key: 'exercise', label: 'แบบฝึกหัด' },
-          { key: 'exam', label: 'ข้อสอบ' },
-        ] as { key: TypeFilter; label: string }[]).map(f => (
-          <button
-            key={f.key}
-            onClick={() => setTypeFilter(f.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              typeFilter === f.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        <Link
-          href={`/assignments/new?classroom=${classroomId}`}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-colors"
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          value={[typeFilter]}
+          onValueChange={values => {
+            const next = values.at(-1)
+            if (next === 'all' || next === 'exercise' || next === 'exam') setTypeFilter(next)
+          }}
+          aria-label="กรองประเภทงาน"
+          size="sm"
+          spacing={1}
+          className="rounded-xl bg-muted p-1"
         >
-          <Plus className="w-3.5 h-3.5" /> มอบหมายงานใหม่
-        </Link>
+          <ToggleGroupItem value="all">ทั้งหมด</ToggleGroupItem>
+          <ToggleGroupItem value="exercise">แบบฝึกหัด</ToggleGroupItem>
+          <ToggleGroupItem value="exam">ข้อสอบ</ToggleGroupItem>
+        </ToggleGroup>
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <AssignmentCategoryManager
+            classroomId={classroomId}
+            categories={categories}
+            assignmentCounts={assignmentCounts}
+            onChange={handleCategoriesChange}
+          />
+          <Button size="sm" render={<Link href={`/assignments/new?classroom=${classroomId}`} />}>
+            <Plus data-icon="inline-start" />
+            มอบหมายงานใหม่
+          </Button>
+        </div>
       </div>
 
-      {/* List */}
-      <Card edge="ring" className="overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            {assignments.length === 0 ? 'ยังไม่มีงานที่มอบหมายให้ห้องนี้' : 'ไม่พบงานที่ตรงกับตัวกรอง'}
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {filtered.map(a => {
-              const statusCfg = STATUS_CFG[a.status] ?? STATUS_CFG.draft
-              const typeCfg = TYPE_CFG[a.type] ?? TYPE_CFG.exam
-              const TypeIcon = typeCfg.icon
-              const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
-              // A งาน for some กลุ่มย่อย is measured against those students only.
-              const audience = audienceByAssignment?.get(a.id) ?? null
-              const stats = computeAssignmentProgress(a, submissions, audience)
-              const expected = audience?.size ?? studentCount
-              const pendingReview = pendingReviewByAssignment?.[a.id] ?? 0
-              // Land straight on the ตรวจ worklist when something is waiting,
-              // and on the plain results page when nothing is.
-              const gradeHref = pendingReview > 0
-                ? `/assignments/${a.id}/results?pending=1`
-                : `/assignments/${a.id}/results`
-              return (
-                <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
-                  <Link href={`/assignments/${a.id}`} className="flex-1 min-w-0 flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${typeCfg.bg}`}>
-                      <TypeIcon className={`w-4 h-4 ${typeCfg.text}`} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
-                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                        <span className="text-xs text-muted-foreground">
-                          {assignmentSizeLabel(a)}
-                        </span>
-                        {a.group_ids && (
-                          <span className="flex items-center gap-0.5 text-xs font-medium text-tint-1">
-                            <Grid3x3 className="w-3 h-3" /> เฉพาะ {describeGroupTarget(a.group_ids, groupNameById)}
-                          </span>
-                        )}
-                        {a.max_attempts != null && (
-                          <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                            <RefreshCw className="w-3 h-3" /> ทำได้ {a.max_attempts} ครั้ง
-                          </span>
-                        )}
-                        {passingThreshold && (
-                          <span className="flex items-center gap-0.5 text-xs text-warning">
-                            <Target className="w-3 h-3" /> เกณฑ์ผ่าน {passingThreshold}
-                          </span>
-                        )}
-                        {a.max_attempts !== 1 && (
-                          <span className="text-xs text-muted-foreground">
-                            · เก็บ{SCORE_STRATEGY_LABELS[a.score_strategy]}
-                          </span>
-                        )}
-                        {a.end_at && (
-                          <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                            <Clock className="w-3 h-3" /> {new Date(a.end_at).toLocaleDateString('th-TH')}
-                          </span>
-                        )}
-                        {a.status !== 'draft' && (
-                          a.type === 'exercise' ? (
-                            <span className="flex items-center gap-0.5 text-xs text-success">
-                              <CheckCircle2 className="w-3 h-3" /> ทำเสร็จ {stats.completed}/{expected} คน
-                            </span>
-                          ) : (
-                            <>
-                              <span className="flex items-center gap-0.5 text-xs text-primary">
-                                <Users className="w-3 h-3" /> เข้าทำ {stats.attempted}/{expected} คน
-                              </span>
-                              {passingThreshold && (
-                                <span className="flex items-center gap-0.5 text-xs text-success">
-                                  <CheckCircle2 className="w-3 h-3" /> ผ่าน {stats.passed}/{expected} คน
+      {filtered.length === 0 ? (
+        <Card edge="ring" className="py-12 text-center text-sm text-muted-foreground">
+          {assignments.length === 0 ? 'ยังไม่มีงานที่มอบหมายให้ห้องนี้' : 'ไม่พบงานที่ตรงกับตัวกรอง'}
+        </Card>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sections.map(section => {
+            const preset = section.category ? groupPreset(section.category.color) : null
+            const sectionKey = section.category?.id ?? UNCATEGORIZED_VALUE
+            return (
+              <Card key={sectionKey} edge="ring" className="overflow-hidden">
+                {categories.length > 0 && (
+                  <div className={cn(
+                    'flex items-center gap-2 border-b px-4 py-2.5',
+                    preset?.surface ?? 'bg-muted/40',
+                  )}>
+                    <Folder className={cn('size-4', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
+                    <h3 className={cn('text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
+                      {section.category?.name ?? 'ยังไม่จัดหมวด'}
+                    </h3>
+                    <span className={cn('text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
+                      {section.assignments.length} งาน
+                    </span>
+                  </div>
+                )}
+                <div className="divide-y divide-border">
+                  {section.assignments.map(assignment => {
+                    const statusCfg = STATUS_CFG[assignment.status] ?? STATUS_CFG.draft
+                    const typeCfg = TYPE_CFG[assignment.type] ?? TYPE_CFG.exam
+                    const TypeIcon = typeCfg.icon
+                    const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
+                    const audience = audienceByAssignment?.get(assignment.id) ?? null
+                    const stats = computeAssignmentProgress(assignment, submissions, audience)
+                    const expected = audience?.size ?? studentCount
+                    const pendingReview = pendingReviewByAssignment?.[assignment.id] ?? 0
+                    const gradeHref = pendingReview > 0
+                      ? `/assignments/${assignment.id}/results?pending=1`
+                      : `/assignments/${assignment.id}/results`
+
+                    return (
+                      <div
+                        key={assignment.id}
+                        className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-muted/50 md:flex-row md:items-center"
+                      >
+                        <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                          <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
+                            <TypeIcon className={cn('size-4', typeCfg.text)} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">{assignment.title}</p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{assignmentSizeLabel(assignment)}</span>
+                              {assignment.group_ids && (
+                                <span className="flex items-center gap-0.5 text-xs font-medium text-tint-1">
+                                  <Grid3x3 className="size-3" /> เฉพาะ {describeGroupTarget(assignment.group_ids, groupNameById)}
                                 </span>
                               )}
-                            </>
-                          )
-                        )}
-                        {pendingReview > 0 && (
-                          <span className="flex items-center gap-0.5 text-xs font-medium text-warning">
-                            <ClipboardCheck className="w-3 h-3" /> รอตรวจ {pendingReview} ชิ้น
+                              {assignment.max_attempts != null && (
+                                <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                  <RefreshCw className="size-3" /> ทำได้ {assignment.max_attempts} ครั้ง
+                                </span>
+                              )}
+                              {passingThreshold && (
+                                <span className="flex items-center gap-0.5 text-xs text-warning">
+                                  <Target className="size-3" /> เกณฑ์ผ่าน {passingThreshold}
+                                </span>
+                              )}
+                              {assignment.max_attempts !== 1 && (
+                                <span className="text-xs text-muted-foreground">· เก็บ{SCORE_STRATEGY_LABELS[assignment.score_strategy]}</span>
+                              )}
+                              {assignment.end_at && (
+                                <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                  <Clock className="size-3" /> {new Date(assignment.end_at).toLocaleDateString('th-TH')}
+                                </span>
+                              )}
+                              {assignment.status !== 'draft' && (
+                                assignment.type === 'exercise' ? (
+                                  <span className="flex items-center gap-0.5 text-xs text-success">
+                                    <CheckCircle2 className="size-3" /> ทำเสร็จ {stats.completed}/{expected} คน
+                                  </span>
+                                ) : (
+                                  <>
+                                    <span className="flex items-center gap-0.5 text-xs text-primary">
+                                      <Users className="size-3" /> เข้าทำ {stats.attempted}/{expected} คน
+                                    </span>
+                                    {passingThreshold && (
+                                      <span className="flex items-center gap-0.5 text-xs text-success">
+                                        <CheckCircle2 className="size-3" /> ผ่าน {stats.passed}/{expected} คน
+                                      </span>
+                                    )}
+                                  </>
+                                )
+                              )}
+                              {pendingReview > 0 && (
+                                <span className="flex items-center gap-0.5 text-xs font-medium text-warning">
+                                  <ClipboardCheck className="size-3" /> รอตรวจ {pendingReview} ชิ้น
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+
+                        <div className="flex items-center gap-2 overflow-x-auto md:overflow-visible">
+                          <Select
+                            value={assignment.category_id ?? UNCATEGORIZED_VALUE}
+                            onValueChange={value => moveToCategory(assignment.id, value)}
+                            disabled={isPending}
+                          >
+                            <SelectTrigger size="sm" className="max-w-40" aria-label={`หมวดของ ${assignment.title}`}>
+                              <Folder />
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectGroup>
+                                <SelectItem value={UNCATEGORIZED_VALUE}>ยังไม่จัดหมวด</SelectItem>
+                                {categories.map(category => (
+                                  <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          {pendingReview > 0 && (
+                            <Button variant="outline" size="sm" render={<Link href={gradeHref} />}>
+                              <ClipboardCheck data-icon="inline-start" />
+                              <span className="hidden lg:inline">ตรวจให้คะแนน</span>
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            render={(
+                              <Link
+                                href={`/assignments/${assignment.id}/preview`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`ดู ${assignment.title} ในมุมนักเรียน`}
+                                title="เปิดตัวอย่างในมุมนักเรียน"
+                              />
+                            )}
+                          >
+                            <Eye data-icon="inline-start" />
+                            <span className="hidden xl:inline">ดูในมุมนักเรียน</span>
+                          </Button>
+                          <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
+                            {typeCfg.label}
                           </span>
-                        )}
+                          <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', statusCfg.bg, statusCfg.text)}>
+                            {statusCfg.label}
+                          </span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground"
+                              aria-label={`เมนูของ ${assignment.title}`}
+                            >
+                              <MoreVertical className="size-3.5" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuGroup>
+                                <DropdownMenuItem render={<Link href={gradeHref} />}>
+                                  <ClipboardCheck /> ตรวจให้คะแนน
+                                  {pendingReview > 0 && <span className="ml-auto text-xs font-semibold text-warning">{pendingReview}</span>}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem render={<Link href={`/assignments/${assignment.id}/edit`} />}>
+                                  <Pencil /> แก้ไขรายละเอียด
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicate(assignment.id)} disabled={isPending}>
+                                  <Copy /> ทำสำเนามาห้องนี้
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onViewScores?.()}>
+                                  <BarChart3 /> ดูคะแนน
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                  {pendingReview > 0 && (
-                    <Link
-                      href={gradeHref}
-                      className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-warning/10 text-warning hover:bg-warning/20 text-xs font-semibold shrink-0 transition-colors"
-                    >
-                      <ClipboardCheck className="w-3.5 h-3.5" /> ตรวจให้คะแนน
-                    </Link>
-                  )}
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeCfg.bg} ${typeCfg.text}`}>
-                    {typeCfg.label}
-                  </span>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusCfg.bg} ${statusCfg.text}`}>
-                    {statusCfg.label}
-                  </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-muted-foreground transition-colors outline-none shrink-0">
-                      <MoreVertical className="w-3.5 h-3.5" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem render={<Link href={gradeHref} />}>
-                        <ClipboardCheck className="w-3.5 h-3.5 text-muted-foreground" /> ตรวจให้คะแนน
-                        {pendingReview > 0 && <span className="ml-auto text-xs font-semibold text-warning">{pendingReview}</span>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem render={<Link href={`/assignments/${a.id}/edit`} />}>
-                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" /> แก้ไขรายละเอียด
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDuplicate(a.id)} disabled={isPending}>
-                        <Copy className="w-3.5 h-3.5 text-muted-foreground" /> ทำสำเนามาห้องนี้
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onViewScores?.()}>
-                        <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" /> ดูคะแนน
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </Card>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

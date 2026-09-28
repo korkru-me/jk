@@ -13,6 +13,7 @@ import { isAttemptExpired } from '@/lib/grading'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
+import type { AssignmentCategory } from '@/lib/assignment-categories'
 import {
   classroomNavigationFor,
   resolveClassroomNavigationKey,
@@ -114,10 +115,23 @@ export default async function ClassroomDetailPage({
       )
     }
 
-    const [{ data: teacherProfile }, { count: studentCount }, { data: links }, posts, { data: myGroup }] = await Promise.all([
+    const [
+      { data: teacherProfile },
+      { count: studentCount },
+      { data: links },
+      { data: assignmentCategoryRows },
+      posts,
+      { data: myGroup },
+    ] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
-      admin.from('assignment_classrooms').select('assignment_id, group_ids').eq('classroom_id', id),
+      admin.from('assignment_classrooms').select('assignment_id, group_ids, category_id').eq('classroom_id', id),
+      admin
+        .from('classroom_assignment_categories')
+        .select('id, classroom_id, name, color, position')
+        .eq('classroom_id', id)
+        .order('position')
+        .order('created_at'),
       getClassroomPosts(id),
       admin
         .from('classroom_group_members')
@@ -127,6 +141,9 @@ export default async function ClassroomDetailPage({
         .maybeSingle(),
     ])
     const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+    const categoryByAssignment = new Map(
+      (links ?? []).map((link: any) => [link.assignment_id as string, link.category_id as string | null]),
+    )
     // งาน handed to กลุ่มย่อย the student is not in stay off this page — unless
     // they already started it (checked once their attempts are loaded below).
     const reachedIds = new Set(
@@ -204,6 +221,7 @@ export default async function ClassroomDetailPage({
         passing_type: a.passing_type,
         passing_value: a.passing_value,
         show_results: a.show_results,
+        category_id: categoryByAssignment.get(a.id) ?? null,
         attempts_used: attemptsUsed[a.id] ?? 0,
         has_in_progress: hasInProgress[a.id] ?? false,
         submission: subMap[a.id]
@@ -217,6 +235,7 @@ export default async function ClassroomDetailPage({
         teacherName={teacherProfile?.full_name ?? 'ครูผู้สอน'}
         studentCount={studentCount ?? 0}
         assignments={assignments}
+        categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
         posts={posts}
       />
     )
@@ -258,6 +277,7 @@ export default async function ClassroomDetailPage({
     { data: inviteRows },
     { data: memberships },
     { data: assignmentLinkRows },
+    { data: assignmentCategoryRows },
     { data: ownerProfile },
     { data: otherClassroomRows },
     { data: coTeachingClassroomRows },
@@ -286,9 +306,17 @@ export default async function ClassroomDetailPage({
     c.classroom_type === 'subject'
       ? admin
           .from('assignment_classrooms')
-          .select('assignment_id, display_order, group_ids')
+          .select('assignment_id, display_order, group_ids, category_id')
           .eq('classroom_id', id)
-      : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null; group_ids: string[] | null }[] }),
+      : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null; group_ids: string[] | null; category_id: string | null }[] }),
+    c.classroom_type === 'subject' && canManage
+      ? admin
+          .from('classroom_assignment_categories')
+          .select('id, classroom_id, name, color, position')
+          .eq('classroom_id', id)
+          .order('position')
+          .order('created_at')
+      : Promise.resolve({ data: [] as AssignmentCategory[] }),
     admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
     admin
       .from('classrooms')
@@ -353,6 +381,10 @@ export default async function ClassroomDetailPage({
   const groupIdsByAssignment = new Map(
     (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, (l.group_ids ?? null) as string[] | null])
   )
+  const categoryByAssignment = new Map(
+    (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, (l.category_id ?? null) as string | null])
+  )
+  const assignmentCategories = (assignmentCategoryRows ?? []) as AssignmentCategory[]
   const groups = (groupRows ?? []) as ClassroomGroup[]
   // Members of students still on the roster only; the FK cascade makes a
   // leftover impossible, but the roster read and this one are not atomic.
@@ -373,6 +405,7 @@ export default async function ClassroomDetailPage({
     max_attempts: number | null; score_strategy: 'best' | 'average' | 'latest'
     display_order: number | null
     group_ids: string[] | null
+    category_id: string | null
   }[] = []
   let classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
@@ -430,6 +463,7 @@ export default async function ClassroomDetailPage({
       ...a,
       display_order: displayOrderByAssignment.get(a.id) ?? null,
       group_ids: groupIdsByAssignment.get(a.id) ?? null,
+      category_id: categoryByAssignment.get(a.id) ?? null,
     }))
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map(a => [a.id as string, (a as any).display_max_score as number | null]))
     classroomSubmissions = rescaleToDisplayMax(
@@ -551,6 +585,7 @@ export default async function ClassroomDetailPage({
       coTeachers={coTeachers}
       invites={invites}
       classroomAssignments={classroomAssignments}
+      assignmentCategories={assignmentCategories}
       classroomSubmissions={classroomSubmissions}
       classroomExtensions={classroomExtensions}
       homeroomAssignments={homeroomAssignments}

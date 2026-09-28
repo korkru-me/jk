@@ -22,10 +22,15 @@ export interface GroupStudent { id: string; full_name: string }
 // ── Colour swatches ────────────────────────────────────────────────────────
 
 export function GroupColorSwatches({
-  value, onChange, idPrefix,
-}: { value: GroupColorId; onChange: (color: GroupColorId) => void; idPrefix: string }) {
+  value, onChange, idPrefix, ariaLabel = 'สีของกลุ่ม',
+}: {
+  value: GroupColorId
+  onChange: (color: GroupColorId) => void
+  idPrefix: string
+  ariaLabel?: string
+}) {
   return (
-    <div role="radiogroup" aria-label="สีของกลุ่ม" className="flex flex-wrap gap-1.5">
+    <div role="radiogroup" aria-label={ariaLabel} className="flex flex-wrap gap-1.5">
       {GROUP_COLOR_IDS.map(id => {
         const preset = groupPreset(id)
         const selected = value === id

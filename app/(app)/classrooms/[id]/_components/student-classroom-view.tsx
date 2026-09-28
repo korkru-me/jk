@@ -4,6 +4,7 @@ import { ClassroomStream } from './classroom-stream'
 import { AssignmentList } from './assignment-list'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
 import type { Classroom, ClassroomPost } from '@/lib/types'
+import type { AssignmentCategory } from '@/lib/assignment-categories'
 import { Card } from '@/components/ui/card'
 import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
@@ -14,10 +15,11 @@ interface Props {
   teacherName: string
   studentCount: number
   assignments: StudentAssignmentRow[]
+  categories: AssignmentCategory[]
   posts: ClassroomPost[]
 }
 
-export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, posts }: Props) {
+export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, categories, posts }: Props) {
   const doneCount = assignments.filter(isCompleted).length
 
   return (
@@ -90,7 +92,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
             <p className="text-sm text-muted-foreground mt-1">ครูจะมอบหมายแบบฝึกหัดหรือข้อสอบให้ที่นี่</p>
           </Card>
         ) : (
-          <AssignmentList assignments={assignments} />
+          <AssignmentList assignments={assignments} categories={categories} />
         )}
       </div>
     </div>

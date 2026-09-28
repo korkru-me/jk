@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, Clock, AlertCircle, CheckCircle2, XCircle, RotateCcw, Target, FileText, Repeat } from 'lucide-react'
+import { BookOpen, Clock, AlertCircle, CheckCircle2, XCircle, RotateCcw, Target, FileText, Repeat, Folder } from 'lucide-react'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
@@ -10,6 +10,11 @@ import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
 import { Card } from '@/components/ui/card'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
+import {
+  groupAssignmentsByCategory,
+  type AssignmentCategory,
+} from '@/lib/assignment-categories'
 
 export type { StudentAssignmentRow }
 
@@ -33,7 +38,13 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
 type StatusFilterKey = 'all' | 'pending' | 'done'
 type TypeFilterKey = 'all' | 'exam' | 'exercise'
 
-export function AssignmentList({ assignments }: { assignments: StudentAssignmentRow[] }) {
+export function AssignmentList({
+  assignments,
+  categories,
+}: {
+  assignments: StudentAssignmentRow[]
+  categories: AssignmentCategory[]
+}) {
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
   const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all')
 
@@ -56,6 +67,7 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
 
   const byStatus = statusFilter === 'pending' ? pending : statusFilter === 'done' ? done : assignments
   const visible = typeFilter === 'all' ? byStatus : byStatus.filter(a => a.type === typeFilter)
+  const sections = groupAssignmentsByCategory(visible, categories)
 
   return (
     <div className="space-y-3">
@@ -107,10 +119,28 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {visible.map(a => (
-            <StudentAssignmentCard key={a.id} assignment={a} />
-          ))}
+        <div className="flex flex-col gap-4">
+          {sections.map(section => {
+            const preset = section.category ? groupPreset(section.category.color) : null
+            return (
+              <section key={section.category?.id ?? 'uncategorized'} className="flex flex-col gap-2">
+                {categories.length > 0 && (
+                  <div className="flex items-center gap-2 px-1">
+                    <span className={cn('flex size-7 items-center justify-center rounded-lg', preset?.surface ?? 'bg-muted')}>
+                      <Folder className={cn('size-3.5', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
+                    </span>
+                    <h3 className="text-sm font-semibold">{section.category?.name ?? 'งานอื่น ๆ'}</h3>
+                    <span className="text-xs text-muted-foreground">{section.assignments.length} งาน</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {section.assignments.map(assignment => (
+                    <StudentAssignmentCard key={assignment.id} assignment={assignment} />
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
       )}
     </div>

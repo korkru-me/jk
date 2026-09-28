@@ -19,6 +19,7 @@ import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { IconButton } from '@/components/ui/icon-button'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
+import type { AssignmentCategory } from '@/lib/assignment-categories'
 import {
   classroomNavigationHref,
   classroomNavigationFor,
@@ -69,6 +70,7 @@ interface Props {
   coTeachers: CoTeacherRow[]
   invites: InviteRow[]
   classroomAssignments: ClassroomAssignmentRow[]
+  assignmentCategories: AssignmentCategory[]
   classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
     total_score: number | null; max_score: number; submitted_at: string | null; attempt_number: number
@@ -100,7 +102,7 @@ interface Props {
 
 export function ClassroomDetailClient({
   classroom, switchableClassrooms, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
-  classroomAssignments, classroomSubmissions, classroomExtensions,
+  classroomAssignments, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewByAssignment, seenByPost, crossPostTargets,
   groups, groupMembers, initialNavigationItem, backHref,
@@ -305,6 +307,7 @@ export function ClassroomDetailClient({
           <ClassroomAssignmentsTab
             classroomId={classroom.id}
             assignments={classroomAssignments}
+            categories={assignmentCategories}
             submissions={classroomSubmissions}
             studentCount={students.length}
             audienceByAssignment={audienceByAssignment}
