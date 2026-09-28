@@ -181,9 +181,9 @@ export function ClassroomOverview({
         </div>
       )}
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+      <div className="grid gap-5 xl:grid-cols-2">
         {/* ── Assignment progress ─────────────────────────────────────── */}
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0">
           <Section
             title={isHomeroom ? 'การบ้านที่กำลังติดตาม' : 'งานที่มอบหมาย'}
             note={ordered.length > 0
@@ -226,7 +226,7 @@ export function ClassroomOverview({
         </div>
 
         {/* ── Side column ─────────────────────────────────────────────── */}
-        <div className="space-y-4">
+        <div className="min-w-0">
           <Section
             title="นักเรียนที่ควรติดตาม"
             note={behindAll.length > 0 ? `${behindAll.length} คน` : undefined}
@@ -268,7 +268,7 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="h-full overflow-hidden">
       <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {title}
