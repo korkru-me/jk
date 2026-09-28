@@ -85,10 +85,6 @@ interface Props {
   studentProfiles: Record<string, StudentProfileRow>
   ownerName: string
   posts: ClassroomPost[]
-  /** Hand-ins with at least one answer still waiting for a teacher's score. */
-  pendingReviewCount: number
-  /** The lookup above stops at a row cap — true means the count is a floor. */
-  pendingReviewCapped: boolean
   /** The same waiting hand-ins split per งาน, keyed by assignment id. */
   pendingReviewByAssignment: Record<string, number>
   /** Student ids that have seen each announcement, keyed by post id. */
@@ -106,7 +102,7 @@ export function ClassroomDetailClient({
   classroom, switchableClassrooms, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
   classroomAssignments, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
-  pendingReviewCount, pendingReviewCapped, pendingReviewByAssignment, seenByPost, crossPostTargets,
+  pendingReviewByAssignment, seenByPost, crossPostTargets,
   groups, groupMembers, initialNavigationItem, backHref,
 }: Props) {
   const router = useRouter()
@@ -284,8 +280,6 @@ export function ClassroomDetailClient({
             assignments={classroomAssignments}
             homeroomAssignments={homeroomAssignments}
             submissions={isHomeroom ? homeroomSubmissions : classroomSubmissions}
-            pendingReviewCount={pendingReviewCount}
-            pendingReviewCapped={pendingReviewCapped}
             posts={posts}
             seenByPost={seenByPost}
             crossPostTargets={crossPostTargets}

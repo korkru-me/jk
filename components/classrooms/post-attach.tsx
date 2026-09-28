@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Paperclip, X } from 'lucide-react'
 import { downscaleImage } from '@/lib/image-downscale'
@@ -36,6 +36,8 @@ interface Props {
   attachments: PostAttachment[]
   onChange: (attachments: PostAttachment[]) => void
   disabled?: boolean
+  /** An adjacent composer action, such as attaching a web link. */
+  action?: ReactNode
 }
 
 /**
@@ -48,7 +50,7 @@ interface Props {
  * from the database only drops the reference, because the post being edited
  * may still be cancelled and a deleted file cannot be brought back.
  */
-export function PostAttach({ attachments, onChange, disabled }: Props) {
+export function PostAttach({ attachments, onChange, disabled, action }: Props) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const uploadedHere = useRef(new Set<string>())
@@ -146,17 +148,20 @@ export function PostAttach({ attachments, onChange, disabled }: Props) {
         </div>
       )}
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled={disabled || uploading || remaining <= 0}
-        onClick={() => inputRef.current?.click()}
-      >
-        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
-        {uploading ? 'กำลังอัปโหลด...' : remaining <= 0 ? `แนบได้สูงสุด ${MAX_POST_ATTACHMENTS} ไฟล์` : 'แนบไฟล์/รูป'}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          disabled={disabled || uploading || remaining <= 0}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+          {uploading ? 'กำลังอัปโหลด...' : remaining <= 0 ? `แนบได้สูงสุด ${MAX_POST_ATTACHMENTS} ไฟล์` : 'แนบไฟล์/รูป'}
+        </Button>
+        {action}
+      </div>
     </div>
   )
 }

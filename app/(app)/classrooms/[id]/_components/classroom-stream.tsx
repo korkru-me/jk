@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   MoreVertical, Pin, PinOff, Pencil, Trash2, Send, MessageCircle, Link2, Megaphone,
-  Paperclip, Download, Eye, ChevronDown, ChevronUp, Users,
+  Paperclip, Download, Eye, ChevronDown, ChevronUp, Users, ExternalLink, Globe2, Video,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,6 +17,9 @@ import {
   addComment, markPostsSeen,
 } from '@/lib/actions/classroom-posts'
 import { linkify, shortenUrl } from '@/lib/linkify'
+import {
+  announcementLinks, appendAnnouncementLink, normalizeAnnouncementUrl,
+} from '@/lib/announcement-links'
 import {
   attachmentKindLabel, formatFileSize, isImageAttachment, shortenFileName,
   type PostAttachment,
@@ -73,6 +76,7 @@ export function ClassroomStream({
   const [attachments, setAttachments] = useState<PostAttachment[]>([])
   const [alsoIn, setAlsoIn] = useState<string[]>([])
   const [showTargets, setShowTargets] = useState(false)
+  const [showLinkField, setShowLinkField] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const isPanel = variant === 'panel'
@@ -87,6 +91,7 @@ export function ClassroomStream({
       setAttachments([])
       setAlsoIn([])
       setShowTargets(false)
+      setShowLinkField(false)
       // Say where it actually landed. A cross-post that reached three rooms out
       // of four must not report itself as a plain success.
       const extra = (res?.postedTo ?? 1) - 1
@@ -137,8 +142,34 @@ export function ClassroomStream({
         </div>
       )}
 
+      {showLinkField && (
+        <AnnouncementLinkField
+          onAdd={href => {
+            setDraft(body => appendAnnouncementLink(body, href))
+            setShowLinkField(false)
+          }}
+          onCancel={() => setShowLinkField(false)}
+        />
+      )}
+
       <div className="flex items-end justify-between gap-2 flex-wrap">
-        <PostAttach attachments={attachments} onChange={setAttachments} disabled={isPending} />
+        <PostAttach
+          attachments={attachments}
+          onChange={setAttachments}
+          disabled={isPending}
+          action={(
+            <Button
+              type="button"
+              variant={showLinkField ? 'secondary' : 'outline'}
+              size="sm"
+              className="gap-1.5"
+              aria-expanded={showLinkField}
+              onClick={() => setShowLinkField(open => !open)}
+            >
+              <Link2 className="w-3.5 h-3.5" /> แนบลิงก์
+            </Button>
+          )}
+        />
         <Button size="sm" className="gap-1.5" disabled={isPending || !canSubmit} onClick={submitPost}>
           <Send className="w-3.5 h-3.5" /> โพสต์ประกาศ
         </Button>
@@ -223,6 +254,130 @@ function PostBody({ body }: { body: string }) {
         )
       ))}
     </p>
+  )
+}
+
+/**
+ * A deliberate link attachment is still stored in the announcement body, so
+ * it travels through edit and cross-post without adding a second database
+ * shape. This control gives that simple model clear validation and feedback.
+ */
+function AnnouncementLinkField({
+  onAdd, onCancel,
+}: {
+  onAdd: (href: string) => void
+  onCancel: () => void
+}) {
+  const inputId = useId()
+  const [value, setValue] = useState('')
+  const [error, setError] = useState('')
+
+  function add() {
+    const href = normalizeAnnouncementUrl(value)
+    if (!href) {
+      setError('ใส่ลิงก์เว็บไซต์ที่ขึ้นต้นด้วย http:// หรือ https://')
+      return
+    }
+    onAdd(href)
+  }
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+      <label className="mb-1.5 block text-xs font-medium" htmlFor={inputId}>
+        ลิงก์ที่ต้องการแนบ
+      </label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          id={inputId}
+          type="url"
+          inputMode="url"
+          autoFocus
+          placeholder="https://example.com หรือ YouTube"
+          value={value}
+          aria-invalid={!!error}
+          onChange={event => {
+            setValue(event.target.value)
+            if (error) setError('')
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              add()
+            }
+            if (event.key === 'Escape') onCancel()
+          }}
+        />
+        <div className="flex gap-2">
+          <Button type="button" size="sm" className="shrink-0" disabled={!value.trim()} onClick={add}>
+            เพิ่มลิงก์
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onCancel}>
+            ยกเลิก
+          </Button>
+        </div>
+      </div>
+      {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        ลิงก์ YouTube จะแสดงวิดีโอให้เปิดดูได้จากประกาศโดยตรง
+      </p>
+    </div>
+  )
+}
+
+/** Rich previews for URLs in the announcement. YouTube is the only embeddable
+ * host; every video id is reduced to a strict eleven-character allowlist by
+ * announcementLinks before it can enter the iframe URL. */
+function PostLinkPreviews({ body }: { body: string }) {
+  const links = announcementLinks(body)
+  if (links.length === 0) return null
+
+  return (
+    <div className="mt-2.5 grid gap-2">
+      {links.map(link => link.youtubeVideoId ? (
+        <div key={link.href} className="max-w-xl overflow-hidden rounded-xl border border-border bg-muted/30">
+          <div className="flex items-center justify-between gap-3 px-3 py-2">
+            <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
+              <Video className="h-4 w-4 shrink-0 text-destructive" />
+              <span className="truncate">วิดีโอ YouTube</span>
+            </span>
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
+            >
+              เปิดบน YouTube <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${link.youtubeVideoId}`}
+            title="วิดีโอ YouTube ที่แนบในประกาศ"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+            className="aspect-video w-full border-0 bg-foreground"
+          />
+        </div>
+      ) : (
+        <a
+          key={link.href}
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="flex max-w-xl items-center gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2.5 transition-colors hover:bg-muted"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-primary">
+            <Globe2 className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{link.host}</span>
+            <span className="block truncate text-xs text-muted-foreground">{shortenUrl(link.href, 64)}</span>
+          </span>
+          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </a>
+      ))}
+    </div>
   )
 }
 
@@ -343,6 +498,7 @@ function PostCard({
   const [isEditing, setIsEditing] = useState(false)
   const [editBody, setEditBody] = useState(post.body)
   const [editAttachments, setEditAttachments] = useState<PostAttachment[]>(post.attachments ?? [])
+  const [showEditLinkField, setShowEditLinkField] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [showComments, setShowComments] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
@@ -387,7 +543,12 @@ function PostCard({
     startTransition(async () => {
       const res = await updateClassroomPost(post.id, classroomId, editBody, editAttachments)
       if (res?.error) toast.error(res.error)
-      else { setIsEditing(false); toast.success('แก้ไขประกาศแล้ว'); router.refresh() }
+      else {
+        setIsEditing(false)
+        setShowEditLinkField(false)
+        toast.success('แก้ไขประกาศแล้ว')
+        router.refresh()
+      }
     })
   }
 
@@ -447,10 +608,36 @@ function PostCard({
           {isEditing ? (
             <div className="mt-2 space-y-2">
               <Textarea value={editBody} onChange={e => setEditBody(e.target.value)} className="min-h-20" />
-              <PostAttach attachments={editAttachments} onChange={setEditAttachments} disabled={isPending} />
+              {showEditLinkField && (
+                <AnnouncementLinkField
+                  onAdd={href => {
+                    setEditBody(body => appendAnnouncementLink(body, href))
+                    setShowEditLinkField(false)
+                  }}
+                  onCancel={() => setShowEditLinkField(false)}
+                />
+              )}
+              <PostAttach
+                attachments={editAttachments}
+                onChange={setEditAttachments}
+                disabled={isPending}
+                action={(
+                  <Button
+                    type="button"
+                    variant={showEditLinkField ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="gap-1.5"
+                    aria-expanded={showEditLinkField}
+                    onClick={() => setShowEditLinkField(open => !open)}
+                  >
+                    <Link2 className="w-3.5 h-3.5" /> แนบลิงก์
+                  </Button>
+                )}
+              />
               <div className="flex gap-2 justify-end">
                 <Button size="sm" variant="outline" onClick={() => {
                   setIsEditing(false)
+                  setShowEditLinkField(false)
                   setEditBody(post.body)
                   setEditAttachments(post.attachments ?? [])
                 }}>
@@ -468,6 +655,7 @@ function PostCard({
           ) : (
             <>
               <PostBody body={post.body} />
+              <PostLinkPreviews body={post.body} />
               <PostAttachments attachments={attachments} />
               {canManage && (
                 <div className="mt-2">

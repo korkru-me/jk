@@ -381,14 +381,10 @@ export default async function ClassroomDetailPage({
   let classroomExtensions: {
     id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
   }[] = []
-  // How much hand-in is still waiting for a person to score it. Auto-grading
-  // leaves `is_correct` null exactly on the answers a teacher has to read
-  // (essays, manual fill-blanks) — the same rule the submission page uses.
-  // Answer rows, not submissions, so the read is capped: past the cap the
-  // overview says "n+" instead of pretending to know the exact number.
+  // Auto-grading leaves `is_correct` null exactly on the answers a teacher has
+  // to read (essays, manual fill-blanks). Answer rows are capped to keep this
+  // classroom-level read bounded; the assignment tab shows the counts per งาน.
   const PENDING_REVIEW_ROW_CAP = 1000
-  let pendingReviewCount = 0
-  let pendingReviewCapped = false
   // How many hand-ins are waiting per งาน, keyed by assignment id.
   let pendingReviewByAssignment: Record<string, number> = {}
   if (c.classroom_type === 'subject' && canManage && linkedAssignmentIds.length > 0) {
@@ -416,21 +412,17 @@ export default async function ClassroomDetailPage({
         .limit(PENDING_REVIEW_ROW_CAP),
     ])
 
-    const pendingSubmissionIds = new Set<string>()
     // Same rows, also split per งาน so the "งานที่มอบหมาย" tab can put the
     // count on the งาน it belongs to instead of only on the overview total.
     const pendingSubmissionIdsByAssignment = new Map<string, Set<string>>()
     for (const row of (pendingAnswerRows ?? []) as any[]) {
       if (!rosterIds.has(row.submissions?.student_id)) continue
-      pendingSubmissionIds.add(row.submission_id as string)
       const assignmentId = row.submissions?.assignment_id as string | undefined
       if (!assignmentId) continue
       let set = pendingSubmissionIdsByAssignment.get(assignmentId)
       if (!set) { set = new Set<string>(); pendingSubmissionIdsByAssignment.set(assignmentId, set) }
       set.add(row.submission_id as string)
     }
-    pendingReviewCount = pendingSubmissionIds.size
-    pendingReviewCapped = (pendingAnswerRows?.length ?? 0) >= PENDING_REVIEW_ROW_CAP
     pendingReviewByAssignment = Object.fromEntries(
       Array.from(pendingSubmissionIdsByAssignment, ([assignmentId, set]) => [assignmentId, set.size])
     )
@@ -567,8 +559,6 @@ export default async function ClassroomDetailPage({
       studentProfiles={studentProfiles}
       ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
       posts={posts}
-      pendingReviewCount={pendingReviewCount}
-      pendingReviewCapped={pendingReviewCapped}
       pendingReviewByAssignment={pendingReviewByAssignment}
       seenByPost={seenByPost}
       crossPostTargets={crossPostTargets}
