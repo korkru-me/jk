@@ -40,6 +40,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ตรวจผู้ใช้ด้วย session ก่อน แล้วตรวจ ownership/membership/permission อย่างชัดเจน
 - จำกัด query ด้วย resource ID และ tenant ที่ตรวจแล้ว
 - อย่าใช้ admin client เพียงเพื่อทำให้ query ที่ติด RLS “ผ่าน”
+- **หน้าที่รับ resource ID จาก URL ต้องปฏิเสธทุกบทบาทก่อน query ด้วย admin** ไม่ใช่เฉพาะนักเรียน — `role = teacher|admin` บอกแค่ว่าเป็นครู ไม่ได้บอกว่าเป็นครูของห้องนี้ · หน้า `/classrooms/[id]` เคยตรวจ roster เฉพาะฝั่งนักเรียน ครูคนใดก็ได้ที่รู้ UUID ของห้องจึงได้แถว `classrooms` ทั้งแถว (รวม `class_code` ที่ใช้เข้าห้อง) รายชื่อ + อีเมลนักเรียน รายชื่อ + อีเมลครูร่วม และ **token ลิงก์เชิญครูร่วมที่ยังใช้ได้** (ซึ่งเอาไปกดรับเป็นครูร่วมของห้องนั้นได้) ส่วนคะแนน งานที่ส่ง และ `student_profiles` ไม่รั่วเพราะผูกกับ `canManage` และประกาศอ่านผ่าน RLS แก้ 27 ก.ย. 2026 ให้ตอบ 404 เมื่อไม่ใช่ `classrooms.teacher_id` และไม่มีแถวใน `classroom_co_teachers` · super admin (`super_admins`) ไม่ได้รับยกเว้นในหน้านี้ เพราะ server action ของห้องเรียน (`canManageClassroom`, `canManageAssignment`, co-teacher, บันทึกโฮมรูม) ไม่มีตัวไหนรับ super admin และยังไม่มี audit ของการเปิดดูห้องครูคนอื่น ถ้าต้องเปิดให้ platform support ดูห้องได้ ให้ทำเป็นเส้นทางแยกที่บันทึก audit · `/classrooms/[id]/report` ตรวจ owner/co-teacher `admin|manage` ถูกต้องอยู่แล้ว
 
 ## RLS และ multi-tenancy
 

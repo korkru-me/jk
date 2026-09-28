@@ -229,6 +229,13 @@ export default async function ClassroomDetailPage({
         .eq('classroom_id', id)
         .eq('user_id', authUser.id)
         .maybeSingle()).data
+  // Everything below is read with the admin client, so this is the only
+  // authorization the teaching side gets: a teacher who neither owns the room
+  // nor co-teaches it must not see its roster, co-teachers or invite links —
+  // the same 404 a student outside the roster gets. Platform super admins are
+  // not let in either; no classroom action accepts them yet (see
+  // docs/SECURITY.md, "Supabase admin client").
+  if (!isOwner && !myCoTeacherRow) notFound()
   const myCoTeacherPermission = myCoTeacherRow?.permission as 'admin' | 'manage' | 'view' | undefined
   const canManage = isOwner || myCoTeacherPermission === 'admin' || myCoTeacherPermission === 'manage'
   const hasGroups = c.classroom_type === 'subject' && (isOwner || myCoTeacherPermission !== undefined)
