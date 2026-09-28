@@ -76,7 +76,7 @@ export function ClassroomContextNavigation({
             <Button
               key={item.key}
               type="button"
-              variant={selected ? 'secondary' : item.key === 'invite' ? 'outline' : 'ghost'}
+              variant={selected ? 'navigation' : item.key === 'invite' ? 'outline' : 'ghost'}
               className={item.key === 'invite' ? 'mt-2 w-full justify-start' : 'w-full justify-start'}
               aria-current={selected ? 'page' : undefined}
               onClick={() => {

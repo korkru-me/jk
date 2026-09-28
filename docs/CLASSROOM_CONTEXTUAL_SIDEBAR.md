@@ -58,6 +58,8 @@
 
 รอบแก้ไขจึงใช้ contextual slot ใน app shell เพื่อให้หน้าในพื้นที่ห้องเรียนแทนเนื้อหาของแถบซ้ายหลักโดยตรง เมนู hamburger บนมือถือใช้ slot เดียวกัน ไม่มี drawer หรือ sidebar ซ้ำในเนื้อหา และมี “เมนูหลัก” กับ “ห้องเรียนทั้งหมด” เป็นทางออกชัดเจน ส่วนมุมมองนักเรียนยังคง navigation เดิมตามขอบเขตระยะแรก
 
+สถานะเมนูรายห้องที่กำลังเปิดใช้พื้น `primary/10` พร้อมข้อความและไอคอนสี `primary` แบบเดียวกับสถานะที่เลือกของเมนูหลัก ไม่ใช้พื้นเทาของ `secondary`
+
 ผลตรวจรอบแก้ไข: `npx tsc --noEmit`, design-token lint, 186 test files / 2,578 tests, production build และ Next.js runtime compilation ผ่านทั้งหมด ส่วน authenticated browser click-through ยังรอผู้ใช้เข้าสู่ระบบใน browser session ทดสอบ
 
 ## งานที่ต้องให้เจ้าของผลิตภัณฑ์ตรวจภายหลัง
