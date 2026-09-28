@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assignmentCreationHref,
+  assignmentCreationTitle,
   firstSearchParam,
   newAssignmentTypeDefaults,
   resolveAssignmentTypePreset,
@@ -17,6 +18,13 @@ describe('assignment creation navigation', () => {
     expect(assignmentCreationHref('room-2', 'exam')).toBe(
       '/assignments/new?classroom=room-2&type=exam',
     )
+  })
+
+  it.each([
+    ['exercise', 'สร้างแบบฝึกหัด'],
+    ['exam', 'สร้างข้อสอบ'],
+  ] as const)('labels a %s creation flow as %s', (type, expected) => {
+    expect(assignmentCreationTitle(type)).toBe(expected)
   })
 
   it('uses the first value when a search parameter is repeated', () => {

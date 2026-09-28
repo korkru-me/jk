@@ -23,6 +23,10 @@ export function newAssignmentTypeDefaults(
   }
 }
 
+export function assignmentCreationTitle(assignmentType: AssignmentType): string {
+  return assignmentType === 'exam' ? 'สร้างข้อสอบ' : 'สร้างแบบฝึกหัด'
+}
+
 export function assignmentCreationHref(
   classroomId: string,
   assignmentType: AssignmentType,

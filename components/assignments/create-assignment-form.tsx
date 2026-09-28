@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
-import { newAssignmentTypeDefaults } from '@/lib/assignment-creation'
+import { assignmentCreationTitle, newAssignmentTypeDefaults } from '@/lib/assignment-creation'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -566,6 +566,15 @@ export function CreateAssignmentForm({
 
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">
+          {assignmentCreationTitle(assignmentType)}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน
+        </p>
+      </div>
+
       {/* Step indicator */}
       <div className="flex items-start">
         {STEPS.map((label, i) => (

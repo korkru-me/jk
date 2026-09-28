@@ -175,19 +175,6 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       )}
 
       <div className="max-w-2xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">สร้างงานที่มอบหมาย</h1>
-          <p className="text-sm text-muted-foreground mt-1">รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน</p>
-        </div>
-
-        {classrooms.length === 0 && (
-          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
-            คุณยังไม่มีห้องเรียน กรุณา{' '}
-            <a href="/classrooms/new" className="underline font-medium">สร้างห้องเรียน</a>
-            {' '}ก่อน
-          </div>
-        )}
-
         <CreateAssignmentForm
           classrooms={classrooms}
           groupsByClassroom={groupsByClassroom}
