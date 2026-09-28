@@ -49,14 +49,17 @@ SEB_SESSION_SECRET=...
 # CK หนึ่งค่า (64 hex)
 SEB_CONFIG_KEY=...
 
-# BEK หลายค่า คั่นด้วย comma/space/newline
-SEB_BROWSER_EXAM_KEYS=windows_bek_64_hex,macos_bek_64_hex,ios_bek_64_hex
+# immutable revision จาก config/seb-release-registry.json
+SEB_CONFIG_REVISION=korkru-production-v1-<artifact-sha256>
+
+# JSON หนึ่งบรรทัดใน secret manager: ผูก BEK กับ exact platform/version/build
+SEB_BROWSER_EXAM_KEY_REGISTRY={"schemaVersion":1,"configRevision":"...","entries":[{"platform":"windows","versionString":"3.10.2","buildNumber":"920","key":"64-hex-BEK"}]}
 
 # URL สาธารณะของไฟล์ .seb ที่เข้ารหัสแล้ว; เว้นว่างได้ถ้าครูแจกไฟล์เอง
 NEXT_PUBLIC_SEB_CONFIG_URL=https://example.school/exam/korkru-production.seb
 ```
 
-สร้าง `SEB_SESSION_SECRET` ด้วย secret generator ของระบบ deploy ห้ามใช้ access code ของข้อสอบหรือ Quit Password ซ้ำ ตัว session เป็น HttpOnly, SameSite=Strict, มีอายุ 12 ชั่วโมง และผูกกับ student + assignment เดียว
+สร้าง `SEB_SESSION_SECRET` ด้วย secret generator ของระบบ deploy ห้ามใช้ access code ของข้อสอบหรือ Quit Password ซ้ำ ตัว session เป็น HttpOnly, SameSite=Strict, มีอายุ 12 ชั่วโมง และผูกกับ student + assignment + config revision เดียว ระบบไม่อ่าน `SEB_BROWSER_EXAM_KEYS` แบบรายการรวมแล้ว เพราะรูปแบบเดิมไม่ผูก BEK กับ build; ขั้นตอนกรอก registry และ rollback อยู่ใน `docs/SEB_CONFIG_RELEASE_RUNBOOK.md`
 
 ไฟล์ `.seb` ที่เผยแพร่ต้องเข้ารหัสและห้ามมีรหัสผ่านเป็น plain text ชื่อ URL ของไฟล์ไม่ถือเป็น secret แต่ CK/BEK และรหัสผู้ดูแลถือเป็น secret
 
@@ -93,7 +96,7 @@ Migrations ตามลำดับ:
 
 อัปเดตวันที่ 5 กันยายน 2026:
 
-- canonical production origin คือ `https://www.korkru.com` และตั้ง `NEXT_PUBLIC_SITE_URL`, `SEB_SESSION_SECRET`, `SEB_CONFIG_KEY` กับ `SEB_BROWSER_EXAM_KEYS` สำหรับ macOS + iPadOS ใน Vercel Production แล้ว
+- canonical production origin คือ `https://www.korkru.com`; environment Production เดิมเคยใช้ `SEB_BROWSER_EXAM_KEYS` แบบ global สำหรับ macOS + iPadOS แต่โค้ด S2 เปลี่ยนเป็น revision-bound registry และ **ห้าม deploy** จนกว่าเจ้าของจะตั้ง `SEB_CONFIG_REVISION` + `SEB_BROWSER_EXAM_KEY_REGISTRY` ชุดใหม่ใน secret manager ครบ
 - ไฟล์ `korkru-production-v1.seb` ตรวจพบ outer gzip wrapper และ inner `pswd` block ตามรูปแบบไฟล์ SEB ที่เข้ารหัสด้วย password แล้ว และเพิ่มไว้ที่ public path `/exam/korkru-production-v1.seb`
 - ก่อน deploy ต้องตั้ง `NEXT_PUBLIC_SEB_CONFIG_URL=https://www.korkru.com/exam/korkru-production-v1.seb`; หลัง deploy ต้องทดสอบดาวน์โหลดไฟล์, system check, autosave/reconnect/submit และห้องคุมสอบด้วย Mac กับ iPad จริง
 - Windows ยังไม่อยู่ใน production matrix จนกว่าจะเก็บ BEK จาก SEB build ที่จะอนุญาตและผ่าน mock exam บนเครื่อง Windows จริง; Android ยังพักไว้ตามขอบเขตการเปิดใช้รอบนี้
@@ -120,7 +123,7 @@ Migrations ตามลำดับ:
 - `NEXT_PUBLIC_SITE_URL` ไม่ใช่ origin ที่ถูกต้อง หรือไม่ใช่ HTTPS ใน production
 - `SEB_SESSION_SECRET` สั้นกว่า 32 ตัวอักษร
 - `SEB_CONFIG_KEY` ไม่ใช่ 64 hex
-- ไม่มี BEK ที่เป็น 64 hex อย่างน้อยหนึ่งค่า
+- ไม่มี revision-bound BEK registry ที่เป็น fixed JSON และมี 64-hex BEK อย่างน้อยหนึ่ง build
 
 การ **เว้นว่าง** `NEXT_PUBLIC_SEB_CONFIG_URL` ไม่บล็อก server publish เพราะโรงเรียนอาจแจกไฟล์ `.seb` เอง และ Phase 7 CLI จะแจ้งเพียง warning แต่หากตั้งค่า URL ไว้แล้วรูปแบบผิด server readiness ยังแสดง warning ขณะที่ `npm run check:seb-readiness` จะ exit ไม่สำเร็จเพื่อหยุด deploy จนกว่าจะแก้หรือลบค่านั้น ทั้งสองส่วนตรวจเพียงรูปแบบ ไม่ทดสอบว่า URL ปลายทางดาวน์โหลดได้จริง จึงต้องเปิดไฟล์จากเครื่องทดสอบด้วย
 

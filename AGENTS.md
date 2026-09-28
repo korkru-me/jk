@@ -9,6 +9,7 @@
 - Read `docs/WORD_IMPORT.md` before adding a question type, changing an existing one, or touching `lib/docx-import/` — it holds the per-type Word format spec, the decisions behind the import, and what a `.docx` provably cannot carry.
 - For matching files, also follow `.cursor/rules/typescript-react.mdc`, `.cursor/rules/supabase-security.mdc`, and `.cursor/rules/product-ui.mdc`.
 - Before any test that touches a deployed site or external service, follow `.cursor/rules/staging-testing.mdc`.
+- For SEB configuration, exam entry, submission, or exit work, follow `.cursor/rules/seb-entry-exit.mdc`.
 - If documentation conflicts with working code, treat code as current behavior, report the mismatch, and update the documentation with the same change.
 
 ## Product direction

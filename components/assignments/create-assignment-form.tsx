@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
@@ -41,6 +42,10 @@ import {
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
+import {
+  SebQuitPasswordFields,
+  getSebQuitPasswordClientError,
+} from '@/components/assignments/seb-quit-password-settings'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -174,6 +179,8 @@ export function CreateAssignmentForm({
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
   const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>('browser')
   const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>('blocked')
+  const [sebQuitPassword, setSebQuitPassword] = useState('')
+  const [sebQuitPasswordConfirmation, setSebQuitPasswordConfirmation] = useState('')
   // เงื่อนไขจบงาน. The three choices a teacher sees are a view over two stored
   // values — 'fixed' + no threshold, 'fixed' + a threshold, or 'streak' — so
   // that turning a threshold on and choosing to end on a run are visibly the
@@ -369,6 +376,9 @@ export function CreateAssignmentForm({
     // the teacher reads the reason next to the field that caused it rather
     // than as an error after ยืนยัน three screens later.
     if (step === 2) return !(streakOn && streakBlocked)
+    if (step === 3 && assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
+      return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
+    }
     return true
   }
 
@@ -502,6 +512,12 @@ export function CreateAssignmentForm({
         exam_watermark_enabled: examWatermarkEnabled,
         secure_browser_mode: secureBrowserMode,
         android_exam_mode: androidExamMode,
+        ...(secureBrowserMode === 'seb_required' ? {
+          seb_quit_password: {
+            password: sebQuitPassword,
+            confirmation: sebQuitPasswordConfirmation,
+          },
+        } : {}),
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -629,6 +645,12 @@ export function CreateAssignmentForm({
                   type="button"
                   onClick={() => {
                     setAssignmentType(t)
+                    if (t !== 'exam') {
+                      setSecureBrowserMode('browser')
+                      setAndroidExamMode('blocked')
+                      setSebQuitPassword('')
+                      setSebQuitPasswordConfirmation('')
+                    }
                     if (attemptsAuto) {
                       setMaxAttempts(t === 'exam' ? '1' : '')
                       setRetryScope(t === 'exam' ? 'all' : 'wrong_only')
@@ -1306,19 +1328,27 @@ export function CreateAssignmentForm({
                   </div>
                 </div>
                 <input
+                  id="create-seb-required"
                   type="checkbox"
                   checked={secureBrowserMode === 'seb_required'}
                   onChange={event => {
                     const enabled = event.target.checked
                     setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
-                    if (!enabled) setAndroidExamMode('blocked')
+                    if (!enabled) {
+                      setAndroidExamMode('blocked')
+                      setSebQuitPassword('')
+                      setSebQuitPasswordConfirmation('')
+                    }
                     if (enabled) setProctoringEnabled(true)
                   }}
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
-              <p className="pl-11 text-xs text-warning">
-                SEB รองรับ Windows, macOS, iPhone และ iPad นักเรียนต้องติดตั้งและตรวจเครื่องก่อนสอบ
+              <p className="pl-11 text-xs leading-5 text-warning">
+                หลังสร้าง ข้อสอบจะอยู่เป็นร่างก่อน ระบบจะยอมเผยแพร่เมื่อไฟล์ SEB รุ่นของข้อสอบและ exact build ผ่านการตรวจครบ นักเรียนต้องตรวจเครื่องก่อนสอบ{' '}
+                <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+                  ตรวจความพร้อม SEB
+                </Link>
               </p>
               {secureBrowserMode === 'seb_required' && (
                 <div className="ml-11 space-y-2 border-t border-border pt-3">
@@ -1344,6 +1374,14 @@ export function CreateAssignmentForm({
                       Android monitored ตรวจการสลับแอป/ออกจากหน้าและการเชื่อมต่อ แต่เว็บห้ามหรือตรวจ screenshot ของระบบไม่ได้ จึงมีความมั่นใจต่ำกว่า SEB
                     </p>
                   )}
+                  <SebQuitPasswordFields
+                    idPrefix="create-seb-quit"
+                    password={sebQuitPassword}
+                    confirmation={sebQuitPasswordConfirmation}
+                    onPasswordChange={setSebQuitPassword}
+                    onConfirmationChange={setSebQuitPasswordConfirmation}
+                    disabled={isPending}
+                  />
                 </div>
               )}
             </div>
@@ -1600,6 +1638,9 @@ export function CreateAssignmentForm({
                   : []),
                 ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
                   ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
+                  : []),
+                ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
+                  ? [{ label: 'รหัสออก SEB', value: 'ครูกำหนดแล้ว · รอเตรียมไฟล์เฉพาะข้อสอบ' }]
                   : []),
                 ...(assignmentType === 'exam' && androidExamMode === 'monitored'
                   ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]

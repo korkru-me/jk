@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "configId": "korkru-production-v1",
+  "configRevision": "korkru-production-v1-ce946d68df1f9a127b63a8cd16ad3f04a1d93c5e2c82c3b77b09174ae6e14cec",
   "platforms": [
     {
       "id": "macos",
       "label": "macOS",
-      "osVersion": "record during final UAT",
-      "sebVersion": "3.7",
+      "buildId": "macos-3.7-build-pending",
       "nativeCore": "passed",
       "productionBek": "unverified",
       "stagingMockExam": "pending",
@@ -15,8 +15,7 @@
     {
       "id": "ipados",
       "label": "iPadOS",
-      "osVersion": "record during final UAT",
-      "sebVersion": "3.6.2",
+      "buildId": "ipados-3.6.2-build-pending",
       "nativeCore": "passed",
       "productionBek": "unverified",
       "stagingMockExam": "pending",
@@ -25,8 +24,7 @@
     {
       "id": "ios",
       "label": "iPhone / iOS",
-      "osVersion": "26.6.1",
-      "sebVersion": "3.7.1",
+      "buildId": "ios-3.7.1-build-pending",
       "nativeCore": "passed",
       "productionBek": "unverified",
       "stagingMockExam": "pending",
@@ -35,8 +33,7 @@
     {
       "id": "windows",
       "label": "Windows 11 x64",
-      "osVersion": "11 x64",
-      "sebVersion": "3.10.2.920",
+      "buildId": "windows-3.10.2-920",
       "nativeCore": "passed",
       "productionBek": "unverified",
       "stagingMockExam": "pending",
