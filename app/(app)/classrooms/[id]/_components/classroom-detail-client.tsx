@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
-  Users, BookOpen, Copy, Check, ChevronLeft, Home,
+  Users, BookOpen, Copy, Check, Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
@@ -25,8 +25,10 @@ import {
   type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import type { GroupState } from './breakout-groups'
-import { ClassroomContextSidebar } from './classroom-context-sidebar'
-import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
+import {
+  ClassroomContextDrawer,
+  ClassroomContextSidebar,
+} from './classroom-context-sidebar'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -170,10 +172,13 @@ export function ClassroomDetailClient({
       />
 
       <div className="flex min-w-0 max-w-[1200px] flex-1 flex-col gap-6">
-        {/* Back link remains visible until the responsive contextual drawer replaces it. */}
-        <Link href="/classrooms" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors lg:hidden">
-          <ChevronLeft className="size-4" /> ห้องเรียนทั้งหมด
-        </Link>
+        <ClassroomContextDrawer
+          classroom={classroom}
+          navigationItems={navigationItems}
+          activeItem={activeTab}
+          studentCount={students.length}
+          onNavigate={setActiveTab}
+        />
 
       {/* Header card */}
       <div
@@ -234,34 +239,6 @@ export function ClassroomDetailClient({
             </div>
           </div>
         )}
-      </div>
-
-      {/* Compact fallback until the contextual menu becomes a drawer on smaller screens. */}
-      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl bg-muted p-1 lg:hidden">
-        {navigationItems.map(tab => {
-          const Icon = CLASSROOM_NAVIGATION_ICONS[tab.key]
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                activeTab === tab.key
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-muted-foreground hover:bg-card/50'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.key === 'students' && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  {students.length}
-                </span>
-              )}
-            </button>
-          )
-        })}
       </div>
 
       {/* Tab content */}
