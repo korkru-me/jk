@@ -18,7 +18,7 @@ const migration = (name: string) => readFileSync(new URL(`../supabase/migrations
 
 const CLASSROOM_INVITATIONS = migration('20260713110000_classroom_invitations.sql')
 const ORG_INVITATIONS = migration('20260510162108_org_invitations.sql')
-const FIX = migration('20260927022004_close_invitation_token_reads.sql')
+const FIX = migration('20260928021309_close_invitation_token_reads.sql')
 
 const OWNER = '10000000-0000-4000-8000-000000000001'
 const STUDENT = '10000000-0000-4000-8000-000000000002'

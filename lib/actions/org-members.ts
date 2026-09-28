@@ -152,7 +152,7 @@ export async function revokeInvite(inviteId: string) {
 // ─── Join via token ────────────────────────────────────────────────────────
 // Only an org's owners/admins can read org_invitations. The invitee goes
 // through two database functions that need the exact token
-// (20260927022004_close_invitation_token_reads.sql).
+// (20260928021309_close_invitation_token_reads.sql).
 
 export async function getInviteInfo(token: string) {
   if (!isInviteToken(token)) return null

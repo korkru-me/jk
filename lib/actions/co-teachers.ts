@@ -87,7 +87,7 @@ export async function revokeClassroomInvitation(inviteId: string, classroomId: s
 // ─── Join via token ────────────────────────────────────────────────────────
 // The token is the whole secret, so nobody but the room's invite managers can
 // read classroom_invitations. The invitee goes through two database functions
-// that need the exact token (20260927022004_close_invitation_token_reads.sql).
+// that need the exact token (20260928021309_close_invitation_token_reads.sql).
 
 export async function getClassroomInviteInfo(token: string) {
   if (!isInviteToken(token)) return null
