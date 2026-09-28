@@ -36,10 +36,24 @@
 - Next.js dev runtime `compile_route` และ `get_compilation_issues` ไม่พบปัญหา
 - ไม่มี migration หรือการเปลี่ยน schema/RLS/server action
 
+## Browser QA หลัง merge
+
+ทดสอบด้วยข้อมูลสังเคราะห์บน renderer จริงโดยไม่แตะฐานข้อมูล ที่ 320×568, 390×844, 768×1024, 1024×768 และ 1280×800 ครบ subject/homeroom, owner/manage/view, light/dark, drawer, keyboard focus, deep link และ Back/Forward
+
+พบบักและแก้แล้ว 5 รายการ:
+
+- สิทธิ์ `view` เปิดภาพรวมแล้วว่าง และยังเห็นลิงก์สร้างชุดข้อสอบ
+- แบนเนอร์บีบชื่อ/รายละเอียดเป็นคอลัมน์แคบมากบนมือถือ
+- grid ภายใน drawer ล้นความกว้าง ทำให้ badge และปุ่มอยู่ใต้ overlay
+- trigger ของ drawer ไม่ประกาศ `aria-expanded`
+- deep link ที่ไม่รู้จักหรือไม่มีสิทธิ์ fallback เป็นภาพรวม แต่ URL ยังอ้าง panel เดิม
+
+หลังแก้ไม่พบ horizontal overflow, console/runtime error หรือ axe WCAG A/AA violation; รายการ `incomplete` ของ axe เหลือเฉพาะสีบนพื้น gradient ที่เครื่องมือคำนวณเองไม่ได้
+
 ## งานที่ต้องให้เจ้าของผลิตภัณฑ์ตรวจภายหลัง
 
 - ยืนยันความรู้สึกของความกว้าง Global rail และ Contextual sidebar บนจอจริง
-- ทดสอบด้วยบัญชีเจ้าของห้อง ผู้ช่วยสอน `admin`/`manage`/`view` และนักเรียนจริง
+- ทดสอบซ้ำด้วยบัญชีเจ้าของห้อง ผู้ช่วยสอน `admin`/`manage`/`view` และนักเรียนจริง (รอบ local ใช้ข้อมูลสังเคราะห์แล้ว)
 - ทดสอบ touch และ drawer บน iPad/iPhone จริง
 - ยืนยันว่าการเน้น “เชิญเข้าร่วม” แบบ action แต่ยังเปิดเป็นหน้าภายในห้องเรียนตรงกับความคาดหวัง
 - ยืนยันตำแหน่ง “ย้ายไปถังขยะ” ในพื้นที่อันตรายของหน้าตั้งค่า (ระบบปัจจุบันยังกู้คืนได้ จึงไม่ใช้คำว่า “ลบถาวร”)

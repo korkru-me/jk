@@ -48,7 +48,7 @@ function ClassroomContextNavigation({
   const subtitle = [meta.gradeLevel, meta.academicTerm].filter(Boolean).join(' • ')
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
       <Button
         variant="ghost"
         className="w-full justify-start"
@@ -142,6 +142,7 @@ export function ClassroomContextDrawer(props: ClassroomContextSidebarProps) {
         className="w-full justify-between"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
+        aria-expanded={open}
       >
         <span className="flex min-w-0 items-center gap-2">
           <Menu data-icon="inline-start" />
@@ -152,7 +153,7 @@ export function ClassroomContextDrawer(props: ClassroomContextSidebarProps) {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="inset-y-0 left-0 top-0 h-dvh max-h-none w-[min(22rem,calc(100%-2rem))] max-w-none translate-x-0 translate-y-0 content-start rounded-none p-4 sm:max-w-none"
+          className="inset-y-0 left-0 top-0 h-dvh max-h-none w-[min(22rem,calc(100%-2rem))] max-w-none grid-cols-[minmax(0,1fr)] content-start translate-x-0 translate-y-0 rounded-none p-4 sm:max-w-none"
         >
           <DialogHeader>
             <DialogTitle>เมนูห้องเรียน</DialogTitle>

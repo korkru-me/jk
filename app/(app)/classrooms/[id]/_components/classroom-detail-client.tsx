@@ -165,9 +165,19 @@ export function ClassroomDetailClient({
   useEffect(() => {
     function syncNavigationFromHistory() {
       const params = new URLSearchParams(window.location.search)
-      setActiveTab(resolveClassroomNavigationKey(params.get('view'), navigationItems))
+      const nextItem = resolveClassroomNavigationKey(params.get('view'), navigationItems)
+      setActiveTab(nextItem)
+
+      // Keep copied/reloaded URLs truthful. A stale or unauthorized `view`
+      // falls back to overview, so replace that history entry with the same
+      // canonical URL the overview button would create instead of leaving the
+      // address bar claiming a different panel is open.
+      const canonicalUrl = classroomNavigationHref(window.location.href, nextItem)
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      if (canonicalUrl !== currentUrl) window.history.replaceState(null, '', canonicalUrl)
     }
 
+    syncNavigationFromHistory()
     window.addEventListener('popstate', syncNavigationFromHistory)
     return () => window.removeEventListener('popstate', syncNavigationFromHistory)
   }, [navigationItems])
@@ -215,7 +225,7 @@ export function ClassroomDetailClient({
           ? `rounded-2xl p-6 border-2 ${savedCover.surface} ${savedCover.text}`
           : `rounded-2xl p-6 text-white bg-gradient-to-br ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 min-w-0">
             {isHomeroom && (
               <p className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-1.5 ${savedCover ? savedCover.textMuted : 'text-primary'}`}>
@@ -228,7 +238,7 @@ export function ClassroomDetailClient({
             )}
 
             {/* Stats row */}
-            <div className="flex items-center gap-5 mt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <Users className={`w-4 h-4 ${coverMuted}`} />
                 <span className="font-semibold">{students.length}</span>
@@ -239,8 +249,11 @@ export function ClassroomDetailClient({
                 <span className="font-semibold">{isHomeroom ? homeroomAssignments.length : assignmentCount}</span>
                 <span className={coverMuted}>{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
               </div>
-              {!isHomeroom && (
-                <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-primary hover:text-primary transition-colors">
+              {!isHomeroom && canManage && (
+                <Link
+                  href={`/assignments/new?classroom=${classroom.id}`}
+                  className="w-full text-xs text-primary transition-colors hover:text-primary sm:ml-auto sm:w-auto"
+                >
                   + สร้างชุดข้อสอบ
                 </Link>
               )}
@@ -248,7 +261,7 @@ export function ClassroomDetailClient({
           </div>
 
           {/* Class code */}
-          <div className="shrink-0 text-right">
+          <div className="shrink-0 text-left sm:text-right">
             <p className={`text-xs mb-1 ${coverMuted}`}>รหัสห้องเรียน</p>
             <div className="flex items-center gap-2">
               <p className={`font-mono font-black text-2xl tracking-[0.3em] ${savedCover ? "" : "text-white"}`}>{classroom.class_code}</p>
@@ -269,7 +282,7 @@ export function ClassroomDetailClient({
 
       {/* Tab content */}
       <div>
-        {activeTab === 'overview' && canManage && (
+        {activeTab === 'overview' && (
           <ClassroomOverview
             classroomId={classroom.id}
             isHomeroom={isHomeroom}
