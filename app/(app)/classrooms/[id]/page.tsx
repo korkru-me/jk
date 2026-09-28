@@ -239,6 +239,10 @@ export default async function ClassroomDetailPage({
   const myCoTeacherPermission = myCoTeacherRow?.permission as 'admin' | 'manage' | 'view' | undefined
   const canManage = isOwner || myCoTeacherPermission === 'admin' || myCoTeacherPermission === 'manage'
   const hasGroups = c.classroom_type === 'subject' && (isOwner || myCoTeacherPermission !== undefined)
+  // Invite links are bearer secrets: only the people RLS lets manage them
+  // (classroom_invitations_owner_all) get the tokens. Anything handed to the
+  // client is readable in the RSC payload even where the tab hides it.
+  const canManageInvites = isOwner || myCoTeacherPermission === 'admin'
 
   // These datasets are independent after authorization. Start them together
   // instead of waiting for six sequential network round-trips.
@@ -258,13 +262,15 @@ export default async function ClassroomDetailPage({
       .select('id, user_id, permission, created_at, users(id, full_name, email)')
       .eq('classroom_id', id)
       .order('created_at', { ascending: true }),
-    admin
-      .from('classroom_invitations')
-      .select('id, token, permission, email, expires_at, created_at')
-      .eq('classroom_id', id)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false }),
+    canManageInvites
+      ? admin
+          .from('classroom_invitations')
+          .select('id, token, permission, email, expires_at, created_at')
+          .eq('classroom_id', id)
+          .is('used_at', null)
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; token: string; permission: string; email: string | null; expires_at: string; created_at: string }[] }),
     admin
       .from('classroom_students')
       .select('student_id, users!inner(id, full_name, email)')
