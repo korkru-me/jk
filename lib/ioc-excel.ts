@@ -7,7 +7,7 @@
  */
 
 import ExcelJS from 'exceljs'
-import { formatThaiDateTime } from '@/lib/thai-time'
+import { formatThaiDateTime, thaiDateStamp } from '@/lib/thai-time'
 
 export interface IocExcelRow {
   itemLabel: string
@@ -155,6 +155,6 @@ export function iocSummaryWorkbookFileName(examTitle: string, generatedAt: Date 
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 60) || 'IOC'
-  const stamp = generatedAt.toISOString().slice(0, 10)
+  const stamp = thaiDateStamp(generatedAt)
   return `IOC-สรุปผล-${safe}-${stamp}.xlsx`
 }

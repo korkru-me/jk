@@ -54,7 +54,7 @@
 
 ### เวลาบน server
 
-Vercel รันโค้ดฝั่ง server ด้วยเขตเวลา UTC ดังนั้น `toLocaleString('th-TH')`, `toLocaleDateString('th-TH')`, `getHours()` ใน Server Component, Route Handler หรือโค้ดที่สร้างไฟล์ จะได้เวลาช้ากว่าเวลาไทย 7 ชั่วโมง (กำหนดส่ง 16:00 แสดงเป็น 09:00 และกำหนดส่งเที่ยงคืนตกไปเป็นวันก่อนหน้า) ฝั่ง server จึงต้องจัดรูปวันที่ผ่าน `lib/thai-time.ts` (`formatThaiDate`, `formatThaiDateTime`, `thaiHour`) หรือใส่ `timeZone: 'Asia/Bangkok'` เอง ส่วน Client Component ใช้ `toLocale*String` ได้เพราะใช้เขตเวลาของเบราว์เซอร์ผู้อ่าน ไฟล์ export ที่ตั้งใจเก็บเวลาแบบ ISO/UTC ให้เครื่องอ่าน (เช่น CSV หลักฐานคุมสอบ) ไม่อยู่ในกติกานี้
+Vercel รันโค้ดฝั่ง server ด้วยเขตเวลา UTC ดังนั้น `toLocaleString('th-TH')`, `toLocaleDateString('th-TH')`, `getHours()` ใน Server Component, Route Handler หรือโค้ดที่สร้างไฟล์ จะได้เวลาช้ากว่าเวลาไทย 7 ชั่วโมง (กำหนดส่ง 16:00 แสดงเป็น 09:00 และกำหนดส่งเที่ยงคืนตกไปเป็นวันก่อนหน้า) ฝั่ง server จึงต้องจัดรูปวันที่ผ่าน `lib/thai-time.ts` (`formatThaiDate`, `formatThaiDateTime`, `thaiHour`) หรือใส่ `timeZone: 'Asia/Bangkok'` เอง ขอบของวันก็เช่นกัน: "วันนี้" ใน query ใช้ `startOfThaiDay()` ไม่ใช่ `setHours(0, 0, 0, 0)` ซึ่งบน server คือ 07:00 น. เวลาไทย และวันที่ในชื่อไฟล์ใช้ `thaiDateStamp()` (`YYYY-MM-DD` ปี ค.ศ.) ไม่ใช่ `toISOString().slice(0, 10)` ซึ่งเป็นวันที่ UTC ไม่ว่าโค้ดจะรันที่ไหน ไฟล์ที่ออกช่วง 00:00–07:00 น. จึงได้วันที่ของเมื่อวาน ส่วน Client Component ใช้ `toLocale*String` ได้เพราะใช้เขตเวลาของเบราว์เซอร์ผู้อ่าน ไฟล์ export ที่ตั้งใจเก็บเวลาแบบ ISO/UTC ให้เครื่องอ่าน (เช่น CSV หลักฐานคุมสอบ) ไม่อยู่ในกติกานี้
 
 ## Authentication และ authorization
 
