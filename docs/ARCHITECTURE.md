@@ -52,6 +52,10 @@
 
 `lib/supabase/admin.ts` ใช้ `SUPABASE_SERVICE_ROLE_KEY` และข้าม RLS ได้ เรียกได้เฉพาะ server และต้องตรวจ authentication/authorization ก่อนทุกครั้ง การมี session อย่างเดียวไม่เพียงพอ
 
+### เวลาบน server
+
+Vercel รันโค้ดฝั่ง server ด้วยเขตเวลา UTC ดังนั้น `toLocaleString('th-TH')`, `toLocaleDateString('th-TH')`, `getHours()` ใน Server Component, Route Handler หรือโค้ดที่สร้างไฟล์ จะได้เวลาช้ากว่าเวลาไทย 7 ชั่วโมง (กำหนดส่ง 16:00 แสดงเป็น 09:00 และกำหนดส่งเที่ยงคืนตกไปเป็นวันก่อนหน้า) ฝั่ง server จึงต้องจัดรูปวันที่ผ่าน `lib/thai-time.ts` (`formatThaiDate`, `formatThaiDateTime`, `thaiHour`) หรือใส่ `timeZone: 'Asia/Bangkok'` เอง ส่วน Client Component ใช้ `toLocale*String` ได้เพราะใช้เขตเวลาของเบราว์เซอร์ผู้อ่าน ไฟล์ export ที่ตั้งใจเก็บเวลาแบบ ISO/UTC ให้เครื่องอ่าน (เช่น CSV หลักฐานคุมสอบ) ไม่อยู่ในกติกานี้
+
 ## Authentication และ authorization
 
 - Supabase Auth ดูแล session
