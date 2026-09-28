@@ -25,7 +25,16 @@
 - [x] เฟส 4 — Responsive สำหรับ mobile/tablet/desktop
 - [x] เฟส 5 — URL state, browser back/forward และ deep link
 - [x] เฟส 6 — polish, accessibility และ destructive-action placement
-- [ ] เฟส 7 — regression QA และตัดสินใจก่อนขยายไปส่วนอื่น
+- [x] เฟส 7 — regression QA ฝั่ง local และเตรียมรายการตัดสินใจก่อนขยายไปส่วนอื่น
+
+## ผลตรวจอัตโนมัติหลังเฟส 7
+
+- `npx tsc --noEmit` ผ่าน
+- `npm run lint:tokens` ผ่าน โดยไม่มีไฟล์ที่มี token debt เพิ่ม
+- `npm test` ผ่าน 186 test files รวม 2,569 tests
+- `npm run build` ผ่าน และสร้าง route `/classrooms/[id]` สำเร็จ
+- Next.js dev runtime `compile_route` และ `get_compilation_issues` ไม่พบปัญหา
+- ไม่มี migration หรือการเปลี่ยน schema/RLS/server action
 
 ## งานที่ต้องให้เจ้าของผลิตภัณฑ์ตรวจภายหลัง
 
