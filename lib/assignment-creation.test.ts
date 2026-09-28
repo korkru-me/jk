@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assignmentCreationHref,
+  firstSearchParam,
   newAssignmentTypeDefaults,
   resolveAssignmentTypePreset,
 } from './assignment-creation'
@@ -16,6 +17,12 @@ describe('assignment creation navigation', () => {
     expect(assignmentCreationHref('room-2', 'exam')).toBe(
       '/assignments/new?classroom=room-2&type=exam',
     )
+  })
+
+  it('uses the first value when a search parameter is repeated', () => {
+    expect(firstSearchParam(['room-1', 'room-2'])).toBe('room-1')
+    expect(firstSearchParam('room-1')).toBe('room-1')
+    expect(firstSearchParam(undefined)).toBeUndefined()
   })
 
   it('uses exercise defaults for repeatable work with math tools', () => {

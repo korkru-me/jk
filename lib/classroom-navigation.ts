@@ -64,6 +64,17 @@ export function classroomNavigationHref(
   return `${url.pathname}${url.search}${url.hash}`
 }
 
+export function classroomNavigationPath(
+  classroomId: string,
+  nextItem: ClassroomNavigationKey,
+): string {
+  const pathname = `/classrooms/${encodeURIComponent(classroomId)}`
+  if (nextItem === 'overview') return pathname
+
+  const searchParams = new URLSearchParams({ view: nextItem })
+  return `${pathname}?${searchParams.toString()}`
+}
+
 const RESERVED_CLASSROOM_PATHS = new Set(['new', 'archived', 'trash'])
 
 export function isClassroomSectionPath(pathname: string): boolean {

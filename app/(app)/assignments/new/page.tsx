@@ -5,27 +5,36 @@ import { redirect } from 'next/navigation'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
 import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import type { AssignmentGroupOption } from '@/components/assignments/group-target-picker'
-import { resolveAssignmentTypePreset } from '@/lib/assignment-creation'
+import type { Classroom } from '@/lib/types'
+import { firstSearchParam, resolveAssignmentTypePreset } from '@/lib/assignment-creation'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
+import { AssignmentClassroomSidebar } from './_components/assignment-classroom-sidebar'
 
 export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
 
 interface Props {
   searchParams: Promise<{
-    classroom?: string
-    set?: string
-    sections?: string
+    classroom?: string | string[]
+    set?: string | string[]
+    sections?: string | string[]
     type?: string | string[]
   }>
 }
 
+type AssignmentClassroomContextRow = Classroom & {
+  classroom_students: Array<{ count: number }>
+}
+
 export default async function NewAssignmentPage({ searchParams }: Props) {
   const {
-    classroom: classroomParam,
-    set: setParam,
-    sections: sectionsParam,
+    classroom: classroomValue,
+    set: setValue,
+    sections: sectionsValue,
     type: typeParam,
   } = await searchParams
+  const classroomParam = firstSearchParam(classroomValue)
+  const setParam = firstSearchParam(setValue)
+  const sectionsParam = firstSearchParam(sectionsValue)
   const preselectedAssignmentType = resolveAssignmentTypePreset(typeParam)
 
   const supabase = await createClient()
@@ -40,6 +49,14 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
         .maybeSingle()
     : Promise.resolve({ data: null })
 
+  const preselectedClassroomContextQuery = classroomParam
+    ? supabase
+        .from('classrooms')
+        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, deleted_at, created_at, updated_at, classroom_students(count)')
+        .eq('id', classroomParam)
+        .maybeSingle()
+    : Promise.resolve({ data: null })
+
   const [
     { data: profile },
     { data: ownedClassrooms },
@@ -47,6 +64,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     questions,
     { data: questionSets },
     { data: preselectedSetRow },
+    { data: preselectedClassroomContextRow },
   ] = await Promise.all([
     supabase.from('users').select('role').eq('id', user.id).single(),
     supabase
@@ -67,6 +85,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       .eq('created_by', user.id)
       .order('created_at', { ascending: false }),
     preselectedSetQuery,
+    preselectedClassroomContextQuery,
   ])
 
   if (profile?.role !== 'teacher' && profile?.role !== 'admin') redirect('/dashboard')
@@ -84,6 +103,14 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   }
 
   const preselectedClassroomId = classroomParam && seen.has(classroomParam) ? classroomParam : undefined
+  const contextRow = preselectedClassroomContextRow as AssignmentClassroomContextRow | null
+  let contextualClassroom: Classroom | undefined
+  let contextualStudentCount = 0
+  if (preselectedClassroomId && contextRow?.id === preselectedClassroomId) {
+    const { classroom_students: studentCounts, ...classroom } = contextRow
+    contextualClassroom = classroom
+    contextualStudentCount = studentCounts?.[0]?.count ?? 0
+  }
 
   // กลุ่มย่อย of those rooms, for "มอบหมายให้". Read under RLS: the owner and
   // any co-teacher of a room can see its groups.
@@ -138,29 +165,39 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">สร้างงานที่มอบหมาย</h1>
-        <p className="text-sm text-muted-foreground mt-1">รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน</p>
-      </div>
-
-      {classrooms.length === 0 && (
-        <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
-          คุณยังไม่มีห้องเรียน กรุณา{' '}
-          <a href="/classrooms/new" className="underline font-medium">สร้างห้องเรียน</a>
-          {' '}ก่อน
-        </div>
+    <>
+      {contextualClassroom && (
+        <AssignmentClassroomSidebar
+          classroom={contextualClassroom}
+          studentCount={contextualStudentCount}
+          isOwner={contextualClassroom.teacher_id === user.id}
+        />
       )}
 
-      <CreateAssignmentForm
-        classrooms={classrooms}
-        groupsByClassroom={groupsByClassroom}
-        questions={questions}
-        questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
-        preselectedClassroomId={preselectedClassroomId}
-        preselectedSet={preselectedSet}
-        preselectedAssignmentType={preselectedAssignmentType}
-      />
-    </div>
+      <div className="max-w-2xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">สร้างงานที่มอบหมาย</h1>
+          <p className="text-sm text-muted-foreground mt-1">รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน</p>
+        </div>
+
+        {classrooms.length === 0 && (
+          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
+            คุณยังไม่มีห้องเรียน กรุณา{' '}
+            <a href="/classrooms/new" className="underline font-medium">สร้างห้องเรียน</a>
+            {' '}ก่อน
+          </div>
+        )}
+
+        <CreateAssignmentForm
+          classrooms={classrooms}
+          groupsByClassroom={groupsByClassroom}
+          questions={questions}
+          questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
+          preselectedClassroomId={preselectedClassroomId}
+          preselectedSet={preselectedSet}
+          preselectedAssignmentType={preselectedAssignmentType}
+        />
+      </div>
+    </>
   )
 }

@@ -6,6 +6,12 @@ interface NewAssignmentTypeDefaults {
   mathToolsEnabled: boolean
 }
 
+export function firstSearchParam(
+  value: string | readonly string[] | undefined,
+): string | undefined {
+  return typeof value === 'string' ? value : value?.[0]
+}
+
 export function newAssignmentTypeDefaults(
   assignmentType: AssignmentType,
 ): NewAssignmentTypeDefaults {
@@ -32,6 +38,6 @@ export function assignmentCreationHref(
 export function resolveAssignmentTypePreset(
   value: string | readonly string[] | undefined,
 ): AssignmentType | undefined {
-  const candidate = Array.isArray(value) ? value[0] : value
+  const candidate = firstSearchParam(value)
   return candidate === 'exercise' || candidate === 'exam' ? candidate : undefined
 }

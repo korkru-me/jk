@@ -3,6 +3,7 @@ import {
   HOMEROOM_CLASSROOM_NAVIGATION,
   SUBJECT_CLASSROOM_NAVIGATION,
   classroomNavigationHref,
+  classroomNavigationPath,
   classroomNavigationFor,
   isClassroomDetailPath,
   isClassroomSectionPath,
@@ -81,6 +82,13 @@ describe('classroom navigation', () => {
       'https://korkru.test/classrooms/room-1?view=scores&back=%2Fclassrooms',
       'overview',
     )).toBe('/classrooms/room-1?back=%2Fclassrooms')
+  })
+
+  it('builds a direct classroom panel link for navigation from another route', () => {
+    expect(classroomNavigationPath('room/1', 'scores')).toBe(
+      '/classrooms/room%2F1?view=scores',
+    )
+    expect(classroomNavigationPath('room-1', 'overview')).toBe('/classrooms/room-1')
   })
 })
 

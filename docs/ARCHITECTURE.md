@@ -36,6 +36,8 @@
 - `supabase/bootstrap/` — ลำดับและ SQL สำหรับ fresh Staging project เท่านั้น ไม่อยู่ใน Production migration ledger
 - `proxy.ts` — refresh Supabase session สำหรับ request ที่เข้าแอป
 
+App shell มี contextual sidebar registry ฝั่ง client ที่ผูก renderer กับ pathname ปัจจุบัน หน้ารายละเอียดห้องและหน้าสร้างงานที่มีบริบทห้องใช้ registry เดียวกัน จึงแทน sidebar หลักได้โดยไม่สร้าง sidebar ซ้อนในเนื้อหา สำหรับ route นอก `/classrooms` เช่น `/assignments/new` ฝั่ง server ต้องตรวจห้อง active และสิทธิ์จัดการจาก session-bound Supabase client ก่อนส่งข้อมูลห้องให้ registrar; URL หรือ state ฝั่ง client อย่างเดียวไม่ใช่สิทธิ์
+
 ## Runtime boundaries
 
 ### Browser

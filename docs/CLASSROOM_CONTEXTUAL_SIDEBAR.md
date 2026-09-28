@@ -62,7 +62,9 @@
 
 ห้องเรียนวิชาที่ผู้ใช้มีสิทธิ์จัดการมีเมนู “มอบหมายงาน” ต่อจาก “งานที่มอบหมาย” โดยเปิดดรอปดาวน์ให้เลือก “แบบฝึกหัด” หรือ “ข้อสอบ” แล้วพาไป `/assignments/new` พร้อมห้องเรียนและประเภทที่เลือกไว้แล้ว หน้าสร้างงานจึงไม่ถาม “ประเภทงาน” ซ้ำ และใช้ค่าเริ่มต้นของจำนวนครั้งกับเครื่องมือช่วยให้ตรงกับประเภทนั้น ส่วนผู้ช่วยสอนสิทธิ์ `view` และห้อง homeroom จะไม่เห็นเมนูสร้างงานนี้
 
-ผลตรวจรอบแก้ไข: `npx tsc --noEmit`, design-token lint, 186 test files / 2,578 tests, production build และ Next.js runtime compilation ผ่านทั้งหมด ส่วน authenticated browser click-through ยังรอผู้ใช้เข้าสู่ระบบใน browser session ทดสอบ
+เมื่อ `/assignments/new` มี `classroom` ที่เป็นห้องวิชา active และผู้ใช้เป็นเจ้าของหรือครูร่วมสิทธิ์ `admin/manage` หน้าใหม่จะลงทะเบียน contextual sidebar ของห้องเดิมกับ app shell และเน้น “มอบหมายงาน” เป็นหน้าปัจจุบัน เมนูอื่นพากลับไป panel ของห้องนั้น ส่วนการเข้าหน้าสร้างงานโดยไม่มีห้อง หรือส่งรหัสห้องที่ไม่มีสิทธิ์จัดการ จะใช้ sidebar หลักตามปกติ ไม่จำบริบทเก่าผ่าน localStorage
+
+ผลตรวจล่าสุด: `npx tsc --noEmit`, design-token lint, 187 test files / 2,589 tests, production build และ Next.js runtime compilation ผ่านทั้งหมด ห้องทดลองข้อมูลสังเคราะห์ยืนยัน contextual sidebar ของหน้าสร้างงานทั้ง desktop/mobile, active state, ดรอปดาวน์สองประเภท และ axe WCAG A/AA ไม่พบ violation ส่วน authenticated browser click-through กับข้อมูลจริงยังรอ session ทดสอบที่ล็อกอิน
 
 ## งานที่ต้องให้เจ้าของผลิตภัณฑ์ตรวจภายหลัง
 

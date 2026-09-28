@@ -14,7 +14,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { isClassroomDetailPath, isClassroomSectionPath } from '@/lib/classroom-navigation'
+import { isClassroomSectionPath } from '@/lib/classroom-navigation'
 import { Separator } from '@/components/ui/separator'
 import { useSidebarContext } from './sidebar-context'
 import type { UserRole } from '@/lib/types'
@@ -251,8 +251,9 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
   const pathname = usePathname()
   const navItems = role === 'teacher' || role === 'admin' ? teacherNav : studentNav
   const { contextualSidebar } = useSidebarContext()
-  const usesClassroomSidebar = (role === 'teacher' || role === 'admin') && isClassroomSectionPath(pathname)
-  const contextualContent = isClassroomDetailPath(pathname) && contextualSidebar?.pathname === pathname
+  const usesTeacherNavigation = role === 'teacher' || role === 'admin'
+  const usesClassroomSidebar = usesTeacherNavigation && isClassroomSectionPath(pathname)
+  const contextualContent = usesTeacherNavigation && contextualSidebar?.pathname === pathname
     ? contextualSidebar.render(onClose)
     : null
 
@@ -279,7 +280,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         </div>
 
         {/* Nav */}
-        {usesClassroomSidebar ? (
+        {contextualContent || usesClassroomSidebar ? (
           <div className="flex-1 overflow-y-auto p-3">
             {contextualContent ?? <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />}
           </div>

@@ -324,6 +324,27 @@ export function CreateAssignmentForm({
     setScratchpadEnabled(defaults.mathToolsEnabled)
   }, [assignmentType])
 
+  // The classroom sidebar stays available on this route. Choosing its other
+  // assignment type changes only the URL search params, so this component may
+  // be preserved by the App Router instead of remounting. Keep the form's
+  // behavior aligned with the new preset without discarding the title,
+  // selected questions, or other work already entered.
+  useEffect(() => {
+    if (!preselectedAssignmentType) return
+
+    setAssignmentType(preselectedAssignmentType)
+    if (preselectedAssignmentType !== 'exam') {
+      setSecureBrowserMode('browser')
+      setAndroidExamMode('blocked')
+      setSebQuitPassword('')
+      setSebQuitPasswordConfirmation('')
+    }
+    if (attemptsAuto) {
+      const defaults = newAssignmentTypeDefaults(preselectedAssignmentType)
+      setMaxAttempts(defaults.maxAttempts)
+      setRetryScope(defaults.retryScope)
+    }
+  }, [attemptsAuto, preselectedAssignmentType])
 
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))

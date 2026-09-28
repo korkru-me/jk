@@ -34,7 +34,8 @@ interface ClassroomContextSidebarProps {
   classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
   backHref: string
   navigationItems: readonly ClassroomNavigationItem[]
-  activeItem: ClassroomNavigationKey
+  activeItem?: ClassroomNavigationKey
+  assignmentCreationActive?: boolean
   studentCount: number
   onNavigate: (item: ClassroomNavigationKey) => void
   managementActions?: ReactNode
@@ -45,6 +46,7 @@ export function ClassroomContextNavigation({
   backHref,
   navigationItems,
   activeItem,
+  assignmentCreationActive = false,
   studentCount,
   onNavigate,
   onClose,
@@ -115,8 +117,9 @@ export function ClassroomContextNavigation({
                     render={(
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant={assignmentCreationActive ? 'navigation' : 'ghost'}
                         className="w-full justify-start data-popup-open:bg-primary/10 data-popup-open:text-primary"
+                        aria-current={assignmentCreationActive ? 'page' : undefined}
                       />
                     )}
                   >
