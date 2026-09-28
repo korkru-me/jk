@@ -1,6 +1,7 @@
 import { inspectExamUatEvidence } from './check-exam-uat-evidence-core.mjs'
 import { inspectSebPlatformEvidence } from './check-seb-platform-evidence-core.mjs'
 import { inspectExamReleaseCandidate } from './check-exam-release-candidate-core.mjs'
+import { inspectSebReleaseRegistry } from './check-seb-release-registry-core.mjs'
 
 const RESPONSIVE_STEPS = [
   ['iphone-responsive', 'ทดสอบหน้าข้อสอบบน iPhone จริง'],
@@ -37,7 +38,14 @@ function step(id, title, instruction) {
 }
 
 /** Return exactly one safe next action so a long UAT run stays sequential. */
-export function nextExamUatStep({ stagingReady, candidateManifest, uatManifest, sebManifest }) {
+export function nextExamUatStep({
+  stagingReady,
+  candidateManifest,
+  uatManifest,
+  sebManifest,
+  sebRegistryManifest,
+  candidateArtifactSha256,
+}) {
   const uatInspection = inspectExamUatEvidence(uatManifest)
   if (hasShapeBlocker(uatInspection)) {
     return step(
@@ -47,7 +55,30 @@ export function nextExamUatStep({ stagingReady, candidateManifest, uatManifest, 
     )
   }
 
-  const sebInspection = inspectSebPlatformEvidence(sebManifest)
+  const registryInspection = inspectSebReleaseRegistry(sebRegistryManifest, {
+    candidateArtifactSha256,
+  })
+  const registryShapeBroken = registryInspection.checks.some(check => check.status === 'blocker'
+    && check.field !== 'candidate release gate')
+  if (registryShapeBroken) {
+    return step(
+      'repair-seb-registry',
+      'ซ่อม SEB release registry ก่อน',
+      'รัน npm run check:seb-registry แล้วแก้เฉพาะ fixed metadata ห้ามใส่ CK, BEK หรือรหัสผ่าน',
+    )
+  }
+
+  if (!registryInspection.ready) {
+    return step(
+      'confirm-seb-registry',
+      'ยืนยันไฟล์ SEB และ build ที่จะรองรับ',
+      'ตรวจ policy ของไฟล์ final บน native SEB และยืนยัน exact platform/version/build ตาม docs/SEB_CONFIG_RELEASE_RUNBOOK.md',
+    )
+  }
+
+  const sebInspection = inspectSebPlatformEvidence(sebManifest, {
+    releaseRegistry: sebRegistryManifest,
+  })
   if (hasShapeBlocker(sebInspection)) {
     return step(
       'repair-seb-evidence',
@@ -59,6 +90,7 @@ export function nextExamUatStep({ stagingReady, candidateManifest, uatManifest, 
   const candidateInspection = inspectExamReleaseCandidate(candidateManifest, {
     uatRunId: uatManifest?.runId,
     sebConfigId: sebManifest?.configId,
+    sebConfigRevision: sebManifest?.configRevision,
   })
   const candidateShapeBroken = candidateInspection.checks.some(check => check.status === 'blocker'
     && !check.field.endsWith(' release gate'))

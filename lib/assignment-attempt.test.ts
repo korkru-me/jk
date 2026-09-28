@@ -1195,3 +1195,78 @@ describe('the จับคู่ column an attempt freezes', () => {
     expect(withSpares.correct_answer).toBe('MATCH:' + JSON.stringify(['นิวตัน', 'จูล', 'วัตต์']))
   })
 })
+
+describe('ตัวเลขชุดเดียวกัน — assignments.shared_random_seed', () => {
+  // Ranges wide enough that two independent draws agreeing is ~1 in 10^12, so
+  // "different" below is a real difference and not a coin landing twice.
+  function numericQuestion(id: string): Question {
+    return {
+      id,
+      question_type: 'written',
+      answer_formula: 'a + b',
+      answer_parts: null,
+      variables: [
+        { name: 'a', min: 1, max: 1_000_000, step: 1, type: 'value' },
+        { name: 'b', min: 1, max: 1_000_000, step: 1, type: 'value' },
+      ],
+      logic_rules: [],
+      extra_data: {},
+      mcq_options: null,
+    } as unknown as Question
+  }
+  const pool = ['q1', 'q2', 'q3', 'q4'].map(numericQuestion)
+  const shared = { ...assignment, question_ids: pool.map(q => q.id), shared_random_seed: 424242 }
+  const byQuestion = (rows: { question_id: string; random_values: Record<string, number>; correct_answer: string }[]) =>
+    Object.fromEntries(rows.map(r => [r.question_id, { values: r.random_values, answer: r.correct_answer }]))
+
+  it('gives two students the same numbers and the same frozen answer', () => {
+    const first = byQuestion(buildAssignmentAttempt(shared, pool))
+    const second = byQuestion(buildAssignmentAttempt(shared, pool))
+    expect(second).toEqual(first)
+    expect(first.q1.answer).toBe(String(first.q1.values.a + first.q1.values.b))
+  })
+
+  it('draws each ข้อ its own numbers rather than one set for the whole งาน', () => {
+    const rows = byQuestion(buildAssignmentAttempt(shared, pool))
+    expect(rows.q2.values).not.toEqual(rows.q1.values)
+  })
+
+  it('keeps a ข้อ\'s numbers when สับลำดับข้อ or สุ่มชุดโจทย์ changes what came before it', () => {
+    const plain = byQuestion(buildAssignmentAttempt(shared, pool))
+    for (let i = 0; i < 10; i++) {
+      const drawn = buildAssignmentAttempt({ ...shared, shuffle_questions: true, random_question_count: 2 }, pool)
+      for (const row of drawn) expect(row.random_values).toEqual(plain[row.question_id].values)
+    }
+  })
+
+  it('gives the same numbers through the one-ข้อ builder a ถูกติดต่อกัน งาน uses', () => {
+    const plain = byQuestion(buildAssignmentAttempt(shared, pool))
+    const one = buildAttemptQuestion(pool[2], { orderIndex: 5, shuffleOptions: false, sharedRandomSeed: 424242 })
+    expect(one.random_values).toEqual(plain.q3.values)
+  })
+
+  it('re-asks a wrong-only retry with the same numbers', () => {
+    const plain = byQuestion(buildAssignmentAttempt(shared, pool))
+    const { retried } = buildRetryAttempt(shared, pool, [{
+      question_id: 'q1', random_values: plain.q1.values, correct_answer: plain.q1.answer,
+      student_answer: '0', is_correct: false, score: 0, max_score: 1, teacher_feedback: null,
+      order_index: 0, option_order: null, work_images: null, score_edited_by: null, score_edited_at: null,
+    }])
+    expect(retried[0].random_values).toEqual(plain.q1.values)
+    expect(retried[0].correct_answer).toBe(plain.q1.answer)
+  })
+
+  it('gives another งาน with another seed other numbers', () => {
+    const one = byQuestion(buildAssignmentAttempt(shared, pool))
+    const other = byQuestion(buildAssignmentAttempt({ ...shared, shared_random_seed: 7 }, pool))
+    expect(other.q1.values).not.toEqual(one.q1.values)
+  })
+
+  it('still draws per student when the seed is unset or not a seed', () => {
+    for (const seed of [null, undefined, 0, -5, 1.5]) {
+      const a = byQuestion(buildAssignmentAttempt({ ...shared, shared_random_seed: seed as number | null }, pool))
+      const b = byQuestion(buildAssignmentAttempt({ ...shared, shared_random_seed: seed as number | null }, pool))
+      expect(b.q1.values).not.toEqual(a.q1.values)
+    }
+  })
+})

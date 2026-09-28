@@ -12,6 +12,7 @@ import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
+import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
 
 export default async function ClassroomDetailPage({
   params,
@@ -106,13 +107,26 @@ export default async function ClassroomDetailPage({
       )
     }
 
-    const [{ data: teacherProfile }, { count: studentCount }, { data: links }, posts] = await Promise.all([
+    const [{ data: teacherProfile }, { count: studentCount }, { data: links }, posts, { data: myGroup }] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
-      admin.from('assignment_classrooms').select('assignment_id').eq('classroom_id', id),
+      admin.from('assignment_classrooms').select('assignment_id, group_ids').eq('classroom_id', id),
       getClassroomPosts(id),
+      admin
+        .from('classroom_group_members')
+        .select('group_id')
+        .eq('classroom_id', id)
+        .eq('student_id', authUser!.id)
+        .maybeSingle(),
     ])
     const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+    // งาน handed to กลุ่มย่อย the student is not in stay off this page — unless
+    // they already started it (checked once their attempts are loaded below).
+    const reachedIds = new Set(
+      (links ?? [])
+        .filter((l: any) => linkReachesGroup(l.group_ids ?? null, myGroup?.group_id))
+        .map((l: any) => l.assignment_id as string)
+    )
 
     const { data: assignmentRows } = assignmentIds.length > 0
       ? await admin
@@ -165,27 +179,30 @@ export default async function ClassroomDetailPage({
       }
     }
 
-    const assignments: StudentAssignmentRow[] = (assignmentRows ?? []).map((a: any) => ({
-      id: a.id,
-      title: a.title,
-      question_ids: a.question_ids ?? [],
-      random_question_count: a.random_question_count ?? null,
-      completion_rule: a.completion_rule ?? null,
-      streak_target: a.streak_target ?? null,
-      end_at: a.end_at,
-      duration_minutes: a.duration_minutes,
-      type: a.type,
-      max_attempts: a.max_attempts,
-      retry_scope: a.retry_scope ?? 'all',
-      passing_type: a.passing_type,
-      passing_value: a.passing_value,
-      show_results: a.show_results,
-      attempts_used: attemptsUsed[a.id] ?? 0,
-      has_in_progress: hasInProgress[a.id] ?? false,
-      submission: subMap[a.id]
-        ? { id: subMap[a.id].id, status: subMap[a.id].status, total_score: subMap[a.id].total_score, max_score: subMap[a.id].max_score }
-        : null,
-    }))
+    const startedIds = new Set(subRows.map((row: any) => row.assignment_id as string))
+    const assignments: StudentAssignmentRow[] = (assignmentRows ?? [])
+      .filter((a: any) => reachedIds.has(a.id) || startedIds.has(a.id))
+      .map((a: any) => ({
+        id: a.id,
+        title: a.title,
+        question_ids: a.question_ids ?? [],
+        random_question_count: a.random_question_count ?? null,
+        completion_rule: a.completion_rule ?? null,
+        streak_target: a.streak_target ?? null,
+        end_at: a.end_at,
+        duration_minutes: a.duration_minutes,
+        type: a.type,
+        max_attempts: a.max_attempts,
+        retry_scope: a.retry_scope ?? 'all',
+        passing_type: a.passing_type,
+        passing_value: a.passing_value,
+        show_results: a.show_results,
+        attempts_used: attemptsUsed[a.id] ?? 0,
+        has_in_progress: hasInProgress[a.id] ?? false,
+        submission: subMap[a.id]
+          ? { id: subMap[a.id].id, status: subMap[a.id].status, total_score: subMap[a.id].total_score, max_score: subMap[a.id].max_score }
+          : null,
+      }))
 
     return (
       <StudentClassroomView
@@ -212,8 +229,20 @@ export default async function ClassroomDetailPage({
         .eq('classroom_id', id)
         .eq('user_id', authUser.id)
         .maybeSingle()).data
+  // Everything below is read with the admin client, so this is the only
+  // authorization the teaching side gets: a teacher who neither owns the room
+  // nor co-teaches it must not see its roster, co-teachers or invite links —
+  // the same 404 a student outside the roster gets. Platform super admins are
+  // not let in either; no classroom action accepts them yet (see
+  // docs/SECURITY.md, "Supabase admin client").
+  if (!isOwner && !myCoTeacherRow) notFound()
   const myCoTeacherPermission = myCoTeacherRow?.permission as 'admin' | 'manage' | 'view' | undefined
   const canManage = isOwner || myCoTeacherPermission === 'admin' || myCoTeacherPermission === 'manage'
+  const hasGroups = c.classroom_type === 'subject' && (isOwner || myCoTeacherPermission !== undefined)
+  // Invite links are bearer secrets: only the people RLS lets manage them
+  // (classroom_invitations_owner_all) get the tokens. Anything handed to the
+  // client is readable in the RSC payload even where the tab hides it.
+  const canManageInvites = isOwner || myCoTeacherPermission === 'admin'
 
   // These datasets are independent after authorization. Start them together
   // instead of waiting for six sequential network round-trips.
@@ -225,19 +254,23 @@ export default async function ClassroomDetailPage({
     { data: ownerProfile },
     { data: otherClassroomRows },
     posts,
+    { data: groupRows },
+    { data: groupMemberRows },
   ] = await Promise.all([
     admin
       .from('classroom_co_teachers')
       .select('id, user_id, permission, created_at, users(id, full_name, email)')
       .eq('classroom_id', id)
       .order('created_at', { ascending: true }),
-    admin
-      .from('classroom_invitations')
-      .select('id, token, permission, email, expires_at, created_at')
-      .eq('classroom_id', id)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false }),
+    canManageInvites
+      ? admin
+          .from('classroom_invitations')
+          .select('id, token, permission, email, expires_at, created_at')
+          .eq('classroom_id', id)
+          .is('used_at', null)
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; token: string; permission: string; email: string | null; expires_at: string; created_at: string }[] }),
     admin
       .from('classroom_students')
       .select('student_id, users!inner(id, full_name, email)')
@@ -245,9 +278,9 @@ export default async function ClassroomDetailPage({
     c.classroom_type === 'subject'
       ? admin
           .from('assignment_classrooms')
-          .select('assignment_id, display_order')
+          .select('assignment_id, display_order, group_ids')
           .eq('classroom_id', id)
-      : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null }[] }),
+      : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null; group_ids: string[] | null }[] }),
     admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
     isOwner
       ? admin
@@ -257,6 +290,22 @@ export default async function ClassroomDetailPage({
           .neq('id', id)
       : Promise.resolve({ data: [] as { id: string; name: string; status: string; deleted_at: string | null }[] }),
     getClassroomPosts(id),
+    // กลุ่มย่อย: only subject rooms have the tab, and only the room's own
+    // teaching staff (owner or any co-teacher) get the arrangement.
+    hasGroups
+      ? admin
+          .from('classroom_groups')
+          .select('id, classroom_id, name, color, position')
+          .eq('classroom_id', id)
+          .order('position')
+          .order('created_at')
+      : Promise.resolve({ data: [] as ClassroomGroup[] }),
+    hasGroups
+      ? admin
+          .from('classroom_group_members')
+          .select('student_id, group_id')
+          .eq('classroom_id', id)
+      : Promise.resolve({ data: [] as { student_id: string; group_id: string }[] }),
   ])
 
   // Co-teacher roster + active invites
@@ -291,6 +340,18 @@ export default async function ClassroomDetailPage({
   const displayOrderByAssignment = new Map(
     (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, l.display_order as number | null])
   )
+  const groupIdsByAssignment = new Map(
+    (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, (l.group_ids ?? null) as string[] | null])
+  )
+  const groups = (groupRows ?? []) as ClassroomGroup[]
+  // Members of students still on the roster only; the FK cascade makes a
+  // leftover impossible, but the roster read and this one are not atomic.
+  const rosterIdSet = new Set(students.map(s => s.id))
+  const groupMembers: Record<string, string> = Object.fromEntries(
+    ((groupMemberRows ?? []) as { student_id: string; group_id: string }[])
+      .filter(m => rosterIdSet.has(m.student_id))
+      .map(m => [m.student_id, m.group_id])
+  )
 
   const assignmentCount = linkedAssignmentIds.length
 
@@ -301,6 +362,7 @@ export default async function ClassroomDetailPage({
     passing_type: 'score' | 'percent' | null; passing_value: number | null
     max_attempts: number | null; score_strategy: 'best' | 'average' | 'latest'
     display_order: number | null
+    group_ids: string[] | null
   }[] = []
   let classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
@@ -365,6 +427,7 @@ export default async function ClassroomDetailPage({
     classroomAssignments = (assignmentRows ?? []).map(a => ({
       ...a,
       display_order: displayOrderByAssignment.get(a.id) ?? null,
+      group_ids: groupIdsByAssignment.get(a.id) ?? null,
     }))
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map(a => [a.id as string, (a as any).display_max_score as number | null]))
     classroomSubmissions = rescaleToDisplayMax(
@@ -472,6 +535,8 @@ export default async function ClassroomDetailPage({
       pendingReviewByAssignment={pendingReviewByAssignment}
       seenByPost={seenByPost}
       crossPostTargets={crossPostTargets}
+      groups={groups}
+      groupMembers={groupMembers}
     />
   )
 }

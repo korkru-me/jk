@@ -16,6 +16,7 @@ import type { GradedAnswer } from '@/lib/assignment-attempt'
 import type { AnswerFeedback } from '@/lib/answer-feedback'
 import { isInstantCheckable } from '@/lib/grading'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
+import { resolveAnswerAutosaveStatus } from '@/lib/exam-autosave-policy'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
 import { useExamTimer } from '@/hooks/use-exam-timer'
@@ -35,11 +36,10 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw, Lightbulb,
+  Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw,
   Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
-import { SolutionFiles } from '@/components/questions/solution-files'
 import { containsMath } from '@/lib/math/latex'
 import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { partLabels } from '@/lib/part-labels'
@@ -134,11 +134,6 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
     image_urls: string[] | null
     // Preview-only, see AnswerRow.max_score above.
     answer_tolerance?: number
-    // Preview-only as well: a real attempt's ตรวจคำตอบ gets the teacher's
-    // วิธีทำ from the server, which is the only side that may decide whether
-    // the student is allowed to see it yet.
-    solution_text?: string | null
-    solution_image_urls?: string[] | null
   }
 }
 
@@ -483,14 +478,16 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   })
 
   // ── Auto-sync whatever went unsaved while offline ───────────────────────────
+  const syncPendingAnswers = useCallback(async () => {
+    if (pendingCount === 0) return
+    toast.info(`กำลังซิงก์คำตอบ ${pendingCount} ข้อ...`)
+    const synced = await retryPending()
+    if (synced.ok) toast.success('ซิงก์คำตอบสำเร็จ ✓')
+    else toast.warning(synced.error ?? 'ยังมีบางคำตอบที่รอซิงก์ กดลองอีกครั้งได้โดยคำตอบยังอยู่ในเครื่อง')
+  }, [pendingCount, retryPending])
+
   const isOnline = useOnlineStatus({
-    onOnline: async () => {
-      if (pendingCount === 0) return
-      toast.info(`กำลังซิงก์คำตอบ ${pendingCount} ข้อ...`)
-      const synced = await retryPending()
-      if (synced.ok) toast.success('ซิงก์คำตอบสำเร็จ ✓')
-      else toast.warning(synced.error ?? 'ยังมีบางคำตอบที่รอซิงก์ ระบบจะลองอีกครั้งเมื่อเชื่อมต่อใหม่')
-    },
+    onOnline: syncPendingAnswers,
     onOffline: () => {
       toast.warning('อินเทอร์เน็ตหลุด — บันทึกในเครื่องแล้ว จะซิงก์อัตโนมัติเมื่อเน็ตกลับมา')
     },
@@ -602,8 +599,6 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             answer_tolerance: answer.questions.answer_tolerance ?? 0.1,
             extra_data: answer.questions.extra_data,
             mcq_options: answer.questions.mcq_options,
-            solution_text: answer.questions.solution_text ?? null,
-            solution_image_urls: answer.questions.solution_image_urls ?? null,
           },
           isCorrect: graded.is_correct,
           score: graded.score,
@@ -949,7 +944,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     if (previewMode) return
     try {
       const result = await saveWorkImage(answerId, partIndex, url)
-      if (result.error) throw new Error(result.error)
+      if ('error' in result) throw new Error(result.error)
     } catch {
       toast.error('บันทึกรูปวิธีทำไม่สำเร็จ ลองใหม่อีกครั้ง')
     }
@@ -1439,6 +1434,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 />
               ) : current.questions.question_type === 'file_upload' ? (
                 <FileUploadAnswerInput
+                  answerId={current.id}
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={files => handleFileSubmissionChange(current.id, files)}
                   localOnly={previewMode}
@@ -1654,12 +1650,15 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <Flag size={9} className="fill-flag" /> {flaggedCount}
               </span>
             )}
-            {saving && <span className="ml-auto animate-pulse">กำลังบันทึก...</span>}
-            {!isOnline && (
-              <span className="flex items-center gap-0.5 text-warning ml-auto">
-                <WifiOff size={9} /> ออฟไลน์
-              </span>
-            )}
+            <span className="ml-auto">
+              <AutosaveStatus
+                saving={saving}
+                isOnline={isOnline}
+                pendingSync={pendingCount}
+                onRetryPending={syncPendingAnswers}
+                compact
+              />
+            </span>
           </div>
         </Card>
         )}
@@ -1779,6 +1778,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             saving={saving}
             isOnline={isOnline}
             pendingSync={pendingCount}
+            onRetryPending={syncPendingAnswers}
             tabSwitchCount={tabSwitchCount}
             config={config}
             proctorStatus={proctorStatus}
@@ -1891,6 +1891,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 style={{ width: `${progress}%` }}
               />
             </div>
+            {(saving || pendingCount > 0 || !isOnline) && (
+              <div className="border-t px-3 py-1.5 text-xs sm:px-6">
+                <AutosaveStatus
+                  saving={saving}
+                  isOnline={isOnline}
+                  pendingSync={pendingCount}
+                  onRetryPending={syncPendingAnswers}
+                  compact
+                />
+              </div>
+            )}
           </div>
 
           <div className="mx-auto w-full max-w-6xl flex-1 overflow-hidden p-2 sm:p-6">
@@ -2256,18 +2267,6 @@ function InstantCheckPanel({
         </div>
       )}
 
-      {(feedback.solutionText || (feedback.solutionImageUrls ?? []).length > 0) && (
-        <Card radius="md" padding="sm" className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-            <Lightbulb size={13} /> วิธีทำ
-          </p>
-          {feedback.solutionText && (
-            <RichText text={feedback.solutionText} blocks className="text-sm leading-relaxed" />
-          )}
-          <SolutionFiles urls={feedback.solutionImageUrls} alt="เฉลยวิธีทำ" imageClassName="max-h-44 rounded-lg border object-contain" />
-        </Card>
-      )}
-
       {!feedback.revealed && feedback.verdict !== 'correct' && (
         <p className="text-xs text-muted-foreground">
           งานนี้ครูตั้งให้ไม่แสดงเฉลย ลองคิดใหม่แล้วกดตรวจอีกครั้งได้
@@ -2364,8 +2363,73 @@ function PreviewResultSummary({
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
+function AutosaveStatus({
+  saving,
+  isOnline,
+  pendingSync,
+  onRetryPending,
+  compact = false,
+}: {
+  saving: boolean
+  isOnline: boolean
+  pendingSync: number
+  onRetryPending: () => void
+  compact?: boolean
+}) {
+  const status = resolveAnswerAutosaveStatus({ saving, pendingCount: pendingSync, isOnline })
+  const iconSize = compact ? 9 : 11
+
+  if (status === 'syncing') {
+    return (
+      <span className="flex items-center gap-1 text-muted-foreground" role="status">
+        <Loader2 size={iconSize} className="animate-spin" aria-hidden />
+        กำลังซิงก์ {pendingSync}
+      </span>
+    )
+  }
+  if (status === 'pending') {
+    return (
+      <span
+        className="flex flex-wrap items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]"
+        role="status"
+      >
+        <AlertTriangle size={iconSize} aria-hidden /> รอซิงก์ {pendingSync}
+        {isOnline && (
+          <button
+            type="button"
+            className="rounded underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={onRetryPending}
+          >
+            ลองอีกครั้ง
+          </button>
+        )}
+      </span>
+    )
+  }
+  if (status === 'saving') {
+    return (
+      <span className="flex items-center gap-1 text-muted-foreground" role="status">
+        <Loader2 size={iconSize} className="animate-spin" aria-hidden /> บันทึก...
+      </span>
+    )
+  }
+  if (status === 'saved') {
+    return (
+      <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">
+        <Wifi size={iconSize} aria-hidden /> บันทึกอัตโนมัติ
+      </span>
+    )
+  }
+  return (
+    <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
+      <WifiOff size={iconSize} aria-hidden /> ออฟไลน์
+    </span>
+  )
+}
+
 function ExamToolbar({
   saving, isOnline, pendingSync, tabSwitchCount,
+  onRetryPending,
   proctorStatus,
   proctorActiveConnectionCount,
   config, calculatorOpen, onToggleCalculator, scratchpadOpen, onToggleScratchpad, onFocusMode,
@@ -2374,6 +2438,7 @@ function ExamToolbar({
   saving: boolean
   isOnline: boolean
   pendingSync: number
+  onRetryPending: () => void
   tabSwitchCount: number
   proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
   proctorActiveConnectionCount: number
@@ -2393,21 +2458,12 @@ function ExamToolbar({
     <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
       {/* Status indicators */}
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
-        {saving ? (
-          <span className="text-muted-foreground animate-pulse">บันทึก...</span>
-        ) : pendingSync > 0 ? (
-          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
-            <WifiOff size={11} /> รอซิงก์ {pendingSync}
-          </span>
-        ) : isOnline ? (
-          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">
-            <Wifi size={11} /> บันทึกอัตโนมัติ
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">
-            <WifiOff size={11} /> ออฟไลน์
-          </span>
-        )}
+        <AutosaveStatus
+          saving={saving}
+          isOnline={isOnline}
+          pendingSync={pendingSync}
+          onRetryPending={onRetryPending}
+        />
         {tabSwitchCount > 0 && (
           <span className="text-destructive flex items-center gap-1">
             <ShieldAlert size={11} /> สลับแท็บ {tabSwitchCount}×
@@ -2725,6 +2781,8 @@ function WorkProofSlot({
             </Button>
           )}
           <WorkImageUpload
+            submissionAnswerId={answerId}
+            partIndex={partIndex}
             value={workImage}
             onChange={onPhotoChange}
             required={required && !artifact}
@@ -3643,8 +3701,8 @@ function EssayAnswerInput({ rawValue, onChange }: {
 
 // ─── File upload ──────────────────────────────────────────────────────────────
 
-function FileUploadAnswerInput({ rawValue, onChange, localOnly }: {
-  rawValue: string; onChange: (files: SubmittedFile[]) => void; localOnly?: boolean
+function FileUploadAnswerInput({ answerId, rawValue, onChange, localOnly }: {
+  answerId: string; rawValue: string; onChange: (files: SubmittedFile[]) => void; localOnly?: boolean
 }) {
   let files: SubmittedFile[] = []
   try { files = rawValue ? JSON.parse(rawValue) : [] } catch { files = [] }
@@ -3652,7 +3710,12 @@ function FileUploadAnswerInput({ rawValue, onChange, localOnly }: {
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">แนบไฟล์คำตอบ (รูปภาพหรือ PDF)</p>
-      <FileSubmissionUpload value={files} onChange={onChange} localOnly={localOnly} />
+      <FileSubmissionUpload
+        submissionAnswerId={answerId}
+        value={files}
+        onChange={onChange}
+        localOnly={localOnly}
+      />
       {files.length === 0 ? (
         <p className="text-xs text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
       ) : (

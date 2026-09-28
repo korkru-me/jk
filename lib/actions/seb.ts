@@ -3,16 +3,22 @@
 import { cookies, headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { studentHasAssignment } from '@/lib/auth/assignment-access'
 import {
   createSebSessionClaims,
   normalizeSebRequestUrl,
   parseSebVersion,
-  readSebEnvironment,
+  readSebSessionSecret,
+  selectSebBrowserExamKeys,
   signSebClaims,
   verifySebClaims,
   verifySebRequestHashes,
   type SebChallengePurpose,
 } from '@/lib/seb'
+import {
+  createAssignmentSebSignedDownloadUrl,
+  readCurrentAssignmentSebRelease,
+} from '@/lib/seb-assignment-release.server'
 import {
   createSebChallenge,
   sebSessionCookieName,
@@ -58,12 +64,12 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     return { error: 'ประเภทการตรวจสอบ Safe Exam Browser ไม่ถูกต้อง' }
   }
 
-  const environment = readSebEnvironment()
-  if (!environment) {
+  const sessionSecret = readSebSessionSecret()
+  if (!sessionSecret) {
     return { error: 'ระบบ Safe Exam Browser ยังตั้งค่าไม่ครบ กรุณาแจ้งครูผู้สอน' }
   }
 
-  const challengeClaims = verifySebClaims(input.challenge, environment.sessionSecret)
+  const challengeClaims = verifySebClaims(input.challenge, sessionSecret)
   if (
     challengeClaims?.kind !== 'seb_challenge'
     || challengeClaims.userId !== user.id
@@ -71,6 +77,15 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     || challengeClaims.purpose !== input.purpose
   ) {
     return { error: 'ลิงก์ตรวจสอบหมดอายุ กรุณากดเริ่มใหม่' }
+  }
+
+  const release = await readCurrentAssignmentSebRelease(input.assignmentId)
+  if (
+    !release
+    || release.revision !== challengeClaims.assignmentConfigRevision
+    || release.releaseId !== challengeClaims.configRevision
+  ) {
+    return { error: 'ไฟล์ตั้งค่าข้อสอบเปลี่ยนแล้ว กรุณาเปิดข้อสอบใหม่' }
   }
 
   const version = parseSebVersion(input.version)
@@ -100,8 +115,8 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     requestUrl: normalizedRequestUrl,
     configKeyHash: input.configKeyHash,
     browserExamKeyHash: input.browserExamKeyHash,
-    configKey: environment.configKey,
-    browserExamKeys: environment.browserExamKeys,
+    configKey: release.configKey,
+    browserExamKeys: selectSebBrowserExamKeys(release.browserExamKeys, version),
   })
   if (!validHashes) {
     return { error: 'การตั้งค่า Safe Exam Browser หรือเวอร์ชันไม่ตรงกับที่โรงเรียนอนุญาต' }
@@ -110,6 +125,8 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
   const claims = createSebSessionClaims({
     userId: user.id,
     assignmentId: input.assignmentId,
+    configRevision: release.releaseId,
+    assignmentConfigRevision: release.revision,
     platform: version.platform,
     version: version.version,
   })
@@ -134,7 +151,7 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
   }
 
   const maxAge = Math.floor((claims.expiresAt - Date.now()) / 1_000)
-  ;(await cookies()).set(sebSessionCookieName(input.assignmentId), signSebClaims(claims, environment.sessionSecret), {
+  ;(await cookies()).set(sebSessionCookieName(input.assignmentId), signSebClaims(claims, sessionSecret), {
     httpOnly: true,
     sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
@@ -164,51 +181,54 @@ export async function getSebSystemCheckData(
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }
 
   const admin = createAdminClient()
-  const [assignmentResult, classroomLinksResult] = await Promise.all([
+  const [assignmentResult, handedToStudent] = await Promise.all([
     admin
       .from('assignments')
       .select('id, title, secure_browser_mode')
       .eq('id', assignmentId)
       .eq('status', 'published')
       .maybeSingle(),
-    admin
-      .from('assignment_classrooms')
-      .select('classroom_id')
-      .eq('assignment_id', assignmentId),
+    studentHasAssignment(admin, assignmentId, user.id),
   ])
 
   const assignment = assignmentResult.data
   if (!assignment) return { error: 'ไม่พบชุดข้อสอบที่เผยแพร่แล้ว' }
-
-  const classroomIds = (classroomLinksResult.data ?? []).map(row => row.classroom_id)
-  const { data: membership } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('id')
-        .eq('student_id', user.id)
-        .in('classroom_id', classroomIds)
-        .limit(1)
-        .maybeSingle()
-    : { data: null }
-  if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องเรียนที่ได้รับข้อสอบนี้' }
+  if (!handedToStudent) return { error: 'คุณไม่ได้อยู่ในห้องเรียนหรือกลุ่มที่ได้รับข้อสอบนี้' }
   if (assignment.secure_browser_mode !== 'seb_required') {
     return { error: 'ข้อสอบนี้ไม่ได้บังคับใช้ Safe Exam Browser' }
   }
 
-  const reusableChallenge = validateSebChallenge(
-    sebChallenge,
-    user.id,
-    assignmentId,
-    'system_check',
-  )
-  const challenge = reusableChallenge
-    ? sebChallenge!
-    : createSebChallenge(user.id, assignmentId, 'system_check')
+  const release = await readCurrentAssignmentSebRelease(assignmentId)
+  const reusableChallenge = release
+    ? validateSebChallenge(
+        sebChallenge,
+        user.id,
+        assignmentId,
+        release.releaseId,
+        release.revision,
+        'system_check',
+      )
+    : null
+  const challenge = !release
+    ? null
+    : reusableChallenge
+      ? sebChallenge!
+      : createSebChallenge(
+          user.id,
+          assignmentId,
+          release.releaseId,
+          release.revision,
+          'system_check',
+        )
+  const configUrl = release && challenge
+    ? await createAssignmentSebSignedDownloadUrl(release)
+    : null
 
   return {
     success: true as const,
     assignmentTitle: assignment.title,
-    challenge,
-    sebConfigured: challenge !== null,
+    challenge: configUrl ? challenge : null,
+    configUrl,
+    sebConfigured: configUrl !== null && challenge !== null,
   }
 }

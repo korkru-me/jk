@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { isInviteToken } from '@/lib/invite-token'
 
 const REVALIDATE = () => revalidatePath('/settings/organization')
 
@@ -149,60 +150,37 @@ export async function revokeInvite(inviteId: string) {
 }
 
 // ─── Join via token ────────────────────────────────────────────────────────
+// Only an org's owners/admins can read org_invitations. The invitee goes
+// through two database functions that need the exact token
+// (20260928021309_close_invitation_token_reads.sql).
 
 export async function getInviteInfo(token: string) {
+  if (!isInviteToken(token)) return null
   const supabase = await createClient()
   const { data } = await supabase
-    .from('org_invitations')
-    .select('id, role, org_id, organizations(name)')
-    .eq('token', token)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
+    .rpc('get_org_invitation_preview', { p_token: token })
     .maybeSingle()
 
   if (!data) return null
-  const org = data.organizations as any
-  return { inviteId: data.id, role: data.role, orgName: org?.name ?? '' }
+  const invite = data as { org_name: string; role: string }
+  return { orgName: invite.org_name, role: invite.role }
 }
 
 export async function joinByToken(token: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'กรุณาเข้าสู่ระบบก่อน' }
+  if (!isInviteToken(token)) return { error: 'ลิงก์นี้หมดอายุหรือใช้งานไปแล้ว' }
 
-  const { data: invite } = await supabase
-    .from('org_invitations')
-    .select('id, org_id, role')
-    .eq('token', token)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle()
+  // Adds the member and closes the invite in one transaction. An existing
+  // member gets the org id back without using the link up.
+  const { data: orgId, error } = await supabase
+    .rpc('accept_org_invitation', { p_token: token })
 
-  if (!invite) return { error: 'ลิงก์นี้หมดอายุหรือใช้งานไปแล้ว' }
+  if (error) return { error: 'เข้าร่วมไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
+  if (!orgId) return { error: 'ลิงก์นี้หมดอายุหรือใช้งานไปแล้ว' }
 
-  // ตรวจสอบว่าเป็นสมาชิกอยู่แล้วหรือไม่
-  const { data: existing } = await supabase
-    .from('organization_members')
-    .select('id')
-    .eq('org_id', invite.org_id)
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (!existing) {
-    const admin = createAdminClient()
-    const { error } = await admin
-      .from('organization_members')
-      .insert({ org_id: invite.org_id, user_id: user.id, org_role: invite.role })
-    if (error) return { error: error.message }
-  }
-
-  // mark invite as used
-  await supabase
-    .from('org_invitations')
-    .update({ used_at: new Date().toISOString() })
-    .eq('id', invite.id)
-
-  return { success: true, orgId: invite.org_id }
+  return { success: true, orgId: orgId as string }
 }
 
 // ─── Member management ─────────────────────────────────────────────────────

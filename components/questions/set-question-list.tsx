@@ -49,6 +49,7 @@ function mergeData(a: QuestionCardData, b: QuestionCardData): QuestionCardData {
     duplicateCounts: { ...a.duplicateCounts, ...b.duplicateCounts },
     subQuestionCounts: { ...a.subQuestionCounts, ...b.subQuestionCounts },
     setMemberships: { ...a.setMemberships, ...b.setMemberships },
+    solutionPresence: { ...a.solutionPresence, ...b.solutionPresence },
   }
 }
 
@@ -368,6 +369,7 @@ export function SetQuestionList({
                 allTags={allTags}
                 duplicateCount={cardData.duplicateCounts[id] ?? 0}
                 subQuestionCount={cardData.subQuestionCounts[id] ?? q.sub_question_count}
+                hasSolution={cardData.solutionPresence[id]}
                 setContext={{
                   order: index + 1,
                   selected: selected.includes(id),

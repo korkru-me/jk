@@ -44,7 +44,7 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
   const admin = createAdminClient()
   const { data: submission } = await admin
     .from('submissions')
-    .select('id, student_id, status, assignment_id, assignments(proctoring_enabled, mode, secure_browser_mode, android_exam_mode)')
+    .select('id, student_id, status, assignment_id, exam_access_mode, seb_config_revision, assignments(proctoring_enabled, mode, secure_browser_mode, android_exam_mode)')
     .eq('id', input.submissionId)
     .eq('student_id', user.id)
     .maybeSingle()
@@ -67,6 +67,10 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
       user.id,
       submission.assignment_id,
       assignment.android_exam_mode === 'monitored',
+      submission.seb_config_revision,
+      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+        ? submission.exam_access_mode
+        : null,
     )
   ) {
     return { error: 'เซสชันเข้าสอบหมดอายุ' }

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { linkReachesGroup } from '@/lib/classroom-groups'
+import { getGroupMembership } from '@/lib/classroom-groups-server'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
@@ -70,7 +72,7 @@ export default async function AssignmentDetailPage({
       .order('submitted_at', { ascending: false }),
     admin
       .from('assignment_classrooms')
-      .select('classroom_id')
+      .select('classroom_id, group_ids')
       .eq('assignment_id', id),
     // Auto-grading leaves `is_correct` null exactly on the answers a person
     // has to read — ข้อเขียน, ช่องเติมคำที่ครูตรวจเอง, เหตุผลของถูก/ผิด. Same
@@ -98,13 +100,27 @@ export default async function AssignmentDetailPage({
   // Full roster of the assignment's linked classroom(s) — admin client to
   // sidestep RLS complexity for a roster read, same approach already used in
   // classrooms/[id]/page.tsx.
-  const classroomIds = Array.from(new Set((classroomLinks ?? []).map((l: any) => l.classroom_id)))
-  const { data: rosterRows } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('student_id, users!inner(id, full_name)')
-        .in('classroom_id', classroomIds)
-    : { data: [] }
+  const links = (classroomLinks ?? []) as { classroom_id: string; group_ids: string[] | null }[]
+  const classroomIds = Array.from(new Set(links.map(l => l.classroom_id)))
+  const groupLinks = links.filter(l => l.group_ids !== null)
+  const [{ data: allRosterRows }, groupMembership] = await Promise.all([
+    classroomIds.length > 0
+      ? admin
+          .from('classroom_students')
+          .select('classroom_id, student_id, users!inner(id, full_name)')
+          .in('classroom_id', classroomIds)
+      : Promise.resolve({ data: [] as any[] }),
+    getGroupMembership(admin, groupLinks.map(l => l.classroom_id)),
+  ])
+  // A room the งาน went to only some กลุ่มย่อย of contributes only those
+  // groups' students; nobody else there was expected to hand anything in.
+  const groupIdsByClassroom = new Map(links.map(l => [l.classroom_id, l.group_ids]))
+  const rosterRows = ((allRosterRows ?? []) as any[]).filter(r =>
+    linkReachesGroup(
+      groupIdsByClassroom.get(r.classroom_id) ?? null,
+      groupMembership.get(`${r.classroom_id}:${r.student_id}`),
+    )
+  )
 
   // A student may have multiple submissions (retries) — reduce to the
   // "official" attempt per the assignment's own score_strategy.
@@ -124,7 +140,7 @@ export default async function AssignmentDetailPage({
   // this list was built purely from `submissions` rows.
   const seenStudentIds = new Set<string>()
   const roster: SubmissionRow[] = []
-  for (const r of (rosterRows ?? []) as any[]) {
+  for (const r of rosterRows) {
     const studentId = r.student_id as string
     if (seenStudentIds.has(studentId)) continue
     seenStudentIds.add(studentId)

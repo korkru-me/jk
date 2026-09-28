@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen, Hash } from 'lucide-react'
+import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
 } from '@/lib/question-set-sections'
@@ -27,6 +29,8 @@ import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
+import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-password-settings'
+import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -42,11 +46,15 @@ interface Props {
   bank: BankQuestion[]
   /** True once anyone has started an attempt — the question set is then frozen. */
   hasSubmissions: boolean
+  sebQuitPasswordSetup: SebQuitPasswordSetupState
 }
 
 export type EditableAssignment = Pick<
   Assignment,
   | 'id'
+  | 'org_id'
+  | 'created_by'
+  | 'status'
   | 'title'
   | 'description'
   | 'question_ids'
@@ -70,12 +78,14 @@ export type EditableAssignment = Pick<
   | 'passing_type'
   | 'passing_value'
   | 'show_results'
+  | 'show_solutions'
   | 'sections'
   | 'show_sections'
   | 'proctoring_enabled'
   | 'fullscreen_required'
   | 'block_clipboard'
   | 'random_question_count'
+  | 'shared_random_seed'
   | 'exam_watermark_enabled'
   | 'require_work_image'
   | 'calculator_enabled'
@@ -87,9 +97,11 @@ export type EditableAssignment = Pick<
 export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'question_text' | 'question_type'> & {
   /** What this question is worth before any override — see lib/question-bank.ts. */
   default_points: number
+  /** Whether students can get different numbers on it — see lib/question-bank.ts. */
+  has_random_values: boolean
 }
 
-export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions }: Props) {
+export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions, sebQuitPasswordSetup }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -113,6 +125,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [instantCheck, setInstantCheck] = useState(a.instant_check === true)
   const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(a.instant_check_answer_key !== false)
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
+  // Changeable at any time, even after everyone has finished — it decides only
+  // whether a เฉลยวิธีทำ opens. Ticking it late is the way to hold a ข้อสอบ's
+  // เฉลย back until every class has sat it.
+  const [showSolutions, setShowSolutions] = useState(a.show_solutions === true)
   const [showSections, setShowSections] = useState(a.show_sections !== false)
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
   const [fullscreenRequired, setFullscreenRequired] = useState(a.fullscreen_required)
@@ -120,6 +136,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [randomQuestionCount, setRandomQuestionCount] = useState(
     a.random_question_count != null ? String(a.random_question_count) : ''
   )
+  const [sharedRandomValues, setSharedRandomValues] = useState(a.shared_random_seed != null)
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
   const [secureBrowserMode, setSecureBrowserMode] = useState(a.secure_browser_mode ?? 'browser')
   const [androidExamMode, setAndroidExamMode] = useState(a.android_exam_mode ?? 'blocked')
@@ -150,7 +167,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
   // Titles for everything that could end up in the list: the questions the
   // assignment came with, plus the bank the picker adds from.
-  const questionsById = new Map<string, { id: string; title: string; question_text: string; question_type?: string }>()
+  const questionsById = new Map<string, { id: string; title: string; question_text: string; question_type?: string; has_random_values?: boolean }>()
   for (const q of [...questions, ...bank]) questionsById.set(q.id, q)
   const orderedQuestions = questionIds.map(
     id => questionsById.get(id) ?? { id, title: 'โจทย์ที่ไม่พบ', question_text: '' }
@@ -159,6 +176,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   // Only เติมคำตอบตัวเลข has working to photograph, so the ask appears exactly
   // when this งาน holds one — and follows the list as the teacher edits it.
   const hasWorkImageQuestions = orderedQuestions.some(q => q.question_type === 'written')
+  // "ตัวเลขชุดเดียวกัน" follows the list the same way, and freezes with it:
+  // once anyone has started, their numbers are already drawn one way or the
+  // other, so switching would split the class in two.
+  const randomValueQuestionCount = orderedQuestions.filter(q => 'has_random_values' in q && q.has_random_values).length
 
   // ── เงื่อนไขจบงาน ────────────────────────────────────────────────────────
   // Same resolver as the create wizard and updateAssignment, so all three
@@ -299,6 +320,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         question_points: questionPoints,
         display_max_score: displayMax,
         show_results: showResults,
+        show_solutions: showSolutions,
         show_sections: showSections,
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
@@ -310,6 +332,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         require_work_image: hasWorkImageQuestions && requireWorkImage,
         calculator_enabled: a.mode === 'online' && calculatorEnabled,
         scratchpad_enabled: a.mode === 'online' && scratchpadEnabled,
+        // Sent only while it can still change, like question_ids above, so
+        // saving a started งาน never trips the server's refusal.
+        ...(hasSubmissions ? {} : { shared_random_values: randomValueQuestionCount > 0 && sharedRandomValues }),
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success('บันทึกการแก้ไขแล้ว')
@@ -357,32 +382,44 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               className="accent-primary w-4 h-4 shrink-0"
             />
           </label>
-          <p className="pl-11 text-xs text-warning">
-            SEB รองรับ Windows, macOS, iPhone และ iPad · Android ใช้ monitored mode ด้านล่างได้
+          <p className="pl-11 text-xs leading-5 text-warning">
+            เผยแพร่ได้เมื่อรหัสออกและไฟล์ SEB เฉพาะข้อสอบ revision เดียวกันผ่านการตรวจแล้ว · Android ใช้ monitored mode ด้านล่างได้ ·{' '}
+            <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+              ตรวจความพร้อม SEB
+            </Link>
             {hasSubmissions ? ' · ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำข้อสอบ' : ''}
+            {a.secure_browser_mode !== 'seb_required' && secureBrowserMode === 'seb_required'
+              ? ' · เมื่อบันทึก ระบบจะเก็บข้อสอบเป็นร่างจนกว่ารหัสออกและไฟล์ SEB รุ่นนี้จะพร้อม'
+              : ''}
           </p>
           {secureBrowserMode === 'seb_required' && (
-            <label className={`ml-11 flex items-start justify-between gap-4 rounded-lg border border-warning/30 bg-warning/5 p-3 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
-              <div className="flex items-start gap-3">
-                <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูตรวจเครื่อง</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    นักเรียนต้องขออนุมัติหน้าห้องสอบ ระบบแจ้งเมื่อออกจากหน้า แต่เว็บป้องกันการแคปหน้าจอระดับระบบไม่ได้
-                  </p>
+            <>
+              <label className={`ml-11 flex items-start justify-between gap-4 rounded-lg border border-warning/30 bg-warning/5 p-3 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
+                <div className="flex items-start gap-3">
+                  <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูตรวจเครื่อง</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      นักเรียนต้องขออนุมัติหน้าห้องสอบ ระบบแจ้งเมื่อออกจากหน้า แต่เว็บป้องกันการแคปหน้าจอระดับระบบไม่ได้
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={androidExamMode === 'monitored'}
-                disabled={hasSubmissions}
-                onChange={event => {
-                  setAndroidExamMode(event.target.checked ? 'monitored' : 'blocked')
-                  if (event.target.checked) setProctoringEnabled(true)
-                }}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                <input
+                  type="checkbox"
+                  checked={androidExamMode === 'monitored'}
+                  disabled={hasSubmissions}
+                  onChange={event => {
+                    setAndroidExamMode(event.target.checked ? 'monitored' : 'blocked')
+                    if (event.target.checked) setProctoringEnabled(true)
+                  }}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                />
+              </label>
+              <SebQuitPasswordSettings
+                assignmentId={a.id}
+                initialState={sebQuitPasswordSetup}
               />
-            </label>
+            </>
           )}
         </Card>
       )}
@@ -776,10 +813,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <div className="border-t border-border pt-3 space-y-1.5">
               <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                 <div>
-                  <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                  <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                   <p className="text-xs text-muted-foreground">
                     {instantCheckAnswerKey
-                      ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำทันที'
+                      ? 'นักเรียนเห็นคำตอบที่ถูกทันที'
                       : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ'}
                   </p>
                 </div>
@@ -792,7 +829,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               </label>
               {a.type === 'exam' && instantCheckAnswerKey && (
                 <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                  งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือเฉลยออกไปจากห้องได้ แนะนำให้ปิด
+                  งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือคำตอบที่ถูกออกไปจากห้องได้ แนะนำให้ปิด
                 </p>
               )}
             </div>
@@ -897,6 +934,31 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </label>
         )}
 
+        {randomValueQuestionCount > 0 && (
+          <label className={`flex items-center justify-between p-3 rounded-xl border border-border transition-all ${hasSubmissions ? 'opacity-70' : 'hover:border-ring cursor-pointer'}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <Hash className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน</p>
+                <p className="text-xs text-muted-foreground">
+                  {hasSubmissions
+                    ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้'
+                    : `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น ทำรอบใหม่ก็ได้ชุดเดิม`}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={sharedRandomValues}
+              onChange={e => setSharedRandomValues(e.target.checked)}
+              disabled={hasSubmissions}
+              className="accent-primary w-4 h-4 shrink-0"
+            />
+          </label>
+        )}
+
       </Card>
 
       <Card padding="xl" className="space-y-4">
@@ -963,9 +1025,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([
-              { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนน+เฉลยทันที' },
-              { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงเฉลย', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
-              { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนเฉลยจนกว่าจะหมดเขต' },
+              { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
+              { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
+              { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
               { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
             ] as const).map(option => (
               <button
@@ -984,6 +1046,13 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             ))}
           </div>
         </div>
+
+        <SolutionReleaseSetting
+          checked={showSolutions}
+          onChange={setShowSolutions}
+          assignmentType={a.type}
+          maxAttempts={maxAttempts}
+        />
 
         <div className="space-y-1.5">
           <Label htmlFor="edit-attempts" className="flex items-center gap-1.5">
@@ -1050,10 +1119,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             {instantCheck && (
               <label className="ml-11 flex items-center justify-between gap-4 rounded-xl border border-border p-3 cursor-pointer">
                 <div>
-                  <p className="text-sm font-medium text-foreground">แสดงเฉลยตอนกดตรวจ</p>
+                  <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {instantCheckAnswerKey
-                      ? 'นักเรียนเห็นคำตอบที่ถูกและวิธีทำที่ครูใส่ไว้ทันที แล้วแก้ให้ถูกได้ — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดู'
+                      ? 'นักเรียนเห็นคำตอบที่ถูกทันที แล้วแก้ให้ถูกได้ — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดู · เฉลยวิธีทำที่แนบไว้ดูได้หลังจบงานตามติ๊ก "ให้นักเรียนดูเฉลยวิธีทำ"'
                       : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
                   </p>
                 </div>
@@ -1092,7 +1161,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             </label>
             {retryScope === 'wrong_only' && showResults === 'immediate' && (
               <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                ตอนนี้ตั้งให้เฉลยทันทีหลังส่ง นักเรียนจึงเห็นเฉลยก่อนกลับมาแก้ข้อที่ผิด
+                ตอนนี้ตั้งให้แสดงคำตอบที่ถูกทันทีหลังส่ง นักเรียนจึงเห็นคำตอบก่อนกลับมาแก้ข้อที่ผิด
               </p>
             )}
           </div>

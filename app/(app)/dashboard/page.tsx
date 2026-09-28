@@ -14,6 +14,8 @@ import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { canStudentViewScore } from '@/lib/result-visibility'
+import { formatThaiDate, thaiHour } from '@/lib/thai-time'
+import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 
@@ -162,7 +164,7 @@ export default async function DashboardPage() {
     ? await Promise.all([
         admin
           .from('assignments')
-          .select('id, title, question_ids, random_question_count, completion_rule, streak_target, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id)')
+          .select('id, title, question_ids, random_question_count, completion_rule, streak_target, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id, group_ids)')
           .in('assignment_classrooms.classroom_id', classroomIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),
@@ -175,7 +177,14 @@ export default async function DashboardPage() {
       ])
     : [{ data: [] }, { data: [] }]
 
-  const allAssignments = assignmentsRes.data ?? []
+  // A งาน handed to กลุ่มย่อย the student is not in is not theirs to do.
+  const allAssignments = await filterAssignmentsForStudent(
+    admin,
+    user.id,
+    classroomIds,
+    (assignmentsRes.data ?? []) as any[],
+    new Set(allSubmissions.map((s: any) => s.assignment_id as string)),
+  )
   const recentPosts = recentPostsRes.data ?? []
 
   let pendingAssignments: any[] = []
@@ -269,7 +278,7 @@ function StudentDashboard({
   calendarEvents: CalendarEvent[]
   recentPosts: any[]
 }) {
-  const hour = new Date().getHours()
+  const hour = thaiHour()
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น'
 
   return (
@@ -398,7 +407,7 @@ function timeAgo(iso: string): string {
   if (hours < 24) return `${hours} ชม.ที่แล้ว`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days} วันที่แล้ว`
-  return new Date(iso).toLocaleDateString('th-TH', { dateStyle: 'short' })
+  return formatThaiDate(iso, { dateStyle: 'short' })
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -443,7 +452,7 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
   if (hours < 24) return { label: `อีก ${hours} ชม.`, urgent: true, color: 'text-flag dark:text-flag' }
   if (days <= 2) return { label: `อีก ${days} วัน`, urgent: true, color: 'text-warning' }
   return {
-    label: new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' }),
+    label: formatThaiDate(endAt, { dateStyle: 'short' }),
     urgent: false,
     color: 'text-muted-foreground',
   }

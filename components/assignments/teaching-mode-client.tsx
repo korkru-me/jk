@@ -80,6 +80,9 @@ const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
 export type TeachingQuestionView = Question & {
   randomValues: Record<string, number>
   correctAnswer: string
+  /** The งาน gives every student the same numbers, so randomValues are the
+   *  class's own rather than a sample. Absent = a sample. */
+  sharedRandomValues?: boolean
 }
 
 interface Props {
@@ -193,7 +196,9 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">ข้อ {index + 1} / {total}</Badge>
         <Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge>
-        {Object.keys(question.randomValues).length > 0 && <Badge variant="secondary">สุ่มค่าตัวอย่างแล้ว</Badge>}
+        {Object.keys(question.randomValues).length > 0 && (
+          <Badge variant="secondary">{question.sharedRandomValues ? 'ตัวเลขชุดเดียวกับนักเรียน' : 'สุ่มค่าตัวอย่างแล้ว'}</Badge>
+        )}
         {actions && <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">{actions}</span>}
       </div>
       {question.title && <h2 className={`text-lg font-semibold ${folded ? 'truncate' : ''}`}>{question.title}</h2>}

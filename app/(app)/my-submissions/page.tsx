@@ -10,6 +10,8 @@ import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { Card } from '@/components/ui/card'
 import { canStudentViewScore } from '@/lib/result-visibility'
+import { formatThaiDate } from '@/lib/thai-time'
+import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 
 export const metadata = { title: 'สรุปงานของฉัน — KorKru' }
 
@@ -24,7 +26,7 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; ove
   if (diff < 0) return { label: 'เลยกำหนดส่งแล้ว', urgent: true, overdue: true }
   if (hours < 24) return { label: `ด่วน · เหลืออีก ${Math.max(1, hours)} ชม.`, urgent: true, overdue: false }
   if (days <= 2) return { label: `ใกล้ครบกำหนด · อีก ${days} วัน`, urgent: true, overdue: false }
-  return { label: `ถึง ${new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'medium' })}`, urgent: false, overdue: false }
+  return { label: `ถึง ${formatThaiDate(endAt)}`, urgent: false, overdue: false }
 }
 
 export default async function MySubmissionsPage() {
@@ -103,13 +105,21 @@ export default async function MySubmissionsPage() {
 
   // Use assignment_classrooms as the authoritative relation in the same
   // query, avoiding a separate link lookup before loading published work.
-  const { data: publishedAssignments } = classroomIds.length > 0
+  const { data: linkedAssignments } = classroomIds.length > 0
     ? await admin
         .from('assignments')
-        .select('id, title, end_at, duration_minutes, classrooms(name), assignment_classrooms!inner(classroom_id)')
+        .select('id, title, end_at, duration_minutes, classrooms(name), assignment_classrooms!inner(classroom_id, group_ids)')
         .in('assignment_classrooms.classroom_id', classroomIds)
         .eq('status', 'published')
     : { data: [] }
+  // Leave out งาน handed to กลุ่มย่อย this student is not in.
+  const publishedAssignments = await filterAssignmentsForStudent(
+    admin,
+    user.id,
+    classroomIds,
+    (linkedAssignments ?? []) as any[],
+    new Set(all.map((s: any) => s.assignment_id as string)),
+  )
 
   const pendingAssignments = (publishedAssignments ?? [])
     .filter((a: any) => !doneAssignmentIds.has(a.id))
@@ -290,7 +300,7 @@ export default async function MySubmissionsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{s.assignments?.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {s.assignments?.classrooms?.name} · {new Date(s.created_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}
+                          {s.assignments?.classrooms?.name} · {formatThaiDate(s.created_at)}
                         </p>
                         {canShowResults ? (
                           <div className="flex items-center gap-2 mt-1.5">

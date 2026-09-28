@@ -153,8 +153,6 @@ export function TeachingAnswerCheck({ question, fields, values, onChange, onClea
           answer_tolerance: question.answer_tolerance ?? 0.1,
           extra_data: question.extra_data,
           mcq_options: question.mcq_options ?? null,
-          solution_text: question.solution_text ?? null,
-          solution_image_urls: question.solution_image_urls ?? null,
         },
         isCorrect: graded.is_correct,
         score: graded.score,

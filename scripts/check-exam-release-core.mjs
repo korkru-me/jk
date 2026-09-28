@@ -5,6 +5,7 @@
  */
 export function inspectExamReleaseReadiness({
   stagingReady,
+  sebRegistryReady,
   releaseCandidateReady,
   sebPlatformsReady,
   externalUatReady,
@@ -13,6 +14,9 @@ export function inspectExamReleaseReadiness({
     stagingReady
       ? { status: 'pass', field: 'authenticated staging', message: 'staging isolation preflight ผ่าน' }
       : { status: 'blocker', field: 'authenticated staging', message: 'ยังไม่มี staging แยกที่ผ่าน isolation preflight' },
+    sebRegistryReady
+      ? { status: 'pass', field: 'SEB release registry', message: 'config revision, policy และ build matrix ผูกกันครบ' }
+      : { status: 'blocker', field: 'SEB release registry', message: 'config revision, policy หรือ build matrix ยังไม่ยืนยันครบ' },
     releaseCandidateReady
       ? { status: 'pass', field: 'release candidate', message: 'code, staging build, UAT run และ SEB config ผูกเป็น candidate เดียวกัน' }
       : { status: 'blocker', field: 'release candidate', message: 'ยังไม่ได้ล็อก revision/build หรือหลักฐานมาจากคนละ candidate' },

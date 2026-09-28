@@ -6,17 +6,13 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { isSolutionTextImageSrc } from '@/lib/solution-attachments'
+import { hasSolutionText } from '@/lib/question-solution'
 import {
   SolutionAttachmentsField,
   storageSolutionFiles,
   uploadSolutionTextImage,
   type SolutionFileStore,
 } from './solution-attachments-field'
-
-/** Typed เฉลย that holds anything: words, or only a picture placed in the text. */
-function hasTypedSolution(text: string): boolean {
-  return text.replace(/<[^>]*>/g, '').trim().length > 0 || /<img\b/i.test(text)
-}
 
 interface SolutionSectionProps {
   text: string
@@ -44,7 +40,9 @@ export function SolutionSection({
   rows = 4,
   fileStore,
 }: SolutionSectionProps) {
-  const hasText = hasTypedSolution(text)
+  // The same test the คลัง's ดูเฉลย button uses, so "มีเนื้อหาแล้ว" here and
+  // a greyed-out button there never disagree about one โจทย์.
+  const hasText = hasSolutionText(text)
   const hasContent = hasText || imageUrls.length > 0
   const [open, setOpen] = useState(hasContent)
   // A เฉลย that already has text opens with it showing; otherwise the box
