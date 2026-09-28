@@ -3,6 +3,7 @@ import {
   HOMEROOM_CLASSROOM_NAVIGATION,
   SUBJECT_CLASSROOM_NAVIGATION,
   classroomNavigationFor,
+  isClassroomDetailPath,
 } from './classroom-navigation'
 
 describe('classroom navigation', () => {
@@ -53,5 +54,26 @@ describe('classroom navigation', () => {
       const keys = items.map(item => item.key)
       expect(new Set(keys).size).toBe(keys.length)
     }
+  })
+})
+
+describe('classroom detail route detection', () => {
+  it.each([
+    '/classrooms/6f201055-28e8-41a2-98ea-90c3054b437e',
+    '/classrooms/room-slug',
+    '/classrooms/room-slug/',
+  ])('recognizes a direct classroom detail route: %s', pathname => {
+    expect(isClassroomDetailPath(pathname)).toBe(true)
+  })
+
+  it.each([
+    '/classrooms',
+    '/classrooms/new',
+    '/classrooms/archived',
+    '/classrooms/trash',
+    '/classrooms/room-slug/report',
+    '/dashboard',
+  ])('does not compact the global sidebar on non-detail routes: %s', pathname => {
+    expect(isClassroomDetailPath(pathname)).toBe(false)
   })
 })

@@ -44,3 +44,10 @@ export function classroomNavigationFor(
 
   return items.filter(item => !('managerOnly' in item) || !item.managerOnly || canManage)
 }
+
+const RESERVED_CLASSROOM_PATHS = new Set(['new', 'archived', 'trash'])
+
+export function isClassroomDetailPath(pathname: string): boolean {
+  const match = pathname.match(/^\/classrooms\/([^/]+)\/?$/)
+  return match !== null && !RESERVED_CLASSROOM_PATHS.has(match[1])
+}
