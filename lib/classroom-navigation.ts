@@ -1,0 +1,46 @@
+export type ClassroomNavigationKey =
+  | 'overview'
+  | 'students'
+  | 'assignments'
+  | 'scores'
+  | 'ability'
+  | 'homeroom'
+  | 'groups'
+  | 'invite'
+  | 'coteachers'
+
+export interface ClassroomNavigationItem {
+  key: ClassroomNavigationKey
+  label: string
+  managerOnly?: boolean
+}
+
+export const SUBJECT_CLASSROOM_NAVIGATION = [
+  { key: 'overview', label: 'ภาพรวม' },
+  { key: 'assignments', label: 'งานที่มอบหมาย', managerOnly: true },
+  { key: 'scores', label: 'คะแนนและการส่งงาน', managerOnly: true },
+  { key: 'ability', label: 'ศักยภาพผู้เรียน', managerOnly: true },
+  { key: 'students', label: 'นักเรียน' },
+  { key: 'groups', label: 'กลุ่มย่อย' },
+  { key: 'invite', label: 'เชิญเข้าร่วม' },
+  { key: 'coteachers', label: 'ผู้ช่วยสอน' },
+] as const satisfies readonly ClassroomNavigationItem[]
+
+export const HOMEROOM_CLASSROOM_NAVIGATION = [
+  { key: 'overview', label: 'ภาพรวม' },
+  { key: 'homeroom', label: 'การบ้านนักเรียน', managerOnly: true },
+  { key: 'students', label: 'นักเรียน' },
+  { key: 'invite', label: 'เชิญเข้าร่วม' },
+  { key: 'coteachers', label: 'ผู้ช่วยสอน' },
+] as const satisfies readonly ClassroomNavigationItem[]
+
+export function classroomNavigationFor(
+  classroomType: 'subject' | 'homeroom',
+  canManage: boolean,
+): readonly ClassroomNavigationItem[] {
+  const items = classroomType === 'homeroom'
+    ? HOMEROOM_CLASSROOM_NAVIGATION
+    : SUBJECT_CLASSROOM_NAVIGATION
+
+  return items.filter(item => !('managerOnly' in item) || !item.managerOnly || canManage)
+}

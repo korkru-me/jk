@@ -22,6 +22,10 @@ import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { IconButton } from '@/components/ui/icon-button'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
+import {
+  classroomNavigationFor,
+  type ClassroomNavigationKey,
+} from '@/lib/classroom-navigation'
 import type { GroupState } from './breakout-groups'
 
 function TabLoading() {
@@ -50,26 +54,17 @@ const StudentAbilityTab = dynamic(
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
-type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'ability' | 'homeroom' | 'groups' | 'invite' | 'coteachers'
-
-const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
-  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
-  { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
-  { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
-  { key: 'ability',     label: 'ศักยภาพผู้เรียน',   icon: ChartColumnIncreasing, managerOnly: true },
-  { key: 'students',    label: 'นักเรียน',        icon: Users },
-  { key: 'groups',      label: 'กลุ่มย่อย',       icon: Grid3x3 },
-  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
-  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-]
-
-const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
-  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
-  { key: 'homeroom',    label: 'การบ้านนักเรียน', icon: CalendarDays, managerOnly: true },
-  { key: 'students',    label: 'นักเรียน',        icon: Users },
-  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
-  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-]
+const CLASSROOM_NAVIGATION_ICONS: Record<ClassroomNavigationKey, typeof Users> = {
+  overview: LayoutDashboard,
+  assignments: BookOpen,
+  scores: ClipboardList,
+  ability: ChartColumnIncreasing,
+  students: Users,
+  homeroom: CalendarDays,
+  groups: Grid3x3,
+  invite: UserPlus,
+  coteachers: GraduationCap,
+}
 
 interface RealStudent { id: string; full_name: string; email: string }
 
@@ -122,8 +117,8 @@ export function ClassroomDetailClient({
   groups, groupMembers,
 }: Props) {
   const isHomeroom = classroom.classroom_type === 'homeroom'
-  const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const navigationItems = classroomNavigationFor(classroom.classroom_type, canManage)
+  const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>('overview')
   const [codeCopied, setCodeCopied] = useState(false)
   const savedCover = coverOf(parseDescription(classroom.description))
   // A chosen cover paints the banner as a tinted surface whose text is the same
@@ -246,8 +241,8 @@ export function ClassroomDetailClient({
 
       {/* Tab bar */}
       <div className="flex items-center gap-1 bg-muted rounded-2xl p-1 overflow-x-auto">
-        {TABS.filter(tab => !tab.managerOnly || canManage).map(tab => {
-          const Icon = tab.icon
+        {navigationItems.map(tab => {
+          const Icon = CLASSROOM_NAVIGATION_ICONS[tab.key]
           return (
             <button
               key={tab.key}
