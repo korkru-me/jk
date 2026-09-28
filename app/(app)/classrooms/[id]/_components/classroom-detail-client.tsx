@@ -7,7 +7,6 @@ import {
   Users, BookOpen, Copy, Check, Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
@@ -195,6 +194,9 @@ export function ClassroomDetailClient({
         activeItem={activeTab}
         studentCount={students.length}
         onNavigate={navigateTo}
+        managementActions={isOwner
+          ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
+          : undefined}
       />
 
       <div className="flex min-w-0 max-w-[1200px] flex-1 flex-col gap-6">
@@ -259,11 +261,8 @@ export function ClassroomDetailClient({
 
         {/* Owner actions */}
         {isOwner && (
-          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-white/10">
+          <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4 lg:hidden">
             <ClassroomSettingsDialog classroom={classroom} onCover={!!savedCover} />
-            <div className="ml-auto">
-              <DeleteClassroomButton id={classroom.id} />
-            </div>
           </div>
         )}
       </div>

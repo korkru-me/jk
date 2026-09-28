@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { BookOpen, ChevronLeft, Menu } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -28,6 +29,7 @@ interface ClassroomContextSidebarProps {
   activeItem: ClassroomNavigationKey
   studentCount: number
   onNavigate: (item: ClassroomNavigationKey) => void
+  managementActions?: ReactNode
 }
 
 function ClassroomContextNavigation({
@@ -38,7 +40,10 @@ function ClassroomContextNavigation({
   studentCount,
   onNavigate,
   onClose,
+  managementActions,
 }: ClassroomContextSidebarProps & { onClose?: () => void }) {
+  const navigationHeadingId = useId()
+  const managementHeadingId = useId()
   const meta = parseDescription(classroom.description)
   const subtitle = [meta.gradeLevel, meta.academicTerm].filter(Boolean).join(' • ')
 
@@ -67,8 +72,10 @@ function ClassroomContextNavigation({
 
       <Separator />
 
-      <div className="px-2 text-xs font-medium text-muted-foreground">เมนูห้องเรียน</div>
-      <nav aria-label="หน้าภายในห้องเรียน" className="flex flex-col gap-1">
+      <div id={navigationHeadingId} className="px-2 text-xs font-medium text-muted-foreground">
+        เมนูห้องเรียน
+      </div>
+      <nav aria-labelledby={navigationHeadingId} className="flex flex-col gap-1">
         {navigationItems.map(item => {
           const Icon = CLASSROOM_NAVIGATION_ICONS[item.key]
           const selected = item.key === activeItem
@@ -77,8 +84,8 @@ function ClassroomContextNavigation({
             <Button
               key={item.key}
               type="button"
-              variant={selected ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
+              variant={selected ? 'secondary' : item.key === 'invite' ? 'outline' : 'ghost'}
+              className={item.key === 'invite' ? 'mt-2 w-full justify-start' : 'w-full justify-start'}
               aria-current={selected ? 'page' : undefined}
               onClick={() => {
                 onNavigate(item.key)
@@ -96,6 +103,16 @@ function ClassroomContextNavigation({
           )
         })}
       </nav>
+
+      {managementActions && (
+        <section aria-labelledby={managementHeadingId} className="flex flex-col gap-2">
+          <Separator />
+          <div id={managementHeadingId} className="px-2 text-xs font-medium text-muted-foreground">
+            จัดการห้องเรียน
+          </div>
+          {managementActions}
+        </section>
+      )}
     </div>
   )
 }
@@ -139,8 +156,15 @@ export function ClassroomContextDrawer(props: ClassroomContextSidebarProps) {
         >
           <DialogHeader>
             <DialogTitle>เมนูห้องเรียน</DialogTitle>
+            <DialogDescription className="sr-only">
+              เลือกหน้าที่ต้องการเปิดภายในห้องเรียน {props.classroom.name}
+            </DialogDescription>
           </DialogHeader>
-          <ClassroomContextNavigation {...props} onClose={() => setOpen(false)} />
+          <ClassroomContextNavigation
+            {...props}
+            managementActions={undefined}
+            onClose={() => setOpen(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

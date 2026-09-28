@@ -28,15 +28,18 @@ import {
 import {
   AccessTypePicker, TagInput, CreatableCombobox,
 } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
+import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 
 export function ClassroomSettingsDialog({
-  classroom, onCover = false,
+  classroom, onCover = false, placement = 'banner',
 }: {
   classroom: Classroom
   /** True when the banner behind the trigger is a tinted cover rather than the
    *  dark default — the trigger then inherits the banner's colour instead of
    *  the light-on-dark tokens. */
   onCover?: boolean
+  /** The contextual sidebar uses a quieter, full-width navigation treatment. */
+  placement?: 'banner' | 'sidebar'
 }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(classroom.name)
@@ -108,12 +111,16 @@ export function ClassroomSettingsDialog({
         render={
           <Button
             size="sm"
-            variant="outline"
+            variant={placement === 'sidebar' ? 'ghost' : 'outline'}
             className={cn(
-              'gap-1.5 bg-transparent',
-              onCover
-                ? 'border-current text-current hover:bg-current/10 hover:text-current'
-                : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground',
+              placement === 'sidebar'
+                ? 'w-full justify-start'
+                : 'gap-1.5 bg-transparent',
+              placement === 'banner' && (
+                onCover
+                  ? 'border-current text-current hover:bg-current/10 hover:text-current'
+                  : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'
+              ),
             )}
           />
         }
@@ -362,6 +369,14 @@ export function ClassroomSettingsDialog({
           <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={handleArchive} disabled={isPending}>
             <Archive className="w-3.5 h-3.5" /> เก็บห้องเรียนเข้าคลัง
           </Button>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className="text-sm font-medium text-destructive">พื้นที่อันตราย</p>
+          <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
+            ย้ายห้องเรียนไปถังขยะพร้อมข้อมูลภายในทั้งหมด และยังสามารถกู้คืนได้ก่อนลบถาวร
+          </p>
+          <DeleteClassroomButton id={classroom.id} />
         </div>
       </DialogContent>
       {confirmDialog}
