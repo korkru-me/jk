@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
@@ -21,7 +21,9 @@ import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { IconButton } from '@/components/ui/icon-button'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
 import {
+  classroomNavigationHref,
   classroomNavigationFor,
+  resolveClassroomNavigationKey,
   type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import type { GroupState } from './breakout-groups'
@@ -97,6 +99,8 @@ interface Props {
   /** กลุ่มย่อย of this room, and each student's group (student id → group id). */
   groups: ClassroomGroup[]
   groupMembers: Record<string, string>
+  initialNavigationItem: ClassroomNavigationKey
+  backHref: string
 }
 
 export function ClassroomDetailClient({
@@ -104,11 +108,14 @@ export function ClassroomDetailClient({
   classroomAssignments, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewCount, pendingReviewCapped, pendingReviewByAssignment, seenByPost, crossPostTargets,
-  groups, groupMembers,
+  groups, groupMembers, initialNavigationItem, backHref,
 }: Props) {
   const isHomeroom = classroom.classroom_type === 'homeroom'
-  const navigationItems = classroomNavigationFor(classroom.classroom_type, canManage)
-  const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>('overview')
+  const navigationItems = useMemo(
+    () => classroomNavigationFor(classroom.classroom_type, canManage),
+    [classroom.classroom_type, canManage],
+  )
+  const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
   const [codeCopied, setCodeCopied] = useState(false)
   const savedCover = coverOf(parseDescription(classroom.description))
   // A chosen cover paints the banner as a tinted surface whose text is the same
@@ -148,6 +155,24 @@ export function ClassroomDetailClient({
     return map
   }, [classroomAssignments])
 
+  const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
+    setActiveTab(nextItem)
+
+    const nextUrl = classroomNavigationHref(window.location.href, nextItem)
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
+  }, [])
+
+  useEffect(() => {
+    function syncNavigationFromHistory() {
+      const params = new URLSearchParams(window.location.search)
+      setActiveTab(resolveClassroomNavigationKey(params.get('view'), navigationItems))
+    }
+
+    window.addEventListener('popstate', syncNavigationFromHistory)
+    return () => window.removeEventListener('popstate', syncNavigationFromHistory)
+  }, [navigationItems])
+
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortDir(d => (studentSortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
     setStudentSortKey(key)
@@ -165,19 +190,21 @@ export function ClassroomDetailClient({
     <div className="flex items-start gap-6">
       <ClassroomContextSidebar
         classroom={classroom}
+        backHref={backHref}
         navigationItems={navigationItems}
         activeItem={activeTab}
         studentCount={students.length}
-        onNavigate={setActiveTab}
+        onNavigate={navigateTo}
       />
 
       <div className="flex min-w-0 max-w-[1200px] flex-1 flex-col gap-6">
         <ClassroomContextDrawer
           classroom={classroom}
+          backHref={backHref}
           navigationItems={navigationItems}
           activeItem={activeTab}
           studentCount={students.length}
-          onNavigate={setActiveTab}
+          onNavigate={navigateTo}
         />
 
       {/* Header card */}
@@ -258,7 +285,7 @@ export function ClassroomDetailClient({
             crossPostTargets={crossPostTargets}
             canManage={canManage}
             audienceByAssignment={audienceByAssignment}
-            onNavigate={(target: OverviewTarget) => setActiveTab(target)}
+            onNavigate={(target: OverviewTarget) => navigateTo(target)}
           />
         )}
         {activeTab === 'students' && (
@@ -283,7 +310,7 @@ export function ClassroomDetailClient({
             audienceByAssignment={audienceByAssignment}
             groupNameById={groupNameById}
             pendingReviewByAssignment={pendingReviewByAssignment}
-            onViewScores={() => setActiveTab('scores')}
+            onViewScores={() => navigateTo('scores')}
           />
         )}
         {activeTab === 'scores' && canManage && (
@@ -299,7 +326,7 @@ export function ClassroomDetailClient({
             groupNameById={groupNameById}
             sortKey={studentSortKey}
             sortDir={studentSortDir}
-            onViewStudents={() => setActiveTab('students')}
+            onViewStudents={() => navigateTo('students')}
           />
         )}
         {activeTab === 'ability' && canManage && (

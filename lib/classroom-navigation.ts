@@ -45,6 +45,25 @@ export function classroomNavigationFor(
   return items.filter(item => !('managerOnly' in item) || !item.managerOnly || canManage)
 }
 
+export function resolveClassroomNavigationKey(
+  value: string | string[] | null | undefined,
+  availableItems: readonly ClassroomNavigationItem[],
+): ClassroomNavigationKey {
+  const candidate = Array.isArray(value) ? value[0] : value
+  const match = availableItems.find(item => item.key === candidate)
+  return match?.key ?? 'overview'
+}
+
+export function classroomNavigationHref(
+  currentHref: string,
+  nextItem: ClassroomNavigationKey,
+): string {
+  const url = new URL(currentHref)
+  if (nextItem === 'overview') url.searchParams.delete('view')
+  else url.searchParams.set('view', nextItem)
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
 const RESERVED_CLASSROOM_PATHS = new Set(['new', 'archived', 'trash'])
 
 export function isClassroomDetailPath(pathname: string): boolean {

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   HOMEROOM_CLASSROOM_NAVIGATION,
   SUBJECT_CLASSROOM_NAVIGATION,
+  classroomNavigationHref,
   classroomNavigationFor,
   isClassroomDetailPath,
+  resolveClassroomNavigationKey,
 } from './classroom-navigation'
 
 describe('classroom navigation', () => {
@@ -54,6 +56,30 @@ describe('classroom navigation', () => {
       const keys = items.map(item => item.key)
       expect(new Set(keys).size).toBe(keys.length)
     }
+  })
+
+  it('resolves only pages available to the current classroom permission', () => {
+    const viewOnlyItems = classroomNavigationFor('subject', false)
+
+    expect(resolveClassroomNavigationKey('students', viewOnlyItems)).toBe('students')
+    expect(resolveClassroomNavigationKey('scores', viewOnlyItems)).toBe('overview')
+    expect(resolveClassroomNavigationKey('unknown', viewOnlyItems)).toBe('overview')
+    expect(resolveClassroomNavigationKey(undefined, viewOnlyItems)).toBe('overview')
+    expect(resolveClassroomNavigationKey(['groups', 'students'], viewOnlyItems)).toBe('groups')
+  })
+
+  it('updates the view parameter without losing the remembered back target', () => {
+    expect(classroomNavigationHref(
+      'https://korkru.test/classrooms/room-1?back=%2Fclassrooms%2Farchived#content',
+      'students',
+    )).toBe('/classrooms/room-1?back=%2Fclassrooms%2Farchived&view=students#content')
+  })
+
+  it('removes the default overview view while preserving other URL state', () => {
+    expect(classroomNavigationHref(
+      'https://korkru.test/classrooms/room-1?view=scores&back=%2Fclassrooms',
+      'overview',
+    )).toBe('/classrooms/room-1?back=%2Fclassrooms')
   })
 })
 

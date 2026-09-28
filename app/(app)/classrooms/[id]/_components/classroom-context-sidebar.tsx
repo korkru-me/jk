@@ -23,6 +23,7 @@ import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
 
 interface ClassroomContextSidebarProps {
   classroom: Pick<Classroom, 'name' | 'description' | 'classroom_type'>
+  backHref: string
   navigationItems: readonly ClassroomNavigationItem[]
   activeItem: ClassroomNavigationKey
   studentCount: number
@@ -31,6 +32,7 @@ interface ClassroomContextSidebarProps {
 
 function ClassroomContextNavigation({
   classroom,
+  backHref,
   navigationItems,
   activeItem,
   studentCount,
@@ -45,7 +47,7 @@ function ClassroomContextNavigation({
       <Button
         variant="ghost"
         className="w-full justify-start"
-        render={<Link href="/classrooms" onClick={onClose} />}
+        render={<Link href={backHref} onClick={onClose} />}
       >
         <ChevronLeft data-icon="inline-start" />
         ห้องเรียนทั้งหมด

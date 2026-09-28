@@ -13,13 +13,20 @@ import { isAttemptExpired } from '@/lib/grading'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
+import {
+  classroomNavigationFor,
+  resolveClassroomNavigationKey,
+} from '@/lib/classroom-navigation'
+import { backHrefFromSearchParams } from '@/lib/back-link'
 
 export default async function ClassroomDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { id } = await params
+  const [{ id }, sp] = await Promise.all([params, searchParams])
   const supabase = await createClient()
   const authUser = await getAuthUser()
   if (!authUser) redirect('/login')
@@ -510,6 +517,11 @@ export default async function ClassroomDetailPage({
   // Who has seen each announcement. Only the teaching side can read these rows
   // (post_reads_select), and only this side has any use for them.
   const seenByPost = canManage ? await getPostSeenByPost(posts.map(p => p.id)) : {}
+  const initialNavigationItem = resolveClassroomNavigationKey(
+    sp.view,
+    classroomNavigationFor(c.classroom_type, canManage),
+  )
+  const backHref = backHrefFromSearchParams(sp, '/classrooms')
 
   return (
     <ClassroomDetailClient
@@ -537,6 +549,8 @@ export default async function ClassroomDetailPage({
       crossPostTargets={crossPostTargets}
       groups={groups}
       groupMembers={groupMembers}
+      initialNavigationItem={initialNavigationItem}
+      backHref={backHref}
     />
   )
 }

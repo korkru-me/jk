@@ -23,7 +23,7 @@
 - [x] เฟส 2 — Global rail สำหรับหน้ารายละเอียดห้องเรียน
 - [x] เฟส 3 — Contextual sidebar และย้ายเมนูออกจากแถบแนวนอน
 - [x] เฟส 4 — Responsive สำหรับ mobile/tablet/desktop
-- [ ] เฟส 5 — URL state, browser back/forward และ deep link
+- [x] เฟส 5 — URL state, browser back/forward และ deep link
 - [ ] เฟส 6 — polish, accessibility และ destructive-action placement
 - [ ] เฟส 7 — regression QA และตัดสินใจก่อนขยายไปส่วนอื่น
 
