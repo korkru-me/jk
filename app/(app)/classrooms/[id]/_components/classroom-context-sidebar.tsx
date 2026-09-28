@@ -17,7 +17,7 @@ import type {
   ClassroomNavigationItem,
   ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
-import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
 
 interface ClassroomContextSidebarProps {
@@ -55,6 +56,7 @@ export function ClassroomContextNavigation({
   const navigationHeadingId = useId()
   const managementHeadingId = useId()
   const meta = parseDescription(classroom.description)
+  const cover = coverOf(meta)
   const subtitle = [meta.gradeLevel, meta.academicTerm].filter(Boolean).join(' • ')
 
   return (
@@ -68,14 +70,20 @@ export function ClassroomContextNavigation({
         ห้องเรียนทั้งหมด
       </Button>
 
-      <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+      <div className={cn(
+        'flex items-center gap-3 rounded-2xl border p-3',
+        cover ? cn(cover.surface, cover.text) : 'border-primary/20 bg-primary/5',
+      )}>
+        <div className={cn(
+          'flex size-12 shrink-0 items-center justify-center rounded-xl shadow-sm',
+          cover ? 'bg-current/10' : 'bg-primary text-primary-foreground',
+        )}>
           <BookOpen aria-hidden="true" className="size-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-primary">ห้องเรียนปัจจุบัน</p>
-          <p className="truncate text-lg font-bold leading-tight text-foreground">{classroom.name}</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className={cn('text-xs font-medium', cover ? cover.textMuted : 'text-primary')}>ห้องเรียนปัจจุบัน</p>
+          <p className={cn('truncate text-lg font-bold leading-tight', cover ? cover.text : 'text-foreground')}>{classroom.name}</p>
+          <p className={cn('truncate text-xs', cover ? cover.textMuted : 'text-muted-foreground')}>
             {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
           </p>
         </div>
