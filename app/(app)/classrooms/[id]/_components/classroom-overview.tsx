@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import {
-  AlertTriangle, ArrowRight, ChevronRight, ClipboardList, Plus, Printer, Sparkles, UserPlus,
+  AlertTriangle, ArrowRight, ChevronRight, Plus, Printer, Sparkles,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { ClassroomStream } from './classroom-stream'
@@ -236,38 +236,20 @@ export function ClassroomOverview({
     <div className="space-y-5">
       {announcements}
 
-      {/* ── Quick actions ─────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2">
-        {isHomeroom ? (
-          <>
-            <Button size="lg" className="gap-1.5" onClick={() => onNavigate('homeroom')}>
-              <ClipboardList className="w-4 h-4" /> ดูการบ้านนักเรียน
-            </Button>
-            <Link
-              href={`/classrooms/${classroomId}/report`}
-              target="_blank"
-              className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'gap-1.5')}
-            >
-              <Printer className="w-4 h-4" /> พิมพ์รายงานผู้ปกครอง
-            </Link>
-          </>
-        ) : (
-          <>
-            <Link
-              href={`/assignments/new?classroom=${classroomId}`}
-              className={cn(buttonVariants({ size: 'lg' }), 'gap-1.5')}
-            >
-              <Plus className="w-4 h-4" /> มอบหมายงานใหม่
-            </Link>
-            <Button variant="outline" size="lg" className="gap-1.5" onClick={() => onNavigate('scores')}>
-              <ClipboardList className="w-4 h-4" /> ดูคะแนนและการส่งงาน
-            </Button>
-          </>
-        )}
-        <Button variant="outline" size="lg" className="gap-1.5" onClick={() => onNavigate('invite')}>
-          <UserPlus className="w-4 h-4" /> เชิญนักเรียน
-        </Button>
-      </div>
+      {/* The contextual sidebar already owns navigation actions. Homeroom's
+          printable parent report stays here because it is a page-specific
+          export, not another destination in that navigation. */}
+      {isHomeroom && (
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/classrooms/${classroomId}/report`}
+            target="_blank"
+            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'gap-1.5')}
+          >
+            <Printer className="w-4 h-4" /> พิมพ์รายงานผู้ปกครอง
+          </Link>
+        </div>
+      )}
 
       {/* ── What needs the teacher now ────────────────────────────────── */}
       <Card padding="md">
