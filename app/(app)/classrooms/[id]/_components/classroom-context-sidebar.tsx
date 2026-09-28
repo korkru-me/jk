@@ -6,10 +6,12 @@ import {
   BookOpen,
   ChevronDown,
   ChevronLeft,
+  ChevronsUpDown,
   ClipboardPenLine,
   LayoutDashboard,
   Plus,
   Repeat2,
+  School,
 } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { assignmentCreationHref } from '@/lib/assignment-creation'
@@ -25,6 +27,8 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
@@ -33,23 +37,27 @@ import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
 
 interface ClassroomContextSidebarProps {
   classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
+  switchableClassrooms?: Array<Pick<Classroom, 'id' | 'name' | 'description'>>
   backHref: string
   navigationItems: readonly ClassroomNavigationItem[]
   activeItem?: ClassroomNavigationKey
   assignmentCreationActive?: boolean
   studentCount: number
   onNavigate: (item: ClassroomNavigationKey) => void
+  onSwitchClassroom?: (classroomId: string) => void
   managementActions?: ReactNode
 }
 
 export function ClassroomContextNavigation({
   classroom,
+  switchableClassrooms = [],
   backHref,
   navigationItems,
   activeItem,
   assignmentCreationActive = false,
   studentCount,
   onNavigate,
+  onSwitchClassroom,
   onClose,
   managementActions,
 }: ClassroomContextSidebarProps & { onClose?: () => void }) {
@@ -58,6 +66,7 @@ export function ClassroomContextNavigation({
   const meta = parseDescription(classroom.description)
   const cover = coverOf(meta)
   const subtitle = [meta.gradeLevel, meta.academicTerm].filter(Boolean).join(' • ')
+  const otherClassrooms = switchableClassrooms.filter(option => option.id !== classroom.id)
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -87,6 +96,67 @@ export function ClassroomContextNavigation({
             {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
           </p>
         </div>
+        {onSwitchClassroom && otherClassrooms.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={(
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="สลับไปห้องเรียนอื่น"
+                />
+              )}
+            >
+              <ChevronsUpDown />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-64">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>ไปห้องเรียนอื่น</DropdownMenuLabel>
+                {otherClassrooms.map(option => {
+                  const optionMeta = parseDescription(option.description)
+                  const optionCover = coverOf(optionMeta)
+                  const optionSubtitle = [optionMeta.gradeLevel, optionMeta.academicTerm]
+                    .filter(Boolean)
+                    .join(' • ')
+
+                  return (
+                    <DropdownMenuItem
+                      key={option.id}
+                      className="py-2"
+                      onClick={() => {
+                        onSwitchClassroom(option.id)
+                        onClose?.()
+                      }}
+                    >
+                      <span className={cn(
+                        'flex size-8 shrink-0 items-center justify-center rounded-lg border',
+                        optionCover ? cn(optionCover.surface, optionCover.text) : 'bg-muted text-muted-foreground',
+                      )}>
+                        <BookOpen aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{option.name}</span>
+                        {optionSubtitle && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {optionSubtitle}
+                          </span>
+                        )}
+                      </span>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem render={<Link href={backHref} onClick={onClose} />}>
+                  <School />
+                  ดูห้องเรียนทั้งหมด
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       <Separator />

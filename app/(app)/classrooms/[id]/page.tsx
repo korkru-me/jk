@@ -260,6 +260,7 @@ export default async function ClassroomDetailPage({
     { data: assignmentLinkRows },
     { data: ownerProfile },
     { data: otherClassroomRows },
+    { data: coTeachingClassroomRows },
     posts,
     { data: groupRows },
     { data: groupMemberRows },
@@ -289,13 +290,15 @@ export default async function ClassroomDetailPage({
           .eq('classroom_id', id)
       : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null; group_ids: string[] | null }[] }),
     admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
-    isOwner
-      ? admin
-          .from('classrooms')
-          .select('id, name, status, deleted_at')
-          .eq('teacher_id', authUser.id)
-          .neq('id', id)
-      : Promise.resolve({ data: [] as { id: string; name: string; status: string; deleted_at: string | null }[] }),
+    admin
+      .from('classrooms')
+      .select('id, name, description, classroom_type, status, deleted_at')
+      .eq('teacher_id', authUser.id)
+      .neq('id', id),
+    admin
+      .from('classroom_co_teachers')
+      .select('classrooms(id, name, description, classroom_type, status, deleted_at)')
+      .eq('user_id', authUser.id),
     getClassroomPosts(id),
     // กลุ่มย่อย: only subject rooms have the tab, and only the room's own
     // teaching staff (owner or any co-teacher) get the arrangement.
@@ -503,10 +506,31 @@ export default async function ClassroomDetailPage({
   )
 
   // Other classrooms for "move student" feature (owners only).
-  const otherClassroomList = (otherClassroomRows ?? []) as {
-    id: string; name: string; status: string; deleted_at: string | null
+  const ownedClassroomList = (otherClassroomRows ?? []) as {
+    id: string; name: string; description: string | null; classroom_type: string
+    status: string; deleted_at: string | null
   }[]
+  const otherClassroomList = isOwner ? ownedClassroomList : []
   const otherClassrooms = otherClassroomList.map(({ id: classroomId, name }) => ({ id: classroomId, name }))
+  const switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>> = []
+  const seenSwitchableClassroomIds = new Set<string>()
+  const switchableCandidates = [
+    c,
+    ...ownedClassroomList.filter(row => row.status === 'active' && !row.deleted_at),
+    ...(coTeachingClassroomRows ?? [])
+      .map((row: any) => row.classrooms)
+      .filter((row: any) => row?.status === 'active' && !row.deleted_at),
+  ]
+  for (const candidate of switchableCandidates) {
+    if (!seenSwitchableClassroomIds.has(candidate.id)) {
+      seenSwitchableClassroomIds.add(candidate.id)
+      switchableClassrooms.push({
+        id: candidate.id,
+        name: candidate.name,
+        description: candidate.description,
+      })
+    }
+  }
   // Cross-posting an announcement only makes sense into a room students are
   // still in — an archived or trashed classroom would take the post and show
   // it to nobody.
@@ -526,6 +550,7 @@ export default async function ClassroomDetailPage({
   return (
     <ClassroomDetailClient
       classroom={c}
+      switchableClassrooms={switchableClassrooms}
       students={students}
       assignmentCount={assignmentCount ?? 0}
       otherClassrooms={otherClassrooms}

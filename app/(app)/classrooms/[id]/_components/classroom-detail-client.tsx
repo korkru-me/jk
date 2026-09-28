@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import {
   Users, BookOpen, Copy, Check, Home,
 } from 'lucide-react'
@@ -22,6 +22,7 @@ import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
 import {
   classroomNavigationHref,
   classroomNavigationFor,
+  classroomNavigationPath,
   resolveClassroomNavigationKey,
   type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
@@ -59,6 +60,7 @@ interface RealStudent { id: string; full_name: string; email: string }
 
 interface Props {
   classroom: Classroom
+  switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>>
   students: RealStudent[]
   assignmentCount: number
   otherClassrooms: { id: string; name: string }[]
@@ -101,12 +103,13 @@ interface Props {
 }
 
 export function ClassroomDetailClient({
-  classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
+  classroom, switchableClassrooms, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
   classroomAssignments, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewCount, pendingReviewCapped, pendingReviewByAssignment, seenByPost, crossPostTargets,
   groups, groupMembers, initialNavigationItem, backHref,
 }: Props) {
+  const router = useRouter()
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const navigationItems = useMemo(
     () => classroomNavigationFor(classroom.classroom_type, canManage),
@@ -160,6 +163,10 @@ export function ClassroomDetailClient({
     if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
   }, [])
 
+  const switchClassroom = useCallback((classroomId: string) => {
+    router.push(classroomNavigationPath(classroomId, activeTab))
+  }, [activeTab, router])
+
   useEffect(() => {
     function syncNavigationFromHistory() {
       const params = new URLSearchParams(window.location.search)
@@ -183,17 +190,19 @@ export function ClassroomDetailClient({
   const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
     <ClassroomContextNavigation
       classroom={classroom}
+      switchableClassrooms={switchableClassrooms}
       backHref={backHref}
       navigationItems={navigationItems}
       activeItem={activeTab}
       studentCount={students.length}
       onNavigate={navigateTo}
+      onSwitchClassroom={switchClassroom}
       onClose={onNavigate}
       managementActions={isOwner
         ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
         : undefined}
     />
-  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, students.length])
+  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, students.length, switchableClassrooms, switchClassroom])
 
   useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar)
 
@@ -242,14 +251,6 @@ export function ClassroomDetailClient({
                 <span className="font-semibold">{isHomeroom ? homeroomAssignments.length : assignmentCount}</span>
                 <span className={coverMuted}>{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
               </div>
-              {!isHomeroom && canManage && (
-                <Link
-                  href={`/assignments/new?classroom=${classroom.id}`}
-                  className="w-full text-xs text-primary transition-colors hover:text-primary sm:ml-auto sm:w-auto"
-                >
-                  + สร้างชุดข้อสอบ
-                </Link>
-              )}
             </div>
           </div>
 

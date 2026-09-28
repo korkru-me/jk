@@ -169,6 +169,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       {contextualClassroom && (
         <AssignmentClassroomSidebar
           classroom={contextualClassroom}
+          switchableClassrooms={classrooms}
           studentCount={contextualStudentCount}
           isOwner={contextualClassroom.teacher_id === user.id}
         />
