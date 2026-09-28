@@ -240,7 +240,7 @@ export function ClassroomStream({
         {initialPosts.length === 0 ? emptyState : (
           <div
             className={cn(
-              'flex flex-col gap-3 overflow-y-auto overscroll-contain bg-muted/30 p-3 [scrollbar-gutter:stable]',
+              'flex flex-col gap-3 overflow-y-auto overscroll-y-auto bg-muted/30 p-3 [scrollbar-gutter:stable]',
               maxHeightClass,
             )}
           >
