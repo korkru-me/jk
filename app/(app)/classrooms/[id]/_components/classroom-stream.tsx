@@ -78,6 +78,7 @@ export function ClassroomStream({
   const [showTargets, setShowTargets] = useState(false)
   const [showLinkField, setShowLinkField] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const composerDropZoneRef = useRef<HTMLDivElement>(null)
 
   const isPanel = variant === 'panel'
   const canSubmit = draft.trim().length > 0 || attachments.length > 0
@@ -102,7 +103,10 @@ export function ClassroomStream({
   }
 
   const composer = canPost && (
-    <div className={cn('space-y-2.5', isPanel ? 'px-4 py-3 border-b border-border' : '')}>
+    <div
+      ref={composerDropZoneRef}
+      className={cn('relative flex flex-col gap-2.5', isPanel ? 'px-4 py-3 border-b border-border' : '')}
+    >
       <Textarea
         placeholder="ประกาศอะไรถึงห้องเรียนนี้... วางลิงก์ในข้อความได้เลย"
         value={draft}
@@ -157,6 +161,7 @@ export function ClassroomStream({
           attachments={attachments}
           onChange={setAttachments}
           disabled={isPending}
+          dropZoneRef={composerDropZoneRef}
           action={(
             <Button
               type="button"
@@ -505,6 +510,7 @@ function PostCard({
   const [isCommentPending, startCommentTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
   const cardRef = useRef<HTMLDivElement>(null)
+  const editDropZoneRef = useRef<HTMLDivElement>(null)
 
   const isPanel = variant === 'panel'
   const authorName = post.users?.full_name ?? 'ครูผู้สอน'
@@ -606,7 +612,7 @@ function PostCard({
           </p>
 
           {isEditing ? (
-            <div className="mt-2 space-y-2">
+            <div ref={editDropZoneRef} className="relative mt-2 flex flex-col gap-2">
               <Textarea value={editBody} onChange={e => setEditBody(e.target.value)} className="min-h-20" />
               {showEditLinkField && (
                 <AnnouncementLinkField
@@ -621,6 +627,7 @@ function PostCard({
                 attachments={editAttachments}
                 onChange={setEditAttachments}
                 disabled={isPending}
+                dropZoneRef={editDropZoneRef}
                 action={(
                   <Button
                     type="button"
