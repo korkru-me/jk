@@ -128,4 +128,17 @@ describe('iocSummaryWorkbookFileName', () => {
     expect(iocSummaryWorkbookFileName('   ', new Date('2026-09-14T00:00:00Z')))
       .toBe('IOC-สรุปผล-IOC-2026-09-14.xlsx')
   })
+
+  // 03:00 on 15 ก.ย. in Thailand is still 14 ก.ย. in UTC, where Vercel runs this.
+  it('dates the file by the Thai calendar, even on a UTC server', () => {
+    const previous = process.env.TZ
+    process.env.TZ = 'UTC'
+    try {
+      expect(iocSummaryWorkbookFileName('กลางภาค', new Date('2026-09-14T20:00:00Z')))
+        .toBe('IOC-สรุปผล-กลางภาค-2026-09-15.xlsx')
+    } finally {
+      if (previous === undefined) delete process.env.TZ
+      else process.env.TZ = previous
+    }
+  })
 })

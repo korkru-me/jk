@@ -44,3 +44,26 @@ export function thaiHour(value: DateInput = new Date()): number {
     .find(part => part.type === 'hour')
   return Number(hour?.value)
 }
+
+/**
+ * The Thai calendar day as YYYY-MM-DD (Gregorian, for a filename), e.g.
+ * "2026-10-03". `toISOString().slice(0, 10)` gives the UTC day, which is still
+ * yesterday until 07:00 in Thailand. Throws on a bad value, as that did.
+ */
+export function thaiDateStamp(value: DateInput = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: THAI_TIME_ZONE,
+  }).formatToParts(new Date(value))
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+/**
+ * The instant the Thai calendar day holding `value` began — for "today" in a
+ * query. `setHours(0, 0, 0, 0)` on a UTC server lands on 07:00 in Thailand.
+ * Thailand has kept UTC+7 all year since 1920, with no daylight saving, so its
+ * midnight is always 17:00 UTC the day before.
+ */
+export function startOfThaiDay(value: DateInput = new Date()): Date {
+  return new Date(`${thaiDateStamp(value)}T00:00:00+07:00`)
+}

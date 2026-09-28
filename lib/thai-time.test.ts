@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, it, expect } from 'vitest'
-import { formatThaiDate, formatThaiDateTime, thaiHour } from './thai-time'
+import { formatThaiDate, formatThaiDateTime, startOfThaiDay, thaiDateStamp, thaiHour } from './thai-time'
 
 // 16:00 on 3 ต.ค. 2569 in Thailand, which is 09:00 in UTC.
 const afternoon = '2026-10-03T09:00:00Z'
 // The midnight that starts 3 ต.ค. in Thailand — still 2 ต.ค. in UTC.
 const midnight = '2026-10-02T17:00:00Z'
+// 03:00 on 3 ต.ค. in Thailand, which is 20:00 on 2 ต.ค. in UTC.
+const earlyMorning = '2026-10-02T20:00:00Z'
 
 // UTC is what Vercel runs server code in; Los Angeles is behind UTC, so a date
 // that leaked the process zone would land on a different day there too.
@@ -46,9 +48,43 @@ describe.each(['UTC', 'America/Los_Angeles'])('with the process in %s', zone => 
     expect(thaiHour(afternoon)).toBe(16)
     expect(thaiHour(midnight)).toBe(0)
   })
+
+  it('stamps a file made at 03:00 with its Thai date, not the day before', () => {
+    // What the IOC filenames used: the UTC day, whatever zone the code runs in.
+    expect(new Date(earlyMorning).toISOString().slice(0, 10)).toBe('2026-10-02')
+    expect(thaiDateStamp(earlyMorning)).toBe('2026-10-03')
+    expect(thaiDateStamp(new Date(afternoon))).toBe('2026-10-03')
+  })
+
+  it('turns the stamp over at Thai midnight', () => {
+    expect(thaiDateStamp('2026-10-02T16:59:59.999Z')).toBe('2026-10-02')
+    expect(thaiDateStamp(midnight)).toBe('2026-10-03')
+    // A Gregorian year for the filename, not 2570, even across New Year.
+    expect(thaiDateStamp('2026-12-31T17:00:00Z')).toBe('2027-01-01')
+  })
+
+  it('starts today at Thai midnight, not the server’s', () => {
+    // What the admin dashboard used: at 03:00 in Thailand, "today" began on the day before.
+    const serverMidnight = new Date(new Date(earlyMorning).setHours(0, 0, 0, 0))
+    expect(thaiDateStamp(serverMidnight)).toBe('2026-10-02')
+
+    expect(startOfThaiDay(earlyMorning).toISOString()).toBe('2026-10-02T17:00:00.000Z')
+    expect(startOfThaiDay(new Date(afternoon)).toISOString()).toBe('2026-10-02T17:00:00.000Z')
+    expect(thaiHour(startOfThaiDay(afternoon))).toBe(0)
+  })
+
+  it('puts midnight itself in the day it starts', () => {
+    expect(startOfThaiDay(midnight).toISOString()).toBe('2026-10-02T17:00:00.000Z')
+    expect(startOfThaiDay('2026-10-02T16:59:59.999Z').toISOString()).toBe('2026-10-01T17:00:00.000Z')
+  })
 })
 
 it('says "Invalid Date" for a bad value rather than throwing', () => {
   expect(formatThaiDate('not a date')).toBe('Invalid Date')
   expect(formatThaiDateTime('not a date')).toBe('Invalid Date')
+})
+
+it('throws on a bad value for a filename or a query, as toISOString did', () => {
+  expect(() => thaiDateStamp('not a date')).toThrow(RangeError)
+  expect(() => startOfThaiDay('not a date')).toThrow(RangeError)
 })
