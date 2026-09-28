@@ -4,9 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
-  Users, BookOpen, Copy, Check,
-  GraduationCap, UserPlus, Grid3x3, ChevronLeft,
-  ClipboardList, CalendarDays, Home, LayoutDashboard, ChartColumnIncreasing,
+  Users, BookOpen, Copy, Check, ChevronLeft, Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
@@ -27,6 +25,8 @@ import {
   type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import type { GroupState } from './breakout-groups'
+import { ClassroomContextSidebar } from './classroom-context-sidebar'
+import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -53,18 +53,6 @@ const StudentAbilityTab = dynamic(
 )
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
-
-const CLASSROOM_NAVIGATION_ICONS: Record<ClassroomNavigationKey, typeof Users> = {
-  overview: LayoutDashboard,
-  assignments: BookOpen,
-  scores: ClipboardList,
-  ability: ChartColumnIncreasing,
-  students: Users,
-  homeroom: CalendarDays,
-  groups: Grid3x3,
-  invite: UserPlus,
-  coteachers: GraduationCap,
-}
 
 interface RealStudent { id: string; full_name: string; email: string }
 
@@ -172,11 +160,20 @@ export function ClassroomDetailClient({
   }
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
-      {/* Back link */}
-      <Link href="/classrooms" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
-        <ChevronLeft className="w-4 h-4" /> ห้องเรียนทั้งหมด
-      </Link>
+    <div className="flex items-start gap-6">
+      <ClassroomContextSidebar
+        classroom={classroom}
+        navigationItems={navigationItems}
+        activeItem={activeTab}
+        studentCount={students.length}
+        onNavigate={setActiveTab}
+      />
+
+      <div className="flex min-w-0 max-w-[1200px] flex-1 flex-col gap-6">
+        {/* Back link remains visible until the responsive contextual drawer replaces it. */}
+        <Link href="/classrooms" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors lg:hidden">
+          <ChevronLeft className="size-4" /> ห้องเรียนทั้งหมด
+        </Link>
 
       {/* Header card */}
       <div
@@ -239,8 +236,8 @@ export function ClassroomDetailClient({
         )}
       </div>
 
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1 overflow-x-auto">
+      {/* Compact fallback until the contextual menu becomes a drawer on smaller screens. */}
+      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl bg-muted p-1 lg:hidden">
         {navigationItems.map(tab => {
           const Icon = CLASSROOM_NAVIGATION_ICONS[tab.key]
           return (
@@ -374,6 +371,7 @@ export function ClassroomDetailClient({
             />
           </div>
         )}
+      </div>
       </div>
     </div>
   )

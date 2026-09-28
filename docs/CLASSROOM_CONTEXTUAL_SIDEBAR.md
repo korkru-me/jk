@@ -21,7 +21,7 @@
 - [x] เฟส 0 — อัปเดตฐานและตรวจ baseline
 - [x] เฟส 1 — แยก navigation contract โดยไม่เปลี่ยนหน้าตา
 - [x] เฟส 2 — Global rail สำหรับหน้ารายละเอียดห้องเรียน
-- [ ] เฟส 3 — Contextual sidebar และย้ายเมนูออกจากแถบแนวนอน
+- [x] เฟส 3 — Contextual sidebar และย้ายเมนูออกจากแถบแนวนอน
 - [ ] เฟส 4 — Responsive สำหรับ mobile/tablet/desktop
 - [ ] เฟส 5 — URL state, browser back/forward และ deep link
 - [ ] เฟส 6 — polish, accessibility และ destructive-action placement
