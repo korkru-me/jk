@@ -148,7 +148,7 @@ export function ClassroomOverview({
       canPost={canManage}
       initialPosts={posts}
       variant="panel"
-      maxHeightClass="max-h-[360px]"
+      maxHeightClass="max-h-[680px]"
       students={students}
       seenByPost={seenByPost}
       crossPostTargets={crossPostTargets}

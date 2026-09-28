@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   MoreVertical, Pin, PinOff, Pencil, Trash2, Send, MessageCircle, Link2, Megaphone,
-  Paperclip, Download, Eye, ChevronDown, ChevronUp, Users, ExternalLink, Globe2, Video,
+  Paperclip, Download, Eye, ChevronDown, ChevronUp, Users, ExternalLink, Globe2, Video, Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -67,7 +67,7 @@ function formatTime(iso: string): string {
 }
 
 export function ClassroomStream({
-  classroomId, canPost, initialPosts, variant = 'page', maxHeightClass = 'max-h-[420px]',
+  classroomId, canPost, initialPosts, variant = 'page', maxHeightClass = 'max-h-[680px]',
   title = 'ประกาศห้องเรียน',
   students = [], seenByPost = {}, crossPostTargets = [], trackSeen = false,
 }: Props) {
@@ -77,11 +77,13 @@ export function ClassroomStream({
   const [alsoIn, setAlsoIn] = useState<string[]>([])
   const [showTargets, setShowTargets] = useState(false)
   const [showLinkField, setShowLinkField] = useState(false)
+  const [composerOpen, setComposerOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const composerDropZoneRef = useRef<HTMLDivElement>(null)
 
   const isPanel = variant === 'panel'
   const canSubmit = draft.trim().length > 0 || attachments.length > 0
+  const hasComposerDraft = canSubmit || alsoIn.length > 0 || showLinkField
 
   function submitPost() {
     if (!canSubmit) return
@@ -93,6 +95,7 @@ export function ClassroomStream({
       setAlsoIn([])
       setShowTargets(false)
       setShowLinkField(false)
+      setComposerOpen(false)
       // Say where it actually landed. A cross-post that reached three rooms out
       // of four must not report itself as a plain success.
       const extra = (res?.postedTo ?? 1) - 1
@@ -102,7 +105,7 @@ export function ClassroomStream({
     })
   }
 
-  const composer = canPost && (
+  const composer = canPost && (!isPanel || composerOpen) && (
     <div
       ref={composerDropZoneRef}
       className={cn('relative flex flex-col gap-2.5', isPanel ? 'px-4 py-3 border-b border-border' : '')}
@@ -209,19 +212,40 @@ export function ClassroomStream({
     return (
       <Card className="overflow-hidden">
         {/* The board has no tab of its own on either side, so it says what it is. */}
-        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
-          <h2 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <Megaphone className="w-3.5 h-3.5" /> {title}
           </h2>
-          <span className="text-xs text-muted-foreground shrink-0">
-            {initialPosts.length > 0 ? `${initialPosts.length} ประกาศ` : 'ยังไม่มีประกาศ'}
-            {/* The hint only earns its space where there is space. */}
-            <span className="hidden sm:inline">{initialPosts.length > 0 ? ' · เลื่อนดูในกรอบนี้' : ''}</span>
-          </span>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              {initialPosts.length > 0 ? `${initialPosts.length} ประกาศ · เลื่อนดูในกรอบนี้` : 'ยังไม่มีประกาศ'}
+            </span>
+            {canPost && (
+              <Button
+                type="button"
+                size="sm"
+                variant={composerOpen ? 'ghost' : 'default'}
+                aria-expanded={composerOpen}
+                onClick={() => setComposerOpen(open => !open)}
+              >
+                {composerOpen
+                  ? <ChevronUp data-icon="inline-start" />
+                  : <Plus data-icon="inline-start" />}
+                {composerOpen ? 'ซ่อนช่องเขียน' : hasComposerDraft ? 'เขียนต่อ' : 'เพิ่มประกาศ'}
+              </Button>
+            )}
+          </div>
         </div>
         {composer}
         {initialPosts.length === 0 ? emptyState : (
-          <div className={cn('overflow-y-auto divide-y divide-border', maxHeightClass)}>{list}</div>
+          <div
+            className={cn(
+              'flex flex-col gap-3 overflow-y-auto overscroll-contain bg-muted/30 p-3 [scrollbar-gutter:stable]',
+              maxHeightClass,
+            )}
+          >
+            {list}
+          </div>
         )}
       </Card>
     )
@@ -244,7 +268,7 @@ export function ClassroomStream({
 function PostBody({ body }: { body: string }) {
   if (!body) return null
   return (
-    <p className="text-sm mt-2 whitespace-pre-wrap leading-relaxed break-words">
+    <p className="mt-3 whitespace-pre-wrap break-words text-base font-medium leading-7 text-foreground">
       {linkify(body).map((segment, i) => (
         segment.type === 'text' ? segment.value : (
           <a
@@ -582,95 +606,34 @@ function PostCard({
   }
 
   return (
-    <div
+    <Card
       ref={cardRef}
+      padding="md"
+      elevation={isPanel ? 'sm' : 'none'}
       className={cn(
-        isPanel
-          ? cn('px-4 py-3', post.pinned && 'bg-primary/5')
-          : cn('bg-card border rounded-2xl p-4', post.pinned && 'border-primary/20'),
+        post.pinned && 'border-primary/30 bg-primary/5',
       )}
     >
       <div className="flex items-start gap-3">
         <div className={cn(
           'rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold shrink-0',
-          isPanel ? 'w-7 h-7 text-xs' : 'w-9 h-9 text-sm',
+          isPanel ? 'size-10 text-sm' : 'size-9 text-sm',
         )}>
           {initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold">{authorName}</p>
+            <p className="text-base font-semibold">{authorName}</p>
             {post.pinned && (
               <Badge variant="outline" className="gap-1 text-primary border-primary/20">
                 <Pin className="w-3 h-3" /> ปักหมุด
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {formatTime(post.created_at)}
             {post.edited_at && ' (แก้ไขแล้ว)'}
           </p>
-
-          {isEditing ? (
-            <div ref={editDropZoneRef} className="relative mt-2 flex flex-col gap-2">
-              <Textarea value={editBody} onChange={e => setEditBody(e.target.value)} className="min-h-20" />
-              {showEditLinkField && (
-                <AnnouncementLinkField
-                  onAdd={href => {
-                    setEditBody(body => appendAnnouncementLink(body, href))
-                    setShowEditLinkField(false)
-                  }}
-                  onCancel={() => setShowEditLinkField(false)}
-                />
-              )}
-              <PostAttach
-                attachments={editAttachments}
-                onChange={setEditAttachments}
-                disabled={isPending}
-                dropZoneRef={editDropZoneRef}
-                action={(
-                  <Button
-                    type="button"
-                    variant={showEditLinkField ? 'secondary' : 'outline'}
-                    size="sm"
-                    className="gap-1.5"
-                    aria-expanded={showEditLinkField}
-                    onClick={() => setShowEditLinkField(open => !open)}
-                  >
-                    <Link2 className="w-3.5 h-3.5" /> แนบลิงก์
-                  </Button>
-                )}
-              />
-              <div className="flex gap-2 justify-end">
-                <Button size="sm" variant="outline" onClick={() => {
-                  setIsEditing(false)
-                  setShowEditLinkField(false)
-                  setEditBody(post.body)
-                  setEditAttachments(post.attachments ?? [])
-                }}>
-                  ยกเลิก
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={isPending || (!editBody.trim() && editAttachments.length === 0)}
-                  onClick={saveEdit}
-                >
-                  บันทึก
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <PostBody body={post.body} />
-              <PostLinkPreviews body={post.body} />
-              <PostAttachments attachments={attachments} />
-              {canManage && (
-                <div className="mt-2">
-                  <SeenPanel students={students} seenBy={seenBy} />
-                </div>
-              )}
-            </>
-          )}
         </div>
 
         {canManage && !isEditing && (
@@ -703,8 +666,69 @@ function PostCard({
         )}
       </div>
 
+      {isEditing ? (
+        <div ref={editDropZoneRef} className="relative mt-3 flex flex-col gap-2">
+          <Textarea value={editBody} onChange={e => setEditBody(e.target.value)} className="min-h-20" />
+          {showEditLinkField && (
+            <AnnouncementLinkField
+              onAdd={href => {
+                setEditBody(body => appendAnnouncementLink(body, href))
+                setShowEditLinkField(false)
+              }}
+              onCancel={() => setShowEditLinkField(false)}
+            />
+          )}
+          <PostAttach
+            attachments={editAttachments}
+            onChange={setEditAttachments}
+            disabled={isPending}
+            dropZoneRef={editDropZoneRef}
+            action={(
+              <Button
+                type="button"
+                variant={showEditLinkField ? 'secondary' : 'outline'}
+                size="sm"
+                className="gap-1.5"
+                aria-expanded={showEditLinkField}
+                onClick={() => setShowEditLinkField(open => !open)}
+              >
+                <Link2 className="w-3.5 h-3.5" /> แนบลิงก์
+              </Button>
+            )}
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => {
+              setIsEditing(false)
+              setShowEditLinkField(false)
+              setEditBody(post.body)
+              setEditAttachments(post.attachments ?? [])
+            }}>
+              ยกเลิก
+            </Button>
+            <Button
+              size="sm"
+              disabled={isPending || (!editBody.trim() && editAttachments.length === 0)}
+              onClick={saveEdit}
+            >
+              บันทึก
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <PostBody body={post.body} />
+          <PostLinkPreviews body={post.body} />
+          <PostAttachments attachments={attachments} />
+          {canManage && (
+            <div className="mt-2">
+              <SeenPanel students={students} seenBy={seenBy} />
+            </div>
+          )}
+        </>
+      )}
+
       {/* Comments */}
-      <div className={cn('mt-3 pt-3 border-t', isPanel ? 'pl-10' : 'pl-12')}>
+      <div className="mt-3 border-t pt-3">
         <Button
           variant="ghost"
           size="xs"
@@ -754,6 +778,6 @@ function PostCard({
         )}
       </div>
       {confirmDialog}
-    </div>
+    </Card>
   )
 }

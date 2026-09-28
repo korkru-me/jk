@@ -57,7 +57,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         canPost={false}
         initialPosts={posts}
         variant="panel"
-        maxHeightClass="max-h-[360px]"
+        maxHeightClass="max-h-[680px]"
         title="ประกาศจากครู"
         trackSeen
       />
