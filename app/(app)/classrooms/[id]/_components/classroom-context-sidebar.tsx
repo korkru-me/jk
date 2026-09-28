@@ -68,12 +68,13 @@ export function ClassroomContextNavigation({
         ห้องเรียนทั้งหมด
       </Button>
 
-      <div className="flex items-start gap-3 px-2 py-1">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <BookOpen aria-hidden="true" className="size-5" />
+      <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+          <BookOpen aria-hidden="true" className="size-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-foreground">{classroom.name}</p>
+          <p className="text-xs font-medium text-primary">ห้องเรียนปัจจุบัน</p>
+          <p className="truncate text-lg font-bold leading-tight text-foreground">{classroom.name}</p>
           <p className="truncate text-xs text-muted-foreground">
             {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
           </p>

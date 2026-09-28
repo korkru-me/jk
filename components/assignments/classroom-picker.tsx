@@ -122,8 +122,6 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
 
   return (
     <div className="flex flex-col gap-2">
-      {primaryRow && <ClassroomRow row={primaryRow} selected locked onToggle={onToggle} />}
-
       {primaryRow && selectableRows.length > 0 ? (
         <Collapsible>
           <CollapsibleTrigger
@@ -156,12 +154,10 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
 function ClassroomRow({
   row,
   selected,
-  locked = false,
   onToggle,
 }: {
   row: Row
   selected: boolean
-  locked?: boolean
   onToggle: (id: string) => void
 }) {
   const { classroom, cover, meta } = row
@@ -181,7 +177,7 @@ function ClassroomRow({
         <p className="text-sm font-medium text-foreground truncate">{classroom.name}</p>
         {meta && <p className="text-xs text-muted-foreground truncate">{meta}</p>}
       </div>
-      {selected && !locked && <Check className="size-4 shrink-0 text-primary" />}
+      {selected && <Check className="size-4 shrink-0 text-primary" />}
     </>
   )
   const rowClassName = cn(
@@ -190,10 +186,6 @@ function ClassroomRow({
       ? 'border-primary bg-primary/10'
       : 'border-border hover:border-ring',
   )
-
-  if (locked) {
-    return <div className={rowClassName}>{content}</div>
-  }
 
   return (
     <Button
