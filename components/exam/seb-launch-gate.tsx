@@ -37,17 +37,18 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (attempted.current) return
+    if (attempted.current || !configured || !challenge) return
     attempted.current = true
     const seb = window.SafeExamBrowser
     if (!seb?.security) return
 
     let cancelled = false
+    let verificationStarted = false
     let timeout: ReturnType<typeof setTimeout> | undefined
     setState('verifying')
 
     const verify = async () => {
-      if (cancelled) return
+      if (cancelled || verificationStarted) return
       const security = seb.security
       const configKeyHash = security?.configKey
       const browserExamKeyHash = security?.browserExamKey
@@ -56,26 +57,35 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
         setError('Safe Exam Browser ยังส่งกุญแจตรวจสอบมาไม่ครบ กรุณาปิดแล้วเปิดไฟล์ตั้งค่าใหม่')
         return
       }
+      verificationStarted = true
+      setState('verifying')
+      setError(null)
 
-      const result = await verifySafeExamBrowser({
-        assignmentId,
-        challenge,
-        requestUrl: window.location.href,
-        configKeyHash,
-        browserExamKeyHash,
-        version: seb.version,
-        purpose: 'take',
-      })
-      if (cancelled) return
-      if ('error' in result) {
+      try {
+        const result = await verifySafeExamBrowser({
+          assignmentId,
+          challenge,
+          requestUrl: window.location.href,
+          configKeyHash,
+          browserExamKeyHash,
+          version: seb.version,
+          purpose: 'take',
+        })
+        if (cancelled) return
+        if ('error' in result) {
+          setState('error')
+          setError(result.error ?? 'ตรวจสอบ Safe Exam Browser ไม่สำเร็จ')
+          return
+        }
+
+        setState('verified')
+        router.replace(`/assignments/${assignmentId}/take`)
+        router.refresh()
+      } catch {
+        if (cancelled) return
         setState('error')
-        setError(result.error ?? 'ตรวจสอบ Safe Exam Browser ไม่สำเร็จ')
-        return
+        setError('ติดต่อเซิร์ฟเวอร์ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วขอรหัสตรวจสอบใหม่')
       }
-
-      setState('verified')
-      router.replace(`/assignments/${assignmentId}/take`)
-      router.refresh()
     }
 
     if (seb.security.configKey && seb.security.browserExamKey) {
@@ -99,7 +109,7 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
       cancelled = true
       if (timeout) clearTimeout(timeout)
     }
-  }, [assignmentId, challenge, router])
+  }, [assignmentId, challenge, configured, router])
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center px-4 py-10">
@@ -111,30 +121,30 @@ export function SebLaunchGate({ assignmentId, challenge, configUrl, configured }
           <div>
             <h1 className="text-xl font-semibold text-foreground">ข้อสอบนี้ใช้ Safe Exam Browser</h1>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              รองรับ Windows, macOS, iPhone และ iPad · Android ต้องใช้ monitored mode ที่ครูเปิดแยกให้ข้อสอบ
+              ใช้ได้เฉพาะระบบและรุ่น SEB ที่โรงเรียนประกาศอนุญาต · Android ต้องใช้ monitored mode ที่ครูเปิดแยกให้ข้อสอบ
             </p>
           </div>
         </div>
 
         {!configured ? (
-          <div className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-foreground">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+          <div role="alert" className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-foreground">
+            <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <p>โรงเรียนยังตั้งค่ากุญแจ SEB ไม่ครบ จึงยังเริ่มสอบไม่ได้ กรุณาแจ้งครูผู้สอน</p>
           </div>
         ) : state === 'verifying' ? (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-4 text-sm">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+            <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-primary" />
             กำลังตรวจสอบการตั้งค่าและเวอร์ชัน Safe Exam Browser…
           </div>
         ) : state === 'verified' ? (
-          <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 p-4 text-sm">
-            <CheckCircle2 className="h-5 w-5 text-success" />
+          <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 p-4 text-sm">
+            <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-success" />
             ยืนยันสำเร็จ กำลังเปิดข้อสอบ…
           </div>
         ) : state === 'error' ? (
           <div className="space-y-3">
-            <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div role="alert" className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
               <p>{error}</p>
             </div>
             <Button variant="outline" onClick={() => window.location.assign(`/assignments/${assignmentId}/take`)}>

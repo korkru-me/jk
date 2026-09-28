@@ -28,10 +28,9 @@ import { StudentAbilityDialog } from './student-ability-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import type { StudentProfileRow } from './homeroom-overview'
 
-const PAGE_SIZE = 25
-
-/** Past this many งาน the name list folds, so a full term does not push the cards off screen. */
-const CHIPS_FOLDED = 8
+/** Students per page the teacher can pick from; 50 is the ceiling. */
+const PAGE_SIZE_OPTIONS = [10, 20, 25, 30, 40, 50] as const
+const DEFAULT_PAGE_SIZE = 25
 
 const TYPE_LABEL: Record<string, string> = { exercise: 'แบบฝึกหัด', exam: 'ข้อสอบ' }
 
@@ -57,9 +56,10 @@ interface Props {
   pendingReviewByAssignment: Record<string, number>
 }
 
-// Which งาน are ticked and which chart is showing are remembered per
-// classroom in this browser only — a viewing preference, not class data.
-interface StoredPrefs { selected?: string[]; chart?: AbilityChartType }
+// Which งาน are ticked, which chart is showing and how many students a page
+// holds are remembered per classroom in this browser only — a viewing
+// preference, not class data.
+interface StoredPrefs { selected?: string[]; chart?: AbilityChartType; pageSize?: number }
 
 function prefsKey(classroomId: string) {
   return `korkru.student-ability.${classroomId}`
@@ -70,10 +70,11 @@ function readPrefs(classroomId: string): StoredPrefs {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(prefsKey(classroomId)) ?? '{}')
     if (!parsed || typeof parsed !== 'object') return {}
-    const { selected, chart } = parsed as Record<string, unknown>
+    const { selected, chart, pageSize } = parsed as Record<string, unknown>
     return {
       selected: Array.isArray(selected) ? selected.filter((id): id is string => typeof id === 'string') : undefined,
       chart: chart === 'bar' || chart === 'radar' ? chart : undefined,
+      pageSize: PAGE_SIZE_OPTIONS.find(size => size === pageSize),
     }
   } catch {
     return {}
@@ -102,10 +103,12 @@ export function StudentAbilityTab({
   // during render made a server-rendered tab fail hydration.
   const [selectedIds, setSelectedIds] = useState<string[]>(() => usable.map(a => a.id))
   const [chartType, setChartType] = useState<AbilityChartType>('bar')
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
   useLayoutEffect(() => {
     const prefs = readPrefs(classroomId)
     setSelectedIds(restoreSelection(prefs.selected, usable.map(a => a.id)))
     if (prefs.chart) setChartType(prefs.chart)
+    if (prefs.pageSize) setPageSize(prefs.pageSize)
     // Once per classroom: later changes to the list must not undo what the
     // teacher ticks while the tab is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,7 +118,6 @@ export function StudentAbilityTab({
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
-  const [chipsOpen, setChipsOpen] = useState(false)
   // Card buttons by student, so closing the full view can hand focus to the
   // student last shown — ← → may have moved far from the card that opened it.
   const cardButtons = useRef(new Map<string, HTMLButtonElement>())
@@ -128,6 +130,9 @@ export function StudentAbilityTab({
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const selected = useMemo(() => usable.filter(a => selectedSet.has(a.id)), [usable, selectedSet])
+  // The number each ticked งาน carries on the charts, shown beside it in the menu.
+  const chartNumber = useMemo(() => new Map(selected.map((a, i) => [a.id, i + 1])), [selected])
+  const pendingSelected = selected.reduce((sum, a) => sum + (pendingReviewByAssignment[a.id] ?? 0), 0)
   const abilities = useMemo(
     () => buildStudentAbilities(students.map(s => s.id), selected, submissions),
     [students, selected, submissions],
@@ -148,21 +153,32 @@ export function StudentAbilityTab({
   )
   const radarAllowed = selected.length >= RADAR_MIN_ASSIGNMENTS
   const effectiveChart: AbilityChartType = chartType === 'radar' && radarAllowed ? 'radar' : 'bar'
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const pageStudents = visible.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const pageStudents = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const openIndex = openId ? visible.findIndex(s => s.id === openId) : -1
   const openStudent = openIndex >= 0 ? visible[openIndex] : null
+
+  function remember(change: StoredPrefs) {
+    writePrefs(classroomId, { selected: selectedIds, chart: chartType, pageSize, ...change })
+  }
 
   function changeSelection(next: string[]) {
     setSelectedIds(next)
     setPage(1)
-    writePrefs(classroomId, { selected: next, chart: chartType })
+    remember({ selected: next })
   }
 
   function changeChart(next: AbilityChartType) {
     setChartType(next)
-    writePrefs(classroomId, { selected: selectedIds, chart: next })
+    remember({ chart: next })
+  }
+
+  // Keeps the first student of the current page in view at the new size.
+  function changePageSize(next: number) {
+    setPage(Math.floor(((currentPage - 1) * pageSize) / next) + 1)
+    setPageSize(next)
+    remember({ pageSize: next })
   }
 
   function toggleAssignment(id: string, checked: boolean) {
@@ -182,7 +198,7 @@ export function StudentAbilityTab({
     const student = visible[index]
     if (!student) return
     showStudent(student.id)
-    setPage(Math.floor(index / PAGE_SIZE) + 1)
+    setPage(Math.floor(index / pageSize) + 1)
   }
 
   const cardData = (ability: StudentAbility | undefined): AbilityDatum[] => selected.map((assignment, i) => {
@@ -226,6 +242,13 @@ export function StudentAbilityTab({
             <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
               {selected.length}/{usable.length}
             </span>
+            {/* The per-งาน count lives in the menu; this only says to look there. */}
+            {pendingSelected > 0 && (
+              <>
+                <Clock aria-hidden="true" className="size-3.5 text-warning" />
+                <span className="sr-only">มีงานรอครูตรวจ {pendingSelected} ชิ้น</span>
+              </>
+            )}
             <ChevronDown className="text-muted-foreground" />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-80 max-w-[calc(100vw-2rem)]">
@@ -239,15 +262,39 @@ export function StudentAbilityTab({
               <DropdownMenuGroup key={type}>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>{TYPE_LABEL[type] ?? 'งาน'}</DropdownMenuLabel>
-                {usable.filter(a => a.type === type).map(a => (
-                  <DropdownMenuCheckboxItem
-                    key={a.id}
-                    checked={selectedSet.has(a.id)}
-                    onCheckedChange={checked => toggleAssignment(a.id, checked)}
-                  >
-                    <span className="truncate">{a.title}</span>
-                  </DropdownMenuCheckboxItem>
-                ))}
+                {usable.filter(a => a.type === type).map(a => {
+                  const number = chartNumber.get(a.id)
+                  const pending = pendingReviewByAssignment[a.id] ?? 0
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={a.id}
+                      checked={number !== undefined}
+                      onCheckedChange={checked => toggleAssignment(a.id, checked)}
+                      className="items-start"
+                    >
+                      {/* The slot stays when unticked, so every title starts at the same edge. */}
+                      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold text-foreground tabular-nums empty:invisible">
+                        {number}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate leading-5">{a.title}</span>
+                        {number !== undefined && (
+                          <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground tabular-nums">
+                            เฉลี่ยห้อง {formatPercent(averages.get(a.id)?.average ?? null)}
+                            {pending > 0 && (
+                              <span
+                                className="inline-flex items-center gap-0.5"
+                                title={`มีงานที่ส่งแล้วรอครูตรวจ ${pending} ชิ้น — เปอร์เซ็นต์ของงานนี้อาจยังไม่ครบ`}
+                              >
+                                <Clock aria-hidden="true" className="size-3 text-warning" /> รอตรวจ {pending}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
               </DropdownMenuGroup>
             ))}
           </DropdownMenuContent>
@@ -297,47 +344,11 @@ export function StudentAbilityTab({
       </div>
 
       {selected.length > 0 && (
-        <div className="space-y-2">
-          <ol id="ability-chips" className="flex flex-wrap items-center gap-1.5" aria-label="งานที่นำมาเทียบ">
-            {(chipsOpen ? selected : selected.slice(0, CHIPS_FOLDED)).map((a, i) => {
-              const pending = pendingReviewByAssignment[a.id] ?? 0
-              return (
-                <li key={a.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted py-1 pr-2.5 pl-1 text-xs">
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-card font-bold text-foreground tabular-nums">{i + 1}</span>
-                  <span className="max-w-[15rem] truncate text-foreground">{a.title}</span>
-                  <span className="shrink-0 text-muted-foreground tabular-nums">เฉลี่ยห้อง {formatPercent(averages.get(a.id)?.average ?? null)}</span>
-                  {pending > 0 && (
-                    <span
-                      className="inline-flex shrink-0 items-center gap-0.5 text-muted-foreground"
-                      title={`มีงานที่ส่งแล้วรอครูตรวจ ${pending} ชิ้น — เปอร์เซ็นต์ของงานนี้อาจยังไม่ครบ`}
-                    >
-                      <Clock aria-hidden="true" className="size-3 text-warning" /> รอตรวจ {pending}
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-            {selected.length > CHIPS_FOLDED && (
-              <li>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  aria-expanded={chipsOpen}
-                  aria-controls="ability-chips"
-                  onClick={() => setChipsOpen(open => !open)}
-                  className="text-primary"
-                >
-                  {chipsOpen ? 'ย่อรายชื่องาน' : `ดูอีก ${selected.length - CHIPS_FOLDED} งาน`}
-                </Button>
-              </li>
-            )}
-          </ol>
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
             ตัวเลขคือเปอร์เซ็นต์ของคะแนนเต็มแต่ละงาน ไม่ใช่คะแนนดิบ · ขีด – คือยังไม่ส่ง และไม่นำมาคิดค่าเฉลี่ย
-            {hasUnscored && ' · วงกลม ○ คือส่งแล้วแต่งานนั้นไม่มีคะแนนเต็ม'} · กดการ์ดเพื่อดูแบบเต็มจอ
+            {hasUnscored && ' · วงกลม ○ คือส่งแล้วแต่งานนั้นไม่มีคะแนนเต็ม'} · เลขบนกราฟคือลำดับงานในปุ่ม &ldquo;เลือกงาน&rdquo; · กดการ์ดเพื่อดูแบบเต็มจอ
           </p>
-        </div>
       )}
 
       {selected.length === 0 ? (
@@ -353,10 +364,28 @@ export function StudentAbilityTab({
         </Card>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground" aria-live="polite">
-            {query.trim() ? `พบ ${visible.length} คนจาก ${students.length} คน` : `นักเรียน ${students.length} คน`}
-            {totalPages > 1 && ` · หน้า ${currentPage}/${totalPages}`}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground" aria-live="polite">
+              {query.trim() ? `พบ ${visible.length} คนจาก ${students.length} คน` : `นักเรียน ${students.length} คน`}
+              {totalPages > 1 && ` · หน้า ${currentPage}/${totalPages}`}
+            </p>
+            {/* A class smaller than the smallest page has nothing to split. */}
+            {students.length > PAGE_SIZE_OPTIONS[0] && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                แสดง
+                <NativeSelect
+                  value={pageSize}
+                  onChange={e => changePageSize(Number(e.target.value))}
+                  className="w-auto"
+                >
+                  {PAGE_SIZE_OPTIONS.map(size => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </NativeSelect>
+                คนต่อหน้า
+              </label>
+            )}
+          </div>
           {/* Columns follow the width this tab actually gets (the app sidebar
               takes a share of the viewport), not the viewport itself. */}
           <div className="@container">

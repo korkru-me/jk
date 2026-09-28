@@ -11,6 +11,7 @@ import {
 } from '@/lib/exam-proctor-alerts'
 import type { ProctorEventRow, ProctorSessionRow } from '@/lib/exam-proctor-realtime'
 import type { SebPreflightCheckinRow } from '@/lib/seb-preflight'
+import { linkReachesGroup } from '@/lib/classroom-groups'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
@@ -54,9 +55,11 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
 
   const { data: links, error: linksError } = await supabase
     .from('assignment_classrooms')
-    .select('classroom_id')
+    .select('classroom_id, group_ids')
     .eq('assignment_id', id)
   const classroomIds = (links ?? []).map(link => link.classroom_id)
+  const groupIdsByClassroom = new Map((links ?? []).map(link => [link.classroom_id, link.group_ids as string[] | null]))
+  const groupClassroomIds = (links ?? []).filter(link => link.group_ids !== null).map(link => link.classroom_id)
 
   const [
     submissionsResult,
@@ -67,6 +70,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     rosterResult,
     approvalsResult,
     sebCheckinsResult,
+    groupMembersResult,
   ] = await Promise.all([
     supabase
       .from('submissions')
@@ -101,7 +105,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     classroomIds.length > 0
       ? supabase
           .from('classroom_students')
-          .select('student_id')
+          .select('classroom_id, student_id')
           .in('classroom_id', classroomIds)
       : Promise.resolve({ data: [], error: null }),
     assignment.android_exam_mode === 'monitored'
@@ -118,7 +122,24 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
           .eq('assignment_id', id)
           .order('verified_at', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    groupClassroomIds.length > 0
+      ? supabase
+          .from('classroom_group_members')
+          .select('classroom_id, student_id, group_id')
+          .in('classroom_id', groupClassroomIds)
+      : Promise.resolve({ data: [], error: null }),
   ])
+
+  // Only the students this ข้อสอบ was handed to sit in the room: in a
+  // classroom it went to only some กลุ่มย่อย of, everyone else stays off the
+  // roster (anyone who started anyway still shows, through their submission).
+  const groupOfStudent = new Map(
+    ((groupMembersResult.data ?? []) as { classroom_id: string; student_id: string; group_id: string }[])
+      .map(row => [`${row.classroom_id}:${row.student_id}`, row.group_id])
+  )
+  const rosterRows = ((rosterResult.data ?? []) as { classroom_id: string; student_id: string }[]).filter(row =>
+    linkReachesGroup(groupIdsByClassroom.get(row.classroom_id) ?? null, groupOfStudent.get(`${row.classroom_id}:${row.student_id}`))
+  )
 
   const initialProctorEvents = selectProctorDashboardEvents([
     ...((eventsResult.data ?? []) as ProctorEventRow[]),
@@ -129,7 +150,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   for (const row of submissionsResult.data ?? []) studentIds.add(row.student_id)
   for (const row of sessionsResult.data ?? []) studentIds.add(row.student_id)
   for (const row of initialProctorEvents) studentIds.add(row.student_id)
-  for (const row of rosterResult.data ?? []) studentIds.add(row.student_id)
+  for (const row of rosterRows) studentIds.add(row.student_id)
   for (const row of approvalsResult.data ?? []) studentIds.add(row.student_id)
 
   // The session-bound assignment query above is the authorization boundary.
@@ -150,6 +171,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     ?? unacknowledgedEventsResult.error
     ?? unacknowledgedCountResult.error
     ?? rosterResult.error
+    ?? groupMembersResult.error
     ?? approvalsResult.error
     ?? namesResult.error
 
@@ -190,7 +212,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   }
 
   const participantByStudent = new Map<string, ProctorParticipant>()
-  for (const row of rosterResult.data ?? []) {
+  for (const row of rosterRows) {
     participantByStudent.set(row.student_id, {
       studentId: row.student_id,
       name: studentName(row.student_id),
@@ -211,7 +233,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
     })
   }
   const initialRosterStudentIds = [
-    ...new Set((rosterResult.data ?? []).map(row => row.student_id)),
+    ...new Set(rosterRows.map(row => row.student_id)),
   ]
   const rosterStudentIdSet = new Set(initialRosterStudentIds)
 

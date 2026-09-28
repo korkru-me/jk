@@ -6,16 +6,21 @@ import {
 
 function readyCandidate() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     candidateId: 'release-2026-09',
     sourceRevision: 'a'.repeat(40),
     stagingBuild: 'staging-build-123',
     sebConfigId: 'production-v1',
+    sebConfigRevision: 'production-v1-revision',
     lockedAt: '2026-09-20T10:00:00.000Z',
   }
 }
 
-const linkage = { uatRunId: 'release-2026-09', sebConfigId: 'production-v1' }
+const linkage = {
+  uatRunId: 'release-2026-09',
+  sebConfigId: 'production-v1',
+  sebConfigRevision: 'production-v1-revision',
+}
 
 describe('exam release candidate', () => {
   it('passes a frozen candidate linked to the same UAT run and SEB config', () => {
@@ -41,6 +46,7 @@ describe('exam release candidate', () => {
     const result = inspectExamReleaseCandidate(readyCandidate(), {
       uatRunId: 'another-release',
       sebConfigId: 'another-config',
+      sebConfigRevision: 'another-revision',
     })
     expect(result.ready).toBe(false)
     expect(result.checks).toContainEqual(expect.objectContaining({
@@ -49,6 +55,10 @@ describe('exam release candidate', () => {
     }))
     expect(result.checks).toContainEqual(expect.objectContaining({
       field: 'SEB candidate linkage',
+      status: 'blocker',
+    }))
+    expect(result.checks).toContainEqual(expect.objectContaining({
+      field: 'SEB revision linkage',
       status: 'blocker',
     }))
   })

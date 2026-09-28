@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
@@ -15,7 +16,7 @@ import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
-  CircleCheck, Calculator, NotebookPen,
+  CircleCheck, Calculator, NotebookPen, Hash,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -34,9 +35,17 @@ import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
+import {
+  GroupTargetPicker, groupTargetsComplete, groupTargetsFor,
+  type AssignmentGroupOption, type GroupTargets,
+} from '@/components/assignments/group-target-picker'
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import { questionExcerpt } from '@/lib/question-display'
 import { subQuestionUnit } from '@/lib/question-parts'
+import {
+  SebQuitPasswordFields,
+  getSebQuitPasswordClientError,
+} from '@/components/assignments/seb-quit-password-settings'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -63,13 +72,17 @@ export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'de
 
 interface Props {
   classrooms: AssignmentClassroomOption[]
+  /** กลุ่มย่อย of each classroom above, for "มอบหมายให้". */
+  groupsByClassroom?: Record<string, AssignmentGroupOption[]>
   questions: AssignmentQuestionOption[]
   questionSets?: AssignmentQuestionSetOption[]
   preselectedClassroomId?: string
   preselectedSet?: AssignmentQuestionSetOption
 }
 
-export function CreateAssignmentForm({ classrooms, questions, questionSets = [], preselectedClassroomId, preselectedSet }: Props) {
+export function CreateAssignmentForm({
+  classrooms, groupsByClassroom = {}, questions, questionSets = [], preselectedClassroomId, preselectedSet,
+}: Props) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
@@ -83,6 +96,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [classroomIds, setClassroomIds] = useState<string[]>(
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
+  // มอบหมายให้: absent/null per room = นักเรียนทุกคนในห้อง, the default.
+  const [groupTargets, setGroupTargets] = useState<GroupTargets>({})
   const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exercise')
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
@@ -130,6 +145,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [duration, setDuration] = useState('')
   const [shuffleQ, setShuffleQ] = useState(false)
   const [shuffleA, setShuffleA] = useState(false)
+  // Off unless the teacher asks: every งาน before this existed gave each
+  // student their own numbers, and that is still what a โจทย์สุ่มตัวเลข is for.
+  const [sharedRandomValues, setSharedRandomValues] = useState(false)
   const [showResults, setShowResults] = useState<ShowResultsMode>('immediate')
   // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
   // before this setting existed, and one that does is a choice, not a default.
@@ -161,6 +179,8 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
   const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>('browser')
   const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>('blocked')
+  const [sebQuitPassword, setSebQuitPassword] = useState('')
+  const [sebQuitPasswordConfirmation, setSebQuitPasswordConfirmation] = useState('')
   // เงื่อนไขจบงาน. The three choices a teacher sees are a view over two stored
   // values — 'fixed' + no threshold, 'fixed' + a threshold, or 'streak' — so
   // that turning a threshold on and choosing to end on a run are visibly the
@@ -237,6 +257,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   function toggleClassroom(id: string) {
     setClassroomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
+
+  // "มอบหมายให้" in the summary: the whole room unless some room is limited
+  // to กลุ่มย่อย, then which groups (named when only one room is ticked).
+  const limitedRooms = classroomIds.filter(id => (groupTargets[id] ?? null) !== null)
+  const audienceSummary = limitedRooms.length === 0
+    ? 'นักเรียนทุกคนในห้อง'
+    : classroomIds.length === 1
+      ? `เฉพาะ ${(groupsByClassroom[classroomIds[0]] ?? [])
+          .filter(g => groupTargets[classroomIds[0]]?.includes(g.id))
+          .map(g => g.name)
+          .join(', ')}`
+      : `เฉพาะบางกลุ่มใน ${limitedRooms.length} ห้อง`
 
   // What survives of the แฟ้มย่อย after the teacher's own picking.
   const assignedSections = filterSectionsToQuestions(sections, selectedIds)
@@ -335,12 +367,18 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const displayMaxSet = displayMaxScore.trim() !== '' && Number(displayMaxScore) > 0
 
   function canNext() {
-    if (step === 0) return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
+    if (step === 0) {
+      return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
+        && groupTargetsComplete(groupTargets, classroomIds)
+    }
     if (step === 1) return selectedIds.length > 0
     // Refuse to leave คะแนนและเกณฑ์ with a streak the server would reject, so
     // the teacher reads the reason next to the field that caused it rather
     // than as an error after ยืนยัน three screens later.
     if (step === 2) return !(streakOn && streakBlocked)
+    if (step === 3 && assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
+      return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
+    }
     return true
   }
 
@@ -351,6 +389,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
   const hasWorkImageQuestions = selectedIds.some(
     id => questions.find(q => q.id === id)?.question_type === 'written'
   )
+  // Same idea for "ตัวเลขชุดเดียวกัน": only a ข้อ that actually draws numbers
+  // can differ between students, so a งาน without one never sees the switch.
+  const randomValueQuestionCount = selectedIds.filter(
+    id => questions.find(q => q.id === id)?.has_random_values
+  ).length
+  const sharedRandomOn = randomValueQuestionCount > 0 && sharedRandomValues
 
   function openPublishDialog() {
     setScheduleMode(false)
@@ -416,6 +460,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
 
       const res = await createAssignment({
         classroom_ids: classroomIds,
+        group_targets: groupTargetsFor(groupTargets, classroomIds),
         title: title.trim(),
         description: description.trim(),
         question_ids: selectedIds,
@@ -431,6 +476,9 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         type: assignmentType,
         shuffle_questions: shuffleQ,
         shuffle_options: shuffleA,
+        // Stored as off when nothing in the งาน draws numbers, whatever the
+        // switch was left on before the last such ข้อ was removed.
+        shared_random_values: sharedRandomOn,
         random_question_count: selectedRandomCount,
         show_results: showResults,
         show_solutions: showSolutions,
@@ -464,6 +512,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
         exam_watermark_enabled: examWatermarkEnabled,
         secure_browser_mode: secureBrowserMode,
         android_exam_mode: androidExamMode,
+        ...(secureBrowserMode === 'seb_required' ? {
+          seb_quit_password: {
+            password: sebQuitPassword,
+            confirmation: sebQuitPasswordConfirmation,
+          },
+        } : {}),
         status,
       })
       if (res?.error) toast.error(res.error)
@@ -546,6 +600,21 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               )}
             </div>
 
+            {classroomIds.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>มอบหมายให้</Label>
+                <GroupTargetPicker
+                  classrooms={classroomIds.flatMap(id => {
+                    const c = classrooms.find(room => room.id === id)
+                    return c ? [{ id: c.id, name: c.name }] : []
+                  })}
+                  groupsByClassroom={groupsByClassroom}
+                  value={groupTargets}
+                  onChange={setGroupTargets}
+                />
+              </div>
+            )}
+
             {!preselectedSet && (
               <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                 <div className="flex items-center gap-3">
@@ -576,6 +645,12 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   type="button"
                   onClick={() => {
                     setAssignmentType(t)
+                    if (t !== 'exam') {
+                      setSecureBrowserMode('browser')
+                      setAndroidExamMode('blocked')
+                      setSebQuitPassword('')
+                      setSebQuitPasswordConfirmation('')
+                    }
                     if (attemptsAuto) {
                       setMaxAttempts(t === 'exam' ? '1' : '')
                       setRetryScope(t === 'exam' ? 'all' : 'wrong_only')
@@ -1151,6 +1226,26 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 value: shuffleA,
                 set: setShuffleA,
               },
+              ...(randomValueQuestionCount > 0 ? [{
+                label: 'ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน',
+                desc: `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — ปกติแต่ละคนได้ตัวเลขไม่ซ้ำกัน เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น`,
+                icon: Hash,
+                value: sharedRandomValues,
+                set: setSharedRandomValues,
+                footer: (sharedRandomValues ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground px-1">
+                      {maxAttempts !== '1' && 'ทำรอบใหม่ก็ยังได้ตัวเลขชุดเดิม · '}
+                      สร้างงานแล้วกด &ldquo;ดูตัวอย่าง&rdquo; เพื่อดูตัวเลขที่นักเรียนจะได้
+                    </p>
+                    {assignmentType === 'exam' && (
+                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                        ตัวเลขเหมือนกันทุกคน คำตอบที่ถูกจึงเหมือนกันทุกคนด้วย — นักเรียนบอกคำตอบกันได้ง่ายกว่าแบบต่างคนต่างสุ่ม
+                      </p>
+                    )}
+                  </div>
+                ) : null) as React.ReactNode,
+              }] : []),
               ...(hasWorkImageQuestions ? [{
                 label: 'ให้นักเรียนแนบรูปแสดงวิธีทำ',
                 desc: `${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)`,
@@ -1168,7 +1263,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
               // coming back to the same ข้อ that were missed.
               ...(maxAttempts !== '1' && !randomDrawOn && !streakOn ? [{
                 label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
-                desc: 'รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ',
+                desc: `รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ${sharedRandomOn ? 'ตัวเลขในโจทย์เป็นชุดเดิม (ตั้งให้ทุกคนได้ชุดเดียวกันไว้)' : 'ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ'}`,
                 icon: RotateCcw,
                 value: retryScope === 'wrong_only',
                 set: (on: boolean) => setRetryScope(on ? 'wrong_only' : 'all'),
@@ -1233,19 +1328,27 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                   </div>
                 </div>
                 <input
+                  id="create-seb-required"
                   type="checkbox"
                   checked={secureBrowserMode === 'seb_required'}
                   onChange={event => {
                     const enabled = event.target.checked
                     setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
-                    if (!enabled) setAndroidExamMode('blocked')
+                    if (!enabled) {
+                      setAndroidExamMode('blocked')
+                      setSebQuitPassword('')
+                      setSebQuitPasswordConfirmation('')
+                    }
                     if (enabled) setProctoringEnabled(true)
                   }}
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
-              <p className="pl-11 text-xs text-warning">
-                SEB รองรับ Windows, macOS, iPhone และ iPad นักเรียนต้องติดตั้งและตรวจเครื่องก่อนสอบ
+              <p className="pl-11 text-xs leading-5 text-warning">
+                หลังสร้าง ข้อสอบจะอยู่เป็นร่างก่อน ระบบจะยอมเผยแพร่เมื่อไฟล์ SEB รุ่นของข้อสอบและ exact build ผ่านการตรวจครบ นักเรียนต้องตรวจเครื่องก่อนสอบ{' '}
+                <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+                  ตรวจความพร้อม SEB
+                </Link>
               </p>
               {secureBrowserMode === 'seb_required' && (
                 <div className="ml-11 space-y-2 border-t border-border pt-3">
@@ -1271,6 +1374,14 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                       Android monitored ตรวจการสลับแอป/ออกจากหน้าและการเชื่อมต่อ แต่เว็บห้ามหรือตรวจ screenshot ของระบบไม่ได้ จึงมีความมั่นใจต่ำกว่า SEB
                     </p>
                   )}
+                  <SebQuitPasswordFields
+                    idPrefix="create-seb-quit"
+                    password={sebQuitPassword}
+                    confirmation={sebQuitPasswordConfirmation}
+                    onPasswordChange={setSebQuitPassword}
+                    onConfirmationChange={setSebQuitPasswordConfirmation}
+                    disabled={isPending}
+                  />
                 </div>
               )}
             </div>
@@ -1485,6 +1596,7 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                     ? (classrooms.find(c => c.id === classroomIds[0])?.name ?? '—')
                     : `${classrooms.find(c => c.id === classroomIds[0])?.name ?? ''} และอีก ${classroomIds.length - 1} ห้อง`,
                 },
+                { label: 'มอบหมายให้', value: audienceSummary },
                 { label: 'ประเภท',    value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
                 {
                   label: 'โจทย์',
@@ -1527,11 +1639,17 @@ export function CreateAssignmentForm({ classrooms, questions, questionSets = [],
                 ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
                   ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
                   : []),
+                ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
+                  ? [{ label: 'รหัสออก SEB', value: 'ครูกำหนดแล้ว · รอเตรียมไฟล์เฉพาะข้อสอบ' }]
+                  : []),
                 ...(assignmentType === 'exam' && androidExamMode === 'monitored'
                   ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]
                   : []),
                 ...(hasWorkImageQuestions
                   ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
+                  : []),
+                ...(randomValueQuestionCount > 0
+                  ? [{ label: 'ตัวเลขในโจทย์สุ่ม', value: sharedRandomOn ? 'ทุกคนได้ชุดเดียวกัน' : 'แต่ละคนได้ต่างกัน' }]
                   : []),
                 { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
                 { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },

@@ -1,5 +1,6 @@
 import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
+import { isSharedRandomSeed, questionRandom } from '@/lib/math/shared-random'
 import { getBlankType, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import {
   CLASSIFY_PREFIX, CLASSIFY_UNSET,
@@ -84,7 +85,15 @@ export type AssignmentAttemptSkeleton = {
   option_order: number[] | null
 }
 
-function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_index' | 'option_order'> {
+// `assignments.shared_random_seed`: set = every student draws this ข้อ's
+// numbers from the same repeatable generator, so they all get the same ones.
+// Null (or anything that is not a valid seed) = Math.random, as before.
+type SharedRandomSeed = number | null | undefined
+
+function buildSkeletonBase(
+  q: Question,
+  sharedRandomSeed?: SharedRandomSeed,
+): Omit<AssignmentAttemptSkeleton, 'order_index' | 'option_order'> {
   const extraData = (q as any).extra_data as any
   const randomValues = randomizeVariables(
     q.variables as Variable[],
@@ -93,6 +102,7 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
       formula: (q as any).answer_parts?.[0]?.formula ?? q.answer_formula,
       answerStep: extraData?.answer_step ?? 0,
       pythagoreanGroups: extraData?.pythagorean_groups ?? [],
+      rng: isSharedRandomSeed(sharedRandomSeed) ? questionRandom(sharedRandomSeed, q.id) : undefined,
     }
   )
   const parts = (q as any).answer_parts as import('@/lib/types').AnswerPart[] | null
@@ -272,7 +282,8 @@ function buildSkeletonBase(q: Question): Omit<AssignmentAttemptSkeleton, 'order_
 // keeping this in one place is what guarantees a preview actually matches
 // what a real attempt would ask.
 export function buildAssignmentAttempt(
-  assignment: Pick<Assignment, 'question_ids' | 'shuffle_questions' | 'shuffle_options' | 'question_points' | 'random_question_count'>,
+  assignment: Pick<Assignment, 'question_ids' | 'shuffle_questions' | 'shuffle_options' | 'question_points' | 'random_question_count'>
+    & { shared_random_seed?: SharedRandomSeed },
   questions: Question[]
 ): AssignmentAttemptSkeleton[] {
   const questionsById = new Map(questions.map((q) => [q.id, q]))
@@ -310,6 +321,7 @@ export function buildAssignmentAttempt(
       orderIndex,
       shuffleOptions: assignment.shuffle_options === true,
       pointOverride: questionPoints?.[qid],
+      sharedRandomSeed: assignment.shared_random_seed,
     }))
 }
 
@@ -325,7 +337,7 @@ export function buildAssignmentAttempt(
  */
 export function buildAttemptQuestion(
   question: Question,
-  opts: { orderIndex: number; shuffleOptions: boolean; pointOverride?: number },
+  opts: { orderIndex: number; shuffleOptions: boolean; pointOverride?: number; sharedRandomSeed?: SharedRandomSeed },
 ): AssignmentAttemptSkeleton {
   // A matching question is only a question if the right-hand column is
   // scrambled, so it shuffles regardless of the assignment's shuffle_options
@@ -347,7 +359,7 @@ export function buildAttemptQuestion(
     ? shuffleArray(Array.from({ length: optionCount }, (_, i) => i))
     : null
 
-  const base = buildSkeletonBase(question)
+  const base = buildSkeletonBase(question, opts.sharedRandomSeed)
   return {
     ...base,
     max_score: opts.pointOverride ?? base.max_score,
@@ -393,7 +405,10 @@ function needsRetry(prev: PreviousAttemptAnswer): boolean {
  *
  * The retried questions are rebuilt from scratch — fresh random values, a
  * freshly evaluated correct answer, a freshly shuffled option order — so a
- * student who saw the เฉลย cannot replay the same instance. Their `max_score`
+ * student who saw the เฉลย cannot replay the same instance. The exception is a
+ * งาน set to give everyone the same numbers: there the retry gets that same
+ * set again, because "the same for everyone" has to include this student's
+ * own next round. Their `max_score`
  * is deliberately pinned to the previous attempt's rather than recomputed:
  * together with the carried rows it makes the new attempt add up to exactly
  * the same total as a full attempt, which is what keeps `score_strategy`
@@ -404,7 +419,7 @@ function needsRetry(prev: PreviousAttemptAnswer): boolean {
  * its row is carried instead of dropped — losing it would shrink the total.
  */
 export function buildRetryAttempt(
-  assignment: Pick<Assignment, 'shuffle_options'>,
+  assignment: Pick<Assignment, 'shuffle_options'> & { shared_random_seed?: SharedRandomSeed },
   questions: Question[],
   previous: PreviousAttemptAnswer[],
 ): { retried: AssignmentAttemptSkeleton[]; carried: CarriedAttemptAnswer[] } {
@@ -428,7 +443,7 @@ export function buildRetryAttempt(
       : null
 
     retried.push({
-      ...buildSkeletonBase(q),
+      ...buildSkeletonBase(q, assignment.shared_random_seed),
       max_score: prev.max_score,
       order_index: prev.order_index,
       option_order: optionOrder,

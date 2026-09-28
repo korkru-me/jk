@@ -21,6 +21,7 @@ const [candidate, uat, seb] = await Promise.all([
 const result = inspectExamReleaseCandidate(candidate, {
   uatRunId: uat?.runId,
   sebConfigId: seb?.configId,
+  sebConfigRevision: seb?.configRevision,
 })
 
 console.log(formatExamReleaseCandidateReport(result.checks))

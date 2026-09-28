@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment-access'
 import { revalidatePath } from 'next/cache'
 import { isAttemptExpired, isInstantCheckable, isStreakEligible } from '@/lib/grading'
 import {
@@ -21,8 +21,15 @@ import { buildAnswerFeedback, type FeedbackQuestion } from '@/lib/answer-feedbac
 import type { Question } from '@/lib/types'
 import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
+import {
+  createAssignmentSebSignedDownloadUrl,
+  readCurrentAssignmentSebRelease,
+} from '@/lib/seb-assignment-release.server'
 import { parseMathInputModes } from '@/lib/math/input-mode'
 import { hasCompleteWorkEvidence } from '@/lib/math-work'
+import { getWritableStudentAnswer } from '@/lib/exam-write-access'
+import { parseSubmittedFiles } from '@/lib/exam-attachment'
+import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
 
 export async function startSubmission(
   assignmentId: string,
@@ -34,20 +41,16 @@ export async function startSubmission(
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
   const admin = createAdminClient()
 
-  // Assignment metadata, classroom links, an individual extension, and the
-  // latest attempt are independent after authentication. Fetch them in one
-  // stage instead of a four-query waterfall on every exam resume.
-  const [assignmentRes, linksRes, extensionRes, existingRes] = await Promise.all([
+  // Assignment metadata, an individual extension, and the latest attempt are
+  // independent after authentication. Fetch them in one stage instead of a
+  // waterfall on every exam resume.
+  const [assignmentRes, extensionRes, existingRes] = await Promise.all([
     admin
       .from('assignments')
       .select('*')
       .eq('id', assignmentId)
       .eq('status', 'published')
       .maybeSingle(),
-    admin
-      .from('assignment_classrooms')
-      .select('classroom_id')
-      .eq('assignment_id', assignmentId),
     admin
       .from('assignment_extensions')
       .select('extended_end_at')
@@ -56,7 +59,7 @@ export async function startSubmission(
       .maybeSingle(),
     admin
       .from('submissions')
-      .select('id, status, attempt_number, started_at')
+      .select('id, status, attempt_number, started_at, exam_access_mode, seb_config_revision')
       .eq('assignment_id', assignmentId)
       .eq('student_id', user.id)
       .order('attempt_number', { ascending: false })
@@ -72,22 +75,12 @@ export async function startSubmission(
     return { error: 'ยังไม่ถึงเวลาเปิดสอบ' }
   }
 
-  // Check student is in one of the classrooms this assignment is linked to
-  // (not just the legacy single classroom_id column — an assignment may now
-  // target multiple classrooms via assignment_classrooms).
-  const links = linksRes.data
-  const classroomIds = (links ?? []).map((l: any) => l.classroom_id)
-
-  const { data: membership } = classroomIds.length > 0
-    ? await admin
-        .from('classroom_students')
-        .select('id')
-        .eq('student_id', user.id)
-        .in('classroom_id', classroomIds)
-        .maybeSingle()
-    : { data: null }
-
-  if (!membership) return { error: 'คุณไม่ได้อยู่ในห้องเรียนนี้' }
+  // Check the งาน was handed to this student: on the roster of one of the
+  // classrooms it is linked to (assignment_classrooms, not the legacy single
+  // classroom_id column) and, where that link names กลุ่มย่อย, in one of
+  // them. An existing attempt keeps access after a move between groups.
+  const handedToStudent = await studentHasAssignment(admin, assignmentId, user.id, existingRes.data != null)
+  if (!handedToStudent) return { error: 'งานนี้ไม่ได้มอบหมายให้คุณ' }
 
   // Check deadline — a per-student extension overrides the assignment's end_at
   const extension = extensionRes.data
@@ -103,25 +96,63 @@ export async function startSubmission(
   // teacher approves that exact student and assignment in the proctor room.
   const secureBrowserRequired = assignment.secure_browser_mode === 'seb_required'
   const androidMonitoredAllowed = assignment.android_exam_mode === 'monitored'
+  const currentSebRelease = secureBrowserRequired
+    ? await readCurrentAssignmentSebRelease(assignmentId)
+    : null
+  const existing = existingRes.data
+  const expectedSebRevision = existing?.status === 'in_progress'
+    && typeof existing.seb_config_revision === 'number'
+      ? existing.seb_config_revision
+      : currentSebRelease?.revision
+  const expectedAccessMode = existing?.status === 'in_progress'
+    ? existing.exam_access_mode === 'seb' || existing.exam_access_mode === 'android_monitored'
+      ? existing.exam_access_mode
+      : null
+    : undefined
   const examAccess = secureBrowserRequired
-    ? await getExamAccessSession(user.id, assignmentId, androidMonitoredAllowed)
+    ? await getExamAccessSession(
+        user.id,
+        assignmentId,
+        androidMonitoredAllowed,
+        expectedSebRevision,
+        expectedAccessMode,
+      )
     : null
   if (secureBrowserRequired && !examAccess) {
-    const reusableChallenge = validateSebChallenge(sebChallenge, user.id, assignmentId, 'take')
-    const challenge = reusableChallenge
-      ? sebChallenge!
-      : createSebChallenge(user.id, assignmentId, 'take')
+    const reusableChallenge = currentSebRelease
+      ? validateSebChallenge(
+          sebChallenge,
+          user.id,
+          assignmentId,
+          currentSebRelease.releaseId,
+          currentSebRelease.revision,
+          'take',
+        )
+      : null
+    const challenge = !currentSebRelease
+      ? null
+      : reusableChallenge
+        ? sebChallenge!
+        : createSebChallenge(
+            user.id,
+            assignmentId,
+            currentSebRelease.releaseId,
+            currentSebRelease.revision,
+            'take',
+          )
+    const configUrl = currentSebRelease && challenge
+      ? await createAssignmentSebSignedDownloadUrl(currentSebRelease)
+      : null
     return {
       requiresSecureBrowser: true as const,
-      sebConfigured: challenge !== null,
+      sebConfigured: challenge !== null && configUrl !== null,
       androidMonitoredAllowed,
-      challenge,
+      challenge: configUrl ? challenge : null,
+      configUrl,
     }
   }
 
   // Return existing in-progress submission, or decide on a retry
-  const existing = existingRes.data
-
   let attemptNumber = 1
   // Set to the attempt a wrong-only retry rebuilds from. Null on a first
   // attempt and whenever the งาน re-asks everything, which is the default.
@@ -129,6 +160,12 @@ export async function startSubmission(
   if (existing) {
     if (existing.status === 'in_progress') {
       if (!isAttemptExpired(existing.started_at, assignment.duration_minutes)) {
+        if (
+          examAccess?.mode === 'seb'
+          && existing.seb_config_revision !== examAccess.assignmentConfigRevision
+        ) {
+          return { error: 'ไฟล์ตั้งค่าของรอบสอบนี้ไม่ตรงกัน กรุณาแจ้งครูผู้คุมสอบ' }
+        }
         if (examAccess) {
           await admin.from('submissions').update(examAccess.mode === 'seb'
             ? {
@@ -251,33 +288,65 @@ export async function startSubmission(
   // they have a personal workspace it is not the assignment's tenant.
   const orgId = assignment.org_id
 
-  // Create submission with correct total max_score
-  const { data: submission, error: subError } = await admin
-    .from('submissions')
-    .insert({
-      org_id: orgId,
-      assignment_id: assignmentId,
-      student_id: user.id,
-      max_score: totalMaxScore,
-      status: 'in_progress',
-      attempt_number: attemptNumber,
-      exam_access_mode: examAccess?.mode ?? 'browser',
-      secure_browser_verified_at: examAccess?.mode === 'seb'
-        ? new Date(examAccess.issuedAt).toISOString()
-        : null,
-      secure_browser_platform: examAccess?.mode === 'seb' ? examAccess.platform : null,
-      secure_browser_version: examAccess?.mode === 'seb' ? examAccess.version : null,
-      android_approved_at: examAccess?.mode === 'android_monitored'
-        ? new Date(examAccess.approvedAt).toISOString()
-        : null,
-      android_approved_by: examAccess?.mode === 'android_monitored'
-        ? examAccess.approvedBy
-        : null,
+  // A new SEB attempt crosses one database transaction that locks the
+  // assignment and re-checks the exact current immutable release revision.
+  // Browser and teacher-approved Android attempts keep their existing path.
+  let submission: { id: string } | null = null
+  let subError: { message: string } | null = null
+  if (examAccess?.mode === 'seb') {
+    const created = await admin.rpc('create_seb_submission_with_revision', {
+      p_org_id: orgId,
+      p_assignment_id: assignmentId,
+      p_student_id: user.id,
+      p_max_score: totalMaxScore,
+      p_attempt_number: attemptNumber,
+      p_verified_at: new Date(examAccess.issuedAt).toISOString(),
+      p_platform: examAccess.platform,
+      p_version: examAccess.version,
+      p_config_revision: examAccess.assignmentConfigRevision,
     })
-    .select('id')
-    .single()
+    const row = Array.isArray(created.data) && created.data.length === 1
+      ? created.data[0] as Record<string, unknown>
+      : null
+    if (
+      created.error
+      || !row
+      || Reflect.ownKeys(row).length !== 2
+      || typeof row.submission_id !== 'string'
+      || row.seb_config_revision !== examAccess.assignmentConfigRevision
+    ) {
+      subError = { message: created.error?.message ?? 'สร้างรอบสอบ SEB ไม่สำเร็จ กรุณาเปิดข้อสอบใหม่' }
+    } else {
+      submission = { id: row.submission_id }
+    }
+  } else {
+    const created = await admin
+      .from('submissions')
+      .insert({
+        org_id: orgId,
+        assignment_id: assignmentId,
+        student_id: user.id,
+        max_score: totalMaxScore,
+        status: 'in_progress',
+        attempt_number: attemptNumber,
+        exam_access_mode: examAccess?.mode ?? 'browser',
+        secure_browser_verified_at: null,
+        secure_browser_platform: null,
+        secure_browser_version: null,
+        android_approved_at: examAccess?.mode === 'android_monitored'
+          ? new Date(examAccess.approvedAt).toISOString()
+          : null,
+        android_approved_by: examAccess?.mode === 'android_monitored'
+          ? examAccess.approvedBy
+          : null,
+      })
+      .select('id')
+      .single()
+    submission = created.data
+    subError = created.error
+  }
 
-  if (subError) return { error: subError.message }
+  if (subError || !submission) return { error: subError?.message ?? 'สร้างรอบสอบไม่สำเร็จ' }
 
   // A streak attempt opens with neither, and an empty insert is not worth
   // asking the database about.
@@ -292,68 +361,6 @@ export async function startSubmission(
   return { submissionId: submission.id }
 }
 
-async function getWritableStudentAnswer(
-  admin: ReturnType<typeof createAdminClient>,
-  submissionAnswerId: string,
-  studentId: string,
-) {
-  const { data: answer } = await admin
-    .from('submission_answers')
-    .select(`
-      id, submission_id, work_images, carried_over, check_count,
-      submissions(
-        id, student_id, status, started_at, assignment_id,
-        current_streak, best_streak, streak_reached,
-        assignments(
-          id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode,
-          instant_check, instant_check_answer_key,
-          completion_rule, streak_target, streak_question_cap, streak_recycle_pool
-        )
-      )
-    `)
-    .eq('id', submissionAnswerId)
-    .maybeSingle()
-
-  if (!answer) return { error: 'ไม่พบคำตอบ' as const }
-  const submission = Array.isArray(answer.submissions) ? answer.submissions[0] : answer.submissions
-  if (!submission || submission.student_id !== studentId) return { error: 'ไม่มีสิทธิ์' as const }
-  if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว' as const }
-
-  const assignment = Array.isArray(submission.assignments)
-    ? submission.assignments[0]
-    : submission.assignments
-  const durationMinutes = assignment?.duration_minutes
-  if (durationMinutes) {
-    const deadline = new Date(submission.started_at).getTime() + durationMinutes * 60_000
-    if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' as const }
-  }
-
-  if (assignment?.end_at && new Date(assignment.end_at).getTime() < Date.now()) {
-    const { data: extension } = await admin
-      .from('assignment_extensions')
-      .select('extended_end_at')
-      .eq('assignment_id', submission.assignment_id)
-      .eq('student_id', studentId)
-      .maybeSingle()
-    if (!extension?.extended_end_at || new Date(extension.extended_end_at).getTime() < Date.now()) {
-      return { error: 'หมดเวลาส่งแล้ว' as const }
-    }
-  }
-
-  if (
-    assignment?.secure_browser_mode === 'seb_required'
-    && !await getExamAccessSession(
-      studentId,
-      submission.assignment_id,
-      assignment.android_exam_mode === 'monitored',
-    )
-  ) {
-    return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' as const }
-  }
-
-  return { answer, submission, assignment }
-}
-
 /**
  * The same four gates getWritableStudentAnswer applies, for an action that
  * addresses the attempt rather than one answer row — currently only
@@ -366,7 +373,15 @@ async function getWritableStudentAnswer(
  */
 async function attemptWriteBlocked(
   admin: ReturnType<typeof createAdminClient>,
-  submission: { id: string; student_id: string; status: string; started_at: string; assignment_id: string },
+  submission: {
+    id: string
+    student_id: string
+    status: string
+    started_at: string
+    assignment_id: string
+    seb_config_revision: number | null
+    exam_access_mode: string
+  },
   assignment: {
     duration_minutes?: number | null
     end_at?: string | null
@@ -402,6 +417,10 @@ async function attemptWriteBlocked(
       studentId,
       submission.assignment_id,
       assignment.android_exam_mode === 'monitored',
+      submission.seb_config_revision,
+      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+        ? submission.exam_access_mode
+        : null,
     )
   ) {
     return 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่'
@@ -427,10 +446,32 @@ export async function saveAnswer(
   const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
   if ('error' in writable) return { error: writable.error }
 
+  let persistedAnswer = studentAnswer
+  if (writable.question?.question_type === 'file_upload') {
+    const files = parseSubmittedFiles(studentAnswer)
+    if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
+    const previousUrls = new Set(
+      (parseSubmittedFiles(writable.answer.student_answer) ?? []).map(file => file.url),
+    )
+    for (const file of files) {
+      const checked = await validateStoredExamAttachmentUrl(admin, {
+        kind: 'submission_file',
+        url: file.url,
+        studentId: user.id,
+        submissionId: writable.submission.id,
+        submissionAnswerId: writable.answer.id,
+        expectedMimeType: file.type,
+        allowLegacy: previousUrls.has(file.url),
+      })
+      if ('error' in checked) return checked
+    }
+    persistedAnswer = JSON.stringify(files)
+  }
+
   const { error } = await admin
     .from('submission_answers')
     .update({
-      student_answer: studentAnswer,
+      student_answer: persistedAnswer,
       ...(parsedModes ? { math_input_modes: parsedModes } : {}),
     })
     .eq('id', submissionAnswerId)
@@ -457,6 +498,17 @@ export async function saveWorkImage(submissionAnswerId: string, partIndex: numbe
     ? [...writable.answer.work_images]
     : []
   while (current.length <= partIndex) current.push(null)
+  if (url) {
+    const checked = await validateStoredExamAttachmentUrl(admin, {
+      kind: 'work_image',
+      url,
+      studentId: user.id,
+      submissionId: writable.submission.id,
+      submissionAnswerId: writable.answer.id,
+      allowLegacy: current[partIndex] === url,
+    })
+    if ('error' in checked) return checked
+  }
   current[partIndex] = url
 
   const { error } = await admin
@@ -694,10 +746,10 @@ export async function drawNextStreakQuestion(
   const { data: submission } = await admin
     .from('submissions')
     .select(`
-      id, student_id, status, started_at, assignment_id,
+      id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
       current_streak, best_streak, streak_reached,
       assignments(
-        id, org_id, question_ids, question_points, shuffle_options, mode, duration_minutes, end_at,
+        id, org_id, question_ids, question_points, shuffle_options, shared_random_seed, mode, duration_minutes, end_at,
         secure_browser_mode, android_exam_mode,
         completion_rule, streak_target, streak_question_cap, streak_recycle_pool
       )
@@ -714,6 +766,7 @@ export async function drawNextStreakQuestion(
       question_ids: string[]
       question_points: Record<string, number> | null
       shuffle_options: boolean | null
+      shared_random_seed: number | null
       mode: string
       duration_minutes: number | null
       end_at: string | null
@@ -733,6 +786,10 @@ export async function drawNextStreakQuestion(
       status: submission.status as string,
       started_at: submission.started_at as string,
       assignment_id: submission.assignment_id as string,
+      seb_config_revision: typeof submission.seb_config_revision === 'number'
+        ? submission.seb_config_revision
+        : null,
+      exam_access_mode: submission.exam_access_mode as string,
     },
     assignment,
     user.id,
@@ -814,6 +871,9 @@ export async function drawNextStreakQuestion(
     orderIndex: rows.length,
     shuffleOptions: assignment.shuffle_options === true,
     pointOverride: assignment.question_points?.[question.id],
+    // A ข้อ the pool hands out again comes back with the same numbers when the
+    // งาน shares them — the same rule as a retry.
+    sharedRandomSeed: assignment.shared_random_seed,
   })
 
   const { data: inserted, error: insertError } = await admin
@@ -950,6 +1010,10 @@ async function gradeAndFinalizeSubmission(
       studentId,
       submission.assignment_id,
       assignment.android_exam_mode === 'monitored',
+      typeof submission.seb_config_revision === 'number' ? submission.seb_config_revision : null,
+      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
+        ? submission.exam_access_mode
+        : null,
     )
   ) {
     return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' }
@@ -970,6 +1034,50 @@ async function gradeAndFinalizeSubmission(
   const carriedScore = answers
     .filter((a: any) => a.carried_over)
     .reduce((sum: number, a: any) => sum + Number(a.score ?? 0), 0)
+
+  // A URL-shaped string is not evidence of an uploaded answer. Re-inspect
+  // every legacy photo/file before the final grade so a tampered client cannot
+  // gain credit by calling saveAnswer/saveWorkImage with external or missing
+  // objects. New paths are bound to this exact student + attempt + answer;
+  // two-segment paths are accepted only for attempts opened before S1 shipped.
+  const attachmentChecks: Array<() => ReturnType<typeof validateStoredExamAttachmentUrl>> = []
+  for (const answer of (opts.enforceSecureBrowser ? gradable : []) as any[]) {
+    if (answer.questions?.question_type === 'file_upload') {
+      const files = parseSubmittedFiles(answer.student_answer)
+      if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
+      for (const file of files) {
+        attachmentChecks.push(() => validateStoredExamAttachmentUrl(admin, {
+          kind: 'submission_file',
+          url: file.url,
+          studentId,
+          submissionId,
+          submissionAnswerId: answer.id,
+          expectedMimeType: file.type,
+          allowLegacy: true,
+        }))
+      }
+    }
+    const workImages: unknown[] = Array.isArray(answer.work_images) ? answer.work_images : []
+    for (const url of workImages) {
+      if (typeof url !== 'string' || !url) continue
+      attachmentChecks.push(() => validateStoredExamAttachmentUrl(admin, {
+        kind: 'work_image',
+        url,
+        studentId,
+        submissionId,
+        submissionAnswerId: answer.id,
+        allowLegacy: true,
+      }))
+    }
+  }
+  const attachmentCheckConcurrency = 4
+  for (let index = 0; index < attachmentChecks.length; index += attachmentCheckConcurrency) {
+    const results = await Promise.all(
+      attachmentChecks.slice(index, index + attachmentCheckConcurrency).map(check => check()),
+    )
+    const failed = results.find(result => 'error' in result)
+    if (failed?.error) return { error: failed.error }
+  }
 
   // Server-side defense-in-depth: the exam UI already blocks submission
   // client-side when required working is missing, but a tampered

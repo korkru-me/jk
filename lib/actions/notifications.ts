@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getMyOrgId } from '@/lib/actions/org'
 import type { Notification } from '@/lib/types'
+import { targetedStudentIds } from '@/lib/classroom-groups'
+import { getClassroomGroupOf } from '@/lib/classroom-groups-server'
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -92,11 +94,26 @@ export async function notifyNonSubmitters(assignmentId: string, classroomId: str
 
   const admin = createAdminClient()
 
-  const { data: roster } = await admin
-    .from('classroom_students')
-    .select('student_id')
-    .eq('classroom_id', classroomId)
-  const rosterIds = (roster ?? []).map((r: any) => r.student_id)
+  // The งาน must actually be given to this room, and when it went only to
+  // some กลุ่มย่อย, only those students are chased for it.
+  const [{ data: link }, { data: roster }] = await Promise.all([
+    admin
+      .from('assignment_classrooms')
+      .select('group_ids')
+      .eq('assignment_id', assignmentId)
+      .eq('classroom_id', classroomId)
+      .maybeSingle(),
+    admin
+      .from('classroom_students')
+      .select('student_id')
+      .eq('classroom_id', classroomId),
+  ])
+  if (!link) return { error: 'งานนี้ไม่ได้มอบหมายให้ห้องเรียนนี้' }
+  let rosterIds = (roster ?? []).map((r: any) => r.student_id as string)
+  if (link.group_ids !== null) {
+    const groupOf = await getClassroomGroupOf(admin, classroomId, rosterIds)
+    rosterIds = [...targetedStudentIds(link.group_ids, rosterIds, groupOf)]
+  }
   if (rosterIds.length === 0) return { success: true, notified: 0 }
 
   const { data: submitted } = await admin
