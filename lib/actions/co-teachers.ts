@@ -1,8 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { isInviteToken } from '@/lib/invite-token'
 import type { CoTeacherPermission } from '@/lib/types'
 
 async function getAuthUser() {
@@ -85,64 +85,37 @@ export async function revokeClassroomInvitation(inviteId: string, classroomId: s
 }
 
 // ─── Join via token ────────────────────────────────────────────────────────
+// The token is the whole secret, so nobody but the room's invite managers can
+// read classroom_invitations. The invitee goes through two database functions
+// that need the exact token (20260928021309_close_invitation_token_reads.sql).
 
 export async function getClassroomInviteInfo(token: string) {
+  if (!isInviteToken(token)) return null
   const supabase = await createClient()
   const { data } = await supabase
-    .from('classroom_invitations')
-    .select('id, permission, classroom_id, classrooms(name)')
-    .eq('token', token)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
+    .rpc('get_classroom_invitation_preview', { p_token: token })
     .maybeSingle()
 
   if (!data) return null
-  const classroom = data.classrooms as any
-  return { inviteId: data.id, permission: data.permission as CoTeacherPermission, classroomName: classroom?.name ?? '', classroomId: data.classroom_id as string }
+  const invite = data as { classroom_name: string; permission: CoTeacherPermission }
+  return { classroomName: invite.classroom_name, permission: invite.permission }
 }
 
 export async function acceptClassroomInvitation(token: string) {
   const supabase = await createClient()
   const user = await getAuthUser()
   if (!user) return { error: 'กรุณาเข้าสู่ระบบก่อน' }
+  if (!isInviteToken(token)) return { error: 'ลิงก์นี้หมดอายุหรือใช้งานไปแล้ว' }
 
-  const { data: invite } = await supabase
-    .from('classroom_invitations')
-    .select('id, classroom_id, permission, created_by')
-    .eq('token', token)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle()
+  // Adds the co-teacher and closes the invite in one transaction. Someone who
+  // already teaches the room gets its id back without using the link up.
+  const { data: classroomId, error } = await supabase
+    .rpc('accept_classroom_invitation', { p_token: token })
 
-  if (!invite) return { error: 'ลิงก์นี้หมดอายุหรือใช้งานไปแล้ว' }
+  if (error) return { error: 'เข้าร่วมไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
+  if (!classroomId) return { error: 'ลิงก์นี้หมดอายุหรือใช้งานไปแล้ว' }
 
-  const admin = createAdminClient()
-
-  const { data: existing } = await admin
-    .from('classroom_co_teachers')
-    .select('id')
-    .eq('classroom_id', invite.classroom_id)
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (!existing) {
-    const { error } = await admin
-      .from('classroom_co_teachers')
-      .insert({
-        classroom_id: invite.classroom_id,
-        user_id: user.id,
-        permission: invite.permission,
-        invited_by: invite.created_by,
-      })
-    if (error) return { error: error.message }
-  }
-
-  await supabase
-    .from('classroom_invitations')
-    .update({ used_at: new Date().toISOString(), used_by: user.id })
-    .eq('id', invite.id)
-
-  return { success: true, classroomId: invite.classroom_id as string }
+  return { success: true, classroomId: classroomId as string }
 }
 
 // ─── Co-teacher management ─────────────────────────────────────────────────

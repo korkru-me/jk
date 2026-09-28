@@ -10,7 +10,7 @@
 - `public.users` — profile และ global role ของ application
 - `organizations` — tenant/workspace และ subscription tier เชิงข้อมูล
 - `organization_members` — สมาชิกและ role ภายใน organization
-- `org_invitations` — คำเชิญเข้า organization
+- `org_invitations` — คำเชิญเข้า organization · อ่าน/เขียนตรงได้เฉพาะ owner/admin ของ org ผู้รับเชิญใช้ `get_org_invitation_preview`/`accept_org_invitation` ที่ต้องได้ token ตรงตัว (`docs/SECURITY.md` หัวข้อ "ลิงก์เชิญ")
 - `super_admins` — แนวทางแยก platform-level authority จาก user role
 
 Invariant สำคัญ:
@@ -45,7 +45,7 @@ Invariant สำคัญ:
 - `classroom_students` — roster
 - `classroom_co_teachers` — ครูร่วมและ permission
 - `classroom_groups` — กลุ่มย่อยในห้อง (ชื่อไม่เกิน 60 ตัวอักษร, `color` เป็น id ของสีหน้าปกห้องเรียน, `position` คือลำดับที่ครูลากเรียง) · `classroom_group_members` — หนึ่งแถวต่อ (ห้อง, นักเรียน) → กลุ่ม **นักเรียนอยู่ได้ไม่เกินหนึ่งกลุ่มต่อห้อง** (PK `(classroom_id, student_id)`) · FK คู่ `(group_id, classroom_id)` บังคับให้กลุ่มเป็นของห้องเดียวกัน และ `(classroom_id, student_id)` → `classroom_students` ON DELETE CASCADE ออกจากห้อง = หลุดจากกลุ่ม · RLS: เจ้าของห้องและผู้ช่วยสอนทุกสิทธิ์อ่านได้ เขียนได้เฉพาะเจ้าของและ `admin`/`manage` · นักเรียนไม่อ่านสองตารางนี้ตรง (migration `20260926232639`)
-- `classroom_invitations` — invitation token สำหรับครูร่วม
+- `classroom_invitations` — invitation token สำหรับครูร่วม · อ่าน/เขียนตรงได้เฉพาะเจ้าของห้องและครูร่วม `admin` ผู้รับเชิญใช้ `get_classroom_invitation_preview`/`accept_classroom_invitation` ที่ต้องได้ token ตรงตัว
 - `classroom_posts` และ `post_comments` — stream การสื่อสาร · `attachments` (jsonb) เก็บไฟล์แนบสูงสุด 6 ไฟล์ต่อประกาศเป็น `{url, name, mime, size}` — เก็บ `name` เพราะ path ใน storage เป็นชื่อสุ่ม ถ้าไม่เก็บ นักเรียนจะได้ไฟล์ชื่อ `1788007637477_gv4hcdo5px4.pdf` · `edited_at` คือเวลาที่ "แก้ไขข้อความ/ไฟล์" จริง — ห้ามอ่าน `updated_at` แทน เพราะ trigger เด้งทุกครั้งที่แตะแถว การปักหมุดจึงเคยขึ้นป้าย “แก้ไขแล้ว” ทั้งที่เนื้อหาไม่เปลี่ยน · ลิงก์ในประกาศไม่มีคอลัมน์ของตัวเอง URL ในข้อความถูกทำเป็นลิงก์ตอน render (`lib/linkify.ts`)
 - `post_reads` — หนึ่งแถวต่อ (ประกาศ, นักเรียน) เขียนครั้งแรกที่ประกาศปรากฏบนจอ ไม่มี `updated_at` เพราะการเห็นซ้ำไม่ใช่เหตุการณ์ใหม่ · UI เขียนว่า “เห็นแล้ว” ไม่ใช่ “อ่านแล้ว” เพราะข้อมูลบอกได้แค่นั้น
 - **การเพิ่ม `post_reads` เคยทำให้ประกาศหายทั้งระบบ** — ตารางนี้มี FK ไปทั้ง `classroom_posts` และ `users` PostgREST จึงเห็นทาง embed `users` จาก `classroom_posts` ได้ 2 ทางและปฏิเสธที่จะเดา (`more than one relationship was found`) query ที่เขียน `users(full_name)` เฉย ๆ เลย error แล้วกลายเป็นรายการว่าง · embed ที่มีตารางเชื่อมแบบนี้ต้องระบุชื่อ FK เช่น `users!classroom_posts_author_id_fkey(full_name)`

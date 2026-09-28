@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 26 กันยายน 2026
+อัปเดตล่าสุด: 27 กันยายน 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -48,6 +48,17 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ตรวจ recursion/SQL helper ด้วย `SECURITY DEFINER`, fixed `search_path` และสิทธิ์ execute ที่เหมาะสม
 - field ที่ใช้ใน RLS บ่อยต้องมี index ที่เหมาะสม
 - การแชร์ต้องเป็น explicit relation/visibility ไม่แก้ ownership boundary
+- policy ที่ไม่ใส่ `TO authenticated` มีผลกับ `public` ซึ่งรวม `anon` และตารางใน `public` ได้ table grant ให้ `anon` โดยอัตโนมัติ — policy แบบนั้นเปิดให้ใครก็ได้ที่มี anon key (อยู่ในหน้าเว็บทุกหน้า) โดยไม่ต้องล็อกอิน · UPDATE policy ที่ไม่มี `WITH CHECK` จะใช้ `USING` ตรวจแถวใหม่ด้วย
+
+### ลิงก์เชิญ (คำเชิญครูร่วม / คำเชิญเข้า organization)
+
+- **token ของลิงก์เชิญคือ bearer secret** ใครถือก็รับคำเชิญได้ จึงห้ามมี policy หรือ query ที่อ่านหรือแก้แถวคำเชิญโดยไม่ต้องรู้ token ก่อน
+- `classroom_invitations` และ `org_invitations` อ่าน/เขียนตรงได้เฉพาะผู้จัดการคำเชิญ (`classroom_invitations_owner_all` = เจ้าของห้องหรือครูร่วม `admin` · `org_invitations_owner_*` = owner/admin ของ org หรือ super admin) และ `anon` ไม่มีสิทธิ์บนสองตารางนี้เลย
+- ผู้รับเชิญใช้ฟังก์ชันที่ต้องได้ token ตรงตัวเท่านั้น: `get_classroom_invitation_preview` / `accept_classroom_invitation` และ `get_org_invitation_preview` / `accept_org_invitation` (`SECURITY DEFINER`, `search_path = ''`, execute เฉพาะ `authenticated`) · preview คืนแค่ชื่อห้องหรือ org กับสิทธิ์ ไม่คืน id · accept ล็อกแถวคำเชิญ (`FOR UPDATE`) เพิ่มสมาชิก และปิดคำเชิญในธุรกรรมเดียว ลิงก์หนึ่งใบจึงใช้ได้ครั้งเดียวแม้สองคนกดพร้อมกัน · คนที่สอนห้องหรืออยู่ใน org นั้นอยู่แล้วได้ id กลับไปโดยไม่ใช้ลิงก์ และสิทธิ์เดิมไม่เปลี่ยน
+- server action (`lib/actions/co-teachers.ts`, `lib/actions/org-members.ts`) ตรวจ session และรูปแบบ token (`isInviteToken`: hex 64 ตัว) ก่อนถามฐาน และตอบข้อความทั่วไป ไม่ส่ง error ของฐานกลับไป
+- หน้า `/classrooms/[id]` อ่านคำเชิญด้วย admin client จึงต้องกรองเองให้ตรงกับ RLS: โหลดเฉพาะเมื่อเป็นเจ้าของห้องหรือครูร่วม `admin` — **สิ่งที่ส่งเข้า Client Component อ่านได้จาก RSC payload แม้แท็บจะซ่อนไว้** ก่อนหน้านี้ครูร่วมทุกระดับรวม `view` ได้ token ของคำเชิญที่ยังใช้ได้ทุกใบ (รวมใบที่ให้สิทธิ์ `admin`)
+- **ประวัติ (แก้ด้วย migration `20260928021309_close_invitation_token_reads.sql`, 27 ก.ย. 2026):** `classroom_invitations_token_select` ให้ผู้ใช้ที่ล็อกอินทุกคน (รวมนักเรียน) อ่าน token ของคำเชิญครูร่วมที่ยังใช้ได้ทุกใบ · `org_invitations_token_select` ไม่ได้จำกัด role จึงอ่านได้ด้วย anon key โดยไม่ต้องล็อกอิน แล้วสมัครบัญชีเข้า org ใดก็ได้ในฐานะ `admin` · `classroom_invitations_mark_used` ให้คนนอกกดคำเชิญครูร่วมทุกใบเป็น "ใช้แล้ว" หรือเปลี่ยนสิทธิ์ของคำเชิญเป็น `admin` · `org_invitations_mark_used` ให้ anon เปลี่ยน role และวันหมดอายุของคำเชิญ org ได้ แต่เพราะไม่มี `WITH CHECK` การตั้ง `used_at` จึงไม่เคยผ่าน **ลิงก์เชิญเข้า org ทุกใบใช้ซ้ำได้จนหมดอายุ** (`joinByToken` ไม่ได้ตรวจ error ของการปิดลิงก์) — ยืนยัน policy จริงบน Staging แล้ว (บทบาท `public` และ anon มี SELECT/UPDATE grant) และมี PGlite regression ที่ `lib/invitation-tokens-sql.test.ts` ซึ่งรันทั้ง policy เดิมและ policy ใหม่ในบทบาท `anon`/`authenticated`
+- ยังไม่ได้ทำ: token เก็บแบบ plaintext (ต่างจากลิงก์ IOC ที่เก็บเฉพาะ SHA-256) เพราะหน้าจัดการคำเชิญแสดงลิงก์เดิมให้คัดลอกซ้ำ ถ้าฐานข้อมูลหลุด ลิงก์ที่ยังไม่หมดอายุก็ใช้ได้ · คอลัมน์ `email` ของคำเชิญไม่ได้ผูกผู้รับ ลิงก์ที่ถูกส่งต่อถึงใครก็ใช้ได้จนหมดอายุ (7 วัน) หรือถูกเพิกถอน
 
 ## Migrations
 
