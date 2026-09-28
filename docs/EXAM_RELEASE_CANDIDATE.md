@@ -2,10 +2,13 @@
 
 อัปเดต: 21 กันยายน 2026
 
-สถานะปัจจุบัน: **ล็อก release candidate สำหรับ final UAT แล้ว** โดยผูก source
-revision, Vercel Staging deployment และ SEB config ไว้ใน
-`config/exam-release-candidate.json`; `npm run check:exam-candidate` ผ่านครบ
-และกำลังทำ physical iPad UAT ต่อบน candidate นี้
+สถานะปัจจุบัน: candidate เดิม `r8` ถูกยกเลิกสำหรับ SEB completion เพราะเก่ากว่า source
+revision และ versioned config contract ใหม่ ปัจจุบัน `config/exam-release-candidate.json`
+เปิดรอบ `seb-v1-uat-r1` แบบ `pending` และผูก immutable SEB config revision แล้ว แต่ยังไม่ล็อก
+source revision หรือ Vercel Staging build จึงจงใจให้ `npm run check:exam-candidate` ตอบ
+`NOT READY` ห้ามนำผลผ่านจาก `r8` มาปิดรอบใหม่นี้
+
+## ประวัติรอบ r7–r8 (ใช้เป็นข้อมูลการค้นพบเท่านั้น)
 
 candidate ถูกล็อกใหม่เป็นรอบ `r8` หลัง physical iPad UAT ของรอบ `r7` ผ่าน
 แป้นคณิตศาสตร์แล้ว แต่พบว่าเครื่องคิดเลขวิทยาศาสตร์แสดงเลขหลักพันติดกัน เช่น
@@ -52,6 +55,8 @@ camera/file picker บน candidate เดียวกัน ต่อมาผ�
 - `sourceRevision` — Git commit SHA ตัวพิมพ์เล็ก 40 ตัวของโค้ดที่ deploy
 - `stagingBuild` — build/deployment id ที่ไม่ใช่ URL หรือ secret
 - `sebConfigId` — ต้องตรงกับ `configId` ใน `config/seb-platform-evidence.json`
+- `sebConfigRevision` — ต้องตรงทั้ง platform evidence และ candidate revision ใน
+  `config/seb-release-registry.json`
 - `lockedAt` — เวลา ISO UTC ที่ล็อก candidate
 
 ## ลำดับการล็อก
@@ -59,7 +64,7 @@ camera/file picker บน candidate เดียวกัน ต่อมาผ�
 1. ให้ `npm run check:exam-staging` ผ่านก่อน
 2. เลือก commit ที่ regression/build ผ่าน แล้วดู SHA เต็มด้วย `git rev-parse HEAD`
 3. deploy commit นั้นไป staging และจดเฉพาะ build id ที่ไม่เป็นความลับ ห้ามใส่ URL/token
-4. ยืนยันว่าจะใช้ SEB config id เดิมตลอดรอบ
+4. ยืนยันว่าจะใช้ SEB config id และ immutable revision เดิมตลอดรอบ
 5. ใส่เวลา ISO UTC แล้วรัน `npm run check:exam-candidate`
 6. เมื่อผ่านแล้วจึงเริ่ม physical/authenticated UAT
 

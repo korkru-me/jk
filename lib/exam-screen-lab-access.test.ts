@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isExamScreenLabEnabled,
   isExamScreenLabPath,
+  isSebQuitPath,
   shouldBypassSessionRefresh,
 } from './exam-screen-lab-access'
 
@@ -41,7 +42,13 @@ describe('exam screen lab access', () => {
     expect(isExamScreenLabPath('/assignments/example/take')).toBe(false)
   })
 
-  it('bypasses session refresh for the synthetic lab but never production', () => {
+  it('matches only the exact native SEB quit fallback route', () => {
+    expect(isSebQuitPath('/exam/quit')).toBe(true)
+    expect(isSebQuitPath('/exam/quit/anything')).toBe(false)
+    expect(isSebQuitPath('/assignments')).toBe(false)
+  })
+
+  it('bypasses session refresh for the synthetic lab but never exposes that lab in production', () => {
     expect(shouldBypassSessionRefresh('/exam-screen-lab', { NODE_ENV: 'development' })).toBe(true)
     expect(shouldBypassSessionRefresh('/exam-screen-lab', isolatedStaging)).toBe(true)
     expect(shouldBypassSessionRefresh('/exam-screen-lab', {
@@ -49,5 +56,14 @@ describe('exam screen lab access', () => {
       VERCEL_ENV: 'production',
     })).toBe(false)
     expect(shouldBypassSessionRefresh('/dashboard', { NODE_ENV: 'development' })).toBe(false)
+  })
+
+  it('keeps the exact SEB quit fallback independent from Supabase auth in every environment', () => {
+    expect(shouldBypassSessionRefresh('/exam/quit', { NODE_ENV: 'development' })).toBe(true)
+    expect(shouldBypassSessionRefresh('/exam/quit', {
+      NODE_ENV: 'production',
+      VERCEL_ENV: 'production',
+    })).toBe(true)
+    expect(shouldBypassSessionRefresh('/exam/quit/anything', { NODE_ENV: 'development' })).toBe(false)
   })
 })

@@ -40,6 +40,8 @@ interface Props {
   crossPostTargets: { id: string; name: string }[]
   /** A view-only co-teacher gets the announcement board and nothing else. */
   canManage: boolean
+  /** The students each กลุ่มย่อย-only งาน was handed to, keyed by assignment id. */
+  audienceByAssignment?: Map<string, Set<string>>
   onNavigate: (target: OverviewTarget) => void
 }
 
@@ -79,7 +81,7 @@ function rateTone(rate: number): string {
 export function ClassroomOverview({
   classroomId, isHomeroom, students, assignments, homeroomAssignments, submissions,
   pendingReviewCount, pendingReviewCapped, posts, seenByPost, crossPostTargets,
-  canManage, onNavigate,
+  canManage, audienceByAssignment, onNavigate,
 }: Props) {
   const now = Date.now()
   const studentIds = students.map(s => s.id)
@@ -93,7 +95,10 @@ export function ClassroomOverview({
     ? homeroomAssignments
     : assignments.filter(a => a.status === 'published' || a.status === 'closed')
   const draftCount = isHomeroom ? 0 : assignments.filter(a => a.status === 'draft').length
-  const summary = summarizeClassroomProgress(studentIds, given, submissions, now)
+  const summary = summarizeClassroomProgress(
+    studentIds, given, submissions, now,
+    a => (isHomeroom ? null : audienceByAssignment?.get(a.id) ?? null),
+  )
 
   const items: OverviewItem[] = given.map(a => ({
     id: a.id,
@@ -107,7 +112,8 @@ export function ClassroomOverview({
     // upcoming and no one gets chased over it.
     closed: !isHomeroom && (a as ClassroomAssignmentRow).status === 'closed',
     progress: summary.byAssignment.get(a.id) ?? {
-      attempted: 0, submitted: 0, completed: 0, passed: 0, inProgress: 0, missing: students.length,
+      attempted: 0, submitted: 0, completed: 0, passed: 0, inProgress: 0,
+      missing: (isHomeroom ? null : audienceByAssignment?.get(a.id)?.size) ?? students.length,
     },
   }))
 
@@ -326,7 +332,12 @@ export function ClassroomOverview({
                  scrolls inside its own frame instead of burying the page. */
               <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
                 {ordered.map(item => (
-                  <AssignmentRow key={item.id} item={item} studentCount={students.length} now={now} />
+                  <AssignmentRow
+                    key={item.id}
+                    item={item}
+                    studentCount={(isHomeroom ? null : audienceByAssignment?.get(item.id)?.size) ?? students.length}
+                    now={now}
+                  />
                 ))}
               </div>
             )}

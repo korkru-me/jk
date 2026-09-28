@@ -8,9 +8,22 @@ import { filterSectionsToQuestions, parseSections, type QuestionSetSection } fro
 import type { AndroidExamMode, AssignmentMode, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
 import { decideCompletion, streakForcedSettings } from '@/lib/streak-completion'
 import { normalizeSetSections } from '@/lib/question-set-sections'
-import { inspectSebReadiness } from '@/lib/seb'
+import { inspectSebReadiness, readSebSessionSecret } from '@/lib/seb'
+import { hasCurrentAssignmentSebRelease } from '@/lib/seb-assignment-release.server'
 import { resolveNewAssignmentMathTools } from '@/lib/assignment-math-tools'
+import {
+  SebQuitPasswordError,
+  assertStrongSebQuitPassword,
+  toSafeSebQuitPasswordError,
+} from '@/lib/seb-quit-password-core.server'
+import {
+  createSebQuitPasswordRevisionForOwner,
+} from '@/lib/seb-quit-password-service.server'
 import { createSharedRandomSeed } from '@/lib/math/shared-random'
+import { cleanGroupTarget } from '@/lib/classroom-groups'
+import { manageableClassroomIds } from '@/lib/classroom-groups-server'
+import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -27,24 +40,20 @@ function normalizeQuestionsPerPage(mode: string, value: number | null | undefine
 }
 
 const SEB_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ เพราะระบบตั้งค่าไม่ครบ กรุณาตรวจที่ การตั้งค่า > ตั้งค่าข้อสอบเริ่มต้น'
+const SEB_RELEASE_NOT_READY_ERROR = 'ยังเผยแพร่ข้อสอบ SEB ไม่ได้ รหัสออกถูกบันทึกแล้ว แต่ไฟล์ SEB รุ่นปัจจุบันยังรอตรวจและผูกกับระบบ'
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
-async function isSebPublishingReady(supabase: ServerSupabaseClient) {
-  if (!inspectSebReadiness().publishReady) return false
-
-  // Probe the newest required table. If it exists, the earlier SEB, Android,
-  // and proctor-review migrations must also have been applied in order. RLS
-  // may return zero rows, but a missing/partial schema returns an error.
-  const { error } = await supabase
-    .from('exam_seb_checkins')
-    .select('assignment_id')
-    .limit(1)
-  return !error
+function isSebPublishingReady() {
+  const readiness = inspectSebReadiness()
+  return readSebSessionSecret() !== null && readiness.siteUrlReady
 }
 
 interface CreateAssignmentData {
   classroom_ids: string[]
+  /** มอบหมายให้: per classroom id, the กลุ่มย่อย that get the งาน. Absent or
+   *  null = the whole room. Checked against the room's real groups here. */
+  group_targets?: Record<string, string[] | null>
   title: string
   description: string
   question_ids: string[]
@@ -94,6 +103,11 @@ interface CreateAssignmentData {
   exam_watermark_enabled?: boolean
   secure_browser_mode?: SecureBrowserMode
   android_exam_mode?: AndroidExamMode
+  /** Sent once to the trusted Server Action. Never stored or returned. */
+  seb_quit_password?: {
+    password: string
+    confirmation: string
+  }
   status?: AssignmentStatus
 }
 
@@ -116,12 +130,52 @@ async function fetchPoolQuestionTypes(
   return { types: (data ?? []).map(row => row.question_type as string) }
 }
 
+/**
+ * The browser's "มอบหมายให้" choice, checked against each room's real กลุ่มย่อย
+ * (read under RLS, so only groups of rooms this teacher can see count). A room
+ * left out, or sent as null, gets the whole room. A room sent with no real
+ * group of its own is refused rather than silently widened to everyone — or
+ * narrowed to nobody.
+ */
+async function resolveGroupTargets(
+  supabase: ServerSupabaseClient,
+  classroomIds: string[],
+  raw: unknown,
+): Promise<Map<string, string[]> | { error: string }> {
+  const result = new Map<string, string[]>()
+  if (raw == null) return result
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { error: 'ข้อมูลกลุ่มที่มอบหมายไม่ถูกต้อง' }
+  const targets = raw as Record<string, unknown>
+  const limited = classroomIds.filter(id => targets[id] != null)
+  if (limited.length === 0) return result
+
+  const { data: groups, error } = await supabase
+    .from('classroom_groups')
+    .select('id, classroom_id')
+    .in('classroom_id', limited)
+  if (error) return { error: 'ตรวจสอบกลุ่มย่อยไม่สำเร็จ กรุณาลองใหม่' }
+  const groupsOf = new Map<string, Set<string>>()
+  for (const g of (groups ?? []) as { id: string; classroom_id: string }[]) {
+    if (!groupsOf.has(g.classroom_id)) groupsOf.set(g.classroom_id, new Set())
+    groupsOf.get(g.classroom_id)!.add(g.id)
+  }
+  for (const classroomId of limited) {
+    const cleaned = cleanGroupTarget(targets[classroomId], groupsOf.get(classroomId) ?? new Set())
+    if (cleaned === 'invalid') return { error: 'กรุณาเลือกกลุ่มที่จะมอบหมายอย่างน้อย 1 กลุ่ม (หรือเลือก “นักเรียนทุกคนในห้อง”)' }
+    if (cleaned) result.set(classroomId, cleaned)
+  }
+  return result
+}
+
 export async function createAssignment(data: CreateAssignmentData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (data.classroom_ids.length === 0) return { error: 'กรุณาเลือกห้องเรียนอย่างน้อย 1 ห้อง' }
+
+  const groupIdsByClassroom = await resolveGroupTargets(supabase, data.classroom_ids, data.group_targets)
+  if ('error' in groupIdsByClassroom) return { error: groupIdsByClassroom.error }
 
   // When created from a saved set, trust the set's own question_ids (fetched
   // server-side under RLS) rather than whatever the client sent, so a
@@ -170,11 +224,32 @@ export async function createAssignment(data: CreateAssignmentData) {
     && data.android_exam_mode === 'monitored'
       ? 'monitored'
       : 'blocked'
-  if (
-    data.status === 'published'
-    && secureBrowserMode === 'seb_required'
-    && !await isSebPublishingReady(supabase)
-  ) return { error: SEB_NOT_READY_ERROR }
+  let sebQuitPassword: { password: string; confirmation: string } | null = null
+  if (secureBrowserMode === 'seb_required') {
+    const input = data.seb_quit_password as unknown
+    if (
+      typeof input !== 'object'
+      || input === null
+      || Array.isArray(input)
+      || Reflect.ownKeys(input).length !== 2
+      || !Object.prototype.hasOwnProperty.call(input, 'password')
+      || !Object.prototype.hasOwnProperty.call(input, 'confirmation')
+      || typeof (input as { password?: unknown }).password !== 'string'
+      || typeof (input as { confirmation?: unknown }).confirmation !== 'string'
+    ) {
+      return { error: toSafeSebQuitPasswordError(new SebQuitPasswordError('SEB_QUIT_PASSWORD_INVALID_COMMAND')).message }
+    }
+    sebQuitPassword = {
+      password: (input as { password: string }).password,
+      confirmation: (input as { confirmation: string }).confirmation,
+    }
+    try {
+      // Reject weak or mismatched values before creating any assignment row.
+      assertStrongSebQuitPassword(sebQuitPassword.password, sebQuitPassword.confirmation)
+    } catch (error) {
+      return { error: toSafeSebQuitPasswordError(error).message }
+    }
+  }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled === true || secureBrowserMode === 'seb_required')
   // Re-asking only the missed questions needs an online attempt to re-open
@@ -290,7 +365,10 @@ export async function createAssignment(data: CreateAssignmentData) {
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled === true,
       secure_browser_mode: secureBrowserMode,
       android_exam_mode: androidExamMode,
-      status: data.status ?? 'draft',
+      // A new SEB exam remains private until its password revision has been
+      // appended successfully below. This avoids a published-but-unusable
+      // window between the assignment insert and the revision RPC.
+      status: secureBrowserMode === 'seb_required' ? 'draft' : (data.status ?? 'draft'),
     })
     .select('id')
     .single()
@@ -299,9 +377,38 @@ export async function createAssignment(data: CreateAssignmentData) {
 
   const { error: linkError } = await supabase
     .from('assignment_classrooms')
-    .insert(data.classroom_ids.map(classroom_id => ({ assignment_id: assignment.id, classroom_id })))
+    .insert(data.classroom_ids.map(classroom_id => ({
+      assignment_id: assignment.id,
+      classroom_id,
+      group_ids: groupIdsByClassroom.get(classroom_id) ?? null,
+    })))
 
-  if (linkError) return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนนี้' }
+  if (linkError) {
+    await supabase.from('assignments').delete().eq('id', assignment.id).eq('created_by', user.id)
+    return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนนี้' }
+  }
+
+  if (secureBrowserMode === 'seb_required' && sebQuitPassword) {
+    try {
+      await createSebQuitPasswordRevisionForOwner({
+        assignmentId: assignment.id,
+        expectedRevision: 0,
+        password: sebQuitPassword.password,
+        confirmation: sebQuitPassword.confirmation,
+      }, user.id)
+    } catch (passwordError) {
+      // This assignment was created by this request and has never been shown
+      // to the caller. Best-effort cleanup keeps a failed password write from
+      // leaving an incomplete draft behind; the DB cascade also removes a
+      // revision if the transport failed after its transaction committed.
+      await supabase.from('assignments').delete().eq('id', assignment.id).eq('created_by', user.id)
+      return { error: toSafeSebQuitPasswordError(passwordError).message }
+    }
+
+    // A password revision is only the first half of a publishable release.
+    // Native SEB must produce and enroll the exact artifact/CK/BEKs next, so
+    // even a create form that requested publish remains draft here.
+  }
 
   revalidatePath('/assignments')
   redirect(`/assignments/${assignment.id}`)
@@ -321,9 +428,15 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
     if (assignmentError) return { error: 'ตรวจสอบความพร้อม Safe Exam Browser ไม่สำเร็จ กรุณาตรวจว่า apply migration แล้ว' }
     if (
       assignment?.secure_browser_mode === 'seb_required'
-      && !await isSebPublishingReady(supabase)
+      && !isSebPublishingReady()
     ) {
       return { error: SEB_NOT_READY_ERROR }
+    }
+    if (
+      assignment?.secure_browser_mode === 'seb_required'
+      && !await hasCurrentAssignmentSebRelease(id)
+    ) {
+      return { error: SEB_RELEASE_NOT_READY_ERROR }
     }
   }
 
@@ -482,11 +595,20 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     && data.android_exam_mode === 'monitored'
       ? 'monitored'
       : 'blocked'
+  const enablingSeb = secureBrowserMode === 'seb_required'
+    && (existing.secure_browser_mode ?? 'browser') !== 'seb_required'
   if (
     existing.status === 'published'
     && secureBrowserMode === 'seb_required'
-    && !await isSebPublishingReady(supabase)
+    && !enablingSeb
+    && !isSebPublishingReady()
   ) return { error: SEB_NOT_READY_ERROR }
+  if (
+    existing.status === 'published'
+    && secureBrowserMode === 'seb_required'
+    && !enablingSeb
+    && !await hasCurrentAssignmentSebRelease(id)
+  ) return { error: SEB_RELEASE_NOT_READY_ERROR }
   const proctoringEnabled = isOnlineExam
     && (data.proctoring_enabled || secureBrowserMode === 'seb_required')
   // Same rule as createAssignment: only an online งาน that can be reopened
@@ -687,6 +809,10 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       exam_watermark_enabled: isOnlineExam && data.exam_watermark_enabled,
       secure_browser_mode: secureBrowserMode,
       android_exam_mode: androidExamMode,
+      // Turning SEB on is a two-step owner flow for an existing exam: first
+      // make the assignment private and eligible, then set the password and
+      // publish. Students must never see an SEB exam between those steps.
+      ...(enablingSeb ? { status: 'draft' } : {}),
       ...(data.require_work_image === undefined ? {} : { require_work_image: data.require_work_image }),
       ...(data.calculator_enabled === undefined
         ? {}
@@ -743,8 +869,11 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
 
   const { data: sourceLinks } = await supabase
     .from('assignment_classrooms')
-    .select('classroom_id')
+    .select('classroom_id, group_ids')
     .eq('assignment_id', id)
+  // A สำเนา for the same room keeps the same กลุ่มย่อย; another room's
+  // groups mean nothing there, so a copy into a new room goes to all of it.
+  const sourceGroupIds = new Map((sourceLinks ?? []).map((l: any) => [l.classroom_id as string, (l.group_ids ?? null) as string[] | null]))
 
   const targetClassroomIds = opts?.targetClassroomIds?.length
     ? opts.targetClassroomIds
@@ -818,12 +947,72 @@ export async function duplicateAssignment(id: string, opts?: { targetClassroomId
 
   const { error: linkError } = await supabase
     .from('assignment_classrooms')
-    .insert(targetClassroomIds.map(classroom_id => ({ assignment_id: copy.id, classroom_id })))
+    .insert(targetClassroomIds.map(classroom_id => ({
+      assignment_id: copy.id,
+      classroom_id,
+      group_ids: sourceGroupIds.get(classroom_id) ?? null,
+    })))
 
   if (linkError) return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนปลายทาง' }
 
   revalidatePath('/assignments')
   redirect(`/assignments/${copy.id}`)
+}
+
+/**
+ * Change "มอบหมายให้" on an existing งาน: per linked classroom, the whole room
+ * (null) or only some of its กลุ่มย่อย. Only rooms this teacher manages can be
+ * changed. Takes effect at once — students outside the groups stop seeing a
+ * งาน they have not started, and those newly included see it on their next
+ * page load.
+ */
+export async function updateAssignmentGroupTargets(
+  assignmentId: string,
+  targets: Record<string, string[] | null>,
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!await canManageAssignment(assignmentId, user.id)) return { error: 'ไม่มีสิทธิ์แก้ไขงานนี้' }
+  if (!targets || typeof targets !== 'object' || Array.isArray(targets)) return { error: 'ข้อมูลกลุ่มที่มอบหมายไม่ถูกต้อง' }
+
+  const admin = createAdminClient()
+  const { data: links } = await admin
+    .from('assignment_classrooms')
+    .select('id, classroom_id, group_ids')
+    .eq('assignment_id', assignmentId)
+  const linked = new Map(((links ?? []) as { id: string; classroom_id: string; group_ids: string[] | null }[])
+    .map(l => [l.classroom_id, l]))
+
+  const requested = Object.keys(targets)
+  if (requested.some(id => !linked.has(id))) return { error: 'ห้องเรียนนี้ไม่ได้รับงานนี้' }
+  const manageable = await manageableClassroomIds(admin, user.id, requested)
+  if (requested.some(id => !manageable.has(id))) return { error: 'ไม่มีสิทธิ์จัดการกลุ่มของห้องเรียนนี้' }
+
+  const resolved = await resolveGroupTargets(supabase, requested, targets)
+  if ('error' in resolved) return { error: resolved.error }
+
+  // assignment_classrooms has no UPDATE policy for the browser role; the
+  // assignment and each room were authorized above, and every update is
+  // pinned to one exact link row.
+  for (const classroomId of requested) {
+    const link = linked.get(classroomId)!
+    const next = resolved.get(classroomId) ?? null
+    const same = (link.group_ids === null && next === null)
+      || (link.group_ids !== null && next !== null
+        && link.group_ids.length === next.length && next.every(id => link.group_ids!.includes(id)))
+    if (same) continue
+    const { error } = await admin
+      .from('assignment_classrooms')
+      .update({ group_ids: next })
+      .eq('id', link.id)
+      .eq('assignment_id', assignmentId)
+    if (error) return { error: 'บันทึกการมอบหมายไม่สำเร็จ กรุณาลองใหม่' }
+    revalidatePath(`/classrooms/${classroomId}`)
+  }
+
+  revalidatePath(`/assignments/${assignmentId}`)
+  return { success: true }
 }
 
 export async function getMyAssignments() {

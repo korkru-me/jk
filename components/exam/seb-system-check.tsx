@@ -68,22 +68,28 @@ export function SebSystemCheck({
 }: Props) {
   const attempted = useRef(false)
   const [state, setState] = useState<CheckState>('outside')
+  // Server rendering and ordinary browsers can truthfully start at false.
+  // Native SEB flips this immediately after hydration when its JavaScript API
+  // is present; this avoids a misleading neutral row in the common path.
+  const [insideSeb, setInsideSeb] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [platform, setPlatform] = useState<SebPlatform | null>(null)
   const [validUntil, setValidUntil] = useState<string | null>(null)
 
   useEffect(() => {
-    if (attempted.current || !configured || !challenge) return
-    attempted.current = true
     const seb = window.SafeExamBrowser
-    if (!seb?.security) return
+    const detected = Boolean(seb?.security)
+    setInsideSeb(detected)
+    if (attempted.current || !configured || !challenge || !seb?.security) return
+    attempted.current = true
 
     let cancelled = false
+    let verificationStarted = false
     let timeout: ReturnType<typeof setTimeout> | undefined
     setState('verifying')
 
     const verify = async () => {
-      if (cancelled) return
+      if (cancelled || verificationStarted) return
       const security = seb.security
       const configKeyHash = security?.configKey
       const browserExamKeyHash = security?.browserExamKey
@@ -92,6 +98,9 @@ export function SebSystemCheck({
         setError('Safe Exam Browser ส่งข้อมูลกุญแจหรือเวอร์ชันมาไม่ครบ กรุณาเปิดไฟล์ .seb ของโรงเรียนใหม่')
         return
       }
+      verificationStarted = true
+      setState('verifying')
+      setError(null)
 
       try {
         const result = await verifySafeExamBrowser({
@@ -142,7 +151,6 @@ export function SebSystemCheck({
     }
   }, [assignmentId, challenge, configured])
 
-  const isSeb = state !== 'outside'
   const verificationState = state === 'verifying'
     ? 'checking'
     : state === 'passed'
@@ -176,9 +184,9 @@ export function SebSystemCheck({
 
         <div className="mt-5">
           <CheckRow
-            state={isSeb ? 'passed' : configured ? 'failed' : 'pending'}
+            state={insideSeb ? 'passed' : 'failed'}
             title="เปิดหน้านี้ใน Safe Exam Browser"
-            description="รองรับ Windows, macOS, iPhone และ iPad — ยังไม่รวม Android"
+            description="ต้องเป็นระบบและ exact build ที่โรงเรียนประกาศอนุญาต — Android ไม่ใช่ SEB และใช้เส้นทาง monitored แยก"
           />
           <CheckRow
             state={verificationState}
@@ -199,8 +207,8 @@ export function SebSystemCheck({
       </Card>
 
       {!configured ? (
-        <div className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+        <div role="alert" className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm">
+          <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <p>ฝั่งโรงเรียนยังตั้งค่า SEB ไม่ครบ กรุณาแจ้งครูหรือผู้ดูแลระบบ</p>
         </div>
       ) : state === 'outside' ? (
@@ -222,11 +230,11 @@ export function SebSystemCheck({
           )}
         </Card>
       ) : state === 'verifying' ? (
-        <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" /> กำลังตรวจสอบกับเซิร์ฟเวอร์…
+        <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
+          <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-primary" /> กำลังตรวจสอบกับเซิร์ฟเวอร์…
         </div>
       ) : state === 'passed' ? (
-        <div className="space-y-3 rounded-xl border border-success/30 bg-success/10 p-5">
+        <div role="status" aria-live="polite" className="space-y-3 rounded-xl border border-success/30 bg-success/10 p-5">
           <div className="flex gap-3">
             <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-success" />
             <div>
@@ -251,7 +259,7 @@ export function SebSystemCheck({
           </p>
         </div>
       ) : (
-        <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
+        <div role="alert" className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
           <div className="flex gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
             <p>{error}</p>

@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 26 กันยายน 2026
+อัปเดตล่าสุด: 27 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -44,6 +44,7 @@ Invariant สำคัญ:
 - `classrooms` — owner teacher, type, class code และ lifecycle
 - `classroom_students` — roster
 - `classroom_co_teachers` — ครูร่วมและ permission
+- `classroom_groups` — กลุ่มย่อยในห้อง (ชื่อไม่เกิน 60 ตัวอักษร, `color` เป็น id ของสีหน้าปกห้องเรียน, `position` คือลำดับที่ครูลากเรียง) · `classroom_group_members` — หนึ่งแถวต่อ (ห้อง, นักเรียน) → กลุ่ม **นักเรียนอยู่ได้ไม่เกินหนึ่งกลุ่มต่อห้อง** (PK `(classroom_id, student_id)`) · FK คู่ `(group_id, classroom_id)` บังคับให้กลุ่มเป็นของห้องเดียวกัน และ `(classroom_id, student_id)` → `classroom_students` ON DELETE CASCADE ออกจากห้อง = หลุดจากกลุ่ม · RLS: เจ้าของห้องและผู้ช่วยสอนทุกสิทธิ์อ่านได้ เขียนได้เฉพาะเจ้าของและ `admin`/`manage` · นักเรียนไม่อ่านสองตารางนี้ตรง (migration `20260926232639`)
 - `classroom_invitations` — invitation token สำหรับครูร่วม
 - `classroom_posts` และ `post_comments` — stream การสื่อสาร · `attachments` (jsonb) เก็บไฟล์แนบสูงสุด 6 ไฟล์ต่อประกาศเป็น `{url, name, mime, size}` — เก็บ `name` เพราะ path ใน storage เป็นชื่อสุ่ม ถ้าไม่เก็บ นักเรียนจะได้ไฟล์ชื่อ `1788007637477_gv4hcdo5px4.pdf` · `edited_at` คือเวลาที่ "แก้ไขข้อความ/ไฟล์" จริง — ห้ามอ่าน `updated_at` แทน เพราะ trigger เด้งทุกครั้งที่แตะแถว การปักหมุดจึงเคยขึ้นป้าย “แก้ไขแล้ว” ทั้งที่เนื้อหาไม่เปลี่ยน · ลิงก์ในประกาศไม่มีคอลัมน์ของตัวเอง URL ในข้อความถูกทำเป็นลิงก์ตอน render (`lib/linkify.ts`)
 - `post_reads` — หนึ่งแถวต่อ (ประกาศ, นักเรียน) เขียนครั้งแรกที่ประกาศปรากฏบนจอ ไม่มี `updated_at` เพราะการเห็นซ้ำไม่ใช่เหตุการณ์ใหม่ · UI เขียนว่า “เห็นแล้ว” ไม่ใช่ “อ่านแล้ว” เพราะข้อมูลบอกได้แค่นั้น
@@ -54,13 +55,15 @@ Invariant สำคัญ:
 ## งานและการส่งคำตอบ
 
 - `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ, `secure_browser_mode` เป็น `browser|seb_required` และ `android_exam_mode` เป็น `blocked|monitored` สำหรับทางสำรองที่ครูตรวจเครื่อง · `show_solutions` (default `false`, migration `20260926020630`) คือครูให้นักเรียนเปิดเฉลยวิธีทำของแต่ละข้อจากหน้าสรุปผลหรือไม่ — แยกจาก `show_results` ที่คุมคะแนนและคำตอบที่ถูก · `shared_random_seed` (integer NULL, migration `20260926105608`) — ว่าง = นักเรียนแต่ละคนสุ่มตัวเลขของตัวเองเหมือนเดิม มีค่า = ทุกคนได้ตัวเลขชุดเดียวกันในโจทย์สุ่มตัวเลข
-- `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom
+- `assignment_seb_config_revisions` — ประวัติ revision แบบ append-only ของรหัสออก SEB ที่ครูเจ้าของข้อสอบกำหนด ผูก exact assignment + org + owner และเก็บเฉพาะ SHA-256 lower-case Base16 ที่ SEB ต้องใช้กับเวลาจาก server ไม่เก็บรหัสจริงหรือช่องยืนยัน Browser role ไม่มี policy/สิทธิ์อ่านเขียน และการสร้าง revision ต้องผ่าน service-role-only RPC ที่ล็อก assignment แล้วตรวจเจ้าของ สถานะข้อสอบ active attempt และ compare-and-swap ซ้ำใน transaction เดียว หน้าแก้ไขอ่านได้เฉพาะ revision/time metadata ที่ปลอดภัยสำหรับ exact owner; revision อย่างเดียวยังไม่ใช่ไฟล์พร้อมใช้
+- `assignment_seb_config_releases` — immutable server-only binding ของ exact password revision กับ private `.seb` path, SHA-256/size, opaque release ID, raw Config Key และ BEK registry แยก exact platform/version/build ไม่มี browser policy/grant และ registration RPC คืนเฉพาะ metadata ที่ไม่มี CK/BEK ก่อน insert application ต้องดาวน์โหลด private object กลับมาตรวจ path/bytes/hash; database trigger และ application publish gate ยอมเฉพาะ release ของ revision ปัจจุบัน
+- `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom · `group_ids uuid[]` (migration `20260926232639`): NULL = ทั้งห้อง, มีค่า = เฉพาะสมาชิกกลุ่มเหล่านั้น, `{}` = ไม่มีใคร — เป็น array ไม่ใช่ตารางเชื่อมโดยตั้งใจ เพราะ FK cascade ตอนลบกลุ่มจะทำให้งานเปิดให้ทั้งห้องเงียบ ๆ · ไม่มี UPDATE policy สำหรับ browser: การเปลี่ยนผ่าน `updateAssignmentGroupTargets`/`deleteClassroomGroup` ที่ตรวจสิทธิ์แล้วใช้ service role กับแถวที่ระบุ · `get_my_visible_assignment_ids()` เคารพ `group_ids` และยกเว้นให้นักเรียนที่มี submission ของงานนั้นแล้ว
 - `assignment_extensions` — ขยายเวลารายคน
-- `submissions` — attempt ต่อผู้เรียน; `exam_access_mode` แยก `browser|seb|android_monitored`, SEB audit เก็บ verified time/platform/version และ Android audit เก็บ approval time/teacher เท่านั้น ไม่เก็บ CK, BEK, request hash, user-agent หรือ fingerprint
+- `submissions` — attempt ต่อผู้เรียน; `exam_access_mode` แยก `browser|seb|android_monitored`, `seb_config_revision` ผูก SEB attempt กับ exact immutable assignment release ตั้งแต่ transaction สร้าง attempt, SEB audit เก็บ verified time/platform/version และ Android audit เก็บ approval time/teacher เท่านั้น ไม่เก็บ CK, BEK, request hash, user-agent หรือ fingerprint
 - `submission_answers` — answer snapshot และคะแนนรายข้อ
 - `exam_android_approvals` — คำขอ Android หนึ่งแถวต่อ assignment/student เก็บ pending/approved/denied, เวลา, ผู้อนุมัติและวันหมดอายุ; browser เขียนตรงไม่ได้และลบอัตโนมัติเมื่อเกินเพดาน retention
 - `exam_seb_checkins` — ผล SEB system check ที่ผ่านล่าสุดหนึ่งแถวต่อ assignment/student เก็บ `verified_at`, `valid_until` ไม่เกิน 12 ชั่วโมง, platform และ version เพื่อ roster ก่อนสอบ; ไม่สร้าง submission/timer และไม่เก็บ failure, raw CK/BEK/request hash, IP, user-agent หรือ device fingerprint
-- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด พร้อมสำเนา access mode/SEB/Android audit ที่ database trigger อ่านจาก submission เพื่อให้ client ปลอมป้ายยืนยันไม่ได้
+- `exam_proctor_sessions` — presence ล่าสุดและ counter สรุปหนึ่งแถวต่อ attempt สำหรับห้องคุมสอบสด พร้อมสำเนา access mode, `seb_config_revision`, SEB/Android audit ที่ database trigger อ่านจาก submission เพื่อให้ client ปลอมป้ายยืนยันไม่ได้
 - `exam_proctor_events` — browser-level event แบบ append-only ที่เก็บเฉพาะชนิดเหตุการณ์ เวลา และ foreign keys พร้อม `acknowledged_at/by` สำหรับการรับทราบครั้งแรกของครู; trigger ห้ามแก้ evidence fields และการรับทราบไม่ใช่คำตัดสินทุจริต ไม่เก็บภาพหน้าจอ เสียง กล้อง เนื้อหาคำตอบ หรือ keystroke
 - `exam_proctor_connections` — heartbeat lease ต่อแท็บด้วย UUID สุ่มและเวลาเห็นล่าสุด ใช้นับการเปิด attempt พร้อมกันหลายจุด; ไม่เก็บ IP, user-agent, device fingerprint หรือเนื้อหาบนจอ
 
@@ -183,11 +186,11 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 | bucket | ลิมิต | ชนิดที่รับ | ใครเขียน |
 | --- | --- | --- | --- |
 | `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์), `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้) และ `solution-attachments-field.tsx` (ไฟล์เฉลย: รูปไม่เกิน 2 MB หลังย่อ, PDF ไม่เกิน 5 MB, รูปจากกระดานเขียนเฉลย) |
-| `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย |
-| `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน |
+| `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย ผ่าน signed target ที่ Server Action อนุญาต |
+| `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน ผ่าน signed target ที่ Server Action อนุญาต |
 | `classroom-post-files` | 10 MB | รูป (PNG/JPEG/WebP/GIF), PDF, Word, Excel, PowerPoint, txt/csv, zip | `post-attach.tsx` — ไฟล์แนบในประกาศห้องเรียน |
 
-- ทุก bucket เป็น public-read และเก็บไฟล์ใต้ `{auth.uid()}/...` โดย `work-images`/`submission-files`/`classroom-post-files` มี RLS จำกัดให้เขียน/ลบได้เฉพาะโฟลเดอร์ของตัวเอง
+- ทุก bucket ในตารางยังเป็น public-read เพื่อ compatibility และเก็บไฟล์ใต้ `{auth.uid()}/...` · `work-images`/`submission-files` รุ่นใหม่ใช้ path `{student}/{submission}/{answer}/{upload}` และ signed upload จาก server หลังตรวจ attempt/session; migration `20260922005743` ถอน direct browser INSERT/DELETE ของสอง bucket นี้ ส่วน `classroom-post-files` ยังคง RLS จำกัดให้เขียน/ลบเฉพาะโฟลเดอร์ตัวเอง
 - **ลบ bucket ผ่าน migration ไม่ได้** Postgres ปฏิเสธ `DELETE FROM storage.buckets` ตรง ๆ (`Direct deletion from storage tables is not allowed`) ต้องใช้ Storage API — bucket `classroom-post-images` ที่ถูกแทนด้วย `classroom-post-files` จึงลบด้วยวิธีนั้น ส่วน policy ของมันลบใน migration ได้ตามปกติ
 - **`question-images` เคยไม่มีลิมิตและไม่จำกัดชนิดไฟล์เลย** ทั้งที่ UI เขียนว่า "สูงสุด 5 MB" เพราะเป็น bucket เดียวที่ถูกสร้างจากหน้า dashboard ก่อนโปรเจกต์ใช้ CLI — migration `20260828073436` ตั้งค่าให้ตรงกับอีกสองตัว (ลิมิตเป็น 10 MB ไม่ใช่ 5 เพราะ widget ไฟล์แนบโฆษณา 10 MB ไว้ และ PDF ย่อไม่ได้)
 - **รูปถูกย่อในเบราว์เซอร์ก่อนอัปโหลดเสมอ** (`lib/image-downscale.ts`) ลิมิตของ bucket เป็นแค่ตาข่ายรับ ไม่ใช่ทางเดินปกติ

@@ -39,4 +39,6 @@ npm run check:exam-uat
 npm run check:exam-release
 ```
 
-ผล native SEB เก็บแยกใน `config/seb-platform-evidence.json` เพราะต้องผูกกับ production config/BEK gate ส่วน manifest นี้ยืนยัน UX และ flow ภายนอกที่ SEB manifest ไม่ครอบคลุม
+ผล native SEB เก็บแยกใน `config/seb-platform-evidence.json` และต้องอ้าง immutable revision/
+build จาก `config/seb-release-registry.json` เพราะต้องผูกกับ production config/BEK gate
+ส่วน manifest นี้ยืนยัน UX และ flow ภายนอกที่ SEB manifest ไม่ครอบคลุม
