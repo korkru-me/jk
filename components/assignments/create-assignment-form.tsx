@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
+import { newAssignmentTypeDefaults } from '@/lib/assignment-creation'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +23,16 @@ import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
-import type { Classroom, QuestionSet, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
+import type {
+  AssignmentStatus,
+  AssignmentType,
+  Classroom,
+  CompletionRule,
+  QuestionSet,
+  RetryScope,
+  ScoreStrategy,
+  ShowResultsMode,
+} from '@/lib/types'
 import {
   STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN,
   STREAK_CAP_MAX, STREAK_CAP_MIN,
@@ -78,12 +88,21 @@ interface Props {
   questionSets?: AssignmentQuestionSetOption[]
   preselectedClassroomId?: string
   preselectedSet?: AssignmentQuestionSetOption
+  preselectedAssignmentType?: AssignmentType
 }
 
 export function CreateAssignmentForm({
-  classrooms, groupsByClassroom = {}, questions, questionSets = [], preselectedClassroomId, preselectedSet,
+  classrooms,
+  groupsByClassroom = {},
+  questions,
+  questionSets = [],
+  preselectedClassroomId,
+  preselectedSet,
+  preselectedAssignmentType,
 }: Props) {
   const router = useRouter()
+  const initialAssignmentType = preselectedAssignmentType ?? 'exercise'
+  const initialTypeDefaults = newAssignmentTypeDefaults(initialAssignmentType)
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
   const [showPublishDialog, setShowPublishDialog] = useState(false)
@@ -98,7 +117,7 @@ export function CreateAssignmentForm({
   )
   // มอบหมายให้: absent/null per room = นักเรียนทุกคนในห้อง, the default.
   const [groupTargets, setGroupTargets] = useState<GroupTargets>({})
-  const [assignmentType, setAssignmentType] = useState<'exercise' | 'exam'>('exercise')
+  const [assignmentType, setAssignmentType] = useState<AssignmentType>(initialAssignmentType)
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
   // able to block students is not a safe default.
@@ -152,14 +171,14 @@ export function CreateAssignmentForm({
   // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
   // before this setting existed, and one that does is a choice, not a default.
   const [showSolutions, setShowSolutions] = useState(false)
-  const [maxAttempts, setMaxAttempts] = useState('')
+  const [maxAttempts, setMaxAttempts] = useState(initialTypeDefaults.maxAttempts)
   const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
   // On by default: a แบบฝึกหัด a student can retake is nearly always meant as
   // a second chance at what they got wrong, not as the whole set again. A
   // teacher who wants the full set back only has to untick it — and ข้อสอบ,
   // which is one attempt, resets this to 'all' below where it means nothing.
-  const [retryScope, setRetryScope] = useState<RetryScope>('wrong_only')
+  const [retryScope, setRetryScope] = useState<RetryScope>(initialTypeDefaults.retryScope)
   const [questionsPerPage, setQuestionsPerPage] = useState('1')
   // On by default, and the reason a แบบฝึกหัด is not just a ข้อสอบ with more
   // attempts: the student finishes a ข้อ, presses ตรวจ, and finds out there and
@@ -170,8 +189,8 @@ export function CreateAssignmentForm({
   const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(true)
   // Approved defaults for a new online งาน: practice tools start on for an
   // exercise and off for an exam. Existing assignments are never backfilled.
-  const [calculatorEnabled, setCalculatorEnabled] = useState(true)
-  const [scratchpadEnabled, setScratchpadEnabled] = useState(true)
+  const [calculatorEnabled, setCalculatorEnabled] = useState(initialTypeDefaults.mathToolsEnabled)
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(initialTypeDefaults.mathToolsEnabled)
   const [accessCode, setAccessCode] = useState('')
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
   const [fullscreenRequired, setFullscreenRequired] = useState(false)
@@ -300,9 +319,9 @@ export function CreateAssignmentForm({
   }, [maxRandomDraw, randomQuestionCount])
 
   useEffect(() => {
-    const defaultEnabled = assignmentType === 'exercise'
-    setCalculatorEnabled(defaultEnabled)
-    setScratchpadEnabled(defaultEnabled)
+    const defaults = newAssignmentTypeDefaults(assignmentType)
+    setCalculatorEnabled(defaults.mathToolsEnabled)
+    setScratchpadEnabled(defaults.mathToolsEnabled)
   }, [assignmentType])
 
 
@@ -636,41 +655,44 @@ export function CreateAssignmentForm({
             )}
           </Card>
 
-          <Card padding="xl" className="space-y-3">
-            <h2 className="font-semibold text-foreground">ประเภทงาน</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(['exercise', 'exam'] as const).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    setAssignmentType(t)
-                    if (t !== 'exam') {
-                      setSecureBrowserMode('browser')
-                      setAndroidExamMode('blocked')
-                      setSebQuitPassword('')
-                      setSebQuitPasswordConfirmation('')
-                    }
-                    if (attemptsAuto) {
-                      setMaxAttempts(t === 'exam' ? '1' : '')
-                      setRetryScope(t === 'exam' ? 'all' : 'wrong_only')
-                    }
-                  }}
-                  className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
-                    assignmentType === t ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                  }`}
-                >
-                  <div className="text-xl leading-none shrink-0">{t === 'exam' ? '📝' : '🔁'}</div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm text-foreground">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {t === 'exam' ? 'ทำได้ครั้งเดียว' : 'ทำได้หลายครั้ง'}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
+          {!preselectedAssignmentType && (
+            <Card padding="xl" className="space-y-3">
+              <h2 className="font-semibold text-foreground">ประเภทงาน</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(['exercise', 'exam'] as const).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      setAssignmentType(t)
+                      if (t !== 'exam') {
+                        setSecureBrowserMode('browser')
+                        setAndroidExamMode('blocked')
+                        setSebQuitPassword('')
+                        setSebQuitPasswordConfirmation('')
+                      }
+                      if (attemptsAuto) {
+                        const defaults = newAssignmentTypeDefaults(t)
+                        setMaxAttempts(defaults.maxAttempts)
+                        setRetryScope(defaults.retryScope)
+                      }
+                    }}
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
+                      assignmentType === t ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
+                    }`}
+                  >
+                    <div className="text-xl leading-none shrink-0">{t === 'exam' ? '📝' : '🔁'}</div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-foreground">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t === 'exam' ? 'ทำได้ครั้งเดียว' : 'ทำได้หลายครั้ง'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
 
         </div>
       )}

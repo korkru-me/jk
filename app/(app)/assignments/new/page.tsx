@@ -5,16 +5,28 @@ import { redirect } from 'next/navigation'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
 import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import type { AssignmentGroupOption } from '@/components/assignments/group-target-picker'
+import { resolveAssignmentTypePreset } from '@/lib/assignment-creation'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 
 export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
 
 interface Props {
-  searchParams: Promise<{ classroom?: string; set?: string; sections?: string }>
+  searchParams: Promise<{
+    classroom?: string
+    set?: string
+    sections?: string
+    type?: string | string[]
+  }>
 }
 
 export default async function NewAssignmentPage({ searchParams }: Props) {
-  const { classroom: classroomParam, set: setParam, sections: sectionsParam } = await searchParams
+  const {
+    classroom: classroomParam,
+    set: setParam,
+    sections: sectionsParam,
+    type: typeParam,
+  } = await searchParams
+  const preselectedAssignmentType = resolveAssignmentTypePreset(typeParam)
 
   const supabase = await createClient()
   const user = await getAuthUser()
@@ -147,6 +159,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
         questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
         preselectedClassroomId={preselectedClassroomId}
         preselectedSet={preselectedSet}
+        preselectedAssignmentType={preselectedAssignmentType}
       />
     </div>
   )

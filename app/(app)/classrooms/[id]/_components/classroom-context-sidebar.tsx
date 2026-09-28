@@ -1,9 +1,18 @@
 'use client'
 
-import { useId, type ReactNode } from 'react'
+import { Fragment, useId, type ReactNode } from 'react'
 import Link from 'next/link'
-import { BookOpen, ChevronLeft, LayoutDashboard } from 'lucide-react'
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronLeft,
+  ClipboardPenLine,
+  LayoutDashboard,
+  Plus,
+  Repeat2,
+} from 'lucide-react'
 import type { Classroom } from '@/lib/types'
+import { assignmentCreationHref } from '@/lib/assignment-creation'
 import type {
   ClassroomNavigationItem,
   ClassroomNavigationKey,
@@ -11,11 +20,18 @@ import type {
 import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
 
 interface ClassroomContextSidebarProps {
-  classroom: Pick<Classroom, 'name' | 'description' | 'classroom_type'>
+  classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
   backHref: string
   navigationItems: readonly ClassroomNavigationItem[]
   activeItem: ClassroomNavigationKey
@@ -73,25 +89,70 @@ export function ClassroomContextNavigation({
           const selected = item.key === activeItem
 
           return (
-            <Button
-              key={item.key}
-              type="button"
-              variant={selected ? 'navigation' : item.key === 'invite' ? 'outline' : 'ghost'}
-              className={item.key === 'invite' ? 'mt-2 w-full justify-start' : 'w-full justify-start'}
-              aria-current={selected ? 'page' : undefined}
-              onClick={() => {
-                onNavigate(item.key)
-                onClose?.()
-              }}
-            >
-              <Icon data-icon="inline-start" />
-              <span className="truncate">{item.label}</span>
-              {item.key === 'students' && (
-                <Badge variant="secondary" className="ml-auto">
-                  {studentCount}
-                </Badge>
+            <Fragment key={item.key}>
+              <Button
+                type="button"
+                variant={selected ? 'navigation' : item.key === 'invite' ? 'outline' : 'ghost'}
+                className={item.key === 'invite' ? 'mt-2 w-full justify-start' : 'w-full justify-start'}
+                aria-current={selected ? 'page' : undefined}
+                onClick={() => {
+                  onNavigate(item.key)
+                  onClose?.()
+                }}
+              >
+                <Icon data-icon="inline-start" />
+                <span className="truncate">{item.label}</span>
+                {item.key === 'students' && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {studentCount}
+                  </Badge>
+                )}
+              </Button>
+
+              {item.key === 'assignments' && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={(
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start data-popup-open:bg-primary/10 data-popup-open:text-primary"
+                      />
+                    )}
+                  >
+                    <Plus data-icon="inline-start" />
+                    <span className="truncate">มอบหมายงาน</span>
+                    <ChevronDown data-icon="inline-end" className="ml-auto" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        render={(
+                          <Link
+                            href={assignmentCreationHref(classroom.id, 'exercise')}
+                            onClick={onClose}
+                          />
+                        )}
+                      >
+                        <Repeat2 />
+                        แบบฝึกหัด
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        render={(
+                          <Link
+                            href={assignmentCreationHref(classroom.id, 'exam')}
+                            onClick={onClose}
+                          />
+                        )}
+                      >
+                        <ClipboardPenLine />
+                        ข้อสอบ
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-            </Button>
+            </Fragment>
           )
         })}
       </nav>
