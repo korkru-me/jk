@@ -9,6 +9,7 @@ import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
 import { Card } from '@/components/ui/card'
 import { displayDescription } from './_components/classroom-meta'
+import { withBackHref } from '@/lib/back-link'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { getStudentGroups } from '@/lib/classroom-groups-server'
 
@@ -155,7 +156,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                 {homeroomClassrooms.map(c => (
                   <Link
                     key={c.id}
-                    href={`/classrooms/${c.id}`}
+                    href={withBackHref(`/classrooms/${c.id}`, '/classrooms')}
                     className="flex items-center gap-5 bg-surface-inverse rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
@@ -189,7 +190,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                 return (
                   <Link
                     key={c.id}
-                    href={`/classrooms/${c.id}`}
+                    href={withBackHref(`/classrooms/${c.id}`, '/classrooms')}
                     className="block p-5 bg-card border rounded-2xl hover:border-primary/20 dark:hover:border-primary hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between gap-2">

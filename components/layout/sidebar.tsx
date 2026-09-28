@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { isClassroomDetailPath } from '@/lib/classroom-navigation'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -86,10 +87,11 @@ function isNavActive(pathname: string, href: string): boolean {
  * a page is added. (The newer interpolate-size/calc-size route does the same
  * job but is Chrome/Edge only — on Safari and Firefox it would snap open.)
  */
-function NavGroupItem({ group, pathname, onNavigate }: {
+function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }: {
   group: NavGroup
   pathname: string
   onNavigate?: () => void
+  compactOnDesktop?: boolean
 }) {
   const hasActiveChild = group.children.some(child => isNavActive(pathname, child.href))
   const [override, setOverride] = useState<boolean | null>(null)
@@ -103,20 +105,23 @@ function NavGroupItem({ group, pathname, onNavigate }: {
         onClick={() => setOverride(!open)}
         aria-expanded={open}
         aria-controls={panelId}
+        title={compactOnDesktop ? group.label : undefined}
         className={cn(
           'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
           hasActiveChild
             ? 'text-primary'
-            : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+            : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+          compactOnDesktop && 'md:justify-center md:px-2'
         )}
       >
         <span className="text-base">{group.icon}</span>
-        {group.label}
+        <span className={cn(compactOnDesktop && 'md:sr-only')}>{group.label}</span>
         <ChevronDown
           aria-hidden="true"
           className={cn(
             'ml-auto size-4 transition-transform duration-200 motion-reduce:transition-none',
-            open && 'rotate-180'
+            open && 'rotate-180',
+            compactOnDesktop && 'md:hidden'
           )}
         />
       </button>
@@ -134,21 +139,26 @@ function NavGroupItem({ group, pathname, onNavigate }: {
         <div className="overflow-hidden">
           {/* Indented under the heading, with a rail so the nesting reads at a
               glance rather than only from the padding. */}
-          <div className="ml-6 mt-1 space-y-1 border-l pl-2">
+          <div className={cn(
+            'ml-6 mt-1 space-y-1 border-l pl-2',
+            compactOnDesktop && 'md:ml-0 md:border-l-0 md:pl-0'
+          )}>
             {group.children.map(child => (
               <Link
                 key={child.href}
                 href={child.href}
                 onClick={onNavigate}
+                title={compactOnDesktop ? child.label : undefined}
                 className={cn(
                   'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   isNavActive(pathname, child.href)
                     ? 'bg-primary/10 text-primary'
-                    : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+                    : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                  compactOnDesktop && 'md:justify-center md:px-2'
                 )}
               >
                 <span className="text-sm">{child.icon}</span>
-                {child.label}
+                <span className={cn(compactOnDesktop && 'md:sr-only')}>{child.label}</span>
               </Link>
             ))}
           </div>
@@ -169,6 +179,7 @@ interface SidebarProps {
 export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = false }: SidebarProps) {
   const pathname = usePathname()
   const navItems = role === 'teacher' || role === 'admin' ? teacherNav : studentNav
+  const compactOnDesktop = (role === 'teacher' || role === 'admin') && isClassroomDetailPath(pathname)
 
   return (
     <aside className={cn(
@@ -176,11 +187,14 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
       'fixed inset-y-0 left-0 z-30 transition-[width,transform] duration-200 ease-in-out',
       'md:static',
       isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0',
-      collapsed ? 'md:w-0 md:border-r-0' : 'md:w-64',
+      collapsed ? 'md:w-0 md:border-r-0' : compactOnDesktop ? 'md:w-20' : 'md:w-64',
     )}>
-      <div className="w-64 h-full flex flex-col">
+      <div className={cn('w-64 h-full flex flex-col', compactOnDesktop && 'md:w-20')}>
         {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b shrink-0">
+        <div className={cn(
+          'h-16 flex items-center px-5 border-b shrink-0',
+          compactOnDesktop && 'md:justify-center md:px-2'
+        )}>
           <Link href="/dashboard" onClick={onClose}>
             <Image
               src="/logo.png"
@@ -196,21 +210,31 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map((entry) => (
             isGroup(entry)
-              ? <NavGroupItem key={entry.label} group={entry} pathname={pathname} onNavigate={onClose} />
+              ? (
+                <NavGroupItem
+                  key={entry.label}
+                  group={entry}
+                  pathname={pathname}
+                  onNavigate={onClose}
+                  compactOnDesktop={compactOnDesktop}
+                />
+              )
               : (
                 <Link
                   key={entry.href}
                   href={entry.href}
                   onClick={onClose}
+                  title={compactOnDesktop ? entry.label : undefined}
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                     isNavActive(pathname, entry.href)
                       ? 'bg-primary/10 text-primary'
-                      : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+                      : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                    compactOnDesktop && 'md:justify-center md:px-2'
                   )}
                 >
                   <span className="text-base">{entry.icon}</span>
-                  {entry.label}
+                  <span className={cn(compactOnDesktop && 'md:sr-only')}>{entry.label}</span>
                 </Link>
               )
           ))}
@@ -222,21 +246,25 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
             <Link
               href="/admin"
               onClick={onClose}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20"
+              title={compactOnDesktop ? 'Admin Panel' : undefined}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20',
+                compactOnDesktop && 'md:justify-center md:px-2'
+              )}
             >
               <span className="text-base">⚙️</span>
-              Admin Panel
+              <span className={cn(compactOnDesktop && 'md:sr-only')}>Admin Panel</span>
             </Link>
           </div>
         )}
 
         {/* User info */}
-        <div className="p-4 border-t shrink-0">
-          <div className="flex items-center gap-3">
+        <div className={cn('p-4 border-t shrink-0', compactOnDesktop && 'md:px-2')}>
+          <div className={cn('flex items-center gap-3', compactOnDesktop && 'md:justify-center')}>
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
               {fullName.charAt(0)}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className={cn('flex-1 min-w-0', compactOnDesktop && 'md:sr-only')}>
               <p className="text-sm font-medium truncate">{fullName}</p>
               <p className="text-xs text-muted-foreground">
                 {role === 'teacher' ? 'ครู' : role === 'student' ? 'นักเรียน' : 'Admin'}

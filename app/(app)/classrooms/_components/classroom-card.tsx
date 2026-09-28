@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Users, BookOpen, TrendingUp, Check, Pin, PinOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
 import { parseDescription, coverOf, displayDescription } from './classroom-meta'
 
@@ -188,7 +189,7 @@ export function ClassroomCard({
 
   return (
     <Link
-      href={`/classrooms/${classroom.id}`}
+      href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms')}
       className={cn(
         'group block bg-card rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden',
         isPinned ? 'ring-2 ring-warning/40' : 'ring-1 ring-border'

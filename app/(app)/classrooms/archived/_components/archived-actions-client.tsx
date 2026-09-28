@@ -7,6 +7,7 @@ import { RotateCcw, Trash2, BookOpen } from 'lucide-react'
 import { restoreClassroom, deleteClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { withBackHref } from '@/lib/back-link'
 
 export function ArchivedActionsClient({ classroom }: { classroom: Classroom }) {
   const [isPending, startTransition] = useTransition()
@@ -41,7 +42,7 @@ export function ArchivedActionsClient({ classroom }: { classroom: Classroom }) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Link
-          href={`/classrooms/${classroom.id}`}
+          href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms/archived')}
           className="text-xs text-primary hover:underline px-2 py-1"
         >
           ดูข้อมูล

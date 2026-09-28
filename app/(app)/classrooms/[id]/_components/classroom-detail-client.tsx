@@ -1,15 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
-  Users, BookOpen, Copy, Check,
-  GraduationCap, UserPlus, Grid3x3, ChevronLeft,
-  ClipboardList, CalendarDays, Home, LayoutDashboard, ChartColumnIncreasing,
+  Users, BookOpen, Copy, Check, Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
@@ -22,7 +19,17 @@ import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { IconButton } from '@/components/ui/icon-button'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
+import {
+  classroomNavigationHref,
+  classroomNavigationFor,
+  resolveClassroomNavigationKey,
+  type ClassroomNavigationKey,
+} from '@/lib/classroom-navigation'
 import type { GroupState } from './breakout-groups'
+import {
+  ClassroomContextDrawer,
+  ClassroomContextSidebar,
+} from './classroom-context-sidebar'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -49,27 +56,6 @@ const StudentAbilityTab = dynamic(
 )
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
-
-type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'ability' | 'homeroom' | 'groups' | 'invite' | 'coteachers'
-
-const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
-  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
-  { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
-  { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
-  { key: 'ability',     label: 'ศักยภาพผู้เรียน',   icon: ChartColumnIncreasing, managerOnly: true },
-  { key: 'students',    label: 'นักเรียน',        icon: Users },
-  { key: 'groups',      label: 'กลุ่มย่อย',       icon: Grid3x3 },
-  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
-  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-]
-
-const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
-  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
-  { key: 'homeroom',    label: 'การบ้านนักเรียน', icon: CalendarDays, managerOnly: true },
-  { key: 'students',    label: 'นักเรียน',        icon: Users },
-  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
-  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-]
 
 interface RealStudent { id: string; full_name: string; email: string }
 
@@ -112,6 +98,8 @@ interface Props {
   /** กลุ่มย่อย of this room, and each student's group (student id → group id). */
   groups: ClassroomGroup[]
   groupMembers: Record<string, string>
+  initialNavigationItem: ClassroomNavigationKey
+  backHref: string
 }
 
 export function ClassroomDetailClient({
@@ -119,11 +107,14 @@ export function ClassroomDetailClient({
   classroomAssignments, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewCount, pendingReviewCapped, pendingReviewByAssignment, seenByPost, crossPostTargets,
-  groups, groupMembers,
+  groups, groupMembers, initialNavigationItem, backHref,
 }: Props) {
   const isHomeroom = classroom.classroom_type === 'homeroom'
-  const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const navigationItems = useMemo(
+    () => classroomNavigationFor(classroom.classroom_type, canManage),
+    [classroom.classroom_type, canManage],
+  )
+  const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
   const [codeCopied, setCodeCopied] = useState(false)
   const savedCover = coverOf(parseDescription(classroom.description))
   // A chosen cover paints the banner as a tinted surface whose text is the same
@@ -163,6 +154,24 @@ export function ClassroomDetailClient({
     return map
   }, [classroomAssignments])
 
+  const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
+    setActiveTab(nextItem)
+
+    const nextUrl = classroomNavigationHref(window.location.href, nextItem)
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
+  }, [])
+
+  useEffect(() => {
+    function syncNavigationFromHistory() {
+      const params = new URLSearchParams(window.location.search)
+      setActiveTab(resolveClassroomNavigationKey(params.get('view'), navigationItems))
+    }
+
+    window.addEventListener('popstate', syncNavigationFromHistory)
+    return () => window.removeEventListener('popstate', syncNavigationFromHistory)
+  }, [navigationItems])
+
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortDir(d => (studentSortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
     setStudentSortKey(key)
@@ -177,11 +186,28 @@ export function ClassroomDetailClient({
   }
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
-      {/* Back link */}
-      <Link href="/classrooms" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
-        <ChevronLeft className="w-4 h-4" /> ห้องเรียนทั้งหมด
-      </Link>
+    <div className="flex items-start gap-6">
+      <ClassroomContextSidebar
+        classroom={classroom}
+        backHref={backHref}
+        navigationItems={navigationItems}
+        activeItem={activeTab}
+        studentCount={students.length}
+        onNavigate={navigateTo}
+        managementActions={isOwner
+          ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
+          : undefined}
+      />
+
+      <div className="flex min-w-0 max-w-[1200px] flex-1 flex-col gap-6">
+        <ClassroomContextDrawer
+          classroom={classroom}
+          backHref={backHref}
+          navigationItems={navigationItems}
+          activeItem={activeTab}
+          studentCount={students.length}
+          onNavigate={navigateTo}
+        />
 
       {/* Header card */}
       <div
@@ -235,41 +261,10 @@ export function ClassroomDetailClient({
 
         {/* Owner actions */}
         {isOwner && (
-          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-white/10">
+          <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4 lg:hidden">
             <ClassroomSettingsDialog classroom={classroom} onCover={!!savedCover} />
-            <div className="ml-auto">
-              <DeleteClassroomButton id={classroom.id} />
-            </div>
           </div>
         )}
-      </div>
-
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1 overflow-x-auto">
-        {TABS.filter(tab => !tab.managerOnly || canManage).map(tab => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                activeTab === tab.key
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-muted-foreground hover:bg-card/50'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.key === 'students' && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  {students.length}
-                </span>
-              )}
-            </button>
-          )
-        })}
       </div>
 
       {/* Tab content */}
@@ -289,7 +284,7 @@ export function ClassroomDetailClient({
             crossPostTargets={crossPostTargets}
             canManage={canManage}
             audienceByAssignment={audienceByAssignment}
-            onNavigate={(target: OverviewTarget) => setActiveTab(target)}
+            onNavigate={(target: OverviewTarget) => navigateTo(target)}
           />
         )}
         {activeTab === 'students' && (
@@ -314,7 +309,7 @@ export function ClassroomDetailClient({
             audienceByAssignment={audienceByAssignment}
             groupNameById={groupNameById}
             pendingReviewByAssignment={pendingReviewByAssignment}
-            onViewScores={() => setActiveTab('scores')}
+            onViewScores={() => navigateTo('scores')}
           />
         )}
         {activeTab === 'scores' && canManage && (
@@ -330,7 +325,7 @@ export function ClassroomDetailClient({
             groupNameById={groupNameById}
             sortKey={studentSortKey}
             sortDir={studentSortDir}
-            onViewStudents={() => setActiveTab('students')}
+            onViewStudents={() => navigateTo('students')}
           />
         )}
         {activeTab === 'ability' && canManage && (
@@ -379,6 +374,7 @@ export function ClassroomDetailClient({
             />
           </div>
         )}
+      </div>
       </div>
     </div>
   )

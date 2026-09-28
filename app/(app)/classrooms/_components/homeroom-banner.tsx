@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Home, Users, Check, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Classroom } from '@/lib/types'
+import { withBackHref } from '@/lib/back-link'
 import { parseDescription, coverOf, displayDescription } from './classroom-meta'
 
 interface Props {
@@ -88,7 +89,7 @@ export function HomeroomBanner({ classroom, studentCount, isSelecting = false, i
   }
 
   return (
-    <Link href={`/classrooms/${classroom.id}`} className="block hover:opacity-90 transition-opacity">
+    <Link href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms')} className="block hover:opacity-90 transition-opacity">
       {body}
     </Link>
   )
