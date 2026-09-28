@@ -21,7 +21,8 @@ import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStuden
 import { sortStudents } from '@/lib/student-sort'
 import { ScoreEditor } from '@/components/assignments/score-editor'
 import { Card } from '@/components/ui/card'
-import { containsMath, renderMathInHtml } from '@/lib/math/latex'
+import { containsMath } from '@/lib/math/latex'
+import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 import { MATH_WORK_BUCKET } from '@/lib/math-work'
 import { shouldOfferSebExit } from '@/lib/seb-exit'
@@ -1242,7 +1243,7 @@ function formatAnswerDisplay(val: string): string {
 function UnitText({ html }: { html: string }) {
   const isHtml = /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
   if (isHtml) {
-    return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
+    return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(html) }} />
   }
   return <>{html}</>
 }
@@ -1257,7 +1258,7 @@ function substituteVars(text: string, values: Record<string, number>) {
 function QuestionText({ text, className }: { text: string; className?: string }) {
   const isHtml = /<[a-z][\s\S]*>/i.test(text) || containsMath(text)
   if (isHtml) {
-    return <div className={`rich-text-content ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
+    return <div className={`rich-text-content ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }} />
   }
   return <p className={`whitespace-pre-line ${className ?? ''}`}>{text}</p>
 }

@@ -65,4 +65,16 @@ describe('renderMathInHtml', () => {
     const html = '<p>ค่าไฟ $5 ต่อหน่วย</p>'
     expect(renderMathInHtml(html)).toBe(html)
   })
+
+  it('renders TeX in text only, never inside a tag', () => {
+    // KaTeX markup spliced into an attribute would break the tag open.
+    const out = renderMathInHtml('<p><img src="https://x.supabase.co/a.png" alt="\\(x\\)"> \\(y\\)</p>')
+    expect(out).toContain('<img src="https://x.supabase.co/a.png" alt="\\(x\\)">')
+    expect(out.match(/class="katex"/g)?.length).toBe(1)
+  })
+
+  it('leaves a formula split across tags as typed', () => {
+    const html = '<p>\\(x<strong>2</strong>\\)</p>'
+    expect(renderMathInHtml(html)).toBe(html)
+  })
 })
