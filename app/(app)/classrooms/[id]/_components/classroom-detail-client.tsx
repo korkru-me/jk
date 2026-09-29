@@ -332,6 +332,7 @@ export function ClassroomDetailClient({
             classroomName={classroom.name}
             students={students}
             assignments={classroomAssignments}
+            categories={assignmentCategories}
             submissions={classroomSubmissions}
             extensions={classroomExtensions}
             profiles={studentProfiles}

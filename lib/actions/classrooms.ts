@@ -260,16 +260,39 @@ async function canManageClassroom(admin: ReturnType<typeof createAdminClient>, c
   return coTeacher?.permission === 'admin' || coTeacher?.permission === 'manage'
 }
 
-export async function setAssignmentDisplayOrder(classroomId: string, assignmentId: string, order: number | null) {
+export async function reorderAssignmentDisplayOrder(classroomId: string, orderedAssignmentIds: string[]) {
   const user = await getAuthUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (orderedAssignmentIds.length === 0 || orderedAssignmentIds.length > 500) {
+    return { error: 'รายการงานไม่ถูกต้อง กรุณาลองใหม่' }
+  }
+  const uniqueIds = [...new Set(orderedAssignmentIds)]
+  if (uniqueIds.length !== orderedAssignmentIds.length || uniqueIds.some(id => typeof id !== 'string' || !id)) {
+    return { error: 'รายการงานไม่ถูกต้อง กรุณาลองใหม่' }
+  }
+
   const admin = createAdminClient()
   if (!(await canManageClassroom(admin, classroomId, user.id))) return { error: 'ไม่มีสิทธิ์' }
+
+  const { data: links, error: linkError } = await admin
+    .from('assignment_classrooms')
+    .select('id, assignment_id')
+    .eq('classroom_id', classroomId)
+    .in('assignment_id', uniqueIds)
+  if (linkError) return { error: linkError.message }
+  if (!links || links.length !== uniqueIds.length) {
+    return { error: 'มีรายการงานเปลี่ยนแปลง กรุณารีเฟรชแล้วลองจัดลำดับอีกครั้ง' }
+  }
+
+  const linkByAssignment = new Map(links.map(link => [link.assignment_id, link.id]))
   const { error } = await admin
     .from('assignment_classrooms')
-    .update({ display_order: order })
-    .eq('classroom_id', classroomId)
-    .eq('assignment_id', assignmentId)
+    .upsert(orderedAssignmentIds.map((assignmentId, index) => ({
+      id: linkByAssignment.get(assignmentId)!,
+      assignment_id: assignmentId,
+      classroom_id: classroomId,
+      display_order: index + 1,
+    })), { onConflict: 'id' })
   if (error) return { error: error.message }
   revalidatePath(`/classrooms/${classroomId}`)
   return { success: true }
