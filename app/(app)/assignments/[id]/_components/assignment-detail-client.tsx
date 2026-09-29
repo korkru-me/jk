@@ -11,6 +11,7 @@ import {
   FileClock, Presentation, ClipboardCheck, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
 import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { Assignment, Question } from '@/lib/types'
@@ -27,9 +28,7 @@ const STATUS_META = {
   closed:    { label: 'ปิดแล้ว',      color: 'bg-destructive/10 text-destructive',     dot: 'bg-destructive' },
 } as const
 
-type Tab = 'overview' | 'questions' | 'students' | 'analytics'
-
-const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
+const TABS: { key: string; label: string; icon: typeof Users }[] = [
   { key: 'overview',   label: 'ภาพรวม',   icon: Activity },
   { key: 'questions',  label: 'โจทย์',    icon: FileText },
   { key: 'students',   label: 'นักเรียน', icon: Users },
@@ -55,7 +54,6 @@ function seedRand(str: string, i: number) {
 export function AssignmentDetailClient({
   assignment: a, questions, submissions, pendingSubmissionIds, pendingReviewCapped,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [isPending, startTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
@@ -111,7 +109,7 @@ export function AssignmentDetailClient({
   }
 
   return (
-    <div className="space-y-6 max-w-[1100px]">
+    <div className="flex max-w-[1200px] flex-col gap-6">
       {/* Back — returns to the classroom this was assigned from */}
       <Link
         href={`/classrooms/${a.classroom_id}`}
@@ -121,7 +119,7 @@ export function AssignmentDetailClient({
       </Link>
 
       {/* Header card */}
-      <div className="bg-surface-inverse text-surface-inverse-foreground rounded-2xl p-6">
+      <Card edge="border" padding="xl" className="border-primary/20 bg-primary/10 text-foreground">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
@@ -141,35 +139,35 @@ export function AssignmentDetailClient({
               )}
             </div>
             <h1 className="text-2xl font-bold leading-tight">{a.title}</h1>
-            {a.classrooms?.name && <p className="text-surface-inverse-muted text-sm mt-1">{a.classrooms.name}</p>}
-            {a.description && <p className="text-surface-inverse-muted text-sm mt-1">{a.description}</p>}
+            {a.classrooms?.name && <p className="mt-1 text-sm text-muted-foreground">{a.classrooms.name}</p>}
+            {a.description && <p className="mt-1 text-sm text-muted-foreground">{a.description}</p>}
 
             {/* Quick stats */}
             <div className="flex items-center gap-5 mt-4 text-sm">
               <div className="flex items-center gap-2" title={a.random_question_count ? `สุ่มจากคลัง ${a.question_ids.length} ข้อ` : undefined}>
-                <FileText className="w-4 h-4 text-surface-inverse-muted" />
+                <FileText className="size-4 text-primary" />
                 <span className="font-semibold">
                   {a.random_question_count ? `${a.random_question_count}/${a.question_ids.length}` : a.question_ids.length}
                 </span>
-                <span className="text-surface-inverse-muted">{a.random_question_count ? 'ข้อสุ่ม/คลัง' : 'ข้อ'}</span>
+                <span className="text-muted-foreground">{a.random_question_count ? 'ข้อสุ่ม/คลัง' : 'ข้อ'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-surface-inverse-muted" />
+                <Users className="size-4 text-primary" />
                 <span className="font-semibold">{submittedSubs.length}</span>
-                <span className="text-surface-inverse-muted">ส่งแล้ว</span>
+                <span className="text-muted-foreground">ส่งแล้ว</span>
               </div>
               {a.duration_minutes && (
                 <div className="flex items-center gap-2">
-                  <Timer className="w-4 h-4 text-surface-inverse-muted" />
+                  <Timer className="size-4 text-primary" />
                   <span className="font-semibold">{a.duration_minutes}</span>
-                  <span className="text-surface-inverse-muted">นาที</span>
+                  <span className="text-muted-foreground">นาที</span>
                 </div>
               )}
               {avgScore !== null && (
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-surface-inverse-muted" />
+                  <TrendingUp className="size-4 text-primary" />
                   <span className="font-semibold">{avgScore}%</span>
-                  <span className="text-surface-inverse-muted">เฉลี่ย</span>
+                  <span className="text-muted-foreground">เฉลี่ย</span>
                 </div>
               )}
             </div>
@@ -180,13 +178,13 @@ export function AssignmentDetailClient({
             <div className="shrink-0 text-right">
               {a.start_at && (
                 <div className="mb-1">
-                  <p className="text-xs text-surface-inverse-muted">เปิด</p>
+                  <p className="text-xs text-muted-foreground">เปิด</p>
                   <p className="text-sm font-medium">{new Date(a.start_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}</p>
                 </div>
               )}
               {a.end_at && (
                 <div>
-                  <p className="text-xs text-surface-inverse-muted">ปิด</p>
+                  <p className="text-xs text-muted-foreground">ปิด</p>
                   <p className="text-sm font-medium">{new Date(a.end_at).toLocaleDateString('th-TH', { dateStyle: 'medium' })}</p>
                 </div>
               )}
@@ -194,93 +192,7 @@ export function AssignmentDetailClient({
           )}
         </div>
 
-        {/* Actions row */}
-        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-surface-inverse-border flex-wrap">
-          {a.status === 'draft' && (
-            <Button onClick={publish} disabled={isPending} size="sm" className="gap-1.5 bg-success hover:bg-success/90 border-0">
-              <Play className="w-3.5 h-3.5" /> เผยแพร่
-            </Button>
-          )}
-          {a.status === 'published' && (
-            <Button onClick={close} disabled={isPending} size="sm" variant="destructive" className="gap-1.5">
-              <Square className="w-3.5 h-3.5" /> ปิดการสอบ
-            </Button>
-          )}
-          {a.mode === 'online' && a.question_ids.length > 0 && (
-            <Link href={`/assignments/${a.id}/preview`} target="_blank">
-              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-                <Eye className="w-3.5 h-3.5" /> ดูตัวอย่างมุมมองนักเรียน
-              </Button>
-            </Link>
-          )}
-          {a.question_ids.length > 0 && (
-            <Link href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)} target="_blank">
-              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-                <Presentation className="w-3.5 h-3.5" /> โหมดสอน
-              </Button>
-            </Link>
-          )}
-          {a.mode === 'online' && a.type === 'exam' && (
-            <Link href={`/assignments/${a.id}/proctor`}>
-              <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-                <Radio className="w-3.5 h-3.5" /> ห้องคุมสอบสด
-              </Button>
-            </Link>
-          )}
-          {a.mode === 'online' && a.type === 'exam' && (
-            <Button
-              nativeButton={false}
-              size="sm"
-              variant="outline"
-              render={<Link href={`/assignments/${a.id}/proctor/report`} />}
-              className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent"
-            >
-              <FileClock className="w-3.5 h-3.5" /> รายงานคุมสอบ
-            </Button>
-          )}
-          <Link href={`/assignments/${a.id}/edit`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-              <Pencil className="w-3.5 h-3.5" /> แก้ไขรายละเอียด
-            </Button>
-          </Link>
-          {/* The way in to scoring by hand. Solid, and first among the
-              outline buttons, whenever something is actually waiting — that
-              is the one action a teacher comes to this page to take. */}
-          <Link href={gradeHref}>
-            <Button
-              size="sm"
-              className={pendingCount > 0
-                ? 'gap-1.5 border-0 bg-warning text-warning-foreground hover:bg-warning/90'
-                : 'gap-1.5 border-surface-inverse-border bg-transparent text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'}
-              variant={pendingCount > 0 ? 'default' : 'outline'}
-            >
-              <ClipboardCheck className="w-3.5 h-3.5" />
-              {pendingCount > 0
-                ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
-                : 'ตรวจให้คะแนน / ดูคำตอบ'}
-            </Button>
-          </Link>
-          <Link href={`/assignments/${a.id}/analytics`}>
-            <Button size="sm" variant="outline" className="gap-1.5 border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground bg-transparent">
-              <TrendingUp className="w-3.5 h-3.5" /> วิเคราะห์เชิงลึก
-            </Button>
-          </Link>
-          <button
-            onClick={handleDuplicate}
-            disabled={isPending}
-            className="ml-auto flex items-center gap-1.5 text-xs text-surface-inverse-foreground/70 hover:text-surface-inverse-foreground transition-colors disabled:opacity-50"
-          >
-            <Copy className="w-3.5 h-3.5" /> ทำสำเนา
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={isPending}
-            className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="w-3.5 h-3.5" /> ลบ
-          </button>
-        </div>
-      </div>
+      </Card>
 
       {a.status === 'draft' && a.secure_browser_mode === 'seb_required' && (
         <div className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -299,56 +211,160 @@ export function AssignmentDetailClient({
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1">
-        {TABS.map(tab => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                activeTab === tab.key
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-muted-foreground hover:bg-card/50'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.key === 'students' && submissions.length > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
-                }`}>{submissions.length}</span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      <Tabs
+        defaultValue="overview"
+        orientation="vertical"
+        className="flex flex-col gap-4 md:grid md:grid-cols-[15rem_minmax(0,1fr)] md:items-start md:gap-6"
+      >
+        <aside className="flex min-w-0 flex-col gap-4 md:sticky md:top-4">
+          <div>
+            <p className="mb-2 hidden px-2 text-xs font-semibold text-muted-foreground md:block">
+              ในหน้านี้
+            </p>
+            <TabsList className="flex h-auto w-full max-w-full !flex-row justify-start overflow-x-auto rounded-xl border border-primary/15 bg-primary/5 p-1.5 md:!flex-col md:items-stretch md:overflow-visible">
+              {TABS.map(tab => {
+                const Icon = tab.icon
+                return (
+                  <TabsTrigger
+                    key={tab.key}
+                    value={tab.key}
+                    className="group/tab h-auto !w-auto shrink-0 justify-start rounded-lg px-3 py-2.5 data-active:bg-primary data-active:text-primary-foreground md:!w-full"
+                  >
+                    <Icon data-icon="inline-start" />
+                    {tab.label}
+                    {tab.key === 'students' && submissions.length > 0 && (
+                      <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground group-data-active/tab:bg-primary-foreground/15 group-data-active/tab:text-primary-foreground">
+                        {submissions.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
+          </div>
 
-      {/* Tab content */}
-      <div>
-        {activeTab === 'overview' && (
-          <OverviewTab
-            a={a}
-            submittedCount={submittedSubs.length}
-            inProgressCount={inProgressSubs.length}
-            totalSubs={submissions.length}
-            avgScore={avgScore}
-            pendingCount={pendingCount}
-            pendingReviewCapped={pendingReviewCapped}
-            gradeHref={gradeHref}
-          />
-        )}
-        {activeTab === 'questions' && (
-          <QuestionsTab
-            questions={questions}
-            sections={parseSections(a.sections)}
-            showSections={a.show_sections !== false}
-          />
-        )}
-        {activeTab === 'students' && <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />}
-        {activeTab === 'analytics' && <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />}
-      </div>
+          <section aria-label="การทำงาน">
+            <p className="mb-2 hidden px-2 text-xs font-semibold text-muted-foreground md:block">
+              การทำงาน
+            </p>
+            <Card radius="md" padding="sm" className="flex gap-1.5 overflow-x-auto md:flex-col md:overflow-visible">
+              {a.status === 'draft' && (
+                <Button onClick={publish} disabled={isPending} size="xs" className="shrink-0 justify-start border-0 bg-success text-success-foreground hover:bg-success/90 md:w-full">
+                  <Play data-icon="inline-start" /> เผยแพร่
+                </Button>
+              )}
+              {a.status === 'published' && (
+                <Button onClick={close} disabled={isPending} size="xs" variant="destructive" className="shrink-0 justify-start md:w-full">
+                  <Square data-icon="inline-start" /> ปิดการสอบ
+                </Button>
+              )}
+              {a.mode === 'online' && a.question_ids.length > 0 && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  render={<Link href={`/assignments/${a.id}/preview`} target="_blank" />}
+                  className="shrink-0 justify-start md:w-full"
+                >
+                  <Eye data-icon="inline-start" /> ดูตัวอย่างมุมมองนักเรียน
+                </Button>
+              )}
+              {a.question_ids.length > 0 && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  render={<Link href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)} target="_blank" />}
+                  className="shrink-0 justify-start md:w-full"
+                >
+                  <Presentation data-icon="inline-start" /> โหมดสอน
+                </Button>
+              )}
+              {a.mode === 'online' && a.type === 'exam' && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  render={<Link href={`/assignments/${a.id}/proctor`} />}
+                  className="shrink-0 justify-start md:w-full"
+                >
+                  <Radio data-icon="inline-start" /> ห้องคุมสอบสด
+                </Button>
+              )}
+              {a.mode === 'online' && a.type === 'exam' && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  render={<Link href={`/assignments/${a.id}/proctor/report`} />}
+                  className="shrink-0 justify-start md:w-full"
+                >
+                  <FileClock data-icon="inline-start" /> รายงานคุมสอบ
+                </Button>
+              )}
+              <Button
+                size="xs"
+                variant="outline"
+                render={<Link href={`/assignments/${a.id}/edit`} />}
+                className="shrink-0 justify-start md:w-full"
+              >
+                <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
+              </Button>
+              <Button
+                size="xs"
+                className={pendingCount > 0
+                  ? 'shrink-0 justify-start border-0 bg-warning text-warning-foreground hover:bg-warning/90 md:w-full'
+                  : 'shrink-0 justify-start md:w-full'}
+                variant={pendingCount > 0 ? 'default' : 'outline'}
+                render={<Link href={gradeHref} />}
+              >
+                <ClipboardCheck data-icon="inline-start" />
+                {pendingCount > 0
+                  ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
+                  : 'ตรวจให้คะแนน / ดูคำตอบ'}
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                render={<Link href={`/assignments/${a.id}/analytics`} />}
+                className="shrink-0 justify-start md:w-full"
+              >
+                <TrendingUp data-icon="inline-start" /> วิเคราะห์เชิงลึก
+              </Button>
+              <Button onClick={handleDuplicate} disabled={isPending} size="xs" variant="ghost" className="shrink-0 justify-start md:w-full">
+                <Copy data-icon="inline-start" /> ทำสำเนา
+              </Button>
+              <Button onClick={handleDelete} disabled={isPending} size="xs" variant="destructive" className="shrink-0 justify-start md:w-full">
+                <Trash2 data-icon="inline-start" /> ลบ
+              </Button>
+            </Card>
+          </section>
+        </aside>
+
+        <div className="min-w-0">
+          <TabsContent value="overview">
+            <OverviewTab
+              a={a}
+              submittedCount={submittedSubs.length}
+              inProgressCount={inProgressSubs.length}
+              totalSubs={submissions.length}
+              avgScore={avgScore}
+              pendingCount={pendingCount}
+              pendingReviewCapped={pendingReviewCapped}
+              gradeHref={gradeHref}
+            />
+          </TabsContent>
+          <TabsContent value="questions">
+            <QuestionsTab
+              questions={questions}
+              sections={parseSections(a.sections)}
+              showSections={a.show_sections !== false}
+            />
+          </TabsContent>
+          <TabsContent value="students">
+            <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />
+          </TabsContent>
+          <TabsContent value="analytics">
+            <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />
+          </TabsContent>
+        </div>
+      </Tabs>
       {confirmDialog}
     </div>
   )

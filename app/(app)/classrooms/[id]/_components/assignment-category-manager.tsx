@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
-import { Check, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useMemo, useRef, useState, useTransition } from 'react'
+import { Check, ChevronDown, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
@@ -55,6 +55,7 @@ export function AssignmentCategoryManager({
   const [colorPickerTarget, setColorPickerTarget] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
+  const activeEditorRef = useRef<string | null>(null)
 
   const sorted = useMemo(
     () => [...categories].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, 'th')),
@@ -62,6 +63,7 @@ export function AssignmentCategoryManager({
   )
 
   function resetEditor() {
+    activeEditorRef.current = null
     setEditingId(null)
     setCreating(false)
     setName('')
@@ -69,6 +71,7 @@ export function AssignmentCategoryManager({
   }
 
   function beginCreate() {
+    activeEditorRef.current = NEW_CATEGORY
     setEditingId(null)
     setCreating(true)
     setName(defaultAssignmentCategoryName(categories.map(category => category.name)))
@@ -77,6 +80,7 @@ export function AssignmentCategoryManager({
   }
 
   function beginEdit(category: AssignmentCategory, showColors = false) {
+    activeEditorRef.current = category.id
     setCreating(false)
     setEditingId(category.id)
     setName(category.name)
@@ -92,19 +96,24 @@ export function AssignmentCategoryManager({
     setColorPickerTarget(current => current === category.id ? null : category.id)
   }
 
-  function saveEdit() {
+  function saveEdit(nextColor = color) {
     if (!editingId) return
     const trimmed = name.trim()
     if (!trimmed) return
     const categoryId = editingId
+    const original = categories.find(category => category.id === categoryId)
+    if (original?.name === trimmed && original.color === nextColor) {
+      if (activeEditorRef.current === categoryId) resetEditor()
+      return
+    }
     startTransition(async () => {
-      const result = await updateAssignmentCategory(classroomId, categoryId, { name: trimmed, color })
+      const result = await updateAssignmentCategory(classroomId, categoryId, { name: trimmed, color: nextColor })
       if (!result.ok) {
         toast.error(result.error)
         return
       }
       onChange(categories.map(category => category.id === result.category.id ? result.category : category))
-      resetEditor()
+      if (activeEditorRef.current === categoryId) resetEditor()
       toast.success('แก้ไขหมวดงานแล้ว')
     })
   }
@@ -164,7 +173,7 @@ export function AssignmentCategoryManager({
           <DialogHeader>
             <DialogTitle>จัดการหมวดงาน</DialogTitle>
             <DialogDescription>
-              กดดินสอเพื่อแก้ชื่อ หรือกดจุดสีเพื่อเปลี่ยนสี งานที่ไม่เลือกหมวดจะอยู่ท้ายรายการ
+              แก้ชื่อหรือเลือกสีแล้วคลิกออกเพื่อบันทึก งานที่ไม่เลือกหมวดจะอยู่ท้ายรายการ
             </DialogDescription>
           </DialogHeader>
 
@@ -213,13 +222,10 @@ export function AssignmentCategoryManager({
                     assignmentCount={assignmentCounts.get(category.id) ?? 0}
                     colorsOpen={colorPickerTarget === category.id}
                     pending={isPending}
-                    submitLabel="บันทึกการแก้ไข"
+                    autoSaveOnBlur
                     onNameChange={setName}
                     onToggleColors={() => toggleEditColors(category)}
-                    onColorChange={next => {
-                      setColor(next)
-                      setColorPickerTarget(null)
-                    }}
+                    onColorChange={setColor}
                     onCancel={resetEditor}
                     onSubmit={saveEdit}
                   />
@@ -286,6 +292,7 @@ function CategoryEditorRow({
   colorsOpen,
   pending,
   submitLabel,
+  autoSaveOnBlur = false,
   onNameChange,
   onToggleColors,
   onColorChange,
@@ -298,7 +305,8 @@ function CategoryEditorRow({
   assignmentCount: number
   colorsOpen: boolean
   pending: boolean
-  submitLabel: string
+  submitLabel?: string
+  autoSaveOnBlur?: boolean
   onNameChange: (name: string) => void
   onToggleColors: () => void
   onColorChange: (color: AssignmentCategoryColor) => void
@@ -309,7 +317,15 @@ function CategoryEditorRow({
   const colorPanelId = `assignment-category-colors-${target}`
 
   return (
-    <div className="rounded-lg border bg-muted/20">
+    <div
+      className="rounded-lg border bg-muted/20"
+      onBlur={event => {
+        if (!autoSaveOnBlur || pending || !name.trim()) return
+        const nextTarget = event.relatedTarget
+        if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return
+        window.setTimeout(onSubmit, 0)
+      }}
+    >
       <form
         className="flex items-center gap-2 p-2"
         onSubmit={event => {
@@ -317,17 +333,21 @@ function CategoryEditorRow({
           onSubmit()
         }}
       >
-        <IconButton
-          label="เปลี่ยนสีหมวด"
+        <Button
+          variant="outline"
           size="sm"
           type="button"
+          aria-label="เปลี่ยนสีหมวด"
           aria-expanded={colorsOpen}
           aria-controls={colorPanelId}
           onClick={onToggleColors}
           disabled={pending}
+          className="shrink-0"
         >
           <span className={cn('size-3 rounded-full', preset.solid)} aria-hidden="true" />
-        </IconButton>
+          สี
+          <ChevronDown data-icon="inline-end" className={cn('transition-transform', colorsOpen && 'rotate-180')} />
+        </Button>
         <Input
           value={name}
           onChange={event => onNameChange(event.target.value)}
@@ -340,14 +360,16 @@ function CategoryEditorRow({
           className="min-w-0 flex-1"
         />
         <span className="shrink-0 text-xs text-muted-foreground">{assignmentCount} งาน</span>
-        <IconButton
-          label={submitLabel}
-          size="sm"
-          type="submit"
-          disabled={!name.trim() || pending}
-        >
-          <Check />
-        </IconButton>
+        {!autoSaveOnBlur && submitLabel && (
+          <IconButton
+            label={submitLabel}
+            size="sm"
+            type="submit"
+            disabled={!name.trim() || pending}
+          >
+            <Check />
+          </IconButton>
+        )}
         <IconButton
           label="ยกเลิก"
           size="sm"
