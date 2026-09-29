@@ -5,7 +5,9 @@ import { Card } from '@/components/ui/card'
 import { BreakoutGroups, type GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
 import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/[id]/_components/group-actions-context'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
+import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 
 export type GroupsLabScenario = 'default' | 'many' | 'empty'
@@ -166,6 +168,24 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
           className="w-full justify-start"
         />
       </Card>
+
+      <div className="max-w-2xl">
+        <AssignmentReviewSummary
+          mode="copy"
+          theme={groupPreset('blue')}
+          rows={[
+            { label: 'ชื่อ', value: 'ทดสอบระบบตรวจกลับไปให้คะแนนเอง (สำเนา)' },
+            { label: 'ห้องเรียน', value: 'ทดสอบ สอบแก้กลางภาค' },
+            { label: 'มอบหมายให้', value: 'นักเรียนทุกคนในห้อง' },
+            { label: 'ประเภท', value: '🔁 แบบฝึกหัด' },
+            { label: 'โจทย์', value: '5 ข้อ' },
+            { label: 'คะแนนเต็ม', value: '11 คะแนน' },
+            { label: 'เงื่อนไขจบ', value: 'ทำครบแล้วจบ' },
+            { label: 'วิธีเก็บคะแนน', value: 'คะแนนครั้งที่ดีที่สุด' },
+            { label: 'แสดงผล', value: 'ทันทีหลังส่ง' },
+          ]}
+        />
+      </div>
     </div>
   )
 }

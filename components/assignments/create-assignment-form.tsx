@@ -52,6 +52,7 @@ import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
+import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import {
   GroupTargetPicker, groupTargetsComplete, groupTargetsFor,
   type AssignmentGroupOption, type GroupTargets,
@@ -65,6 +66,7 @@ import {
 } from '@/components/assignments/seb-quit-password-settings'
 import { cn } from '@/lib/utils'
 import { THAI_TIME_ZONE } from '@/lib/thai-time'
+import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -383,6 +385,10 @@ export function CreateAssignmentForm({
           .map(g => g.name)
           .join(', ')}`
       : `เฉพาะบางกลุ่มใน ${limitedRooms.length} ห้อง`
+  const summaryClassroom = classrooms.find(classroom => classroom.id === classroomIds[0])
+  const summaryTheme = summaryClassroom
+    ? coverOf(parseDescription(summaryClassroom.description))
+    : null
 
   // What survives of the แฟ้มย่อย after the teacher's own picking.
   const assignedSections = filterSectionsToQuestions(sections, selectedIds)
@@ -1721,90 +1727,78 @@ export function CreateAssignmentForm({
             </div>
           </Card>
 
-          {/* Summary */}
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
-            <h3 className="font-bold text-base mb-4">{isCopy ? 'สรุปก่อนทำสำเนา' : 'สรุปก่อนสร้าง'}</h3>
-            <div className="space-y-2.5 text-sm">
-              {[
-                { label: 'ชื่อ',      value: title },
-                {
-                  label: 'ห้องเรียน',
-                  value: classroomIds.length <= 1
-                    ? (classrooms.find(c => c.id === classroomIds[0])?.name ?? '—')
-                    : `${classrooms.find(c => c.id === classroomIds[0])?.name ?? ''} และอีก ${classroomIds.length - 1} ห้อง`,
-                },
-                { label: 'มอบหมายให้', value: audienceSummary },
-                { label: 'ประเภท',    value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
-                {
-                  label: 'โจทย์',
-                  value: randomDrawOn
-                    ? `${questionsPerAttempt} ข้อ/คน (สุ่มจาก ${selectedIds.length})`
-                    : `${selectedIds.length} ข้อ`,
-                },
-                {
-                  label: 'คะแนนเต็ม',
-                  value: displayMaxScore.trim() && Number(displayMaxScore) > 0
-                    ? `${displayMaxScore} คะแนน (จริง ${pointsSum})`
-                    : `${pointsSum} คะแนน`,
-                },
-                ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
-                {
-                  label: 'เงื่อนไขจบ',
-                  value: streakOn
-                    ? `ถูกติดกัน ${streakTarget} ข้อ`
-                    : (passingEnabled && passingValue
-                        ? `ผ่านเกณฑ์ ${passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน`}`
-                        : 'ทำครบแล้วจบ'),
-                },
-                ...(streakOn && streakCapValue ? [{ label: 'เพดานข้อ', value: `${streakCapValue} ข้อ` }] : []),
-                ...(streakOn ? [{ label: 'ทำครบคลังแล้ว', value: streakRecycle ? 'วนกลับมาใหม่' : 'จบเลย' }] : []),
-                ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
-                ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
-                ...(maxAttempts !== '1' && !randomDrawOn && retryScope === 'wrong_only'
-                  ? [{ label: 'การทำรอบต่อไป', value: 'แก้เฉพาะข้อที่ไม่ถูกต้อง' }]
-                  : []),
-                ...(randomDrawOn && maxAttempts !== '1'
-                  ? [{ label: 'การทำรอบต่อไป', value: 'สุ่มชุดใหม่ทั้งชุด' }]
-                  : []),
-                ...(perPageValue > 1
-                  ? [{ label: 'ข้อต่อหน้า', value: `${perPageValue} ข้อ` }]
-                  : []),
-                ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
-                ...(assignmentType === 'exam' && proctoringEnabled
-                  ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
-                  : []),
-                ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
-                  ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
-                  : []),
-                ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
-                  ? [{ label: 'รหัสออก SEB', value: 'ครูกำหนดแล้ว · รอเตรียมไฟล์เฉพาะข้อสอบ' }]
-                  : []),
-                ...(assignmentType === 'exam' && androidExamMode === 'monitored'
-                  ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]
-                  : []),
-                ...(hasWorkImageQuestions
-                  ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
-                  : []),
-                ...(randomValueQuestionCount > 0
-                  ? [{ label: 'ตัวเลขในโจทย์สุ่ม', value: sharedRandomOn ? 'ทุกคนได้ชุดเดียวกัน' : 'แต่ละคนได้ต่างกัน' }]
-                  : []),
-                { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
-                { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
-                { label: 'แสดงผล',    value: SHOW_RESULTS_SUMMARY[showResults] },
-                { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
-              ].map(row => (
-                <div key={row.label} className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">{row.label}</span>
-                  <span className="font-medium text-right truncate max-w-[200px]">{row.value}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-4 border-t border-white/10 pt-3">
-              {isCopy
-                ? 'เลือกได้ว่าจะเผยแพร่สำเนาทันที ตั้งเวลา หรือเก็บสำเนาเป็นแบบร่างไว้ตรวจต่อ'
-                : 'เลือกได้ว่าจะเผยแพร่ทันที ตั้งเวลา หรือกดบันทึกแบบร่างไว้ทำต่อภายหลัง'}
-            </p>
-          </div>
+          <AssignmentReviewSummary
+            mode={isCopy ? 'copy' : 'create'}
+            theme={summaryTheme}
+            rows={[
+              { label: 'ชื่อ', value: title },
+              {
+                label: 'ห้องเรียน',
+                value: classroomIds.length <= 1
+                  ? (classrooms.find(c => c.id === classroomIds[0])?.name ?? '—')
+                  : `${classrooms.find(c => c.id === classroomIds[0])?.name ?? ''} และอีก ${classroomIds.length - 1} ห้อง`,
+              },
+              { label: 'มอบหมายให้', value: audienceSummary },
+              { label: 'ประเภท', value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
+              {
+                label: 'โจทย์',
+                value: randomDrawOn
+                  ? `${questionsPerAttempt} ข้อ/คน (สุ่มจาก ${selectedIds.length})`
+                  : `${selectedIds.length} ข้อ`,
+              },
+              {
+                label: 'คะแนนเต็ม',
+                value: displayMaxScore.trim() && Number(displayMaxScore) > 0
+                  ? `${displayMaxScore} คะแนน (จริง ${pointsSum})`
+                  : `${pointsSum} คะแนน`,
+              },
+              ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
+              {
+                label: 'เงื่อนไขจบ',
+                value: streakOn
+                  ? `ถูกติดกัน ${streakTarget} ข้อ`
+                  : (passingEnabled && passingValue
+                      ? `ผ่านเกณฑ์ ${passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน`}`
+                      : 'ทำครบแล้วจบ'),
+              },
+              ...(streakOn && streakCapValue ? [{ label: 'เพดานข้อ', value: `${streakCapValue} ข้อ` }] : []),
+              ...(streakOn ? [{ label: 'ทำครบคลังแล้ว', value: streakRecycle ? 'วนกลับมาใหม่' : 'จบเลย' }] : []),
+              ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
+              ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
+              ...(maxAttempts !== '1' && !randomDrawOn && retryScope === 'wrong_only'
+                ? [{ label: 'การทำรอบต่อไป', value: 'แก้เฉพาะข้อที่ไม่ถูกต้อง' }]
+                : []),
+              ...(randomDrawOn && maxAttempts !== '1'
+                ? [{ label: 'การทำรอบต่อไป', value: 'สุ่มชุดใหม่ทั้งชุด' }]
+                : []),
+              ...(perPageValue > 1
+                ? [{ label: 'ข้อต่อหน้า', value: `${perPageValue} ข้อ` }]
+                : []),
+              ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
+              ...(assignmentType === 'exam' && proctoringEnabled
+                ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
+                : []),
+              ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
+                ? [{ label: 'Safe Exam Browser', value: 'บังคับใช้' }]
+                : []),
+              ...(assignmentType === 'exam' && secureBrowserMode === 'seb_required'
+                ? [{ label: 'รหัสออก SEB', value: 'ครูกำหนดแล้ว · รอเตรียมไฟล์เฉพาะข้อสอบ' }]
+                : []),
+              ...(assignmentType === 'exam' && androidExamMode === 'monitored'
+                ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]
+                : []),
+              ...(hasWorkImageQuestions
+                ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
+                : []),
+              ...(randomValueQuestionCount > 0
+                ? [{ label: 'ตัวเลขในโจทย์สุ่ม', value: sharedRandomOn ? 'ทุกคนได้ชุดเดียวกัน' : 'แต่ละคนได้ต่างกัน' }]
+                : []),
+              { label: 'เครื่องคิดเลข', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
+              { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
+              { label: 'แสดงผล', value: SHOW_RESULTS_SUMMARY[showResults] },
+              { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
+            ]}
+          />
         </div>
       )}
 
