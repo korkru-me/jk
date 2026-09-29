@@ -138,9 +138,9 @@ export function AssignmentContextNavigation({
 
       <Separator />
 
-      <div className="px-2 text-xs font-medium text-muted-foreground">ในงานนี้</div>
-      <nav aria-label="เมนูในงานที่มอบหมาย" className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <Button
+          size="sm"
           variant={currentSection === 'detail' ? 'navigation' : 'ghost'}
           className="w-full justify-start"
           aria-current={currentSection === 'detail' ? 'page' : undefined}
@@ -149,12 +149,6 @@ export function AssignmentContextNavigation({
           <Activity data-icon="inline-start" />
           ภาพรวม
         </Button>
-      </nav>
-
-      <Separator />
-
-      <div className="px-2 text-xs font-medium text-muted-foreground">การทำงาน</div>
-      <div className="flex flex-col gap-1.5">
         {canOpenAssignment && (
           <>
             <Button
