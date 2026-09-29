@@ -86,6 +86,9 @@ function AssignmentContextNavigation({
 }) {
   const statusMeta = STATUS_META[a.status]
   const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const isOpeningAgain = a.status === 'closed'
+  const canOpenAssignment = a.status === 'draft' || isOpeningAgain
+  const openActionLabel = isOpeningAgain ? 'เปิดให้ทำอีกครั้ง' : 'เผยแพร่'
 
   function runAction(action: () => void) {
     action()
@@ -169,7 +172,7 @@ function AssignmentContextNavigation({
 
       <div className="px-2 text-xs font-medium text-muted-foreground">การทำงาน</div>
       <div className="flex flex-col gap-1.5">
-        {a.status === 'draft' && (
+        {canOpenAssignment && (
           <>
             <Button
               onClick={() => runAction(onPublish)}
@@ -177,15 +180,15 @@ function AssignmentContextNavigation({
               size="sm"
               className="w-full justify-start border-0 bg-success text-success-foreground hover:bg-success/90"
             >
-              <Play data-icon="inline-start" /> เผยแพร่
+              <Play data-icon="inline-start" /> {openActionLabel}
             </Button>
             {(availableQuestionCount === 0 || missingQuestionCount > 0 || duplicateQuestionCount > 0) && (
               <p className="px-2 text-xs leading-5 text-warning">
                 {missingQuestionCount > 0
-                  ? 'ตรวจและแก้โจทย์ที่หายก่อนเผยแพร่'
+                  ? `ตรวจและแก้โจทย์ที่หายก่อน${openActionLabel}`
                   : duplicateQuestionCount > 0
-                    ? 'ลบรายการโจทย์ซ้ำก่อนเผยแพร่'
-                  : 'เพิ่มโจทย์อย่างน้อย 1 ข้อก่อนเผยแพร่'}
+                    ? `ลบรายการโจทย์ซ้ำก่อน${openActionLabel}`
+                    : `เพิ่มโจทย์อย่างน้อย 1 ข้อก่อน${openActionLabel}`}
               </p>
             )}
           </>
@@ -322,9 +325,14 @@ export function AssignmentDetailClient({
     startTransition(async () => {
       const res = await updateAssignmentStatus(a.id, 'published')
       if (res?.error) toast.error(res.error)
-      else { toast.success(`เผยแพร่${assignmentTypeLabel}แล้ว`); router.refresh() }
+      else {
+        toast.success(a.status === 'closed'
+          ? `เปิด${assignmentTypeLabel}ให้ทำอีกครั้งแล้ว`
+          : `เผยแพร่${assignmentTypeLabel}แล้ว`)
+        router.refresh()
+      }
     })
-  }, [a.id, assignmentTypeLabel, router])
+  }, [a.id, a.status, assignmentTypeLabel, router])
 
   const close = useCallback(() => {
     startTransition(async () => {

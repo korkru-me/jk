@@ -25,6 +25,7 @@ import { manageableClassroomIds } from '@/lib/classroom-groups-server'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
+import { shouldClearExpiredEndAt } from '@/lib/assignment-status'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -435,13 +436,14 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
+  let clearExpiredEndAt = false
   if (status === 'published') {
     if (!await canManageAssignment(id, user.id)) {
       return { error: 'ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์จัดการงานนี้' }
     }
     const { data: assignment, error: assignmentError } = await supabase
       .from('assignments')
-      .select('created_by, org_id, secure_browser_mode, question_ids')
+      .select('created_by, org_id, secure_browser_mode, question_ids, status, end_at')
       .eq('id', id)
       .maybeSingle()
     if (assignmentError) return { error: 'ตรวจสอบความพร้อมก่อนเผยแพร่ไม่สำเร็จ กรุณาตรวจว่า apply migration แล้ว' }
@@ -471,6 +473,14 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
     ) {
       return { error: SEB_RELEASE_NOT_READY_ERROR }
     }
+
+    // Reopening must make the assignment genuinely available again. A closed
+    // assignment can still carry an end_at in the past, which would otherwise
+    // make startSubmission reject every student immediately after this update.
+    clearExpiredEndAt = shouldClearExpiredEndAt({
+      currentStatus: assignment.status,
+      endAt: assignment.end_at,
+    })
   }
 
   // No explicit created_by filter — RLS (assignments_org_teacher_all /
@@ -480,7 +490,7 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
   // affected, not an error), which is acceptable here.
   const { error } = await supabase
     .from('assignments')
-    .update({ status })
+    .update(clearExpiredEndAt ? { status, end_at: null } : { status })
     .eq('id', id)
 
   if (error) return { error: error.message }
