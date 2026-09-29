@@ -2,12 +2,13 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Users, BookOpen, CalendarRange, Check, Copy, GraduationCap, Pin, PinOff, Trash2 } from 'lucide-react'
+import { Users, BookOpen, CalendarRange, Check, Copy, GraduationCap, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
 import { parseDescription, coverOf } from './classroom-meta'
 import { IconButton } from '@/components/ui/icon-button'
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
   classroom: Classroom
@@ -16,7 +17,6 @@ interface Props {
   isSelecting?: boolean
   isSelected?: boolean
   onToggle?: () => void
-  onTogglePin?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
   dragHandle?: ReactNode
@@ -24,10 +24,10 @@ interface Props {
 
 export function ClassroomCard({
   classroom, studentCount, assignmentCount,
-  isSelecting = false, isSelected = false, onToggle, onTogglePin,
+  isSelecting = false, isSelected = false, onToggle,
   onDuplicate, onDelete, dragHandle,
 }: Props) {
-  const isPinned = !!classroom.pinned_at
+  const isHomeroom = classroom.classroom_type === 'homeroom'
   const meta = parseDescription(classroom.description)
   const savedCover = coverOf(meta)
   const shownDescription = meta.description
@@ -55,8 +55,9 @@ export function ClassroomCard({
           </div>
         )}
         {dragHandle}
-        <div className={cn(isSelecting ? 'ml-8' : dragHandle && 'ml-8')}>
-          <p className="font-bold text-lg leading-tight">
+        <div className={cn('min-w-0', isSelecting ? 'ml-8' : dragHandle && 'ml-8')}>
+          {isHomeroom && <Badge variant="warning" className="mb-1">HOMEROOM</Badge>}
+          <p className="text-base font-bold leading-tight">
             {classroom.name}
           </p>
           {shownDescription && (
@@ -66,51 +67,6 @@ export function ClassroomCard({
             )}>{shownDescription}</p>
           )}
         </div>
-        <BookOpen className={cn(
-          'size-7 shrink-0',
-          !isSelecting && (onDuplicate || onTogglePin || onDelete) && 'mr-28',
-          savedCover ? savedCover.textMuted : 'text-muted-foreground',
-        )} aria-hidden="true" />
-        {!isSelecting && (onDuplicate || onTogglePin || onDelete) && (
-          <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1">
-            {onDuplicate && (
-              <IconButton
-                type="button"
-                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDuplicate() }}
-                label={`คัดลอก ${classroom.name} และเก็บงานเดิมเป็นแบบร่าง`}
-                size="sm"
-                className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-              >
-                <Copy className="size-4" aria-hidden="true" />
-              </IconButton>
-            )}
-            {onTogglePin && (
-              <IconButton
-                type="button"
-                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onTogglePin() }}
-                label={isPinned ? `เลิกปักหมุด ${classroom.name} เพื่อให้ลากเปลี่ยนลำดับได้` : `ปักหมุด ${classroom.name} ไว้บนสุด`}
-                size="sm"
-                className={cn(
-                  'flex size-8 items-center justify-center rounded-lg transition-colors',
-                  isPinned ? 'bg-card text-warning' : 'bg-card/85 text-muted-foreground hover:bg-card hover:text-foreground',
-                )}
-              >
-                {isPinned ? <Pin className="size-4 fill-current" /> : <PinOff className="size-4" />}
-              </IconButton>
-            )}
-            {onDelete && (
-              <IconButton
-                type="button"
-                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}
-                label={`ลบ ${classroom.name}`}
-                size="sm"
-                className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-destructive transition-colors hover:bg-destructive/10"
-              >
-                <Trash2 className="size-4" aria-hidden="true" />
-              </IconButton>
-            )}
-          </div>
-        )}
         <div className={cn(
           'absolute inset-0 transition-colors',
           isSelecting && isSelected ? 'bg-primary/15' : 'bg-foreground/0 group-hover:bg-foreground/5'
@@ -130,11 +86,6 @@ export function ClassroomCard({
             <span className="font-semibold text-foreground">{assignmentCount}</span>
             <span className="text-xs">งาน</span>
           </div>
-          {isPinned && (
-            <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-warning bg-warning/10 px-2 py-0.5 rounded-full">
-              <Pin className="w-2.5 h-2.5 fill-current" /> ปักหมุด
-            </span>
-          )}
         </div>
 
         <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-muted p-3">
@@ -152,11 +103,37 @@ export function ClassroomCard({
           </div>
         </div>
 
-        <div className="pt-3 border-t border-border">
+        <div className="flex items-end justify-between gap-3 border-t border-border pt-3">
           <div>
             <p className="text-[10px] text-muted-foreground">รหัสห้องเรียน</p>
             <p className="font-mono font-bold text-foreground tracking-widest text-sm">{classroom.class_code}</p>
           </div>
+          {!isSelecting && (onDuplicate || onDelete) && (
+            <div className="relative z-20 flex items-center gap-1">
+              {onDuplicate && (
+                <IconButton
+                  type="button"
+                  onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDuplicate() }}
+                  label={`คัดลอก ${classroom.name} และเก็บงานเดิมเป็นแบบร่าง`}
+                  size="sm"
+                  className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Copy className="size-4" aria-hidden="true" />
+                </IconButton>
+              )}
+              {onDelete && (
+                <IconButton
+                  type="button"
+                  onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}
+                  label={`ลบ ${classroom.name}`}
+                  size="sm"
+                  className="flex size-8 items-center justify-center rounded-lg border border-destructive/20 text-destructive transition-colors hover:bg-destructive/10"
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </IconButton>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -180,7 +157,7 @@ export function ClassroomCard({
     <div
       className={cn(
         'group relative overflow-hidden rounded-2xl bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
-        isPinned ? 'ring-2 ring-warning/40' : 'ring-1 ring-border',
+        isHomeroom ? 'ring-2 ring-warning/50 shadow-md' : 'ring-1 ring-border',
       )}
     >
       <Link

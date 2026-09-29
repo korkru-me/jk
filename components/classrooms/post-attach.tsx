@@ -40,6 +40,8 @@ interface Props {
   disabled?: boolean
   /** An adjacent composer action, such as attaching a web link. */
   action?: ReactNode
+  /** Actions shown before the file picker, kept in the same utility row. */
+  leadingActions?: ReactNode
   /** The whole composer surface that accepts files dropped from the desktop. */
   dropZoneRef?: RefObject<HTMLElement | null>
 }
@@ -54,7 +56,7 @@ interface Props {
  * from the database only drops the reference, because the post being edited
  * may still be cancelled and a deleted file cannot be brought back.
  */
-export function PostAttach({ attachments, onChange, disabled, action, dropZoneRef }: Props) {
+export function PostAttach({ attachments, onChange, disabled, action, leadingActions, dropZoneRef }: Props) {
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -230,12 +232,13 @@ export function PostAttach({ attachments, onChange, disabled, action, dropZoneRe
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5">
+        {leadingActions}
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="gap-1.5"
+          className="shrink-0 gap-1.5"
           disabled={disabled || uploading || remaining <= 0}
           onClick={() => inputRef.current?.click()}
         >
@@ -244,7 +247,7 @@ export function PostAttach({ attachments, onChange, disabled, action, dropZoneRe
         </Button>
         {action}
         {dropZoneRef && remaining > 0 && !uploading && (
-          <span className="inline-flex items-center gap-1 self-center text-xs text-muted-foreground">
+          <span className="inline-flex shrink-0 items-center gap-1 self-center text-xs text-muted-foreground">
             <UploadCloud className="size-3.5" /> หรือลากไฟล์มาวาง
           </span>
         )}

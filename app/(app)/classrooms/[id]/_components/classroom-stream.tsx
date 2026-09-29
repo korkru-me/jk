@@ -154,9 +154,13 @@ export function ClassroomStream({
         className={isPanel ? 'min-h-16' : 'min-h-20'}
       />
 
-      {crossPostTargets.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+      <PostAttach
+        attachments={attachments}
+        onChange={setAttachments}
+        disabled={isPending}
+        dropZoneRef={composerDropZoneRef}
+        leadingActions={crossPostTargets.length > 0 ? (
+          <>
             <Button
               type="button"
               variant="outline"
@@ -191,8 +195,24 @@ export function ClassroomStream({
                 ? <ChevronUp data-icon="inline-end" aria-hidden="true" />
                 : <ChevronDown data-icon="inline-end" aria-hidden="true" />}
             </Button>
-          </div>
+          </>
+        ) : undefined}
+        action={(
+          <Button
+            type="button"
+            variant={showLinkField ? 'secondary' : 'outline'}
+            size="sm"
+            className="shrink-0"
+            aria-expanded={showLinkField}
+            onClick={() => setShowLinkField(open => !open)}
+          >
+            <Link2 data-icon="inline-start" aria-hidden="true" /> แนบลิงก์
+          </Button>
+        )}
+      />
 
+      {crossPostTargets.length > 0 && (
+        <div className="flex flex-col gap-2">
           {showReuse && (
             <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -280,25 +300,7 @@ export function ClassroomStream({
         />
       )}
 
-      <div className="flex items-end justify-between gap-2 flex-wrap">
-        <PostAttach
-          attachments={attachments}
-          onChange={setAttachments}
-          disabled={isPending}
-          dropZoneRef={composerDropZoneRef}
-          action={(
-            <Button
-              type="button"
-              variant={showLinkField ? 'secondary' : 'outline'}
-              size="sm"
-              className="gap-1.5"
-              aria-expanded={showLinkField}
-              onClick={() => setShowLinkField(open => !open)}
-            >
-              <Link2 className="w-3.5 h-3.5" /> แนบลิงก์
-            </Button>
-          )}
-        />
+      <div className="flex justify-end">
         <Button size="sm" className="gap-1.5" disabled={isPending || !canSubmit} onClick={submitPost}>
           <Send className="w-3.5 h-3.5" /> โพสต์ประกาศ
         </Button>

@@ -317,22 +317,6 @@ export async function permanentDeleteClassroom(id: string) {
   return { success: true }
 }
 
-// ── Pinning (sort a classroom first on the teacher's list) ─────────────────
-
-export async function togglePinClassroom(id: string, pinned: boolean) {
-  const user = await getAuthUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-  const admin = createAdminClient()
-  const { error } = await admin
-    .from('classrooms')
-    .update({ pinned_at: pinned ? new Date().toISOString() : null })
-    .eq('id', id)
-    .eq('teacher_id', user.id)
-  if (error) return { error: error.message }
-  revalidatePath('/classrooms')
-  return { success: true }
-}
-
 // ── Manual classroom ordering ──────────────────────────────────────────────
 
 export async function reorderClassrooms(orderedClassroomIds: string[]) {
@@ -343,9 +327,21 @@ export async function reorderClassrooms(orderedClassroomIds: string[]) {
     return { error: 'ลำดับห้องเรียนไม่ถูกต้อง กรุณารีเฟรชแล้วลองใหม่' }
   }
 
-  // The RPC runs with the session client and checks auth.uid(), ownership,
-  // active status and pinned_at again inside one transaction. A forged list
-  // cannot reorder someone else's room or a room that is still pinned.
+  // Pinning is no longer part of the classroom list UI. Clear any legacy pins
+  // owned by this teacher before the existing atomic order RPC validates the
+  // complete subject-room list.
+  const admin = createAdminClient()
+  const { error: unpinError } = await admin
+    .from('classrooms')
+    .update({ pinned_at: null })
+    .in('id', ids)
+    .eq('teacher_id', user.id)
+    .eq('status', 'active')
+    .eq('classroom_type', 'subject')
+  if (unpinError) return { error: 'เตรียมลำดับห้องเรียนไม่สำเร็จ กรุณาลองใหม่' }
+
+  // The RPC checks auth.uid(), ownership and active status again inside one
+  // transaction. A forged list still cannot reorder someone else's room.
   const supabase = await createClient()
   const { error } = await supabase.rpc('reorder_my_classrooms', { ordered_ids: ids })
   if (error) return { error: 'รายการห้องเรียนมีการเปลี่ยนแปลง กรุณารีเฟรชแล้วลองจัดลำดับอีกครั้ง' }

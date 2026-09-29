@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition, type ComponentProps } from 'react'
+import { useEffect, useState, useTransition, type ComponentProps } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -17,10 +17,9 @@ import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import {
-  bulkDeleteClassrooms, deleteClassroom, reorderClassrooms, togglePinClassroom,
+  bulkDeleteClassrooms, deleteClassroom, reorderClassrooms,
 } from '@/lib/actions/classrooms'
 import { ClassroomCard } from './classroom-card'
-import { HomeroomBanner } from './homeroom-banner'
 import type { Classroom } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -46,7 +45,6 @@ export function TeacherViewClient({
   )
   const [confirm, confirmDialog] = useConfirm()
   const [isPending, startTransition] = useTransition()
-  const [, startPinTransition] = useTransition()
   const [, startOrderTransition] = useTransition()
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -58,16 +56,6 @@ export function TeacherViewClient({
   useEffect(() => {
     setOrderedSubjects(classrooms.filter(c => c.classroom_type !== 'homeroom'))
   }, [classrooms])
-  const pinnedSubjects = useMemo(() => orderedSubjects.filter(c => c.pinned_at), [orderedSubjects])
-  const movableSubjects = useMemo(() => orderedSubjects.filter(c => !c.pinned_at), [orderedSubjects])
-
-  function handleTogglePin(id: string, currentlyPinned: boolean) {
-    startPinTransition(async () => {
-      const res = await togglePinClassroom(id, !currentlyPinned)
-      if (res?.error) toast.error(res.error)
-      else toast.success(currentlyPinned ? 'เลิกปักหมุดแล้ว' : 'ปักหมุดห้องเรียนแล้ว')
-    })
-  }
 
   function handleDuplicate(id: string) {
     router.push(`/classrooms/new?copyFrom=${encodeURIComponent(id)}`)
@@ -92,16 +80,16 @@ export function TeacherViewClient({
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    const previous = movableSubjects
+    const previous = orderedSubjects
     const oldIndex = previous.findIndex(classroom => classroom.id === active.id)
     const newIndex = previous.findIndex(classroom => classroom.id === over.id)
     if (oldIndex < 0 || newIndex < 0) return
-    const nextMovable = arrayMove(previous, oldIndex, newIndex)
-    setOrderedSubjects([...pinnedSubjects, ...nextMovable])
+    const nextSubjects = arrayMove(previous, oldIndex, newIndex)
+    setOrderedSubjects(nextSubjects)
     startOrderTransition(async () => {
-      const res = await reorderClassrooms(nextMovable.map(classroom => classroom.id))
+      const res = await reorderClassrooms(nextSubjects.map(classroom => classroom.id))
       if (res?.error) {
-        setOrderedSubjects([...pinnedSubjects, ...previous])
+        setOrderedSubjects(previous)
         toast.error(res.error)
       }
     })
@@ -246,12 +234,13 @@ export function TeacherViewClient({
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 <GraduationCap className="w-3.5 h-3.5" /> ห้อง Homeroom
               </div>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {homeroomClassrooms.map((c) => (
-                  <HomeroomBanner
+                  <ClassroomCard
                     key={c.id}
                     classroom={c}
                     studentCount={studentCountMap[c.id] ?? 0}
+                    assignmentCount={assignmentCountMap[c.id] ?? 0}
                     isSelecting={isSelecting}
                     isSelected={selected.has(c.id)}
                     onToggle={() => toggleSelect(c.id)}
@@ -270,23 +259,9 @@ export function TeacherViewClient({
               </div>
             )}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={movableSubjects.map(c => c.id)} strategy={rectSortingStrategy}>
+              <SortableContext items={orderedSubjects.map(c => c.id)} strategy={rectSortingStrategy}>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {pinnedSubjects.map(c => (
-                    <ClassroomCard
-                      key={c.id}
-                      classroom={c}
-                      studentCount={studentCountMap[c.id] ?? 0}
-                      assignmentCount={assignmentCountMap[c.id] ?? 0}
-                      isSelecting={isSelecting}
-                      isSelected={selected.has(c.id)}
-                      onToggle={() => toggleSelect(c.id)}
-                      onTogglePin={() => handleTogglePin(c.id, true)}
-                      onDuplicate={() => handleDuplicate(c.id)}
-                      onDelete={() => handleDelete(c)}
-                    />
-                  ))}
-                  {movableSubjects.map(c => (
+                  {orderedSubjects.map(c => (
                     <SortableClassroomCard
                       key={c.id}
                       classroom={c}
@@ -295,7 +270,6 @@ export function TeacherViewClient({
                       isSelecting={isSelecting}
                       isSelected={selected.has(c.id)}
                       onToggle={() => toggleSelect(c.id)}
-                      onTogglePin={() => handleTogglePin(c.id, false)}
                       onDuplicate={() => handleDuplicate(c.id)}
                       onDelete={() => handleDelete(c)}
                     />
@@ -341,7 +315,7 @@ export function TeacherViewClient({
 }
 
 function SortableClassroomCard(props: ComponentProps<typeof ClassroomCard>) {
-  const disabled = props.isSelecting || !!props.classroom.pinned_at
+  const disabled = props.isSelecting
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: props.classroom.id, disabled })

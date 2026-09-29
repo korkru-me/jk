@@ -53,15 +53,14 @@ export default async function ClassroomsPage() {
       return classroom
     })
 
-    // Homeroom classrooms lead the list (there are only ever a handful);
-    // subject classrooms follow, most-recently-pinned first.
+    // Homeroom classrooms keep their own section; subject classrooms use the
+    // teacher's manual order. Legacy pins are intentionally ignored now that
+    // every subject card can be dragged directly.
     const cls = [
       ...classrooms.filter(c => c.classroom_type === 'homeroom'),
       ...classrooms
         .filter(c => c.classroom_type !== 'homeroom')
         .sort((a, b) => {
-          const pinDiff = (b.pinned_at ? new Date(b.pinned_at).getTime() : 0) - (a.pinned_at ? new Date(a.pinned_at).getTime() : 0)
-          if (pinDiff !== 0) return pinDiff
           const orderDiff = (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER)
           if (orderDiff !== 0) return orderDiff
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
