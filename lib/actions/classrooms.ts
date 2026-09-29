@@ -246,7 +246,7 @@ export async function updateClassroom(id: string, data: { name: string; descript
   return { success: true }
 }
 
-// ── Soft delete (moves to trash, kept 3 months) ────────────────────────────
+// ── Soft delete (moves to trash, kept for 30 days) ─────────────────────────
 
 export async function deleteClassroom(id: string) {
   const user = await getAuthUser()
@@ -294,7 +294,7 @@ export async function restoreClassroom(id: string) {
   return { success: true }
 }
 
-// ── Permanent delete (only after 3 months, or forced from trash page) ──────
+// ── Permanent delete (scheduled after 30 days, or forced from trash page) ──
 
 export async function permanentDeleteClassroom(id: string) {
   const user = await getAuthUser()

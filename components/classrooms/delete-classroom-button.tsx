@@ -15,7 +15,7 @@ export function DeleteClassroomButton({ id }: { id: string }) {
   async function handleDelete() {
     const ok = await confirm({
       title: 'ย้ายห้องเรียนไปถังขยะ?',
-      description: 'ห้องเรียนและข้อมูลภายในจะถูกซ่อนจากรายการหลัก แต่เจ้าของยังกู้คืนได้จากถังขยะก่อนลบถาวร',
+      description: 'ห้องเรียนและข้อมูลภายในจะถูกซ่อนจากรายการหลัก และกู้คืนได้จากถังขยะภายใน 30 วันก่อนลบถาวร',
       confirmLabel: 'ย้ายไปถังขยะ',
       variant: 'destructive',
     })

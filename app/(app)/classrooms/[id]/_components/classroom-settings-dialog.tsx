@@ -346,7 +346,7 @@ export function ClassroomSettingsDialog({
         <div className="border-t border-border pt-4">
           <p className="text-sm font-medium text-destructive">พื้นที่อันตราย</p>
           <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
-            ย้ายห้องเรียนไปถังขยะพร้อมข้อมูลภายในทั้งหมด และยังสามารถกู้คืนได้ก่อนลบถาวร
+            ย้ายห้องเรียนไปถังขยะพร้อมข้อมูลภายในทั้งหมด และกู้คืนได้ภายใน 30 วันก่อนลบถาวร
           </p>
           <DeleteClassroomButton id={classroom.id} />
         </div>
