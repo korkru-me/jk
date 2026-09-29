@@ -11,7 +11,7 @@ import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
 import { parseDescription, coverOf, displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
-import type { SortKey as StudentSortKey, SortDir as StudentSortDir } from './student-table'
+import type { SortKey as StudentSortKey } from './student-table'
 import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { ClassroomOverview, type OverviewTarget } from './classroom-overview'
@@ -30,6 +30,7 @@ import {
 import type { GroupState } from './breakout-groups'
 import { ClassroomContextNavigation } from './classroom-context-sidebar'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
+import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -123,8 +124,9 @@ export function ClassroomDetailClient({
   const shownDescription = displayDescription(classroom.description)
 
   // Owned here so the student-table sort survives switching tabs.
-  const [studentSortKey, setStudentSortKey] = useState<StudentSortKey>('name')
-  const [studentSortDir, setStudentSortDir] = useState<StudentSortDir>('asc')
+  const [studentSortRules, setStudentSortRules] = useState<StudentSortRule[]>([
+    { key: 'name', dir: 'asc' },
+  ])
 
   // กลุ่มย่อย live here rather than inside their tab: the tab unmounts when
   // another is opened, and the งาน tabs read the same arrangement to count
@@ -213,8 +215,7 @@ export function ClassroomDetailClient({
   useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar)
 
   function toggleStudentSort(key: StudentSortKey) {
-    setStudentSortDir(d => (studentSortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
-    setStudentSortKey(key)
+    setStudentSortRules(current => nextStudentSortRules(current, key))
   }
 
   function copyCode() {
@@ -306,8 +307,7 @@ export function ClassroomDetailClient({
             profiles={studentProfiles}
             showRoster={canManage}
             showProfiles={isHomeroom && canManage}
-            sortKey={studentSortKey}
-            sortDir={studentSortDir}
+            sortRules={studentSortRules}
             onToggleSort={toggleStudentSort}
           />
         )}

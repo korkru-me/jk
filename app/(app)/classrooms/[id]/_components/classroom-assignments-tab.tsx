@@ -261,7 +261,9 @@ export function ClassroomAssignmentsTab({
                             <TypeIcon className={cn('size-4', typeCfg.text)} />
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-foreground">{assignment.title}</p>
+                            <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground" title={assignment.title}>
+                              {assignment.title}
+                            </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-2">
                               <span className="text-xs text-muted-foreground">{assignmentSizeLabel(assignment)}</span>
                               {assignment.group_ids && (

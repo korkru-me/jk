@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import {
-  Search, ChevronUp, ChevronDown, MoreVertical,
+  Search, ChevronUp, ChevronDown, ChevronsUpDown, MoreVertical,
   Mail, ArrowRightLeft, UserMinus, X, IdCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,14 +13,16 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview'
-import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib/student-sort'
+import { compareStudentsByRules, type StudentSortKey, type StudentSortRule } from '@/lib/student-sort'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { cn } from '@/lib/utils'
 
 export type SortKey = StudentSortKey
-export type SortDir = StudentSortDir
+export type SortRule = StudentSortRule
 
 interface RealStudent { id: string; full_name: string; email: string }
 interface Student extends RealStudent {
@@ -38,10 +40,8 @@ interface Props {
   /** Full personal-info dialog (health/address/guardians) — homeroom
    *  advisor only, a stricter gate than showRoster. */
   showProfiles?: boolean
-  /** Sort state lives in the parent so the "คะแนนและการส่งงาน" tab can
-   *  mirror the same student order. */
-  sortKey: SortKey
-  sortDir: SortDir
+  /** Sort state lives in the parent so it survives switching tabs. */
+  sortRules: SortRule[]
   onToggleSort: (key: SortKey) => void
 }
 
@@ -54,7 +54,7 @@ const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(160px,1fr)_90px_80px_
 
 export function StudentTable({
   classroomId, students, otherClassrooms, profiles = {}, showRoster = false, showProfiles = false,
-  sortKey, sortDir, onToggleSort,
+  sortRules, onToggleSort,
 }: Props) {
   const [confirm, confirmDialog] = useConfirm()
   const GRID_COLS = showRoster ? GRID_COLS_WITH_ROSTER : GRID_COLS_DEFAULT
@@ -72,7 +72,7 @@ export function StudentTable({
       s.full_name.toLowerCase().includes(query.toLowerCase()) ||
       s.email.toLowerCase().includes(query.toLowerCase())
     )
-    .sort((a, b) => compareStudents(a, b, profiles, sortKey, sortDir))
+    .sort((a, b) => compareStudentsByRules(a, b, profiles, sortRules))
 
   async function handleRemove(studentId: string, name: string) {
     const ok = await confirm({
@@ -90,16 +90,41 @@ export function StudentTable({
   }
 
   function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ChevronUp className="w-3 h-3 text-muted-foreground/40" />
-    return sortDir === 'asc'
-      ? <ChevronUp className="w-3 h-3 text-primary" />
-      : <ChevronDown className="w-3 h-3 text-primary" />
+    const ruleIndex = sortRules.findIndex(rule => rule.key === col)
+    if (ruleIndex < 0) return <ChevronsUpDown className="size-3 text-muted-foreground/40" />
+    const rule = sortRules[ruleIndex]
+    return (
+      <>
+        {rule.dir === 'asc'
+          ? <ChevronUp className="size-3 text-primary" />
+          : <ChevronDown className="size-3 text-primary" />}
+        <Badge
+          variant={ruleIndex === 0 ? 'default' : 'secondary'}
+          className="size-4 rounded-full p-0 text-[10px] tabular-nums"
+          aria-label={`ลำดับการเรียงที่ ${ruleIndex + 1}`}
+        >
+          {ruleIndex + 1}
+        </Badge>
+      </>
+    )
   }
 
   function headerBtnClass(col: SortKey) {
-    return `flex items-center gap-1 px-2 py-1 -my-1 rounded-lg transition-colors ${
-      sortKey === col ? 'bg-primary/10 text-primary font-semibold' : 'hover:text-muted-foreground hover:bg-muted'
-    }`
+    const ruleIndex = sortRules.findIndex(rule => rule.key === col)
+    return cn(
+      'flex items-center gap-1 rounded-lg px-2 py-1 -my-1 transition-colors',
+      ruleIndex === 0 && 'bg-primary/10 font-semibold text-primary',
+      ruleIndex > 0 && 'bg-background text-foreground',
+      ruleIndex < 0 && 'hover:bg-muted hover:text-muted-foreground',
+    )
+  }
+
+  function sortButtonTitle(col: SortKey) {
+    const ruleIndex = sortRules.findIndex(rule => rule.key === col)
+    if (ruleIndex < 0) return 'กดเพื่อใช้เป็นลำดับหลัก โดยคงการเรียงเดิมเป็นลำดับรอง'
+    const rule = sortRules[ruleIndex]
+    if (ruleIndex === 0) return `ลำดับหลัก: ${rule.dir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'} · กดอีกครั้งเพื่อกลับทิศ`
+    return `ลำดับรองที่ ${ruleIndex + 1} · กดเพื่อเลื่อนเป็นลำดับหลัก`
   }
 
   return (
@@ -131,21 +156,21 @@ export function StudentTable({
             </div>
           )}
           <div className="w-8" />
-          <button className={`text-left ${headerBtnClass('name')}`} onClick={() => onToggleSort('name')}>
+          <button className={cn('text-left', headerBtnClass('name'))} onClick={() => onToggleSort('name')} title={sortButtonTitle('name')}>
             ชื่อ <SortIcon col="name" />
           </button>
           {showRoster && (
             <>
-              <button className={headerBtnClass('grade')} onClick={() => onToggleSort('grade')}>
+              <button className={headerBtnClass('grade')} onClick={() => onToggleSort('grade')} title={sortButtonTitle('grade')}>
                 ระดับชั้น <SortIcon col="grade" />
               </button>
-              <button className={headerBtnClass('section')} onClick={() => onToggleSort('section')}>
+              <button className={headerBtnClass('section')} onClick={() => onToggleSort('section')} title={sortButtonTitle('section')}>
                 ห้อง <SortIcon col="section" />
               </button>
-              <button className={headerBtnClass('number')} onClick={() => onToggleSort('number')}>
+              <button className={headerBtnClass('number')} onClick={() => onToggleSort('number')} title={sortButtonTitle('number')}>
                 เลขที่ <SortIcon col="number" />
               </button>
-              <button className={headerBtnClass('code')} onClick={() => onToggleSort('code')}>
+              <button className={headerBtnClass('code')} onClick={() => onToggleSort('code')} title={sortButtonTitle('code')}>
                 รหัสนักเรียน <SortIcon col="code" />
               </button>
             </>
