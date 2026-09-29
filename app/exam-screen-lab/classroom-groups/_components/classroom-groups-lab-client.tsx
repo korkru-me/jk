@@ -3,6 +3,10 @@
 import { useMemo, useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { BreakoutGroups, type GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
+import {
+  ClassroomAssignmentsTab,
+  type ClassroomAssignmentRow,
+} from '@/app/(app)/classrooms/[id]/_components/classroom-assignments-tab'
 import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/[id]/_components/group-actions-context'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
@@ -13,6 +17,72 @@ import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 export type GroupsLabScenario = 'default' | 'many' | 'empty'
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000001'
+
+const LAB_ASSIGNMENTS: ClassroomAssignmentRow[] = [
+  {
+    id: '00000000-0000-4000-b000-000000000001',
+    title: 'แบบฝึกหัดที่กำลังเตรียมโจทย์',
+    type: 'exercise',
+    mode: 'standard',
+    status: 'draft',
+    start_at: null,
+    end_at: null,
+    question_ids: ['q1', 'q2', 'q3'],
+    random_question_count: null,
+    completion_rule: null,
+    streak_target: null,
+    created_at: '2026-09-27T08:00:00.000Z',
+    passing_type: null,
+    passing_value: null,
+    max_attempts: null,
+    score_strategy: 'best',
+    display_order: 1,
+    category_id: null,
+    group_ids: null,
+  },
+  {
+    id: '00000000-0000-4000-b000-000000000002',
+    title: 'การเคลื่อนที่แบบโปรเจกไทล์',
+    type: 'exercise',
+    mode: 'standard',
+    status: 'published',
+    start_at: null,
+    end_at: null,
+    question_ids: ['q1', 'q2', 'q3', 'q4', 'q5'],
+    random_question_count: null,
+    completion_rule: null,
+    streak_target: null,
+    created_at: '2026-09-28T08:00:00.000Z',
+    passing_type: 'percent',
+    passing_value: 80,
+    max_attempts: 3,
+    score_strategy: 'best',
+    display_order: 2,
+    category_id: null,
+    group_ids: null,
+  },
+  {
+    id: '00000000-0000-4000-b000-000000000003',
+    title: 'ทบทวนก่อนสอบกลางภาค',
+    type: 'exercise',
+    mode: 'standard',
+    status: 'closed',
+    start_at: null,
+    end_at: '2026-09-29T08:00:00.000Z',
+    question_ids: ['q1', 'q2', 'q3', 'q4'],
+    random_question_count: null,
+    completion_rule: null,
+    streak_target: null,
+    created_at: '2026-09-29T08:00:00.000Z',
+    passing_type: 'percent',
+    passing_value: 70,
+    max_attempts: 1,
+    score_strategy: 'best',
+    display_order: 3,
+    category_id: null,
+    group_ids: null,
+  },
+]
 
 const FIRST = ['กนกธร', 'กมลวรรณ', 'ขวัญหทัย', 'จิรัชญา', 'ชญานิษฐ์', 'ชลดา', 'ชลธิชา', 'โชติกา', 'ชาคริต', 'ณัฐวุฒิ', 'ธนกร', 'ธีรภัทร', 'นภัสสร', 'ปภาวรินทร์', 'พิมพ์ชนก', 'ภูมิพัฒน์', 'วรินทร', 'ศุภกร', 'สิรินดา', 'อนันดา']
 const LAST = ['พรมยศ', 'จินามา', 'ขัติยเนตร', 'สุวราพัฒนากรณ์', 'คงธนอนันต์', 'ปัญญาดิบวงศ์', 'ทะยศ', 'บุญหนอ', 'ศรีสุข', 'ใจดี', 'มั่นคง', 'รุ่งเรือง']
@@ -168,6 +238,29 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
           className="w-full justify-start"
         />
       </Card>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">ตัวอย่างรายการงานและการลากเรียง</h2>
+          <p className="text-sm text-muted-foreground">
+            มีครบทั้งฉบับร่าง เผยแพร่แล้ว และปิดแล้ว · ลำดับที่ลากอยู่ในหน่วยความจำของแท็บนี้
+          </p>
+        </div>
+        <ClassroomAssignmentsTab
+          classroomId={CLASSROOM_ID}
+          assignments={LAB_ASSIGNMENTS}
+          categories={[]}
+          submissions={[]}
+          studentCount={32}
+          pendingReviewByAssignment={{}}
+          onReorderAssignments={async () => {
+            await wait()
+            return fail
+              ? { error: '(ห้องทดลอง) บันทึกลำดับไม่สำเร็จ — รายการควรย้อนกลับเป็นแบบเดิม' }
+              : {}
+          }}
+        />
+      </section>
 
       <div className="max-w-2xl">
         <AssignmentReviewSummary

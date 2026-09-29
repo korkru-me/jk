@@ -321,7 +321,6 @@ export function ClassroomDetailClient({
             audienceByAssignment={audienceByAssignment}
             groupNameById={groupNameById}
             pendingReviewByAssignment={pendingReviewByAssignment}
-            onViewScores={() => navigateTo('scores')}
           />
         )}
         {activeTab === 'scores' && canManage && (

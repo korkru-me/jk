@@ -1,25 +1,44 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  BarChart3,
   CheckCircle2,
   ClipboardCheck,
   Clock,
   Copy,
   Eye,
   Folder,
+  GripVertical,
   Grid3x3,
   Pencil,
   RefreshCw,
   Target,
   Users,
 } from 'lucide-react'
+import {
+  DndContext,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS as DndCSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { setAssignmentCategory } from '@/lib/actions/assignment-categories'
+import { reorderAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { assignmentCopyHref } from '@/lib/assignment-creation'
+import { moveVisibleAssignmentColumn, reconcileAssignmentOrder } from '@/lib/assignment-column-order'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { formatPassingThreshold } from '@/lib/grading'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
@@ -35,6 +54,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
@@ -83,10 +103,78 @@ export interface ClassroomAssignmentSubmissionRow {
 
 type TypeFilter = 'all' | 'exercise' | 'exam'
 
-const STATUS_CFG: Record<string, { label: string; bg: string; text: string }> = {
-  draft: { label: 'ฉบับร่าง', bg: 'bg-muted', text: 'text-muted-foreground' },
-  published: { label: 'เผยแพร่แล้ว', bg: 'bg-success/10', text: 'text-success' },
-  closed: { label: 'ปิดแล้ว', bg: 'bg-destructive/10', text: 'text-destructive' },
+const STATUS_CFG = {
+  draft: {
+    label: 'ฉบับร่าง',
+    badge: 'statusWarning',
+    row: 'border-l-warning bg-card hover:bg-muted/30',
+  },
+  published: {
+    label: 'เผยแพร่แล้ว',
+    badge: 'statusSuccess',
+    row: 'border-l-success bg-card hover:bg-muted/30',
+  },
+  closed: {
+    label: 'ปิดแล้ว',
+    badge: 'statusDestructive',
+    row: 'border-l-destructive bg-card hover:bg-muted/30',
+  },
+} as const
+
+function statusConfig(status: string) {
+  return STATUS_CFG[status as keyof typeof STATUS_CFG] ?? STATUS_CFG.draft
+}
+
+function SortableAssignmentRow({
+  assignmentId,
+  title,
+  disabled,
+  tone,
+  children,
+}: {
+  assignmentId: string
+  title: string
+  disabled: boolean
+  tone: string
+  children: ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: assignmentId, disabled })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: DndCSS.Transform.toString(transform), transition }}
+      className={cn(
+        'flex gap-2 border-l-4 px-2 py-3 transition-[background-color,box-shadow,opacity]',
+        tone,
+        isDragging && 'relative z-10 opacity-75 shadow-md',
+      )}
+    >
+      <Button
+        ref={setActivatorNodeRef}
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`ลากเพื่อเปลี่ยนลำดับ ${title}`}
+        title="กดค้างแล้วลากเพื่อสลับลำดับ"
+        disabled={disabled}
+        className="mt-0.5 cursor-grab touch-none text-muted-foreground hover:bg-primary/10 hover:text-primary active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical />
+      </Button>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  )
 }
 
 interface Props {
@@ -100,7 +188,8 @@ interface Props {
   groupNameById?: Map<string, string>
   /** Hand-ins still waiting for a teacher's score, keyed by assignment id. */
   pendingReviewByAssignment?: Record<string, number>
-  onViewScores?: () => void
+  /** QA workbenches can keep reorder writes in memory instead of touching Supabase. */
+  onReorderAssignments?: (orderedAssignmentIds: string[]) => Promise<{ error?: string }>
 }
 
 export function ClassroomAssignmentsTab({
@@ -112,7 +201,7 @@ export function ClassroomAssignmentsTab({
   audienceByAssignment,
   groupNameById = new Map(),
   pendingReviewByAssignment,
-  onViewScores,
+  onReorderAssignments,
 }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categories, setCategories] = useState(initialCategories)
@@ -123,16 +212,41 @@ export function ClassroomAssignmentsTab({
     ])),
   )
   const [isPending, startTransition] = useTransition()
+  const [isOrderPending, startOrderTransition] = useTransition()
+  const defaultAssignmentIds = useMemo(
+    () => assignments
+      .map((assignment, index) => ({ assignment, index }))
+      .sort((a, b) => (
+        (a.assignment.display_order ?? Number.MAX_SAFE_INTEGER)
+          - (b.assignment.display_order ?? Number.MAX_SAFE_INTEGER)
+        || a.index - b.index
+      ))
+      .map(({ assignment }) => assignment.id),
+    [assignments],
+  )
+  const [assignmentOrder, setAssignmentOrder] = useState(defaultAssignmentIds)
+  const dndId = useId()
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  useEffect(() => {
+    setAssignmentOrder(current => reconcileAssignmentOrder(current, defaultAssignmentIds))
+  }, [defaultAssignmentIds])
 
   const categoryItems = useMemo(() => assignmentCategorySelectItems(categories), [categories])
 
-  const rows = useMemo(
-    () => assignments.map(assignment => ({
-      ...assignment,
-      category_id: normalizeAssignmentCategoryId(categoryByAssignment[assignment.id], categories),
-    })),
-    [assignments, categories, categoryByAssignment],
-  )
+  const rows = useMemo(() => {
+    const byId = new Map(assignments.map(assignment => [assignment.id, assignment]))
+    return reconcileAssignmentOrder(assignmentOrder, defaultAssignmentIds)
+      .flatMap(id => byId.get(id) ?? [])
+      .map(assignment => ({
+        ...assignment,
+        category_id: normalizeAssignmentCategoryId(categoryByAssignment[assignment.id], categories),
+      }))
+  }, [assignmentOrder, assignments, categories, categoryByAssignment, defaultAssignmentIds])
   const filtered = rows.filter(assignment => typeFilter === 'all' || assignment.type === typeFilter)
   const sections = groupAssignmentsByCategory(filtered, categories)
   const assignmentCounts = useMemo(() => {
@@ -168,6 +282,32 @@ export function ClassroomAssignmentsTab({
     ))
   }
 
+  function handleAssignmentDragEnd(visibleIds: string[], event: DragEndEvent) {
+    if (!event.over || event.active.id === event.over.id) return
+    const previousOrder = rows.map(assignment => assignment.id)
+    const nextOrder = moveVisibleAssignmentColumn(
+      previousOrder,
+      visibleIds,
+      String(event.active.id),
+      String(event.over.id),
+    )
+    if (nextOrder === previousOrder) return
+
+    setAssignmentOrder(nextOrder)
+    startOrderTransition(async () => {
+      const result = onReorderAssignments
+        ? await onReorderAssignments(nextOrder)
+        : await reorderAssignmentDisplayOrder(classroomId, nextOrder)
+      if (!result?.error) return
+      toast.error(result.error)
+      setAssignmentOrder(current => (
+        current.length === nextOrder.length && current.every((id, index) => id === nextOrder[index])
+          ? previousOrder
+          : current
+      ))
+    })
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -198,6 +338,14 @@ export function ClassroomAssignmentsTab({
         </div>
       </div>
 
+      {filtered.length > 1 && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <GripVertical className="size-3.5 shrink-0" aria-hidden="true" />
+          กดค้างที่ตัวจับแล้วลากขึ้น–ลงเพื่อสลับลำดับงาน ระบบจะบันทึกให้อัตโนมัติ
+          {isOrderPending && <span className="font-medium text-primary">กำลังบันทึก...</span>}
+        </p>
+      )}
+
       {filtered.length === 0 ? (
         <Card edge="ring" className="py-12 text-center text-sm text-muted-foreground">
           {assignments.length === 0 ? 'ยังไม่มีงานที่มอบหมายให้ห้องนี้' : 'ไม่พบงานที่ตรงกับตัวกรอง'}
@@ -207,8 +355,22 @@ export function ClassroomAssignmentsTab({
           {sections.map(section => {
             const preset = section.category ? groupPreset(section.category.color) : null
             const sectionKey = section.category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE
+            const sectionIds = section.assignments.map(assignment => assignment.id)
             return (
-              <Card key={sectionKey} edge="ring" className="overflow-hidden">
+              <DndContext
+                key={sectionKey}
+                id={`${dndId}-${sectionKey}`}
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={event => handleAssignmentDragEnd(sectionIds, event)}
+                accessibility={{
+                  screenReaderInstructions: {
+                    draggable: 'กด Space เพื่อหยิบงาน ใช้ปุ่มลูกศรเพื่อเลื่อน แล้วกด Space อีกครั้งเพื่อวาง หรือกด Escape เพื่อยกเลิก',
+                  },
+                }}
+              >
+                <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+                  <Card edge="ring" className="overflow-hidden">
                 {categories.length > 0 && (
                   <div className={cn(
                     'flex items-center gap-2 border-b px-4 py-2.5',
@@ -225,7 +387,7 @@ export function ClassroomAssignmentsTab({
                 )}
                 <div className="divide-y divide-border">
                   {section.assignments.map(assignment => {
-                    const statusCfg = STATUS_CFG[assignment.status] ?? STATUS_CFG.draft
+                    const statusCfg = statusConfig(assignment.status)
                     const typeCfg = TYPE_CFG[assignment.type] ?? TYPE_CFG.exam
                     const TypeIcon = typeCfg.icon
                     const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
@@ -238,10 +400,14 @@ export function ClassroomAssignmentsTab({
                       : `/assignments/${assignment.id}/results`
 
                     return (
-                      <div
+                      <SortableAssignmentRow
                         key={assignment.id}
-                        className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-muted/30"
+                        assignmentId={assignment.id}
+                        title={assignment.title}
+                        disabled={isOrderPending}
+                        tone={statusCfg.row}
                       >
+                        <div className="flex flex-col gap-3 px-2">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
                           <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                             <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
@@ -264,8 +430,8 @@ export function ClassroomAssignmentsTab({
                                   </span>
                                 )}
                                 {passingThreshold && (
-                                  <span className="flex items-center gap-0.5 text-xs text-warning">
-                                    <Target className="size-3" /> เกณฑ์ผ่าน {passingThreshold}
+                                  <span className="flex items-center gap-0.5 text-xs font-medium text-foreground">
+                                    <Target className="size-3 text-warning" /> เกณฑ์ผ่าน {passingThreshold}
                                   </span>
                                 )}
                                 {assignment.max_attempts !== 1 && (
@@ -278,8 +444,8 @@ export function ClassroomAssignmentsTab({
                                 )}
                                 {assignment.status !== 'draft' && (
                                   assignment.type === 'exercise' ? (
-                                    <span className="flex items-center gap-0.5 text-xs text-success">
-                                      <CheckCircle2 className="size-3" /> ทำเสร็จ {stats.completed}/{expected} คน
+                                    <span className="flex items-center gap-0.5 text-xs font-medium text-foreground">
+                                      <CheckCircle2 className="size-3 text-success" /> ทำเสร็จ {stats.completed}/{expected} คน
                                     </span>
                                   ) : (
                                     <>
@@ -287,16 +453,16 @@ export function ClassroomAssignmentsTab({
                                         <Users className="size-3" /> เข้าทำ {stats.attempted}/{expected} คน
                                       </span>
                                       {passingThreshold && (
-                                        <span className="flex items-center gap-0.5 text-xs text-success">
-                                          <CheckCircle2 className="size-3" /> ผ่าน {stats.passed}/{expected} คน
+                                        <span className="flex items-center gap-0.5 text-xs font-medium text-foreground">
+                                          <CheckCircle2 className="size-3 text-success" /> ผ่าน {stats.passed}/{expected} คน
                                         </span>
                                       )}
                                     </>
                                   )
                                 )}
                                 {pendingReview > 0 && (
-                                  <span className="flex items-center gap-0.5 text-xs font-medium text-warning">
-                                    <ClipboardCheck className="size-3" /> รอตรวจ {pendingReview} ชิ้น
+                                  <span className="flex items-center gap-0.5 text-xs font-medium text-foreground">
+                                    <ClipboardCheck className="size-3 text-warning" /> รอตรวจ {pendingReview} ชิ้น
                                   </span>
                                 )}
                               </div>
@@ -327,9 +493,9 @@ export function ClassroomAssignmentsTab({
                             <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
                               {typeCfg.label}
                             </span>
-                            <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', statusCfg.bg, statusCfg.text)}>
+                            <Badge variant={statusCfg.badge}>
                               {statusCfg.label}
-                            </span>
+                            </Badge>
                           </div>
                         </div>
 
@@ -353,7 +519,7 @@ export function ClassroomAssignmentsTab({
                           <Button variant="ghost" size="sm" render={<Link href={gradeHref} />}>
                             <ClipboardCheck data-icon="inline-start" />
                             ตรวจให้คะแนน
-                            {pendingReview > 0 && <span className="text-xs font-semibold text-warning">{pendingReview}</span>}
+                            {pendingReview > 0 && <span className="text-xs font-semibold text-foreground">{pendingReview}</span>}
                           </Button>
                           <Button
                             variant="ghost"
@@ -369,15 +535,15 @@ export function ClassroomAssignmentsTab({
                           >
                             <Copy data-icon="inline-start" /> ทำสำเนา
                           </Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => onViewScores?.()}>
-                            <BarChart3 data-icon="inline-start" /> ดูคะแนน
-                          </Button>
                         </div>
-                      </div>
+                        </div>
+                      </SortableAssignmentRow>
                     )
                   })}
                 </div>
-              </Card>
+                  </Card>
+                </SortableContext>
+              </DndContext>
             )
           })}
         </div>

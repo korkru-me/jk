@@ -9,10 +9,11 @@ const SCENARIOS: GroupsLabScenario[] = ['default', 'many', 'empty']
 
 /**
  * Local/Staging-only workbench for the classroom "กลุ่มย่อย" tab, the
- * "มอบหมายให้" picker, the two-level assignment creation menu, and the
- * classroom-themed assignment review card on a synthetic room. Every save is
- * answered from memory — nothing reads or writes a database, so dragging,
- * renaming, recolouring, deleting and random splits can all be tried freely.
+ * "มอบหมายให้" picker, the two-level assignment creation menu, the assignment
+ * status/reordering list, and the classroom-themed review card on a synthetic
+ * room. Every save is answered from memory — nothing reads or writes a
+ * database, so dragging, renaming, recolouring, deleting and random splits can
+ * all be tried freely.
  *
  * `?scenario=` none = 32 students in four groups; `many` = 143 students and
  * six groups (the size of a real room that looked cramped); `empty` = no
