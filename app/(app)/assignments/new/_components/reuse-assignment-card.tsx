@@ -80,7 +80,9 @@ export function ReuseAssignmentCard({
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="เลือกห้องเรียน" />
+                <SelectValue placeholder="เลือกห้องเรียน">
+                  {value => sourceClassrooms.find(classroom => classroom.id === value)?.name ?? 'เลือกห้องเรียน'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -100,7 +102,9 @@ export function ReuseAssignmentCard({
               onValueChange={value => value !== null && setAssignmentId(value)}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder={availableAssignments.length === 0 ? 'ห้องนี้ยังไม่มีงาน' : 'เลือกแบบฝึกหัดหรือข้อสอบ'} />
+                <SelectValue placeholder={availableAssignments.length === 0 ? 'ห้องนี้ยังไม่มีงาน' : 'เลือกแบบฝึกหัดหรือข้อสอบ'}>
+                  {value => availableAssignments.find(assignment => assignment.id === value)?.title ?? 'เลือกแบบฝึกหัดหรือข้อสอบ'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>

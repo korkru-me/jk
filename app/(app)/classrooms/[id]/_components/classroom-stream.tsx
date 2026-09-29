@@ -175,7 +175,9 @@ export function ClassroomStream({
                   <label className="text-xs font-medium text-foreground">1. เลือกห้องเรียนต้นทาง</label>
                   <Select value={reuseSourceId} onValueChange={value => value !== null && chooseReuseSource(value)}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="เลือกห้องเรียน" />
+                      <SelectValue placeholder="เลือกห้องเรียน">
+                        {value => crossPostTargets.find(target => target.id === value)?.name ?? 'เลือกห้องเรียน'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -194,7 +196,12 @@ export function ClassroomStream({
                     onValueChange={value => value !== null && setReuseAnnouncementId(value)}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder={isReusePending ? 'กำลังโหลด...' : reuseAnnouncements.length === 0 && reuseSourceId ? 'ห้องนี้ยังไม่มีประกาศ' : 'เลือกประกาศ'} />
+                      <SelectValue placeholder={isReusePending ? 'กำลังโหลด...' : reuseAnnouncements.length === 0 && reuseSourceId ? 'ห้องนี้ยังไม่มีประกาศ' : 'เลือกประกาศ'}>
+                        {value => {
+                          const selected = reuseAnnouncements.find(post => post.id === value)
+                          return selected ? reusableAnnouncementLabel(selected) : 'เลือกประกาศ'
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
