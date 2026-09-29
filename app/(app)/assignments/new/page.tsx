@@ -9,6 +9,7 @@ import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/c
 import type { AssignmentGroupOption } from '@/components/assignments/group-target-picker'
 import type { Classroom } from '@/lib/types'
 import { firstSearchParam, resolveAssignmentTypePreset } from '@/lib/assignment-creation'
+import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 import { AssignmentClassroomSidebar } from './_components/assignment-classroom-sidebar'
 import { AssignmentStartChoice, AssignmentTypeChoice } from './_components/assignment-start-choice'
@@ -245,13 +246,17 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     )
   }
 
-  if (!preselectedAssignmentType && requestedFlow === 'reuse' && preselectedClassroomId && hasReusableSource) {
+  if (!preselectedAssignmentType && requestedFlow === 'reuse' && preselectedClassroomId) {
     return (
       <>
         {assignmentSidebar}
         <div className="flex max-w-3xl flex-col gap-6">
-          <Button variant="ghost" className="w-fit" render={<Link href={flowHref({})} />}>
-            <ArrowLeft data-icon="inline-start" /> กลับไปเลือกวิธีมอบหมายงาน
+          <Button
+            variant="ghost"
+            className="w-fit"
+            render={<Link href={classroomNavigationPath(preselectedClassroomId, 'assignments')} />}
+          >
+            <ArrowLeft data-icon="inline-start" /> กลับไปงานที่มอบหมาย
           </Button>
           <ReuseAssignmentCard
             targetClassroomId={preselectedClassroomId}

@@ -3,6 +3,7 @@ import {
   assignmentCreationHref,
   assignmentCreationHubHref,
   assignmentCreationTitle,
+  assignmentReuseHref,
   firstSearchParam,
   newAssignmentTypeDefaults,
   resolveAssignmentTypePreset,
@@ -18,6 +19,12 @@ describe('assignment creation navigation', () => {
   it('builds a classroom-scoped exercise link', () => {
     expect(assignmentCreationHref('room 1', 'exercise')).toBe(
       '/assignments/new?classroom=room+1&type=exercise',
+    )
+  })
+
+  it('builds a classroom-scoped reuse link', () => {
+    expect(assignmentReuseHref('room 1')).toBe(
+      '/assignments/new?classroom=room+1&flow=reuse',
     )
   })
 

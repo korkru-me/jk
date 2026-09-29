@@ -45,7 +45,21 @@ export function ReuseAssignmentCard({
     [assignments, sourceClassroomId],
   )
 
-  if (sourceClassrooms.length === 0) return null
+  if (sourceClassrooms.length === 0) {
+    return (
+      <Card padding="lg" className="flex max-w-3xl items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Copy className="size-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-semibold text-foreground">ยังไม่มีงานจากห้องอื่นให้นำมาใช้</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            เมื่อมีแบบฝึกหัดหรือข้อสอบในห้องเรียนอื่น งานเหล่านั้นจะมาแสดงให้เลือกที่นี่
+          </p>
+        </div>
+      </Card>
+    )
+  }
 
   function reuseAssignment() {
     if (!assignmentId) return

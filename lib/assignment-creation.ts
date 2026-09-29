@@ -44,6 +44,15 @@ export function assignmentCreationHubHref(classroomId: string): string {
   return `/assignments/new?${searchParams.toString()}`
 }
 
+export function assignmentReuseHref(classroomId: string): string {
+  const searchParams = new URLSearchParams({
+    classroom: classroomId,
+    flow: 'reuse',
+  })
+
+  return `/assignments/new?${searchParams.toString()}`
+}
+
 export function resolveAssignmentTypePreset(
   value: string | readonly string[] | undefined,
 ): AssignmentType | undefined {

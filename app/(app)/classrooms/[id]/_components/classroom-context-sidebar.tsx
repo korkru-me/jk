@@ -7,11 +7,9 @@ import {
   ChevronLeft,
   ChevronsUpDown,
   LayoutDashboard,
-  Plus,
   School,
 } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
-import { assignmentCreationHubHref } from '@/lib/assignment-creation'
 import type {
   ClassroomNavigationItem,
   ClassroomNavigationKey,
@@ -19,6 +17,7 @@ import type {
 import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -188,15 +187,15 @@ export function ClassroomContextNavigation({
               </Button>
 
               {item.key === 'assignments' && (
-                <Button
+                <AssignmentCreationMenu
+                  classroomId={classroom.id}
+                  label="มอบหมายงาน"
                   variant={assignmentCreationActive ? 'navigation' : 'ghost'}
                   className="w-full justify-start"
-                  aria-current={assignmentCreationActive ? 'page' : undefined}
-                  render={<Link href={assignmentCreationHubHref(classroom.id)} onClick={onClose} />}
-                >
-                  <Plus data-icon="inline-start" />
-                  <span className="truncate">มอบหมายงาน</span>
-                </Button>
+                  align="start"
+                  active={assignmentCreationActive}
+                  onNavigate={onClose}
+                />
               )}
             </Fragment>
           )
