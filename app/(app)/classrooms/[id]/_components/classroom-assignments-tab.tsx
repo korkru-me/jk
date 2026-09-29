@@ -320,7 +320,7 @@ export function ClassroomAssignmentsTab({
                           </div>
                         </Link>
 
-                        <div className="grid min-w-[47rem] shrink-0 grid-cols-[10rem_11rem_6.5rem_7.5rem_2rem] items-center gap-2 overflow-x-auto md:overflow-visible">
+                        <div className="ml-auto grid w-max max-w-full shrink-0 grid-cols-[10rem_11rem_max-content_max-content_2rem] items-center gap-2 overflow-x-auto md:overflow-visible">
                           <Select
                             items={categoryItems}
                             value={assignment.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
