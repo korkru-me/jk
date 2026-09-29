@@ -23,6 +23,7 @@ import { withBackHref } from '@/lib/back-link'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
+import { classroomNavigationPath } from '@/lib/classroom-navigation'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
@@ -82,10 +83,10 @@ function AssignmentContextNavigation({
       <Button
         variant="ghost"
         className="w-full justify-start"
-        render={<Link href={`/classrooms/${a.classroom_id}`} onClick={onClose} />}
+        render={<Link href={classroomNavigationPath(a.classroom_id, 'assignments')} onClick={onClose} />}
       >
         <ChevronLeft data-icon="inline-start" />
-        กลับไปห้องเรียน
+        กลับไปงานที่มอบหมาย
       </Button>
 
       <Card radius="md" padding="sm" className="flex flex-col gap-3 border-primary/20 bg-primary/5">
