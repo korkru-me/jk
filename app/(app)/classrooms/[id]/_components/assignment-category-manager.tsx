@@ -1,12 +1,11 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { FolderPlus, Pencil, Trash2 } from 'lucide-react'
+import { Check, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -40,6 +39,8 @@ interface Props {
   onChange: (categories: AssignmentCategory[]) => void
 }
 
+const NEW_CATEGORY = 'new'
+
 export function AssignmentCategoryManager({
   classroomId,
   categories,
@@ -48,8 +49,10 @@ export function AssignmentCategoryManager({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [color, setColor] = useState<AssignmentCategoryColor>('purple')
+  const [colorPickerTarget, setColorPickerTarget] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
 
@@ -58,46 +61,66 @@ export function AssignmentCategoryManager({
     [categories],
   )
 
-  function resetForm() {
+  function resetEditor() {
     setEditingId(null)
+    setCreating(false)
     setName('')
-    setColor(nextAssignmentCategoryColor(categories.map(category => category.color)))
+    setColorPickerTarget(null)
   }
 
   function beginCreate() {
     setEditingId(null)
+    setCreating(true)
     setName(defaultAssignmentCategoryName(categories.map(category => category.name)))
     setColor(nextAssignmentCategoryColor(categories.map(category => category.color)))
+    setColorPickerTarget(null)
   }
 
-  function beginEdit(category: AssignmentCategory) {
+  function beginEdit(category: AssignmentCategory, showColors = false) {
+    setCreating(false)
     setEditingId(category.id)
     setName(category.name)
     setColor(category.color)
+    setColorPickerTarget(showColors ? category.id : null)
   }
 
-  function submit() {
+  function toggleEditColors(category: AssignmentCategory) {
+    if (editingId !== category.id) {
+      beginEdit(category, true)
+      return
+    }
+    setColorPickerTarget(current => current === category.id ? null : category.id)
+  }
+
+  function saveEdit() {
+    if (!editingId) return
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const categoryId = editingId
+    startTransition(async () => {
+      const result = await updateAssignmentCategory(classroomId, categoryId, { name: trimmed, color })
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      onChange(categories.map(category => category.id === result.category.id ? result.category : category))
+      resetEditor()
+      toast.success('แก้ไขหมวดงานแล้ว')
+    })
+  }
+
+  function createCategory() {
     const trimmed = name.trim()
     if (!trimmed) return
     startTransition(async () => {
-      if (editingId) {
-        const result = await updateAssignmentCategory(classroomId, editingId, { name: trimmed, color })
-        if (!result.ok) {
-          toast.error(result.error)
-          return
-        }
-        onChange(categories.map(category => category.id === result.category.id ? result.category : category))
-        toast.success('แก้ไขหมวดงานแล้ว')
-      } else {
-        const result = await createAssignmentCategory(classroomId, { name: trimmed, color })
-        if (!result.ok) {
-          toast.error(result.error)
-          return
-        }
-        onChange([...categories, result.category])
-        toast.success('เพิ่มหมวดงานแล้ว')
+      const result = await createAssignmentCategory(classroomId, { name: trimmed, color })
+      if (!result.ok) {
+        toast.error(result.error)
+        return
       }
-      resetForm()
+      onChange([...categories, result.category])
+      resetEditor()
+      toast.success('เพิ่มหมวดงานแล้ว')
     })
   }
 
@@ -119,12 +142,10 @@ export function AssignmentCategoryManager({
         return
       }
       onChange(categories.filter(item => item.id !== category.id))
-      if (editingId === category.id) resetForm()
+      if (editingId === category.id) resetEditor()
       toast.success('ลบหมวดแล้ว งานยังอยู่ครบ')
     })
   }
-
-  const isEditing = editingId !== null
 
   return (
     <>
@@ -132,39 +153,99 @@ export function AssignmentCategoryManager({
         open={open}
         onOpenChange={next => {
           setOpen(next)
-          if (next) beginCreate()
-          else resetForm()
+          resetEditor()
         }}
       >
         <DialogTrigger render={<Button variant="outline" size="sm" />}>
           <FolderPlus data-icon="inline-start" />
           จัดการหมวดงาน
         </DialogTrigger>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>จัดการหมวดงาน</DialogTitle>
             <DialogDescription>
-              หมวดจะแสดงทั้งในหน้าครูและนักเรียน งานที่ยังไม่เลือกหมวดจะอยู่ท้ายรายการ
+              กดดินสอเพื่อแก้ชื่อ หรือกดจุดสีเพื่อเปลี่ยนสี งานที่ไม่เลือกหมวดจะอยู่ท้ายรายการ
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
-            {sorted.length === 0 ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">{sorted.length} หมวด</p>
+            <Button type="button" size="sm" onClick={beginCreate} disabled={creating || isPending}>
+              <Plus data-icon="inline-start" />
+              เพิ่มหมวด
+            </Button>
+          </div>
+
+          <div className="flex max-h-80 flex-col gap-2 overflow-y-auto pr-1">
+            {creating && (
+              <CategoryEditorRow
+                target={NEW_CATEGORY}
+                name={name}
+                color={color}
+                assignmentCount={0}
+                colorsOpen={colorPickerTarget === NEW_CATEGORY}
+                pending={isPending}
+                submitLabel="เพิ่มหมวด"
+                onNameChange={setName}
+                onToggleColors={() => setColorPickerTarget(current => current === NEW_CATEGORY ? null : NEW_CATEGORY)}
+                onColorChange={next => {
+                  setColor(next)
+                  setColorPickerTarget(null)
+                }}
+                onCancel={resetEditor}
+                onSubmit={createCategory}
+              />
+            )}
+
+            {sorted.length === 0 && !creating ? (
               <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                ยังไม่มีหมวด ลองสร้าง “บทที่ 1” หรือ “การบ้านเสริม” ได้เลย
+                ยังไม่มีหมวด กด “เพิ่มหมวด” เพื่อเริ่มจัดงาน
               </p>
             ) : sorted.map(category => {
+              const isEditing = editingId === category.id
+              if (isEditing) {
+                return (
+                  <CategoryEditorRow
+                    key={category.id}
+                    target={category.id}
+                    name={name}
+                    color={color}
+                    assignmentCount={assignmentCounts.get(category.id) ?? 0}
+                    colorsOpen={colorPickerTarget === category.id}
+                    pending={isPending}
+                    submitLabel="บันทึกการแก้ไข"
+                    onNameChange={setName}
+                    onToggleColors={() => toggleEditColors(category)}
+                    onColorChange={next => {
+                      setColor(next)
+                      setColorPickerTarget(null)
+                    }}
+                    onCancel={resetEditor}
+                    onSubmit={saveEdit}
+                  />
+                )
+              }
+
               const preset = groupPreset(category.color)
               return (
                 <div key={category.id} className="flex items-center gap-2 rounded-lg border p-2">
-                  <span className={cn('size-3 shrink-0 rounded-full', preset.solid)} aria-hidden="true" />
+                  <IconButton
+                    label={`เปลี่ยนสีหมวด ${category.name}`}
+                    size="sm"
+                    type="button"
+                    onClick={() => toggleEditColors(category)}
+                    disabled={isPending}
+                  >
+                    <span className={cn('size-3 rounded-full', preset.solid)} aria-hidden="true" />
+                  </IconButton>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{category.name}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="shrink-0 text-xs text-muted-foreground">
                     {assignmentCounts.get(category.id) ?? 0} งาน
                   </span>
                   <IconButton
                     label={`แก้ไขหมวด ${category.name}`}
                     size="sm"
+                    type="button"
                     onClick={() => beginEdit(category)}
                     disabled={isPending}
                   >
@@ -173,6 +254,7 @@ export function AssignmentCategoryManager({
                   <IconButton
                     label={`ลบหมวด ${category.name}`}
                     size="sm"
+                    type="button"
                     variant="destructive"
                     onClick={() => remove(category)}
                     disabled={isPending}
@@ -184,48 +266,108 @@ export function AssignmentCategoryManager({
             })}
           </div>
 
-          <div className="flex flex-col gap-3 rounded-xl bg-muted/40 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold">{isEditing ? 'แก้ไขหมวด' : 'เพิ่มหมวดใหม่'}</p>
-              {isEditing && (
-                <Button variant="ghost" size="xs" type="button" onClick={beginCreate}>
-                  ยกเลิกการแก้ไข
-                </Button>
-              )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="assignment-category-name">ชื่อหมวด</Label>
-              <Input
-                id="assignment-category-name"
-                value={name}
-                onChange={event => setName(event.target.value)}
-                maxLength={ASSIGNMENT_CATEGORY_NAME_MAX}
-                placeholder="เช่น บทที่ 1: การเคลื่อนที่"
-                disabled={isPending}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>สีของหมวด</Label>
-              <GroupColorSwatches
-                value={color}
-                onChange={setColor}
-                idPrefix="assignment-category-color"
-                ariaLabel="สีของหมวดงาน"
-              />
-            </div>
-          </div>
-
           <DialogFooter>
             <Button variant="outline" type="button" onClick={() => setOpen(false)}>
               ปิด
-            </Button>
-            <Button type="button" onClick={submit} disabled={!name.trim() || isPending}>
-              {isPending ? 'กำลังบันทึก…' : isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มหมวด'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       {confirmDialog}
     </>
+  )
+}
+
+function CategoryEditorRow({
+  target,
+  name,
+  color,
+  assignmentCount,
+  colorsOpen,
+  pending,
+  submitLabel,
+  onNameChange,
+  onToggleColors,
+  onColorChange,
+  onCancel,
+  onSubmit,
+}: {
+  target: string
+  name: string
+  color: AssignmentCategoryColor
+  assignmentCount: number
+  colorsOpen: boolean
+  pending: boolean
+  submitLabel: string
+  onNameChange: (name: string) => void
+  onToggleColors: () => void
+  onColorChange: (color: AssignmentCategoryColor) => void
+  onCancel: () => void
+  onSubmit: () => void
+}) {
+  const preset = groupPreset(color)
+  const colorPanelId = `assignment-category-colors-${target}`
+
+  return (
+    <div className="rounded-lg border bg-muted/20">
+      <form
+        className="flex items-center gap-2 p-2"
+        onSubmit={event => {
+          event.preventDefault()
+          onSubmit()
+        }}
+      >
+        <IconButton
+          label="เปลี่ยนสีหมวด"
+          size="sm"
+          type="button"
+          aria-expanded={colorsOpen}
+          aria-controls={colorPanelId}
+          onClick={onToggleColors}
+          disabled={pending}
+        >
+          <span className={cn('size-3 rounded-full', preset.solid)} aria-hidden="true" />
+        </IconButton>
+        <Input
+          value={name}
+          onChange={event => onNameChange(event.target.value)}
+          maxLength={ASSIGNMENT_CATEGORY_NAME_MAX}
+          placeholder="ชื่อหมวด เช่น บทที่ 1"
+          aria-label="ชื่อหมวด"
+          autoFocus
+          onFocus={event => event.currentTarget.select()}
+          disabled={pending}
+          className="min-w-0 flex-1"
+        />
+        <span className="shrink-0 text-xs text-muted-foreground">{assignmentCount} งาน</span>
+        <IconButton
+          label={submitLabel}
+          size="sm"
+          type="submit"
+          disabled={!name.trim() || pending}
+        >
+          <Check />
+        </IconButton>
+        <IconButton
+          label="ยกเลิก"
+          size="sm"
+          type="button"
+          onClick={onCancel}
+          disabled={pending}
+        >
+          <X />
+        </IconButton>
+      </form>
+      {colorsOpen && (
+        <div id={colorPanelId} className="border-t px-3 py-2">
+          <GroupColorSwatches
+            value={color}
+            onChange={onColorChange}
+            idPrefix={`assignment-category-color-${target}`}
+            ariaLabel="เลือกสีของหมวดงาน"
+          />
+        </div>
+      )}
+    </div>
   )
 }
