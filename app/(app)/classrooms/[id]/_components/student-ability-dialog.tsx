@@ -135,9 +135,6 @@ function DialogBody({
                 <span className="flex items-center gap-1.5">
                   <span aria-hidden="true" className="size-2.5 rounded-sm bg-primary" /> {student.full_name.split(' ')[0]}
                 </span>
-                {showClassAverage && <span className="flex items-center gap-1.5">
-                  <span aria-hidden="true" className="h-0.5 w-3.5 rounded-full bg-muted-foreground" /> ค่าเฉลี่ยห้อง
-                </span>}
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-muted px-3 py-2 text-xs text-foreground">
@@ -152,6 +149,14 @@ function DialogBody({
                 <ChartTypeToggle value={effectiveChart} onChange={onChartTypeChange} radarAllowed={radarAllowed} />
               </div>
             </div>
+            {showClassAverage && (
+              <div className="flex justify-end">
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span aria-hidden="true" className="h-0.5 w-3.5 rounded-full bg-muted-foreground" />
+                  ค่าเฉลี่ยห้อง
+                </span>
+              </div>
+            )}
             {effectiveChart === 'radar'
               ? <AbilityRadarChart data={data} activeKey={activeKey} onActiveChange={setActiveKey} label={chartLabel} showClassAverage={showClassAverage} labelMode={labelMode} />
               : <AbilityBarChart data={data} activeKey={activeKey} onActiveChange={setActiveKey} label={chartLabel} showClassAverage={showClassAverage} labelMode={labelMode} />}
