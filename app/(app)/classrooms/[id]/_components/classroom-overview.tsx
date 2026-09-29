@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { ClassroomStream } from './classroom-stream'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { assignmentCreationHubHref } from '@/lib/assignment-creation'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { SEVERITY_BADGE } from '@/lib/calendar-display'
 import { summarizeClassroomProgress, isDueBy, type AssignmentProgress, type ProgressSubmission } from '@/lib/classroom-progress'
@@ -201,7 +202,7 @@ export function ClassroomOverview({
                 </p>
                 {!isHomeroom && (
                   <Link
-                    href={`/assignments/new?classroom=${classroomId}`}
+                    href={assignmentCreationHubHref(classroomId)}
                     className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5')}
                   >
                     <Plus className="w-3.5 h-3.5" /> มอบหมายงานแรก

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assignmentCreationHref,
+  assignmentCreationHubHref,
   assignmentCreationTitle,
   firstSearchParam,
   newAssignmentTypeDefaults,
@@ -8,6 +9,12 @@ import {
 } from './assignment-creation'
 
 describe('assignment creation navigation', () => {
+  it('builds the shared classroom-scoped assignment start link', () => {
+    expect(assignmentCreationHubHref('room 1')).toBe(
+      '/assignments/new?classroom=room+1',
+    )
+  })
+
   it('builds a classroom-scoped exercise link', () => {
     expect(assignmentCreationHref('room 1', 'exercise')).toBe(
       '/assignments/new?classroom=room+1&type=exercise',

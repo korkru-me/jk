@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { fetchBankQuestions } from '@/lib/question-bank'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
 import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import type { AssignmentGroupOption } from '@/components/assignments/group-target-picker'
@@ -9,9 +11,11 @@ import type { Classroom } from '@/lib/types'
 import { firstSearchParam, resolveAssignmentTypePreset } from '@/lib/assignment-creation'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 import { AssignmentClassroomSidebar } from './_components/assignment-classroom-sidebar'
+import { AssignmentStartChoice, AssignmentTypeChoice } from './_components/assignment-start-choice'
 import {
   ReuseAssignmentCard, type ReusableAssignmentOption,
 } from './_components/reuse-assignment-card'
+import { Button } from '@/components/ui/button'
 
 export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
 
@@ -21,6 +25,7 @@ interface Props {
     set?: string | string[]
     sections?: string | string[]
     type?: string | string[]
+    flow?: string | string[]
   }>
 }
 
@@ -51,11 +56,13 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     set: setValue,
     sections: sectionsValue,
     type: typeParam,
+    flow: flowValue,
   } = await searchParams
   const classroomParam = firstSearchParam(classroomValue)
   const setParam = firstSearchParam(setValue)
   const sectionsParam = firstSearchParam(sectionsValue)
   const preselectedAssignmentType = resolveAssignmentTypePreset(typeParam)
+  const requestedFlow = firstSearchParam(flowValue)
 
   const supabase = await createClient()
   const user = await getAuthUser()
@@ -201,25 +208,78 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     }
   }
 
-  return (
-    <>
-      {contextualClassroom && (
-        <AssignmentClassroomSidebar
-          classroom={contextualClassroom}
-          switchableClassrooms={classrooms}
-          studentCount={contextualStudentCount}
-          isOwner={contextualClassroom.teacher_id === user.id}
-        />
-      )}
+  const baseSearchParams = new URLSearchParams()
+  if (preselectedClassroomId) baseSearchParams.set('classroom', preselectedClassroomId)
+  if (setParam) baseSearchParams.set('set', setParam)
+  if (sectionsParam) baseSearchParams.set('sections', sectionsParam)
+  const flowHref = ({ flow, type }: { flow?: 'create' | 'reuse'; type?: 'exercise' | 'exam' }) => {
+    const params = new URLSearchParams(baseSearchParams)
+    if (flow) params.set('flow', flow)
+    if (type) params.set('type', type)
+    const query = params.toString()
+    return query ? `/assignments/new?${query}` : '/assignments/new'
+  }
 
-      <div className="max-w-2xl space-y-6">
-        {preselectedClassroomId && (
+  const assignmentSidebar = contextualClassroom ? (
+    <AssignmentClassroomSidebar
+      classroom={contextualClassroom}
+      switchableClassrooms={classrooms}
+      studentCount={contextualStudentCount}
+      isOwner={contextualClassroom.teacher_id === user.id}
+    />
+  ) : null
+
+  const hasReusableSource = preselectedClassroomId !== undefined
+    && reusableAssignments.some(assignment => assignment.classroomId !== preselectedClassroomId)
+
+  if (!preselectedAssignmentType && requestedFlow === 'create') {
+    return (
+      <>
+        {assignmentSidebar}
+        <AssignmentTypeChoice
+          backHref={flowHref({})}
+          exerciseHref={flowHref({ type: 'exercise' })}
+          examHref={flowHref({ type: 'exam' })}
+        />
+      </>
+    )
+  }
+
+  if (!preselectedAssignmentType && requestedFlow === 'reuse' && preselectedClassroomId && hasReusableSource) {
+    return (
+      <>
+        {assignmentSidebar}
+        <div className="flex max-w-3xl flex-col gap-6">
+          <Button variant="ghost" className="w-fit" render={<Link href={flowHref({})} />}>
+            <ArrowLeft data-icon="inline-start" /> กลับไปเลือกวิธีมอบหมายงาน
+          </Button>
           <ReuseAssignmentCard
             targetClassroomId={preselectedClassroomId}
             classrooms={classrooms}
             assignments={reusableAssignments}
           />
-        )}
+        </div>
+      </>
+    )
+  }
+
+  if (!preselectedAssignmentType) {
+    return (
+      <>
+        {assignmentSidebar}
+        <AssignmentStartChoice
+          createHref={flowHref({ flow: 'create' })}
+          reuseHref={hasReusableSource ? flowHref({ flow: 'reuse' }) : undefined}
+        />
+      </>
+    )
+  }
+
+  return (
+    <>
+      {assignmentSidebar}
+
+      <div className="max-w-2xl space-y-6">
         <CreateAssignmentForm
           classrooms={classrooms}
           groupsByClassroom={groupsByClassroom}

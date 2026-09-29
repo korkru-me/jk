@@ -94,7 +94,7 @@ interface Props {
   questionSets?: AssignmentQuestionSetOption[]
   preselectedClassroomId?: string
   preselectedSet?: AssignmentQuestionSetOption
-  preselectedAssignmentType?: AssignmentType
+  preselectedAssignmentType: AssignmentType
 }
 
 export function CreateAssignmentForm({
@@ -107,8 +107,8 @@ export function CreateAssignmentForm({
   preselectedAssignmentType,
 }: Props) {
   const router = useRouter()
-  const initialAssignmentType = preselectedAssignmentType ?? 'exercise'
-  const initialTypeDefaults = newAssignmentTypeDefaults(initialAssignmentType)
+  const assignmentType = preselectedAssignmentType
+  const initialTypeDefaults = newAssignmentTypeDefaults(assignmentType)
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
   const [showPublishDialog, setShowPublishDialog] = useState(false)
@@ -123,7 +123,6 @@ export function CreateAssignmentForm({
   )
   // มอบหมายให้: absent/null per room = นักเรียนทุกคนในห้อง, the default.
   const [groupTargets, setGroupTargets] = useState<GroupTargets>({})
-  const [assignmentType, setAssignmentType] = useState<AssignmentType>(initialAssignmentType)
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
   // able to block students is not a safe default.
@@ -178,7 +177,6 @@ export function CreateAssignmentForm({
   // before this setting existed, and one that does is a choice, not a default.
   const [showSolutions, setShowSolutions] = useState(false)
   const [maxAttempts, setMaxAttempts] = useState(initialTypeDefaults.maxAttempts)
-  const [attemptsAuto, setAttemptsAuto] = useState(true)
   const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
   // On by default: a แบบฝึกหัด a student can retake is nearly always meant as
   // a second chance at what they got wrong, not as the whole set again. A
@@ -323,34 +321,6 @@ export function CreateAssignmentForm({
   useEffect(() => {
     if (Number(randomQuestionCount) > maxRandomDraw) setRandomQuestionCount(String(maxRandomDraw))
   }, [maxRandomDraw, randomQuestionCount])
-
-  useEffect(() => {
-    const defaults = newAssignmentTypeDefaults(assignmentType)
-    setCalculatorEnabled(defaults.mathToolsEnabled)
-    setScratchpadEnabled(defaults.mathToolsEnabled)
-  }, [assignmentType])
-
-  // The classroom sidebar stays available on this route. Choosing its other
-  // assignment type changes only the URL search params, so this component may
-  // be preserved by the App Router instead of remounting. Keep the form's
-  // behavior aligned with the new preset without discarding the title,
-  // selected questions, or other work already entered.
-  useEffect(() => {
-    if (!preselectedAssignmentType) return
-
-    setAssignmentType(preselectedAssignmentType)
-    if (preselectedAssignmentType !== 'exam') {
-      setSecureBrowserMode('browser')
-      setAndroidExamMode('blocked')
-      setSebQuitPassword('')
-      setSebQuitPasswordConfirmation('')
-    }
-    if (attemptsAuto) {
-      const defaults = newAssignmentTypeDefaults(preselectedAssignmentType)
-      setMaxAttempts(defaults.maxAttempts)
-      setRetryScope(defaults.retryScope)
-    }
-  }, [attemptsAuto, preselectedAssignmentType])
 
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
@@ -673,45 +643,6 @@ export function CreateAssignmentForm({
             )}
 
           </Card>
-
-          {!preselectedAssignmentType && (
-            <Card padding="xl" className="space-y-3">
-              <h2 className="font-semibold text-foreground">ประเภทงาน</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {(['exercise', 'exam'] as const).map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => {
-                      setAssignmentType(t)
-                      if (t !== 'exam') {
-                        setSecureBrowserMode('browser')
-                        setAndroidExamMode('blocked')
-                        setSebQuitPassword('')
-                        setSebQuitPasswordConfirmation('')
-                      }
-                      if (attemptsAuto) {
-                        const defaults = newAssignmentTypeDefaults(t)
-                        setMaxAttempts(defaults.maxAttempts)
-                        setRetryScope(defaults.retryScope)
-                      }
-                    }}
-                    className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
-                      assignmentType === t ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                    }`}
-                  >
-                    <div className="text-xl leading-none shrink-0">{t === 'exam' ? '📝' : '🔁'}</div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm text-foreground">{t === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t === 'exam' ? 'ทำได้ครั้งเดียว' : 'ทำได้หลายครั้ง'}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </Card>
-          )}
 
         </div>
       )}
@@ -1612,7 +1543,6 @@ export function CreateAssignmentForm({
               value={maxAttempts}
               onChange={e => {
                 setMaxAttempts(e.target.value)
-                setAttemptsAuto(false)
                 if (e.target.value === '1') setRetryScope('all')
               }}
               placeholder="ไม่จำกัด (เว้นว่าง)"

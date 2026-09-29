@@ -4,17 +4,14 @@ import { Fragment, useId, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   BookOpen,
-  ChevronDown,
   ChevronLeft,
   ChevronsUpDown,
-  ClipboardPenLine,
   LayoutDashboard,
   Plus,
-  Repeat2,
   School,
 } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
-import { assignmentCreationHref } from '@/lib/assignment-creation'
+import { assignmentCreationHubHref } from '@/lib/assignment-creation'
 import type {
   ClassroomNavigationItem,
   ClassroomNavigationKey,
@@ -191,48 +188,15 @@ export function ClassroomContextNavigation({
               </Button>
 
               {item.key === 'assignments' && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={(
-                      <Button
-                        type="button"
-                        variant={assignmentCreationActive ? 'navigation' : 'ghost'}
-                        className="w-full justify-start data-popup-open:bg-primary/10 data-popup-open:text-primary"
-                        aria-current={assignmentCreationActive ? 'page' : undefined}
-                      />
-                    )}
-                  >
-                    <Plus data-icon="inline-start" />
-                    <span className="truncate">มอบหมายงาน</span>
-                    <ChevronDown data-icon="inline-end" className="ml-auto" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem
-                        render={(
-                          <Link
-                            href={assignmentCreationHref(classroom.id, 'exercise')}
-                            onClick={onClose}
-                          />
-                        )}
-                      >
-                        <Repeat2 />
-                        แบบฝึกหัด
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        render={(
-                          <Link
-                            href={assignmentCreationHref(classroom.id, 'exam')}
-                            onClick={onClose}
-                          />
-                        )}
-                      >
-                        <ClipboardPenLine />
-                        ข้อสอบ
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button
+                  variant={assignmentCreationActive ? 'navigation' : 'ghost'}
+                  className="w-full justify-start"
+                  aria-current={assignmentCreationActive ? 'page' : undefined}
+                  render={<Link href={assignmentCreationHubHref(classroom.id)} onClick={onClose} />}
+                >
+                  <Plus data-icon="inline-start" />
+                  <span className="truncate">มอบหมายงาน</span>
+                </Button>
               )}
             </Fragment>
           )

@@ -31,7 +31,10 @@ export function ReuseAssignmentCard({
   classrooms: AssignmentClassroomOption[]
   assignments: ReusableAssignmentOption[]
 }) {
-  const sourceClassrooms = classrooms.filter(classroom => classroom.id !== targetClassroomId)
+  const reusableSourceIds = new Set(assignments.map(assignment => assignment.classroomId))
+  const sourceClassrooms = classrooms.filter(classroom => (
+    classroom.id !== targetClassroomId && reusableSourceIds.has(classroom.id)
+  ))
   const [sourceClassroomId, setSourceClassroomId] = useState(sourceClassrooms[0]?.id ?? '')
   const [assignmentId, setAssignmentId] = useState('')
   const [isPending, startTransition] = useTransition()

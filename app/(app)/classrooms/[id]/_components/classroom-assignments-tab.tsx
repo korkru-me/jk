@@ -35,6 +35,7 @@ import {
   type AssignmentCategory,
 } from '@/lib/assignment-categories'
 import { cn } from '@/lib/utils'
+import { assignmentCreationHubHref } from '@/lib/assignment-creation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -209,7 +210,7 @@ export function ClassroomAssignmentsTab({
             assignmentCounts={assignmentCounts}
             onChange={handleCategoriesChange}
           />
-          <Button size="sm" render={<Link href={`/assignments/new?classroom=${classroomId}`} />}>
+          <Button size="sm" render={<Link href={assignmentCreationHubHref(classroomId)} />}>
             <Plus data-icon="inline-start" />
             มอบหมายงานใหม่
           </Button>
