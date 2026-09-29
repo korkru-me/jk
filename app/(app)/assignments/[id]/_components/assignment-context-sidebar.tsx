@@ -238,7 +238,7 @@ export function AssignmentContextNavigation({
         {a.mode === 'online' && questionsReady && (
           <Button
             size="sm"
-            variant="outline"
+            variant="ghost"
             render={<Link href={`/assignments/${a.id}/preview`} target="_blank" rel="noopener noreferrer" onClick={onClose} />}
             className="w-full justify-start"
           >
@@ -247,7 +247,7 @@ export function AssignmentContextNavigation({
         )}
         <Button
           size="sm"
-          variant="outline"
+          variant="ghost"
           render={<Link href={gradeHref} onClick={onClose} />}
           className="w-full justify-start"
         >
@@ -258,7 +258,7 @@ export function AssignmentContextNavigation({
         </Button>
         <Button
           size="sm"
-          variant={currentSection === 'edit' ? 'navigation' : 'outline'}
+          variant={currentSection === 'edit' ? 'navigation' : 'ghost'}
           aria-current={currentSection === 'edit' ? 'page' : undefined}
           render={<Link href={`/assignments/${a.id}/edit`} onClick={onClose} />}
           className="w-full justify-start"
@@ -268,7 +268,7 @@ export function AssignmentContextNavigation({
         {questionsReady && (
           <Button
             size="sm"
-            variant="outline"
+            variant="ghost"
             render={(
               <Link
                 href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)}
@@ -286,7 +286,7 @@ export function AssignmentContextNavigation({
           <>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               render={<Link href={`/assignments/${a.id}/proctor`} onClick={onClose} />}
               className="w-full justify-start"
             >
@@ -294,7 +294,7 @@ export function AssignmentContextNavigation({
             </Button>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}
               className="w-full justify-start"
             >

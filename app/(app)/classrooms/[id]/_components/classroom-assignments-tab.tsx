@@ -11,7 +11,6 @@ import {
   Eye,
   Folder,
   Grid3x3,
-  MoreVertical,
   Pencil,
   Plus,
   RefreshCw,
@@ -47,13 +46,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { AssignmentCategoryManager } from './assignment-category-manager'
 
@@ -259,93 +251,103 @@ export function ClassroomAssignmentsTab({
                     return (
                       <div
                         key={assignment.id}
-                        className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-muted/50 md:flex-row md:items-center"
+                        className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-muted/30"
                       >
-                        <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                          <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
-                            <TypeIcon className={cn('size-4', typeCfg.text)} />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground" title={assignment.title}>
-                              {assignment.title}
-                            </p>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                              <span className="text-xs text-muted-foreground">{assignmentSizeLabel(assignment)}</span>
-                              {assignment.group_ids && (
-                                <span className="flex items-center gap-0.5 text-xs font-medium text-tint-1">
-                                  <Grid3x3 className="size-3" /> เฉพาะ {describeGroupTarget(assignment.group_ids, groupNameById)}
-                                </span>
-                              )}
-                              {assignment.max_attempts != null && (
-                                <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                                  <RefreshCw className="size-3" /> ทำได้ {assignment.max_attempts} ครั้ง
-                                </span>
-                              )}
-                              {passingThreshold && (
-                                <span className="flex items-center gap-0.5 text-xs text-warning">
-                                  <Target className="size-3" /> เกณฑ์ผ่าน {passingThreshold}
-                                </span>
-                              )}
-                              {assignment.max_attempts !== 1 && (
-                                <span className="text-xs text-muted-foreground">· เก็บ{SCORE_STRATEGY_LABELS[assignment.score_strategy]}</span>
-                              )}
-                              {assignment.end_at && (
-                                <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                                  <Clock className="size-3" /> {new Date(assignment.end_at).toLocaleDateString('th-TH')}
-                                </span>
-                              )}
-                              {assignment.status !== 'draft' && (
-                                assignment.type === 'exercise' ? (
-                                  <span className="flex items-center gap-0.5 text-xs text-success">
-                                    <CheckCircle2 className="size-3" /> ทำเสร็จ {stats.completed}/{expected} คน
-                                  </span>
-                                ) : (
-                                  <>
-                                    <span className="flex items-center gap-0.5 text-xs text-primary">
-                                      <Users className="size-3" /> เข้าทำ {stats.attempted}/{expected} คน
-                                    </span>
-                                    {passingThreshold && (
-                                      <span className="flex items-center gap-0.5 text-xs text-success">
-                                        <CheckCircle2 className="size-3" /> ผ่าน {stats.passed}/{expected} คน
-                                      </span>
-                                    )}
-                                  </>
-                                )
-                              )}
-                              {pendingReview > 0 && (
-                                <span className="flex items-center gap-0.5 text-xs font-medium text-warning">
-                                  <ClipboardCheck className="size-3" /> รอตรวจ {pendingReview} ชิ้น
-                                </span>
-                              )}
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+                          <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                            <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
+                              <TypeIcon className={cn('size-4', typeCfg.text)} />
                             </div>
-                          </div>
-                        </Link>
+                            <div className="min-w-0">
+                              <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground" title={assignment.title}>
+                                {assignment.title}
+                              </p>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{assignmentSizeLabel(assignment)}</span>
+                                {assignment.group_ids && (
+                                  <span className="flex items-center gap-0.5 text-xs font-medium text-tint-1">
+                                    <Grid3x3 className="size-3" /> เฉพาะ {describeGroupTarget(assignment.group_ids, groupNameById)}
+                                  </span>
+                                )}
+                                {assignment.max_attempts != null && (
+                                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                    <RefreshCw className="size-3" /> ทำได้ {assignment.max_attempts} ครั้ง
+                                  </span>
+                                )}
+                                {passingThreshold && (
+                                  <span className="flex items-center gap-0.5 text-xs text-warning">
+                                    <Target className="size-3" /> เกณฑ์ผ่าน {passingThreshold}
+                                  </span>
+                                )}
+                                {assignment.max_attempts !== 1 && (
+                                  <span className="text-xs text-muted-foreground">· เก็บ{SCORE_STRATEGY_LABELS[assignment.score_strategy]}</span>
+                                )}
+                                {assignment.end_at && (
+                                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                    <Clock className="size-3" /> {new Date(assignment.end_at).toLocaleDateString('th-TH')}
+                                  </span>
+                                )}
+                                {assignment.status !== 'draft' && (
+                                  assignment.type === 'exercise' ? (
+                                    <span className="flex items-center gap-0.5 text-xs text-success">
+                                      <CheckCircle2 className="size-3" /> ทำเสร็จ {stats.completed}/{expected} คน
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <span className="flex items-center gap-0.5 text-xs text-primary">
+                                        <Users className="size-3" /> เข้าทำ {stats.attempted}/{expected} คน
+                                      </span>
+                                      {passingThreshold && (
+                                        <span className="flex items-center gap-0.5 text-xs text-success">
+                                          <CheckCircle2 className="size-3" /> ผ่าน {stats.passed}/{expected} คน
+                                        </span>
+                                      )}
+                                    </>
+                                  )
+                                )}
+                                {pendingReview > 0 && (
+                                  <span className="flex items-center gap-0.5 text-xs font-medium text-warning">
+                                    <ClipboardCheck className="size-3" /> รอตรวจ {pendingReview} ชิ้น
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </Link>
 
-                        <div className="ml-auto grid w-max max-w-full shrink-0 grid-cols-[10rem_11rem_max-content_max-content_2rem] items-center gap-2 overflow-x-auto md:overflow-visible">
-                          <Select
-                            items={categoryItems}
-                            value={assignment.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
-                            onValueChange={value => moveToCategory(assignment.id, value)}
-                            disabled={isPending}
-                          >
-                            <SelectTrigger size="sm" className="w-full" aria-label={`กลุ่มของ ${assignment.title}`}>
-                              <Folder />
-                              <SelectValue>
-                                {value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectGroup>
-                                {categoryItems.map(item => (
-                                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                            <Select
+                              items={categoryItems}
+                              value={assignment.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
+                              onValueChange={value => moveToCategory(assignment.id, value)}
+                              disabled={isPending}
+                            >
+                              <SelectTrigger size="sm" className="w-40 max-w-full" aria-label={`กลุ่มของ ${assignment.title}`}>
+                                <Folder />
+                                <SelectValue>
+                                  {value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent align="end">
+                                <SelectGroup>
+                                  {categoryItems.map(item => (
+                                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                            <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
+                              {typeCfg.label}
+                            </span>
+                            <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', statusCfg.bg, statusCfg.text)}>
+                              {statusCfg.label}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/40 p-1 md:justify-end">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="w-full"
                             render={(
                               <Link
                                 href={`/assignments/${assignment.id}/preview`}
@@ -357,39 +359,32 @@ export function ClassroomAssignmentsTab({
                             )}
                           >
                             <Eye data-icon="inline-start" />
-                            <span className="hidden xl:inline">ดูในมุมนักเรียน</span>
+                            ดูในมุมนักเรียน
                           </Button>
-                          <span className={cn('justify-self-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
-                            {typeCfg.label}
-                          </span>
-                          <span className={cn('justify-self-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', statusCfg.bg, statusCfg.text)}>
-                            {statusCfg.label}
-                          </span>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              className="flex size-7 items-center justify-center justify-self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground"
-                              aria-label={`เมนูของ ${assignment.title}`}
-                            >
-                              <MoreVertical className="size-3.5" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuGroup>
-                                <DropdownMenuItem render={<Link href={gradeHref} />}>
-                                  <ClipboardCheck /> ตรวจให้คะแนน
-                                  {pendingReview > 0 && <span className="ml-auto text-xs font-semibold text-warning">{pendingReview}</span>}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem render={<Link href={`/assignments/${assignment.id}/edit`} />}>
-                                  <Pencil /> แก้ไขรายละเอียด
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDuplicate(assignment.id)} disabled={isPending}>
-                                  <Copy /> ทำสำเนามาห้องนี้
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onViewScores?.()}>
-                                  <BarChart3 /> ดูคะแนน
-                                </DropdownMenuItem>
-                              </DropdownMenuGroup>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button variant="ghost" size="sm" render={<Link href={gradeHref} />}>
+                            <ClipboardCheck data-icon="inline-start" />
+                            ตรวจให้คะแนน
+                            {pendingReview > 0 && <span className="text-xs font-semibold text-warning">{pendingReview}</span>}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            render={<Link href={`/assignments/${assignment.id}/edit`} />}
+                          >
+                            <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDuplicate(assignment.id)}
+                            disabled={isPending}
+                          >
+                            <Copy data-icon="inline-start" /> ทำสำเนามาห้องนี้
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => onViewScores?.()}>
+                            <BarChart3 data-icon="inline-start" /> ดูคะแนน
+                          </Button>
                         </div>
                       </div>
                     )
