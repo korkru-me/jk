@@ -10,12 +10,16 @@ import {
   SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, Search, Shuffle, UserPlus, Users, X } from 'lucide-react'
+import { GripVertical, Plus, Search, UserPlus, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuRadioGroup,
@@ -25,11 +29,12 @@ import { cn } from '@/lib/utils'
 import {
   GROUP_COLOR_IDS, GROUP_NAME_MAX, MAX_GROUPS_PER_CLASSROOM,
   defaultGroupName, isGroupColorId, nextGroupColor, normalizeGroupName,
+  filterGroupStudents, GROUP_STUDENT_FILTER_ALL, GROUP_STUDENT_FILTER_MISSING,
   type ClassroomGroup, type GroupColorId,
 } from '@/lib/classroom-groups'
 import { useGroupActions } from './group-actions-context'
 import {
-  AddStudentsDialog, CreateGroupDialog, RandomSplitDialog, groupPreset, type GroupStudent,
+  AddStudentsDialog, CreateGroupDialog, groupPreset, type GroupStudent,
 } from './group-dialogs'
 
 /** The room's กลุ่มย่อย, held by the classroom page so it outlives tab switches. */
@@ -53,6 +58,7 @@ interface Props {
 type DragItem = { type: 'student'; id: string } | { type: 'group'; id: string }
 
 const POOL_ID = 'pool'
+const rosterCollator = new Intl.Collator('th', { numeric: true, sensitivity: 'base' })
 
 /**
  * Students are dropped on whatever the pointer is inside — a group card or
@@ -93,18 +99,19 @@ function initialOf(name: string): string {
 
 export function BreakoutGroups({ classroomId, students, state, setState, canManage, assignmentTitlesByGroup }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
-  const [randomOpen, setRandomOpen] = useState(false)
   const [pickerGroupId, setPickerGroupId] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'create' | 'random' | null>(null)
+  const [busy, setBusy] = useState<'create' | null>(null)
   const [dragging, setDragging] = useState<DragItem | null>(null)
   const [poolQuery, setPoolQuery] = useState('')
+  const [poolGrade, setPoolGrade] = useState(GROUP_STUDENT_FILTER_ALL)
+  const [poolSection, setPoolSection] = useState(GROUP_STUDENT_FILTER_ALL)
   const [confirm, confirmDialog] = useConfirm()
   // dnd-kit numbers its screen-reader hint ids with a module counter, which
   // differs between the server render and the browser; a stable id avoids the
   // hydration mismatch.
   const dndId = useId()
   const {
-    createClassroomGroup, deleteClassroomGroup, moveStudentsToGroup, randomizeClassroomGroups,
+    createClassroomGroup, deleteClassroomGroup, moveStudentsToGroup,
     reorderClassroomGroups, updateClassroomGroup,
   } = useGroupActions()
 
@@ -234,16 +241,6 @@ export function BreakoutGroups({ classroomId, students, state, setState, canMana
     })
   }
 
-  async function handleRandom(createCount?: number) {
-    setBusy('random')
-    const res = await randomizeClassroomGroups(classroomId, createCount)
-    setBusy(null)
-    if (!res.ok) { toast.error(res.error); return }
-    setState({ groups: res.groups, members: res.members })
-    setRandomOpen(false)
-    toast.success(`สุ่มแบ่ง ${Object.keys(res.members).length} คนลง ${res.groups.length} กลุ่มแล้ว`)
-  }
-
   async function handlePick(groupId: string, change: { add: string[]; remove: string[] }) {
     const group = groupsById.get(groupId)
     setPickerGroupId(null)
@@ -295,28 +292,31 @@ export function BreakoutGroups({ classroomId, students, state, setState, canMana
 
   const draggedStudent = dragging?.type === 'student' ? studentsById.get(dragging.id) : undefined
   const pickerGroup = pickerGroupId ? groupsById.get(pickerGroupId) ?? null : null
-  const term = poolQuery.trim().toLowerCase()
-  const poolShown = term ? unassigned.filter(s => s.full_name.toLowerCase().includes(term)) : unassigned
+  const gradeLevels = useMemo(() => Array.from(new Set(
+    students.map(student => student.grade_level?.trim()).filter((value): value is string => !!value),
+  )).sort(rosterCollator.compare), [students])
+  const sections = useMemo(() => Array.from(new Set(
+    students.map(student => student.section_number).filter((value): value is number => value !== null),
+  )).sort((a, b) => a - b), [students])
+  const poolShown = filterGroupStudents(unassigned, {
+    query: poolQuery,
+    gradeLevel: poolGrade,
+    sectionNumber: poolSection,
+  })
 
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         {canManage && (
-          <>
-            <Button size="sm" variant="outline" onClick={() => setRandomOpen(true)} className="gap-1.5" disabled={students.length === 0}>
-              <Shuffle className="size-3.5" /> แบ่งกลุ่มสุ่ม
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setCreateOpen(true)}
-              className="gap-1.5"
-              disabled={groups.length >= MAX_GROUPS_PER_CLASSROOM}
-            >
-              <Plus className="size-3.5" /> เพิ่มกลุ่ม
-            </Button>
-          </>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setCreateOpen(true)}
+            disabled={groups.length >= MAX_GROUPS_PER_CLASSROOM}
+          >
+            <Plus data-icon="inline-start" /> เพิ่มกลุ่ม
+          </Button>
         )}
         <p className="ml-auto text-xs text-muted-foreground">
           {canManage
@@ -346,6 +346,14 @@ export function BreakoutGroups({ classroomId, students, state, setState, canMana
             total={unassigned.length}
             query={poolQuery}
             onQuery={setPoolQuery}
+            gradeFilter={poolGrade}
+            onGradeFilter={setPoolGrade}
+            sectionFilter={poolSection}
+            onSectionFilter={setPoolSection}
+            gradeLevels={gradeLevels}
+            sections={sections}
+            hasMissingGrade={students.some(student => !student.grade_level?.trim())}
+            hasMissingSection={students.some(student => student.section_number === null)}
             canManage={canManage}
             highlight={dragging?.type === 'student'}
           />
@@ -356,7 +364,7 @@ export function BreakoutGroups({ classroomId, students, state, setState, canMana
               <Users className="size-6 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm font-medium text-foreground">ห้องนี้ยังไม่มีกลุ่มย่อย</p>
               <p className="text-xs text-muted-foreground">
-                {canManage ? 'กด “เพิ่มกลุ่ม” เพื่อตั้งชื่อเอง หรือ “แบ่งกลุ่มสุ่ม” ให้ระบบจัดให้' : 'ครูผู้สอนยังไม่ได้แบ่งกลุ่ม'}
+                {canManage ? 'กด “เพิ่มกลุ่ม” แล้วตั้งชื่อตามเป้าหมายการจัดกลุ่มของคุณ' : 'ครูผู้สอนยังไม่ได้แบ่งกลุ่ม'}
               </p>
             </Card>
           ) : (
@@ -393,14 +401,6 @@ export function BreakoutGroups({ classroomId, students, state, setState, canMana
         pending={busy === 'create'}
         onSubmit={handleCreate}
       />
-      <RandomSplitDialog
-        open={randomOpen}
-        onOpenChange={setRandomOpen}
-        studentCount={students.length}
-        groupCount={groups.length}
-        pending={busy === 'random'}
-        onConfirm={handleRandom}
-      />
       <AddStudentsDialog
         open={pickerGroup !== null}
         onOpenChange={open => { if (!open) setPickerGroupId(null) }}
@@ -421,16 +421,37 @@ export function BreakoutGroups({ classroomId, students, state, setState, canMana
 // ── Pieces ─────────────────────────────────────────────────────────────────
 
 function UnassignedPool({
-  students, total, query, onQuery, canManage, highlight,
+  students, total, query, onQuery,
+  gradeFilter, onGradeFilter, sectionFilter, onSectionFilter,
+  gradeLevels, sections, hasMissingGrade, hasMissingSection,
+  canManage, highlight,
 }: {
   students: GroupStudent[]
   total: number
   query: string
   onQuery: (q: string) => void
+  gradeFilter: string
+  onGradeFilter: (value: string) => void
+  sectionFilter: string
+  onSectionFilter: (value: string) => void
+  gradeLevels: string[]
+  sections: number[]
+  hasMissingGrade: boolean
+  hasMissingSection: boolean
   canManage: boolean
   highlight: boolean
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: POOL_ID, data: { type: 'pool' } })
+  const gradeItems = [
+    { value: GROUP_STUDENT_FILTER_ALL, label: 'ทุกระดับชั้น' },
+    ...gradeLevels.map(grade => ({ value: grade, label: grade })),
+    ...(hasMissingGrade ? [{ value: GROUP_STUDENT_FILTER_MISSING, label: 'ไม่ระบุชั้น' }] : []),
+  ]
+  const sectionItems = [
+    { value: GROUP_STUDENT_FILTER_ALL, label: 'ทุกห้อง' },
+    ...sections.map(section => ({ value: String(section), label: `ห้อง ${section}` })),
+    ...(hasMissingSection ? [{ value: GROUP_STUDENT_FILTER_MISSING, label: 'ไม่ระบุห้อง' }] : []),
+  ]
   return (
     <Card
       ref={setNodeRef}
@@ -444,9 +465,33 @@ function UnassignedPool({
       <div className="mb-2 flex items-center gap-2">
         <Users className="size-4 text-muted-foreground" aria-hidden="true" />
         <p className="text-sm font-semibold text-muted-foreground">ยังไม่ได้จัดกลุ่ม</p>
-        <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">{total}</span>
+        <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          {students.length === total ? total : `${students.length}/${total}`}
+        </span>
       </div>
-      {total > 8 && (
+      <div className="mb-2 grid grid-cols-2 gap-1.5">
+        <Select items={gradeItems} value={gradeFilter} onValueChange={value => { if (value !== null) onGradeFilter(value) }}>
+          <SelectTrigger size="sm" className="w-full min-w-0 bg-background" aria-label="กรองตามระดับชั้น">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectGroup>
+              {gradeItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select items={sectionItems} value={sectionFilter} onValueChange={value => { if (value !== null) onSectionFilter(value) }}>
+          <SelectTrigger size="sm" className="w-full min-w-0 bg-background" aria-label="กรองตามห้อง">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectGroup>
+              {sectionItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+      {(total > 8 || query) && (
         <div className="relative mb-2">
           <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
@@ -464,7 +509,7 @@ function UnassignedPool({
           <p className="text-xs italic text-muted-foreground">นักเรียนทุกคนอยู่ในกลุ่มแล้ว</p>
         )}
         {total > 0 && students.length === 0 && (
-          <p className="text-xs text-muted-foreground">ไม่พบชื่อที่ค้นหา</p>
+          <p className="text-xs text-muted-foreground">ไม่พบนักเรียนตามตัวกรอง</p>
         )}
       </div>
     </Card>
@@ -582,9 +627,9 @@ function GroupCard({
           variant="ghost"
           size="xs"
           onClick={onPick}
-          className={cn('mt-2 self-start gap-1 px-1.5 hover:bg-background/60', preset.text)}
+          className={cn('mt-2 self-start px-1.5 hover:bg-background/60', preset.text)}
         >
-          <UserPlus className="size-3.5" /> เพิ่มนักเรียน
+          <UserPlus data-icon="inline-start" /> เพิ่มนักเรียน
         </Button>
       )}
     </Card>
@@ -658,14 +703,41 @@ function StudentChip({ student, canManage }: { student: GroupStudent; canManage:
   // chips as separate tab stops would bury everything after them.
   return (
     <div ref={setNodeRef} {...listeners}>
-      <ChipBody
-        student={student}
-        className={cn(
-          canManage && 'cursor-grab touch-manipulation hover:border-primary/30 active:cursor-grabbing',
-          isDragging && 'opacity-40',
-        )}
-      />
+      <HoverCard>
+        <HoverCardTrigger delay={180} closeDelay={80} render={<div />}>
+          <ChipBody
+            student={student}
+            className={cn(
+              canManage && 'cursor-grab touch-manipulation hover:border-primary/30 active:cursor-grabbing',
+              isDragging && 'opacity-40',
+            )}
+          />
+        </HoverCardTrigger>
+        <StudentDetails student={student} />
+      </HoverCard>
     </div>
+  )
+}
+
+function StudentDetails({ student }: { student: GroupStudent }) {
+  const rows = [
+    ['ชั้น', student.grade_level?.trim() || 'ไม่ระบุ'],
+    ['ห้อง', student.section_number === null ? 'ไม่ระบุ' : String(student.section_number)],
+    ['เลขที่', student.class_number === null ? 'ไม่ระบุ' : String(student.class_number)],
+    ['รหัสนักเรียน', student.student_code?.trim() || 'ไม่ระบุ'],
+  ]
+  return (
+    <HoverCardContent side="top" align="start" className="w-60">
+      <p className="truncate font-semibold text-foreground">{student.full_name}</p>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="truncate text-right font-medium text-foreground">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </HoverCardContent>
   )
 }
 

@@ -132,6 +132,16 @@ export function ClassroomDetailClient({
   // another is opened, and the งาน tabs read the same arrangement to count
   // each งาน only against the students it was handed to.
   const [groupState, setGroupState] = useState<GroupState>({ groups, members: groupMembers })
+  const groupStudents = useMemo(() => students.map(student => {
+    const profile = studentProfiles[student.id]
+    return {
+      ...student,
+      grade_level: profile?.grade_level ?? null,
+      section_number: profile?.section_number ?? null,
+      class_number: profile?.class_number ?? null,
+      student_code: profile?.student_code ?? null,
+    }
+  }), [studentProfiles, students])
   const rosterIds = useMemo(() => students.map(s => s.id), [students])
   const audienceByAssignment = useMemo(() => {
     const groupOf = new Map(Object.entries(groupState.members))
@@ -355,7 +365,7 @@ export function ClassroomDetailClient({
         {activeTab === 'groups' && (
           <BreakoutGroups
             classroomId={classroom.id}
-            students={students}
+            students={groupStudents}
             state={groupState}
             setState={setGroupState}
             canManage={canManage}

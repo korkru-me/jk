@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react'
 import {
-  createClassroomGroup, deleteClassroomGroup, moveStudentsToGroup, randomizeClassroomGroups,
+  createClassroomGroup, deleteClassroomGroup, moveStudentsToGroup,
   reorderClassroomGroups, updateClassroomGroup,
 } from '@/lib/actions/classroom-groups'
 
@@ -12,7 +12,6 @@ const serverActions = {
   deleteClassroomGroup,
   reorderClassroomGroups,
   moveStudentsToGroup,
-  randomizeClassroomGroups,
 }
 
 /** What the กลุ่มย่อย tab calls to save. The real server actions everywhere

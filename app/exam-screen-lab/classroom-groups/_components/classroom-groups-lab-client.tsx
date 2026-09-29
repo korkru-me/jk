@@ -5,9 +5,7 @@ import { Card } from '@/components/ui/card'
 import { BreakoutGroups, type GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
 import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/[id]/_components/group-actions-context'
 import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
-import {
-  GROUP_COLOR_IDS, defaultGroupName, nextGroupColor, splitIntoGroups, type ClassroomGroup,
-} from '@/lib/classroom-groups'
+import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 
 export type GroupsLabScenario = 'default' | 'many' | 'empty'
 
@@ -21,6 +19,10 @@ function students(count: number) {
     id: `00000000-0000-4000-9000-${String(i + 1).padStart(12, '0')}`,
     // Two students share a name on purpose — the lists must still tell them apart by id.
     full_name: i === 7 ? `${FIRST[7]} ${LAST[7]}` : `${FIRST[i % FIRST.length]} ${LAST[(i * 7) % LAST.length]}`,
+    grade_level: i % 13 === 0 ? null : `ม.${4 + (i % 3)}`,
+    section_number: i % 11 === 0 ? null : (i % 4) + 1,
+    class_number: i + 1,
+    student_code: `2569${String(i + 1).padStart(4, '0')}`,
   })).sort((a, b) => a.full_name.localeCompare(b.full_name, 'th'))
 }
 
@@ -109,27 +111,8 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
         server.current = { ...server.current, members }
         return { ok: true as const }
       },
-      async randomizeClassroomGroups(_classroomId, createCount) {
-        await wait()
-        if (fail) return refuse
-        let groups = server.current.groups
-        if (groups.length === 0) {
-          const names: string[] = []
-          const colors: string[] = []
-          groups = Array.from({ length: createCount ?? 2 }, (_, position) => {
-            const name = defaultGroupName(names)
-            const color = nextGroupColor(colors)
-            names.push(name)
-            colors.push(color)
-            return { ...group(counter.current++, name), color, position }
-          })
-        }
-        const members = Object.fromEntries(splitIntoGroups(seed.roster.map(s => s.id), groups.map(g => g.id)))
-        server.current = { groups, members }
-        return { ok: true as const, groups, members }
-      },
     }
-  }, [fail, seed.roster])
+  }, [fail])
 
   const groupOptions = {
     [CLASSROOM_ID]: state.groups.map(g => ({

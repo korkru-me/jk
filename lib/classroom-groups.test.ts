@@ -5,11 +5,13 @@ import {
   cleanGroupTarget,
   defaultGroupName,
   describeGroupTarget,
+  filterGroupStudents,
+  GROUP_STUDENT_FILTER_ALL,
+  GROUP_STUDENT_FILTER_MISSING,
   isGroupColorId,
   linkReachesGroup,
   nextGroupColor,
   normalizeGroupName,
-  splitIntoGroups,
   targetedStudentIds,
 } from './classroom-groups'
 import { COVER_PRESETS } from '@/app/(app)/classrooms/_components/classroom-meta'
@@ -116,24 +118,27 @@ describe('targetedStudentIds', () => {
   })
 })
 
-describe('splitIntoGroups', () => {
-  it('places everyone, with sizes differing by at most one', () => {
-    const students = Array.from({ length: 23 }, (_, i) => `s${i}`)
-    const result = splitIntoGroups(students, ['a', 'b', 'c', 'd'])
-    expect(result.size).toBe(23)
-    const sizes = ['a', 'b', 'c', 'd'].map(g => [...result.values()].filter(v => v === g).length)
-    expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1)
+describe('filterGroupStudents', () => {
+  const students = [
+    { full_name: 'กมล มั่นคง', grade_level: 'ม.4', section_number: 1 },
+    { full_name: 'ขวัญใจ ใจดี', grade_level: 'ม.4', section_number: 2 },
+    { full_name: 'ธนกร รุ่งเรือง', grade_level: 'ม.5', section_number: 1 },
+    { full_name: 'ไม่ระบุ ข้อมูล', grade_level: null, section_number: null },
+  ]
+
+  it('applies grade and section filters together', () => {
+    expect(filterGroupStudents(students, {
+      query: '', gradeLevel: 'ม.4', sectionNumber: '1',
+    })).toEqual([students[0]])
   })
 
-  it('shuffles with the random source it is given', () => {
-    const students = ['s1', 's2', 's3', 's4']
-    const first = splitIntoGroups(students, ['a', 'b'], () => 0)
-    const second = splitIntoGroups(students, ['a', 'b'], () => 0.99)
-    expect([...first.entries()]).not.toEqual([...second.entries()])
-  })
-
-  it('places nobody when there are no groups', () => {
-    expect(splitIntoGroups(['s1'], []).size).toBe(0)
+  it('combines name search with missing profile filters', () => {
+    expect(filterGroupStudents(students, {
+      query: 'ข้อมูล', gradeLevel: GROUP_STUDENT_FILTER_MISSING, sectionNumber: GROUP_STUDENT_FILTER_MISSING,
+    })).toEqual([students[3]])
+    expect(filterGroupStudents(students, {
+      query: 'กมล', gradeLevel: GROUP_STUDENT_FILTER_ALL, sectionNumber: GROUP_STUDENT_FILTER_ALL,
+    })).toEqual([students[0]])
   })
 })
 

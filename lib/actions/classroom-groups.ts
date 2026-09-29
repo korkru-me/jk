@@ -5,11 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   MAX_GROUPS_PER_CLASSROOM,
-  defaultGroupName,
   isGroupColorId,
-  nextGroupColor,
   normalizeGroupName,
-  splitIntoGroups,
   type ClassroomGroup,
 } from '@/lib/classroom-groups'
 
@@ -232,62 +229,4 @@ export async function moveStudentsToGroup(
         )
   if (error) return { ok: false, error: writeError(error) }
   return { ok: true }
-}
-
-/**
- * แบ่งกลุ่มสุ่ม: deal every student on the roster into the room's groups,
- * sizes differing by at most one. With no groups yet, `createCount` groups
- * are made first ("กลุ่มที่ 1" …). Replaces any arrangement already there —
- * the screen asks before calling this.
- */
-export async function randomizeClassroomGroups(
-  classroomId: string,
-  createCount?: number,
-): Promise<Result<{ groups: ClassroomGroup[]; members: Record<string, string> }>> {
-  const auth = await authorize(classroomId)
-  if ('error' in auth) return { ok: false, error: auth.error }
-
-  let groups = await groupsOf(classroomId)
-  const supabase = await createClient()
-
-  if (groups.length === 0) {
-    const count = Number(createCount)
-    if (!Number.isInteger(count) || count < 2 || count > MAX_GROUPS_PER_CLASSROOM) {
-      return { ok: false, error: `จำนวนกลุ่มต้องอยู่ระหว่าง 2–${MAX_GROUPS_PER_CLASSROOM}` }
-    }
-    const names: string[] = []
-    const colors: string[] = []
-    const rows = Array.from({ length: count }, (_, position) => {
-      const name = defaultGroupName(names)
-      const color = nextGroupColor(colors)
-      names.push(name)
-      colors.push(color)
-      return { classroom_id: classroomId, name, color, position, created_by: auth.userId }
-    })
-    const { data, error } = await supabase.from('classroom_groups').insert(rows).select(GROUP_COLUMNS)
-    if (error || !data) return { ok: false, error: writeError(error) }
-    groups = (data as ClassroomGroup[]).sort((a, b) => a.position - b.position)
-  }
-
-  // Roster read with the service role, like the classroom page itself does —
-  // this classroom was authorized above.
-  const admin = createAdminClient()
-  const { data: roster } = await admin
-    .from('classroom_students')
-    .select('student_id')
-    .eq('classroom_id', classroomId)
-  const studentIds = (roster ?? []).map((r: { student_id: string }) => r.student_id)
-
-  const placement = splitIntoGroups(studentIds, groups.map(g => g.id))
-  if (placement.size > 0) {
-    const { error } = await supabase
-      .from('classroom_group_members')
-      .upsert(
-        [...placement].map(([student_id, group_id]) => ({ classroom_id: classroomId, student_id, group_id })),
-        { onConflict: 'classroom_id,student_id' },
-      )
-    if (error) return { ok: false, error: writeError(error) }
-  }
-
-  return { ok: true, groups, members: Object.fromEntries(placement) }
 }
