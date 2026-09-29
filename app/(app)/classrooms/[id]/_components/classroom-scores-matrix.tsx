@@ -1,6 +1,9 @@
 'use client'
 
-import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from 'react'
+import {
+  useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition,
+  type ReactNode,
+} from 'react'
 import Link from 'next/link'
 import {
   Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle, Download,
@@ -14,7 +17,7 @@ import {
   SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { CSS as DndCSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
 import { reorderAssignmentDisplayOrder, reorderClassroomStudentRoster } from '@/lib/actions/classrooms'
@@ -97,6 +100,11 @@ interface SortableAssignmentHeaderProps {
   onRemind: () => void
   sort: ScoreMatrixSort | null
   onSort: () => void
+  onColumnMotion: (
+    assignmentId: string,
+    transform: string | undefined,
+    transition: string | undefined,
+  ) => void
 }
 
 function sortAria(sort: ScoreMatrixSort | null, key: ScoreMatrixSortKey): 'ascending' | 'descending' | 'none' {
@@ -115,6 +123,7 @@ function SortIndicator({ value }: { value: 'ascending' | 'descending' | 'none' }
 
 function SortableAssignmentHeader({
   assignment, disabled, hasNonSubmitter, reminding, groupNameById, onRemind, sort, onSort,
+  onColumnMotion,
 }: SortableAssignmentHeaderProps) {
   const sortValue = sortAria(sort, { type: 'assignment', assignmentId: assignment.id })
   const {
@@ -124,47 +133,59 @@ function SortableAssignmentHeader({
     disabled,
     data: { type: 'assignment', assignmentId: assignment.id, title: assignment.title },
   })
+  const headerTransform = DndCSS.Translate.toString(transform)
+
+  // dnd-kit calculates the exact displacement for each sortable header. The
+  // score cells live in separate table rows, so mirror that same displacement
+  // onto every cell in the column. The active column itself is represented by
+  // the full-height DragOverlay below; only the columns making room for it
+  // need this transform.
+  useLayoutEffect(() => {
+    onColumnMotion(assignment.id, isDragging ? undefined : headerTransform, transition)
+  }, [assignment.id, headerTransform, isDragging, onColumnMotion, transition])
 
   return (
     <th
       ref={setNodeRef}
       aria-sort={sortValue}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      style={{ transform: headerTransform, transition }}
       className={cn(
         'px-3 py-3 text-center min-w-[140px] border-b border-border bg-card',
         isOver && !isDragging && 'bg-primary/5',
         isDragging && 'relative z-30 opacity-60 shadow-lg ring-1 ring-primary/30',
       )}
     >
-      <Button
-        ref={setActivatorNodeRef}
-        {...attributes}
-        {...listeners}
-        type="button"
-        variant="ghost"
-        size="icon-2xs"
-        disabled={disabled}
-        aria-label={`ย้ายคอลัมน์ ${assignment.title}`}
-        title="ลากเพื่อสลับ"
-        className="mx-auto mb-1 cursor-grab touch-manipulation rounded-full text-muted-foreground active:cursor-grabbing"
-      >
-        <GripVertical />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        onPointerDown={event => event.stopPropagation()}
-        onClick={event => {
-          event.stopPropagation()
-          onSort()
-        }}
-        className="mx-auto h-auto max-w-[150px] whitespace-normal px-1 py-0 text-xs font-semibold text-muted-foreground hover:text-primary"
-        title={`เรียงนักเรียนตาม ${assignment.title}`}
-      >
-        <span className="line-clamp-2">{assignment.title}</span>
-        <SortIndicator value={sortValue} />
-      </Button>
+      <div className="mx-auto flex max-w-[160px] items-start justify-center gap-0.5">
+        <Button
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          type="button"
+          variant="ghost"
+          size="icon-2xs"
+          disabled={disabled}
+          aria-label={`ย้ายคอลัมน์ ${assignment.title}`}
+          title="ลากเพื่อสลับ"
+          className="mt-0.5 shrink-0 cursor-grab touch-manipulation rounded-full text-muted-foreground active:cursor-grabbing"
+        >
+          <GripVertical />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={event => {
+            event.stopPropagation()
+            onSort()
+          }}
+          className="h-auto min-w-0 flex-1 whitespace-normal px-1 py-0 text-xs font-semibold text-muted-foreground hover:text-primary"
+          title={`เรียงนักเรียนตาม ${assignment.title}`}
+        >
+          <span className="line-clamp-2">{assignment.title}</span>
+          <SortIndicator value={sortValue} />
+        </Button>
+      </div>
       {assignment.group_ids && (
         <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-tint-1" title={describeGroupTarget(assignment.group_ids, groupNameById)}>
           เฉพาะ {describeGroupTarget(assignment.group_ids, groupNameById)}
@@ -205,7 +226,7 @@ function SortableStudentRow({ student, index, disabled, children }: SortableStud
   return (
     <tr
       ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      style={{ transform: DndCSS.Translate.toString(transform), transition }}
       className={cn(
         'hover:bg-muted/50',
         isOver && !isDragging && 'bg-primary/5',
@@ -267,6 +288,7 @@ export function ClassroomScoresMatrix({
   const [studentSort, setStudentSort] = useState<ScoreMatrixSort | null>(null)
   const [draggingAssignmentId, setDraggingAssignmentId] = useState<string | null>(null)
   const [draggingStudentId, setDraggingStudentId] = useState<string | null>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
   const dndId = useId()
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -286,6 +308,23 @@ export function ClassroomScoresMatrix({
     if (categoryFilter === 'all' || categoryFilter === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE) return
     if (!categories.some(category => category.id === categoryFilter)) setCategoryFilter('all')
   }, [categories, categoryFilter])
+
+  const moveAssignmentCells = useCallback((
+    assignmentId: string,
+    transform: string | undefined,
+    transition: string | undefined,
+  ) => {
+    const cells = tableRef.current?.querySelectorAll<HTMLTableCellElement>(
+      `[data-assignment-column="${assignmentId}"]`,
+    )
+    if (!cells) return
+    for (const cell of cells) {
+      cell.style.transform = transform ?? ''
+      cell.style.transition = transition ?? ''
+      cell.style.willChange = transform ? 'transform' : ''
+      cell.style.zIndex = transform ? '1' : ''
+    }
+  }, [])
 
   // Default order (no manual display_order set) is oldest-assigned-first. The
   // local order then tracks drag-and-drop immediately while the server saves.
@@ -615,7 +654,7 @@ export function ClassroomScoresMatrix({
             cells doesn't reliably paint over a collapsed border seam, which
             let scrolled-under content show through the gap between the
             sticky ลำดับ/นักเรียน columns. */}
-        <table className="w-full text-sm border-separate border-spacing-0">
+        <table ref={tableRef} className="w-full text-sm border-separate border-spacing-0">
           <thead>
             {/* Row-divider borders live on the cells, not the <tr> — the
                 separated-borders table model (needed above) doesn't render
@@ -659,6 +698,7 @@ export function ClassroomScoresMatrix({
                     onRemind={() => handleRemind(a.id)}
                     sort={studentSort}
                     onSort={() => toggleStudentSort({ type: 'assignment', assignmentId: a.id })}
+                    onColumnMotion={moveAssignmentCells}
                   />
                 )
               })}
@@ -679,7 +719,7 @@ export function ClassroomScoresMatrix({
 
                   if (notGiven(a.id, student.id)) {
                     return (
-                      <td key={a.id} className={cn(
+                      <td key={a.id} data-assignment-column={a.id} className={cn(
                         'px-3 py-2.5 text-center border-b border-border bg-muted/40',
                         draggingAssignmentId === a.id && 'bg-primary/10 opacity-40',
                       )}>
@@ -689,7 +729,7 @@ export function ClassroomScoresMatrix({
                   }
 
                   return (
-                    <td key={a.id} className={cn(
+                    <td key={a.id} data-assignment-column={a.id} className={cn(
                       'px-3 py-2.5 text-center group relative border-b border-border',
                       draggingAssignmentId === a.id && 'bg-primary/5 opacity-40',
                     )}>
@@ -748,8 +788,8 @@ export function ClassroomScoresMatrix({
               aria-hidden="true"
               className="w-[140px] cursor-grabbing overflow-hidden bg-card shadow-xl ring-2 ring-primary/30"
             >
-              <div className="flex min-h-28 flex-col items-center justify-center gap-1 px-2 py-3 text-center">
-                <GripVertical className="size-4 text-primary" />
+              <div className="flex min-h-28 items-center justify-center gap-1 px-2 py-3 text-center">
+                <GripVertical className="size-4 shrink-0 text-primary" />
                 <p className="line-clamp-2 text-xs font-semibold text-foreground">{assignment.title}</p>
               </div>
               <div className="max-h-[calc(100dvh-12rem)] overflow-hidden">
