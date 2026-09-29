@@ -1,0 +1,134 @@
+'use client'
+
+import { useMemo, useState, useTransition } from 'react'
+import { Copy, FileText } from 'lucide-react'
+import { toast } from 'sonner'
+import { duplicateAssignment } from '@/lib/actions/assignments'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import type { AssignmentClassroomOption } from '@/components/assignments/create-assignment-form'
+import type { AssignmentStatus, AssignmentType } from '@/lib/types'
+
+export interface ReusableAssignmentOption {
+  id: string
+  classroomId: string
+  title: string
+  type: AssignmentType
+  status: AssignmentStatus
+  createdAt: string
+}
+
+export function ReuseAssignmentCard({
+  targetClassroomId,
+  classrooms,
+  assignments,
+}: {
+  targetClassroomId: string
+  classrooms: AssignmentClassroomOption[]
+  assignments: ReusableAssignmentOption[]
+}) {
+  const sourceClassrooms = classrooms.filter(classroom => classroom.id !== targetClassroomId)
+  const [sourceClassroomId, setSourceClassroomId] = useState(sourceClassrooms[0]?.id ?? '')
+  const [assignmentId, setAssignmentId] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const availableAssignments = useMemo(
+    () => assignments
+      .filter(assignment => assignment.classroomId === sourceClassroomId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [assignments, sourceClassroomId],
+  )
+
+  if (sourceClassrooms.length === 0) return null
+
+  function reuseAssignment() {
+    if (!assignmentId) return
+    startTransition(async () => {
+      const result = await duplicateAssignment(assignmentId, { targetClassroomIds: [targetClassroomId] })
+      if (result?.error) toast.error(result.error)
+    })
+  }
+
+  return (
+    <Card padding="lg" className="flex flex-col gap-4">
+      <div>
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Copy className="size-5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-semibold text-foreground">นำงานจากห้องอื่นมาใช้ซ้ำ</h2>
+            <p className="text-sm text-muted-foreground">
+              เลือกห้องเรียนก่อน แล้วเลือกแบบฝึกหัดหรือข้อสอบ ระบบจะสร้างสำเนาเป็นแบบร่างในห้องนี้
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label className="text-sm font-medium">1. ห้องเรียนต้นทาง</label>
+            <Select
+              value={sourceClassroomId}
+              onValueChange={value => {
+                if (value === null) return
+                setSourceClassroomId(value)
+                setAssignmentId('')
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="เลือกห้องเรียน" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {sourceClassrooms.map(classroom => (
+                    <SelectItem key={classroom.id} value={classroom.id}>{classroom.name}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label className="text-sm font-medium">2. งานที่ต้องการนำมาใช้</label>
+            <Select
+              value={assignmentId}
+              disabled={availableAssignments.length === 0}
+              onValueChange={value => value !== null && setAssignmentId(value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={availableAssignments.length === 0 ? 'ห้องนี้ยังไม่มีงาน' : 'เลือกแบบฝึกหัดหรือข้อสอบ'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {availableAssignments.map(assignment => (
+                    <SelectItem key={assignment.id} value={assignment.id}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <FileText className="size-4" aria-hidden="true" />
+                        <span className="truncate">{assignment.title}</span>
+                        <Badge variant="secondary">{assignment.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</Badge>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            คัดลอกเฉพาะโจทย์และการตั้งค่า ไม่คัดลอกนักเรียน การส่งงาน หรือคะแนน และยังไม่เผยแพร่จนกว่าครูจะสั่ง
+          </p>
+          <Button type="button" variant="outline" disabled={!assignmentId || isPending} onClick={reuseAssignment}>
+            <Copy data-icon="inline-start" />
+            {isPending ? 'กำลังสร้างแบบร่าง...' : 'นำมาใช้เป็นแบบร่าง'}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  )
+}

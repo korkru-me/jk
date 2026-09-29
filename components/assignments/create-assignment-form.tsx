@@ -22,7 +22,7 @@ import {
   Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
   Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
-  CircleCheck, Calculator, NotebookPen, Hash,
+  CircleCheck, Calculator, NotebookPen, Hash, Save,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -1755,7 +1755,7 @@ export function CreateAssignmentForm({
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-4 border-t border-white/10 pt-3">
-              ชุดข้อสอบจะถูกบันทึกเป็นร่าง — เผยแพร่ได้จากหน้ารายละเอียด
+              เลือกได้ว่าจะเผยแพร่ทันที ตั้งเวลา หรือกดบันทึกแบบร่างไว้ทำต่อภายหลัง
             </p>
           </div>
         </div>
@@ -1790,15 +1790,26 @@ export function CreateAssignmentForm({
             ถัดไป <ChevronRight className="w-4 h-4" />
           </Button>
         ) : (
-          <Button
-            type="button"
-            onClick={openPublishDialog}
-            disabled={isPending}
-            className="gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            {isPending ? 'กำลังสร้าง...' : assignmentType === 'exam' ? 'สร้างชุดข้อสอบ' : 'สร้างแบบฝึกหัด'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSaveDraft}
+              disabled={isPending}
+            >
+              <Save data-icon="inline-start" />
+              {isPending ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}
+            </Button>
+            <Button
+              type="button"
+              onClick={openPublishDialog}
+              disabled={isPending}
+              className="gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              {isPending ? 'กำลังสร้าง...' : assignmentType === 'exam' ? 'สร้างชุดข้อสอบ' : 'สร้างแบบฝึกหัด'}
+            </Button>
+          </div>
         )}
       </div>
 

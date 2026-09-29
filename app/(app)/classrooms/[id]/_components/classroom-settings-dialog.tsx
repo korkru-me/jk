@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import {
-  Settings, Archive, Users, CalendarDays, Clock, Tag, BookOpen, Home, Info, Palette, Check, Ban,
+  Settings, Users, CalendarDays, Clock, Tag, BookOpen, Home, Info, Palette, Check, Ban,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -14,11 +13,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
-import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
-import { updateClassroom, archiveClassroom } from '@/lib/actions/classrooms'
+import { updateClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import {
   composeDescription, parseDescription, GRADE_SUGGESTIONS, getTermSuggestions,
@@ -45,8 +43,6 @@ export function ClassroomSettingsDialog({
   const [name, setName] = useState(classroom.name)
   const [meta, setMeta] = useState<ClassroomMeta>(() => parseDescription(classroom.description))
   const [isPending, startTransition] = useTransition()
-  const [confirm, confirmDialog] = useConfirm()
-  const router = useRouter()
 
   const isHomeroom = classroom.classroom_type === 'homeroom'
 
@@ -88,20 +84,6 @@ export function ClassroomSettingsDialog({
       })
       if (res?.error) toast.error(res.error)
       else { toast.success('บันทึกการตั้งค่าแล้ว'); setOpen(false) }
-    })
-  }
-
-  async function handleArchive() {
-    const ok = await confirm({
-      title: 'เก็บห้องเรียนนี้เข้าคลัง?',
-      description: 'ห้องเรียนจะหายจากรายการหลัก แต่กู้คืนได้ภายหลังจากหน้าถังขยะ',
-      confirmLabel: 'เก็บเข้าคลัง',
-    })
-    if (!ok) return
-    startTransition(async () => {
-      const res = await archiveClassroom(classroom.id)
-      if (res?.error) toast.error(res.error)
-      else { toast.success('เก็บห้องเรียนเข้าคลังแล้ว'); setOpen(false); router.push('/classrooms') }
     })
   }
 
@@ -361,16 +343,6 @@ export function ClassroomSettingsDialog({
           </div>
         </form>
 
-        <div className={cn('border-t border-border pt-4')}>
-          <p className="text-sm font-medium">เก็บเข้าคลัง</p>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-            ซ่อนห้องเรียนจากรายการหลักโดยไม่ลบข้อมูล กู้คืนได้จากหน้าคลังห้องเรียน
-          </p>
-          <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={handleArchive} disabled={isPending}>
-            <Archive className="w-3.5 h-3.5" /> เก็บห้องเรียนเข้าคลัง
-          </Button>
-        </div>
-
         <div className="border-t border-border pt-4">
           <p className="text-sm font-medium text-destructive">พื้นที่อันตราย</p>
           <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
@@ -379,7 +351,6 @@ export function ClassroomSettingsDialog({
           <DeleteClassroomButton id={classroom.id} />
         </div>
       </DialogContent>
-      {confirmDialog}
     </Dialog>
   )
 }

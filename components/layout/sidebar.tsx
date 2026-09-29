@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
-  Archive,
   ChevronDown,
   ChevronLeft,
   LayoutGrid,
@@ -185,7 +184,6 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
   const items = [
     { href: '/classrooms', label: 'ห้องเรียนทั้งหมด', Icon: LayoutGrid },
     { href: '/classrooms/new', label: 'สร้างห้องเรียน', Icon: Plus },
-    { href: '/classrooms/archived', label: 'ห้องเรียนที่เก็บถาวร', Icon: Archive },
     { href: '/classrooms/trash', label: 'ถังขยะ', Icon: Trash2 },
   ]
 

@@ -9,6 +9,9 @@ import type { Classroom } from '@/lib/types'
 import { firstSearchParam, resolveAssignmentTypePreset } from '@/lib/assignment-creation'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 import { AssignmentClassroomSidebar } from './_components/assignment-classroom-sidebar'
+import {
+  ReuseAssignmentCard, type ReusableAssignmentOption,
+} from './_components/reuse-assignment-card'
 
 export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
 
@@ -23,6 +26,23 @@ interface Props {
 
 type AssignmentClassroomContextRow = Classroom & {
   classroom_students: Array<{ count: number }>
+}
+
+type ReusableAssignmentLinkRow = {
+  classroom_id: string
+  assignments: {
+    id: string
+    title: string
+    type: ReusableAssignmentOption['type']
+    status: ReusableAssignmentOption['status']
+    created_at: string
+  } | Array<{
+    id: string
+    title: string
+    type: ReusableAssignmentOption['type']
+    status: ReusableAssignmentOption['status']
+    created_at: string
+  }> | null
 }
 
 export default async function NewAssignmentPage({ searchParams }: Props) {
@@ -52,7 +72,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   const preselectedClassroomContextQuery = classroomParam
     ? supabase
         .from('classrooms')
-        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, deleted_at, created_at, updated_at, classroom_students(count)')
+        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, display_order, deleted_at, created_at, updated_at, classroom_students(count)')
         .eq('id', classroomParam)
         .maybeSingle()
     : Promise.resolve({ data: null })
@@ -115,7 +135,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   // กลุ่มย่อย of those rooms, for "มอบหมายให้". Read under RLS: the owner and
   // any co-teacher of a room can see its groups.
   const classroomIdList = classrooms.map(c => c.id)
-  const [{ data: groupRows }, { data: memberRows }] = classroomIdList.length > 0
+  const [{ data: groupRows }, { data: memberRows }, { data: reusableAssignmentRows }] = classroomIdList.length > 0
     ? await Promise.all([
         supabase
           .from('classroom_groups')
@@ -127,8 +147,12 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
           .from('classroom_group_members')
           .select('group_id')
           .in('classroom_id', classroomIdList),
+        supabase
+          .from('assignment_classrooms')
+          .select('classroom_id, assignments!inner(id, title, type, status, created_at)')
+          .in('classroom_id', classroomIdList),
       ])
-    : [{ data: [] }, { data: [] }]
+    : [{ data: [] }, { data: [] }, { data: [] }]
   const memberCount = new Map<string, number>()
   for (const row of (memberRows ?? []) as { group_id: string }[]) {
     memberCount.set(row.group_id, (memberCount.get(row.group_id) ?? 0) + 1)
@@ -137,6 +161,19 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   for (const g of (groupRows ?? []) as { id: string; classroom_id: string; name: string; color: string }[]) {
     ;(groupsByClassroom[g.classroom_id] ??= []).push({
       id: g.id, name: g.name, color: g.color, memberCount: memberCount.get(g.id) ?? 0,
+    })
+  }
+  const reusableAssignments: ReusableAssignmentOption[] = []
+  for (const row of (reusableAssignmentRows ?? []) as unknown as ReusableAssignmentLinkRow[]) {
+    const assignment = Array.isArray(row.assignments) ? row.assignments[0] : row.assignments
+    if (!assignment) continue
+    reusableAssignments.push({
+      id: assignment.id,
+      classroomId: row.classroom_id,
+      title: assignment.title,
+      type: assignment.type,
+      status: assignment.status,
+      createdAt: assignment.created_at,
     })
   }
   let preselectedSet = (preselectedSetRow ?? undefined) as AssignmentQuestionSetOption | undefined
@@ -176,6 +213,13 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       )}
 
       <div className="max-w-2xl space-y-6">
+        {preselectedClassroomId && (
+          <ReuseAssignmentCard
+            targetClassroomId={preselectedClassroomId}
+            classrooms={classrooms}
+            assignments={reusableAssignments}
+          />
+        )}
         <CreateAssignmentForm
           classrooms={classrooms}
           groupsByClassroom={groupsByClassroom}

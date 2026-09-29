@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import {
   MoreVertical, Pin, PinOff, Pencil, Trash2, Send, MessageCircle, Link2, Megaphone,
   Paperclip, Download, Eye, ChevronDown, ChevronUp, Users, ExternalLink, Globe2, Video, Plus,
+  RefreshCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   createClassroomPost, updateClassroomPost, togglePinClassroomPost, deleteClassroomPost,
-  addComment, markPostsSeen,
+  addComment, getReusableAnnouncements, markPostsSeen, type ReusableAnnouncement,
 } from '@/lib/actions/classroom-posts'
 import { linkify, shortenUrl } from '@/lib/linkify'
 import {
@@ -32,6 +33,9 @@ import { PostAttach } from '@/components/classrooms/post-attach'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 /**
  * `page` — the standing list a student scrolls, one card per announcement.
@@ -66,6 +70,13 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+function reusableAnnouncementLabel(post: ReusableAnnouncement): string {
+  const firstLine = post.body.trim().split('\n')[0]
+  if (firstLine) return firstLine.length > 70 ? `${firstLine.slice(0, 67)}...` : firstLine
+  const firstFile = post.attachments[0]?.name
+  return firstFile ? `ไฟล์: ${firstFile}` : 'ประกาศไม่มีข้อความ'
+}
+
 export function ClassroomStream({
   classroomId, canPost, initialPosts, variant = 'page', maxHeightClass = 'max-h-[680px]',
   title = 'ประกาศห้องเรียน',
@@ -76,9 +87,14 @@ export function ClassroomStream({
   const [attachments, setAttachments] = useState<PostAttachment[]>([])
   const [alsoIn, setAlsoIn] = useState<string[]>([])
   const [showTargets, setShowTargets] = useState(false)
+  const [showReuse, setShowReuse] = useState(false)
+  const [reuseSourceId, setReuseSourceId] = useState('')
+  const [reuseAnnouncementId, setReuseAnnouncementId] = useState('')
+  const [reuseAnnouncements, setReuseAnnouncements] = useState<ReusableAnnouncement[]>([])
   const [showLinkField, setShowLinkField] = useState(false)
   const [composerOpen, setComposerOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [isReusePending, startReuseTransition] = useTransition()
   const composerDropZoneRef = useRef<HTMLDivElement>(null)
 
   const isPanel = variant === 'panel'
@@ -105,6 +121,27 @@ export function ClassroomStream({
     })
   }
 
+  function chooseReuseSource(sourceId: string) {
+    setReuseSourceId(sourceId)
+    setReuseAnnouncementId('')
+    setReuseAnnouncements([])
+    if (!sourceId) return
+    startReuseTransition(async () => {
+      const result = await getReusableAnnouncements(sourceId)
+      if ('error' in result) { toast.error(result.error); return }
+      setReuseAnnouncements(result.announcements)
+    })
+  }
+
+  function applyReusableAnnouncement() {
+    const selected = reuseAnnouncements.find(post => post.id === reuseAnnouncementId)
+    if (!selected) return
+    setDraft(selected.body)
+    setAttachments(selected.attachments)
+    setShowReuse(false)
+    toast.success('นำประกาศเดิมมาใส่ในช่องเขียนแล้ว แก้ไขก่อนโพสต์ได้')
+  }
+
   const composer = canPost && (!isPanel || composerOpen) && (
     <div
       ref={composerDropZoneRef}
@@ -116,6 +153,77 @@ export function ClassroomStream({
         onChange={e => setDraft(e.target.value)}
         className={isPanel ? 'min-h-16' : 'min-h-20'}
       />
+
+      {crossPostTargets.length > 0 && (
+        <div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="gap-1 px-1 text-muted-foreground"
+            aria-expanded={showReuse}
+            onClick={() => setShowReuse(open => !open)}
+          >
+            <RefreshCcw className="size-3.5" aria-hidden="true" />
+            ใช้ประกาศเดิมจากห้องอื่น
+            {showReuse ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+          </Button>
+          {showReuse && (
+            <div className="mt-1.5 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <label className="text-xs font-medium text-foreground">1. เลือกห้องเรียนต้นทาง</label>
+                  <Select value={reuseSourceId} onValueChange={value => value !== null && chooseReuseSource(value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="เลือกห้องเรียน" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {crossPostTargets.map(target => (
+                          <SelectItem key={target.id} value={target.id}>{target.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <label className="text-xs font-medium text-foreground">2. เลือกประกาศ</label>
+                  <Select
+                    value={reuseAnnouncementId}
+                    disabled={!reuseSourceId || isReusePending || reuseAnnouncements.length === 0}
+                    onValueChange={value => value !== null && setReuseAnnouncementId(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={isReusePending ? 'กำลังโหลด...' : reuseAnnouncements.length === 0 && reuseSourceId ? 'ห้องนี้ยังไม่มีประกาศ' : 'เลือกประกาศ'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {reuseAnnouncements.map(post => (
+                          <SelectItem key={post.id} value={post.id}>
+                            {reusableAnnouncementLabel(post)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">ระบบจะคัดลอกข้อความและไฟล์มาให้แก้ไขก่อน ยังไม่โพสต์ทันที</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!reuseAnnouncementId}
+                  onClick={applyReusableAnnouncement}
+                >
+                  นำมาใช้
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {crossPostTargets.length > 0 && (
         <div>

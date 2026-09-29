@@ -65,6 +65,7 @@ export interface Classroom {
   status: ClassroomStatus
   classroom_type: ClassroomType
   pinned_at: string | null
+  display_order: number | null
   deleted_at: string | null
   created_at: string
   updated_at: string

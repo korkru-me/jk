@@ -1,11 +1,13 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Users, BookOpen, CalendarRange, Check, GraduationCap, Pin, PinOff } from 'lucide-react'
+import { Users, BookOpen, CalendarRange, Check, Copy, GraduationCap, LoaderCircle, Pin, PinOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
 import { parseDescription, coverOf } from './classroom-meta'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Props {
   classroom: Classroom
@@ -15,11 +17,15 @@ interface Props {
   isSelected?: boolean
   onToggle?: () => void
   onTogglePin?: () => void
+  onDuplicate?: () => void
+  isDuplicating?: boolean
+  dragHandle?: ReactNode
 }
 
 export function ClassroomCard({
   classroom, studentCount, assignmentCount,
   isSelecting = false, isSelected = false, onToggle, onTogglePin,
+  onDuplicate, isDuplicating = false, dragHandle,
 }: Props) {
   const isPinned = !!classroom.pinned_at
   const meta = parseDescription(classroom.description)
@@ -48,7 +54,8 @@ export function ClassroomCard({
             {isSelected && <Check className="w-3.5 h-3.5 text-primary stroke-[3]" />}
           </div>
         )}
-        <div className={isSelecting ? 'ml-8' : ''}>
+        {dragHandle}
+        <div className={cn(isSelecting ? 'ml-8' : dragHandle && 'ml-8')}>
           <p className="font-bold text-lg leading-tight">
             {classroom.name}
           </p>
@@ -59,19 +66,42 @@ export function ClassroomCard({
             )}>{shownDescription}</p>
           )}
         </div>
-        <BookOpen className={cn('size-7 shrink-0', savedCover ? savedCover.textMuted : 'text-muted-foreground')} aria-hidden="true" />
-        {!isSelecting && onTogglePin && (
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin() }}
-            title={isPinned ? 'เลิกปักหมุด' : 'ปักหมุดไว้บนสุด'}
-            className={cn(
-              'absolute top-2.5 right-2.5 w-7 h-7 rounded-lg flex items-center justify-center transition-colors z-10',
-              isPinned ? 'bg-card text-warning' : 'bg-card/80 text-muted-foreground hover:bg-card hover:text-foreground'
+        <BookOpen className={cn(
+          'size-7 shrink-0',
+          !isSelecting && (onDuplicate || onTogglePin) && 'mr-20',
+          savedCover ? savedCover.textMuted : 'text-muted-foreground',
+        )} aria-hidden="true" />
+        {!isSelecting && (onDuplicate || onTogglePin) && (
+          <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1">
+            {onDuplicate && (
+              <IconButton
+                type="button"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDuplicate() }}
+                label={`คัดลอก ${classroom.name} และเก็บงานเดิมเป็นแบบร่าง`}
+                size="sm"
+                disabled={isDuplicating}
+                className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-50"
+              >
+                {isDuplicating
+                  ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  : <Copy className="size-4" aria-hidden="true" />}
+              </IconButton>
             )}
-          >
-            {isPinned ? <Pin className="w-3.5 h-3.5 fill-current" /> : <PinOff className="w-3.5 h-3.5" />}
-          </button>
+            {onTogglePin && (
+              <IconButton
+                type="button"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onTogglePin() }}
+                label={isPinned ? `เลิกปักหมุด ${classroom.name} เพื่อให้ลากเปลี่ยนลำดับได้` : `ปักหมุด ${classroom.name} ไว้บนสุด`}
+                size="sm"
+                className={cn(
+                  'flex size-8 items-center justify-center rounded-lg transition-colors',
+                  isPinned ? 'bg-card text-warning' : 'bg-card/85 text-muted-foreground hover:bg-card hover:text-foreground',
+                )}
+              >
+                {isPinned ? <Pin className="size-4 fill-current" /> : <PinOff className="size-4" />}
+              </IconButton>
+            )}
+          </div>
         )}
         <div className={cn(
           'absolute inset-0 transition-colors',
@@ -142,14 +172,18 @@ export function ClassroomCard({
   }
 
   return (
-    <Link
-      href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms')}
+    <div
       className={cn(
-        'group block bg-card rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden',
-        isPinned ? 'ring-2 ring-warning/40' : 'ring-1 ring-border'
+        'group relative overflow-hidden rounded-2xl bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+        isPinned ? 'ring-2 ring-warning/40' : 'ring-1 ring-border',
       )}
     >
+      <Link
+        href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms')}
+        aria-label={`เปิดห้องเรียน ${classroom.name}`}
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
       {cardBody}
-    </Link>
+    </div>
   )
 }

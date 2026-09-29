@@ -34,14 +34,13 @@ export default async function ClassroomsPage() {
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
 
   if (isTeacher) {
-    const [activeRes, archivedRes, trashedRes] = await Promise.all([
+    const [activeRes, trashedRes] = await Promise.all([
       admin
         .from('classrooms')
-        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, deleted_at, created_at, updated_at, classroom_students(count), assignment_classrooms(count)')
+        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, display_order, deleted_at, created_at, updated_at, classroom_students(count), assignment_classrooms(count)')
         .eq('teacher_id', authUser.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false }),
-      admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser.id).eq('status', 'archived'),
       admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser.id).eq('status', 'deleted'),
     ])
 
@@ -63,6 +62,8 @@ export default async function ClassroomsPage() {
         .sort((a, b) => {
           const pinDiff = (b.pinned_at ? new Date(b.pinned_at).getTime() : 0) - (a.pinned_at ? new Date(a.pinned_at).getTime() : 0)
           if (pinDiff !== 0) return pinDiff
+          const orderDiff = (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER)
+          if (orderDiff !== 0) return orderDiff
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         }),
     ]
@@ -74,7 +75,6 @@ export default async function ClassroomsPage() {
         assignmentCountMap={assignmentCountMap}
         totalStudents={Object.values(studentCountMap).reduce((a, b) => a + b, 0)}
         totalAssignments={Object.values(assignmentCountMap).reduce((a, b) => a + b, 0)}
-        archivedCount={archivedRes.count ?? 0}
         trashedCount={trashedRes.count ?? 0}
       />
     )

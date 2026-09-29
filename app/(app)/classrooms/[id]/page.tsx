@@ -551,11 +551,11 @@ export default async function ClassroomDetailPage({
       })
     }
   }
-  // Cross-posting an announcement only makes sense into a room students are
-  // still in — an archived or trashed classroom would take the post and show
-  // it to nobody.
-  const crossPostTargets = otherClassroomList
-    .filter(row => row.status === 'active' && !row.deleted_at)
+  // Reusing or cross-posting an announcement is available in every other
+  // active classroom this teacher can manage, including co-taught rooms. The
+  // switchable list was already filtered to active, non-deleted classrooms.
+  const crossPostTargets = switchableClassrooms
+    .filter(row => row.id !== c.id)
     .map(({ id: classroomId, name }) => ({ id: classroomId, name }))
 
   // Who has seen each announcement. Only the teaching side can read these rows

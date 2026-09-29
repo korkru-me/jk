@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
+import type { Assignment } from '@/lib/types'
 
 function generateClassCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -52,6 +53,169 @@ export async function createClassroom(data: { name: string; description: string;
 
   revalidatePath('/classrooms', 'layout')
   return { success: true }
+}
+
+function assignmentDraftCopyPayload(source: Assignment, classroomId: string, createdBy: string) {
+  return {
+    org_id: source.org_id,
+    classroom_id: classroomId,
+    created_by: createdBy,
+    title: source.title,
+    description: source.description,
+    question_ids: source.question_ids,
+    sections: source.sections ?? null,
+    show_sections: source.show_sections ?? true,
+    question_points: source.question_points,
+    display_max_score: source.display_max_score,
+    set_id: null,
+    start_at: null,
+    end_at: null,
+    duration_minutes: source.duration_minutes,
+    mode: source.mode,
+    type: source.type,
+    shuffle_questions: source.shuffle_questions,
+    shuffle_options: source.shuffle_options,
+    shared_random_seed: source.shared_random_seed ?? null,
+    random_question_count: source.random_question_count ?? null,
+    show_results: source.show_results,
+    show_solutions: source.show_solutions ?? false,
+    max_attempts: source.max_attempts,
+    score_strategy: source.score_strategy,
+    retry_scope: source.retry_scope ?? 'all',
+    questions_per_page: source.questions_per_page ?? 1,
+    instant_check: source.instant_check ?? false,
+    instant_check_answer_key: source.instant_check_answer_key ?? true,
+    completion_rule: source.completion_rule ?? 'fixed',
+    streak_target: source.streak_target ?? null,
+    streak_question_cap: source.streak_question_cap ?? null,
+    streak_recycle_pool: source.streak_recycle_pool ?? true,
+    access_code: null,
+    passing_type: source.passing_type,
+    passing_value: source.passing_value,
+    require_work_image: source.require_work_image,
+    calculator_enabled: source.mode === 'online' && (source.calculator_enabled ?? false),
+    scratchpad_enabled: source.mode === 'online' && (source.scratchpad_enabled ?? false),
+    proctoring_enabled: source.proctoring_enabled ?? false,
+    fullscreen_required: source.fullscreen_required ?? false,
+    block_clipboard: source.block_clipboard ?? false,
+    exam_watermark_enabled: source.exam_watermark_enabled ?? false,
+    secure_browser_mode: source.secure_browser_mode ?? 'browser',
+    android_exam_mode: source.android_exam_mode ?? 'blocked',
+    status: 'draft' as const,
+  }
+}
+
+/**
+ * Copy a classroom shell and its assigned exercises/exams. Every copied work
+ * item receives a new assignment id and starts as a draft; roster,
+ * submissions, scores, comments, announcements and pins are intentionally not
+ * copied.
+ */
+export async function duplicateClassroom(id: string) {
+  const user = await getAuthUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const admin = createAdminClient()
+  const { data: source, error: sourceError } = await admin
+    .from('classrooms')
+    .select('*')
+    .eq('id', id)
+    .eq('teacher_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle()
+  if (sourceError) return { error: sourceError.message }
+  if (!source) return { error: 'ไม่พบห้องเรียน หรือคุณไม่มีสิทธิ์คัดลอกห้องนี้' }
+
+  let classCode = generateClassCode()
+  for (let i = 0; i < 5; i++) {
+    const { data: existing } = await admin
+      .from('classrooms').select('id').eq('class_code', classCode).maybeSingle()
+    if (!existing) break
+    classCode = generateClassCode()
+  }
+
+  const { data: lastOrder } = await admin
+    .from('classrooms')
+    .select('display_order')
+    .eq('teacher_id', user.id)
+    .eq('status', 'active')
+    .eq('classroom_type', source.classroom_type)
+    .not('display_order', 'is', null)
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data: copy, error: copyError } = await admin
+    .from('classrooms')
+    .insert({
+      org_id: source.org_id,
+      teacher_id: user.id,
+      name: `${source.name} (สำเนา)`,
+      description: source.description,
+      class_code: classCode,
+      status: 'active',
+      classroom_type: source.classroom_type,
+      pinned_at: null,
+      display_order: (lastOrder?.display_order ?? 0) + 1,
+    })
+    .select('id')
+    .single()
+  if (copyError) return { error: copyError.message }
+
+  const createdAssignmentIds: string[] = []
+  const cleanup = async () => {
+    if (createdAssignmentIds.length > 0) {
+      await admin.from('assignments').delete().in('id', createdAssignmentIds).eq('created_by', user.id)
+    }
+    await admin.from('classrooms').delete().eq('id', copy.id).eq('teacher_id', user.id)
+  }
+
+  const { data: links, error: linksError } = await admin
+    .from('assignment_classrooms')
+    .select('assignment_id')
+    .eq('classroom_id', source.id)
+  if (linksError) {
+    await cleanup()
+    return { error: 'อ่านรายการงานของห้องต้นฉบับไม่สำเร็จ กรุณาลองใหม่' }
+  }
+
+  const assignmentIds = Array.from(new Set((links ?? []).map(link => link.assignment_id)))
+  if (assignmentIds.length > 0) {
+    const { data: sourceAssignments, error: assignmentError } = await admin
+      .from('assignments')
+      .select('*')
+      .in('id', assignmentIds)
+    if (assignmentError) {
+      await cleanup()
+      return { error: 'อ่านแบบฝึกหัดและข้อสอบของห้องต้นฉบับไม่สำเร็จ กรุณาลองใหม่' }
+    }
+
+    for (const sourceAssignment of (sourceAssignments ?? []) as Assignment[]) {
+      const { data: assignmentCopy, error: insertError } = await admin
+        .from('assignments')
+        .insert(assignmentDraftCopyPayload(sourceAssignment, copy.id, user.id))
+        .select('id')
+        .single()
+      if (insertError) {
+        await cleanup()
+        return { error: `คัดลอกงาน “${sourceAssignment.title}” ไม่สำเร็จ ห้องเรียนใหม่จึงยังไม่ถูกสร้าง` }
+      }
+      createdAssignmentIds.push(assignmentCopy.id)
+
+      const { error: linkError } = await admin.from('assignment_classrooms').insert({
+        assignment_id: assignmentCopy.id,
+        classroom_id: copy.id,
+        group_ids: null,
+      })
+      if (linkError) {
+        await cleanup()
+        return { error: `ผูกงาน “${sourceAssignment.title}” กับห้องเรียนใหม่ไม่สำเร็จ ห้องเรียนใหม่จึงยังไม่ถูกสร้าง` }
+      }
+    }
+  }
+
+  revalidatePath('/classrooms', 'layout')
+  return { success: true, id: copy.id, copiedAssignments: createdAssignmentIds.length }
 }
 
 // ── Update (rename / edit the description shown on the classroom header) ───
@@ -113,37 +277,6 @@ export async function bulkDeleteClassrooms(ids: string[]) {
   return { success: true }
 }
 
-// ── Archive ────────────────────────────────────────────────────────────────
-
-export async function archiveClassroom(id: string) {
-  const user = await getAuthUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-  const admin = createAdminClient()
-  const { error } = await admin
-    .from('classrooms')
-    .update({ status: 'archived' })
-    .eq('id', id)
-    .eq('teacher_id', user.id)
-  if (error) return { error: error.message }
-  revalidatePath('/classrooms')
-  return { success: true }
-}
-
-export async function bulkArchiveClassrooms(ids: string[]) {
-  if (!ids.length) return { error: 'ไม่ได้เลือกห้องเรียน' }
-  const user = await getAuthUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-  const admin = createAdminClient()
-  const { error } = await admin
-    .from('classrooms')
-    .update({ status: 'archived' })
-    .in('id', ids)
-    .eq('teacher_id', user.id)
-  if (error) return { error: error.message }
-  revalidatePath('/classrooms')
-  return { success: true }
-}
-
 // ── Restore (back to active) ───────────────────────────────────────────────
 
 export async function restoreClassroom(id: string) {
@@ -158,7 +291,6 @@ export async function restoreClassroom(id: string) {
   if (error) return { error: error.message }
   revalidatePath('/classrooms')
   revalidatePath('/classrooms/trash')
-  revalidatePath('/classrooms/archived')
   return { success: true }
 }
 
@@ -190,6 +322,27 @@ export async function togglePinClassroom(id: string, pinned: boolean) {
     .eq('id', id)
     .eq('teacher_id', user.id)
   if (error) return { error: error.message }
+  revalidatePath('/classrooms')
+  return { success: true }
+}
+
+// ── Manual classroom ordering ──────────────────────────────────────────────
+
+export async function reorderClassrooms(orderedClassroomIds: string[]) {
+  const user = await getAuthUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const ids = orderedClassroomIds.filter(id => typeof id === 'string' && id)
+  if (ids.length === 0 || ids.length > 500 || new Set(ids).size !== ids.length) {
+    return { error: 'ลำดับห้องเรียนไม่ถูกต้อง กรุณารีเฟรชแล้วลองใหม่' }
+  }
+
+  // The RPC runs with the session client and checks auth.uid(), ownership,
+  // active status and pinned_at again inside one transaction. A forged list
+  // cannot reorder someone else's room or a room that is still pinned.
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('reorder_my_classrooms', { ordered_ids: ids })
+  if (error) return { error: 'รายการห้องเรียนมีการเปลี่ยนแปลง กรุณารีเฟรชแล้วลองจัดลำดับอีกครั้ง' }
+
   revalidatePath('/classrooms')
   return { success: true }
 }
