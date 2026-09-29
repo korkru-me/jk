@@ -88,6 +88,7 @@ export default async function AssignmentTeachingPage({
       questionsPerPage={a.questions_per_page ?? 1}
       initialBoards={initial && !('error' in initial) ? initial.boards : []}
       initialBoardsError={initial && 'error' in initial ? initial.error : undefined}
+      contextualSidebarPath={`/assignments/${id}/teach`}
     />
   )
 }

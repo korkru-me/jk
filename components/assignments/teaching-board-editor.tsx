@@ -14,7 +14,6 @@ import type {
 } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronUp,
   ImagePlus,
   Loader2,
   PenLine,
@@ -137,8 +136,6 @@ interface Props {
   sessionLibraryItems: readonly DrawingBoardSessionLibraryItem[]
   onSessionLibraryItemAdd: (item: DrawingBoardSessionLibraryItem) => void
   onSessionLibraryItemRemove: (itemId: string) => void
-  /** Given when the board can be folded away to its heading. */
-  onHide?: () => void
 }
 
 function contentSignature(elements: readonly OrderedExcalidrawElement[]): string {
@@ -187,7 +184,6 @@ export default function TeachingBoardEditor({
   sessionLibraryItems,
   onSessionLibraryItemAdd,
   onSessionLibraryItemRemove,
-  onHide,
 }: Props) {
   const initialValidation = useMemo(
     () => initialScene ? validateStoredTeacherScene(initialScene) : null,
@@ -872,11 +868,6 @@ export default function TeachingBoardEditor({
                 <Button type="button" size="xs" onClick={() => void saveBoard()} disabled={saving || loading || duplicating || !dirty}>
                   {saving ? <Loader2 className="animate-spin" /> : <Save />}
                   {saving ? 'กำลังบันทึก...' : savesOverBoard ? 'บันทึกทับ' : 'บันทึกเฉลย'}
-                </Button>
-              )}
-              {onHide && (
-                <Button type="button" variant="ghost" size="xs" aria-expanded={true} onClick={onHide} disabled={saving}>
-                  <ChevronUp /> ซ่อน
                 </Button>
               )}
             </div>
