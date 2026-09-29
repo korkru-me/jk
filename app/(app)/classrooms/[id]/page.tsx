@@ -15,6 +15,11 @@ import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 import {
+  getAssignmentCategories,
+  getAssignmentClassroomLinks,
+  type AssignmentClassroomLinkRow,
+} from '@/lib/assignment-category-data.server'
+import {
   classroomNavigationFor,
   resolveClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
@@ -118,20 +123,15 @@ export default async function ClassroomDetailPage({
     const [
       { data: teacherProfile },
       { count: studentCount },
-      { data: links },
-      { data: assignmentCategoryRows },
+      links,
+      assignmentCategoryRows,
       posts,
       { data: myGroup },
     ] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
-      admin.from('assignment_classrooms').select('assignment_id, group_ids, category_id').eq('classroom_id', id),
-      admin
-        .from('classroom_assignment_categories')
-        .select('id, classroom_id, name, color, position')
-        .eq('classroom_id', id)
-        .order('position')
-        .order('created_at'),
+      getAssignmentClassroomLinks(admin, id),
+      getAssignmentCategories(admin, id),
       getClassroomPosts(id),
       admin
         .from('classroom_group_members')
@@ -276,8 +276,8 @@ export default async function ClassroomDetailPage({
     { data: coTeacherRows },
     { data: inviteRows },
     { data: memberships },
-    { data: assignmentLinkRows },
-    { data: assignmentCategoryRows },
+    assignmentLinkRows,
+    assignmentCategoryRows,
     { data: ownerProfile },
     { data: otherClassroomRows },
     { data: coTeachingClassroomRows },
@@ -304,19 +304,11 @@ export default async function ClassroomDetailPage({
       .select('student_id, users!inner(id, full_name, email)')
       .eq('classroom_id', id),
     c.classroom_type === 'subject'
-      ? admin
-          .from('assignment_classrooms')
-          .select('assignment_id, display_order, group_ids, category_id')
-          .eq('classroom_id', id)
-      : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null; group_ids: string[] | null; category_id: string | null }[] }),
+      ? getAssignmentClassroomLinks(admin, id)
+      : Promise.resolve([] as AssignmentClassroomLinkRow[]),
     c.classroom_type === 'subject' && canManage
-      ? admin
-          .from('classroom_assignment_categories')
-          .select('id, classroom_id, name, color, position')
-          .eq('classroom_id', id)
-          .order('position')
-          .order('created_at')
-      : Promise.resolve({ data: [] as AssignmentCategory[] }),
+      ? getAssignmentCategories(admin, id)
+      : Promise.resolve([] as AssignmentCategory[]),
     admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
     admin
       .from('classrooms')

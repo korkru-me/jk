@@ -64,6 +64,9 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 ## Migrations
 
 - ตรวจสถานะ migration ของฐานข้อมูลจริงก่อนเขียน
+- ก่อน `migration list`, `db push` หรือ `migration repair` ต้องยืนยันว่า project ref จาก
+  `NEXT_PUBLIC_SUPABASE_URL` ของ deployment เป้าหมายตรงกับ `supabase/.temp/project-ref`
+  ของ CLI ห้ามอนุมานว่า linked project คือ Production จากชื่อ branch หรือผล push ครั้งก่อน
 - ห้ามแก้ migration ที่ apply แล้วเพื่อเปลี่ยน production
 - migration ที่แตะ policy/role/function ต้องผ่าน review เป็นพิเศษ
 - รักษา backward compatibility ระหว่างช่วง deploy code และ schema

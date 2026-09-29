@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   defaultAssignmentCategoryName,
   groupAssignmentsByCategory,
+  isMissingAssignmentCategorySchema,
   normalizeAssignmentCategoryName,
   type AssignmentCategory,
 } from './assignment-categories'
@@ -41,5 +42,14 @@ describe('assignment categories', () => {
   it('can retain empty categories for the teacher management view', () => {
     const sections = groupAssignmentsByCategory([], categories, true)
     expect(sections.map(section => section.category?.id ?? null)).toEqual(['first', 'later', null])
+  })
+
+  it('recognizes only missing-schema errors for the deployment fallback', () => {
+    expect(isMissingAssignmentCategorySchema({ code: '42703' })).toBe(true)
+    expect(isMissingAssignmentCategorySchema({ code: '42P01' })).toBe(true)
+    expect(isMissingAssignmentCategorySchema({ code: 'PGRST204' })).toBe(true)
+    expect(isMissingAssignmentCategorySchema({ code: 'PGRST205' })).toBe(true)
+    expect(isMissingAssignmentCategorySchema({ code: '42501' })).toBe(false)
+    expect(isMissingAssignmentCategorySchema(null)).toBe(false)
   })
 })

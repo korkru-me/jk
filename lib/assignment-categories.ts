@@ -18,6 +18,17 @@ export interface AssignmentCategory {
   position: number
 }
 
+/**
+ * Postgres/PostgREST codes returned while a newly deployed category schema is
+ * still absent from the runtime database or schema cache.
+ */
+export function isMissingAssignmentCategorySchema(error: { code?: string } | null): boolean {
+  return error?.code === '42703'
+    || error?.code === '42P01'
+    || error?.code === 'PGRST204'
+    || error?.code === 'PGRST205'
+}
+
 export function normalizeAssignmentCategoryName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   const name = raw.replace(/\s+/g, ' ').trim()
