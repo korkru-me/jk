@@ -1,5 +1,4 @@
 export type ScoreMatrixSortKey =
-  | { type: 'roster' }
   | { type: 'name' }
   | { type: 'assignment'; assignmentId: string }
 
@@ -44,17 +43,19 @@ export function sortScoreMatrixStudents<T extends ScoreMatrixStudent>(
 
   return ordered.sort((a, b) => {
     let result = 0
-    if (sort.key.type === 'roster') {
-      result = fallbackIndex(a.id) - fallbackIndex(b.id)
-    } else if (sort.key.type === 'name') {
+    if (sort.key.type === 'name') {
       result = collator.compare(a.full_name, b.full_name)
     } else {
       const aScore = scoreFor(a.id, sort.key.assignmentId)
       const bScore = scoreFor(b.id, sort.key.assignmentId)
       if (aScore === null && bScore === null) return fallbackIndex(a.id) - fallbackIndex(b.id)
-      if (aScore === null) return 1
-      if (bScore === null) return -1
-      result = aScore - bScore
+      // An unsubmitted score is lower than a submitted score. Applying the
+      // direction below therefore makes the second click visibly reverse a
+      // column even when only one student has submitted: missing scores lead
+      // in ascending order and trail in descending order.
+      if (aScore === null) result = -1
+      else if (bScore === null) result = 1
+      else result = aScore - bScore
     }
 
     return result === 0 ? fallbackIndex(a.id) - fallbackIndex(b.id) : result * direction

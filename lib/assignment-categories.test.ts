@@ -4,6 +4,7 @@ import {
   defaultAssignmentCategoryName,
   groupAssignmentsByCategory,
   isMissingAssignmentCategorySchema,
+  normalizeAssignmentCategoryId,
   normalizeAssignmentCategoryName,
   UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE,
   type AssignmentCategory,
@@ -31,6 +32,12 @@ describe('assignment categories', () => {
       { value: 'later', label: 'บทที่ 2' },
       { value: 'first', label: 'บทที่ 1' },
     ])
+  })
+
+  it('normalizes deleted category ids instead of exposing their UUIDs', () => {
+    expect(normalizeAssignmentCategoryId('first', categories)).toBe('first')
+    expect(normalizeAssignmentCategoryId('deleted-category-id', categories)).toBeNull()
+    expect(normalizeAssignmentCategoryId(null, categories)).toBeNull()
   })
 
   it('orders sections and keeps stale category assignments visible as ungrouped', () => {

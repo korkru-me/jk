@@ -30,6 +30,7 @@ import { describeGroupTarget } from '@/lib/classroom-groups'
 import {
   assignmentCategorySelectItems,
   groupAssignmentsByCategory,
+  normalizeAssignmentCategoryId,
   UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE,
   type AssignmentCategory,
 } from '@/lib/assignment-categories'
@@ -124,7 +125,10 @@ export function ClassroomAssignmentsTab({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categories, setCategories] = useState(initialCategories)
   const [categoryByAssignment, setCategoryByAssignment] = useState<Record<string, string | null>>(
-    () => Object.fromEntries(assignments.map(assignment => [assignment.id, assignment.category_id ?? null])),
+    () => Object.fromEntries(assignments.map(assignment => [
+      assignment.id,
+      normalizeAssignmentCategoryId(assignment.category_id, initialCategories),
+    ])),
   )
   const [isPending, startTransition] = useTransition()
 
@@ -133,9 +137,9 @@ export function ClassroomAssignmentsTab({
   const rows = useMemo(
     () => assignments.map(assignment => ({
       ...assignment,
-      category_id: categoryByAssignment[assignment.id] ?? null,
+      category_id: normalizeAssignmentCategoryId(categoryByAssignment[assignment.id], categories),
     })),
-    [assignments, categoryByAssignment],
+    [assignments, categories, categoryByAssignment],
   )
   const filtered = rows.filter(assignment => typeFilter === 'all' || assignment.type === typeFilter)
   const sections = groupAssignmentsByCategory(filtered, categories)
@@ -325,7 +329,9 @@ export function ClassroomAssignmentsTab({
                           >
                             <SelectTrigger size="sm" className="w-full" aria-label={`กลุ่มของ ${assignment.title}`}>
                               <Folder />
-                              <SelectValue />
+                              <SelectValue>
+                                {value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent align="end">
                               <SelectGroup>

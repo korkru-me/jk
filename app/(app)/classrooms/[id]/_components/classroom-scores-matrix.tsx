@@ -142,20 +142,23 @@ function SortableAssignmentHeader({
         {...listeners}
         type="button"
         variant="ghost"
-        size="xs"
+        size="icon-2xs"
         disabled={disabled}
         aria-label={`ย้ายคอลัมน์ ${assignment.title}`}
-        title="กดค้างแล้วลากซ้าย–ขวาเพื่อสลับคอลัมน์"
-        className="mx-auto mb-1 cursor-grab touch-manipulation rounded-full px-2 text-[10px] text-muted-foreground active:cursor-grabbing"
+        title="ลากเพื่อสลับ"
+        className="mx-auto mb-1 cursor-grab touch-manipulation rounded-full text-muted-foreground active:cursor-grabbing"
       >
-        <GripVertical data-icon="inline-start" />
-        ลากเพื่อสลับ
+        <GripVertical />
       </Button>
       <Button
         type="button"
         variant="ghost"
         size="xs"
-        onClick={onSort}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => {
+          event.stopPropagation()
+          onSort()
+        }}
         className="mx-auto h-auto max-w-[150px] whitespace-normal px-1 py-0 text-xs font-semibold text-muted-foreground hover:text-primary"
         title={`เรียงนักเรียนตาม ${assignment.title}`}
       >
@@ -220,7 +223,7 @@ function SortableStudentRow({ student, index, disabled, children }: SortableStud
             size="icon-xs"
             disabled={disabled}
             aria-label={`ย้ายลำดับ ${student.full_name}`}
-            title="กดค้างแล้วลากขึ้น–ลงเพื่อจัดลำดับนักเรียน"
+            title="ลากเพื่อสลับ"
             className="cursor-grab touch-manipulation text-muted-foreground active:cursor-grabbing"
           >
             <GripVertical />
@@ -529,7 +532,13 @@ export function ClassroomScoresMatrix({
           >
             <SelectTrigger size="sm" className="min-w-36 rounded-full bg-muted/60">
               <Folder className="text-muted-foreground" />
-              <SelectValue />
+              <SelectValue>
+                {value => {
+                  if (value === 'all') return 'ทุกกลุ่มงาน'
+                  if (value === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE) return 'ยังไม่จัดกลุ่ม'
+                  return sortedCategories.find(category => category.id === value)?.name ?? 'ทุกกลุ่มงาน'
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent align="start">
               <SelectGroup>
@@ -612,19 +621,24 @@ export function ClassroomScoresMatrix({
                 separated-borders table model (needed above) doesn't render
                 borders set directly on rows. */}
             <tr>
-              <th
-                aria-sort={sortAria(studentSort, { type: 'roster' })}
-                className="sticky left-0 z-20 bg-card text-center px-1 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16 min-w-16 max-w-16 border-b border-border"
-              >
-                <Button type="button" variant="ghost" size="xs" onClick={() => toggleStudentSort({ type: 'roster' })} className="mx-auto px-1 hover:text-primary">
-                  ลำดับ <SortIndicator value={sortAria(studentSort, { type: 'roster' })} />
-                </Button>
+              <th className="sticky left-0 z-20 w-16 min-w-16 max-w-16 border-b border-border bg-card px-1 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                ลำดับ
               </th>
               <th
                 aria-sort={sortAria(studentSort, { type: 'name' })}
                 className="sticky left-16 z-20 bg-card text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px] border-b border-border"
               >
-                <Button type="button" variant="ghost" size="xs" onClick={() => toggleStudentSort({ type: 'name' })} className="px-1 hover:text-primary">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onPointerDown={event => event.stopPropagation()}
+                  onClick={event => {
+                    event.stopPropagation()
+                    toggleStudentSort({ type: 'name' })
+                  }}
+                  className="px-1 hover:text-primary"
+                >
                   นักเรียน <SortIndicator value={sortAria(studentSort, { type: 'name' })} />
                 </Button>
               </th>
@@ -667,7 +681,7 @@ export function ClassroomScoresMatrix({
                     return (
                       <td key={a.id} className={cn(
                         'px-3 py-2.5 text-center border-b border-border bg-muted/40',
-                        draggingAssignmentId === a.id && 'bg-primary/10',
+                        draggingAssignmentId === a.id && 'bg-primary/10 opacity-40',
                       )}>
                         <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
                       </td>
@@ -677,7 +691,7 @@ export function ClassroomScoresMatrix({
                   return (
                     <td key={a.id} className={cn(
                       'px-3 py-2.5 text-center group relative border-b border-border',
-                      draggingAssignmentId === a.id && 'bg-primary/5',
+                      draggingAssignmentId === a.id && 'bg-primary/5 opacity-40',
                     )}>
                       {submitted ? (
                         <Link
@@ -725,15 +739,59 @@ export function ClassroomScoresMatrix({
       </Card>
       </SortableContext>
       <DragOverlay dropAnimation={null}>
-        {draggingAssignmentId && (
-          <Card edge="ring" className="max-w-56 cursor-grabbing bg-card px-4 py-3 shadow-xl ring-2 ring-primary/30">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-              <GripVertical className="size-3.5 text-primary" />
-              <span className="truncate">{assignmentTitleById.get(draggingAssignmentId) ?? 'งาน'}</span>
-            </p>
-            <p className="mt-1 text-[10px] text-muted-foreground">กำลังย้ายทั้งคอลัมน์</p>
-          </Card>
-        )}
+        {draggingAssignmentId && (() => {
+          const assignment = assignments.find(item => item.id === draggingAssignmentId)
+          if (!assignment) return null
+          return (
+            <Card
+              edge="ring"
+              aria-hidden="true"
+              className="w-[140px] cursor-grabbing overflow-hidden bg-card shadow-xl ring-2 ring-primary/30"
+            >
+              <div className="flex min-h-28 flex-col items-center justify-center gap-1 px-2 py-3 text-center">
+                <GripVertical className="size-4 text-primary" />
+                <p className="line-clamp-2 text-xs font-semibold text-foreground">{assignment.title}</p>
+              </div>
+              <div className="max-h-[calc(100dvh-12rem)] overflow-hidden">
+                {orderedStudents.map(student => {
+                  const sub = bestSubmission.get(subKey(assignment.id, student.id))
+                  const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
+                  const inProgress = sub?.status === 'in_progress'
+                  const passed = submitted
+                    ? computePassed(sub!.total_score, sub!.max_score, assignment.passing_type, assignment.passing_value)
+                    : null
+
+                  return (
+                    <div
+                      key={student.id}
+                      className="flex min-h-14 items-center justify-center border-t border-border px-2 py-2 text-center"
+                    >
+                      {notGiven(assignment.id, student.id) ? (
+                        <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
+                      ) : submitted ? (
+                        <span className={cn(
+                          'flex items-center gap-1 text-xs font-semibold',
+                          passed === false ? 'text-destructive' : 'text-success',
+                        )}>
+                          {passed === false ? <XCircle className="size-3.5" /> : <CheckCircle2 className="size-3.5" />}
+                          {sub!.total_score ?? 0}/{sub!.max_score}
+                        </span>
+                      ) : inProgress ? (
+                        <span className="flex items-center gap-1 text-xs text-primary">
+                          <CircleDashed className="size-3.5" /> กำลังทำ
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground/40">
+                          <MinusCircle className="size-3.5" /> ยังไม่ทำ
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          )
+        })()}
         {draggingStudentId && (
           <Card edge="ring" className="min-w-64 cursor-grabbing bg-card px-4 py-3 shadow-xl ring-2 ring-primary/30">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">

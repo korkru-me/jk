@@ -11,7 +11,9 @@ describe('nextScoreMatrixSort', () => {
   it('starts a new column high-to-low and toggles the same column', () => {
     const first = nextScoreMatrixSort(null, { type: 'assignment', assignmentId: 'work-1' })
     expect(first.dir).toBe('desc')
-    expect(nextScoreMatrixSort(first, first.key).dir).toBe('asc')
+    const second = nextScoreMatrixSort(first, { type: 'assignment', assignmentId: 'work-1' })
+    expect(second.dir).toBe('asc')
+    expect(nextScoreMatrixSort(second, { type: 'assignment', assignmentId: 'work-1' }).dir).toBe('desc')
   })
 })
 
@@ -21,7 +23,7 @@ describe('sortScoreMatrixStudents', () => {
       .toEqual(['c', 'a', 'b'])
   })
 
-  it('sorts assignment scores while keeping missing scores last in both directions', () => {
+  it('sorts assignment scores in both directions, treating missing scores as lower', () => {
     const score = (id: string) => ({ a: 4, b: 9 }[id as 'a' | 'b'] ?? null)
     expect(sortScoreMatrixStudents(
       students, ['a', 'b', 'c'],
@@ -32,6 +34,6 @@ describe('sortScoreMatrixStudents', () => {
       students, ['a', 'b', 'c'],
       { key: { type: 'assignment', assignmentId: 'work-1' }, dir: 'asc' },
       score,
-    ).map(s => s.id)).toEqual(['a', 'b', 'c'])
+    ).map(s => s.id)).toEqual(['c', 'a', 'b'])
   })
 })

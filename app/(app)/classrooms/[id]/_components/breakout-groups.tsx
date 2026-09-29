@@ -559,6 +559,7 @@ function GroupCard({
             ref={setActivatorNodeRef}
             {...attributes}
             label={`ย้ายตำแหน่ง ${group.name}`}
+            title="ลากเพื่อสลับ"
             size="2xs"
             className={cn('-ml-1 cursor-grab text-muted-foreground active:cursor-grabbing', preset.textMuted)}
           >

@@ -26,6 +26,15 @@ export function assignmentCategorySelectItems(categories: AssignmentCategory[]) 
   ]
 }
 
+/** Unknown/deleted category ids are presented as ungrouped, never as raw UUIDs. */
+export function normalizeAssignmentCategoryId(
+  categoryId: string | null | undefined,
+  categories: AssignmentCategory[],
+): string | null {
+  if (!categoryId) return null
+  return categories.some(category => category.id === categoryId) ? categoryId : null
+}
+
 /**
  * Postgres/PostgREST codes returned while a newly deployed category schema is
  * still absent from the runtime database or schema cache.
