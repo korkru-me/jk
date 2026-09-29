@@ -55,6 +55,7 @@ import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
@@ -106,17 +107,23 @@ type TypeFilter = 'all' | 'exercise' | 'exam'
 const STATUS_CFG = {
   draft: {
     label: 'ฉบับร่าง',
+    description: 'ยังไม่แสดงให้นักเรียนเห็น จนกว่าครูจะเผยแพร่งานชุดนี้',
     badge: 'statusWarning',
+    dot: 'bg-warning',
     row: 'border-l-warning bg-card hover:bg-muted/30',
   },
   published: {
     label: 'เผยแพร่แล้ว',
+    description: 'นักเรียนที่ได้รับมอบหมายสามารถเปิดและทำงานชุดนี้ได้',
     badge: 'statusSuccess',
+    dot: 'bg-success',
     row: 'border-l-success bg-card hover:bg-muted/30',
   },
   closed: {
     label: 'ปิดแล้ว',
+    description: 'ปิดรับการทำงานแล้ว นักเรียนจึงเริ่มทำรอบใหม่ไม่ได้',
     badge: 'statusDestructive',
+    dot: 'bg-destructive',
     row: 'border-l-destructive bg-card hover:bg-muted/30',
   },
 } as const
@@ -130,12 +137,14 @@ function SortableAssignmentRow({
   title,
   disabled,
   tone,
+  status,
   children,
 }: {
   assignmentId: string
   title: string
   disabled: boolean
   tone: string
+  status: ReturnType<typeof statusConfig>
   children: ReactNode
 }) {
   const {
@@ -153,11 +162,31 @@ function SortableAssignmentRow({
       ref={setNodeRef}
       style={{ transform: DndCSS.Transform.toString(transform), transition }}
       className={cn(
-        'flex gap-2 border-l-4 px-2 py-3 transition-[background-color,box-shadow,opacity]',
+        'relative flex gap-2 border-l-4 py-3 pr-2 pl-3 transition-[background-color,box-shadow,opacity]',
         tone,
         isDragging && 'relative z-10 opacity-75 shadow-md',
       )}
     >
+      <HoverCard>
+        <HoverCardTrigger
+          delay={140}
+          closeDelay={80}
+          render={(
+            <button
+              type="button"
+              aria-label={`สถานะ ${status.label}: ${status.description}`}
+              className="absolute inset-y-0 left-0 w-3 cursor-help outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            />
+          )}
+        />
+        <HoverCardContent side="right" align="start">
+          <div className="flex items-center gap-2">
+            <span className={cn('size-2.5 shrink-0 rounded-full', status.dot)} aria-hidden="true" />
+            <p className="font-semibold text-foreground">สถานะ: {status.label}</p>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{status.description}</p>
+        </HoverCardContent>
+      </HoverCard>
       <Button
         ref={setActivatorNodeRef}
         type="button"
@@ -406,6 +435,7 @@ export function ClassroomAssignmentsTab({
                         title={assignment.title}
                         disabled={isOrderPending}
                         tone={statusCfg.row}
+                        status={statusCfg}
                       >
                         <div className="flex flex-col gap-3 px-2">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
