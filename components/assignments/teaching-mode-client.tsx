@@ -1601,8 +1601,11 @@ export function TeachingModeClient({
       </Card>
 
       {/* Each ข้อ is one row of its own: the question and saved answers on
-          the left, its board on the right. Hidden regions leave no placeholder;
-          whichever region remains expands to the full available width. */}
+          the left, its board on the right. The question track is based on the
+          normal desktop viewport after subtracting the 64-unit sidebar,
+          12 units of page padding and the 3-unit gap. Collapsing the sidebar
+          therefore gives all reclaimed width to the board instead of making
+          the question wider, including with a custom density/spacing theme. */}
       <div className="flex min-h-0 min-w-0 flex-1 gap-3">
         <div className="min-w-0 flex-1 space-y-4">
           {pageQuestions.map((pageQuestion, offset) => {
@@ -1616,7 +1619,7 @@ export function TeachingModeClient({
                   'grid min-w-0 gap-3',
                   !showQuestion && !showBoards && !showBoard && 'hidden',
                   (showQuestion || showBoards) && showBoard
-                    && 'lg:grid-cols-[minmax(17rem,0.72fr)_minmax(30rem,1.28fr)]',
+                    && 'lg:grid-cols-[clamp(17rem,calc(36vw-(var(--spacing)*28.44)),35rem)_minmax(30rem,1fr)]',
                 )}
               >
                 <TeachingQuestionCard
