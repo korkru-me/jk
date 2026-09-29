@@ -250,6 +250,7 @@ export default function TeachingBoardEditor({
   const [duplicating, setDuplicating] = useState(false)
   const [insertingImage, setInsertingImage] = useState(false)
   const [pickingImage, setPickingImage] = useState(false)
+  const [advancedToolsOpen, setAdvancedToolsOpen] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [draftState, setDraftState] = useState<TeacherQuestionDraftState>(() => (
     initialPolicyMessage
@@ -915,20 +916,6 @@ export default function TeachingBoardEditor({
           </div>
         )}
 
-        {canManage && (
-          <SessionLibraryBar
-            label="คลังชั่วคราวของกระดานสอน"
-            items={sessionLibraryItems}
-            disabled={!editable || presentationLocked || duplicating || insertingImage}
-            getApi={() => apiRef.current}
-            getScene={() => sceneRef.current}
-            getSurface={() => surfaceRef.current}
-            getLegacyTeacherImages={() => legacyTeacherImagesRef.current}
-            onAdd={onSessionLibraryItemAdd}
-            onRemove={onSessionLibraryItemRemove}
-          />
-        )}
-
         <TeacherDrawingToolbar
           controller={controller}
           state={commandState}
@@ -939,9 +926,24 @@ export default function TeachingBoardEditor({
           gridEnabled={gridEnabled}
           snapEnabled={snapEnabled}
           duplicateBusy={duplicating}
+          advancedOpen={advancedToolsOpen}
+          advancedContent={canManage ? (
+            <SessionLibraryBar
+              label="คลังชั่วคราวของกระดานสอน"
+              items={sessionLibraryItems}
+              disabled={!editable || presentationLocked || duplicating || insertingImage}
+              getApi={() => apiRef.current}
+              getScene={() => sceneRef.current}
+              getSurface={() => surfaceRef.current}
+              getLegacyTeacherImages={() => legacyTeacherImagesRef.current}
+              onAdd={onSessionLibraryItemAdd}
+              onRemove={onSessionLibraryItemRemove}
+            />
+          ) : undefined}
           onBackgroundChange={chooseBackground}
           onFingerModeChange={onFingerInputModeChange}
           onFit={fitPaper}
+          onAdvancedOpenChange={setAdvancedToolsOpen}
           onPresentationLockedChange={locked => {
             setPickingImage(false)
             onPresentationLockedChange(locked)
