@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
-import { assignmentCreationTitle, newAssignmentTypeDefaults } from '@/lib/assignment-creation'
+import { assignmentCopyTitle, assignmentCreationTitle, newAssignmentTypeDefaults } from '@/lib/assignment-creation'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
@@ -23,6 +23,7 @@ import {
   Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
   Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
   CircleCheck, Calculator, NotebookPen, Hash, Save,
+  Copy,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -31,6 +32,7 @@ import {
 import type {
   AssignmentStatus,
   AssignmentType,
+  Assignment,
   Classroom,
   CompletionRule,
   QuestionSet,
@@ -62,6 +64,7 @@ import {
   getSebQuitPasswordClientError,
 } from '@/components/assignments/seb-quit-password-settings'
 import { cn } from '@/lib/utils'
+import { THAI_TIME_ZONE } from '@/lib/thai-time'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -86,6 +89,65 @@ export type AssignmentClassroomOption = Pick<Classroom, 'id' | 'name' | 'descrip
 export type AssignmentQuestionOption = BankQuestion
 export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'description' | 'question_ids' | 'sections'>
 
+export type AssignmentCopyPreset = Pick<
+  Assignment,
+  | 'id'
+  | 'title'
+  | 'description'
+  | 'question_ids'
+  | 'question_points'
+  | 'display_max_score'
+  | 'sections'
+  | 'show_sections'
+  | 'start_at'
+  | 'end_at'
+  | 'duration_minutes'
+  | 'type'
+  | 'shuffle_questions'
+  | 'shuffle_options'
+  | 'shared_random_seed'
+  | 'random_question_count'
+  | 'show_results'
+  | 'show_solutions'
+  | 'max_attempts'
+  | 'score_strategy'
+  | 'retry_scope'
+  | 'questions_per_page'
+  | 'instant_check'
+  | 'instant_check_answer_key'
+  | 'completion_rule'
+  | 'streak_target'
+  | 'streak_question_cap'
+  | 'streak_recycle_pool'
+  | 'access_code'
+  | 'passing_type'
+  | 'passing_value'
+  | 'require_work_image'
+  | 'calculator_enabled'
+  | 'scratchpad_enabled'
+  | 'proctoring_enabled'
+  | 'fullscreen_required'
+  | 'block_clipboard'
+  | 'exam_watermark_enabled'
+  | 'secure_browser_mode'
+  | 'android_exam_mode'
+>
+
+function toLocalInputValue(iso: string | null): string {
+  if (!iso) return ''
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: THAI_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`
+}
+
 interface Props {
   classrooms: AssignmentClassroomOption[]
   /** กลุ่มย่อย of each classroom above, for "มอบหมายให้". */
@@ -95,6 +157,8 @@ interface Props {
   preselectedClassroomId?: string
   preselectedSet?: AssignmentQuestionSetOption
   preselectedAssignmentType: AssignmentType
+  copySource?: AssignmentCopyPreset
+  initialGroupTargets?: GroupTargets
 }
 
 export function CreateAssignmentForm({
@@ -105,9 +169,12 @@ export function CreateAssignmentForm({
   preselectedClassroomId,
   preselectedSet,
   preselectedAssignmentType,
+  copySource,
+  initialGroupTargets = {},
 }: Props) {
   const router = useRouter()
   const assignmentType = preselectedAssignmentType
+  const isCopy = copySource !== undefined
   const initialTypeDefaults = newAssignmentTypeDefaults(assignmentType)
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
@@ -116,17 +183,19 @@ export function CreateAssignmentForm({
   const [scheduleAt, setScheduleAt] = useState('')
 
   // Step 1: รายละเอียดและโจทย์
-  const [title, setTitle] = useState(preselectedSet?.title ?? '')
-  const [description, setDescription] = useState(preselectedSet?.description ?? '')
+  const [title, setTitle] = useState(
+    copySource ? assignmentCopyTitle(copySource.title) : (preselectedSet?.title ?? ''),
+  )
+  const [description, setDescription] = useState(copySource?.description ?? preselectedSet?.description ?? '')
   const [classroomIds, setClassroomIds] = useState<string[]>(
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
   // มอบหมายให้: absent/null per room = นักเรียนทุกคนในห้อง, the default.
-  const [groupTargets, setGroupTargets] = useState<GroupTargets>({})
+  const [groupTargets, setGroupTargets] = useState<GroupTargets>(initialGroupTargets)
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
   // able to block students is not a safe default.
-  const [requireWorkImage, setRequireWorkImage] = useState(false)
+  const [requireWorkImage, setRequireWorkImage] = useState(copySource?.require_work_image ?? false)
   // When not starting from an existing set, offer to save the picked
   // questions back into the library as a new reusable set.
   const [saveAsSet, setSaveAsSet] = useState(false)
@@ -137,89 +206,111 @@ export function CreateAssignmentForm({
   // previewQuestions (step 2 can only render questions it can find), and the
   // teacher sees the count mysteriously shrink by however many are dangling.
   const [selectedIds, setSelectedIds] = useState<string[]>(
-    (preselectedSet?.question_ids ?? []).filter(id => questions.some(q => q.id === id))
+    (copySource?.question_ids ?? preselectedSet?.question_ids ?? []).filter(id => questions.some(q => q.id === id))
   )
   // แฟ้มย่อย carried over from the แฟ้มโจทย์ these questions came from. Trimmed
   // down to the questions actually assigned when the งาน is created.
   const [sections, setSections] = useState<QuestionSetSection[]>(
-    parseSections(preselectedSet?.sections)
+    parseSections(copySource?.sections ?? preselectedSet?.sections)
   )
-  const [showSections, setShowSections] = useState(true)
+  const [showSections, setShowSections] = useState(copySource?.show_sections ?? true)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
   // How much of the คลัง above each student actually receives. Empty = all of
   // it, which is what every งาน did before this setting existed. It lives here
   // rather than in ตั้งค่า because "ให้เด็กทำกี่ข้อ" is the thought that comes
   // immediately after ticking the last โจทย์, not three steps later.
-  const [randomQuestionCount, setRandomQuestionCount] = useState('')
+  const [randomQuestionCount, setRandomQuestionCount] = useState(
+    copySource?.random_question_count != null ? String(copySource.random_question_count) : '',
+  )
 
   // Step 2 (คะแนน) — a question starts at the point value its own structure
   // gives it (one per ข้อย่อย); teacher can edit individual questions and the
   // total recalculates automatically.
-  const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>({})
+  const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>(
+    Object.fromEntries(
+      Object.entries(copySource?.question_points ?? {}).map(([id, points]) => [id, String(points)]),
+    ),
+  )
   // Which row's มุมมองนักเรียน is open, as an index into selectedIds so the
   // dialog's ข้อถัดไป walks the teacher's own order. null = closed.
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   // Independent of the per-question points above — rescales what's
   // *reported* only (never the underlying structure), and can be changed
   // any time later from the edit page too, even after students finish.
-  const [displayMaxScore, setDisplayMaxScore] = useState('')
+  const [displayMaxScore, setDisplayMaxScore] = useState(
+    copySource?.display_max_score != null ? String(copySource.display_max_score) : '',
+  )
 
   // Step 3 (ตั้งค่า)
-  const [duration, setDuration] = useState('')
-  const [shuffleQ, setShuffleQ] = useState(false)
-  const [shuffleA, setShuffleA] = useState(false)
+  const [duration, setDuration] = useState(
+    copySource?.duration_minutes != null ? String(copySource.duration_minutes) : '',
+  )
+  const [shuffleQ, setShuffleQ] = useState(copySource?.shuffle_questions ?? false)
+  const [shuffleA, setShuffleA] = useState(copySource?.shuffle_options ?? false)
   // Off unless the teacher asks: every งาน before this existed gave each
   // student their own numbers, and that is still what a โจทย์สุ่มตัวเลข is for.
-  const [sharedRandomValues, setSharedRandomValues] = useState(false)
-  const [showResults, setShowResults] = useState<ShowResultsMode>('immediate')
+  const [sharedRandomValues, setSharedRandomValues] = useState(copySource?.shared_random_seed != null)
+  const [showResults, setShowResults] = useState<ShowResultsMode>(copySource?.show_results ?? 'immediate')
   // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
   // before this setting existed, and one that does is a choice, not a default.
-  const [showSolutions, setShowSolutions] = useState(false)
-  const [maxAttempts, setMaxAttempts] = useState(initialTypeDefaults.maxAttempts)
-  const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>('best')
+  const [showSolutions, setShowSolutions] = useState(copySource?.show_solutions ?? false)
+  const [maxAttempts, setMaxAttempts] = useState(
+    copySource ? (copySource.max_attempts != null ? String(copySource.max_attempts) : '') : initialTypeDefaults.maxAttempts,
+  )
+  const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(copySource?.score_strategy ?? 'best')
   // On by default: a แบบฝึกหัด a student can retake is nearly always meant as
   // a second chance at what they got wrong, not as the whole set again. A
   // teacher who wants the full set back only has to untick it — and ข้อสอบ,
   // which is one attempt, resets this to 'all' below where it means nothing.
-  const [retryScope, setRetryScope] = useState<RetryScope>(initialTypeDefaults.retryScope)
-  const [questionsPerPage, setQuestionsPerPage] = useState('1')
+  const [retryScope, setRetryScope] = useState<RetryScope>(copySource?.retry_scope ?? initialTypeDefaults.retryScope)
+  const [questionsPerPage, setQuestionsPerPage] = useState(String(copySource?.questions_per_page ?? 1))
   // On by default, and the reason a แบบฝึกหัด is not just a ข้อสอบ with more
   // attempts: the student finishes a ข้อ, presses ตรวจ, and finds out there and
   // then. A teacher who wants the whole set answered blind before any feedback
   // unticks it; the เฉลย itself is a separate decision below, because "บอกว่า
   // ผิด" and "บอกว่าคำตอบคืออะไร" are not the same amount of help.
-  const [instantCheck, setInstantCheck] = useState(true)
-  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(true)
+  const [instantCheck, setInstantCheck] = useState(copySource?.instant_check ?? true)
+  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(copySource?.instant_check_answer_key ?? true)
   // Approved defaults for a new online งาน: practice tools start on for an
   // exercise and off for an exam. Existing assignments are never backfilled.
-  const [calculatorEnabled, setCalculatorEnabled] = useState(initialTypeDefaults.mathToolsEnabled)
-  const [scratchpadEnabled, setScratchpadEnabled] = useState(initialTypeDefaults.mathToolsEnabled)
-  const [accessCode, setAccessCode] = useState('')
-  const [proctoringEnabled, setProctoringEnabled] = useState(false)
-  const [fullscreenRequired, setFullscreenRequired] = useState(false)
-  const [blockClipboard, setBlockClipboard] = useState(false)
-  const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(false)
-  const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>('browser')
-  const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>('blocked')
+  const [calculatorEnabled, setCalculatorEnabled] = useState(copySource?.calculator_enabled ?? initialTypeDefaults.mathToolsEnabled)
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(copySource?.scratchpad_enabled ?? initialTypeDefaults.mathToolsEnabled)
+  const [accessCode, setAccessCode] = useState(copySource?.access_code ?? '')
+  const [proctoringEnabled, setProctoringEnabled] = useState(copySource?.proctoring_enabled ?? false)
+  const [fullscreenRequired, setFullscreenRequired] = useState(copySource?.fullscreen_required ?? false)
+  const [blockClipboard, setBlockClipboard] = useState(copySource?.block_clipboard ?? false)
+  const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(copySource?.exam_watermark_enabled ?? false)
+  const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>(copySource?.secure_browser_mode ?? 'browser')
+  const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>(copySource?.android_exam_mode ?? 'blocked')
   const [sebQuitPassword, setSebQuitPassword] = useState('')
   const [sebQuitPasswordConfirmation, setSebQuitPasswordConfirmation] = useState('')
   // เงื่อนไขจบงาน. The three choices a teacher sees are a view over two stored
   // values — 'fixed' + no threshold, 'fixed' + a threshold, or 'streak' — so
   // that turning a threshold on and choosing to end on a run are visibly the
   // same decision rather than two switches that can disagree.
-  const [completionRule, setCompletionRule] = useState<CompletionRule>('fixed')
-  const [streakTarget, setStreakTarget] = useState(String(STREAK_TARGET_DEFAULT))
-  const [streakCapEnabled, setStreakCapEnabled] = useState(true)
-  const [streakCap, setStreakCap] = useState(String(defaultQuestionCap(STREAK_TARGET_DEFAULT)))
-  const [streakRecycle, setStreakRecycle] = useState(true)
-  const [passingEnabled, setPassingEnabled] = useState(false)
-  const [passingType, setPassingType] = useState<'score' | 'percent'>('percent')
-  const [passingValue, setPassingValue] = useState('')
+  const [completionRule, setCompletionRule] = useState<CompletionRule>(copySource?.completion_rule ?? 'fixed')
+  const [streakTarget, setStreakTarget] = useState(
+    String(copySource?.streak_target ?? STREAK_TARGET_DEFAULT),
+  )
+  const [streakCapEnabled, setStreakCapEnabled] = useState(
+    copySource ? copySource.streak_question_cap != null : true,
+  )
+  const [streakCap, setStreakCap] = useState(
+    String(copySource?.streak_question_cap ?? defaultQuestionCap(copySource?.streak_target ?? STREAK_TARGET_DEFAULT)),
+  )
+  const [streakRecycle, setStreakRecycle] = useState(copySource?.streak_recycle_pool ?? true)
+  const [passingEnabled, setPassingEnabled] = useState(
+    copySource?.passing_type != null && copySource.passing_value != null,
+  )
+  const [passingType, setPassingType] = useState<'score' | 'percent'>(copySource?.passing_type ?? 'percent')
+  const [passingValue, setPassingValue] = useState(
+    copySource?.passing_value != null ? String(copySource.passing_value) : '',
+  )
 
   // Step 4 (กำหนดการสอบ)
-  const [startAt, setStartAt] = useState('')
-  const [endAt, setEndAt] = useState('')
+  const [startAt, setStartAt] = useState(toLocalInputValue(copySource?.start_at ?? null))
+  const [endAt, setEndAt] = useState(toLocalInputValue(copySource?.end_at ?? null))
 
   // Every โจทย์ this teacher can actually assign. Kept as a set because both
   // the แฟ้ม shortcut and importSet ask "is this id real?" once per ข้อ in a
@@ -474,6 +565,7 @@ export function CreateAssignmentForm({
           : null
 
       const res = await createAssignment({
+        copy_source_assignment_id: copySource?.id,
         classroom_ids: classroomIds,
         group_targets: groupTargetsFor(groupTargets, classroomIds),
         title: title.trim(),
@@ -543,10 +635,12 @@ export function CreateAssignmentForm({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          {assignmentCreationTitle(assignmentType)}
+          {isCopy ? 'ทำสำเนา' : assignmentCreationTitle(assignmentType)}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน
+          {isCopy
+            ? 'ตรวจสอบข้อมูล การตั้งค่า และโจทย์จากงานเดิมก่อนสร้างสำเนา'
+            : 'รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน'}
         </p>
       </div>
 
@@ -578,6 +672,13 @@ export function CreateAssignmentForm({
         <div className="space-y-4">
           <Card padding="xl" className="space-y-4">
             <h2 className="font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
+
+            {copySource && (
+              <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2.5 text-sm text-primary">
+                <Copy className="size-4 shrink-0" aria-hidden="true" />
+                เติมข้อมูลและโจทย์จาก &ldquo;{copySource.title}&rdquo; ให้แล้ว — แก้ไขได้ก่อนทำสำเนา
+              </div>
+            )}
 
             {preselectedSet && (
               <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-xl px-3 py-2.5">
@@ -749,7 +850,9 @@ export function CreateAssignmentForm({
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">ให้ครบทั้ง {selectedIds.length} ข้อ</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">ทุกคนได้โจทย์ชุดเดียวกัน</p>
+                  <p className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
+                    ทุกคนได้โจทย์ชุดเดียวกัน
+                  </p>
                 </button>
                 <button
                   type="button"
@@ -761,7 +864,9 @@ export function CreateAssignmentForm({
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">สุ่มมาให้คนละไม่กี่ข้อ</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">แต่ละคน แต่ละรอบ ได้คนละชุด</p>
+                  <p className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
+                    แต่ละคน แต่ละรอบ ได้คนละชุด
+                  </p>
                 </button>
               </div>
 
@@ -962,7 +1067,12 @@ export function CreateAssignmentForm({
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                  <p className={cn(
+                    'mt-0.5 text-xs',
+                    completionChoice === opt.key ? 'text-foreground' : 'text-muted-foreground',
+                  )}>
+                    {opt.desc}
+                  </p>
                 </button>
               ))}
             </div>
@@ -1516,7 +1626,12 @@ export function CreateAssignmentForm({
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">{o.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{o.desc}</p>
+                  <p className={cn(
+                    'mt-0.5 text-xs',
+                    showResults === o.key ? 'text-foreground' : 'text-muted-foreground',
+                  )}>
+                    {o.desc}
+                  </p>
                 </button>
               ))}
             </div>
@@ -1594,7 +1709,7 @@ export function CreateAssignmentForm({
             <h2 className="font-semibold text-foreground flex items-center gap-2">
               <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการสอบ (ไม่บังคับ)
             </h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="sat">เปิดรับตั้งแต่</Label>
                 <Input id="sat" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} />
@@ -1608,7 +1723,7 @@ export function CreateAssignmentForm({
 
           {/* Summary */}
           <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
-            <h3 className="font-bold text-base mb-4">สรุปก่อนสร้าง</h3>
+            <h3 className="font-bold text-base mb-4">{isCopy ? 'สรุปก่อนทำสำเนา' : 'สรุปก่อนสร้าง'}</h3>
             <div className="space-y-2.5 text-sm">
               {[
                 { label: 'ชื่อ',      value: title },
@@ -1685,7 +1800,9 @@ export function CreateAssignmentForm({
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-4 border-t border-white/10 pt-3">
-              เลือกได้ว่าจะเผยแพร่ทันที ตั้งเวลา หรือกดบันทึกแบบร่างไว้ทำต่อภายหลัง
+              {isCopy
+                ? 'เลือกได้ว่าจะเผยแพร่สำเนาทันที ตั้งเวลา หรือเก็บสำเนาเป็นแบบร่างไว้ตรวจต่อ'
+                : 'เลือกได้ว่าจะเผยแพร่ทันที ตั้งเวลา หรือกดบันทึกแบบร่างไว้ทำต่อภายหลัง'}
             </p>
           </div>
         </div>
@@ -1699,12 +1816,12 @@ export function CreateAssignmentForm({
       />
 
       {/* Navigation */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <Button
           type="button"
           variant="outline"
           onClick={() => step > 0 ? setStep(s => s - 1) : router.back()}
-          className="gap-2"
+          className="w-full gap-2 sm:w-auto"
         >
           <ChevronLeft className="w-4 h-4" />
           {step === 0 ? 'ยกเลิก' : 'ย้อนกลับ'}
@@ -1715,29 +1832,34 @@ export function CreateAssignmentForm({
             type="button"
             onClick={() => setStep(s => s + 1)}
             disabled={!canNext()}
-            className="gap-2"
+            className="w-full gap-2 sm:w-auto"
           >
             ถัดไป <ChevronRight className="w-4 h-4" />
           </Button>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button
               type="button"
               variant="outline"
               onClick={handleSaveDraft}
               disabled={isPending}
+              className="w-full sm:w-auto"
             >
               <Save data-icon="inline-start" />
-              {isPending ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}
+              {isPending
+                ? (isCopy ? 'กำลังทำสำเนา...' : 'กำลังบันทึก...')
+                : (isCopy ? 'ทำสำเนาเป็นแบบร่าง' : 'บันทึกแบบร่าง')}
             </Button>
             <Button
               type="button"
               onClick={openPublishDialog}
               disabled={isPending}
-              className="gap-2"
+              className="w-full gap-2 sm:w-auto"
             >
               <FileText className="w-4 h-4" />
-              {isPending ? 'กำลังสร้าง...' : assignmentType === 'exam' ? 'สร้างชุดข้อสอบ' : 'สร้างแบบฝึกหัด'}
+              {isPending
+                ? (isCopy ? 'กำลังทำสำเนา...' : 'กำลังสร้าง...')
+                : (isCopy ? 'ทำสำเนา' : assignmentType === 'exam' ? 'สร้างชุดข้อสอบ' : 'สร้างแบบฝึกหัด')}
             </Button>
           </div>
         )}
@@ -1747,7 +1869,9 @@ export function CreateAssignmentForm({
       {showPublishDialog && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay backdrop-blur-sm px-4">
           <Card padding="xl" elevation="xl" className="max-w-sm w-full">
-            <h3 className="font-bold text-lg text-foreground">เผยแพร่{assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?</h3>
+            <h3 className="font-bold text-lg text-foreground">
+              {isCopy ? 'เผยแพร่สำเนานี้เมื่อไหร่?' : `เผยแพร่${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?`}
+            </h3>
             <p className="text-sm text-muted-foreground mt-2">
               เลือกได้ว่าจะให้นักเรียนเห็นและเริ่มทำได้ทันที ตั้งเวลาให้เปิดล่วงหน้า หรือเก็บไว้เป็นร่างก่อนแล้วค่อยเผยแพร่ทีหลัง
             </p>
@@ -1755,13 +1879,13 @@ export function CreateAssignmentForm({
             {!scheduleMode ? (
               <div className="flex flex-col gap-2 mt-5">
                 <Button type="button" onClick={handlePublishNow} disabled={isPending} className="w-full">
-                  {isPending ? 'กำลังสร้าง...' : 'เผยแพร่ทันที'}
+                  {isPending ? (isCopy ? 'กำลังทำสำเนา...' : 'กำลังสร้าง...') : (isCopy ? 'ทำสำเนาและเผยแพร่ทันที' : 'เผยแพร่ทันที')}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setScheduleMode(true)} disabled={isPending} className="w-full">
                   ตั้งเวลาเผยแพร่ล่วงหน้า
                 </Button>
                 <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={isPending} className="w-full">
-                  {isPending ? 'กำลังบันทึก...' : 'ยังไม่เผยแพร่ (เก็บไว้เป็นร่าง)'}
+                  {isPending ? (isCopy ? 'กำลังทำสำเนา...' : 'กำลังบันทึก...') : (isCopy ? 'ทำสำเนาเป็นแบบร่าง' : 'ยังไม่เผยแพร่ (เก็บไว้เป็นร่าง)')}
                 </Button>
                 <Button
                   type="button"
@@ -1787,7 +1911,7 @@ export function CreateAssignmentForm({
                 </div>
                 <div className="flex flex-col gap-2">
                   <Button type="button" onClick={handleScheduleConfirm} disabled={isPending} className="w-full">
-                    {isPending ? 'กำลังสร้าง...' : 'ยืนยันตั้งเวลาเผยแพร่'}
+                    {isPending ? (isCopy ? 'กำลังทำสำเนา...' : 'กำลังสร้าง...') : (isCopy ? 'ทำสำเนาและตั้งเวลา' : 'ยืนยันตั้งเวลาเผยแพร่')}
                   </Button>
                   <Button type="button" variant="ghost" onClick={() => setScheduleMode(false)} disabled={isPending} className="w-full text-muted-foreground">
                     ย้อนกลับ

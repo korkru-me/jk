@@ -18,8 +18,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { TYPE_CFG } from '@/lib/assignment-display'
-import { duplicateAssignment } from '@/lib/actions/assignments'
 import { setAssignmentCategory } from '@/lib/actions/assignment-categories'
+import { assignmentCopyHref } from '@/lib/assignment-creation'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { formatPassingThreshold } from '@/lib/grading'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
@@ -142,13 +142,6 @@ export function ClassroomAssignmentsTab({
     }
     return counts
   }, [categoryByAssignment])
-
-  function handleDuplicate(id: string) {
-    startTransition(async () => {
-      const result = await duplicateAssignment(id, { targetClassroomIds: [classroomId] })
-      if (result?.error) toast.error(result.error)
-    })
-  }
 
   function moveToCategory(assignmentId: string, value: string | null) {
     if (value === null) return
@@ -370,13 +363,11 @@ export function ClassroomAssignmentsTab({
                             <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
                           </Button>
                           <Button
-                            type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDuplicate(assignment.id)}
-                            disabled={isPending}
+                            render={<Link href={assignmentCopyHref(classroomId, assignment.id)} />}
                           >
-                            <Copy data-icon="inline-start" /> ทำสำเนามาห้องนี้
+                            <Copy data-icon="inline-start" /> ทำสำเนา
                           </Button>
                           <Button type="button" variant="ghost" size="sm" onClick={() => onViewScores?.()}>
                             <BarChart3 data-icon="inline-start" /> ดูคะแนน

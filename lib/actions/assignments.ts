@@ -52,6 +52,10 @@ function isSebPublishingReady() {
 }
 
 interface CreateAssignmentData {
+  /** Present only when the teacher reviewed an existing assignment in the
+   *  create wizard. Re-authorized here because a query string is not proof
+   *  that the caller may copy that source. */
+  copy_source_assignment_id?: string
   classroom_ids: string[]
   /** มอบหมายให้: per classroom id, the กลุ่มย่อย that get the งาน. Absent or
    *  null = the whole room. Checked against the room's real groups here. */
@@ -178,6 +182,24 @@ export async function createAssignment(data: CreateAssignmentData) {
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
 
+  const assignmentType = data.type ?? 'exercise'
+  let copiedSharedRandomSeed: number | null = null
+  if (data.copy_source_assignment_id) {
+    if (!await canManageAssignment(data.copy_source_assignment_id, user.id)) {
+      return { error: 'ไม่พบงานต้นฉบับ หรือคุณไม่มีสิทธิ์ทำสำเนางานนี้' }
+    }
+    const { data: copySource } = await createAdminClient()
+      .from('assignments')
+      .select('type, shared_random_seed')
+      .eq('id', data.copy_source_assignment_id)
+      .maybeSingle()
+    if (!copySource) return { error: 'ไม่พบงานต้นฉบับ' }
+    if (copySource.type !== assignmentType) {
+      return { error: 'ประเภทงานไม่ตรงกับงานต้นฉบับ กรุณาเปิดหน้าทำสำเนาใหม่' }
+    }
+    copiedSharedRandomSeed = copySource.shared_random_seed ?? null
+  }
+
   const groupIdsByClassroom = await resolveGroupTargets(supabase, data.classroom_ids, data.group_targets)
   if ('error' in groupIdsByClassroom) return { error: groupIdsByClassroom.error }
 
@@ -219,12 +241,15 @@ export async function createAssignment(data: CreateAssignmentData) {
   })
   if ('error' in questionResult) return { error: questionResult.error }
   if (questionResult.missingQuestionIds.length > 0) {
-    return { error: 'มีโจทย์บางข้อที่นำมาใช้ไม่ได้ กรุณารีเฟรชหน้าแล้วลองใหม่' }
+    return {
+      error: data.copy_source_assignment_id
+        ? 'มีโจทย์บางข้อจากงานต้นฉบับที่บัญชีนี้นำมาใช้ไม่ได้ กรุณาติดต่อผู้สร้างโจทย์หรือเลือกโจทย์อื่น'
+        : 'มีโจทย์บางข้อที่นำมาใช้ไม่ได้ กรุณารีเฟรชหน้าแล้วลองใหม่',
+    }
   }
 
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
-  const assignmentType = data.type ?? 'exercise'
   const isOnlineExam = data.mode === 'online' && assignmentType === 'exam'
   // Checking one ข้อ at a time is what makes a แบบฝึกหัด a แบบฝึกหัด, so it is
   // on unless the teacher turns it off — and it is never on for a ข้อสอบ or a
@@ -349,7 +374,9 @@ export async function createAssignment(data: CreateAssignmentData) {
       type: assignmentType,
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? false,
-      shared_random_seed: data.shared_random_values === true ? createSharedRandomSeed() : null,
+      shared_random_seed: data.shared_random_values === true
+        ? (copiedSharedRandomSeed ?? createSharedRandomSeed())
+        : null,
       random_question_count: randomQuestionCount,
       show_results: showResults,
       show_solutions: data.show_solutions === true,
@@ -911,111 +938,6 @@ export async function deleteAssignment(id: string) {
   const classroomId = existing?.classroom_id
   if (classroomId) revalidatePath(`/classrooms/${classroomId}`)
   redirect(classroomId ? `/classrooms/${classroomId}` : '/classrooms')
-}
-
-export async function duplicateAssignment(id: string, opts?: { targetClassroomIds?: string[] }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-
-  const { data: source } = await supabase
-    .from('assignments')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
-
-  if (!source) return { error: 'ไม่พบชุดข้อสอบ' }
-
-  const { data: sourceLinks } = await supabase
-    .from('assignment_classrooms')
-    .select('classroom_id, group_ids')
-    .eq('assignment_id', id)
-  // A สำเนา for the same room keeps the same กลุ่มย่อย; another room's
-  // groups mean nothing there, so a copy into a new room goes to all of it.
-  const sourceGroupIds = new Map((sourceLinks ?? []).map((l: any) => [l.classroom_id as string, (l.group_ids ?? null) as string[] | null]))
-
-  const targetClassroomIds = opts?.targetClassroomIds?.length
-    ? opts.targetClassroomIds
-    : (sourceLinks ?? []).map((l: any) => l.classroom_id)
-
-  if (targetClassroomIds.length === 0) return { error: 'ไม่พบห้องเรียนปลายทาง' }
-
-  const orgId = await getMyOrgId()
-  if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
-
-  const { data: copy, error } = await supabase
-    .from('assignments')
-    .insert({
-      org_id: orgId,
-      classroom_id: targetClassroomIds[0],
-      created_by: user.id,
-      title: `${source.title} (สำเนา)`,
-      description: source.description,
-      question_ids: source.question_ids,
-      sections: source.sections ?? null,
-      show_sections: source.show_sections ?? true,
-      question_points: source.question_points,
-      display_max_score: source.display_max_score,
-      set_id: null,
-      start_at: null,
-      end_at: null,
-      duration_minutes: source.duration_minutes,
-      mode: source.mode,
-      type: source.type,
-      shuffle_questions: source.shuffle_questions,
-      shuffle_options: source.shuffle_options,
-      // The same seed, not a new one: a สำเนา is the same งาน for another
-      // class, so its students get the same numbers as the original's.
-      shared_random_seed: source.shared_random_seed ?? null,
-      random_question_count: source.random_question_count ?? null,
-      show_results: source.show_results,
-      show_solutions: source.show_solutions ?? false,
-      max_attempts: source.max_attempts,
-      score_strategy: source.score_strategy,
-      retry_scope: source.retry_scope ?? 'all',
-      questions_per_page: source.questions_per_page ?? 1,
-      // Carried, not defaulted. A สำเนา of a แบบฝึกหัด that let students check
-      // each ข้อ used to come back with that turned off, because these two
-      // were simply missing from this payload and the columns default to
-      // false. They are also what the streak CHECK below depends on: a copied
-      // streak งาน without instant_check would be rejected outright.
-      instant_check: source.instant_check ?? false,
-      instant_check_answer_key: source.instant_check_answer_key ?? true,
-      completion_rule: source.completion_rule ?? 'fixed',
-      streak_target: source.streak_target ?? null,
-      streak_question_cap: source.streak_question_cap ?? null,
-      streak_recycle_pool: source.streak_recycle_pool ?? true,
-      access_code: null,
-      passing_type: source.passing_type,
-      passing_value: source.passing_value,
-      require_work_image: source.require_work_image,
-      calculator_enabled: source.mode === 'online' && (source.calculator_enabled ?? false),
-      scratchpad_enabled: source.mode === 'online' && (source.scratchpad_enabled ?? false),
-      proctoring_enabled: source.proctoring_enabled ?? false,
-      fullscreen_required: source.fullscreen_required ?? false,
-      block_clipboard: source.block_clipboard ?? false,
-      exam_watermark_enabled: source.exam_watermark_enabled ?? false,
-      secure_browser_mode: source.secure_browser_mode ?? 'browser',
-      android_exam_mode: source.android_exam_mode ?? 'blocked',
-      status: 'draft',
-    })
-    .select('id')
-    .single()
-
-  if (error) return { error: error.message }
-
-  const { error: linkError } = await supabase
-    .from('assignment_classrooms')
-    .insert(targetClassroomIds.map(classroom_id => ({
-      assignment_id: copy.id,
-      classroom_id,
-      group_ids: sourceGroupIds.get(classroom_id) ?? null,
-    })))
-
-  if (linkError) return { error: 'ไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนปลายทาง' }
-
-  revalidatePath('/assignments')
-  redirect(`/assignments/${copy.id}`)
 }
 
 /**

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assignmentCopyHref,
+  assignmentCopyTitle,
   assignmentCreationHref,
   assignmentCreationHubHref,
   assignmentCreationTitle,
@@ -25,6 +27,18 @@ describe('assignment creation navigation', () => {
   it('builds a classroom-scoped reuse link', () => {
     expect(assignmentReuseHref('room 1')).toBe(
       '/assignments/new?classroom=room+1&flow=reuse',
+    )
+  })
+
+  it('builds a classroom-scoped copy review link', () => {
+    expect(assignmentCopyHref('room 1', 'assignment/1')).toBe(
+      '/assignments/new?classroom=room+1&copy=assignment%2F1',
+    )
+  })
+
+  it('labels a proposed copy without changing the source title', () => {
+    expect(assignmentCopyTitle('แบบฝึกหัดแรงและการเคลื่อนที่ ')).toBe(
+      'แบบฝึกหัดแรงและการเคลื่อนที่ (สำเนา)',
     )
   })
 

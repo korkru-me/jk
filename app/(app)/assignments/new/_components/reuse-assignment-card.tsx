@@ -1,9 +1,8 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Copy, FileText } from 'lucide-react'
-import { toast } from 'sonner'
-import { duplicateAssignment } from '@/lib/actions/assignments'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -12,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import type { AssignmentClassroomOption } from '@/components/assignments/create-assignment-form'
 import type { AssignmentStatus, AssignmentType } from '@/lib/types'
+import { assignmentCopyHref } from '@/lib/assignment-creation'
 
 export interface ReusableAssignmentOption {
   id: string
@@ -37,7 +37,6 @@ export function ReuseAssignmentCard({
   ))
   const [sourceClassroomId, setSourceClassroomId] = useState(sourceClassrooms[0]?.id ?? '')
   const [assignmentId, setAssignmentId] = useState('')
-  const [isPending, startTransition] = useTransition()
   const availableAssignments = useMemo(
     () => assignments
       .filter(assignment => assignment.classroomId === sourceClassroomId)
@@ -61,14 +60,6 @@ export function ReuseAssignmentCard({
     )
   }
 
-  function reuseAssignment() {
-    if (!assignmentId) return
-    startTransition(async () => {
-      const result = await duplicateAssignment(assignmentId, { targetClassroomIds: [targetClassroomId] })
-      if (result?.error) toast.error(result.error)
-    })
-  }
-
   return (
     <Card padding="lg" className="flex flex-col gap-4">
       <div>
@@ -79,7 +70,7 @@ export function ReuseAssignmentCard({
           <div className="min-w-0">
             <h2 className="font-semibold text-foreground">นำงานจากห้องอื่นมาใช้ซ้ำ</h2>
             <p className="text-sm text-muted-foreground">
-              เลือกห้องเรียนก่อน แล้วเลือกแบบฝึกหัดหรือข้อสอบ ระบบจะสร้างสำเนาเป็นแบบร่างในห้องนี้
+              เลือกห้องเรียนและงานต้นฉบับ แล้วตรวจสอบข้อมูลกับโจทย์ก่อนทำสำเนาเข้าห้องนี้
             </p>
           </div>
         </div>
@@ -142,12 +133,22 @@ export function ReuseAssignmentCard({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            คัดลอกเฉพาะโจทย์และการตั้งค่า ไม่คัดลอกนักเรียน การส่งงาน หรือคะแนน และยังไม่เผยแพร่จนกว่าครูจะสั่ง
+            ระบบเติมข้อมูล การตั้งค่า และโจทย์เดิมให้แก้ไขก่อน โดยไม่คัดลอกนักเรียน การส่งงาน หรือคะแนน
           </p>
-          <Button type="button" variant="outline" disabled={!assignmentId || isPending} onClick={reuseAssignment}>
-            <Copy data-icon="inline-start" />
-            {isPending ? 'กำลังสร้างแบบร่าง...' : 'นำมาใช้เป็นแบบร่าง'}
-          </Button>
+          {assignmentId ? (
+            <Button
+              variant="outline"
+              render={<Link href={assignmentCopyHref(targetClassroomId, assignmentId)} />}
+            >
+              <Copy data-icon="inline-start" />
+              ตรวจสอบและทำสำเนา
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" disabled>
+              <Copy data-icon="inline-start" />
+              เลือกงานที่จะทำสำเนา
+            </Button>
+          )}
         </div>
       </div>
     </Card>

@@ -1,13 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
-import { fetchBankQuestions } from '@/lib/question-bank'
-import { redirect } from 'next/navigation'
+import { fetchBankQuestions, withQuestionPoints } from '@/lib/question-bank'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { CreateAssignmentForm } from '@/components/assignments/create-assignment-form'
-import type { AssignmentClassroomOption, AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
-import type { AssignmentGroupOption } from '@/components/assignments/group-target-picker'
-import type { Classroom } from '@/lib/types'
+import type {
+  AssignmentClassroomOption,
+  AssignmentCopyPreset,
+  AssignmentQuestionSetOption,
+} from '@/components/assignments/create-assignment-form'
+import type { AssignmentGroupOption, GroupTargets } from '@/components/assignments/group-target-picker'
+import type { Assignment, Classroom } from '@/lib/types'
 import { firstSearchParam, resolveAssignmentTypePreset } from '@/lib/assignment-creation'
 import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
@@ -17,8 +21,8 @@ import {
   ReuseAssignmentCard, type ReusableAssignmentOption,
 } from './_components/reuse-assignment-card'
 import { Button } from '@/components/ui/button'
-
-export const metadata = { title: 'สร้างงานที่มอบหมาย — KorKru' }
+import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 
 interface Props {
   searchParams: Promise<{
@@ -27,8 +31,18 @@ interface Props {
     sections?: string | string[]
     type?: string | string[]
     flow?: string | string[]
+    copy?: string | string[]
   }>
 }
+
+export async function generateMetadata({ searchParams }: Props) {
+  const { copy } = await searchParams
+  return {
+    title: firstSearchParam(copy) ? 'ทำสำเนา — KorKru' : 'สร้างงานที่มอบหมาย — KorKru',
+  }
+}
+
+type AssignmentCopyRow = AssignmentCopyPreset & Pick<Assignment, 'created_by' | 'org_id'>
 
 type AssignmentClassroomContextRow = Classroom & {
   classroom_students: Array<{ count: number }>
@@ -58,12 +72,14 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     sections: sectionsValue,
     type: typeParam,
     flow: flowValue,
+    copy: copyValue,
   } = await searchParams
   const classroomParam = firstSearchParam(classroomValue)
   const setParam = firstSearchParam(setValue)
   const sectionsParam = firstSearchParam(sectionsValue)
-  const preselectedAssignmentType = resolveAssignmentTypePreset(typeParam)
+  const requestedAssignmentType = resolveAssignmentTypePreset(typeParam)
   const requestedFlow = firstSearchParam(flowValue)
+  const copyParam = firstSearchParam(copyValue)
 
   const supabase = await createClient()
   const user = await getAuthUser()
@@ -85,14 +101,23 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
         .maybeSingle()
     : Promise.resolve({ data: null })
 
+  const copySourceQuery = copyParam
+    ? supabase
+        .from('assignments')
+        .select('id, org_id, created_by, title, description, question_ids, question_points, display_max_score, sections, show_sections, start_at, end_at, duration_minutes, type, shuffle_questions, shuffle_options, shared_random_seed, random_question_count, show_results, show_solutions, max_attempts, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, access_code, passing_type, passing_value, require_work_image, calculator_enabled, scratchpad_enabled, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode')
+        .eq('id', copyParam)
+        .maybeSingle()
+    : Promise.resolve({ data: null })
+
   const [
     { data: profile },
     { data: ownedClassrooms },
     { data: coTeaching },
-    questions,
+    bankQuestions,
     { data: questionSets },
     { data: preselectedSetRow },
     { data: preselectedClassroomContextRow },
+    { data: copySourceRow },
   ] = await Promise.all([
     supabase.from('users').select('role').eq('id', user.id).single(),
     supabase
@@ -114,6 +139,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       .order('created_at', { ascending: false }),
     preselectedSetQuery,
     preselectedClassroomContextQuery,
+    copySourceQuery,
   ])
 
   if (profile?.role !== 'teacher' && profile?.role !== 'admin') redirect('/dashboard')
@@ -139,6 +165,44 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     contextualClassroom = classroom
     contextualStudentCount = studentCounts?.[0]?.count ?? 0
   }
+
+  let copySource: AssignmentCopyRow | undefined
+  let copySourceLinks: Array<{ classroom_id: string; group_ids: string[] | null }> = []
+  let questions = bankQuestions
+  if (copyParam) {
+    if (!preselectedClassroomId || !copySourceRow || !await canManageAssignment(copyParam, user.id)) {
+      notFound()
+    }
+    copySource = copySourceRow as AssignmentCopyRow
+    const [questionResult, { data: sourceLinks }] = await Promise.all([
+      loadAssignmentQuestionsByProvenance(copySource),
+      supabase
+        .from('assignment_classrooms')
+        .select('classroom_id, group_ids')
+        .eq('assignment_id', copyParam),
+    ])
+    if ('error' in questionResult) throw new Error(questionResult.error)
+
+    const questionsById = new Map(bankQuestions.map(question => [question.id, question]))
+    for (const question of questionResult.questions) {
+      const counted = withQuestionPoints(question)
+      questionsById.set(question.id, {
+        id: question.id,
+        title: question.title,
+        question_text: question.question_text,
+        difficulty: question.difficulty,
+        question_type: question.question_type,
+        tags: question.tags,
+        sub_question_count: counted.sub_question_count,
+        default_points: counted.default_points,
+        has_random_values: counted.has_random_values,
+      })
+    }
+    questions = [...questionsById.values()]
+    copySourceLinks = (sourceLinks ?? []) as Array<{ classroom_id: string; group_ids: string[] | null }>
+  }
+
+  const preselectedAssignmentType = copySource?.type ?? requestedAssignmentType
 
   // กลุ่มย่อย of those rooms, for "มอบหมายให้". Read under RLS: the owner and
   // any co-teacher of a room can see its groups.
@@ -171,6 +235,17 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       id: g.id, name: g.name, color: g.color, memberCount: memberCount.get(g.id) ?? 0,
     })
   }
+  const initialGroupTargets: GroupTargets = {}
+  if (copySource && preselectedClassroomId) {
+    const sourceLink = copySourceLinks.find(link => link.classroom_id === preselectedClassroomId)
+    if (sourceLink) {
+      initialGroupTargets[preselectedClassroomId] = sourceLink.group_ids === null
+        ? null
+        : sourceLink.group_ids.filter(groupId => (
+            groupsByClassroom[preselectedClassroomId]?.some(group => group.id === groupId) ?? false
+          ))
+    }
+  }
   const reusableAssignments: ReusableAssignmentOption[] = []
   for (const row of (reusableAssignmentRows ?? []) as unknown as ReusableAssignmentLinkRow[]) {
     const assignment = Array.isArray(row.assignments) ? row.assignments[0] : row.assignments
@@ -184,7 +259,9 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       createdAt: assignment.created_at,
     })
   }
-  let preselectedSet = (preselectedSetRow ?? undefined) as AssignmentQuestionSetOption | undefined
+  let preselectedSet = copySource
+    ? undefined
+    : (preselectedSetRow ?? undefined) as AssignmentQuestionSetOption | undefined
 
   // ?sections=... — assigning only part of a แฟ้ม ("this week, projectiles
   // only"). Narrowed here rather than in the client so an unknown section id
@@ -293,6 +370,8 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
           preselectedClassroomId={preselectedClassroomId}
           preselectedSet={preselectedSet}
           preselectedAssignmentType={preselectedAssignmentType}
+          copySource={copySource}
+          initialGroupTargets={initialGroupTargets}
         />
       </div>
     </>

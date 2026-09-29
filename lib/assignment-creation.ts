@@ -53,6 +53,22 @@ export function assignmentReuseHref(classroomId: string): string {
   return `/assignments/new?${searchParams.toString()}`
 }
 
+export function assignmentCopyHref(
+  classroomId: string,
+  sourceAssignmentId: string,
+): string {
+  const searchParams = new URLSearchParams({
+    classroom: classroomId,
+    copy: sourceAssignmentId,
+  })
+
+  return `/assignments/new?${searchParams.toString()}`
+}
+
+export function assignmentCopyTitle(sourceTitle: string): string {
+  return `${sourceTitle.trim()} (สำเนา)`
+}
+
 export function resolveAssignmentTypePreset(
   value: string | readonly string[] | undefined,
 ): AssignmentType | undefined {
