@@ -24,7 +24,7 @@ import {
 interface AssignmentCreationMenuProps {
   classroomId: string
   label?: string
-  variant?: 'default' | 'outline' | 'secondary' | 'navigation' | 'ghost'
+  variant?: 'default' | 'outline' | 'secondary' | 'navigation' | 'primaryGhost' | 'ghost'
   size?: 'default' | 'xs' | 'sm' | 'lg'
   className?: string
   align?: 'start' | 'center' | 'end'
@@ -69,6 +69,7 @@ export function AssignmentCreationMenu({
           <DropdownMenuGroup>
             <DropdownMenuLabel>เลือกวิธีมอบหมายงาน</DropdownMenuLabel>
             <DropdownMenuItem
+              variant="primary"
               className="py-2"
               render={<Link href={assignmentReuseHref(classroomId)} onClick={onNavigate} />}
             >
@@ -76,6 +77,7 @@ export function AssignmentCreationMenu({
               <span>นำงานเดิมมาใช้</span>
             </DropdownMenuItem>
             <DropdownMenuItem
+              variant="primary"
               className="py-2"
               closeOnClick={false}
               onClick={() => setMenuLevel('type')}
@@ -89,6 +91,7 @@ export function AssignmentCreationMenu({
           <DropdownMenuGroup>
             <DropdownMenuLabel>เลือกประเภทงาน</DropdownMenuLabel>
             <DropdownMenuItem
+              variant="primary"
               className="py-2 text-muted-foreground"
               closeOnClick={false}
               onClick={() => setMenuLevel('start')}
@@ -97,6 +100,7 @@ export function AssignmentCreationMenu({
               <span>กลับไปเลือกวิธี</span>
             </DropdownMenuItem>
             <DropdownMenuItem
+              variant="primary"
               className="py-2"
               render={(
                 <Link
@@ -109,6 +113,7 @@ export function AssignmentCreationMenu({
               <span>แบบฝึกหัด</span>
             </DropdownMenuItem>
             <DropdownMenuItem
+              variant="primary"
               className="py-2"
               render={(
                 <Link

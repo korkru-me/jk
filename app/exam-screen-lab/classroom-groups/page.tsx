@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic'
 const SCENARIOS: GroupsLabScenario[] = ['default', 'many', 'empty']
 
 /**
- * Local/Staging-only workbench for the classroom "กลุ่มย่อย" tab and the
- * "มอบหมายให้" picker of the create-งาน form, on a synthetic room. Every save
- * is answered from memory — nothing reads or writes a database, so dragging,
- * renaming, recolouring, deleting and random splits can all be tried freely.
+ * Local/Staging-only workbench for the classroom "กลุ่มย่อย" tab, the
+ * "มอบหมายให้" picker, and the two-level assignment creation menu on a
+ * synthetic room. Every save is answered from memory — nothing reads or
+ * writes a database, so dragging, renaming, recolouring, deleting and random
+ * splits can all be tried freely.
  *
  * `?scenario=` none = 32 students in four groups; `many` = 143 students and
  * six groups (the size of a real room that looked cramped); `empty` = no

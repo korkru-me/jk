@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { BreakoutGroups, type GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
 import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/[id]/_components/group-actions-context'
+import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
 import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 
@@ -152,6 +153,17 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
           value={targets}
           onChange={setTargets}
           idPrefix="lab-target"
+        />
+      </Card>
+
+      <Card padding="lg" className="flex max-w-sm flex-col gap-2">
+        <p className="text-sm font-semibold text-foreground">ตัวอย่างเมนู “มอบหมายงาน”</p>
+        <AssignmentCreationMenu
+          classroomId={CLASSROOM_ID}
+          label="มอบหมายงาน"
+          variant="primaryGhost"
+          align="start"
+          className="w-full justify-start"
         />
       </Card>
     </div>

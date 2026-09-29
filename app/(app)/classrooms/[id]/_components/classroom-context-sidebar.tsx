@@ -190,7 +190,7 @@ export function ClassroomContextNavigation({
                 <AssignmentCreationMenu
                   classroomId={classroom.id}
                   label="มอบหมายงาน"
-                  variant={assignmentCreationActive ? 'navigation' : 'ghost'}
+                  variant={assignmentCreationActive ? 'navigation' : 'primaryGhost'}
                   className="w-full justify-start"
                   align="start"
                   active={assignmentCreationActive}
