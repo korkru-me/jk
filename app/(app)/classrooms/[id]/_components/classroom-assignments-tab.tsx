@@ -28,7 +28,9 @@ import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computeAssignmentProgress } from '@/lib/classroom-progress'
 import { describeGroupTarget } from '@/lib/classroom-groups'
 import {
+  assignmentCategorySelectItems,
   groupAssignmentsByCategory,
+  UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE,
   type AssignmentCategory,
 } from '@/lib/assignment-categories'
 import { cn } from '@/lib/utils'
@@ -52,8 +54,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { AssignmentCategoryManager } from './assignment-category-manager'
-
-const UNCATEGORIZED_VALUE = '__uncategorized__'
 
 export interface ClassroomAssignmentRow {
   id: string
@@ -128,6 +128,8 @@ export function ClassroomAssignmentsTab({
   )
   const [isPending, startTransition] = useTransition()
 
+  const categoryItems = useMemo(() => assignmentCategorySelectItems(categories), [categories])
+
   const rows = useMemo(
     () => assignments.map(assignment => ({
       ...assignment,
@@ -154,7 +156,7 @@ export function ClassroomAssignmentsTab({
 
   function moveToCategory(assignmentId: string, value: string | null) {
     if (value === null) return
-    const categoryId = value === UNCATEGORIZED_VALUE ? null : value
+    const categoryId = value === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE ? null : value
     startTransition(async () => {
       const result = await setAssignmentCategory(classroomId, assignmentId, categoryId)
       if (!result.ok) {
@@ -218,7 +220,7 @@ export function ClassroomAssignmentsTab({
         <div className="flex flex-col gap-3">
           {sections.map(section => {
             const preset = section.category ? groupPreset(section.category.color) : null
-            const sectionKey = section.category?.id ?? UNCATEGORIZED_VALUE
+            const sectionKey = section.category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE
             return (
               <Card key={sectionKey} edge="ring" className="overflow-hidden">
                 {categories.length > 0 && (
@@ -314,7 +316,8 @@ export function ClassroomAssignmentsTab({
 
                         <div className="flex items-center gap-2 overflow-x-auto md:overflow-visible">
                           <Select
-                            value={assignment.category_id ?? UNCATEGORIZED_VALUE}
+                            items={categoryItems}
+                            value={assignment.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
                             onValueChange={value => moveToCategory(assignment.id, value)}
                             disabled={isPending}
                           >
@@ -324,9 +327,8 @@ export function ClassroomAssignmentsTab({
                             </SelectTrigger>
                             <SelectContent align="end">
                               <SelectGroup>
-                                <SelectItem value={UNCATEGORIZED_VALUE}>ยังไม่จัดหมวด</SelectItem>
-                                {categories.map(category => (
-                                  <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                                {categoryItems.map(item => (
+                                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                                 ))}
                               </SelectGroup>
                             </SelectContent>

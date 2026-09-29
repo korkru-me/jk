@@ -9,6 +9,7 @@ export type AssignmentCategoryColor = GroupColorId
 
 export const ASSIGNMENT_CATEGORY_NAME_MAX = 60
 export const MAX_ASSIGNMENT_CATEGORIES_PER_CLASSROOM = 30
+export const UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE = '__uncategorized__'
 
 export interface AssignmentCategory {
   id: string
@@ -16,6 +17,13 @@ export interface AssignmentCategory {
   name: string
   color: AssignmentCategoryColor
   position: number
+}
+
+export function assignmentCategorySelectItems(categories: AssignmentCategory[]) {
+  return [
+    { value: UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, label: 'ยังไม่จัดหมวด' },
+    ...categories.map(category => ({ value: category.id, label: category.name })),
+  ]
 }
 
 /**

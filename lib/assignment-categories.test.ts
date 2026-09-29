@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assignmentCategorySelectItems,
   defaultAssignmentCategoryName,
   groupAssignmentsByCategory,
   isMissingAssignmentCategorySchema,
   normalizeAssignmentCategoryName,
+  UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE,
   type AssignmentCategory,
 } from './assignment-categories'
 
@@ -21,6 +23,14 @@ describe('assignment categories', () => {
 
   it('suggests the first unused numbered name', () => {
     expect(defaultAssignmentCategoryName(['หมวดที่ 1', 'หมวดที่ 3'])).toBe('หมวดที่ 2')
+  })
+
+  it('provides human-readable labels for category select values', () => {
+    expect(assignmentCategorySelectItems(categories)).toEqual([
+      { value: UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, label: 'ยังไม่จัดหมวด' },
+      { value: 'later', label: 'บทที่ 2' },
+      { value: 'first', label: 'บทที่ 1' },
+    ])
   })
 
   it('orders sections and keeps stale category assignments visible as ungrouped', () => {
