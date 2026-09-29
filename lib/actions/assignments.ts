@@ -24,6 +24,7 @@ import { cleanGroupTarget } from '@/lib/classroom-groups'
 import { manageableClassroomIds } from '@/lib/classroom-groups-server'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -173,6 +174,8 @@ export async function createAssignment(data: CreateAssignmentData) {
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (data.classroom_ids.length === 0) return { error: 'กรุณาเลือกห้องเรียนอย่างน้อย 1 ห้อง' }
+  const orgId = await getMyOrgId()
+  if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
 
   const groupIdsByClassroom = await resolveGroupTargets(supabase, data.classroom_ids, data.group_targets)
   if ('error' in groupIdsByClassroom) return { error: groupIdsByClassroom.error }
@@ -201,6 +204,22 @@ export async function createAssignment(data: CreateAssignmentData) {
   }
 
   if (questionIds.length === 0) return { error: 'กรุณาเลือกโจทย์อย่างน้อย 1 ข้อ' }
+  const uniqueQuestionIds = [...new Set(questionIds)]
+  if (uniqueQuestionIds.length !== questionIds.length) {
+    return { error: 'มีรายการโจทย์ซ้ำ กรุณาเลือกโจทย์ใหม่แล้วลองอีกครั้ง' }
+  }
+  // The request may be forged independently of the form. Validate every ID
+  // against the assignment creator/organization context before storing it,
+  // including when this request creates an already-published assignment.
+  const questionResult = await loadAssignmentQuestionsByProvenance({
+    created_by: user.id,
+    org_id: orgId,
+    question_ids: uniqueQuestionIds,
+  })
+  if ('error' in questionResult) return { error: questionResult.error }
+  if (questionResult.missingQuestionIds.length > 0) {
+    return { error: 'มีโจทย์บางข้อที่นำมาใช้ไม่ได้ กรุณารีเฟรชหน้าแล้วลองใหม่' }
+  }
 
   const showResults = data.show_results ?? 'immediate'
   if (!SHOW_RESULTS_MODES.includes(showResults)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
@@ -304,9 +323,6 @@ export async function createAssignment(data: CreateAssignmentData) {
   const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
     ? data.display_max_score
     : null
-
-  const orgId = await getMyOrgId()
-  if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
 
   const { data: assignment, error } = await supabase
     .from('assignments')
@@ -420,20 +436,37 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (status === 'published') {
+    if (!await canManageAssignment(id, user.id)) {
+      return { error: 'ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์จัดการงานนี้' }
+    }
     const { data: assignment, error: assignmentError } = await supabase
       .from('assignments')
-      .select('secure_browser_mode')
+      .select('created_by, org_id, secure_browser_mode, question_ids')
       .eq('id', id)
       .maybeSingle()
-    if (assignmentError) return { error: 'ตรวจสอบความพร้อม Safe Exam Browser ไม่สำเร็จ กรุณาตรวจว่า apply migration แล้ว' }
+    if (assignmentError) return { error: 'ตรวจสอบความพร้อมก่อนเผยแพร่ไม่สำเร็จ กรุณาตรวจว่า apply migration แล้ว' }
+    if (!assignment) return { error: 'ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์จัดการงานนี้' }
+
+    const questionResult = await loadAssignmentQuestionsByProvenance({ id, ...assignment })
+    if ('error' in questionResult) return { error: questionResult.error }
+    if (assignment.question_ids.length === 0) {
+      return { error: 'ยังเผยแพร่งานไม่ได้ กรุณาเพิ่มโจทย์อย่างน้อย 1 ข้อ' }
+    }
+    if (questionResult.duplicateQuestionCount > 0) {
+      return { error: 'ยังเผยแพร่งานไม่ได้ เพราะมีรายการโจทย์ซ้ำ กรุณาแก้ไขโจทย์ก่อน' }
+    }
+    if (questionResult.missingQuestionIds.length > 0) {
+      return { error: 'ยังเผยแพร่งานไม่ได้ เพราะโจทย์บางข้อถูกลบหรือเปิดใช้งานไม่ได้ กรุณาแก้ไขโจทย์ก่อน' }
+    }
+
     if (
-      assignment?.secure_browser_mode === 'seb_required'
+      assignment.secure_browser_mode === 'seb_required'
       && !isSebPublishingReady()
     ) {
       return { error: SEB_NOT_READY_ERROR }
     }
     if (
-      assignment?.secure_browser_mode === 'seb_required'
+      assignment.secure_browser_mode === 'seb_required'
       && !await hasCurrentAssignmentSebRelease(id)
     ) {
       return { error: SEB_RELEASE_NOT_READY_ERROR }
@@ -513,6 +546,8 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!await canManageAssignment(id, user.id)) return { error: 'ไม่พบชุดข้อสอบ' }
+  const admin = createAdminClient()
 
   if (!data.title.trim()) return { error: 'กรุณากรอกชื่องานที่มอบหมาย' }
   if (data.start_at && data.end_at && data.start_at > data.end_at) {
@@ -520,12 +555,11 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   }
   if (!SHOW_RESULTS_MODES.includes(data.show_results)) return { error: 'รูปแบบการแสดงผลลัพธ์ไม่ถูกต้อง' }
 
-  // No explicit created_by filter — RLS (assignments_org_teacher_all /
-  // assignments_co_teacher_all) already restricts this update to owner or
-  // authorized co-teacher, same as updateAssignmentStatus above.
+  // Keep the write under session RLS, after the explicit authorization above
+  // has also made service-role reads safe for co-teacher submission checks.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('question_ids, sections, type, mode, status, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, streak_target, streak_question_cap, streak_recycle_pool')
+    .select('created_by, org_id, question_ids, sections, type, mode, status, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -544,23 +578,38 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   if (questionSet && nextIds.length === 0) return { error: 'ชุดข้อสอบต้องมีโจทย์อย่างน้อย 1 ข้อ' }
 
   if (questionsChanged) {
-    // Only questions this teacher may actually assign. RLS decides that — ids
-    // it will not return are dropped by the `in` filter, so a short result
-    // means something in the list was not theirs to add.
-    const { data: allowed, error: allowedError } = await supabase
-      .from('questions')
-      .select('id')
-      .in('id', nextIds)
-      .eq('is_research_snapshot', false)
-    if (allowedError) return { error: 'ตรวจสอบโจทย์ไม่สำเร็จ กรุณาลองใหม่' }
-    if ((allowed ?? []).length !== nextIds.length) {
+    const existingIdSet = new Set(existingIds)
+    const addedIds = [...new Set(nextIds.filter(questionId => !existingIdSet.has(questionId)))]
+    if (addedIds.length > 0) {
+      // Provenance keeps the final assignment safe for every manager, while
+      // this actor-scoped read prevents a co-teacher from attaching a private
+      // owner question merely by guessing its UUID.
+      const { data: actorVisibleAdditions, error: additionsError } = await supabase
+        .from('questions')
+        .select('id')
+        .in('id', addedIds)
+        .eq('is_research_snapshot', false)
+      if (additionsError) return { error: 'ตรวจสอบโจทย์ที่เพิ่มไม่สำเร็จ กรุณาลองใหม่' }
+      if ((actorVisibleAdditions ?? []).length !== addedIds.length) {
+        return { error: 'มีโจทย์บางข้อที่คุณไม่มีสิทธิ์เพิ่ม กรุณารีเฟรชหน้าแล้วลองใหม่' }
+      }
+    }
+
+    const questionResult = await loadAssignmentQuestionsByProvenance({
+      id,
+      created_by: existing.created_by,
+      org_id: existing.org_id,
+      question_ids: nextIds,
+    })
+    if ('error' in questionResult) return { error: questionResult.error }
+    if (questionResult.duplicateQuestionCount > 0 || questionResult.missingQuestionIds.length > 0) {
       return { error: 'มีโจทย์บางข้อที่เพิ่มเข้าชุดนี้ไม่ได้ กรุณารีเฟรชหน้าแล้วลองใหม่' }
     }
 
     // Every attempt freezes the question set as it starts, so changing it
     // after anyone has begun hands later students a different paper — and a
     // different คะแนนเต็ม — from the same งาน.
-    const { data: startedSubmission, error: startedError } = await supabase
+    const { data: startedSubmission, error: startedError } = await admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -660,7 +709,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     completion
     && (completion.rule !== existing.completion_rule || completion.target !== existing.streak_target)
   ) {
-    const { data: startedCompletion, error: startedCompletionError } = await supabase
+    const { data: startedCompletion, error: startedCompletionError } = await admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -676,7 +725,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // draw size after anyone has started so later students do not receive a
   // materially different exam by accident.
   if (randomQuestionCount !== existing.random_question_count) {
-    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+    const { data: startedSubmission, error: startedSubmissionError } = await admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -692,7 +741,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const sharedRandomChanged = data.shared_random_values !== undefined
     && data.shared_random_values !== sharedRandomWasOn
   if (sharedRandomChanged) {
-    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+    const { data: startedSubmission, error: startedSubmissionError } = await admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -705,7 +754,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   }
 
   if (secureBrowserMode !== (existing.secure_browser_mode ?? 'browser')) {
-    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+    const { data: startedSubmission, error: startedSubmissionError } = await admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -718,7 +767,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   }
 
   if (androidExamMode !== (existing.android_exam_mode ?? 'blocked')) {
-    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+    const { data: startedSubmission, error: startedSubmissionError } = await admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -740,7 +789,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     nextCalculatorEnabled !== existing.calculator_enabled
     || nextScratchpadEnabled !== existing.scratchpad_enabled
   ) {
-    const { data: startedSubmission, error: startedSubmissionError } = await supabase
+    const { data: startedSubmission, error: startedSubmissionError } = await admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)

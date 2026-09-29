@@ -30,6 +30,7 @@ import { hasCompleteWorkEvidence } from '@/lib/math-work'
 import { getWritableStudentAnswer } from '@/lib/exam-write-access'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
+import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 
 export async function startSubmission(
   assignmentId: string,
@@ -216,13 +217,17 @@ export async function startSubmission(
     }
   }
 
-  // Fetch questions
-  const { data: questions } = await admin
-    .from('questions')
-    .select('*')
-    .in('id', assignment.question_ids)
-
-  if (!questions || questions.length === 0) return { error: 'ไม่พบโจทย์' }
+  // Resolve the stored refs through assignment provenance even though this is
+  // a service-role path. A forged assignment row must not turn a known private
+  // question UUID into content delivered to a student.
+  const questionResult = await loadAssignmentQuestionsByProvenance(assignment)
+  if ('error' in questionResult) return { error: questionResult.error }
+  if (
+    questionResult.questions.length === 0
+    || questionResult.missingQuestionIds.length > 0
+    || questionResult.duplicateQuestionCount > 0
+  ) return { error: 'ชุดโจทย์ไม่พร้อม กรุณาแจ้งครูผู้สอน' }
+  const questions = questionResult.questions
 
   let skeletons: AssignmentAttemptSkeleton[]
   // Rows copied from the previous attempt, kept out of this attempt's exam
@@ -749,7 +754,7 @@ export async function drawNextStreakQuestion(
       id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
       current_streak, best_streak, streak_reached,
       assignments(
-        id, org_id, question_ids, question_points, shuffle_options, shared_random_seed, mode, duration_minutes, end_at,
+        id, org_id, created_by, question_ids, question_points, shuffle_options, shared_random_seed, mode, duration_minutes, end_at,
         secure_browser_mode, android_exam_mode,
         completion_rule, streak_target, streak_question_cap, streak_recycle_pool
       )
@@ -763,6 +768,7 @@ export async function drawNextStreakQuestion(
     : submission.assignments) as {
       id: string
       org_id: string
+      created_by: string
       question_ids: string[]
       question_points: Record<string, number> | null
       shuffle_options: boolean | null
@@ -827,12 +833,15 @@ export async function drawNextStreakQuestion(
     }
   }
 
-  const { data: poolQuestions } = await admin
-    .from('questions')
-    .select('*')
-    .in('id', assignment.question_ids)
+  const questionResult = await loadAssignmentQuestionsByProvenance(assignment)
+  if ('error' in questionResult) return { error: questionResult.error }
+  if (
+    questionResult.missingQuestionIds.length > 0
+    || questionResult.duplicateQuestionCount > 0
+  ) return { error: 'ชุดโจทย์ไม่พร้อม กรุณาแจ้งครูผู้สอน' }
+  const poolQuestions = questionResult.questions
 
-  const questionsById = new Map(((poolQuestions ?? []) as Question[]).map(q => [q.id, q]))
+  const questionsById = new Map((poolQuestions as Question[]).map(q => [q.id, q]))
   // Authored order, minus ids whose ข้อ was deleted from the คลัง, minus the
   // types this mode cannot judge on the spot — the same filter the wizard
   // counted with before letting the teacher choose this ending.

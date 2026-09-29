@@ -6,6 +6,9 @@ import { buildAssignmentAttempt } from '@/lib/assignment-attempt'
 import { parseSections } from '@/lib/question-set-sections'
 import { matchingChoices } from '@/lib/matching-choices'
 import type { Assignment, MCQOption, Question, MatchingConfig, MatchingPair } from '@/lib/types'
+import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 
 export const metadata = { title: 'ตัวอย่างมุมมองนักเรียน — KorKru' }
 
@@ -20,16 +23,18 @@ export default async function AssignmentPreviewPage({
 
   const supabase = await createClient()
 
-  // No explicit ownership check — RLS (assignments_org_teacher_all /
-  // assignments_co_teacher_all) already scopes this row to a teacher who may
-  // manage the assignment; a null result means unauthorized.
-  const { data: assignment } = await supabase
-    .from('assignments')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
+  const [{ data: assignment }, canManage] = await Promise.all([
+    supabase
+      .from('assignments')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle(),
+    canManageAssignment(id, user.id),
+  ])
 
-  if (!assignment) notFound()
+  // Preview carries answer keys, so assignment visibility alone is not enough:
+  // only an owner or admin/manage co-teacher may open it.
+  if (!assignment || !canManage) notFound()
   const a = assignment as Assignment
 
   if (a.question_ids.length === 0) {
@@ -45,12 +50,10 @@ export default async function AssignmentPreviewPage({
 
   // The โจทย์ themselves, and whether anyone has started this งาน — the second
   // decides only what the banner says, so it must never block the preview.
-  const [{ data: questions }, { data: startedSubmission }] = await Promise.all([
-    supabase
-      .from('questions')
-      .select('*')
-      .in('id', a.question_ids),
-    supabase
+  const admin = createAdminClient()
+  const [questionResult, { data: startedSubmission }] = await Promise.all([
+    loadAssignmentQuestionsByProvenance(a),
+    admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -58,7 +61,10 @@ export default async function AssignmentPreviewPage({
       .maybeSingle(),
   ])
 
-  if (!questions || questions.length === 0) notFound()
+  if ('error' in questionResult) throw new Error(questionResult.error)
+  if (questionResult.missingQuestionIds.length > 0 || questionResult.duplicateQuestionCount > 0) notFound()
+  const questions = questionResult.questions
+  if (questions.length === 0) notFound()
 
   // Same computation real students get (correct answers, per-attempt
   // question/option shuffle, max_score) — just never persisted to a

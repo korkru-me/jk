@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
-  Play, Square, BarChart2, Trash2, TrendingUp,
+  ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2,
+  Play, Square, Trash2, TrendingUp,
   AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
-  FileClock, Presentation, ClipboardCheck, ChevronRight, LayoutDashboard,
+  FileClock, Presentation, ClipboardCheck, ChevronRight, LayoutDashboard, Ellipsis, Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
@@ -24,6 +24,16 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { classroomNavigationPath } from '@/lib/classroom-navigation'
+import { assignmentSizeLabel } from '@/lib/assignment-size-label'
+import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
@@ -31,23 +41,24 @@ const STATUS_META = {
   closed:    { label: 'ปิดแล้ว',      color: 'bg-destructive/10 text-destructive',     dot: 'bg-destructive' },
 } as const
 
-type AssignmentDetailTab = 'overview' | 'questions' | 'students' | 'analytics'
+type AssignmentDetailTab = 'overview' | 'questions' | 'students'
 
 const TABS: { key: AssignmentDetailTab; label: string; icon: typeof Users }[] = [
   { key: 'overview',   label: 'ภาพรวม',   icon: Activity },
   { key: 'questions',  label: 'โจทย์',    icon: FileText },
   { key: 'students',   label: 'นักเรียน', icon: Users },
-  { key: 'analytics',  label: 'วิเคราะห์', icon: BarChart2 },
 ]
 
 function AssignmentContextNavigation({
   assignment: a,
   activeTab,
   studentCount,
-  submittedCount,
   pendingCount,
   pendingReviewCapped,
   gradeHref,
+  availableQuestionCount,
+  missingQuestionCount,
+  duplicateQuestionCount,
   isPending,
   onTabChange,
   onPublish,
@@ -59,10 +70,12 @@ function AssignmentContextNavigation({
   assignment: Assignment & { classrooms: { name: string } | null }
   activeTab: AssignmentDetailTab
   studentCount: number
-  submittedCount: number
   pendingCount: number
   pendingReviewCapped: boolean
   gradeHref: string
+  availableQuestionCount: number
+  missingQuestionCount: number
+  duplicateQuestionCount: number
   isPending: boolean
   onTabChange: (tab: AssignmentDetailTab) => void
   onPublish: () => void
@@ -72,6 +85,7 @@ function AssignmentContextNavigation({
   onClose?: () => void
 }) {
   const statusMeta = STATUS_META[a.status]
+  const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
 
   function runAction(action: () => void) {
     action()
@@ -89,30 +103,32 @@ function AssignmentContextNavigation({
         กลับไปงานที่มอบหมาย
       </Button>
 
-      <Card radius="md" padding="sm" className="flex flex-col gap-3 border-primary/20 bg-primary/5">
-        <div className="flex items-start gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <FileText aria-hidden="true" className="size-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <Badge variant="secondary" className={statusMeta.color}>
-              <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
-              {statusMeta.label}
-            </Badge>
-            <p className="mt-1 truncate font-bold text-foreground" title={a.title}>{a.title}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {a.classrooms?.name ?? 'ชุดข้อสอบ'}
-            </p>
-          </div>
+      <Card radius="md" padding="sm" className="flex flex-col gap-2.5 border-primary/20 bg-primary/5">
+        <div className="flex items-center justify-between gap-2">
+          <Badge variant="secondary" className={statusMeta.color}>
+            <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
+            {statusMeta.label}
+          </Badge>
+          <Badge variant="outline">{assignmentTypeLabel}</Badge>
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="min-w-0">
+          <p className="line-clamp-2 font-bold leading-snug text-foreground" title={a.title}>{a.title}</p>
+          {a.classrooms?.name && (
+            <p className="mt-1 truncate text-xs text-muted-foreground" title={a.classrooms.name}>
+              ห้องหลัก · {a.classrooms.name}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <FileText aria-hidden="true" className="size-3.5 text-primary" />
-            <strong className="text-foreground">{a.question_ids.length}</strong> ข้อ
+            <strong className="font-medium text-foreground">{assignmentSizeLabel(a)}</strong>
+            {missingQuestionCount > 0 && <span className="text-warning">· หาย {missingQuestionCount}</span>}
+            {duplicateQuestionCount > 0 && <span className="text-warning">· ซ้ำ {duplicateQuestionCount}</span>}
           </span>
           <span className="flex items-center gap-1.5">
             <Users aria-hidden="true" className="size-3.5 text-primary" />
-            <strong className="text-foreground">{submittedCount}</strong> ส่งแล้ว
+            <strong className="font-medium text-foreground">{studentCount}</strong> คน
           </span>
         </div>
       </Card>
@@ -141,6 +157,9 @@ function AssignmentContextNavigation({
               {tab.key === 'students' && studentCount > 0 && (
                 <Badge variant="secondary" className="ml-auto">{studentCount}</Badge>
               )}
+              {tab.key === 'questions' && (
+                <Badge variant="secondary" className="ml-auto">{availableQuestionCount}</Badge>
+              )}
             </Button>
           )
         })}
@@ -151,14 +170,25 @@ function AssignmentContextNavigation({
       <div className="px-2 text-xs font-medium text-muted-foreground">การทำงาน</div>
       <div className="flex flex-col gap-1.5">
         {a.status === 'draft' && (
-          <Button
-            onClick={() => runAction(onPublish)}
-            disabled={isPending}
-            size="sm"
-            className="w-full justify-start border-0 bg-success text-success-foreground hover:bg-success/90"
-          >
-            <Play data-icon="inline-start" /> เผยแพร่
-          </Button>
+          <>
+            <Button
+              onClick={() => runAction(onPublish)}
+              disabled={isPending || availableQuestionCount === 0 || missingQuestionCount > 0 || duplicateQuestionCount > 0}
+              size="sm"
+              className="w-full justify-start border-0 bg-success text-success-foreground hover:bg-success/90"
+            >
+              <Play data-icon="inline-start" /> เผยแพร่
+            </Button>
+            {(availableQuestionCount === 0 || missingQuestionCount > 0 || duplicateQuestionCount > 0) && (
+              <p className="px-2 text-xs leading-5 text-warning">
+                {missingQuestionCount > 0
+                  ? 'ตรวจและแก้โจทย์ที่หายก่อนเผยแพร่'
+                  : duplicateQuestionCount > 0
+                    ? 'ลบรายการโจทย์ซ้ำก่อนเผยแพร่'
+                  : 'เพิ่มโจทย์อย่างน้อย 1 ข้อก่อนเผยแพร่'}
+              </p>
+            )}
+          </>
         )}
         {a.status === 'published' && (
           <Button
@@ -168,84 +198,72 @@ function AssignmentContextNavigation({
             variant="destructive"
             className="w-full justify-start"
           >
-            <Square data-icon="inline-start" /> ปิดการสอบ
+            <Square data-icon="inline-start" /> ปิด{assignmentTypeLabel}
           </Button>
         )}
-        {a.mode === 'online' && a.question_ids.length > 0 && (
+        {a.mode === 'online' && availableQuestionCount > 0 && missingQuestionCount === 0 && duplicateQuestionCount === 0 && (
           <Button
             size="sm"
             variant="outline"
-            render={<Link href={`/assignments/${a.id}/preview`} target="_blank" onClick={onClose} />}
+            render={<Link href={`/assignments/${a.id}/preview`} target="_blank" rel="noopener noreferrer" onClick={onClose} />}
             className="w-full justify-start"
           >
-            <Eye data-icon="inline-start" /> ดูตัวอย่างมุมมองนักเรียน
+            <Eye data-icon="inline-start" /> ดูตัวอย่างนักเรียน
           </Button>
         )}
-        {a.question_ids.length > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            render={<Link href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)} target="_blank" onClick={onClose} />}
-            className="w-full justify-start"
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button size="sm" variant="outline" className="w-full justify-start" />}
           >
-            <Presentation data-icon="inline-start" /> โหมดสอน
-          </Button>
-        )}
-        {a.mode === 'online' && a.type === 'exam' && (
-          <Button
-            size="sm"
-            variant="outline"
-            render={<Link href={`/assignments/${a.id}/proctor`} onClick={onClose} />}
-            className="w-full justify-start"
-          >
-            <Radio data-icon="inline-start" /> ห้องคุมสอบสด
-          </Button>
-        )}
-        {a.mode === 'online' && a.type === 'exam' && (
-          <Button
-            size="sm"
-            variant="outline"
-            render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}
-            className="w-full justify-start"
-          >
-            <FileClock data-icon="inline-start" /> รายงานคุมสอบ
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant="outline"
-          render={<Link href={`/assignments/${a.id}/edit`} onClick={onClose} />}
-          className="w-full justify-start"
-        >
-          <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
-        </Button>
-        <Button
-          size="sm"
-          className={pendingCount > 0
-            ? 'w-full justify-start border-0 bg-warning text-warning-foreground hover:bg-warning/90'
-            : 'w-full justify-start'}
-          variant={pendingCount > 0 ? 'default' : 'outline'}
-          render={<Link href={gradeHref} onClick={onClose} />}
-        >
-          <ClipboardCheck data-icon="inline-start" />
-          {pendingCount > 0
-            ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
-            : 'ตรวจให้คะแนน / ดูคำตอบ'}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          render={<Link href={`/assignments/${a.id}/analytics`} onClick={onClose} />}
-          className="w-full justify-start"
-        >
-          <TrendingUp data-icon="inline-start" /> วิเคราะห์เชิงลึก
-        </Button>
-        <Button onClick={() => runAction(onDuplicate)} disabled={isPending} size="sm" variant="ghost" className="w-full justify-start">
-          <Copy data-icon="inline-start" /> ทำสำเนา
-        </Button>
-        <Button onClick={() => runAction(onDelete)} disabled={isPending} size="sm" variant="destructive" className="w-full justify-start">
-          <Trash2 data-icon="inline-start" /> ลบ
-        </Button>
+            <Ellipsis data-icon="inline-start" /> เพิ่มเติม
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuGroup>
+              <DropdownMenuItem render={<Link href={gradeHref} onClick={onClose} />}>
+                <ClipboardCheck />
+                {pendingCount > 0
+                  ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
+                  : 'ตรวจให้คะแนน / ดูคำตอบ'}
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href={`/assignments/${a.id}/edit`} onClick={onClose} />}>
+                <Pencil /> แก้ไขรายละเอียด
+              </DropdownMenuItem>
+              {availableQuestionCount > 0 && missingQuestionCount === 0 && duplicateQuestionCount === 0 && (
+                <DropdownMenuItem
+                  render={(
+                    <Link
+                      href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={onClose}
+                    />
+                  )}
+                >
+                  <Presentation /> โหมดสอน
+                </DropdownMenuItem>
+              )}
+              {a.mode === 'online' && a.type === 'exam' && (
+                <DropdownMenuItem render={<Link href={`/assignments/${a.id}/proctor`} onClick={onClose} />}>
+                  <Radio /> ห้องคุมสอบสด
+                </DropdownMenuItem>
+              )}
+              {a.mode === 'online' && a.type === 'exam' && (
+                <DropdownMenuItem render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}>
+                  <FileClock /> รายงานคุมสอบ
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => runAction(onDuplicate)} disabled={isPending}>
+                <Copy /> ทำสำเนา
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem variant="destructive" onClick={() => runAction(onDelete)} disabled={isPending}>
+                <Trash2 /> ลบ{assignmentTypeLabel}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Separator />
@@ -272,11 +290,6 @@ interface Props {
   pendingReviewCapped: boolean
 }
 
-function seedRand(str: string, i: number) {
-  const h = [...str].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
-  return (((h * (i + 7) * 2654435761) >>> 0) % 100) / 100
-}
-
 export function AssignmentDetailClient({
   assignment: a, questions, submissions, pendingSubmissionIds, pendingReviewCapped,
 }: Props) {
@@ -286,6 +299,7 @@ export function AssignmentDetailClient({
   const router = useRouter()
 
   const statusMeta = STATUS_META[a.status]
+  const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const pendingIdSet = new Set(pendingSubmissionIds)
   // Counted as hand-ins, not students — the same unit the classroom overview
   // and the "งานที่มอบหมาย" list use, so the three screens never disagree.
@@ -300,33 +314,36 @@ export function AssignmentDetailClient({
   const avgScore = submittedSubs.length > 0
     ? Math.round(submittedSubs.reduce((sum, s) => sum + (s.total_score ?? 0) / (s.max_score || 1) * 100, 0) / submittedSubs.length)
     : null
+  const uniqueQuestionCount = new Set(a.question_ids).size
+  const missingQuestionCount = Math.max(0, uniqueQuestionCount - questions.length)
+  const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
 
   const publish = useCallback(() => {
     startTransition(async () => {
       const res = await updateAssignmentStatus(a.id, 'published')
       if (res?.error) toast.error(res.error)
-      else { toast.success('เผยแพร่ชุดข้อสอบแล้ว'); router.refresh() }
+      else { toast.success(`เผยแพร่${assignmentTypeLabel}แล้ว`); router.refresh() }
     })
-  }, [a.id, router])
+  }, [a.id, assignmentTypeLabel, router])
 
   const close = useCallback(() => {
     startTransition(async () => {
       const res = await updateAssignmentStatus(a.id, 'closed')
       if (res?.error) toast.error(res.error)
-      else { toast.success('ปิดชุดข้อสอบแล้ว'); router.refresh() }
+      else { toast.success(`ปิด${assignmentTypeLabel}แล้ว`); router.refresh() }
     })
-  }, [a.id, router])
+  }, [a.id, assignmentTypeLabel, router])
 
   const handleDelete = useCallback(async () => {
     const ok = await confirm({
-      title: 'ลบชุดข้อสอบนี้?',
-      description: 'ข้อมูลการสอบและการส่งทั้งหมดของชุดนี้จะถูกลบถาวร กู้คืนไม่ได้',
+      title: `ลบ${assignmentTypeLabel}นี้?`,
+      description: `ข้อมูลการทำและการส่งทั้งหมดของ${assignmentTypeLabel}นี้จะถูกลบถาวร กู้คืนไม่ได้`,
       confirmLabel: 'ลบถาวร',
       variant: 'destructive',
     })
     if (!ok) return
     startTransition(async () => { await deleteAssignment(a.id) })
-  }, [a.id, confirm])
+  }, [a.id, assignmentTypeLabel, confirm])
 
   const handleDuplicate = useCallback(() => {
     startTransition(async () => {
@@ -340,10 +357,12 @@ export function AssignmentDetailClient({
       assignment={a}
       activeTab={activeTab}
       studentCount={submissions.length}
-      submittedCount={submittedSubs.length}
       pendingCount={pendingCount}
       pendingReviewCapped={pendingReviewCapped}
       gradeHref={gradeHref}
+      availableQuestionCount={questions.length}
+      missingQuestionCount={missingQuestionCount}
+      duplicateQuestionCount={duplicateQuestionCount}
       isPending={isPending}
       onTabChange={setActiveTab}
       onPublish={publish}
@@ -352,49 +371,47 @@ export function AssignmentDetailClient({
       onDelete={handleDelete}
       onClose={onNavigate}
     />
-  ), [a, activeTab, close, gradeHref, handleDelete, handleDuplicate, isPending, pendingCount, pendingReviewCapped, publish, submissions.length, submittedSubs.length])
+  ), [a, activeTab, close, duplicateQuestionCount, gradeHref, handleDelete, handleDuplicate, isPending, missingQuestionCount, pendingCount, pendingReviewCapped, publish, questions.length, submissions.length])
 
   useContextualSidebar(`/assignments/${a.id}`, renderContextualSidebar)
 
   return (
     <div className="flex max-w-[1200px] flex-col gap-6">
       {/* Header card */}
-      <Card edge="border" padding="xl" className="border-primary/20 bg-primary/10 text-foreground">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${statusMeta.color}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
+      <Card edge="border" padding="lg" className="border-primary/20 bg-primary/10 text-foreground">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className={statusMeta.color}>
+                <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
                 {statusMeta.label}
-              </span>
+              </Badge>
+              <Badge variant="outline">{assignmentTypeLabel}</Badge>
               {a.secure_browser_mode === 'seb_required' && (
-                <span className="flex items-center gap-1 text-xs text-success border border-success/40 bg-success/10 px-2.5 py-1 rounded-full">
-                  <LockKeyhole className="w-3 h-3" /> Safe Exam Browser
-                </span>
+                <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
+                  <LockKeyhole /> Safe Exam Browser
+                </Badge>
               )}
               {a.android_exam_mode === 'monitored' && (
-                <span className="flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-warning">
-                  <Smartphone className="h-3 w-3" /> Android ครูอนุมัติรายคน
-                </span>
+                <Badge variant="warning">
+                  <Smartphone /> Android ครูอนุมัติรายคน
+                </Badge>
               )}
             </div>
             <h1 className="text-2xl font-bold leading-tight">{a.title}</h1>
-            {a.classrooms?.name && <p className="mt-1 text-sm text-muted-foreground">{a.classrooms.name}</p>}
+            {a.classrooms?.name && <p className="mt-1 text-sm text-muted-foreground">ห้องหลัก · {a.classrooms.name}</p>}
             {a.description && <p className="mt-1 text-sm text-muted-foreground">{a.description}</p>}
 
             {/* Quick stats */}
-            <div className="flex items-center gap-5 mt-4 text-sm">
-              <div className="flex items-center gap-2" title={a.random_question_count ? `สุ่มจากคลัง ${a.question_ids.length} ข้อ` : undefined}>
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <div className="flex items-center gap-2">
                 <FileText className="size-4 text-primary" />
-                <span className="font-semibold">
-                  {a.random_question_count ? `${a.random_question_count}/${a.question_ids.length}` : a.question_ids.length}
-                </span>
-                <span className="text-muted-foreground">{a.random_question_count ? 'ข้อสุ่ม/คลัง' : 'ข้อ'}</span>
+                <span className="font-semibold">{assignmentSizeLabel(a)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Users className="size-4 text-primary" />
-                <span className="font-semibold">{submittedSubs.length}</span>
-                <span className="text-muted-foreground">ส่งแล้ว</span>
+                <span className="font-semibold">{a.status === 'draft' ? submissions.length : submittedSubs.length}</span>
+                <span className="text-muted-foreground">{a.status === 'draft' ? 'นักเรียน' : 'ส่งแล้ว'}</span>
               </div>
               {a.duration_minutes && (
                 <div className="flex items-center gap-2">
@@ -403,7 +420,7 @@ export function AssignmentDetailClient({
                   <span className="text-muted-foreground">นาที</span>
                 </div>
               )}
-              {avgScore !== null && (
+              {a.status !== 'draft' && avgScore !== null && (
                 <div className="flex items-center gap-2">
                   <TrendingUp className="size-4 text-primary" />
                   <span className="font-semibold">{avgScore}%</span>
@@ -415,7 +432,7 @@ export function AssignmentDetailClient({
 
           {/* Schedule */}
           {(a.start_at || a.end_at) && (
-            <div className="shrink-0 text-right">
+            <div className="shrink-0 sm:text-right">
               {a.start_at && (
                 <div className="mb-1">
                   <p className="text-xs text-muted-foreground">เปิด</p>
@@ -455,6 +472,7 @@ export function AssignmentDetailClient({
         {activeTab === 'overview' && (
           <OverviewTab
             a={a}
+            questions={questions}
             submittedCount={submittedSubs.length}
             inProgressCount={inProgressSubs.length}
             totalSubs={submissions.length}
@@ -474,9 +492,6 @@ export function AssignmentDetailClient({
         {activeTab === 'students' && (
           <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />
         )}
-        {activeTab === 'analytics' && (
-          <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />
-        )}
       </div>
       {confirmDialog}
     </div>
@@ -485,8 +500,184 @@ export function AssignmentDetailClient({
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore, pendingCount, pendingReviewCapped, gradeHref }: {
+function AssignmentInfoCard({ a }: {
   a: Assignment & { classrooms: { name: string } | null }
+}) {
+  const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const rows = [
+    { label: 'ประเภท', value: assignmentTypeLabel },
+    ...(a.classrooms?.name ? [{ label: 'ห้องหลัก', value: a.classrooms.name }] : []),
+    { label: 'ขนาดงาน', value: assignmentSizeLabel(a) },
+    { label: 'เวลาทำ', value: a.duration_minutes ? `${a.duration_minutes} นาที` : 'ไม่จำกัด' },
+    { label: 'เปิดรับ', value: a.start_at ? new Date(a.start_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ทันทีเมื่อเผยแพร่' },
+    { label: 'ปิดรับ', value: a.end_at ? new Date(a.end_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่กำหนด' },
+    // The three endings are mutually exclusive — the database refuses a
+    // streak งาน that also carries a score threshold — so this reads as one
+    // row, not two that could both appear.
+    ...(a.completion_rule === 'streak'
+      ? [
+          { label: 'เงื่อนไขจบ', value: `ถูกติดต่อกัน ${a.streak_target} ข้อ` },
+          ...(a.streak_question_cap != null
+            ? [{ label: 'หยุดอัตโนมัติ', value: `ทำครบ ${a.streak_question_cap} ข้อ` }]
+            : []),
+          { label: 'ทำครบคลังแล้ว', value: a.streak_recycle_pool === false ? 'จบเลย' : 'วนกลับมาใหม่' },
+        ]
+      : a.passing_type != null && a.passing_value != null
+        ? [{ label: 'เกณฑ์ผ่าน', value: a.passing_type === 'percent' ? `${a.passing_value}%` : `${a.passing_value} คะแนน` }]
+        : [{ label: 'เงื่อนไขจบ', value: 'ทำครบแล้วจบ' }]),
+  ]
+
+  return (
+    <Card edge="ring" padding="lg" className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold text-foreground">ข้อมูล{assignmentTypeLabel}</h3>
+      <div className="divide-y divide-border">
+        {rows.map(row => (
+          <div key={row.label} className="flex items-start justify-between gap-6 py-2.5 text-sm">
+            <span className="shrink-0 text-muted-foreground">{row.label}</span>
+            <span className="text-right font-medium text-foreground">{row.value}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+function DraftOverview({ a, questions, totalStudents }: {
+  a: Assignment & { classrooms: { name: string } | null }
+  questions: Question[]
+  totalStudents: number
+}) {
+  const uniqueQuestionCount = new Set(a.question_ids).size
+  const missingQuestionCount = Math.max(0, uniqueQuestionCount - questions.length)
+  const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
+  const questionsReady = uniqueQuestionCount > 0 && missingQuestionCount === 0 && duplicateQuestionCount === 0
+  const openLabel = a.start_at
+    ? `เปิด ${new Date(a.start_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}`
+    : 'เปิดทันทีเมื่อเผยแพร่'
+  const closeLabel = a.end_at
+    ? `ปิด ${new Date(a.end_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}`
+    : 'ไม่กำหนดวันปิด'
+  const accessLabel = a.secure_browser_mode === 'seb_required'
+    ? a.android_exam_mode === 'monitored'
+      ? 'Safe Exam Browser · Android ครูอนุมัติรายคน'
+      : 'Safe Exam Browser'
+    : 'เว็บเบราว์เซอร์'
+  const preparationItems = [
+    {
+      label: 'โจทย์ในงาน',
+      detail: a.question_ids.length === 0
+        ? 'ยังไม่มีโจทย์ในงาน'
+        : missingQuestionCount > 0
+          ? `${assignmentSizeLabel(a)} · เปิดไม่ได้ ${missingQuestionCount} ข้อ`
+          : duplicateQuestionCount > 0
+            ? `${assignmentSizeLabel(a)} · มีรายการซ้ำ ${duplicateQuestionCount} รายการ`
+          : assignmentSizeLabel(a),
+      icon: questionsReady ? CheckCircle2 : AlertCircle,
+      tone: questionsReady ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning',
+    },
+    {
+      label: 'ผู้เรียนที่จะได้รับงาน',
+      detail: totalStudents > 0 ? `${totalStudents} คน` : 'ยังไม่มีนักเรียนในห้องที่มอบหมาย',
+      icon: totalStudents > 0 ? Users : AlertCircle,
+      tone: totalStudents > 0 ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning',
+    },
+    {
+      label: 'ช่วงเวลารับงาน',
+      detail: `${openLabel} · ${closeLabel}`,
+      icon: Clock,
+      tone: 'bg-primary/10 text-primary',
+    },
+    {
+      label: 'วิธีเข้าใช้งาน',
+      detail: accessLabel,
+      icon: a.secure_browser_mode === 'seb_required' ? LockKeyhole : Globe,
+      tone: 'bg-primary/10 text-primary',
+    },
+  ]
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Card edge="border" padding="lg" className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-semibold text-foreground">ตรวจความพร้อมก่อนเผยแพร่</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            สรุปข้อมูลสำคัญที่นักเรียนจะได้รับเมื่อเผยแพร่งานนี้
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {preparationItems.map(item => {
+            const Icon = item.icon
+            return (
+              <div key={item.label} className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
+                <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl', item.tone)}>
+                  <Icon aria-hidden="true" className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{item.label}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
+
+      <Card edge="ring" className="overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">ตัวอย่างโจทย์</h3>
+            <p className="mt-1 text-xs text-muted-foreground">ตรวจชื่อและเนื้อหาโดยย่อก่อนเผยแพร่</p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full sm:w-auto"
+            render={<Link href={`/assignments/${a.id}/edit`} />}
+          >
+            <Pencil data-icon="inline-start" /> แก้ไขโจทย์ทั้งหมด
+          </Button>
+        </div>
+        {questions.length > 0 ? (
+          <div className="divide-y divide-border">
+            {questions.slice(0, 3).map((question, index) => (
+              <div key={question.id} className="flex items-start gap-3 px-5 py-3.5">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{question.title}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    {questionExcerpt(question.question_text) || 'ไม่มีคำอธิบายเพิ่มเติม'}
+                  </p>
+                </div>
+                <Badge variant="outline" className="hidden sm:inline-flex">
+                  {TYPE_SHORT[question.question_type] ?? question.question_type}
+                </Badge>
+              </div>
+            ))}
+            {questions.length > 3 && (
+              <p className="px-5 py-3 text-center text-xs text-muted-foreground">
+                และอีก {questions.length - 3} ข้อ — ดูทั้งหมดได้ที่เมนูโจทย์
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
+            <FileText aria-hidden="true" className="size-8 text-muted-foreground/50" />
+            <p className="text-sm font-medium text-foreground">ยังไม่มีโจทย์ที่เปิดดูได้</p>
+            <p className="text-xs text-muted-foreground">เพิ่มโจทย์หรือแก้รายการโจทย์ก่อนเผยแพร่</p>
+          </div>
+        )}
+      </Card>
+
+      <AssignmentInfoCard a={a} />
+    </div>
+  )
+}
+
+function OverviewTab({ a, questions, submittedCount, inProgressCount, totalSubs, avgScore, pendingCount, pendingReviewCapped, gradeHref }: {
+  a: Assignment & { classrooms: { name: string } | null }
+  questions: Question[]
   submittedCount: number
   inProgressCount: number
   totalSubs: number
@@ -495,15 +686,19 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore, 
   pendingReviewCapped: boolean
   gradeHref: string
 }) {
+  if (a.status === 'draft') {
+    return <DraftOverview a={a} questions={questions} totalStudents={totalSubs} />
+  }
+
   const stats = [
     { label: 'ส่งแล้ว',      value: submittedCount,  icon: CheckCircle2, color: 'bg-success/10 text-success' },
     { label: 'กำลังทำ',      value: inProgressCount, icon: Activity,     color: 'bg-warning/10 text-warning' },
     { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'bg-primary/10 text-primary' },
-    { label: 'จำนวนข้อ',    value: a.question_ids.length, icon: FileText, color: 'bg-tint-1/10 text-tint-1' },
+    { label: 'ขนาดงาน',      value: assignmentSizeLabel(a), icon: FileText, color: 'bg-tint-1/10 text-tint-1', compact: true },
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       {/* งานที่ระบบตรวจเองไม่ได้ — ข้อเขียน ช่องเติมคำที่ครูตรวจเอง เหตุผลของ
           ถูก/ผิด — ค้างอยู่จนกว่าครูจะกรอกคะแนน คะแนนรวมของนักเรียนจึงยัง
           ไม่นิ่ง ปุ่มนี้พาไปที่หน้ากรอกคะแนนโดยตรง */}
@@ -534,11 +729,11 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore, 
           const Icon = s.icon
           return (
             <Card edge="ring" padding="md" className="flex items-center gap-3" key={s.label}>
-              <div className={`w-9 h-9 rounded-xl ${s.color} flex items-center justify-center shrink-0`}>
-                <Icon className="w-4 h-4" />
+              <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl', s.color)}>
+                <Icon className="size-4" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground leading-none">{s.value}</p>
+                <p className={cn('font-bold text-foreground', s.compact ? 'text-base leading-snug' : 'text-2xl leading-none')}>{s.value}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
               </div>
             </Card>
@@ -555,7 +750,7 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore, 
           </div>
           <div className="h-3 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-green-400 to-emerald-400 rounded-full transition-all"
+              className="h-full rounded-full bg-success transition-all"
               style={{ width: `${totalSubs > 0 ? (submittedCount / totalSubs) * 100 : 0}%` }}
             />
           </div>
@@ -565,37 +760,7 @@ function OverviewTab({ a, submittedCount, inProgressCount, totalSubs, avgScore, 
         </Card>
       )}
 
-      {/* Info */}
-      <Card edge="ring" padding="lg" className="space-y-3">
-        <h3 className="font-semibold text-foreground text-sm">ข้อมูลชุดข้อสอบ</h3>
-        <div className="divide-y divide-border">
-          {[
-            { label: 'ห้องเรียน', value: a.classrooms?.name ?? '—' },
-            { label: 'เวลาทำ', value: a.duration_minutes ? `${a.duration_minutes} นาที` : 'ไม่จำกัด' },
-            { label: 'เปิดรับ', value: a.start_at ? new Date(a.start_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ทันที' },
-            { label: 'ปิดรับ', value: a.end_at ? new Date(a.end_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่กำหนด' },
-            // The three endings are mutually exclusive — the database refuses
-            // a streak งาน that also carries a score threshold — so this reads
-            // as one row, not two that could both appear.
-            ...(a.completion_rule === 'streak'
-              ? [
-                  { label: 'เงื่อนไขจบ', value: `ถูกติดต่อกัน ${a.streak_target} ข้อ` },
-                  ...(a.streak_question_cap != null
-                    ? [{ label: 'หยุดอัตโนมัติ', value: `ทำครบ ${a.streak_question_cap} ข้อ` }]
-                    : []),
-                  { label: 'ทำครบคลังแล้ว', value: a.streak_recycle_pool === false ? 'จบเลย' : 'วนกลับมาใหม่' },
-                ]
-              : a.passing_type != null && a.passing_value != null
-                ? [{ label: 'เกณฑ์ผ่าน', value: a.passing_type === 'percent' ? `${a.passing_value}%` : `${a.passing_value} คะแนน` }]
-                : [{ label: 'เงื่อนไขจบ', value: 'ทำครบแล้วจบ' }]),
-          ].map(row => (
-            <div key={row.label} className="flex justify-between py-2.5 text-sm">
-              <span className="text-muted-foreground">{row.label}</span>
-              <span className="font-medium text-foreground">{row.value}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <AssignmentInfoCard a={a} />
     </div>
   )
 }
@@ -770,98 +935,6 @@ function StudentsTab({ submissions, pendingIdSet }: { submissions: SubmissionRow
             </div>
           )
         })}
-      </Card>
-    </div>
-  )
-}
-
-// ─── Analytics Tab ────────────────────────────────────────────────────────────
-
-function AnalyticsTab({ questions, submissions, assignmentId }: {
-  questions: Question[]
-  submissions: SubmissionRow[]
-  assignmentId: string
-}) {
-  if (submissions.length === 0) {
-    return (
-      <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
-        <BarChart2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-        <p className="text-muted-foreground font-medium">ยังไม่มีข้อมูลเพียงพอ</p>
-        <p className="text-sm text-muted-foreground mt-1">ต้องมีการส่งอย่างน้อย 1 ครั้ง</p>
-      </div>
-    )
-  }
-
-  // Mock per-question accuracy (deterministic from question id + assignmentId)
-  const qStats = questions.map((q, i) => {
-    const acc = Math.round(30 + seedRand(q.id + assignmentId, i) * 60)
-    return { q, acc }
-  })
-
-  const avgAcc = Math.round(qStats.reduce((s, x) => s + x.acc, 0) / qStats.length)
-
-  // Score distribution buckets
-  const buckets = [0, 0, 0, 0, 0] // 0-20, 21-40, 41-60, 61-80, 81-100
-  for (const s of submissions) {
-    const pct = s.total_score != null && s.max_score > 0 ? (s.total_score / s.max_score) * 100 : 0
-    buckets[Math.min(4, Math.floor(pct / 20))]++
-  }
-  const maxBucket = Math.max(...buckets, 1)
-
-  return (
-    <div className="space-y-5">
-      {/* Score distribution */}
-      <Card edge="ring" padding="lg">
-        <h3 className="font-semibold text-foreground text-sm mb-4">การกระจายคะแนน ({submissions.length} คน)</h3>
-        <div className="flex items-end gap-3 h-32">
-          {buckets.map((count, i) => {
-            const labels = ['0–20%', '21–40%', '41–60%', '61–80%', '81–100%']
-            const colors = ['bg-destructive', 'bg-flag', 'bg-warning', 'bg-success/60', 'bg-success']
-            return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="text-xs font-bold text-muted-foreground">{count}</span>
-                <div className="w-full flex items-end justify-center">
-                  <div
-                    className={`w-full rounded-t-md ${colors[i]} transition-all`}
-                    style={{ height: `${Math.max(4, (count / maxBucket) * 80)}px` }}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{labels[i]}</span>
-              </div>
-            )
-          })}
-        </div>
-      </Card>
-
-      {/* Per-question accuracy */}
-      <Card edge="ring" padding="lg">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-foreground text-sm">ความแม่นยำรายข้อ</h3>
-          <span className="text-xs text-muted-foreground">เฉลี่ย {avgAcc}%</span>
-        </div>
-        <div className="space-y-2.5">
-          {qStats.map(({ q, acc }, i) => {
-            const diff = DIFF_META[q.difficulty]
-            const barColor = acc >= 70 ? 'bg-success' : acc >= 50 ? 'bg-warning' : 'bg-destructive'
-            return (
-              <div key={q.id} className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-5 text-right shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs text-muted-foreground truncate pr-2">{q.title}</p>
-                    <span className="text-xs font-bold text-muted-foreground shrink-0">{acc}%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full ${barColor} rounded-full`} style={{ width: `${acc}%` }} />
-                  </div>
-                </div>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${diff?.badge ?? ''}`}>
-                  {diff?.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
       </Card>
     </div>
   )
