@@ -14,6 +14,8 @@ import { AssignmentGroupTargetsCard } from '@/components/assignments/assignment-
 import type { AssignmentGroupOption, GroupTargets } from '@/components/assignments/group-target-picker'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
+import { AssignmentEditSidebar } from './_components/assignment-edit-sidebar'
+import type { AssignmentSidebarSummary } from '../_components/assignment-context-sidebar'
 
 export const metadata = { title: 'แก้ไขชุดข้อสอบ — KorKru' }
 
@@ -34,7 +36,7 @@ export default async function EditAssignmentPage({
   // unauthorized and is handled by notFound() below.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('id, org_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode')
+    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
@@ -81,9 +83,19 @@ export default async function EditAssignmentPage({
   const questions = [...new Set(a.question_ids)]
     .map(id => questionsById.get(id))
     .filter((q): q is NonNullable<typeof q> => !!q)
+  const uniqueQuestionCount = new Set(a.question_ids).size
+  const missingQuestionCount = Math.max(0, uniqueQuestionCount - questions.length)
+  const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
 
   return (
     <div className="max-w-2xl space-y-6">
+      <AssignmentEditSidebar
+        assignment={assignment as unknown as AssignmentSidebarSummary}
+        availableQuestionCount={questions.length}
+        missingQuestionCount={missingQuestionCount}
+        duplicateQuestionCount={duplicateQuestionCount}
+      />
+
       <Link href={`/assignments/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
         <ChevronLeft className="w-4 h-4" /> กลับไปหน้าชุดข้อสอบ
       </Link>

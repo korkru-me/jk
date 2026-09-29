@@ -5,13 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2,
-  Play, Square, Trash2, TrendingUp,
-  AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
-  FileClock, Presentation, ClipboardCheck, ChevronRight, LayoutDashboard, Ellipsis, Globe,
+  Users, FileText, Timer, Clock, CheckCircle2, TrendingUp,
+  AlertCircle, Activity, Pencil, LockKeyhole, Smartphone,
+  ClipboardCheck, ChevronRight, Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
+import { updateAssignmentStatus, deleteAssignment } from '@/lib/actions/assignments'
 import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { Assignment, Question } from '@/lib/types'
 import type { SubmissionRow } from '../page'
@@ -19,268 +18,17 @@ import { Card } from '@/components/ui/card'
 import { questionExcerpt } from '@/lib/question-display'
 import { sectionByQuestionId, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import { useConfirm } from '@/components/ui/confirm-dialog'
-import { withBackHref } from '@/lib/back-link'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
-import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { cn } from '@/lib/utils'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { AssignmentContextNavigation, type AssignmentDetailTab } from './assignment-context-sidebar'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
   published: { label: 'เผยแพร่แล้ว',  color: 'bg-success/10 text-success', dot: 'bg-success' },
   closed:    { label: 'ปิดแล้ว',      color: 'bg-destructive/10 text-destructive',     dot: 'bg-destructive' },
 } as const
-
-type AssignmentDetailTab = 'overview' | 'questions' | 'students'
-
-const TABS: { key: AssignmentDetailTab; label: string; icon: typeof Users }[] = [
-  { key: 'overview',   label: 'ภาพรวม',   icon: Activity },
-  { key: 'questions',  label: 'โจทย์',    icon: FileText },
-  { key: 'students',   label: 'นักเรียน', icon: Users },
-]
-
-function AssignmentContextNavigation({
-  assignment: a,
-  activeTab,
-  studentCount,
-  pendingCount,
-  pendingReviewCapped,
-  gradeHref,
-  availableQuestionCount,
-  missingQuestionCount,
-  duplicateQuestionCount,
-  isPending,
-  onTabChange,
-  onPublish,
-  onCloseExam,
-  onDuplicate,
-  onDelete,
-  onClose,
-}: {
-  assignment: Assignment & { classrooms: { name: string } | null }
-  activeTab: AssignmentDetailTab
-  studentCount: number
-  pendingCount: number
-  pendingReviewCapped: boolean
-  gradeHref: string
-  availableQuestionCount: number
-  missingQuestionCount: number
-  duplicateQuestionCount: number
-  isPending: boolean
-  onTabChange: (tab: AssignmentDetailTab) => void
-  onPublish: () => void
-  onCloseExam: () => void
-  onDuplicate: () => void
-  onDelete: () => void
-  onClose?: () => void
-}) {
-  const statusMeta = STATUS_META[a.status]
-  const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
-  const isOpeningAgain = a.status === 'closed'
-  const canOpenAssignment = a.status === 'draft' || isOpeningAgain
-  const openActionLabel = isOpeningAgain ? 'เปิดให้ทำอีกครั้ง' : 'เผยแพร่'
-
-  function runAction(action: () => void) {
-    action()
-    onClose?.()
-  }
-
-  return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <Button
-        variant="ghost"
-        className="w-full justify-start"
-        render={<Link href={classroomNavigationPath(a.classroom_id, 'assignments')} onClick={onClose} />}
-      >
-        <ChevronLeft data-icon="inline-start" />
-        กลับไปงานที่มอบหมาย
-      </Button>
-
-      <Card radius="md" padding="sm" className="flex flex-col gap-2.5 border-primary/20 bg-primary/5">
-        <div className="flex items-center justify-between gap-2">
-          <Badge variant="secondary" className={statusMeta.color}>
-            <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
-            {statusMeta.label}
-          </Badge>
-          <Badge variant="outline">{assignmentTypeLabel}</Badge>
-        </div>
-        <div className="min-w-0">
-          <p className="line-clamp-2 font-bold leading-snug text-foreground" title={a.title}>{a.title}</p>
-          {a.classrooms?.name && (
-            <p className="mt-1 truncate text-xs text-muted-foreground" title={a.classrooms.name}>
-              ห้องหลัก · {a.classrooms.name}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <FileText aria-hidden="true" className="size-3.5 text-primary" />
-            <strong className="font-medium text-foreground">{assignmentSizeLabel(a)}</strong>
-            {missingQuestionCount > 0 && <span className="text-warning">· หาย {missingQuestionCount}</span>}
-            {duplicateQuestionCount > 0 && <span className="text-warning">· ซ้ำ {duplicateQuestionCount}</span>}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Users aria-hidden="true" className="size-3.5 text-primary" />
-            <strong className="font-medium text-foreground">{studentCount}</strong> คน
-          </span>
-        </div>
-      </Card>
-
-      <Separator />
-
-      <div className="px-2 text-xs font-medium text-muted-foreground">ในหน้านี้</div>
-      <nav aria-label="เมนูในหน้ารายละเอียดงาน" className="flex flex-col gap-1">
-        {TABS.map(tab => {
-          const Icon = tab.icon
-          const selected = tab.key === activeTab
-          return (
-            <Button
-              key={tab.key}
-              type="button"
-              variant={selected ? 'navigation' : 'ghost'}
-              className="w-full justify-start"
-              aria-current={selected ? 'page' : undefined}
-              onClick={() => {
-                onTabChange(tab.key)
-                onClose?.()
-              }}
-            >
-              <Icon data-icon="inline-start" />
-              {tab.label}
-              {tab.key === 'students' && studentCount > 0 && (
-                <Badge variant="secondary" className="ml-auto">{studentCount}</Badge>
-              )}
-              {tab.key === 'questions' && (
-                <Badge variant="secondary" className="ml-auto">{availableQuestionCount}</Badge>
-              )}
-            </Button>
-          )
-        })}
-      </nav>
-
-      <Separator />
-
-      <div className="px-2 text-xs font-medium text-muted-foreground">การทำงาน</div>
-      <div className="flex flex-col gap-1.5">
-        {canOpenAssignment && (
-          <>
-            <Button
-              onClick={() => runAction(onPublish)}
-              disabled={isPending || availableQuestionCount === 0 || missingQuestionCount > 0 || duplicateQuestionCount > 0}
-              size="sm"
-              className="w-full justify-start border-0 bg-success text-success-foreground hover:bg-success/90"
-            >
-              <Play data-icon="inline-start" /> {openActionLabel}
-            </Button>
-            {(availableQuestionCount === 0 || missingQuestionCount > 0 || duplicateQuestionCount > 0) && (
-              <p className="px-2 text-xs leading-5 text-warning">
-                {missingQuestionCount > 0
-                  ? `ตรวจและแก้โจทย์ที่หายก่อน${openActionLabel}`
-                  : duplicateQuestionCount > 0
-                    ? `ลบรายการโจทย์ซ้ำก่อน${openActionLabel}`
-                    : `เพิ่มโจทย์อย่างน้อย 1 ข้อก่อน${openActionLabel}`}
-              </p>
-            )}
-          </>
-        )}
-        {a.status === 'published' && (
-          <Button
-            onClick={() => runAction(onCloseExam)}
-            disabled={isPending}
-            size="sm"
-            variant="destructive"
-            className="w-full justify-start"
-          >
-            <Square data-icon="inline-start" /> ปิด{assignmentTypeLabel}
-          </Button>
-        )}
-        {a.mode === 'online' && availableQuestionCount > 0 && missingQuestionCount === 0 && duplicateQuestionCount === 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            render={<Link href={`/assignments/${a.id}/preview`} target="_blank" rel="noopener noreferrer" onClick={onClose} />}
-            className="w-full justify-start"
-          >
-            <Eye data-icon="inline-start" /> ดูตัวอย่างนักเรียน
-          </Button>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button size="sm" variant="outline" className="w-full justify-start" />}
-          >
-            <Ellipsis data-icon="inline-start" /> เพิ่มเติม
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuGroup>
-              <DropdownMenuItem render={<Link href={gradeHref} onClick={onClose} />}>
-                <ClipboardCheck />
-                {pendingCount > 0
-                  ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
-                  : 'ตรวจให้คะแนน / ดูคำตอบ'}
-              </DropdownMenuItem>
-              <DropdownMenuItem render={<Link href={`/assignments/${a.id}/edit`} onClick={onClose} />}>
-                <Pencil /> แก้ไขรายละเอียด
-              </DropdownMenuItem>
-              {availableQuestionCount > 0 && missingQuestionCount === 0 && duplicateQuestionCount === 0 && (
-                <DropdownMenuItem
-                  render={(
-                    <Link
-                      href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={onClose}
-                    />
-                  )}
-                >
-                  <Presentation /> โหมดสอน
-                </DropdownMenuItem>
-              )}
-              {a.mode === 'online' && a.type === 'exam' && (
-                <DropdownMenuItem render={<Link href={`/assignments/${a.id}/proctor`} onClick={onClose} />}>
-                  <Radio /> ห้องคุมสอบสด
-                </DropdownMenuItem>
-              )}
-              {a.mode === 'online' && a.type === 'exam' && (
-                <DropdownMenuItem render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}>
-                  <FileClock /> รายงานคุมสอบ
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={() => runAction(onDuplicate)} disabled={isPending}>
-                <Copy /> ทำสำเนา
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem variant="destructive" onClick={() => runAction(onDelete)} disabled={isPending}>
-                <Trash2 /> ลบ{assignmentTypeLabel}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <Separator />
-      <Button
-        variant="ghost"
-        className="w-full justify-start"
-        render={<Link href="/dashboard" onClick={onClose} />}
-      >
-        <LayoutDashboard data-icon="inline-start" />
-        เมนูหลัก
-      </Button>
-    </div>
-  )
-}
 
 interface Props {
   assignment: Assignment & { classrooms: { name: string } | null }
@@ -291,13 +39,14 @@ interface Props {
   pendingSubmissionIds: string[]
   /** The lookup stops at a row cap — true means the count is a floor. */
   pendingReviewCapped: boolean
+  initialTab?: AssignmentDetailTab
 }
 
 export function AssignmentDetailClient({
-  assignment: a, questions, submissions, pendingSubmissionIds, pendingReviewCapped,
+  assignment: a, questions, submissions, pendingSubmissionIds, pendingReviewCapped, initialTab = 'overview',
 }: Props) {
   const [isPending, startTransition] = useTransition()
-  const [activeTab, setActiveTab] = useState<AssignmentDetailTab>('overview')
+  const [activeTab, setActiveTab] = useState<AssignmentDetailTab>(initialTab)
   const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
 
@@ -320,6 +69,13 @@ export function AssignmentDetailClient({
   const uniqueQuestionCount = new Set(a.question_ids).size
   const missingQuestionCount = Math.max(0, uniqueQuestionCount - questions.length)
   const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
+
+  const handleTabChange = useCallback((tab: AssignmentDetailTab) => {
+    setActiveTab(tab)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', tab)
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
 
   const publish = useCallback(() => {
     startTransition(async () => {
@@ -353,13 +109,6 @@ export function AssignmentDetailClient({
     startTransition(async () => { await deleteAssignment(a.id) })
   }, [a.id, assignmentTypeLabel, confirm])
 
-  const handleDuplicate = useCallback(() => {
-    startTransition(async () => {
-      const res = await duplicateAssignment(a.id)
-      if (res?.error) toast.error(res.error)
-    })
-  }, [a.id])
-
   const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
     <AssignmentContextNavigation
       assignment={a}
@@ -372,14 +121,13 @@ export function AssignmentDetailClient({
       missingQuestionCount={missingQuestionCount}
       duplicateQuestionCount={duplicateQuestionCount}
       isPending={isPending}
-      onTabChange={setActiveTab}
+      onTabChange={handleTabChange}
       onPublish={publish}
       onCloseExam={close}
-      onDuplicate={handleDuplicate}
       onDelete={handleDelete}
       onClose={onNavigate}
     />
-  ), [a, activeTab, close, duplicateQuestionCount, gradeHref, handleDelete, handleDuplicate, isPending, missingQuestionCount, pendingCount, pendingReviewCapped, publish, questions.length, submissions.length])
+  ), [a, activeTab, close, duplicateQuestionCount, gradeHref, handleDelete, handleTabChange, isPending, missingQuestionCount, pendingCount, pendingReviewCapped, publish, questions.length, submissions.length])
 
   useContextualSidebar(`/assignments/${a.id}`, renderContextualSidebar)
 
