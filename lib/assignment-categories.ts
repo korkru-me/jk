@@ -21,7 +21,7 @@ export interface AssignmentCategory {
 
 export function assignmentCategorySelectItems(categories: AssignmentCategory[]) {
   return [
-    { value: UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, label: 'ยังไม่จัดหมวด' },
+    { value: UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, label: 'ยังไม่จัดกลุ่ม' },
     ...categories.map(category => ({ value: category.id, label: category.name })),
   ]
 }
@@ -55,7 +55,7 @@ export function nextAssignmentCategoryColor(existingColors: string[]): Assignmen
 export function defaultAssignmentCategoryName(existingNames: string[]): string {
   const taken = new Set(existingNames.map(name => name.trim()))
   for (let number = 1; ; number++) {
-    const candidate = `หมวดที่ ${number}`
+    const candidate = `กลุ่มที่ ${number}`
     if (!taken.has(candidate)) return candidate
   }
 }
@@ -67,7 +67,7 @@ export interface AssignmentCategorySection<T> {
 
 /**
  * Categories keep their teacher-defined position. Unknown/stale category ids
- * fail open into "ยังไม่จัดหมวด" so an assignment never disappears merely
+ * fail open into "ยังไม่จัดกลุ่ม" so an assignment never disappears merely
  * because category data was deleted between the page queries.
  */
 export function groupAssignmentsByCategory<T extends { category_id?: string | null }>(

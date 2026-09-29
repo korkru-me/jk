@@ -22,12 +22,12 @@ describe('assignment categories', () => {
   })
 
   it('suggests the first unused numbered name', () => {
-    expect(defaultAssignmentCategoryName(['หมวดที่ 1', 'หมวดที่ 3'])).toBe('หมวดที่ 2')
+    expect(defaultAssignmentCategoryName(['กลุ่มที่ 1', 'กลุ่มที่ 3'])).toBe('กลุ่มที่ 2')
   })
 
   it('provides human-readable labels for category select values', () => {
     expect(assignmentCategorySelectItems(categories)).toEqual([
-      { value: UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, label: 'ยังไม่จัดหมวด' },
+      { value: UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, label: 'ยังไม่จัดกลุ่ม' },
       { value: 'later', label: 'บทที่ 2' },
       { value: 'first', label: 'บทที่ 1' },
     ])

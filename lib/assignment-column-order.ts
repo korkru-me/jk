@@ -2,7 +2,7 @@
  * Keep the order a teacher has arranged, discard assignments that no longer
  * exist, and append newly assigned work in the server-provided default order.
  */
-export function reconcileAssignmentOrder(currentIds: string[], defaultIds: string[]): string[] {
+export function reconcileOrderedIds(currentIds: string[], defaultIds: string[]): string[] {
   const available = new Set(defaultIds)
   const seen = new Set<string>()
   const next: string[] = []
@@ -18,6 +18,24 @@ export function reconcileAssignmentOrder(currentIds: string[], defaultIds: strin
     next.push(id)
   }
 
+  return next
+}
+
+export const reconcileAssignmentOrder = reconcileOrderedIds
+
+/** Move one item in an ordered list. Invalid drops preserve the same array. */
+export function moveOrderedItem(
+  orderedIds: string[],
+  activeId: string,
+  overId: string,
+): string[] {
+  const from = orderedIds.indexOf(activeId)
+  const to = orderedIds.indexOf(overId)
+  if (from < 0 || to < 0 || from === to) return orderedIds
+
+  const next = [...orderedIds]
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, moved)
   return next
 }
 
@@ -44,4 +62,3 @@ export function moveVisibleAssignmentColumn(
   let visibleIndex = 0
   return allIds.map(id => visible.has(id) ? movedVisible[visibleIndex++] : id)
 }
-

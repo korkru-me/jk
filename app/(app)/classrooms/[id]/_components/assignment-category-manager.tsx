@@ -114,7 +114,7 @@ export function AssignmentCategoryManager({
       }
       onChange(categories.map(category => category.id === result.category.id ? result.category : category))
       if (activeEditorRef.current === categoryId) resetEditor()
-      toast.success('แก้ไขหมวดงานแล้ว')
+      toast.success('แก้ไขกลุ่มงานแล้ว')
     })
   }
 
@@ -129,18 +129,18 @@ export function AssignmentCategoryManager({
       }
       onChange([...categories, result.category])
       resetEditor()
-      toast.success('เพิ่มหมวดงานแล้ว')
+      toast.success('เพิ่มกลุ่มงานแล้ว')
     })
   }
 
   async function remove(category: AssignmentCategory) {
     const count = assignmentCounts.get(category.id) ?? 0
     const accepted = await confirm({
-      title: `ลบหมวด “${category.name}”?`,
+      title: `ลบกลุ่ม “${category.name}”?`,
       description: count > 0
-        ? `หมวดนี้มี ${count} งาน งานทั้งหมดจะยังอยู่และย้ายไป “ยังไม่จัดหมวด”`
-        : 'หมวดนี้จะถูกลบถาวร โดยไม่มีงานใดถูกลบ',
-      confirmLabel: 'ลบหมวด',
+        ? `กลุ่มนี้มี ${count} งาน งานทั้งหมดจะยังอยู่และย้ายไป “ยังไม่จัดกลุ่ม”`
+        : 'กลุ่มนี้จะถูกลบถาวร โดยไม่มีงานใดถูกลบ',
+      confirmLabel: 'ลบกลุ่ม',
       variant: 'destructive',
     })
     if (!accepted) return
@@ -152,7 +152,7 @@ export function AssignmentCategoryManager({
       }
       onChange(categories.filter(item => item.id !== category.id))
       if (editingId === category.id) resetEditor()
-      toast.success('ลบหมวดแล้ว งานยังอยู่ครบ')
+      toast.success('ลบกลุ่มแล้ว งานยังอยู่ครบ')
     })
   }
 
@@ -167,21 +167,21 @@ export function AssignmentCategoryManager({
       >
         <DialogTrigger render={<Button variant="outline" size="sm" />}>
           <FolderPlus data-icon="inline-start" />
-          จัดการหมวดงาน
+          จัดการกลุ่มงาน
         </DialogTrigger>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>จัดการหมวดงาน</DialogTitle>
+            <DialogTitle>จัดการกลุ่มงาน</DialogTitle>
             <DialogDescription>
-              แก้ชื่อหรือเลือกสีแล้วคลิกออกเพื่อบันทึก งานที่ไม่เลือกหมวดจะอยู่ท้ายรายการ
+              แก้ชื่อหรือเลือกสีแล้วคลิกออกเพื่อบันทึก งานที่ไม่เลือกกลุ่มจะอยู่ท้ายรายการ
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{sorted.length} หมวด</p>
+            <p className="text-sm text-muted-foreground">{sorted.length} กลุ่ม</p>
             <Button type="button" size="sm" onClick={beginCreate} disabled={creating || isPending}>
               <Plus data-icon="inline-start" />
-              เพิ่มหมวด
+              เพิ่มกลุ่ม
             </Button>
           </div>
 
@@ -194,7 +194,7 @@ export function AssignmentCategoryManager({
                 assignmentCount={0}
                 colorsOpen={colorPickerTarget === NEW_CATEGORY}
                 pending={isPending}
-                submitLabel="เพิ่มหมวด"
+                submitLabel="เพิ่มกลุ่ม"
                 onNameChange={setName}
                 onToggleColors={() => setColorPickerTarget(current => current === NEW_CATEGORY ? null : NEW_CATEGORY)}
                 onColorChange={next => {
@@ -208,7 +208,7 @@ export function AssignmentCategoryManager({
 
             {sorted.length === 0 && !creating ? (
               <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                ยังไม่มีหมวด กด “เพิ่มหมวด” เพื่อเริ่มจัดงาน
+                ยังไม่มีกลุ่ม กด “เพิ่มกลุ่ม” เพื่อเริ่มจัดงาน
               </p>
             ) : sorted.map(category => {
               const isEditing = editingId === category.id
@@ -236,7 +236,7 @@ export function AssignmentCategoryManager({
               return (
                 <div key={category.id} className="flex items-center gap-2 rounded-lg border p-2">
                   <IconButton
-                    label={`เปลี่ยนสีหมวด ${category.name}`}
+                    label={`เปลี่ยนสีกลุ่ม ${category.name}`}
                     size="sm"
                     type="button"
                     onClick={() => toggleEditColors(category)}
@@ -249,7 +249,7 @@ export function AssignmentCategoryManager({
                     {assignmentCounts.get(category.id) ?? 0} งาน
                   </span>
                   <IconButton
-                    label={`แก้ไขหมวด ${category.name}`}
+                    label={`แก้ไขกลุ่ม ${category.name}`}
                     size="sm"
                     type="button"
                     onClick={() => beginEdit(category)}
@@ -258,7 +258,7 @@ export function AssignmentCategoryManager({
                     <Pencil />
                   </IconButton>
                   <IconButton
-                    label={`ลบหมวด ${category.name}`}
+                    label={`ลบกลุ่ม ${category.name}`}
                     size="sm"
                     type="button"
                     variant="destructive"
@@ -337,7 +337,7 @@ function CategoryEditorRow({
           variant="outline"
           size="sm"
           type="button"
-          aria-label="เปลี่ยนสีหมวด"
+          aria-label="เปลี่ยนสีกลุ่ม"
           aria-expanded={colorsOpen}
           aria-controls={colorPanelId}
           onClick={onToggleColors}
@@ -352,8 +352,8 @@ function CategoryEditorRow({
           value={name}
           onChange={event => onNameChange(event.target.value)}
           maxLength={ASSIGNMENT_CATEGORY_NAME_MAX}
-          placeholder="ชื่อหมวด เช่น บทที่ 1"
-          aria-label="ชื่อหมวด"
+          placeholder="ชื่อกลุ่ม เช่น บทที่ 1"
+          aria-label="ชื่อกลุ่ม"
           autoFocus
           onFocus={event => event.currentTarget.select()}
           disabled={pending}
@@ -386,7 +386,7 @@ function CategoryEditorRow({
             value={color}
             onChange={onColorChange}
             idPrefix={`assignment-category-color-${target}`}
-            ariaLabel="เลือกสีของหมวดงาน"
+            ariaLabel="เลือกสีของกลุ่มงาน"
           />
         </div>
       )}

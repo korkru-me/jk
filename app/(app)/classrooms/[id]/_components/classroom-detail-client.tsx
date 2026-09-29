@@ -57,7 +57,7 @@ const StudentAbilityTab = dynamic(
 const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
-interface RealStudent { id: string; full_name: string; email: string }
+interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
 
 interface Props {
   classroom: Classroom
@@ -122,9 +122,7 @@ export function ClassroomDetailClient({
   const coverMuted = savedCover ? savedCover.textMuted : 'text-muted-foreground'
   const shownDescription = displayDescription(classroom.description)
 
-  // Shared with the "คะแนนและการส่งงาน" tab so both show students in the
-  // same order — set here (not inside StudentTable) so it survives
-  // switching tabs and both consumers stay in sync.
+  // Owned here so the student-table sort survives switching tabs.
   const [studentSortKey, setStudentSortKey] = useState<StudentSortKey>('name')
   const [studentSortDir, setStudentSortDir] = useState<StudentSortDir>('asc')
 
@@ -335,12 +333,8 @@ export function ClassroomDetailClient({
             categories={assignmentCategories}
             submissions={classroomSubmissions}
             extensions={classroomExtensions}
-            profiles={studentProfiles}
             audienceByAssignment={audienceByAssignment}
             groupNameById={groupNameById}
-            sortKey={studentSortKey}
-            sortDir={studentSortDir}
-            onViewStudents={() => navigateTo('students')}
           />
         )}
         {activeTab === 'ability' && canManage && (

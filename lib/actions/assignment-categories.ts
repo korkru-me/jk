@@ -12,7 +12,7 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CATEGORY_COLUMNS = 'id, classroom_id, name, color, position'
-const NO_PERMISSION = 'ไม่มีสิทธิ์จัดหมวดงานในห้องเรียนนี้'
+const NO_PERMISSION = 'ไม่มีสิทธิ์จัดกลุ่มงานในห้องเรียนนี้'
 const STALE = 'ข้อมูลบนหน้าไม่ตรงกับล่าสุด กรุณารีเฟรชหน้าแล้วลองอีกครั้ง'
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string }
@@ -46,9 +46,9 @@ async function authorize(classroomId: string): Promise<{ userId: string } | { er
 
 function writeError(error: { code?: string } | null): string {
   if (error?.code === '42501') return NO_PERMISSION
-  if (error?.code === '23505') return 'มีหมวดชื่อนี้ในห้องแล้ว'
+  if (error?.code === '23505') return 'มีกลุ่มชื่อนี้ในห้องแล้ว'
   if (error?.code === '23503' || error?.code === '23514') return STALE
-  return 'บันทึกหมวดงานไม่สำเร็จ กรุณาลองใหม่'
+  return 'บันทึกกลุ่มงานไม่สำเร็จ กรุณาลองใหม่'
 }
 
 async function categoriesOf(classroomId: string): Promise<AssignmentCategory[]> {
@@ -70,12 +70,12 @@ export async function createAssignmentCategory(
   if ('error' in auth) return { ok: false, error: auth.error }
 
   const name = normalizeAssignmentCategoryName(input.name)
-  if (!name) return { ok: false, error: 'กรุณาตั้งชื่อหมวด (ไม่เกิน 60 ตัวอักษร)' }
-  if (!isAssignmentCategoryColor(input.color)) return { ok: false, error: 'สีหมวดไม่ถูกต้อง' }
+  if (!name) return { ok: false, error: 'กรุณาตั้งชื่อกลุ่ม (ไม่เกิน 60 ตัวอักษร)' }
+  if (!isAssignmentCategoryColor(input.color)) return { ok: false, error: 'สีกลุ่มไม่ถูกต้อง' }
 
   const existing = await categoriesOf(classroomId)
   if (existing.length >= MAX_ASSIGNMENT_CATEGORIES_PER_CLASSROOM) {
-    return { ok: false, error: `ห้องหนึ่งมีได้ไม่เกิน ${MAX_ASSIGNMENT_CATEGORIES_PER_CLASSROOM} หมวด` }
+    return { ok: false, error: `ห้องหนึ่งมีได้ไม่เกิน ${MAX_ASSIGNMENT_CATEGORIES_PER_CLASSROOM} กลุ่มงาน` }
   }
 
   const supabase = await createClient()
@@ -105,8 +105,8 @@ export async function updateAssignmentCategory(
   if (!UUID.test(categoryId)) return { ok: false, error: STALE }
 
   const name = normalizeAssignmentCategoryName(patch.name)
-  if (!name) return { ok: false, error: 'กรุณาตั้งชื่อหมวด (ไม่เกิน 60 ตัวอักษร)' }
-  if (!isAssignmentCategoryColor(patch.color)) return { ok: false, error: 'สีหมวดไม่ถูกต้อง' }
+  if (!name) return { ok: false, error: 'กรุณาตั้งชื่อกลุ่ม (ไม่เกิน 60 ตัวอักษร)' }
+  if (!isAssignmentCategoryColor(patch.color)) return { ok: false, error: 'สีกลุ่มไม่ถูกต้อง' }
 
   const supabase = await createClient()
   const { data, error } = await supabase

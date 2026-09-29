@@ -75,7 +75,7 @@ export interface ClassroomAssignmentRow {
   display_order?: number | null
   /** กลุ่มย่อย this room's link hands the งาน to; null = ทั้งห้อง. */
   group_ids?: string[] | null
-  /** หมวดของงานในห้องนี้; null = ยังไม่จัดหมวด. */
+  /** กลุ่มของงานในห้องนี้; null = ยังไม่จัดกลุ่ม. */
   category_id?: string | null
 }
 
@@ -164,7 +164,7 @@ export function ClassroomAssignmentsTab({
         return
       }
       setCategoryByAssignment(current => ({ ...current, [assignmentId]: categoryId }))
-      toast.success(categoryId ? 'ย้ายงานเข้าหมวดแล้ว' : 'ย้ายงานไปยังไม่จัดหมวดแล้ว')
+      toast.success(categoryId ? 'ย้ายงานเข้ากลุ่มแล้ว' : 'ย้ายงานไปยังไม่จัดกลุ่มแล้ว')
     })
   }
 
@@ -230,7 +230,7 @@ export function ClassroomAssignmentsTab({
                   )}>
                     <Folder className={cn('size-4', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
                     <h3 className={cn('text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
-                      {section.category?.name ?? 'ยังไม่จัดหมวด'}
+                      {section.category?.name ?? 'ยังไม่จัดกลุ่ม'}
                     </h3>
                     <span className={cn('text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
                       {section.assignments.length} งาน
@@ -314,14 +314,14 @@ export function ClassroomAssignmentsTab({
                           </div>
                         </Link>
 
-                        <div className="flex items-center gap-2 overflow-x-auto md:overflow-visible">
+                        <div className="grid min-w-[47rem] shrink-0 grid-cols-[10rem_11rem_6.5rem_7.5rem_2rem] items-center gap-2 overflow-x-auto md:overflow-visible">
                           <Select
                             items={categoryItems}
                             value={assignment.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
                             onValueChange={value => moveToCategory(assignment.id, value)}
                             disabled={isPending}
                           >
-                            <SelectTrigger size="sm" className="max-w-40" aria-label={`หมวดของ ${assignment.title}`}>
+                            <SelectTrigger size="sm" className="w-full" aria-label={`กลุ่มของ ${assignment.title}`}>
                               <Folder />
                               <SelectValue />
                             </SelectTrigger>
@@ -333,15 +333,10 @@ export function ClassroomAssignmentsTab({
                               </SelectGroup>
                             </SelectContent>
                           </Select>
-                          {pendingReview > 0 && (
-                            <Button variant="outline" size="sm" render={<Link href={gradeHref} />}>
-                              <ClipboardCheck data-icon="inline-start" />
-                              <span className="hidden lg:inline">ตรวจให้คะแนน</span>
-                            </Button>
-                          )}
                           <Button
                             variant="outline"
                             size="sm"
+                            className="w-full"
                             render={(
                               <Link
                                 href={`/assignments/${assignment.id}/preview`}
@@ -355,15 +350,15 @@ export function ClassroomAssignmentsTab({
                             <Eye data-icon="inline-start" />
                             <span className="hidden xl:inline">ดูในมุมนักเรียน</span>
                           </Button>
-                          <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
+                          <span className={cn('justify-self-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
                             {typeCfg.label}
                           </span>
-                          <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', statusCfg.bg, statusCfg.text)}>
+                          <span className={cn('justify-self-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', statusCfg.bg, statusCfg.text)}>
                             {statusCfg.label}
                           </span>
                           <DropdownMenu>
                             <DropdownMenuTrigger
-                              className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground"
+                              className="flex size-7 items-center justify-center justify-self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground"
                               aria-label={`เมนูของ ${assignment.title}`}
                             >
                               <MoreVertical className="size-3.5" />

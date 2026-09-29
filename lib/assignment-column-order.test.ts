@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moveVisibleAssignmentColumn, reconcileAssignmentOrder } from './assignment-column-order'
+import { moveOrderedItem, moveVisibleAssignmentColumn, reconcileAssignmentOrder } from './assignment-column-order'
 
 describe('reconcileAssignmentOrder', () => {
   it('keeps the arranged order, removes stale ids, and appends new work', () => {
@@ -27,3 +27,13 @@ describe('moveVisibleAssignmentColumn', () => {
   })
 })
 
+describe('moveOrderedItem', () => {
+  it('moves a row to the drop position', () => {
+    expect(moveOrderedItem(['a', 'b', 'c'], 'c', 'a')).toEqual(['c', 'a', 'b'])
+  })
+
+  it('preserves the same array for invalid drops', () => {
+    const current = ['a', 'b']
+    expect(moveOrderedItem(current, 'a', 'missing')).toBe(current)
+  })
+})

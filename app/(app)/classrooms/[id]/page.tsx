@@ -301,7 +301,7 @@ export default async function ClassroomDetailPage({
       : Promise.resolve({ data: [] as { id: string; token: string; permission: string; email: string | null; expires_at: string; created_at: string }[] }),
     admin
       .from('classroom_students')
-      .select('student_id, users!inner(id, full_name, email)')
+      .select('student_id, roster_order, users!inner(id, full_name, email)')
       .eq('classroom_id', id),
     c.classroom_type === 'subject'
       ? getAssignmentClassroomLinks(admin, id)
@@ -357,12 +357,14 @@ export default async function ClassroomDetailPage({
     createdAt: i.created_at as string,
   }))
 
-  // Students in this classroom, always alphabetical by name — the roster
-  // display order is a fixed 1,2,3,... row position, not a stored/editable
-  // field, so there's nothing else to sort by here.
+  // A teacher-defined roster order is shared by the score matrix. Students
+  // that have not been arranged yet follow alphabetically after saved rows.
   const students = (memberships ?? [])
-    .map((m: any) => m.users)
-    .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name, 'th')) as Pick<User, 'id' | 'full_name' | 'email'>[]
+    .map((m: any) => ({ ...m.users, roster_order: m.roster_order as number | null }))
+    .sort((a: any, b: any) => (
+      (a.roster_order ?? Number.MAX_SAFE_INTEGER) - (b.roster_order ?? Number.MAX_SAFE_INTEGER)
+      || a.full_name.localeCompare(b.full_name, 'th')
+    )) as (Pick<User, 'id' | 'full_name' | 'email'> & { roster_order: number | null })[]
 
   // Assignments linked to this classroom (via assignment_classrooms, not the
   // legacy single classroom_id column, so multi-classroom assignments count too)

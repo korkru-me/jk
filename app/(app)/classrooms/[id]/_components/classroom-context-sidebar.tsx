@@ -173,8 +173,8 @@ export function ClassroomContextNavigation({
             <Fragment key={item.key}>
               <Button
                 type="button"
-                variant={selected ? 'navigation' : item.key === 'invite' ? 'outline' : 'ghost'}
-                className={item.key === 'invite' ? 'mt-2 w-full justify-start' : 'w-full justify-start'}
+                variant={selected ? 'navigation' : 'ghost'}
+                className="w-full justify-start"
                 aria-current={selected ? 'page' : undefined}
                 onClick={() => {
                   onNavigate(item.key)

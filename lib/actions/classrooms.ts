@@ -297,3 +297,41 @@ export async function reorderAssignmentDisplayOrder(classroomId: string, ordered
   revalidatePath(`/classrooms/${classroomId}`)
   return { success: true }
 }
+
+export async function reorderClassroomStudentRoster(classroomId: string, orderedStudentIds: string[]) {
+  const user = await getAuthUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (orderedStudentIds.length === 0 || orderedStudentIds.length > 500) {
+    return { error: 'รายชื่อนักเรียนไม่ถูกต้อง กรุณาลองใหม่' }
+  }
+  const uniqueIds = [...new Set(orderedStudentIds)]
+  if (uniqueIds.length !== orderedStudentIds.length || uniqueIds.some(id => typeof id !== 'string' || !id)) {
+    return { error: 'รายชื่อนักเรียนไม่ถูกต้อง กรุณาลองใหม่' }
+  }
+
+  const admin = createAdminClient()
+  if (!(await canManageClassroom(admin, classroomId, user.id))) return { error: 'ไม่มีสิทธิ์' }
+
+  const { data: memberships, error: membershipError } = await admin
+    .from('classroom_students')
+    .select('id, student_id')
+    .eq('classroom_id', classroomId)
+  if (membershipError) return { error: membershipError.message }
+  const requested = new Set(uniqueIds)
+  if (!memberships || memberships.length !== uniqueIds.length || memberships.some(row => !requested.has(row.student_id))) {
+    return { error: 'รายชื่อนักเรียนมีการเปลี่ยนแปลง กรุณารีเฟรชแล้วลองจัดลำดับอีกครั้ง' }
+  }
+
+  const membershipByStudent = new Map(memberships.map(row => [row.student_id, row.id]))
+  const { error } = await admin
+    .from('classroom_students')
+    .upsert(orderedStudentIds.map((studentId, index) => ({
+      id: membershipByStudent.get(studentId)!,
+      classroom_id: classroomId,
+      student_id: studentId,
+      roster_order: index + 1,
+    })), { onConflict: 'id' })
+  if (error) return { error: error.message }
+  revalidatePath(`/classrooms/${classroomId}`)
+  return { success: true }
+}
