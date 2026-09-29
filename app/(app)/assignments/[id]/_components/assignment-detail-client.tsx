@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -8,10 +8,9 @@ import {
   ChevronLeft, Users, FileText, Timer, Clock, CheckCircle2, BookOpen,
   Play, Square, BarChart2, Trash2, TrendingUp,
   AlertCircle, Activity, Copy, Pencil, Eye, Radio, LockKeyhole, Smartphone,
-  FileClock, Presentation, ClipboardCheck, ChevronRight,
+  FileClock, Presentation, ClipboardCheck, ChevronRight, LayoutDashboard,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { updateAssignmentStatus, deleteAssignment, duplicateAssignment } from '@/lib/actions/assignments'
 import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { Assignment, Question } from '@/lib/types'
@@ -21,6 +20,9 @@ import { questionExcerpt } from '@/lib/question-display'
 import { sectionByQuestionId, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { withBackHref } from '@/lib/back-link'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { useContextualSidebar } from '@/components/layout/sidebar-context'
 
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
@@ -28,12 +30,235 @@ const STATUS_META = {
   closed:    { label: 'ปิดแล้ว',      color: 'bg-destructive/10 text-destructive',     dot: 'bg-destructive' },
 } as const
 
-const TABS: { key: string; label: string; icon: typeof Users }[] = [
+type AssignmentDetailTab = 'overview' | 'questions' | 'students' | 'analytics'
+
+const TABS: { key: AssignmentDetailTab; label: string; icon: typeof Users }[] = [
   { key: 'overview',   label: 'ภาพรวม',   icon: Activity },
   { key: 'questions',  label: 'โจทย์',    icon: FileText },
   { key: 'students',   label: 'นักเรียน', icon: Users },
   { key: 'analytics',  label: 'วิเคราะห์', icon: BarChart2 },
 ]
+
+function AssignmentContextNavigation({
+  assignment: a,
+  activeTab,
+  studentCount,
+  submittedCount,
+  pendingCount,
+  pendingReviewCapped,
+  gradeHref,
+  isPending,
+  onTabChange,
+  onPublish,
+  onCloseExam,
+  onDuplicate,
+  onDelete,
+  onClose,
+}: {
+  assignment: Assignment & { classrooms: { name: string } | null }
+  activeTab: AssignmentDetailTab
+  studentCount: number
+  submittedCount: number
+  pendingCount: number
+  pendingReviewCapped: boolean
+  gradeHref: string
+  isPending: boolean
+  onTabChange: (tab: AssignmentDetailTab) => void
+  onPublish: () => void
+  onCloseExam: () => void
+  onDuplicate: () => void
+  onDelete: () => void
+  onClose?: () => void
+}) {
+  const statusMeta = STATUS_META[a.status]
+
+  function runAction(action: () => void) {
+    action()
+    onClose?.()
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <Button
+        variant="ghost"
+        className="w-full justify-start"
+        render={<Link href={`/classrooms/${a.classroom_id}`} onClick={onClose} />}
+      >
+        <ChevronLeft data-icon="inline-start" />
+        กลับไปห้องเรียน
+      </Button>
+
+      <Card radius="md" padding="sm" className="flex flex-col gap-3 border-primary/20 bg-primary/5">
+        <div className="flex items-start gap-3">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <FileText aria-hidden="true" className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <Badge variant="secondary" className={statusMeta.color}>
+              <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
+              {statusMeta.label}
+            </Badge>
+            <p className="mt-1 truncate font-bold text-foreground" title={a.title}>{a.title}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {a.classrooms?.name ?? 'ชุดข้อสอบ'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <FileText aria-hidden="true" className="size-3.5 text-primary" />
+            <strong className="text-foreground">{a.question_ids.length}</strong> ข้อ
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Users aria-hidden="true" className="size-3.5 text-primary" />
+            <strong className="text-foreground">{submittedCount}</strong> ส่งแล้ว
+          </span>
+        </div>
+      </Card>
+
+      <Separator />
+
+      <div className="px-2 text-xs font-medium text-muted-foreground">ในหน้านี้</div>
+      <nav aria-label="เมนูในหน้ารายละเอียดงาน" className="flex flex-col gap-1">
+        {TABS.map(tab => {
+          const Icon = tab.icon
+          const selected = tab.key === activeTab
+          return (
+            <Button
+              key={tab.key}
+              type="button"
+              variant={selected ? 'navigation' : 'ghost'}
+              className="w-full justify-start"
+              aria-current={selected ? 'page' : undefined}
+              onClick={() => {
+                onTabChange(tab.key)
+                onClose?.()
+              }}
+            >
+              <Icon data-icon="inline-start" />
+              {tab.label}
+              {tab.key === 'students' && studentCount > 0 && (
+                <Badge variant="secondary" className="ml-auto">{studentCount}</Badge>
+              )}
+            </Button>
+          )
+        })}
+      </nav>
+
+      <Separator />
+
+      <div className="px-2 text-xs font-medium text-muted-foreground">การทำงาน</div>
+      <div className="flex flex-col gap-1.5">
+        {a.status === 'draft' && (
+          <Button
+            onClick={() => runAction(onPublish)}
+            disabled={isPending}
+            size="sm"
+            className="w-full justify-start border-0 bg-success text-success-foreground hover:bg-success/90"
+          >
+            <Play data-icon="inline-start" /> เผยแพร่
+          </Button>
+        )}
+        {a.status === 'published' && (
+          <Button
+            onClick={() => runAction(onCloseExam)}
+            disabled={isPending}
+            size="sm"
+            variant="destructive"
+            className="w-full justify-start"
+          >
+            <Square data-icon="inline-start" /> ปิดการสอบ
+          </Button>
+        )}
+        {a.mode === 'online' && a.question_ids.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href={`/assignments/${a.id}/preview`} target="_blank" onClick={onClose} />}
+            className="w-full justify-start"
+          >
+            <Eye data-icon="inline-start" /> ดูตัวอย่างมุมมองนักเรียน
+          </Button>
+        )}
+        {a.question_ids.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)} target="_blank" onClick={onClose} />}
+            className="w-full justify-start"
+          >
+            <Presentation data-icon="inline-start" /> โหมดสอน
+          </Button>
+        )}
+        {a.mode === 'online' && a.type === 'exam' && (
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href={`/assignments/${a.id}/proctor`} onClick={onClose} />}
+            className="w-full justify-start"
+          >
+            <Radio data-icon="inline-start" /> ห้องคุมสอบสด
+          </Button>
+        )}
+        {a.mode === 'online' && a.type === 'exam' && (
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}
+            className="w-full justify-start"
+          >
+            <FileClock data-icon="inline-start" /> รายงานคุมสอบ
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          render={<Link href={`/assignments/${a.id}/edit`} onClick={onClose} />}
+          className="w-full justify-start"
+        >
+          <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
+        </Button>
+        <Button
+          size="sm"
+          className={pendingCount > 0
+            ? 'w-full justify-start border-0 bg-warning text-warning-foreground hover:bg-warning/90'
+            : 'w-full justify-start'}
+          variant={pendingCount > 0 ? 'default' : 'outline'}
+          render={<Link href={gradeHref} onClick={onClose} />}
+        >
+          <ClipboardCheck data-icon="inline-start" />
+          {pendingCount > 0
+            ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
+            : 'ตรวจให้คะแนน / ดูคำตอบ'}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          render={<Link href={`/assignments/${a.id}/analytics`} onClick={onClose} />}
+          className="w-full justify-start"
+        >
+          <TrendingUp data-icon="inline-start" /> วิเคราะห์เชิงลึก
+        </Button>
+        <Button onClick={() => runAction(onDuplicate)} disabled={isPending} size="sm" variant="ghost" className="w-full justify-start">
+          <Copy data-icon="inline-start" /> ทำสำเนา
+        </Button>
+        <Button onClick={() => runAction(onDelete)} disabled={isPending} size="sm" variant="destructive" className="w-full justify-start">
+          <Trash2 data-icon="inline-start" /> ลบ
+        </Button>
+      </div>
+
+      <Separator />
+      <Button
+        variant="ghost"
+        className="w-full justify-start"
+        render={<Link href="/dashboard" onClick={onClose} />}
+      >
+        <LayoutDashboard data-icon="inline-start" />
+        เมนูหลัก
+      </Button>
+    </div>
+  )
+}
 
 interface Props {
   assignment: Assignment & { classrooms: { name: string } | null }
@@ -55,6 +280,7 @@ export function AssignmentDetailClient({
   assignment: a, questions, submissions, pendingSubmissionIds, pendingReviewCapped,
 }: Props) {
   const [isPending, startTransition] = useTransition()
+  const [activeTab, setActiveTab] = useState<AssignmentDetailTab>('overview')
   const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
 
@@ -74,23 +300,23 @@ export function AssignmentDetailClient({
     ? Math.round(submittedSubs.reduce((sum, s) => sum + (s.total_score ?? 0) / (s.max_score || 1) * 100, 0) / submittedSubs.length)
     : null
 
-  function publish() {
+  const publish = useCallback(() => {
     startTransition(async () => {
       const res = await updateAssignmentStatus(a.id, 'published')
       if (res?.error) toast.error(res.error)
       else { toast.success('เผยแพร่ชุดข้อสอบแล้ว'); router.refresh() }
     })
-  }
+  }, [a.id, router])
 
-  function close() {
+  const close = useCallback(() => {
     startTransition(async () => {
       const res = await updateAssignmentStatus(a.id, 'closed')
       if (res?.error) toast.error(res.error)
       else { toast.success('ปิดชุดข้อสอบแล้ว'); router.refresh() }
     })
-  }
+  }, [a.id, router])
 
-  async function handleDelete() {
+  const handleDelete = useCallback(async () => {
     const ok = await confirm({
       title: 'ลบชุดข้อสอบนี้?',
       description: 'ข้อมูลการสอบและการส่งทั้งหมดของชุดนี้จะถูกลบถาวร กู้คืนไม่ได้',
@@ -99,25 +325,38 @@ export function AssignmentDetailClient({
     })
     if (!ok) return
     startTransition(async () => { await deleteAssignment(a.id) })
-  }
+  }, [a.id, confirm])
 
-  function handleDuplicate() {
+  const handleDuplicate = useCallback(() => {
     startTransition(async () => {
       const res = await duplicateAssignment(a.id)
       if (res?.error) toast.error(res.error)
     })
-  }
+  }, [a.id])
+
+  const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
+    <AssignmentContextNavigation
+      assignment={a}
+      activeTab={activeTab}
+      studentCount={submissions.length}
+      submittedCount={submittedSubs.length}
+      pendingCount={pendingCount}
+      pendingReviewCapped={pendingReviewCapped}
+      gradeHref={gradeHref}
+      isPending={isPending}
+      onTabChange={setActiveTab}
+      onPublish={publish}
+      onCloseExam={close}
+      onDuplicate={handleDuplicate}
+      onDelete={handleDelete}
+      onClose={onNavigate}
+    />
+  ), [a, activeTab, close, gradeHref, handleDelete, handleDuplicate, isPending, pendingCount, pendingReviewCapped, publish, submissions.length, submittedSubs.length])
+
+  useContextualSidebar(`/assignments/${a.id}`, renderContextualSidebar)
 
   return (
     <div className="flex max-w-[1200px] flex-col gap-6">
-      {/* Back — returns to the classroom this was assigned from */}
-      <Link
-        href={`/classrooms/${a.classroom_id}`}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors"
-      >
-        <ChevronLeft className="w-4 h-4" /> {a.classrooms?.name ?? 'กลับไปห้องเรียน'}
-      </Link>
-
       {/* Header card */}
       <Card edge="border" padding="xl" className="border-primary/20 bg-primary/10 text-foreground">
         <div className="flex items-start justify-between gap-4">
@@ -211,160 +450,33 @@ export function AssignmentDetailClient({
         </div>
       )}
 
-      <Tabs
-        defaultValue="overview"
-        orientation="vertical"
-        className="flex flex-col gap-4 md:grid md:grid-cols-[15rem_minmax(0,1fr)] md:items-start md:gap-6"
-      >
-        <aside className="flex min-w-0 flex-col gap-4 md:sticky md:top-4">
-          <div>
-            <p className="mb-2 hidden px-2 text-xs font-semibold text-muted-foreground md:block">
-              ในหน้านี้
-            </p>
-            <TabsList className="flex h-auto w-full max-w-full !flex-row justify-start overflow-x-auto rounded-xl border border-primary/15 bg-primary/5 p-1.5 md:!flex-col md:items-stretch md:overflow-visible">
-              {TABS.map(tab => {
-                const Icon = tab.icon
-                return (
-                  <TabsTrigger
-                    key={tab.key}
-                    value={tab.key}
-                    className="group/tab h-auto !w-auto shrink-0 justify-start rounded-lg px-3 py-2.5 data-active:bg-primary data-active:text-primary-foreground md:!w-full"
-                  >
-                    <Icon data-icon="inline-start" />
-                    {tab.label}
-                    {tab.key === 'students' && submissions.length > 0 && (
-                      <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground group-data-active/tab:bg-primary-foreground/15 group-data-active/tab:text-primary-foreground">
-                        {submissions.length}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                )
-              })}
-            </TabsList>
-          </div>
-
-          <section aria-label="การทำงาน">
-            <p className="mb-2 hidden px-2 text-xs font-semibold text-muted-foreground md:block">
-              การทำงาน
-            </p>
-            <Card radius="md" padding="sm" className="flex gap-1.5 overflow-x-auto md:flex-col md:overflow-visible">
-              {a.status === 'draft' && (
-                <Button onClick={publish} disabled={isPending} size="xs" className="shrink-0 justify-start border-0 bg-success text-success-foreground hover:bg-success/90 md:w-full">
-                  <Play data-icon="inline-start" /> เผยแพร่
-                </Button>
-              )}
-              {a.status === 'published' && (
-                <Button onClick={close} disabled={isPending} size="xs" variant="destructive" className="shrink-0 justify-start md:w-full">
-                  <Square data-icon="inline-start" /> ปิดการสอบ
-                </Button>
-              )}
-              {a.mode === 'online' && a.question_ids.length > 0 && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  render={<Link href={`/assignments/${a.id}/preview`} target="_blank" />}
-                  className="shrink-0 justify-start md:w-full"
-                >
-                  <Eye data-icon="inline-start" /> ดูตัวอย่างมุมมองนักเรียน
-                </Button>
-              )}
-              {a.question_ids.length > 0 && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  render={<Link href={withBackHref(`/assignments/${a.id}/teach`, `/assignments/${a.id}`)} target="_blank" />}
-                  className="shrink-0 justify-start md:w-full"
-                >
-                  <Presentation data-icon="inline-start" /> โหมดสอน
-                </Button>
-              )}
-              {a.mode === 'online' && a.type === 'exam' && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  render={<Link href={`/assignments/${a.id}/proctor`} />}
-                  className="shrink-0 justify-start md:w-full"
-                >
-                  <Radio data-icon="inline-start" /> ห้องคุมสอบสด
-                </Button>
-              )}
-              {a.mode === 'online' && a.type === 'exam' && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  render={<Link href={`/assignments/${a.id}/proctor/report`} />}
-                  className="shrink-0 justify-start md:w-full"
-                >
-                  <FileClock data-icon="inline-start" /> รายงานคุมสอบ
-                </Button>
-              )}
-              <Button
-                size="xs"
-                variant="outline"
-                render={<Link href={`/assignments/${a.id}/edit`} />}
-                className="shrink-0 justify-start md:w-full"
-              >
-                <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
-              </Button>
-              <Button
-                size="xs"
-                className={pendingCount > 0
-                  ? 'shrink-0 justify-start border-0 bg-warning text-warning-foreground hover:bg-warning/90 md:w-full'
-                  : 'shrink-0 justify-start md:w-full'}
-                variant={pendingCount > 0 ? 'default' : 'outline'}
-                render={<Link href={gradeHref} />}
-              >
-                <ClipboardCheck data-icon="inline-start" />
-                {pendingCount > 0
-                  ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
-                  : 'ตรวจให้คะแนน / ดูคำตอบ'}
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                render={<Link href={`/assignments/${a.id}/analytics`} />}
-                className="shrink-0 justify-start md:w-full"
-              >
-                <TrendingUp data-icon="inline-start" /> วิเคราะห์เชิงลึก
-              </Button>
-              <Button onClick={handleDuplicate} disabled={isPending} size="xs" variant="ghost" className="shrink-0 justify-start md:w-full">
-                <Copy data-icon="inline-start" /> ทำสำเนา
-              </Button>
-              <Button onClick={handleDelete} disabled={isPending} size="xs" variant="destructive" className="shrink-0 justify-start md:w-full">
-                <Trash2 data-icon="inline-start" /> ลบ
-              </Button>
-            </Card>
-          </section>
-        </aside>
-
-        <div className="min-w-0">
-          <TabsContent value="overview">
-            <OverviewTab
-              a={a}
-              submittedCount={submittedSubs.length}
-              inProgressCount={inProgressSubs.length}
-              totalSubs={submissions.length}
-              avgScore={avgScore}
-              pendingCount={pendingCount}
-              pendingReviewCapped={pendingReviewCapped}
-              gradeHref={gradeHref}
-            />
-          </TabsContent>
-          <TabsContent value="questions">
-            <QuestionsTab
-              questions={questions}
-              sections={parseSections(a.sections)}
-              showSections={a.show_sections !== false}
-            />
-          </TabsContent>
-          <TabsContent value="students">
-            <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />
-          </TabsContent>
-          <TabsContent value="analytics">
-            <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />
-          </TabsContent>
-        </div>
-      </Tabs>
+      <div className="min-w-0">
+        {activeTab === 'overview' && (
+          <OverviewTab
+            a={a}
+            submittedCount={submittedSubs.length}
+            inProgressCount={inProgressSubs.length}
+            totalSubs={submissions.length}
+            avgScore={avgScore}
+            pendingCount={pendingCount}
+            pendingReviewCapped={pendingReviewCapped}
+            gradeHref={gradeHref}
+          />
+        )}
+        {activeTab === 'questions' && (
+          <QuestionsTab
+            questions={questions}
+            sections={parseSections(a.sections)}
+            showSections={a.show_sections !== false}
+          />
+        )}
+        {activeTab === 'students' && (
+          <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />
+        )}
+        {activeTab === 'analytics' && (
+          <AnalyticsTab questions={questions} submissions={submittedSubs} assignmentId={a.id} />
+        )}
+      </div>
       {confirmDialog}
     </div>
   )

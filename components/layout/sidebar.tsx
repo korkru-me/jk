@@ -315,7 +315,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         )}
 
         {/* Admin link */}
-        {role === 'admin' && !usesClassroomSidebar && (
+        {role === 'admin' && !usesClassroomSidebar && !contextualContent && (
           <div className="px-3 pb-2">
             <Link
               href="/admin"
