@@ -32,16 +32,10 @@ export type SubmissionRow = {
 
 export default async function AssignmentDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string | string[] }>
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams])
-  const requestedTab = Array.isArray(query.tab) ? query.tab[0] : query.tab
-  const initialTab = requestedTab === 'questions' || requestedTab === 'students'
-    ? requestedTab
-    : 'overview'
+  const { id } = await params
   const supabase = await createClient()
   const user = await getAuthUser()
   if (!user) redirect('/login')
@@ -173,7 +167,6 @@ export default async function AssignmentDetailPage({
       submissions={roster}
       pendingSubmissionIds={pendingSubmissionIds}
       pendingReviewCapped={pendingReviewCapped}
-      initialTab={initialTab}
     />
   )
 }

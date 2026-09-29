@@ -32,14 +32,6 @@ const STATUS_META = {
   closed: { label: 'ปิดแล้ว', color: 'bg-destructive/10 text-destructive', dot: 'bg-destructive' },
 } as const
 
-export type AssignmentDetailTab = 'overview' | 'questions' | 'students'
-
-const TABS: { key: AssignmentDetailTab; label: string; icon: typeof Users }[] = [
-  { key: 'overview', label: 'ภาพรวม', icon: Activity },
-  { key: 'questions', label: 'โจทย์', icon: FileText },
-  { key: 'students', label: 'นักเรียน', icon: Users },
-]
-
 export type AssignmentSidebarSummary = Pick<
   Assignment,
   | 'id'
@@ -56,7 +48,6 @@ export type AssignmentSidebarSummary = Pick<
 
 interface AssignmentContextNavigationProps {
   assignment: AssignmentSidebarSummary
-  activeTab?: AssignmentDetailTab
   currentSection?: 'detail' | 'edit'
   studentCount?: number
   pendingCount?: number
@@ -66,7 +57,6 @@ interface AssignmentContextNavigationProps {
   missingQuestionCount: number
   duplicateQuestionCount: number
   isPending: boolean
-  onTabChange?: (tab: AssignmentDetailTab) => void
   onPublish: () => void
   onCloseExam: () => void
   onDelete: () => void
@@ -75,7 +65,6 @@ interface AssignmentContextNavigationProps {
 
 export function AssignmentContextNavigation({
   assignment: a,
-  activeTab,
   currentSection = 'detail',
   studentCount,
   pendingCount = 0,
@@ -85,7 +74,6 @@ export function AssignmentContextNavigation({
   missingQuestionCount,
   duplicateQuestionCount,
   isPending,
-  onTabChange,
   onPublish,
   onCloseExam,
   onDelete,
@@ -152,51 +140,15 @@ export function AssignmentContextNavigation({
 
       <div className="px-2 text-xs font-medium text-muted-foreground">ในงานนี้</div>
       <nav aria-label="เมนูในงานที่มอบหมาย" className="flex flex-col gap-1">
-        {TABS.map(tab => {
-          const Icon = tab.icon
-          const selected = currentSection === 'detail' && tab.key === activeTab
-          const content = (
-            <>
-              <Icon data-icon="inline-start" />
-              {tab.label}
-              {tab.key === 'students' && studentCount !== undefined && studentCount > 0 && (
-                <Badge variant="secondary" className="ml-auto">{studentCount}</Badge>
-              )}
-              {tab.key === 'questions' && (
-                <Badge variant="secondary" className="ml-auto">{availableQuestionCount}</Badge>
-              )}
-            </>
-          )
-
-          if (onTabChange && currentSection === 'detail') {
-            return (
-              <Button
-                key={tab.key}
-                type="button"
-                variant={selected ? 'navigation' : 'ghost'}
-                className="w-full justify-start"
-                aria-current={selected ? 'page' : undefined}
-                onClick={() => {
-                  onTabChange(tab.key)
-                  onClose?.()
-                }}
-              >
-                {content}
-              </Button>
-            )
-          }
-
-          return (
-            <Button
-              key={tab.key}
-              variant="ghost"
-              className="w-full justify-start"
-              render={<Link href={`/assignments/${a.id}?tab=${tab.key}`} onClick={onClose} />}
-            >
-              {content}
-            </Button>
-          )
-        })}
+        <Button
+          variant={currentSection === 'detail' ? 'navigation' : 'ghost'}
+          className="w-full justify-start"
+          aria-current={currentSection === 'detail' ? 'page' : undefined}
+          render={<Link href={`/assignments/${a.id}`} onClick={onClose} />}
+        >
+          <Activity data-icon="inline-start" />
+          ภาพรวม
+        </Button>
       </nav>
 
       <Separator />
