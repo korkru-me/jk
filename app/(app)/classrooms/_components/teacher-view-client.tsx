@@ -155,7 +155,7 @@ export function TeacherViewClient({
           {[
             { label: 'ห้องเรียน', value: classrooms.length, icon: BookOpen, color: 'bg-primary/10 text-primary' },
             { label: 'นักเรียนรวม', value: totalStudents, icon: Users, color: 'bg-tint-1/10 text-tint-1' },
-            { label: 'ชุดข้อสอบรวม', value: totalAssignments, icon: BookOpen, color: 'bg-warning/10 text-warning' },
+            { label: 'งานทั้งหมด', value: totalAssignments, icon: BookOpen, color: 'bg-warning/10 text-warning' },
           ].map(s => {
             const Icon = s.icon
             return (
@@ -180,7 +180,7 @@ export function TeacherViewClient({
             <BookOpen className="w-8 h-8 text-primary" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีห้องเรียน</h3>
-          <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">สร้างห้องเรียนแรกของคุณเพื่อเริ่มมอบหมายข้อสอบให้นักเรียน</p>
+          <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">สร้างห้องเรียนแรกของคุณเพื่อเริ่มมอบหมายงานให้นักเรียน</p>
           <Link href="/classrooms/new" className={cn(buttonVariants(), 'gap-2')}>
             <Plus className="w-4 h-4" />
             สร้างห้องเรียน
@@ -215,13 +215,12 @@ export function TeacherViewClient({
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {subjectClassrooms.map((c, i) => (
+              {subjectClassrooms.map((c) => (
                 <ClassroomCard
                   key={c.id}
                   classroom={c}
                   studentCount={studentCountMap[c.id] ?? 0}
                   assignmentCount={assignmentCountMap[c.id] ?? 0}
-                  index={i}
                   isSelecting={isSelecting}
                   isSelected={selected.has(c.id)}
                   onToggle={() => toggleSelect(c.id)}

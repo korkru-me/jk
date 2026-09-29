@@ -17,7 +17,6 @@ import { compareStudentsByRules, type StudentSortKey, type StudentSortRule } fro
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 
@@ -93,20 +92,9 @@ export function StudentTable({
     const ruleIndex = sortRules.findIndex(rule => rule.key === col)
     if (ruleIndex < 0) return <ChevronsUpDown className="size-3 text-muted-foreground/40" />
     const rule = sortRules[ruleIndex]
-    return (
-      <>
-        {rule.dir === 'asc'
-          ? <ChevronUp className="size-3 text-primary" />
-          : <ChevronDown className="size-3 text-primary" />}
-        <Badge
-          variant={ruleIndex === 0 ? 'default' : 'secondary'}
-          className="size-4 rounded-full p-0 text-[10px] tabular-nums"
-          aria-label={`ลำดับการเรียงที่ ${ruleIndex + 1}`}
-        >
-          {ruleIndex + 1}
-        </Badge>
-      </>
-    )
+    return rule.dir === 'asc'
+      ? <ChevronUp className="size-3 text-primary" />
+      : <ChevronDown className="size-3 text-primary" />
   }
 
   function headerBtnClass(col: SortKey) {
@@ -124,7 +112,7 @@ export function StudentTable({
     if (ruleIndex < 0) return 'กดเพื่อใช้เป็นลำดับหลัก โดยคงการเรียงเดิมเป็นลำดับรอง'
     const rule = sortRules[ruleIndex]
     if (ruleIndex === 0) return `ลำดับหลัก: ${rule.dir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'} · กดอีกครั้งเพื่อกลับทิศ`
-    return `ลำดับรองที่ ${ruleIndex + 1} · กดเพื่อเลื่อนเป็นลำดับหลัก`
+    return 'ลำดับรอง · กดเพื่อเลื่อนเป็นลำดับหลัก'
   }
 
   return (

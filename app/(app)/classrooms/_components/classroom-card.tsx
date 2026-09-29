@@ -1,41 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { Users, BookOpen, TrendingUp, Check, Pin, PinOff } from 'lucide-react'
+import { Users, BookOpen, CalendarRange, Check, GraduationCap, Pin, PinOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
-import { parseDescription, coverOf, displayDescription } from './classroom-meta'
-
-const GRADIENTS = [
-  'from-blue-500 to-violet-500',
-  'from-emerald-500 to-teal-500',
-  'from-orange-400 to-rose-500',
-  'from-cyan-500 to-blue-500',
-  'from-purple-500 to-pink-500',
-  'from-amber-400 to-orange-500',
-]
-
-const COVER_EMOJIS = ['⚛️', '🔭', '⚡', '🌊', '🧲', '🔬']
-
-function seedRand(str: string, i: number) {
-  const h = [...str].reduce((a, c, j) => a + c.charCodeAt(0) * (j + 1), 0)
-  return (((h * (i + 3) * 2654435761) >>> 0) % 100) / 100
-}
-
-function getPisaData(classroomId: string) {
-  return [
-    { name: 'อธิบายปรากฏการณ์', score: Math.round(55 + seedRand(classroomId, 0) * 35) },
-    { name: 'ออกแบบการสืบเสาะ', score: Math.round(45 + seedRand(classroomId, 1) * 40) },
-    { name: 'แปลความหมายข้อมูล', score: Math.round(50 + seedRand(classroomId, 2) * 38) },
-  ]
-}
+import { parseDescription, coverOf } from './classroom-meta'
 
 interface Props {
   classroom: Classroom
   studentCount: number
   assignmentCount: number
-  index: number
   isSelecting?: boolean
   isSelected?: boolean
   onToggle?: () => void
@@ -43,18 +18,13 @@ interface Props {
 }
 
 export function ClassroomCard({
-  classroom, studentCount, assignmentCount, index,
+  classroom, studentCount, assignmentCount,
   isSelecting = false, isSelected = false, onToggle, onTogglePin,
 }: Props) {
   const isPinned = !!classroom.pinned_at
-  // A teacher-picked cover wins; classrooms saved before covers were persisted
-  // keep the position-based gradient they have always shown.
-  const savedCover = coverOf(parseDescription(classroom.description))
-  const shownDescription = displayDescription(classroom.description)
-  const gradient = GRADIENTS[index % GRADIENTS.length]
-  const emoji = COVER_EMOJIS[index % COVER_EMOJIS.length]
-  const pisaData = getPisaData(classroom.id)
-  const avgScore = Math.round(pisaData.reduce((a, d) => a + d.score, 0) / pisaData.length)
+  const meta = parseDescription(classroom.description)
+  const savedCover = coverOf(meta)
+  const shownDescription = meta.description
 
   const cardBody = (
     <>
@@ -64,7 +34,7 @@ export function ClassroomCard({
           'h-20 relative flex items-center justify-between px-5',
           savedCover
             ? `border-b-2 ${savedCover.surface} ${savedCover.text}`
-            : `bg-gradient-to-br ${gradient}`,
+            : 'border-b border-border bg-muted text-foreground',
         )}
       >
         {/* Checkbox overlay in selection mode */}
@@ -79,17 +49,17 @@ export function ClassroomCard({
           </div>
         )}
         <div className={isSelecting ? 'ml-8' : ''}>
-          <p className={cn('font-bold text-lg leading-tight', !savedCover && 'text-white')}>
+          <p className="font-bold text-lg leading-tight">
             {classroom.name}
           </p>
           {shownDescription && (
             <p className={cn(
               'text-xs mt-0.5 truncate max-w-[180px]',
-              savedCover ? savedCover.textMuted : 'text-white/70',
+              savedCover ? savedCover.textMuted : 'text-muted-foreground',
             )}>{shownDescription}</p>
           )}
         </div>
-        <span className="text-3xl">{emoji}</span>
+        <BookOpen className={cn('size-7 shrink-0', savedCover ? savedCover.textMuted : 'text-muted-foreground')} aria-hidden="true" />
         {!isSelecting && onTogglePin && (
           <button
             type="button"
@@ -97,7 +67,7 @@ export function ClassroomCard({
             title={isPinned ? 'เลิกปักหมุด' : 'ปักหมุดไว้บนสุด'}
             className={cn(
               'absolute top-2.5 right-2.5 w-7 h-7 rounded-lg flex items-center justify-center transition-colors z-10',
-              isPinned ? 'bg-card text-warning' : 'bg-card/15 text-white/70 hover:bg-card/25 hover:text-white'
+              isPinned ? 'bg-card text-warning' : 'bg-card/80 text-muted-foreground hover:bg-card hover:text-foreground'
             )}
           >
             {isPinned ? <Pin className="w-3.5 h-3.5 fill-current" /> : <PinOff className="w-3.5 h-3.5" />}
@@ -105,7 +75,7 @@ export function ClassroomCard({
         )}
         <div className={cn(
           'absolute inset-0 transition-colors',
-          isSelecting && isSelected ? 'bg-primary/15' : 'bg-black/0 group-hover:bg-black/5'
+          isSelecting && isSelected ? 'bg-primary/15' : 'bg-foreground/0 group-hover:bg-foreground/5'
         )} />
       </div>
 
@@ -120,11 +90,7 @@ export function ClassroomCard({
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="font-semibold text-foreground">{assignmentCount}</span>
-            <span className="text-xs">ชุดข้อสอบ</span>
-          </div>
-          <div className="flex items-center gap-1.5 ml-auto">
-            <TrendingUp className="w-3.5 h-3.5 text-success" />
-            <span className="text-sm font-bold text-success">{avgScore}%</span>
+            <span className="text-xs">งาน</span>
           </div>
           {isPinned && (
             <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-warning bg-warning/10 px-2 py-0.5 rounded-full">
@@ -133,30 +99,18 @@ export function ClassroomCard({
           )}
         </div>
 
-        <div className="mb-3">
-          <p className="text-[10px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">
-            ทักษะ PISA · ข้อมูลตัวอย่าง
-          </p>
-          <div
-            className="h-[52px] flex items-end justify-around gap-3 px-2"
-            role="img"
-            aria-label={`ข้อมูลตัวอย่างทักษะ PISA: ${pisaData.map(item => `${item.name} ${item.score}%`).join(', ')}`}
-          >
-            {pisaData.map(item => (
-              <div
-                key={item.name}
-                className="w-[18px] rounded-t-[3px] bg-primary"
-                style={{ height: `${item.score}%` }}
-                title={`${item.name}: ${item.score}% (ข้อมูลตัวอย่าง)`}
-              />
-            ))}
+        <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-muted p-3">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+              <GraduationCap className="size-3" aria-hidden="true" /> ระดับชั้น
+            </div>
+            <p className="truncate text-sm font-semibold text-foreground">{meta.gradeLevel || 'ยังไม่ระบุ'}</p>
           </div>
-          <div className="flex justify-between mt-1">
-            {pisaData.map((d) => (
-              <p key={d.name} className="text-[9px] text-muted-foreground text-center" style={{ width: '33%' }}>
-                {d.score}%
-              </p>
-            ))}
+          <div className="min-w-0 border-l border-border pl-3">
+            <div className="mb-1 flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+              <CalendarRange className="size-3" aria-hidden="true" /> ภาคเรียน
+            </div>
+            <p className="truncate text-sm font-semibold text-foreground">{meta.academicTerm || 'ยังไม่ระบุ'}</p>
           </div>
         </div>
 
