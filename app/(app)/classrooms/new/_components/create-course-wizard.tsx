@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { createClassroom } from '@/lib/actions/classrooms'
+import { createClassroom, duplicateClassroom } from '@/lib/actions/classrooms'
 import {
   ACCESS_LABEL, ACCESS_BADGE, GRADE_SUGGESTIONS, getTermSuggestions, getSmartTermDefault,
   composeDescription, COVER_PRESETS,
@@ -45,7 +45,7 @@ const wizardSchema = z.object({
   endDate:         z.string(),
 })
 
-type WizardData = z.infer<typeof wizardSchema>
+export type WizardData = z.infer<typeof wizardSchema>
 
 const DEFAULT_VALUES: WizardData = {
   classroomType:   'subject',
@@ -349,16 +349,24 @@ function ClassroomPreviewCard({ values }: { values: WizardData }) {
 
 // ─── Step 0: Cover Design & Metadata ─────────────────────────────────────────
 
-function ClassroomTypeSection({ value, onChange }: { value: ClassroomType; onChange: (v: ClassroomType) => void }) {
+function ClassroomTypeSection({
+  value, onChange, disabled = false,
+}: {
+  value: ClassroomType
+  onChange: (v: ClassroomType) => void
+  disabled?: boolean
+}) {
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">ประเภทห้องเรียน</Label>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           type="button"
+          disabled={disabled}
           onClick={() => onChange('subject')}
           className={cn(
             'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+            disabled && 'cursor-not-allowed opacity-70',
             value === 'subject'
               ? 'border-primary bg-primary/10 shadow-sm'
               : 'border-border bg-card hover:border-muted-foreground/30',
@@ -374,9 +382,11 @@ function ClassroomTypeSection({ value, onChange }: { value: ClassroomType; onCha
         </button>
         <button
           type="button"
+          disabled={disabled}
           onClick={() => onChange('homeroom')}
           className={cn(
             'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+            disabled && 'cursor-not-allowed opacity-70',
             value === 'homeroom'
               ? 'border-primary bg-primary/10 shadow-sm'
               : 'border-border bg-card hover:border-muted-foreground/30',
@@ -403,6 +413,7 @@ function Step0Content({
   onCoverChange,
   onCoverImageChange,
   onTagsChange,
+  classroomTypeLocked,
 }: {
   control: ReturnType<typeof useForm<WizardData>>['control']
   errors: ReturnType<typeof useForm<WizardData>>['formState']['errors']
@@ -411,6 +422,7 @@ function Step0Content({
   onCoverChange: (id: string) => void
   onCoverImageChange: (u: string) => void
   onTagsChange: (t: string[]) => void
+  classroomTypeLocked?: boolean
 }) {
   return (
     <div className="space-y-7">
@@ -419,7 +431,11 @@ function Step0Content({
         <p className="text-sm text-muted-foreground mt-0.5">ตั้งชื่อ เลือกธีม และกรอกรายละเอียดห้องเรียน</p>
       </div>
 
-      <ClassroomTypeSection value={values.classroomType} onChange={onClassroomTypeChange} />
+      <ClassroomTypeSection
+        value={values.classroomType}
+        onChange={onClassroomTypeChange}
+        disabled={classroomTypeLocked}
+      />
 
       <CoverDesignSection
         cover={values.cover}
@@ -637,13 +653,19 @@ function Step1Content({
 
 // ─── Main Wizard ──────────────────────────────────────────────────────────────
 
-export function CreateCourseWizard() {
+export function CreateCourseWizard({
+  duplicateSourceId,
+  initialValues,
+}: {
+  duplicateSourceId?: string
+  initialValues?: Partial<WizardData>
+}) {
   const [currentStep, setCurrentStep] = useState(0)
   const [isPending, startTransition] = useTransition()
 
   const form = useForm<WizardData>({
     resolver: zodResolver(wizardSchema),
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: { ...DEFAULT_VALUES, ...initialValues },
     mode: 'onTouched',
   })
 
@@ -694,16 +716,26 @@ export function CreateCourseWizard() {
 
     startTransition(async () => {
       try {
-        const res = await createClassroom({
-          name: data.name.trim(),
-          description,
-          classroomType: data.classroomType,
-        })
+        const res = duplicateSourceId
+          ? await duplicateClassroom(duplicateSourceId, {
+              name: data.name.trim(),
+              description,
+            })
+          : await createClassroom({
+              name: data.name.trim(),
+              description,
+              classroomType: data.classroomType,
+            })
         if (res?.error) {
           toast.error(res.error)
           return
         }
-        toast.success('สร้างห้องเรียนสำเร็จ! กำลังเปลี่ยนหน้า...')
+        const copiedAssignments = 'copiedAssignments' in res && typeof res.copiedAssignments === 'number'
+          ? res.copiedAssignments
+          : 0
+        toast.success(duplicateSourceId
+          ? `สร้างสำเนาห้องเรียนแล้ว${copiedAssignments > 0 ? ` · เก็บงาน ${copiedAssignments} ชิ้นเป็นแบบร่าง` : ''}`
+          : 'สร้างห้องเรียนสำเร็จ! กำลังเปลี่ยนหน้า...')
         setTimeout(() => { window.location.href = '/classrooms' }, 800)
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e)
@@ -719,7 +751,9 @@ export function CreateCourseWizard() {
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-border">
           <div className="mb-5">
-            <h1 className="text-xl font-bold text-foreground">สร้างห้องเรียนใหม่</h1>
+            <h1 className="text-xl font-bold text-foreground">
+              {duplicateSourceId ? 'ตรวจสอบข้อมูลสำเนาห้องเรียน' : 'สร้างห้องเรียนใหม่'}
+            </h1>
             <p className="text-sm text-muted-foreground mt-0.5">ขั้นตอน {currentStep + 1} จาก {STEPS.length}</p>
           </div>
           <StepIndicator current={currentStep} onStepClick={handleStepClick} />
@@ -736,6 +770,7 @@ export function CreateCourseWizard() {
               onCoverChange={(id) => setValue('cover', id)}
               onCoverImageChange={(u) => setValue('coverImageUrl', u)}
               onTagsChange={(t) => setValue('tags', t)}
+              classroomTypeLocked={!!duplicateSourceId}
             />
           )}
           {currentStep === 1 && (
@@ -777,7 +812,9 @@ export function CreateCourseWizard() {
                 className="bg-success hover:bg-success/90 disabled:bg-success/40 text-success-foreground min-w-[160px]"
               >
                 <Check className="w-4 h-4 mr-1.5" />
-                {isPending ? 'กำลังสร้างห้องเรียน...' : 'ยืนยันสร้างห้องเรียน'}
+                {isPending
+                  ? 'กำลังสร้างห้องเรียน...'
+                  : duplicateSourceId ? 'ยืนยันสร้างสำเนา' : 'ยืนยันสร้างห้องเรียน'}
               </Button>
             )}
           </div>

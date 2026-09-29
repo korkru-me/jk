@@ -17,12 +17,13 @@ import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import {
-  bulkDeleteClassrooms, duplicateClassroom, reorderClassrooms, togglePinClassroom,
+  bulkDeleteClassrooms, deleteClassroom, reorderClassrooms, togglePinClassroom,
 } from '@/lib/actions/classrooms'
 import { ClassroomCard } from './classroom-card'
 import { HomeroomBanner } from './homeroom-banner'
 import type { Classroom } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface Props {
   classrooms: Classroom[]
@@ -43,7 +44,7 @@ export function TeacherViewClient({
   const [orderedSubjects, setOrderedSubjects] = useState(
     () => classrooms.filter(c => c.classroom_type !== 'homeroom'),
   )
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [confirm, confirmDialog] = useConfirm()
   const [isPending, startTransition] = useTransition()
   const [, startPinTransition] = useTransition()
   const [, startOrderTransition] = useTransition()
@@ -69,16 +70,21 @@ export function TeacherViewClient({
   }
 
   function handleDuplicate(id: string) {
-    setDuplicatingId(id)
+    router.push(`/classrooms/new?copyFrom=${encodeURIComponent(id)}`)
+  }
+
+  async function handleDelete(classroom: Classroom) {
+    const accepted = await confirm({
+      title: `ย้าย “${classroom.name}” ไปถังขยะ?`,
+      description: 'ห้องเรียนและข้อมูลภายในจะถูกซ่อนทันที คุณยังกู้คืนได้จากถังขยะภายใน 30 วัน ก่อนระบบลบถาวร',
+      confirmLabel: 'ย้ายไปถังขยะ',
+      variant: 'destructive',
+    })
+    if (!accepted) return
     startTransition(async () => {
-      const res = await duplicateClassroom(id)
-      setDuplicatingId(null)
-      if ('error' in res) { toast.error(res.error); return }
-      toast.success(
-        res.copiedAssignments > 0
-          ? `คัดลอกห้องเรียนแล้ว · งาน ${res.copiedAssignments} ชิ้นถูกเก็บเป็นแบบร่าง`
-          : 'คัดลอกห้องเรียนแล้ว',
-      )
+      const res = await deleteClassroom(classroom.id)
+      if (res?.error) { toast.error(res.error); return }
+      toast.success(`ย้าย “${classroom.name}” ไปถังขยะแล้ว`)
       router.refresh()
     })
   }
@@ -119,11 +125,19 @@ export function TeacherViewClient({
     setSelected(new Set())
   }
 
-  function handleBulkDelete() {
+  async function handleBulkDelete() {
+    const count = selected.size
+    const accepted = await confirm({
+      title: `ย้ายห้องเรียน ${count} ห้องไปถังขยะ?`,
+      description: 'ห้องเรียนและข้อมูลภายในจะถูกซ่อนทันที คุณยังกู้คืนได้จากถังขยะภายใน 30 วัน ก่อนระบบลบถาวร',
+      confirmLabel: 'ย้ายไปถังขยะ',
+      variant: 'destructive',
+    })
+    if (!accepted) return
     startTransition(async () => {
       const res = await bulkDeleteClassrooms([...selected])
       if (res?.error) { toast.error(res.error); return }
-      toast.success(`ย้าย ${selected.size} ห้องเรียนไปถังขยะแล้ว`)
+      toast.success(`ย้าย ${count} ห้องเรียนไปถังขยะแล้ว`)
       exitSelection()
     })
   }
@@ -241,6 +255,8 @@ export function TeacherViewClient({
                     isSelecting={isSelecting}
                     isSelected={selected.has(c.id)}
                     onToggle={() => toggleSelect(c.id)}
+                    onDuplicate={() => handleDuplicate(c.id)}
+                    onDelete={() => handleDelete(c)}
                   />
                 ))}
               </div>
@@ -267,7 +283,7 @@ export function TeacherViewClient({
                       onToggle={() => toggleSelect(c.id)}
                       onTogglePin={() => handleTogglePin(c.id, true)}
                       onDuplicate={() => handleDuplicate(c.id)}
-                      isDuplicating={duplicatingId === c.id}
+                      onDelete={() => handleDelete(c)}
                     />
                   ))}
                   {movableSubjects.map(c => (
@@ -281,7 +297,7 @@ export function TeacherViewClient({
                       onToggle={() => toggleSelect(c.id)}
                       onTogglePin={() => handleTogglePin(c.id, false)}
                       onDuplicate={() => handleDuplicate(c.id)}
-                      isDuplicating={duplicatingId === c.id}
+                      onDelete={() => handleDelete(c)}
                     />
                   ))}
                   {!isSelecting && (
@@ -319,6 +335,7 @@ export function TeacherViewClient({
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { Home, Users, Check, ArrowRight } from 'lucide-react'
+import { Home, Users, Check, ArrowRight, Copy, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Classroom } from '@/lib/types'
 import { withBackHref } from '@/lib/back-link'
 import { parseDescription, coverOf, displayDescription } from './classroom-meta'
+import { IconButton } from '@/components/ui/icon-button'
 
 interface Props {
   classroom: Classroom
@@ -13,13 +14,18 @@ interface Props {
   isSelecting?: boolean
   isSelected?: boolean
   onToggle?: () => void
+  onDuplicate?: () => void
+  onDelete?: () => void
 }
 
 // Deliberately NOT a grid tile like ClassroomCard — a homeroom is a
 // fundamentally different thing (a monitoring roster, not a subject with
 // assignments), so it gets a full-width banner shape that can't be mistaken
 // for a subject classroom at a glance.
-export function HomeroomBanner({ classroom, studentCount, isSelecting = false, isSelected = false, onToggle }: Props) {
+export function HomeroomBanner({
+  classroom, studentCount, isSelecting = false, isSelected = false,
+  onToggle, onDuplicate, onDelete,
+}: Props) {
   // A homeroom carries a cover just like a subject room; without one it keeps
   // the dark inverse surface this banner was designed around.
   const cover = coverOf(parseDescription(classroom.description))
@@ -71,11 +77,37 @@ export function HomeroomBanner({ classroom, studentCount, isSelecting = false, i
 
       {!isSelecting && (
         <span className={cn(
-          'flex items-center gap-1 text-sm font-medium shrink-0',
+          'mr-20 flex items-center gap-1 text-sm font-medium shrink-0',
           !cover && 'text-primary',
         )}>
           ดูภาพรวมการบ้าน <ArrowRight className="w-3.5 h-3.5" />
         </span>
+      )}
+      {!isSelecting && (onDuplicate || onDelete) && (
+        <div className="absolute right-3 top-3 z-20 flex items-center gap-1">
+          {onDuplicate && (
+            <IconButton
+              type="button"
+              size="sm"
+              label={`คัดลอก ${classroom.name} และเก็บงานเดิมเป็นแบบร่าง`}
+              onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDuplicate() }}
+              className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-muted-foreground hover:bg-card hover:text-foreground"
+            >
+              <Copy className="size-4" aria-hidden="true" />
+            </IconButton>
+          )}
+          {onDelete && (
+            <IconButton
+              type="button"
+              size="sm"
+              label={`ลบ ${classroom.name}`}
+              onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}
+              className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </IconButton>
+          )}
+        </div>
       )}
     </div>
   )
@@ -89,8 +121,13 @@ export function HomeroomBanner({ classroom, studentCount, isSelecting = false, i
   }
 
   return (
-    <Link href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms')} className="block hover:opacity-90 transition-opacity">
+    <div className="group relative transition-opacity hover:opacity-90">
+      <Link
+        href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms')}
+        aria-label={`เปิดห้องเรียน ${classroom.name}`}
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
       {body}
-    </Link>
+    </div>
   )
 }

@@ -111,7 +111,10 @@ function assignmentDraftCopyPayload(source: Assignment, classroomId: string, cre
  * submissions, scores, comments, announcements and pins are intentionally not
  * copied.
  */
-export async function duplicateClassroom(id: string) {
+export async function duplicateClassroom(
+  id: string,
+  overrides?: { name: string; description: string },
+) {
   const user = await getAuthUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
@@ -125,6 +128,10 @@ export async function duplicateClassroom(id: string) {
     .maybeSingle()
   if (sourceError) return { error: sourceError.message }
   if (!source) return { error: 'ไม่พบห้องเรียน หรือคุณไม่มีสิทธิ์คัดลอกห้องนี้' }
+
+  const name = overrides?.name.trim() || `${source.name} (สำเนา)`
+  if (name.length > 100) return { error: 'ชื่อห้องเรียนไม่เกิน 100 ตัวอักษร' }
+  const description = overrides ? overrides.description.trim() : source.description
 
   let classCode = generateClassCode()
   for (let i = 0; i < 5; i++) {
@@ -150,8 +157,8 @@ export async function duplicateClassroom(id: string) {
     .insert({
       org_id: source.org_id,
       teacher_id: user.id,
-      name: `${source.name} (สำเนา)`,
-      description: source.description,
+      name,
+      description: description || null,
       class_code: classCode,
       status: 'active',
       classroom_type: source.classroom_type,

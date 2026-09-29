@@ -155,21 +155,46 @@ export function ClassroomStream({
       />
 
       {crossPostTargets.length > 0 && (
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            className="gap-1 px-1 text-muted-foreground"
-            aria-expanded={showReuse}
-            onClick={() => setShowReuse(open => !open)}
-          >
-            <RefreshCcw className="size-3.5" aria-hidden="true" />
-            ใช้ประกาศเดิมจากห้องอื่น
-            {showReuse ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              aria-expanded={showReuse}
+              onClick={() => {
+                setShowReuse(open => !open)
+                setShowTargets(false)
+              }}
+            >
+              <RefreshCcw data-icon="inline-start" aria-hidden="true" />
+              ใช้ประกาศเดิมจากห้องอื่น
+              {showReuse
+                ? <ChevronUp data-icon="inline-end" aria-hidden="true" />
+                : <ChevronDown data-icon="inline-end" aria-hidden="true" />}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              aria-expanded={showTargets}
+              onClick={() => {
+                setShowTargets(open => !open)
+                setShowReuse(false)
+              }}
+            >
+              <Users data-icon="inline-start" aria-hidden="true" />
+              {alsoIn.length > 0 ? `โพสต์ไปอีก ${alsoIn.length} ห้อง` : 'โพสต์ไปห้องอื่นด้วย'}
+              {showTargets
+                ? <ChevronUp data-icon="inline-end" aria-hidden="true" />
+                : <ChevronDown data-icon="inline-end" aria-hidden="true" />}
+            </Button>
+          </div>
+
           {showReuse && (
-            <div className="mt-1.5 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <label className="text-xs font-medium text-foreground">1. เลือกห้องเรียนต้นทาง</label>
@@ -217,40 +242,21 @@ export function ClassroomStream({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">ระบบจะคัดลอกข้อความและไฟล์มาให้แก้ไขก่อน ยังไม่โพสต์ทันที</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={!reuseAnnouncementId}
-                  onClick={applyReusableAnnouncement}
-                >
+                <Button type="button" size="sm" variant="outline" disabled={!reuseAnnouncementId} onClick={applyReusableAnnouncement}>
                   นำมาใช้
                 </Button>
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {crossPostTargets.length > 0 && (
-        <div>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="gap-1 px-1 text-muted-foreground"
-            onClick={() => setShowTargets(open => !open)}
-          >
-            <Users className="w-3.5 h-3.5" />
-            {alsoIn.length > 0 ? `โพสต์ไปอีก ${alsoIn.length} ห้อง` : 'โพสต์ไปห้องอื่นด้วย'}
-            {showTargets ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </Button>
           {showTargets && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 rounded-xl border border-border bg-muted/30 p-3">
               {crossPostTargets.map(target => {
                 const picked = alsoIn.includes(target.id)
                 return (
                   <Button
                     key={target.id}
+                    type="button"
                     variant={picked ? 'default' : 'outline'}
                     size="xs"
                     onClick={() => setAlsoIn(ids => picked ? ids.filter(id => id !== target.id) : [...ids, target.id])}

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Users, BookOpen, CalendarRange, Check, Copy, GraduationCap, LoaderCircle, Pin, PinOff } from 'lucide-react'
+import { Users, BookOpen, CalendarRange, Check, Copy, GraduationCap, Pin, PinOff, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
@@ -18,14 +18,14 @@ interface Props {
   onToggle?: () => void
   onTogglePin?: () => void
   onDuplicate?: () => void
-  isDuplicating?: boolean
+  onDelete?: () => void
   dragHandle?: ReactNode
 }
 
 export function ClassroomCard({
   classroom, studentCount, assignmentCount,
   isSelecting = false, isSelected = false, onToggle, onTogglePin,
-  onDuplicate, isDuplicating = false, dragHandle,
+  onDuplicate, onDelete, dragHandle,
 }: Props) {
   const isPinned = !!classroom.pinned_at
   const meta = parseDescription(classroom.description)
@@ -68,10 +68,10 @@ export function ClassroomCard({
         </div>
         <BookOpen className={cn(
           'size-7 shrink-0',
-          !isSelecting && (onDuplicate || onTogglePin) && 'mr-20',
+          !isSelecting && (onDuplicate || onTogglePin || onDelete) && 'mr-28',
           savedCover ? savedCover.textMuted : 'text-muted-foreground',
         )} aria-hidden="true" />
-        {!isSelecting && (onDuplicate || onTogglePin) && (
+        {!isSelecting && (onDuplicate || onTogglePin || onDelete) && (
           <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1">
             {onDuplicate && (
               <IconButton
@@ -79,12 +79,9 @@ export function ClassroomCard({
                 onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDuplicate() }}
                 label={`คัดลอก ${classroom.name} และเก็บงานเดิมเป็นแบบร่าง`}
                 size="sm"
-                disabled={isDuplicating}
-                className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-50"
+                className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
               >
-                {isDuplicating
-                  ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                  : <Copy className="size-4" aria-hidden="true" />}
+                <Copy className="size-4" aria-hidden="true" />
               </IconButton>
             )}
             {onTogglePin && (
@@ -99,6 +96,17 @@ export function ClassroomCard({
                 )}
               >
                 {isPinned ? <Pin className="size-4 fill-current" /> : <PinOff className="size-4" />}
+              </IconButton>
+            )}
+            {onDelete && (
+              <IconButton
+                type="button"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}
+                label={`ลบ ${classroom.name}`}
+                size="sm"
+                className="flex size-8 items-center justify-center rounded-lg bg-card/85 text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
               </IconButton>
             )}
           </div>
@@ -144,14 +152,11 @@ export function ClassroomCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t border-border">
+        <div className="pt-3 border-t border-border">
           <div>
             <p className="text-[10px] text-muted-foreground">รหัสห้องเรียน</p>
             <p className="font-mono font-bold text-foreground tracking-widest text-sm">{classroom.class_code}</p>
           </div>
-          {!isSelecting && (
-            <span className="text-xs text-primary font-medium group-hover:underline">จัดการ →</span>
-          )}
         </div>
       </div>
     </>
