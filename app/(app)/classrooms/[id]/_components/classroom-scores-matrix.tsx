@@ -630,7 +630,7 @@ export function ClassroomScoresMatrix({
                 sortKey={{ type: 'grade' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="left-[12.5rem] w-14 min-w-14 max-w-14 text-center"
+                className="left-[calc(var(--spacing)*50)] w-14 min-w-14 max-w-14 text-center"
               />
               <RosterSortHeader
                 label="ห้อง"
@@ -644,14 +644,14 @@ export function ClassroomScoresMatrix({
                 sortKey={{ type: 'number' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="left-[19rem] w-12 min-w-12 max-w-12 text-center"
+                className="left-[calc(var(--spacing)*76)] w-12 min-w-12 max-w-12 text-center"
               />
               <RosterSortHeader
                 label="รหัสนักเรียน"
                 sortKey={{ type: 'code' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="left-[22rem] w-18 min-w-18 max-w-18 text-center"
+                className="left-[calc(var(--spacing)*88)] w-18 min-w-18 max-w-18 text-center"
               />
               {visibleAssignments.map(a => {
                 const hasNonSubmitter = orderedStudents.some(s => {
@@ -686,16 +686,16 @@ export function ClassroomScoresMatrix({
                   <p className="truncate text-sm font-medium text-foreground" title={student.full_name}>{student.full_name}</p>
                   <p className="truncate text-xs text-muted-foreground" title={student.email}>{student.email}</p>
                 </td>
-                <td className="sticky left-[12.5rem] z-10 w-14 min-w-14 max-w-14 border-b border-border bg-card px-1 py-2.5 text-center text-xs text-muted-foreground transition-colors group-hover/row:bg-muted" title={student.grade_level ?? undefined}>
+                <td className="sticky left-[calc(var(--spacing)*50)] z-10 w-14 min-w-14 max-w-14 border-b border-border bg-card px-1 py-2.5 text-center text-xs text-muted-foreground transition-colors group-hover/row:bg-muted" title={student.grade_level ?? undefined}>
                   <span className="block truncate">{student.grade_level || '—'}</span>
                 </td>
                 <td className="sticky left-64 z-10 w-12 min-w-12 max-w-12 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted">
                   {student.section_number ?? '—'}
                 </td>
-                <td className="sticky left-[19rem] z-10 w-12 min-w-12 max-w-12 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted">
+                <td className="sticky left-[calc(var(--spacing)*76)] z-10 w-12 min-w-12 max-w-12 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted">
                   {student.class_number ?? '—'}
                 </td>
-                <td className="sticky left-[22rem] z-10 w-18 min-w-18 max-w-18 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted" title={student.student_code ?? undefined}>
+                <td className="sticky left-[calc(var(--spacing)*88)] z-10 w-18 min-w-18 max-w-18 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted" title={student.student_code ?? undefined}>
                   <span className="block truncate">{student.student_code || '—'}</span>
                 </td>
                 {visibleAssignments.map(a => {
