@@ -3,7 +3,11 @@ import {
   MAX_WORK_ELEMENTS,
   MAX_WORK_SCENE_BYTES,
 } from '@/lib/math-work'
-import type { ScratchpadBackground, ScratchpadScene } from '@/lib/scratchpad'
+import {
+  isScratchpadPageCount,
+  type ScratchpadBackground,
+  type ScratchpadScene,
+} from '@/lib/scratchpad'
 
 export type DrawingBoardRole = 'student' | 'teacher'
 
@@ -111,7 +115,14 @@ const COMMON_ELEMENT_TYPES = new Set([
 const TEACHER_ELEMENT_TYPES = new Set([...COMMON_ELEMENT_TYPES, 'frame', 'image'])
 
 const BACKGROUNDS = new Set<ScratchpadBackground>(['blank', 'lined', 'grid', 'dots'])
-const SCENE_ENVELOPE_KEYS = new Set(['formatVersion', 'elements', 'appState', 'files', 'background'])
+const SCENE_ENVELOPE_KEYS = new Set([
+  'formatVersion',
+  'elements',
+  'appState',
+  'files',
+  'background',
+  'pageCount',
+])
 
 /** Exact stable subset emitted by stableDrawingAppState(). */
 const STABLE_APP_STATE_KEYS = new Set([
@@ -634,6 +645,12 @@ export function validateDrawingScene(
   ) {
     return fail('invalid', 'invalid-envelope')
   }
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'pageCount')
+    && !isScratchpadPageCount(value.pageCount)
+  ) {
+    return fail('invalid', 'invalid-envelope')
+  }
   if (value.elements.length > MAX_WORK_ELEMENTS) return fail('unsupported', 'too-many-elements')
   if (options.mode !== 'live') {
     const size = jsonBytes(value)
@@ -828,6 +845,7 @@ export function validateDrawingScene(
       appState: value.appState,
       files: value.files,
       background: value.background as ScratchpadBackground,
+      ...(isScratchpadPageCount(value.pageCount) ? { pageCount: value.pageCount } : {}),
     },
   }
 }

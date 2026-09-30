@@ -14,6 +14,7 @@ import type {
 } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  FilePlus2,
   ImagePlus,
   Loader2,
   PenLine,
@@ -32,11 +33,14 @@ import type {
 } from '@/components/drawing-board/drawing-board-controller'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
+  boardPageTop,
+  boardPaperHeight,
   BOARD_SHEET_HEIGHT,
   BOARD_SHEET_WIDTH,
   createDrawingPreview,
   DRAWING_DEFAULT_ITEM_STATE,
   drawingBackgroundStyle,
+  minimumBoardZoom,
   stableDrawingAppState,
   TRANSPARENT_CANVAS,
 } from '@/components/exam/drawing-board-utils'
@@ -53,6 +57,8 @@ import {
 } from '@/lib/teaching-board-lifecycle'
 import {
   emptyScratchpadScene,
+  MAX_SCRATCHPAD_PAGE_COUNT,
+  scratchpadPageCount,
   type ScratchpadBackground,
   type ScratchpadScene,
 } from '@/lib/scratchpad'
@@ -207,6 +213,7 @@ export default function TeachingBoardEditor({
   const savingRef = useRef(false)
   const releasePersistenceOnReadyRef = useRef(false)
   const sceneRef = useRef<ScratchpadScene>(safeInitialScene)
+  const pageCountRef = useRef(scratchpadPageCount(safeInitialScene.pageCount))
   const contentSignatureRef = useRef(
     contentSignature(safeInitialScene.elements as readonly OrderedExcalidrawElement[]),
   )
@@ -234,6 +241,7 @@ export default function TeachingBoardEditor({
   )
   const ignoreChangesRef = useRef(true)
   const [background, setBackground] = useState<ScratchpadBackground>(safeInitialScene.background)
+  const [pageCount, setPageCount] = useState(pageCountRef.current)
   const [controller, setController] = useState<DrawingBoardController | null>(null)
   const [commandState, setCommandState] = useState<DrawingBoardCommandState>({
     ready: false,
@@ -269,6 +277,12 @@ export default function TeachingBoardEditor({
   const [editorScene, setEditorScene] = useState<ScratchpadScene>(safeInitialScene)
   const [editorRevision, setEditorRevision] = useState(0)
   const [confirm, confirmDialog] = useConfirm()
+
+  const updatePageCount = useCallback((value: unknown) => {
+    const next = scratchpadPageCount(value)
+    pageCountRef.current = next
+    setPageCount(next)
+  }, [])
 
   useEffect(() => {
     mountedRef.current = true
@@ -328,10 +342,11 @@ export default function TeachingBoardEditor({
     legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
     contentSignatureRef.current = ''
     setBackground('lined')
+    updatePageCount(1)
     setEditorScene(scene)
     setEditorRevision(value => value + 1)
     setDirty(false)
-  }, [])
+  }, [updatePageCount])
 
   const resetCanvas = useCallback((dirtyAfterReset = false) => {
     loadRequestRef.current += 1
@@ -346,12 +361,13 @@ export default function TeachingBoardEditor({
     legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
     contentSignatureRef.current = ''
     setBackground(scene.background)
+    updatePageCount(1)
     setPolicyReadOnlyMessage(null)
     setEditorScene(scene)
     setEditorRevision(value => value + 1)
     onSceneChange?.(target, scene)
     markDirty(dirtyAfterReset)
-  }, [markDirty, onSceneChange, target])
+  }, [markDirty, onSceneChange, target, updatePageCount])
 
   const loadBoardScene = useCallback(async (
     targetBoard: TeachingBoardView,
@@ -404,6 +420,7 @@ export default function TeachingBoardEditor({
       releasePersistenceOnReadyRef.current = true
       setPolicyReadOnlyMessage(null)
       setBackground(scene.background)
+      updatePageCount(scene.pageCount)
       setEditorScene(scene)
       setEditorRevision(value => value + 1)
       const resolvedState: TeacherQuestionDraftState = targetBoard.editable
@@ -436,7 +453,7 @@ export default function TeachingBoardEditor({
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false)
     }
-  }, [dirty, onLoadFailed, onLoadResolved, onSceneChange, questionId, reportDraftState, sceneReady, showSafeReadOnlyPlaceholder, target])
+  }, [dirty, onLoadFailed, onLoadResolved, onSceneChange, questionId, reportDraftState, sceneReady, showSafeReadOnlyPlaceholder, target, updatePageCount])
 
   useEffect(() => {
     if (
@@ -494,6 +511,22 @@ export default function TeachingBoardEditor({
     files: BinaryFiles,
   ) => {
     if (operationPending || persistenceBlockedRef.current) return
+    const box = surfaceRef.current?.getBoundingClientRect()
+    const minimumZoom = box ? minimumBoardZoom(box.width) : appState.zoom.value
+    let effectiveAppState = appState
+    if (box && appState.zoom.value < minimumZoom - 0.0001) {
+      const visibleCenterY = -appState.scrollY + box.height / (2 * appState.zoom.value)
+      const constrainedView = {
+        scrollX: 0,
+        scrollY: box.height / (2 * minimumZoom) - visibleCenterY,
+        zoom: { value: minimumZoom as AppState['zoom']['value'] },
+      }
+      effectiveAppState = { ...appState, ...constrainedView }
+      apiRef.current?.updateScene({
+        appState: constrainedView,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      })
+    }
     const nextSignature = contentSignature(elements)
     const contentChanged = nextSignature !== contentSignatureRef.current
     contentSignatureRef.current = nextSignature
@@ -501,17 +534,18 @@ export default function TeachingBoardEditor({
     sceneRef.current = {
       formatVersion: CURRENT_WORK_FORMAT_VERSION,
       elements,
-      appState: stableDrawingAppState(appState),
+      appState: stableDrawingAppState(effectiveAppState),
       files,
       background,
+      ...(pageCountRef.current > 1 ? { pageCount: pageCountRef.current } : {}),
     }
     // The sheet is a plain DOM element under a transparent canvas, so it is
     // moved by hand on every change — written straight to the node, because a
     // re-render per pointer move while panning is not affordable.
     const paper = paperRef.current
     if (paper) {
-      const zoom = appState.zoom.value
-      paper.style.transform = `translate(${appState.scrollX * zoom}px, ${appState.scrollY * zoom}px) scale(${zoom})`
+      const zoom = effectiveAppState.zoom.value
+      paper.style.transform = `translate(${effectiveAppState.scrollX * zoom}px, ${effectiveAppState.scrollY * zoom}px) scale(${zoom})`
     }
     onSceneChange?.(target, sceneRef.current)
     if (contentChanged && !ignoreChangesRef.current && editable) markDirty(true)
@@ -628,19 +662,70 @@ export default function TeachingBoardEditor({
     })
   }, [apiReady, dropQuestionImage, editable, insertImage, onInsertImageHandled, sceneReady])
 
-  /** Puts the whole sheet on screen — the way back when the view wanders. */
-  const fitPaper = () => {
+  /** Fill the board width. This is also the minimum zoom teachers may use. */
+  const ensureMinimumPaperZoom = useCallback((forceFitWidth = false) => {
     const api = apiRef.current
     const box = surfaceRef.current?.getBoundingClientRect()
     if (!api || !box || box.width === 0) return
-    const zoom = Math.min(box.width / (BOARD_SHEET_WIDTH + 80), box.height / (BOARD_SHEET_HEIGHT + 80))
+    const state = api.getAppState()
+    const zoom = minimumBoardZoom(box.width)
+    if (!forceFitWidth && state.zoom.value >= zoom - 0.0001) return
+    const visibleCenterY = -state.scrollY + box.height / (2 * state.zoom.value)
+    const scrollY = forceFitWidth
+      ? 0
+      : box.height / (2 * zoom) - visibleCenterY
     api.updateScene({
       appState: {
-        scrollX: box.width / (2 * zoom) - BOARD_SHEET_WIDTH / 2,
-        scrollY: box.height / (2 * zoom) - BOARD_SHEET_HEIGHT / 2,
+        scrollX: 0,
+        scrollY,
         zoom: { value: zoom as AppState['zoom']['value'] },
       },
+      captureUpdate: CaptureUpdateAction.NEVER,
     })
+    const paper = paperRef.current
+    if (paper) paper.style.transform = `translate(0px, ${scrollY * zoom}px) scale(${zoom})`
+  }, [])
+
+  const fitPaper = useCallback(() => {
+    ensureMinimumPaperZoom(true)
+  }, [ensureMinimumPaperZoom])
+
+  useEffect(() => {
+    if (!apiReady || !sceneReady) return
+    const shouldFitWidth = !(
+      editorScene.appState.zoom
+      && typeof editorScene.appState.zoom === 'object'
+      && !Array.isArray(editorScene.appState.zoom)
+      && typeof (editorScene.appState.zoom as { value?: unknown }).value === 'number'
+    )
+    const frame = requestAnimationFrame(() => ensureMinimumPaperZoom(shouldFitWidth))
+    const surface = surfaceRef.current
+    if (typeof ResizeObserver === 'undefined' || !surface) {
+      return () => cancelAnimationFrame(frame)
+    }
+    const observer = new ResizeObserver(() => ensureMinimumPaperZoom(false))
+    observer.observe(surface)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [apiReady, editorRevision, editorScene.appState.zoom, ensureMinimumPaperZoom, sceneReady])
+
+  const addBoardPage = () => {
+    if (!editable || presentationLocked || pageCountRef.current >= MAX_SCRATCHPAD_PAGE_COUNT) return
+    const nextPageCount = pageCountRef.current + 1
+    sceneMutationEpochRef.current += 1
+    updatePageCount(nextPageCount)
+    sceneRef.current = { ...sceneRef.current, pageCount: nextPageCount }
+    onSceneChange?.(target, sceneRef.current)
+    markDirty(true)
+    requestAnimationFrame(() => {
+      apiRef.current?.updateScene({
+        appState: { scrollY: -boardPageTop(nextPageCount - 1) },
+        captureUpdate: CaptureUpdateAction.NEVER,
+      })
+    })
+    toast.success(`เพิ่มหน้าที่ ${nextPageCount} แล้ว`)
   }
 
   const duplicateNextStep = async () => {
@@ -687,6 +772,7 @@ export default function TeachingBoardEditor({
       contentSignatureRef.current = contentSignature(scene.elements as readonly OrderedExcalidrawElement[])
       legacyTeacherImagesRef.current = createLegacyTeacherImageSnapshot(scene)
       setBackground(scene.background)
+      updatePageCount(scene.pageCount)
       setEditorScene(scene)
       setEditorRevision(value => value + 1)
       onDuplicated?.(scene)
@@ -860,6 +946,23 @@ export default function TeachingBoardEditor({
               </p>
             </div>
             <div className="ml-auto flex items-center gap-1">
+              {editable && (
+                <>
+                  <span className="whitespace-nowrap rounded-full bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground" aria-live="polite">
+                    หน้า {pageCount}/{MAX_SCRATCHPAD_PAGE_COUNT}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={addBoardPage}
+                    disabled={saving || loading || operationPending || presentationLocked || duplicating || pageCount >= MAX_SCRATCHPAD_PAGE_COUNT}
+                  >
+                    <FilePlus2 />
+                    {pageCount >= MAX_SCRATCHPAD_PAGE_COUNT ? 'ครบ 3 หน้า' : 'เพิ่มหน้า'}
+                  </Button>
+                </>
+              )}
               {canReset && (
                 <Button type="button" variant="outline" size="xs" onClick={() => void requestReset()} disabled={saving || loading || operationPending || presentationLocked || duplicating || !scratchpadHasMeaningfulDraft(sceneRef.current)}>
                   <RotateCcw /> กระดานใหม่
@@ -997,9 +1100,24 @@ export default function TeachingBoardEditor({
           <div
             ref={paperRef}
             aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 origin-top-left rounded-md shadow-sm ring-1 ring-border"
-            style={{ width: BOARD_SHEET_WIDTH, height: BOARD_SHEET_HEIGHT, ...drawingBackgroundStyle(background) }}
-          />
+            data-board-paper-stack="true"
+            className="pointer-events-none absolute left-0 top-0 origin-top-left"
+            style={{ width: BOARD_SHEET_WIDTH, height: boardPaperHeight(pageCount) }}
+          >
+            {Array.from({ length: pageCount }, (_, index) => (
+              <div
+                key={index}
+                data-board-page={index + 1}
+                className="absolute left-0 rounded-md shadow-sm ring-1 ring-border"
+                style={{
+                  top: boardPageTop(index),
+                  width: BOARD_SHEET_WIDTH,
+                  height: BOARD_SHEET_HEIGHT,
+                  ...drawingBackgroundStyle(background),
+                }}
+              />
+            ))}
+          </div>
           {(loading || operationPending) && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-overlay/20 backdrop-blur-[1px]">
               <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-sm shadow-md">

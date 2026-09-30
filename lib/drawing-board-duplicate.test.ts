@@ -13,6 +13,7 @@ describe('duplicateDrawingScene', () => {
     const source: ScratchpadScene = {
       formatVersion: CURRENT_WORK_FORMAT_VERSION,
       background: 'grid' as const,
+      pageCount: 3,
       appState: { scrollX: 12 },
       elements: [
         {
@@ -43,6 +44,7 @@ describe('duplicateDrawingScene', () => {
 
     const result = duplicateDrawingScene(source, kind => ids[kind].shift() ?? 'unexpected', 99)
     expect(result.scene.background).toBe('grid')
+    expect(result.scene.pageCount).toBe(3)
     expect(result.scene.appState).toEqual({ scrollX: 12 })
     expect(result.scene.elements).toHaveLength(4)
     expect(result.elementIdMap.get('deleted')).toBeUndefined()

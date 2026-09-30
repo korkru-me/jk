@@ -29,6 +29,14 @@ describe('scratchpad scene foundation', () => {
     expect(sanitizeScratchpadScene({ ...scene, formatVersion: 999 })).toBeNull()
   })
 
+  it('accepts one to three paper pages and rejects an invalid count', () => {
+    const scene = emptyScratchpadScene('lined')
+    expect(sanitizeScratchpadScene({ ...scene, pageCount: 3 })).toMatchObject({ pageCount: 3 })
+    expect(sanitizeScratchpadScene({ ...scene, pageCount: 0 })).toBeNull()
+    expect(sanitizeScratchpadScene({ ...scene, pageCount: 4 })).toBeNull()
+    expect(sanitizeScratchpadScene({ ...scene, pageCount: 1.5 })).toBeNull()
+  })
+
   it('rejects a scene above the local byte ceiling', () => {
     const scene = {
       ...emptyScratchpadScene(),

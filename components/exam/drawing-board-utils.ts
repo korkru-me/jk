@@ -25,6 +25,22 @@ export const TRANSPARENT_CANVAS = 'transparent'
  */
 export const BOARD_SHEET_WIDTH = 1600
 export const BOARD_SHEET_HEIGHT = 1100
+export const BOARD_PAGE_GAP = 48
+
+/** The paper may fill the viewport or be enlarged, but never shrink below it. */
+export function minimumBoardZoom(surfaceWidth: number): number {
+  if (!Number.isFinite(surfaceWidth) || surfaceWidth <= 0) return 1
+  return Math.min(30, Math.max(0.1, surfaceWidth / BOARD_SHEET_WIDTH))
+}
+
+export function boardPaperHeight(pageCount: number): number {
+  const safePageCount = Math.min(3, Math.max(1, Math.floor(pageCount)))
+  return safePageCount * BOARD_SHEET_HEIGHT + (safePageCount - 1) * BOARD_PAGE_GAP
+}
+
+export function boardPageTop(pageIndex: number): number {
+  return Math.max(0, Math.floor(pageIndex)) * (BOARD_SHEET_HEIGHT + BOARD_PAGE_GAP)
+}
 
 /** Ink presets behind the ปากกา / ไฮไลต์ buttons. */
 export const PEN_INK = { color: '#172554', width: 2, opacity: 100 } as const
