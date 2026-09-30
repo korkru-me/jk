@@ -1,0 +1,18 @@
+---
+description: Keep Git merges and Staging migration delivery in one explicit workflow
+alwaysApply: true
+---
+
+# Migration delivery
+
+- A feature that adds `supabase/migrations/*.sql` is not delivered merely because its code was merged.
+- Keep the migration and dependent code in the same commit. Merge or push that commit before mutating any database so Git remains the recovery and handoff record.
+- In the same delivery task, target the exact Staging project, run `supabase migration list`, inspect the exact pending SQL, and require `supabase db push --dry-run` to show only the intended migration(s).
+- After the dry-run passes, apply to Staging, run any documented Staging-only bootstrap/cron step, then run `supabase migration list` again. Do not report completion until local and Staging histories match.
+- If SQL contains or can cause `DELETE`, `DROP`, `TRUNCATE`, irreversible backfill, retention purge, RLS/grant/role/function authority changes, or another material data risk, obtain explicit user approval before apply even on Staging.
+- Never apply an unexpected migration just to make the histories match. Stop, identify its owner and intended environment, and report the mismatch.
+- Production never follows a merge automatically. It requires its own readiness checks, dry-run, explicit approval where required, apply, and parity verification.
+- Every migration handoff must report these separately:
+  - `Git: merged/pushed` or `pending/blocked`
+  - `Staging DB: applied + parity verified` or `pending/blocked`
+  - `Production DB: applied + parity verified` or `not requested/pending/blocked`
