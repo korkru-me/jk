@@ -46,17 +46,16 @@ interface Props {
 // push the track wider, so rows (and the header) end up different total
 // widths and the fixed columns after it drift out of alignment row to row.
 const GRID_COLS_READ_ONLY = 'grid-cols-[auto_minmax(160px,1fr)]'
-const GRID_COLS_MANAGE = 'grid-cols-[32px_auto_minmax(160px,1fr)_40px]'
-const GRID_COLS_WITH_ROSTER = 'grid-cols-[32px_56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
+const GRID_COLS_MANAGE = 'grid-cols-[auto_minmax(160px,1fr)_40px]'
+const GRID_COLS_MANAGE_SELECT = 'grid-cols-[32px_auto_minmax(160px,1fr)_40px]'
+const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
+const GRID_COLS_WITH_ROSTER_SELECT = 'grid-cols-[32px_56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
 
 export function StudentTable({
   classroomId, students, profiles = {}, canManage = false, showRoster = false, showProfiles = false,
   sortRules, onToggleSort,
 }: Props) {
   const [confirm, confirmDialog] = useConfirm()
-  const GRID_COLS = showRoster && canManage
-    ? GRID_COLS_WITH_ROSTER
-    : canManage ? GRID_COLS_MANAGE : GRID_COLS_READ_ONLY
   const augmented: Student[] = students.map(s => ({
     ...s,
     initials: s.full_name.slice(0, 2),
@@ -64,8 +63,15 @@ export function StudentTable({
 
   const [query, setQuery] = useState('')
   const [viewingProfile, setViewingProfile] = useState<Student | null>(null)
+  const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [isPending, startTransition] = useTransition()
+
+  const GRID_COLS = showRoster && canManage
+    ? selectionMode ? GRID_COLS_WITH_ROSTER_SELECT : GRID_COLS_WITH_ROSTER
+    : canManage
+      ? selectionMode ? GRID_COLS_MANAGE_SELECT : GRID_COLS_MANAGE
+      : GRID_COLS_READ_ONLY
 
   const filtered = augmented
     .filter(s =>
@@ -75,7 +81,6 @@ export function StudentTable({
     .sort((a, b) => compareStudentsByRules(a, b, profiles, sortRules))
 
   const selectedStudents = augmented.filter(student => selectedIds.has(student.id))
-  const allStudentsSelected = students.length > 0 && students.every(student => selectedIds.has(student.id))
   const allFilteredSelected = filtered.length > 0 && filtered.every(student => selectedIds.has(student.id))
   const someFilteredSelected = filtered.some(student => selectedIds.has(student.id))
 
@@ -144,6 +149,7 @@ export function StudentTable({
       if (res?.error) toast.error(res.error)
       else {
         setSelectedIds(new Set())
+        setSelectionMode(false)
         toast.success(`นำนักเรียนออกแล้ว ${count} คน`)
       }
     })
@@ -195,27 +201,41 @@ export function StudentTable({
         </div>
         {canManage && (
           <div className="flex flex-wrap items-center gap-2">
-            {selectedStudents.length > 0 && (
-              <Badge variant="secondary">เลือกแล้ว {selectedStudents.length} คน</Badge>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setSelectedIds(allStudentsSelected ? new Set() : new Set(students.map(student => student.id)))}
-              disabled={students.length === 0 || isPending}
-            >
-              <ListChecks data-icon="inline-start" />
-              {allStudentsSelected ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทั้งหมด'}
-            </Button>
-            {selectedStudents.length > 0 && (
+            {selectionMode ? (
+              <>
+                <Badge variant="secondary">เลือกแล้ว {selectedStudents.length} คน</Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectionMode(false)
+                    setSelectedIds(new Set())
+                  }}
+                  disabled={isPending}
+                >
+                  ยกเลิก
+                </Button>
+                {selectedStudents.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleBulkRemove}
+                    disabled={isPending}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    ลบนักเรียน {selectedStudents.length} คน
+                  </Button>
+                )}
+              </>
+            ) : (
               <Button
                 type="button"
-                variant="destructive"
-                onClick={handleBulkRemove}
-                disabled={isPending}
+                variant="outline"
+                onClick={() => setSelectionMode(true)}
+                disabled={students.length === 0 || isPending}
               >
-                <Trash2 data-icon="inline-start" />
-                ลบนักเรียน {selectedStudents.length} คน
+                <ListChecks data-icon="inline-start" />
+                เลือกนักเรียน
               </Button>
             )}
           </div>
@@ -226,7 +246,7 @@ export function StudentTable({
       <Card edge="ring" className="overflow-x-auto">
         {/* Header */}
         <div className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-muted border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
-          {canManage && (
+          {canManage && selectionMode && (
             <label className="flex items-center justify-center" title="เลือกนักเรียนที่แสดงทั้งหมด">
               <input
                 type="checkbox"
@@ -280,7 +300,7 @@ export function StudentTable({
                   key={student.id}
                   className={`grid ${GRID_COLS} gap-3 items-center px-4 py-3 hover:bg-muted/50 transition-colors relative`}
                 >
-                  {canManage && (
+                  {canManage && selectionMode && (
                     <label className="flex items-center justify-center">
                       <input
                         type="checkbox"
