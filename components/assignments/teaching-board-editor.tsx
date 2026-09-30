@@ -37,6 +37,7 @@ import {
   boardPaperHeight,
   BOARD_SHEET_HEIGHT,
   BOARD_SHEET_WIDTH,
+  clampBoardScrollX,
   createDrawingPreview,
   DRAWING_DEFAULT_ITEM_STATE,
   drawingBackgroundStyle,
@@ -513,13 +514,25 @@ export default function TeachingBoardEditor({
     if (operationPending || persistenceBlockedRef.current) return
     const box = surfaceRef.current?.getBoundingClientRect()
     const minimumZoom = box ? minimumBoardZoom(box.width) : appState.zoom.value
+    const constrainedZoom = Math.max(appState.zoom.value, minimumZoom)
+    const constrainedScrollX = box
+      ? clampBoardScrollX(appState.scrollX, box.width, constrainedZoom)
+      : appState.scrollX
     let effectiveAppState = appState
-    if (box && appState.zoom.value < minimumZoom - 0.0001) {
+    if (
+      box
+      && (
+        appState.zoom.value < minimumZoom - 0.0001
+        || Math.abs(appState.scrollX - constrainedScrollX) > 0.0001
+      )
+    ) {
       const visibleCenterY = -appState.scrollY + box.height / (2 * appState.zoom.value)
       const constrainedView = {
-        scrollX: 0,
-        scrollY: box.height / (2 * minimumZoom) - visibleCenterY,
-        zoom: { value: minimumZoom as AppState['zoom']['value'] },
+        scrollX: constrainedScrollX,
+        scrollY: appState.zoom.value < minimumZoom - 0.0001
+          ? box.height / (2 * constrainedZoom) - visibleCenterY
+          : appState.scrollY,
+        zoom: { value: constrainedZoom as AppState['zoom']['value'] },
       }
       effectiveAppState = { ...appState, ...constrainedView }
       apiRef.current?.updateScene({
@@ -662,33 +675,39 @@ export default function TeachingBoardEditor({
     })
   }, [apiReady, dropQuestionImage, editable, insertImage, onInsertImageHandled, sceneReady])
 
-  /** Fill the board width. This is also the minimum zoom teachers may use. */
-  const ensureMinimumPaperZoom = useCallback((forceFitWidth = false) => {
+  /** Fill the board horizontally and never let either paper edge cross the viewport. */
+  const constrainPaperViewport = useCallback((forceFitWidth = false) => {
     const api = apiRef.current
     const box = surfaceRef.current?.getBoundingClientRect()
     if (!api || !box || box.width === 0) return
     const state = api.getAppState()
-    const zoom = minimumBoardZoom(box.width)
-    if (!forceFitWidth && state.zoom.value >= zoom - 0.0001) return
+    const minimumZoom = minimumBoardZoom(box.width)
+    const zoom = forceFitWidth ? minimumZoom : Math.max(state.zoom.value, minimumZoom)
+    const scrollX = forceFitWidth ? 0 : clampBoardScrollX(state.scrollX, box.width, zoom)
+    const zoomChanged = Math.abs(state.zoom.value - zoom) > 0.0001
+    const scrollXChanged = Math.abs(state.scrollX - scrollX) > 0.0001
+    if (!forceFitWidth && !zoomChanged && !scrollXChanged) return
     const visibleCenterY = -state.scrollY + box.height / (2 * state.zoom.value)
     const scrollY = forceFitWidth
       ? 0
-      : box.height / (2 * zoom) - visibleCenterY
+      : zoomChanged ? box.height / (2 * zoom) - visibleCenterY : state.scrollY
     api.updateScene({
       appState: {
-        scrollX: 0,
+        scrollX,
         scrollY,
         zoom: { value: zoom as AppState['zoom']['value'] },
       },
       captureUpdate: CaptureUpdateAction.NEVER,
     })
     const paper = paperRef.current
-    if (paper) paper.style.transform = `translate(0px, ${scrollY * zoom}px) scale(${zoom})`
+    if (paper) {
+      paper.style.transform = `translate(${scrollX * zoom}px, ${scrollY * zoom}px) scale(${zoom})`
+    }
   }, [])
 
   const fitPaper = useCallback(() => {
-    ensureMinimumPaperZoom(true)
-  }, [ensureMinimumPaperZoom])
+    constrainPaperViewport(true)
+  }, [constrainPaperViewport])
 
   useEffect(() => {
     if (!apiReady || !sceneReady) return
@@ -698,18 +717,18 @@ export default function TeachingBoardEditor({
       && !Array.isArray(editorScene.appState.zoom)
       && typeof (editorScene.appState.zoom as { value?: unknown }).value === 'number'
     )
-    const frame = requestAnimationFrame(() => ensureMinimumPaperZoom(shouldFitWidth))
+    const frame = requestAnimationFrame(() => constrainPaperViewport(shouldFitWidth))
     const surface = surfaceRef.current
     if (typeof ResizeObserver === 'undefined' || !surface) {
       return () => cancelAnimationFrame(frame)
     }
-    const observer = new ResizeObserver(() => ensureMinimumPaperZoom(false))
+    const observer = new ResizeObserver(() => constrainPaperViewport(false))
     observer.observe(surface)
     return () => {
       cancelAnimationFrame(frame)
       observer.disconnect()
     }
-  }, [apiReady, editorRevision, editorScene.appState.zoom, ensureMinimumPaperZoom, sceneReady])
+  }, [apiReady, constrainPaperViewport, editorRevision, editorScene.appState.zoom, sceneReady])
 
   const addBoardPage = () => {
     if (!editable || presentationLocked || pageCountRef.current >= MAX_SCRATCHPAD_PAGE_COUNT) return

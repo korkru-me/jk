@@ -33,6 +33,15 @@ export function minimumBoardZoom(surfaceWidth: number): number {
   return Math.min(30, Math.max(0.1, surfaceWidth / BOARD_SHEET_WIDTH))
 }
 
+/** Keep the sheet covering the viewport while allowing movement when zoomed in. */
+export function clampBoardScrollX(scrollX: number, surfaceWidth: number, zoom: number): number {
+  if (!Number.isFinite(scrollX)) return 0
+  const safeSurfaceWidth = Number.isFinite(surfaceWidth) ? Math.max(0, surfaceWidth) : 0
+  const safeZoom = Number.isFinite(zoom) ? Math.max(0.1, zoom) : 1
+  const minimumScrollX = Math.min(0, safeSurfaceWidth / safeZoom - BOARD_SHEET_WIDTH)
+  return Math.min(0, Math.max(minimumScrollX, scrollX))
+}
+
 export function boardPaperHeight(pageCount: number): number {
   const safePageCount = Math.min(3, Math.max(1, Math.floor(pageCount)))
   return safePageCount * BOARD_SHEET_HEIGHT + (safePageCount - 1) * BOARD_PAGE_GAP
