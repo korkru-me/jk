@@ -16,7 +16,6 @@ interface ClassroomPeopleTabsProps {
   classroomId: string
   students: Array<{ id: string; full_name: string; email: string }>
   groupStudents: GroupStudent[]
-  otherClassrooms: Array<{ id: string; name: string }>
   profiles: Record<string, StudentProfileRow>
   canManage: boolean
   sortRules: StudentSortRule[]
@@ -29,7 +28,7 @@ interface ClassroomPeopleTabsProps {
 }
 
 export function ClassroomPeopleTabs({
-  classroomId, students, groupStudents, otherClassrooms, profiles, canManage,
+  classroomId, students, groupStudents, profiles, canManage,
   sortRules, onToggleSort, groupState, setGroupState, assignmentTitlesByGroup,
   value, onValueChange,
 }: ClassroomPeopleTabsProps) {
@@ -56,8 +55,8 @@ export function ClassroomPeopleTabs({
         <StudentTable
           classroomId={classroomId}
           students={students}
-          otherClassrooms={otherClassrooms}
           profiles={profiles}
+          canManage={canManage}
           showRoster={canManage}
           sortRules={sortRules}
           onToggleSort={onToggleSort}

@@ -67,7 +67,6 @@ interface Props {
   switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>>
   students: RealStudent[]
   assignmentCount: number
-  otherClassrooms: { id: string; name: string }[]
   isOwner: boolean
   canManage: boolean
   coTeachers: CoTeacherRow[]
@@ -105,7 +104,7 @@ interface Props {
 }
 
 export function ClassroomDetailClient({
-  classroom, switchableClassrooms, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
+  classroom, switchableClassrooms, students, assignmentCount, isOwner, canManage, coTeachers, invites,
   classroomAssignments, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewByAssignment, seenByPost, crossPostTargets,
@@ -311,8 +310,8 @@ export function ClassroomDetailClient({
           <StudentTable
             classroomId={classroom.id}
             students={students}
-            otherClassrooms={otherClassrooms}
             profiles={studentProfiles}
+            canManage={canManage}
             showRoster={canManage}
             showProfiles={canManage}
             sortRules={studentSortRules}
@@ -323,7 +322,6 @@ export function ClassroomDetailClient({
             classroomId={classroom.id}
             students={students}
             groupStudents={groupStudents}
-            otherClassrooms={otherClassrooms}
             profiles={studentProfiles}
             canManage={canManage}
             sortRules={studentSortRules}

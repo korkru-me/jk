@@ -256,7 +256,6 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
           classroomId={CLASSROOM_ID}
           students={roster}
           groupStudents={seed.roster}
-          otherClassrooms={[]}
           profiles={profiles}
           canManage
           sortRules={sortRules}

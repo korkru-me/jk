@@ -525,13 +525,10 @@ export default async function ClassroomDetailPage({
     }])
   )
 
-  // Other classrooms for "move student" feature (owners only).
   const ownedClassroomList = (otherClassroomRows ?? []) as {
     id: string; name: string; description: string | null; classroom_type: string
     status: string; deleted_at: string | null
   }[]
-  const otherClassroomList = isOwner ? ownedClassroomList : []
-  const otherClassrooms = otherClassroomList.map(({ id: classroomId, name }) => ({ id: classroomId, name }))
   const switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>> = []
   const seenSwitchableClassroomIds = new Set<string>()
   const switchableCandidates = [
@@ -576,7 +573,6 @@ export default async function ClassroomDetailPage({
       switchableClassrooms={switchableClassrooms}
       students={students}
       assignmentCount={assignmentCount ?? 0}
-      otherClassrooms={otherClassrooms}
       isOwner={isOwner}
       canManage={canManage}
       coTeachers={coTeachers}

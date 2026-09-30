@@ -387,19 +387,35 @@ export async function leaveClassroom(classroomId: string) {
 }
 
 export async function removeStudent(classroomId: string, studentId: string) {
+  return removeStudents(classroomId, [studentId])
+}
+
+export async function removeStudents(classroomId: string, studentIds: string[]) {
   const user = await getAuthUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  if (!Array.isArray(studentIds) || studentIds.length === 0 || studentIds.length > 500) {
+    return { error: 'รายการนักเรียนไม่ถูกต้อง' }
+  }
+  const uniqueIds = [...new Set(studentIds)]
+  if (
+    uniqueIds.length !== studentIds.length
+    || uniqueIds.some(studentId => typeof studentId !== 'string' || !studentId)
+  ) {
+    return { error: 'รายการนักเรียนไม่ถูกต้อง' }
+  }
+
   const admin = createAdminClient()
-  const { data: classroom } = await admin
-    .from('classrooms').select('id').eq('id', classroomId).eq('teacher_id', user.id).maybeSingle()
-  if (!classroom) return { error: 'ไม่มีสิทธิ์' }
+  if (!(await canManageClassroom(admin, classroomId, user.id))) return { error: 'ไม่มีสิทธิ์' }
+
   const { error } = await admin
     .from('classroom_students')
     .delete()
     .eq('classroom_id', classroomId)
-    .eq('student_id', studentId)
+    .in('student_id', uniqueIds)
   if (error) return { error: error.message }
   revalidatePath(`/classrooms/${classroomId}`)
+  return { success: true }
 }
 
 async function canManageClassroom(admin: ReturnType<typeof createAdminClient>, classroomId: string, userId: string) {
