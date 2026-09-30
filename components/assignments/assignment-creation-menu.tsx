@@ -1,10 +1,7 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import {
-  ChevronLeft,
-  ChevronRight,
   ClipboardPenLine,
   Copy,
   Plus,
@@ -46,10 +43,8 @@ export function AssignmentCreationMenu({
   active = false,
   onNavigate,
 }: AssignmentCreationMenuProps) {
-  const [menuLevel, setMenuLevel] = useState<'start' | 'type'>('start')
-
   return (
-    <DropdownMenu onOpenChange={open => !open && setMenuLevel('start')}>
+    <DropdownMenu>
       <DropdownMenuTrigger
         render={(
           <Button
@@ -65,68 +60,43 @@ export function AssignmentCreationMenu({
         <span className="truncate">{label}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="min-w-56">
-        {menuLevel === 'start' ? (
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>เลือกวิธีมอบหมายงาน</DropdownMenuLabel>
-            <DropdownMenuItem
-              variant="primary"
-              className="py-2"
-              render={<Link href={assignmentReuseHref(classroomId)} onClick={onNavigate} />}
-            >
-              <Copy aria-hidden="true" />
-              <span>นำงานเดิมมาใช้</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="primary"
-              className="py-2"
-              closeOnClick={false}
-              onClick={() => setMenuLevel('type')}
-            >
-              <Plus aria-hidden="true" />
-              <span>สร้างงานใหม่</span>
-              <ChevronRight className="ml-auto" aria-hidden="true" />
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        ) : (
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>เลือกประเภทงาน</DropdownMenuLabel>
-            <DropdownMenuItem
-              variant="primary"
-              className="py-2 text-muted-foreground"
-              closeOnClick={false}
-              onClick={() => setMenuLevel('start')}
-            >
-              <ChevronLeft aria-hidden="true" />
-              <span>กลับไปเลือกวิธี</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="primary"
-              className="py-2"
-              render={(
-                <Link
-                  href={assignmentCreationHref(classroomId, 'exercise')}
-                  onClick={onNavigate}
-                />
-              )}
-            >
-              <Repeat2 aria-hidden="true" />
-              <span>แบบฝึกหัด</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="primary"
-              className="py-2"
-              render={(
-                <Link
-                  href={assignmentCreationHref(classroomId, 'exam')}
-                  onClick={onNavigate}
-                />
-              )}
-            >
-              <ClipboardPenLine aria-hidden="true" />
-              <span>ข้อสอบ</span>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        )}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>เลือกงานที่ต้องการมอบหมาย</DropdownMenuLabel>
+          <DropdownMenuItem
+            variant="primary"
+            className="py-2"
+            render={<Link href={assignmentReuseHref(classroomId)} onClick={onNavigate} />}
+          >
+            <Copy aria-hidden="true" />
+            <span>นำงานเดิมมาใช้</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="primary"
+            className="py-2"
+            render={(
+              <Link
+                href={assignmentCreationHref(classroomId, 'exercise')}
+                onClick={onNavigate}
+              />
+            )}
+          >
+            <Repeat2 aria-hidden="true" />
+            <span>แบบฝึกหัด</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="primary"
+            className="py-2"
+            render={(
+              <Link
+                href={assignmentCreationHref(classroomId, 'exam')}
+                onClick={onNavigate}
+              />
+            )}
+          >
+            <ClipboardPenLine aria-hidden="true" />
+            <span>ข้อสอบ</span>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )
