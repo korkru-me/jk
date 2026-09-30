@@ -11,7 +11,6 @@ import {
   Folder,
   GripVertical,
   Grid3x3,
-  Pencil,
   RefreshCw,
   Target,
   Users,
@@ -550,13 +549,6 @@ export function ClassroomAssignmentsTab({
                             <ClipboardCheck data-icon="inline-start" />
                             ตรวจให้คะแนน
                             {pendingReview > 0 && <span className="text-xs font-semibold text-foreground">{pendingReview}</span>}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            render={<Link href={`/assignments/${assignment.id}/edit`} />}
-                          >
-                            <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
                           </Button>
                           <Button
                             variant="ghost"
