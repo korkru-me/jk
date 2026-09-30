@@ -38,6 +38,7 @@ function validEnvironment(overrides = {}) {
 }
 
 function plist({ quitHash = OLD_HASH, sendKey = false, startUrl, quitUrl } = {}) {
+  const origin = new URL(startUrl ?? 'https://staging.korkru.com/assignments').origin
   return Buffer.from(`<?xml version="1.0" encoding="utf-8"?>
 <plist version="1.0"><dict>
   <key>startURL</key><string>${startUrl ?? 'https://staging.korkru.com/assignments'}</string>
@@ -51,6 +52,15 @@ function plist({ quitHash = OLD_HASH, sendKey = false, startUrl, quitUrl } = {})
   <key>sendBrowserExamKey</key><${sendKey ? 'true' : 'false'} />
   <key>examKeySalt</key><data>${Buffer.alloc(32, 1).toString('base64')}</data>
   <key>browserExamKey</key><string />
+  <key>URLFilterEnable</key><true />
+  <key>URLFilterRules</key><array>
+    <dict>
+      <key>active</key><true />
+      <key>regex</key><false />
+      <key>expression</key><string>${origin}/*</string>
+      <key>action</key><integer>1</integer>
+    </dict>
+  </array>
 </dict></plist>`)
 }
 
@@ -170,6 +180,7 @@ describe('assignment SEB artifact operator core', () => {
     expect(xml).toContain('<key>sendBrowserExamKey</key><true />')
     expect(xml).toContain(`<data>${Buffer.alloc(32, 7).toString('base64')}</data>`)
     expect(xml).toContain('<key>browserExamKey</key><string></string>')
+    expect(xml).toContain('<key>expression</key><string>https://staging.korkru.com/*</string>')
     expect(xml).not.toContain(CONFIG_KEY)
     expect(xml).not.toContain(BROWSER_KEY)
   })
@@ -218,6 +229,22 @@ describe('assignment SEB artifact operator core', () => {
       plist({ startUrl: 'https://staging.korkru.com/assignments?wrong=1' }),
       CURRENT_HASH,
     )).toThrowError('SEB_ARTIFACT_POLICY_INVALID')
+  })
+
+  it('rewrites and validates the current URLFilterRules origin for dedicated UAT', () => {
+    const bytes = materializeAssignmentSebPlaintextSeed(
+      plist(),
+      CURRENT_HASH,
+      () => Buffer.alloc(32, 11),
+      UAT_ORIGIN,
+    )
+    const xml = bytes.toString('utf8')
+    expect(xml).toContain(`<key>expression</key><string>${UAT_ORIGIN}/*</string>`)
+    expect(xml).not.toContain('<key>expression</key><string>https://staging.korkru.com/*</string>')
+
+    const staleRules = Buffer.from(xml.replace(`${UAT_ORIGIN}/*`, 'https://staging.korkru.com/*'))
+    expect(() => inspectAssignmentSebPlaintextArtifact(staleRules, CURRENT_HASH, UAT_ORIGIN))
+      .toThrowError('SEB_ARTIFACT_POLICY_INVALID')
   })
 
   it('rejects comment-only policy decoys and identical admin/quit passwords', () => {

@@ -1,17 +1,16 @@
 import 'server-only'
 
 import { createHash } from 'node:crypto'
+import {
+  SEB_QUIT_PASSWORD_MAX_LENGTH,
+  SEB_QUIT_PASSWORD_MIN_LENGTH,
+  isValidSebQuitPassword,
+} from '@/lib/seb-quit-password-policy'
 
-export const SEB_QUIT_PASSWORD_MIN_LENGTH = 20
-export const SEB_QUIT_PASSWORD_MAX_LENGTH = 64
+export { SEB_QUIT_PASSWORD_MAX_LENGTH, SEB_QUIT_PASSWORD_MIN_LENGTH }
 export const SEB_QUIT_PASSWORD_MAX_REVISION = 2_147_483_646
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const PRINTABLE_ASCII_PATTERN = /^[\x21-\x7e]+$/
-const UPPERCASE_PATTERN = /[A-Z]/
-const LOWERCASE_PATTERN = /[a-z]/
-const DIGIT_PATTERN = /[0-9]/
-const SYMBOL_PATTERN = /[^A-Za-z0-9]/
 
 export type SebQuitPasswordErrorCode =
   | 'SEB_QUIT_PASSWORD_INVALID_COMMAND'
@@ -184,15 +183,7 @@ export function assertStrongSebQuitPassword(password: string, confirmation: stri
   if (password !== confirmation) {
     throw new SebQuitPasswordError('SEB_QUIT_PASSWORD_CONFIRMATION_MISMATCH')
   }
-  if (
-    password.length < SEB_QUIT_PASSWORD_MIN_LENGTH
-    || password.length > SEB_QUIT_PASSWORD_MAX_LENGTH
-    || !PRINTABLE_ASCII_PATTERN.test(password)
-    || !UPPERCASE_PATTERN.test(password)
-    || !LOWERCASE_PATTERN.test(password)
-    || !DIGIT_PATTERN.test(password)
-    || !SYMBOL_PATTERN.test(password)
-  ) {
+  if (!isValidSebQuitPassword(password)) {
     throw new SebQuitPasswordError('SEB_QUIT_PASSWORD_INVALID')
   }
 }
@@ -268,7 +259,7 @@ const SAFE_ERROR_MESSAGES: Record<SebQuitPasswordErrorCode, string> = {
   SEB_QUIT_PASSWORD_ACTIVE_ATTEMPT: 'เปลี่ยนรหัสไม่ได้ขณะที่มีนักเรียนกำลังทำข้อสอบ',
   SEB_QUIT_PASSWORD_REVISION_CONFLICT: 'การตั้งค่าถูกเปลี่ยนจากอีกหน้าหนึ่ง กรุณาโหลดข้อมูลล่าสุด',
   SEB_QUIT_PASSWORD_REVISION_EXHAUSTED: 'สร้าง revision เพิ่มไม่ได้ กรุณาติดต่อผู้ดูแลระบบ',
-  SEB_QUIT_PASSWORD_INVALID: 'รหัสต้องยาว 20–64 ตัว และมีพิมพ์ใหญ่ พิมพ์เล็ก ตัวเลข และสัญลักษณ์',
+  SEB_QUIT_PASSWORD_INVALID: 'รหัสต้องยาว 6–64 ตัว ใช้ตัวอักษรภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์ และไม่มีเว้นวรรค',
   SEB_QUIT_PASSWORD_CONFIRMATION_MISMATCH: 'รหัสออกและช่องยืนยันไม่ตรงกัน',
 }
 

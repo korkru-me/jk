@@ -17,9 +17,11 @@ The hash-only database boundary described below was added separately in Phase
 - Rotation uses compare-and-swap semantics: the browser-provided expected
   revision must equal the server-read current revision. A successful operation
   produces exactly `current + 1`.
-- A release password is 20–64 printable ASCII characters, contains uppercase,
-  lowercase, number and symbol characters, and matches its confirmation byte
-  for byte. Values are never trimmed or normalized.
+- A release password is 6–64 printable ASCII characters without whitespace and
+  matches its confirmation byte for byte. It intentionally has no uppercase,
+  lowercase, number or symbol composition rule: this is a teacher-owned
+  classroom exit control rather than a student login credential. Values are
+  never trimmed or normalized.
 - The only secret-derived output is the lower-case Base16 SHA-256 value used by
   the standardized SEB `hashedQuitPassword` setting. The plaintext and confirmation are not
   included in the prepared revision, errors, safe responses or metadata.

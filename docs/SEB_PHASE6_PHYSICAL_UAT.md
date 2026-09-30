@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 27 กันยายน 2026 · **กำลังดำเนินการ — immutable release ถูกลงทะเบียนและเผยแพร่บน dedicated UAT แล้ว; รอ physical UAT สี่ระบบ**
+อัปเดต: 30 กันยายน 2026 · **กำลังดำเนินการ — candidate r1 ไม่ผ่าน Windows launch และต้องออก revision/candidate ใหม่ก่อนทดสอบต่อ**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -42,6 +42,20 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   และล็อก `releaseCommitmentSha256`/`lockedAt` ที่ไม่เปิดเผย raw key แล้ว
 - ห้ามใช้ bypass token หรือ shareable secret ใน Start URL/ไฟล์ `.seb`; dedicated UAT origin
   ต้องเข้าได้โดยตรงและยังแสดง `STAGING · ระบบทดสอบ`
+
+### ผล physical UAT ของ candidate r1
+
+- Windows 11 Home Single Language 25H2 (OS Build 26200.9550), SEB 3.10.2 build 920
+  เปิดไฟล์โดยไม่มี entry/settings password แต่ไปไม่ถึง KorKru และแสดง `Page Blocked`
+  จึงบันทึกเคส `opens-without-entry-password` เป็น `failed`; การไม่ถามรหัสอย่างเดียวไม่พอให้เคสผ่าน
+- ตรวจซอร์ส SEB Windows 3.10.2 และ artifact แล้วพบว่า URL ถูกซ่อนในข้อความตาม `browserWindowShowURL=0`
+  ไม่ใช่คำขอ URL ว่าง สาเหตุคือ seed เปลี่ยน `startURL` ไป dedicated UAT แต่ไม่ได้เปลี่ยน
+  authoritative `URLFilterRules` จาก Staging origin ทำให้ redirect หลัง Start URL ถูก default-deny
+- ทดสอบ Quit/Unlock Password ของ candidate r1 บนเครื่องจริงแล้ว SEB ออกสำเร็จ จึงยืนยันเฉพาะกลไก
+  emergency quit แต่ไม่ทำให้ candidate r1 ผ่าน launch หรือใช้แทน end-to-end UAT ได้
+- ต้องแก้ materializer ให้ย้าย active non-regex allow rule เป็น exact `https://korkru-seb-uat.vercel.app/*`, เพิ่ม validator
+  ป้องกัน stale origin แล้วให้ครูตั้งรหัสใหม่เพื่อสร้าง revision 2; หลัง native Final Save ต้องเก็บ CK/BEK
+  ของ artifact ใหม่ครบทุก exact build และลงทะเบียน candidate r2 ก่อนเริ่ม Windows ใหม่
 
 ### Synthetic fixture รอบปัจจุบัน
 

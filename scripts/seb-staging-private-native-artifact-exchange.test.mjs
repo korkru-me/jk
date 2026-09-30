@@ -57,6 +57,13 @@ async function makeTemplate(path) {
 <key>sendBrowserExamKey</key><true />
 <key>examKeySalt</key><data>${Buffer.alloc(32, 1).toString('base64')}</data>
 <key>browserExamKey</key><string></string>
+<key>URLFilterEnable</key><true />
+<key>URLFilterRules</key><array><dict>
+<key>active</key><true />
+<key>regex</key><false />
+<key>expression</key><string>https://staging.korkru.com/*</string>
+<key>action</key><integer>1</integer>
+</dict></array>
 </dict></plist>`
   await writeFile(path, template, { mode: 0o600 })
 }

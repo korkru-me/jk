@@ -177,7 +177,7 @@ function parseTopLevelPlistScalars(xml) {
       values.set(key, { kind, value: textNodeValue(valueNode[kind]) })
       continue
     }
-    values.set(key, { kind: 'complex', value: null })
+    values.set(key, { kind: 'complex', value: null, node: valueNode })
   }
 
   return values
@@ -218,6 +218,120 @@ function replaceScalar(xml, key, replacementTag) {
 function assertScalar(xml, key, kind, expected) {
   const scalar = readScalar(xml, key)
   if (scalar.kind !== kind || scalar.value !== expected) fail('SEB_ARTIFACT_POLICY_INVALID')
+}
+
+function readDictionaryEntries(children) {
+  if (!Array.isArray(children)) fail('SEB_ARTIFACT_POLICY_INVALID')
+  const entries = children.filter(node => significantNodeKeys(node).length > 0)
+  if (entries.length % 2 !== 0) fail('SEB_ARTIFACT_POLICY_INVALID')
+  const values = new Map()
+
+  for (let index = 0; index < entries.length; index += 2) {
+    const keyNode = entries[index]
+    const valueNode = entries[index + 1]
+    if (
+      significantNodeKeys(keyNode).length !== 1
+      || significantNodeKeys(keyNode)[0] !== 'key'
+    ) fail('SEB_ARTIFACT_POLICY_INVALID')
+    const key = textNodeValue(keyNode.key)
+    if (!key || values.has(key)) fail('SEB_ARTIFACT_POLICY_INVALID')
+
+    const valueKeys = significantNodeKeys(valueNode)
+    if (valueKeys.length !== 1) fail('SEB_ARTIFACT_POLICY_INVALID')
+    const kind = valueKeys[0]
+    if (kind === 'true' || kind === 'false') {
+      if (!Array.isArray(valueNode[kind]) || valueNode[kind].length !== 0) {
+        fail('SEB_ARTIFACT_POLICY_INVALID')
+      }
+      values.set(key, { kind: 'boolean', value: kind === 'true' })
+    } else if (kind === 'string' || kind === 'data' || kind === 'integer') {
+      values.set(key, { kind, value: textNodeValue(valueNode[kind]) })
+    } else {
+      fail('SEB_ARTIFACT_POLICY_INVALID')
+    }
+  }
+
+  return values
+}
+
+function readUrlFilterRules(xml) {
+  const parsed = parseTopLevelPlistScalars(xml).get('URLFilterRules')
+  if (
+    !parsed
+    || parsed.kind !== 'complex'
+    || significantNodeKeys(parsed.node).length !== 1
+    || significantNodeKeys(parsed.node)[0] !== 'array'
+    || !Array.isArray(parsed.node.array)
+  ) fail('SEB_ARTIFACT_POLICY_INVALID')
+
+  return parsed.node.array
+    .filter(node => significantNodeKeys(node).length > 0)
+    .map(node => {
+      if (
+        significantNodeKeys(node).length !== 1
+        || significantNodeKeys(node)[0] !== 'dict'
+      ) fail('SEB_ARTIFACT_POLICY_INVALID')
+      const rule = readDictionaryEntries(node.dict)
+      if (
+        rule.size !== 4
+        || !rule.has('active')
+        || !rule.has('regex')
+        || !rule.has('expression')
+        || !rule.has('action')
+      ) fail('SEB_ARTIFACT_POLICY_INVALID')
+      const active = rule.get('active')
+      const regex = rule.get('regex')
+      const expression = rule.get('expression')
+      const action = rule.get('action')
+      if (
+        active.kind !== 'boolean'
+        || regex.kind !== 'boolean'
+        || expression.kind !== 'string'
+        || action.kind !== 'integer'
+        || !['0', '1'].includes(action.value)
+      ) fail('SEB_ARTIFACT_POLICY_INVALID')
+      return Object.freeze({
+        active: active.value,
+        regex: regex.value,
+        expression: expression.value,
+        action: Number(action.value),
+      })
+    })
+}
+
+function assertUrlFilterPolicy(xml, expectedOrigin) {
+  assertScalar(xml, 'URLFilterEnable', 'boolean', true)
+  const rules = readUrlFilterRules(xml)
+  const expectedExpression = `${expectedOrigin}/*`
+  const korkruRules = rules.filter(rule => [...ASSIGNMENT_SEB_TEST_ORIGINS]
+    .some(origin => rule.expression === `${origin}/*`))
+  if (
+    korkruRules.length !== 1
+    || korkruRules[0].active !== true
+    || korkruRules[0].regex !== false
+    || korkruRules[0].action !== 1
+    || korkruRules[0].expression !== expectedExpression
+  ) fail('SEB_ARTIFACT_POLICY_INVALID')
+}
+
+function replaceUrlFilterOrigin(xml, expectedOrigin) {
+  const rules = readUrlFilterRules(xml)
+  const candidates = rules.filter(rule => (
+    rule.active === true
+    && rule.regex === false
+    && rule.action === 1
+    && [...ASSIGNMENT_SEB_TEST_ORIGINS].some(origin => rule.expression === `${origin}/*`)
+  ))
+  if (candidates.length !== 1) fail('SEB_ARTIFACT_POLICY_INVALID')
+
+  const currentExpression = candidates[0].expression
+  const pattern = new RegExp(
+    `(<key>\\s*expression\\s*</key>\\s*<string>\\s*)${escapePattern(currentExpression)}(\\s*</string>)`,
+    'g',
+  )
+  const matches = [...xml.matchAll(pattern)]
+  if (matches.length !== 1) fail('SEB_ARTIFACT_POLICY_INVALID')
+  return xml.replace(pattern, `$1${expectedOrigin}/*$2`)
 }
 
 function decodePlaintextArtifact(bytes) {
@@ -280,6 +394,7 @@ function assertCommonStagingPolicy(xml, expectedOrigin = ASSIGNMENT_SEB_STAGING_
   assertScalar(xml, 'allowQuit', 'boolean', true)
   assertScalar(xml, 'downloadAndOpenSebConfig', 'boolean', false)
   assertScalar(xml, 'examSessionReconfigureAllow', 'boolean', false)
+  assertUrlFilterPolicy(xml, expectedOrigin)
 
   const adminHash = readScalar(xml, 'hashedAdminPassword')
   if (adminHash.kind !== 'string' || !SHA256_PATTERN.test(adminHash.value)) {
@@ -375,6 +490,7 @@ export function materializeAssignmentSebPlaintextSeed(
   xml = replaceScalar(xml, 'examKeySalt', `<data>${randomBytes(32).toString('base64')}</data>`)
   xml = replaceScalar(xml, 'startURL', `<string>${expectedOrigin}/assignments</string>`)
   xml = replaceScalar(xml, 'quitURL', `<string>${expectedOrigin}/exam/quit</string>`)
+  xml = replaceUrlFilterOrigin(xml, expectedOrigin)
   // A BEK copied from a template would describe different bytes/build. The
   // native tool derives the real value only after the final Windows save.
   xml = replaceScalar(xml, 'browserExamKey', '<string></string>')

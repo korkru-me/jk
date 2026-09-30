@@ -13,9 +13,9 @@
       "label": "Windows",
       "sebVersion": "3.10.2",
       "buildNumber": "920",
-      "osVersion": "pending",
+      "osVersion": "Windows 11 Home Single Language 25H2 (OS Build 26200.9550)",
       "cases": [
-        { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
+        { "id": "opens-without-entry-password", "status": "failed", "testedAt": "2026-09-30T06:43:10.000Z" },
         { "id": "system-check", "status": "pending", "testedAt": null },
         { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
         { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },

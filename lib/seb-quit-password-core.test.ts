@@ -93,34 +93,34 @@ describe('SEB teacher-owned quit password policy', () => {
   })
 
   it('accepts the exact minimum and maximum printable-ASCII boundaries', () => {
-    const minimum = `Aa1!${'x'.repeat(SEB_QUIT_PASSWORD_MIN_LENGTH - 4)}`
-    const maximum = `Aa1!${'x'.repeat(SEB_QUIT_PASSWORD_MAX_LENGTH - 4)}`
+    const minimum = '1'.repeat(SEB_QUIT_PASSWORD_MIN_LENGTH)
+    const maximum = 'x'.repeat(SEB_QUIT_PASSWORD_MAX_LENGTH)
 
     expect(() => assertStrongSebQuitPassword(minimum, minimum)).not.toThrow()
     expect(() => assertStrongSebQuitPassword(maximum, maximum)).not.toThrow()
   })
 
   it.each([
-    'Aa1!visible-quote-\'"xx',
-    'Aa1!visible-backslash-\\x',
-    'Aa1!visible-backtick-`xx',
-  ])('accepts visible ASCII symbols without transforming them: %s', value => {
+    '123456',
+    'lowercase-only',
+    'UPPERCASE-ONLY',
+    'no-symbol-123',
+    'visible-quote-\'"',
+    'visible-backslash-\\',
+    'visible-backtick-`',
+  ])('accepts a teacher-chosen printable ASCII password without composition rules: %s', value => {
     expect(() => assertStrongSebQuitPassword(value, value)).not.toThrow()
   })
 
   it.each([
-    ['too short', `Aa1!${'x'.repeat(SEB_QUIT_PASSWORD_MIN_LENGTH - 5)}`],
-    ['too long', `Aa1!${'x'.repeat(SEB_QUIT_PASSWORD_MAX_LENGTH - 3)}`],
+    ['too short', 'x'.repeat(SEB_QUIT_PASSWORD_MIN_LENGTH - 1)],
+    ['too long', 'x'.repeat(SEB_QUIT_PASSWORD_MAX_LENGTH + 1)],
     ['space', 'Strong Password-With1!'],
     ['newline', 'Strong-Password-With1!\n'],
     ['tab', 'Strong-Password-With1!\t'],
     ['NUL', 'Strong-Password-With1!\0'],
     ['DEL', `Strong-Password-With1!${String.fromCharCode(127)}`],
     ['non ASCII', 'Strong-Password-ไทย1!'],
-    ['no uppercase', 'lowercase-password-123!'],
-    ['no lowercase', 'UPPERCASE-PASSWORD-123!'],
-    ['no digit', 'Strong-Password-No-Digit!'],
-    ['no symbol', 'StrongPasswordWithoutSymbol123'],
   ])('rejects %s passwords without reflecting them', (_label, value) => {
     expectCode(
       () => prepareSebQuitPasswordRevision(command({ password: value, confirmation: value }), context()),

@@ -8,25 +8,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { saveSebQuitPassword } from '@/lib/actions/seb-quit-password'
+import {
+  SEB_QUIT_PASSWORD_MAX_LENGTH,
+  SEB_QUIT_PASSWORD_MIN_LENGTH,
+  isValidSebQuitPassword,
+} from '@/lib/seb-quit-password-policy'
 import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
-
-const MIN_LENGTH = 20
-const MAX_LENGTH = 64
-const PRINTABLE_ASCII = /^[\x21-\x7e]+$/
 
 export function getSebQuitPasswordClientError(password: string, confirmation: string): string | null {
   if (!password || !confirmation) return 'กรอกรหัสออกและยืนยันรหัสให้ครบ'
   if (password !== confirmation) return 'รหัสออกและช่องยืนยันไม่ตรงกัน'
-  if (
-    password.length < MIN_LENGTH
-    || password.length > MAX_LENGTH
-    || !PRINTABLE_ASCII.test(password)
-    || !/[A-Z]/.test(password)
-    || !/[a-z]/.test(password)
-    || !/[0-9]/.test(password)
-    || !/[^A-Za-z0-9]/.test(password)
-  ) {
-    return 'รหัสต้องยาว 20–64 ตัว และมีพิมพ์ใหญ่ พิมพ์เล็ก ตัวเลข และสัญลักษณ์ โดยไม่มีเว้นวรรค'
+  if (!isValidSebQuitPassword(password)) {
+    return 'รหัสต้องยาว 6–64 ตัว ใช้ตัวอักษรภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์ และไม่มีเว้นวรรค'
   }
   return null
 }
@@ -86,8 +79,8 @@ export function SebQuitPasswordFields({
             type={visible ? 'text' : 'password'}
             value={password}
             onChange={event => onPasswordChange(event.target.value)}
-            minLength={MIN_LENGTH}
-            maxLength={MAX_LENGTH}
+            minLength={SEB_QUIT_PASSWORD_MIN_LENGTH}
+            maxLength={SEB_QUIT_PASSWORD_MAX_LENGTH}
             autoComplete="new-password"
             spellCheck={false}
             disabled={disabled}
@@ -103,8 +96,8 @@ export function SebQuitPasswordFields({
               type={visible ? 'text' : 'password'}
               value={confirmation}
               onChange={event => onConfirmationChange(event.target.value)}
-              minLength={MIN_LENGTH}
-              maxLength={MAX_LENGTH}
+              minLength={SEB_QUIT_PASSWORD_MIN_LENGTH}
+              maxLength={SEB_QUIT_PASSWORD_MAX_LENGTH}
               autoComplete="new-password"
               spellCheck={false}
               disabled={disabled}
@@ -126,7 +119,8 @@ export function SebQuitPasswordFields({
       </div>
 
       <p id={`${idPrefix}-help`} className="text-xs leading-5 text-muted-foreground">
-        ใช้ 20–64 ตัว มี A–Z, a–z, ตัวเลข และสัญลักษณ์ โดยไม่มีเว้นวรรค ระบบจะไม่แสดงรหัสนี้อีกหลังบันทึก
+        ใช้ 6–64 ตัว เป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์ โดยไม่มีเว้นวรรค
+        ระบบจะไม่แสดงรหัสนี้อีกหลังบันทึก
       </p>
       {error && (
         <p id={`${idPrefix}-error`} role="alert" className="text-xs text-destructive">
