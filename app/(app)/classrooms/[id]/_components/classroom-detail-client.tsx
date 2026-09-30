@@ -4,9 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import {
-  Users, BookOpen, Copy, Check, Home,
+  Users, BookOpen, Home,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
@@ -17,7 +16,6 @@ import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { ClassroomOverview, type OverviewTarget } from './classroom-overview'
 import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
-import { IconButton } from '@/components/ui/icon-button'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 import {
@@ -32,6 +30,7 @@ import { ClassroomContextNavigation } from './classroom-context-sidebar'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 import type { PeopleView } from './classroom-people-tabs'
+import { ClassroomAccessPanel } from './classroom-access-panel'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -42,7 +41,6 @@ function TabLoading() {
 // opens that tab, keeping the first classroom bundle focused on what is
 // actually visible.
 const StudentTable = dynamic(() => import('./student-table').then(module => module.StudentTable), { loading: TabLoading })
-const InvitePanel = dynamic(() => import('./invite-panel').then(module => module.InvitePanel), { loading: TabLoading })
 const CoTeachers = dynamic(() => import('./co-teachers').then(module => module.CoTeachers), { loading: TabLoading })
 const ClassroomAssignmentsTab = dynamic(
   () => import('./classroom-assignments-tab').then(module => module.ClassroomAssignmentsTab),
@@ -121,7 +119,6 @@ export function ClassroomDetailClient({
   )
   const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
   const [peopleView, setPeopleView] = useState<PeopleView>(initialPeopleView)
-  const [codeCopied, setCodeCopied] = useState(false)
   const savedCover = coverOf(parseDescription(classroom.description))
   // A chosen cover paints the banner as a tinted surface whose text is the same
   // colour at full strength; secondary lines just dim it. Without one the
@@ -213,7 +210,6 @@ export function ClassroomDetailClient({
     }
 
     syncNavigationFromHistory()
-    syncNavigationFromHistory()
     window.addEventListener('popstate', syncNavigationFromHistory)
     return () => window.removeEventListener('popstate', syncNavigationFromHistory)
   }, [navigationItems])
@@ -239,14 +235,6 @@ export function ClassroomDetailClient({
 
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortRules(current => nextStudentSortRules(current, key))
-  }
-
-  function copyCode() {
-    navigator.clipboard.writeText(classroom.class_code).then(() => {
-      setCodeCopied(true)
-      toast.success('คัดลอกรหัสแล้ว')
-      setTimeout(() => setCodeCopied(false), 2000)
-    })
   }
 
   return (
@@ -284,16 +272,13 @@ export function ClassroomDetailClient({
             </div>
           </div>
 
-          {/* Class code */}
-          <div className="shrink-0 text-left sm:text-right">
-            <p className={`text-xs mb-1 ${coverMuted}`}>รหัสห้องเรียน</p>
-            <div className="flex items-center gap-2">
-              <p className={`font-mono font-black text-2xl tracking-[0.3em] ${savedCover ? "" : "text-white"}`}>{classroom.class_code}</p>
-              <IconButton onClick={copyCode} label="คัดลอกรหัสห้องเรียน" className="bg-card/10 hover:bg-card/20">
-                {codeCopied ? <Check className="text-success" /> : <Copy />}
-              </IconButton>
-            </div>
-          </div>
+          {/* Class access: one compact place for the code and student invite link. */}
+          <ClassroomAccessPanel
+            classCode={classroom.class_code}
+            canManage={canManage}
+            onCover={!!savedCover}
+            mutedClassName={coverMuted}
+          />
         </div>
 
         {/* Owner actions */}
@@ -394,11 +379,6 @@ export function ClassroomDetailClient({
             notes={studentNotes}
             profiles={studentProfiles}
           />
-        )}
-        {activeTab === 'invite' && (
-          <div className="max-w-lg">
-            <InvitePanel classCode={classroom.class_code} classroomId={classroom.id} />
-          </div>
         )}
         {activeTab === 'coteachers' && (
           <div className="max-w-2xl">

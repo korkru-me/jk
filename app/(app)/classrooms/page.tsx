@@ -23,7 +23,13 @@ type ClassroomListRow = Classroom & {
 
 type StudentClassroom = Pick<Classroom, 'id' | 'name' | 'description' | 'status' | 'classroom_type'>
 
-export default async function ClassroomsPage() {
+export default async function ClassroomsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ join?: string | string[] }>
+}) {
+  const { join } = await searchParams
+  const initialJoinCode = (Array.isArray(join) ? join[0] : join) ?? ''
   const supabase = await createClient()
   const authUser = await getAuthUser()
   if (!authUser) redirect('/login')
@@ -119,10 +125,24 @@ export default async function ClassroomsPage() {
     }
   }
 
-  return <StudentView classrooms={classrooms} pendingCountMap={pendingCountMap} />
+  return (
+    <StudentView
+      classrooms={classrooms}
+      pendingCountMap={pendingCountMap}
+      initialJoinCode={initialJoinCode}
+    />
+  )
 }
 
-function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClassroom[]; pendingCountMap: Record<string, number> }) {
+function StudentView({
+  classrooms,
+  pendingCountMap,
+  initialJoinCode,
+}: {
+  classrooms: StudentClassroom[]
+  pendingCountMap: Record<string, number>
+  initialJoinCode: string
+}) {
   const homeroomClassrooms = classrooms.filter(c => c.classroom_type === 'homeroom')
   const subjectClassrooms = classrooms.filter(c => c.classroom_type !== 'homeroom')
 
@@ -135,7 +155,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
 
       <Card padding="lg">
         <p className="text-sm font-medium mb-3">เข้าร่วมห้องเรียนใหม่</p>
-        <JoinClassroomForm />
+        <JoinClassroomForm initialCode={initialJoinCode} />
       </Card>
 
       {classrooms.length === 0 ? (

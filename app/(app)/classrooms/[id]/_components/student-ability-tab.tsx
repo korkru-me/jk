@@ -245,7 +245,7 @@ export function StudentAbilityTab({
   if (students.length === 0) {
     return (
       <Card className="py-12 text-center text-sm text-muted-foreground">
-        ยังไม่มีนักเรียนในห้องนี้ — เชิญนักเรียนได้ที่แท็บ &ldquo;เชิญเข้าร่วม&rdquo;
+        ยังไม่มีนักเรียนในห้องนี้ — แชร์รหัสห้องเรียนหรือลิงก์เชิญจากกรอบข้อมูลด้านบน
       </Card>
     )
   }

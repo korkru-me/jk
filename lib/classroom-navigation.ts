@@ -6,7 +6,6 @@ export type ClassroomNavigationKey =
   | 'ability'
   | 'homeroom'
   | 'groups'
-  | 'invite'
   | 'coteachers'
 
 export interface ClassroomNavigationItem {
@@ -21,7 +20,6 @@ export const SUBJECT_CLASSROOM_NAVIGATION = [
   { key: 'scores', label: 'คะแนนและการส่งงาน', managerOnly: true },
   { key: 'ability', label: 'ศักยภาพผู้เรียน', managerOnly: true },
   { key: 'students', label: 'นักเรียนและกลุ่ม' },
-  { key: 'invite', label: 'เชิญเข้าร่วม' },
   { key: 'coteachers', label: 'ผู้ช่วยสอน' },
 ] as const satisfies readonly ClassroomNavigationItem[]
 
@@ -29,7 +27,6 @@ export const HOMEROOM_CLASSROOM_NAVIGATION = [
   { key: 'overview', label: 'ภาพรวม' },
   { key: 'homeroom', label: 'การบ้านนักเรียน', managerOnly: true },
   { key: 'students', label: 'นักเรียน' },
-  { key: 'invite', label: 'เชิญเข้าร่วม' },
   { key: 'coteachers', label: 'ผู้ช่วยสอน' },
 ] as const satisfies readonly ClassroomNavigationItem[]
 

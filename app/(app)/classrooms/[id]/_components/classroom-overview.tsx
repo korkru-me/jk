@@ -15,7 +15,7 @@ import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 
 /** The tabs this overview can hand the teacher off to. */
-export type OverviewTarget = 'students' | 'assignments' | 'scores' | 'homeroom' | 'invite'
+export type OverviewTarget = 'students' | 'assignments' | 'scores' | 'homeroom'
 
 interface OverviewStudent { id: string; full_name: string }
 

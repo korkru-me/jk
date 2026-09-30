@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { joinClassroom } from '@/lib/actions/classrooms'
 
-export function JoinClassroomForm() {
-  const [code, setCode] = useState('')
+export function JoinClassroomForm({ initialCode = '' }: { initialCode?: string }) {
+  const [code, setCode] = useState(initialCode.trim().slice(0, 6).toUpperCase())
   const [isPending, startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent) {

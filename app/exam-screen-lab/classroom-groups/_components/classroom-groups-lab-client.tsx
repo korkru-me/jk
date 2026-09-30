@@ -18,6 +18,8 @@ import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/g
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
+import { ClassroomAccessPanel } from '@/app/(app)/classrooms/[id]/_components/classroom-access-panel'
+import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
 
 export type GroupsLabScenario = 'default' | 'many' | 'empty'
 
@@ -233,6 +235,21 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
           {fail && ' · โหมด ?fail=1: ทุกการบันทึกจะล้มเหลว'}
         </p>
       </div>
+
+      <div className="flex justify-start rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-6 text-white sm:justify-end">
+        <ClassroomAccessPanel
+          classCode="ABC123"
+          canManage
+          onCover={false}
+          mutedClassName="text-white/60"
+        />
+      </div>
+
+      <Card padding="lg" className="flex max-w-md flex-col gap-2">
+        <p className="text-sm font-semibold text-foreground">ตัวอย่างปลายทางลิงก์เชิญนักเรียน</p>
+        <p className="text-xs text-muted-foreground">เมื่อเปิดลิงก์ ระบบเติมรหัสห้องเรียนให้พร้อมกดเข้าร่วม</p>
+        <JoinClassroomForm initialCode="ABC123" />
+      </Card>
 
       <GroupActionsProvider value={actions}>
         <ClassroomPeopleTabs

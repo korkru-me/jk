@@ -6,7 +6,6 @@ import {
   GraduationCap,
   Grid3x3,
   LayoutDashboard,
-  UserPlus,
   Users,
 } from 'lucide-react'
 import type { ClassroomNavigationKey } from '@/lib/classroom-navigation'
@@ -19,6 +18,5 @@ export const CLASSROOM_NAVIGATION_ICONS: Record<ClassroomNavigationKey, typeof U
   students: Users,
   homeroom: CalendarDays,
   groups: Grid3x3,
-  invite: UserPlus,
   coteachers: GraduationCap,
 }

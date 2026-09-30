@@ -18,7 +18,6 @@ describe('classroom navigation', () => {
       'scores',
       'ability',
       'students',
-      'invite',
       'coteachers',
     ])
   })
@@ -27,7 +26,6 @@ describe('classroom navigation', () => {
     expect(classroomNavigationFor('subject', false).map(item => item.key)).toEqual([
       'overview',
       'students',
-      'invite',
       'coteachers',
     ])
   })
@@ -37,7 +35,6 @@ describe('classroom navigation', () => {
       'overview',
       'homeroom',
       'students',
-      'invite',
       'coteachers',
     ])
   })
@@ -46,7 +43,6 @@ describe('classroom navigation', () => {
     expect(classroomNavigationFor('homeroom', false).map(item => item.key)).toEqual([
       'overview',
       'students',
-      'invite',
       'coteachers',
     ])
   })
@@ -62,6 +58,7 @@ describe('classroom navigation', () => {
     const viewOnlyItems = classroomNavigationFor('subject', false)
 
     expect(resolveClassroomNavigationKey('students', viewOnlyItems)).toBe('students')
+    expect(resolveClassroomNavigationKey('invite', viewOnlyItems)).toBe('overview')
     expect(resolveClassroomNavigationKey('scores', viewOnlyItems)).toBe('overview')
     expect(resolveClassroomNavigationKey('unknown', viewOnlyItems)).toBe('overview')
     expect(resolveClassroomNavigationKey(undefined, viewOnlyItems)).toBe('overview')
