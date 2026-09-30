@@ -327,7 +327,7 @@ export function ClassroomDetailClient({
           <ClassroomScoresMatrix
             classroomId={classroom.id}
             classroomName={classroom.name}
-            students={students}
+            students={groupStudents}
             assignments={classroomAssignments}
             categories={assignmentCategories}
             submissions={classroomSubmissions}

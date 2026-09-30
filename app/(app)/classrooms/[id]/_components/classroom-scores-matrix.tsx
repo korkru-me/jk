@@ -2,7 +2,6 @@
 
 import {
   useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition,
-  type ReactNode,
 } from 'react'
 import Link from 'next/link'
 import {
@@ -15,18 +14,17 @@ import {
 } from '@dnd-kit/core'
 import {
   SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable,
-  verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS as DndCSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
-import { reorderAssignmentDisplayOrder, reorderClassroomStudentRoster } from '@/lib/actions/classrooms'
+import { reorderAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { computePassed } from '@/lib/grading'
 import { describeGroupTarget } from '@/lib/classroom-groups'
 import { officialSubmissionsByStudent } from '@/lib/scoring'
 import { cn, downloadTextFile, toCsv, safeFilenamePart } from '@/lib/utils'
 import {
-  moveOrderedItem, moveVisibleAssignmentColumn, reconcileAssignmentOrder, reconcileOrderedIds,
+  moveVisibleAssignmentColumn, reconcileAssignmentOrder,
 } from '@/lib/assignment-column-order'
 import {
   UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, type AssignmentCategory,
@@ -53,7 +51,15 @@ const STATUS_LABEL: Record<string, string> = {
 
 type TypeFilter = 'all' | 'exercise' | 'exam'
 
-interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
+interface RealStudent {
+  id: string
+  full_name: string
+  email: string
+  grade_level?: string | null
+  section_number?: number | null
+  class_number?: number | null
+  student_code?: string | null
+}
 
 interface SubmissionRow {
   id: string
@@ -88,7 +94,6 @@ interface Props {
 }
 
 const assignmentDndId = (id: string) => `assignment:${id}`
-const studentDndId = (id: string) => `student:${id}`
 const rawDndId = (id: string) => id.slice(id.indexOf(':') + 1)
 
 interface SortableAssignmentHeaderProps {
@@ -121,6 +126,46 @@ function SortIndicator({ value }: { value: 'ascending' | 'descending' | 'none' }
   return <ArrowUpDown className="size-3 text-muted-foreground/60" aria-hidden="true" />
 }
 
+interface RosterSortHeaderProps {
+  label: string
+  sortKey: ScoreMatrixSortKey
+  sort: ScoreMatrixSort
+  className: string
+  onSort: (key: ScoreMatrixSortKey) => void
+}
+
+function RosterSortHeader({ label, sortKey, sort, className, onSort }: RosterSortHeaderProps) {
+  const value = sortAria(sort, sortKey)
+  return (
+    <th
+      aria-sort={value}
+      className={cn(
+        'sticky z-20 border-b border-border bg-card px-1 py-3 text-xs font-semibold text-muted-foreground',
+        className,
+      )}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => {
+          event.stopPropagation()
+          onSort(sortKey)
+        }}
+        className={cn(
+          'h-auto max-w-full gap-1 px-1 py-1 hover:text-primary',
+          value !== 'none' && 'bg-primary/10 text-primary',
+        )}
+        title={`เรียงตาม${label}`}
+      >
+        <span className="line-clamp-2 whitespace-normal text-center leading-tight">{label}</span>
+        <SortIndicator value={value} />
+      </Button>
+    </th>
+  )
+}
+
 function SortableAssignmentHeader({
   assignment, disabled, hasNonSubmitter, reminding, groupNameById, onRemind, sort, onSort,
   onColumnMotion,
@@ -150,7 +195,7 @@ function SortableAssignmentHeader({
       aria-sort={sortValue}
       style={{ transform: headerTransform, transition }}
       className={cn(
-        'px-3 py-3 text-center min-w-[140px] border-b border-border bg-card',
+        'min-w-32 border-b border-border bg-card px-2 py-3 text-center',
         isOver && !isDragging && 'bg-primary/5',
         isDragging && 'relative z-30 opacity-60 shadow-lg ring-1 ring-primary/30',
       )}
@@ -209,58 +254,6 @@ function SortableAssignmentHeader({
   )
 }
 
-interface SortableStudentRowProps {
-  student: RealStudent
-  index: number
-  disabled: boolean
-  children: ReactNode
-}
-
-function SortableStudentRow({ student, index, disabled, children }: SortableStudentRowProps) {
-  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging, isOver } = useSortable({
-    id: studentDndId(student.id),
-    disabled,
-    data: { type: 'student', studentId: student.id, name: student.full_name },
-  })
-
-  return (
-    <tr
-      ref={setNodeRef}
-      style={{ transform: DndCSS.Translate.toString(transform), transition }}
-      className={cn(
-        'hover:bg-muted/50',
-        isOver && !isDragging && 'bg-primary/5',
-        isDragging && 'relative z-20 opacity-60 shadow-lg',
-      )}
-    >
-      <td className="sticky left-0 z-10 bg-card px-1 py-2.5 text-center text-sm text-muted-foreground w-16 min-w-16 max-w-16 border-b border-border">
-        <div className="flex items-center justify-center gap-0.5">
-          <Button
-            ref={setActivatorNodeRef}
-            {...attributes}
-            {...listeners}
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            disabled={disabled}
-            aria-label={`ย้ายลำดับ ${student.full_name}`}
-            title="ลากเพื่อสลับ"
-            className="cursor-grab touch-manipulation text-muted-foreground active:cursor-grabbing"
-          >
-            <GripVertical />
-          </Button>
-          <span>{index + 1}</span>
-        </div>
-      </td>
-      <td className="sticky left-16 z-10 bg-card px-4 py-2.5 border-b border-border">
-        <p className="text-sm font-medium text-foreground truncate max-w-[160px]">{student.full_name}</p>
-        <p className="text-xs text-muted-foreground truncate max-w-[160px]">{student.email}</p>
-      </td>
-      {children}
-    </tr>
-  )
-}
-
 export function ClassroomScoresMatrix({
   classroomId, classroomName, students, assignments, submissions, extensions,
   categories, audienceByAssignment, groupNameById = new Map(),
@@ -271,23 +264,13 @@ export function ClassroomScoresMatrix({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [isAssignmentOrderPending, startAssignmentOrderTransition] = useTransition()
-  const [isStudentOrderPending, startStudentOrderTransition] = useTransition()
   const defaultAssignmentIds = useMemo(
     () => assignments.slice().sort(compareAssignmentsForDisplay).map(assignment => assignment.id),
     [assignments],
   )
   const [assignmentOrder, setAssignmentOrder] = useState(defaultAssignmentIds)
-  const defaultStudentIds = useMemo(
-    () => students.slice().sort((a, b) => (
-      (a.roster_order ?? Number.MAX_SAFE_INTEGER) - (b.roster_order ?? Number.MAX_SAFE_INTEGER)
-      || a.full_name.localeCompare(b.full_name, 'th')
-    )).map(student => student.id),
-    [students],
-  )
-  const [studentOrder, setStudentOrder] = useState(defaultStudentIds)
-  const [studentSort, setStudentSort] = useState<ScoreMatrixSort | null>(null)
+  const [studentSort, setStudentSort] = useState<ScoreMatrixSort>({ key: { type: 'name' }, dir: 'asc' })
   const [draggingAssignmentId, setDraggingAssignmentId] = useState<string | null>(null)
-  const [draggingStudentId, setDraggingStudentId] = useState<string | null>(null)
   const tableRef = useRef<HTMLTableElement>(null)
   const dndId = useId()
   const sensors = useSensors(
@@ -299,10 +282,6 @@ export function ClassroomScoresMatrix({
   useEffect(() => {
     setAssignmentOrder(current => reconcileAssignmentOrder(current, defaultAssignmentIds))
   }, [defaultAssignmentIds])
-
-  useEffect(() => {
-    setStudentOrder(current => reconcileOrderedIds(current, defaultStudentIds))
-  }, [defaultStudentIds])
 
   useEffect(() => {
     if (categoryFilter === 'all' || categoryFilter === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE) return
@@ -369,7 +348,7 @@ export function ClassroomScoresMatrix({
     return (submission.total_score ?? 0) / submission.max_score
   }
 
-  const orderedStudents = sortScoreMatrixStudents(students, studentOrder, studentSort, scoreFor)
+  const orderedStudents = sortScoreMatrixStudents(students, studentSort, scoreFor)
 
   const extensionMap = new Map<string, ExtensionRow>()
   for (const e of extensions) extensionMap.set(subKey(e.assignment_id, e.student_id), e)
@@ -397,44 +376,19 @@ export function ClassroomScoresMatrix({
   }
 
   function handleDragStart(event: DragStartEvent) {
-    const type = event.active.data.current?.type
-    if (type === 'assignment') setDraggingAssignmentId(rawDndId(String(event.active.id)))
-    if (type === 'student') setDraggingStudentId(rawDndId(String(event.active.id)))
+    if (event.active.data.current?.type === 'assignment') {
+      setDraggingAssignmentId(rawDndId(String(event.active.id)))
+    }
   }
 
   function handleDragCancel() {
     setDraggingAssignmentId(null)
-    setDraggingStudentId(null)
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const type = event.active.data.current?.type
     handleDragCancel()
     if (!event.over || event.active.id === event.over.id) return
-
-    if (type === 'student') {
-      const previousOrder = orderedStudents.map(student => student.id)
-      const nextOrder = moveOrderedItem(
-        previousOrder,
-        rawDndId(String(event.active.id)),
-        rawDndId(String(event.over.id)),
-      )
-      if (nextOrder === previousOrder) return
-
-      setStudentOrder(nextOrder)
-      setStudentSort(null)
-      startStudentOrderTransition(async () => {
-        const result = await reorderClassroomStudentRoster(classroomId, nextOrder)
-        if (!result?.error) return
-        toast.error(result.error)
-        setStudentOrder(current => (
-          current.length === nextOrder.length && current.every((id, index) => id === nextOrder[index])
-            ? previousOrder
-            : current
-        ))
-      })
-      return
-    }
 
     if (type !== 'assignment') return
     const previousOrder = orderedAssignments.map(assignment => assignment.id)
@@ -461,19 +415,12 @@ export function ClassroomScoresMatrix({
   }
 
   const assignmentTitleById = new Map(assignments.map(assignment => [assignment.id, assignment.title]))
-  const studentNameById = new Map(students.map(student => [student.id, student.full_name]))
   const announcements: Announcements = {
-    onDragStart: ({ active }) => active.data.current?.type === 'student'
-      ? `หยิบแถวนักเรียน ${studentNameById.get(rawDndId(String(active.id))) ?? ''}`
-      : `หยิบคอลัมน์ ${assignmentTitleById.get(rawDndId(String(active.id))) ?? 'งาน'}`,
+    onDragStart: ({ active }) => `หยิบคอลัมน์ ${assignmentTitleById.get(rawDndId(String(active.id))) ?? 'งาน'}`,
     onDragOver: ({ active, over }) => over
-      ? active.data.current?.type === 'student'
-        ? `กำลังย้าย ${studentNameById.get(rawDndId(String(active.id))) ?? 'นักเรียน'} ไปใกล้ ${studentNameById.get(rawDndId(String(over.id))) ?? 'นักเรียน'}`
-        : `กำลังย้าย ${assignmentTitleById.get(rawDndId(String(active.id))) ?? 'งาน'} ไปใกล้ ${assignmentTitleById.get(rawDndId(String(over.id))) ?? 'งาน'}`
+      ? `กำลังย้าย ${assignmentTitleById.get(rawDndId(String(active.id))) ?? 'งาน'} ไปใกล้ ${assignmentTitleById.get(rawDndId(String(over.id))) ?? 'งาน'}`
       : 'รายการอยู่นอกตำแหน่งที่วางได้',
-    onDragEnd: ({ active, over }) => over
-      ? `วาง ${active.data.current?.type === 'student' ? 'แถวนักเรียน' : 'คอลัมน์งาน'} แล้ว`
-      : 'วางรายการไว้ที่เดิม',
+    onDragEnd: ({ over }) => over ? 'วางคอลัมน์งานแล้ว' : 'วางรายการไว้ที่เดิม',
     onDragCancel: () => 'ยกเลิกการย้ายรายการ',
   }
 
@@ -494,9 +441,13 @@ export function ClassroomScoresMatrix({
 
   function exportAll() {
     // Mirrors exactly what's on screen: same columns, same order, same filter.
-    const header = ['ลำดับ', 'นักเรียน', 'อีเมล', ...visibleAssignments.map(a => a.title)]
+    const header = [
+      'ลำดับ', 'นักเรียน', 'อีเมล', 'ชั้น', 'ห้อง', 'เลขที่', 'รหัสนักเรียน',
+      ...visibleAssignments.map(a => a.title),
+    ]
     const rows = orderedStudents.map((s, i) => [
-      i + 1, s.full_name, s.email,
+      i + 1, s.full_name, s.email, s.grade_level ?? '', s.section_number ?? '',
+      s.class_number ?? '', s.student_code ?? '',
       ...visibleAssignments.map(a => cellText(a.id, s.id)),
     ])
     const dateStr = new Date().toLocaleDateString('th-TH').replace(/\//g, '-')
@@ -509,7 +460,10 @@ export function ClassroomScoresMatrix({
   }
 
   function exportAssignment(assignment: ClassroomAssignmentRow) {
-    const header = ['ลำดับ', 'นักเรียน', 'อีเมล', 'สถานะ', 'คะแนน', 'คะแนนเต็ม', 'ผลการประเมิน', 'ส่งเมื่อ', 'ครั้งที่', 'ขยายเวลาถึง']
+    const header = [
+      'ลำดับ', 'นักเรียน', 'อีเมล', 'ชั้น', 'ห้อง', 'เลขที่', 'รหัสนักเรียน',
+      'สถานะ', 'คะแนน', 'คะแนนเต็ม', 'ผลการประเมิน', 'ส่งเมื่อ', 'ครั้งที่', 'ขยายเวลาถึง',
+    ]
     const rows = orderedStudents.map((s, i) => {
       const sub = bestSubmission.get(subKey(assignment.id, s.id))
       const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
@@ -518,7 +472,8 @@ export function ClassroomScoresMatrix({
         : null
       const extension = extensionMap.get(subKey(assignment.id, s.id))
       return [
-        i + 1, s.full_name, s.email,
+        i + 1, s.full_name, s.email, s.grade_level ?? '', s.section_number ?? '',
+        s.class_number ?? '', s.student_code ?? '',
         sub ? (STATUS_LABEL[sub.status] ?? sub.status) : notGiven(assignment.id, s.id) ? 'ไม่ได้มอบหมาย' : 'ยังไม่ทำ',
         submitted ? sub!.total_score ?? 0 : '',
         submitted ? sub!.max_score : '',
@@ -625,8 +580,8 @@ export function ClassroomScoresMatrix({
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <GripVertical className="w-3.5 h-3.5 shrink-0" />
-        กดค้างแล้วลากหัวงานซ้าย–ขวา หรือใช้ตัวจับหน้าแถวนักเรียนเพื่อลากขึ้น–ลง ระบบจะบันทึกลำดับอัตโนมัติ
-        {(isAssignmentOrderPending || isStudentOrderPending) && <span className="font-medium text-primary">กำลังบันทึก...</span>}
+        กดหัวตารางเพื่อเรียงนักเรียน หรือกดค้างแล้วลากหัวงานซ้าย–ขวาเพื่อจัดลำดับคอลัมน์
+        {isAssignmentOrderPending && <span className="font-medium text-primary">กำลังบันทึก...</span>}
       </p>
 
       {visibleAssignments.length === 0 ? (
@@ -660,27 +615,44 @@ export function ClassroomScoresMatrix({
                 separated-borders table model (needed above) doesn't render
                 borders set directly on rows. */}
             <tr>
-              <th className="sticky left-0 z-20 w-16 min-w-16 max-w-16 border-b border-border bg-card px-1 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="sticky left-0 z-20 w-10 min-w-10 max-w-10 border-b border-border bg-card px-1 py-3 text-center text-xs font-semibold text-muted-foreground">
                 ลำดับ
               </th>
-              <th
-                aria-sort={sortAria(studentSort, { type: 'name' })}
-                className="sticky left-16 z-20 bg-card text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px] border-b border-border"
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onPointerDown={event => event.stopPropagation()}
-                  onClick={event => {
-                    event.stopPropagation()
-                    toggleStudentSort({ type: 'name' })
-                  }}
-                  className="px-1 hover:text-primary"
-                >
-                  นักเรียน <SortIndicator value={sortAria(studentSort, { type: 'name' })} />
-                </Button>
-              </th>
+              <RosterSortHeader
+                label="นักเรียน"
+                sortKey={{ type: 'name' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="left-10 w-40 min-w-40 max-w-40 text-left"
+              />
+              <RosterSortHeader
+                label="ชั้น"
+                sortKey={{ type: 'grade' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="left-[12.5rem] w-14 min-w-14 max-w-14 text-center"
+              />
+              <RosterSortHeader
+                label="ห้อง"
+                sortKey={{ type: 'section' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="left-64 w-12 min-w-12 max-w-12 text-center"
+              />
+              <RosterSortHeader
+                label="เลขที่"
+                sortKey={{ type: 'number' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="left-[19rem] w-12 min-w-12 max-w-12 text-center"
+              />
+              <RosterSortHeader
+                label="รหัสนักเรียน"
+                sortKey={{ type: 'code' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="left-[22rem] w-18 min-w-18 max-w-18 text-center"
+              />
               {visibleAssignments.map(a => {
                 const hasNonSubmitter = orderedStudents.some(s => {
                   if (notGiven(a.id, s.id)) return false
@@ -705,9 +677,27 @@ export function ClassroomScoresMatrix({
             </tr>
           </thead>
           <tbody>
-            <SortableContext items={orderedStudents.map(student => studentDndId(student.id))} strategy={verticalListSortingStrategy}>
             {orderedStudents.map((student, index) => (
-              <SortableStudentRow key={student.id} student={student} index={index} disabled={isStudentOrderPending}>
+              <tr key={student.id} className="group/row hover:bg-muted/50">
+                <td className="sticky left-0 z-10 w-10 min-w-10 max-w-10 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted">
+                  {index + 1}
+                </td>
+                <td className="sticky left-10 z-10 w-40 min-w-40 max-w-40 border-b border-border bg-card px-2.5 py-2.5 transition-colors group-hover/row:bg-muted">
+                  <p className="truncate text-sm font-medium text-foreground" title={student.full_name}>{student.full_name}</p>
+                  <p className="truncate text-xs text-muted-foreground" title={student.email}>{student.email}</p>
+                </td>
+                <td className="sticky left-[12.5rem] z-10 w-14 min-w-14 max-w-14 border-b border-border bg-card px-1 py-2.5 text-center text-xs text-muted-foreground transition-colors group-hover/row:bg-muted" title={student.grade_level ?? undefined}>
+                  <span className="block truncate">{student.grade_level || '—'}</span>
+                </td>
+                <td className="sticky left-64 z-10 w-12 min-w-12 max-w-12 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted">
+                  {student.section_number ?? '—'}
+                </td>
+                <td className="sticky left-[19rem] z-10 w-12 min-w-12 max-w-12 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted">
+                  {student.class_number ?? '—'}
+                </td>
+                <td className="sticky left-[22rem] z-10 w-18 min-w-18 max-w-18 border-b border-border bg-card px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground transition-colors group-hover/row:bg-muted" title={student.student_code ?? undefined}>
+                  <span className="block truncate">{student.student_code || '—'}</span>
+                </td>
                 {visibleAssignments.map(a => {
                   const sub = bestSubmission.get(subKey(a.id, student.id))
                   const extension = extensionMap.get(subKey(a.id, student.id))
@@ -771,9 +761,8 @@ export function ClassroomScoresMatrix({
                     </td>
                   )
                 })}
-              </SortableStudentRow>
+              </tr>
             ))}
-            </SortableContext>
           </tbody>
         </table>
       </Card>
@@ -786,7 +775,7 @@ export function ClassroomScoresMatrix({
             <Card
               edge="ring"
               aria-hidden="true"
-              className="w-[140px] cursor-grabbing overflow-hidden bg-card shadow-xl ring-2 ring-primary/30"
+              className="w-32 cursor-grabbing overflow-hidden bg-card shadow-xl ring-2 ring-primary/30"
             >
               <div className="flex min-h-28 items-center justify-center gap-1 px-2 py-3 text-center">
                 <GripVertical className="size-4 shrink-0 text-primary" />
@@ -832,15 +821,6 @@ export function ClassroomScoresMatrix({
             </Card>
           )
         })()}
-        {draggingStudentId && (
-          <Card edge="ring" className="min-w-64 cursor-grabbing bg-card px-4 py-3 shadow-xl ring-2 ring-primary/30">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <GripVertical className="size-4 text-primary" />
-              <span className="truncate">{studentNameById.get(draggingStudentId) ?? 'นักเรียน'}</span>
-            </p>
-            <p className="mt-1 text-[10px] text-muted-foreground">กำลังย้ายทั้งแถว</p>
-          </Card>
-        )}
       </DragOverlay>
       </DndContext>
       )}
