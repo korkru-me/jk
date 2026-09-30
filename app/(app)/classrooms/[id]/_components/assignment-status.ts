@@ -15,6 +15,7 @@ export interface StudentAssignmentRow {
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
   show_results: 'immediate' | 'score_only' | 'after_due' | 'never'
+  category_id?: string | null
   attempts_used: number
   // Whether the student's most recent attempt is still unfinished — kept
   // separate from `submission` (which reflects the best/official-strategy

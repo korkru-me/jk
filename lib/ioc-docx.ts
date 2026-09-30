@@ -36,6 +36,7 @@ import {
 import type { IocPrintRow, IocSignatureBlock, PrintSection, SummaryPrintRow } from '@/lib/ioc-print'
 import { groupRowsByStandard } from '@/lib/ioc-print'
 import { htmlToDocxParagraphs, htmlToPlainText, type DocxParagraph } from '@/lib/ioc-docx-html'
+import { thaiDateStamp } from '@/lib/thai-time'
 
 /**
  * What Thai official paperwork is set in. If a teacher's machine does not have
@@ -499,6 +500,6 @@ export function iocDocxFileName(input: {
     .replace(/\s+/g, ' ')
     .trim()
 
-  const stamp = input.generatedAt.toISOString().slice(0, 10)
+  const stamp = thaiDateStamp(input.generatedAt)
   return `IOC-${safe(kind)}-${safe(input.examTitle).slice(0, 60) || 'IOC'}-${stamp}.docx`
 }

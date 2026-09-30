@@ -13,13 +13,26 @@ import { isAttemptExpired } from '@/lib/grading'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
+import type { AssignmentCategory } from '@/lib/assignment-categories'
+import {
+  getAssignmentCategories,
+  getAssignmentClassroomLinks,
+  type AssignmentClassroomLinkRow,
+} from '@/lib/assignment-category-data.server'
+import {
+  classroomNavigationFor,
+  resolveClassroomNavigationKey,
+} from '@/lib/classroom-navigation'
+import { backHrefFromSearchParams } from '@/lib/back-link'
 
 export default async function ClassroomDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { id } = await params
+  const [{ id }, sp] = await Promise.all([params, searchParams])
   const supabase = await createClient()
   const authUser = await getAuthUser()
   if (!authUser) redirect('/login')
@@ -107,10 +120,18 @@ export default async function ClassroomDetailPage({
       )
     }
 
-    const [{ data: teacherProfile }, { count: studentCount }, { data: links }, posts, { data: myGroup }] = await Promise.all([
+    const [
+      { data: teacherProfile },
+      { count: studentCount },
+      links,
+      assignmentCategoryRows,
+      posts,
+      { data: myGroup },
+    ] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
-      admin.from('assignment_classrooms').select('assignment_id, group_ids').eq('classroom_id', id),
+      getAssignmentClassroomLinks(admin, id),
+      getAssignmentCategories(admin, id),
       getClassroomPosts(id),
       admin
         .from('classroom_group_members')
@@ -120,6 +141,9 @@ export default async function ClassroomDetailPage({
         .maybeSingle(),
     ])
     const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
+    const categoryByAssignment = new Map(
+      (links ?? []).map((link: any) => [link.assignment_id as string, link.category_id as string | null]),
+    )
     // งาน handed to กลุ่มย่อย the student is not in stay off this page — unless
     // they already started it (checked once their attempts are loaded below).
     const reachedIds = new Set(
@@ -197,6 +221,7 @@ export default async function ClassroomDetailPage({
         passing_type: a.passing_type,
         passing_value: a.passing_value,
         show_results: a.show_results,
+        category_id: categoryByAssignment.get(a.id) ?? null,
         attempts_used: attemptsUsed[a.id] ?? 0,
         has_in_progress: hasInProgress[a.id] ?? false,
         submission: subMap[a.id]
@@ -210,6 +235,7 @@ export default async function ClassroomDetailPage({
         teacherName={teacherProfile?.full_name ?? 'ครูผู้สอน'}
         studentCount={studentCount ?? 0}
         assignments={assignments}
+        categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
         posts={posts}
       />
     )
@@ -229,9 +255,20 @@ export default async function ClassroomDetailPage({
         .eq('classroom_id', id)
         .eq('user_id', authUser.id)
         .maybeSingle()).data
+  // Everything below is read with the admin client, so this is the only
+  // authorization the teaching side gets: a teacher who neither owns the room
+  // nor co-teaches it must not see its roster, co-teachers or invite links —
+  // the same 404 a student outside the roster gets. Platform super admins are
+  // not let in either; no classroom action accepts them yet (see
+  // docs/SECURITY.md, "Supabase admin client").
+  if (!isOwner && !myCoTeacherRow) notFound()
   const myCoTeacherPermission = myCoTeacherRow?.permission as 'admin' | 'manage' | 'view' | undefined
   const canManage = isOwner || myCoTeacherPermission === 'admin' || myCoTeacherPermission === 'manage'
   const hasGroups = c.classroom_type === 'subject' && (isOwner || myCoTeacherPermission !== undefined)
+  // Invite links are bearer secrets: only the people RLS lets manage them
+  // (classroom_invitations_owner_all) get the tokens. Anything handed to the
+  // client is readable in the RSC payload even where the tab hides it.
+  const canManageInvites = isOwner || myCoTeacherPermission === 'admin'
 
   // These datasets are independent after authorization. Start them together
   // instead of waiting for six sequential network round-trips.
@@ -239,9 +276,11 @@ export default async function ClassroomDetailPage({
     { data: coTeacherRows },
     { data: inviteRows },
     { data: memberships },
-    { data: assignmentLinkRows },
+    assignmentLinkRows,
+    assignmentCategoryRows,
     { data: ownerProfile },
     { data: otherClassroomRows },
+    { data: coTeachingClassroomRows },
     posts,
     { data: groupRows },
     { data: groupMemberRows },
@@ -251,31 +290,35 @@ export default async function ClassroomDetailPage({
       .select('id, user_id, permission, created_at, users(id, full_name, email)')
       .eq('classroom_id', id)
       .order('created_at', { ascending: true }),
-    admin
-      .from('classroom_invitations')
-      .select('id, token, permission, email, expires_at, created_at')
-      .eq('classroom_id', id)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false }),
+    canManageInvites
+      ? admin
+          .from('classroom_invitations')
+          .select('id, token, permission, email, expires_at, created_at')
+          .eq('classroom_id', id)
+          .is('used_at', null)
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; token: string; permission: string; email: string | null; expires_at: string; created_at: string }[] }),
     admin
       .from('classroom_students')
-      .select('student_id, users!inner(id, full_name, email)')
+      .select('student_id, roster_order, users!inner(id, full_name, email)')
       .eq('classroom_id', id),
     c.classroom_type === 'subject'
-      ? admin
-          .from('assignment_classrooms')
-          .select('assignment_id, display_order, group_ids')
-          .eq('classroom_id', id)
-      : Promise.resolve({ data: [] as { assignment_id: string; display_order: number | null; group_ids: string[] | null }[] }),
+      ? getAssignmentClassroomLinks(admin, id)
+      : Promise.resolve([] as AssignmentClassroomLinkRow[]),
+    c.classroom_type === 'subject' && canManage
+      ? getAssignmentCategories(admin, id)
+      : Promise.resolve([] as AssignmentCategory[]),
     admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
-    isOwner
-      ? admin
-          .from('classrooms')
-          .select('id, name, status, deleted_at')
-          .eq('teacher_id', authUser.id)
-          .neq('id', id)
-      : Promise.resolve({ data: [] as { id: string; name: string; status: string; deleted_at: string | null }[] }),
+    admin
+      .from('classrooms')
+      .select('id, name, description, classroom_type, status, deleted_at')
+      .eq('teacher_id', authUser.id)
+      .neq('id', id),
+    admin
+      .from('classroom_co_teachers')
+      .select('classrooms(id, name, description, classroom_type, status, deleted_at)')
+      .eq('user_id', authUser.id),
     getClassroomPosts(id),
     // กลุ่มย่อย: only subject rooms have the tab, and only the room's own
     // teaching staff (owner or any co-teacher) get the arrangement.
@@ -314,12 +357,14 @@ export default async function ClassroomDetailPage({
     createdAt: i.created_at as string,
   }))
 
-  // Students in this classroom, always alphabetical by name — the roster
-  // display order is a fixed 1,2,3,... row position, not a stored/editable
-  // field, so there's nothing else to sort by here.
+  // A teacher-defined roster order is shared by the score matrix. Students
+  // that have not been arranged yet follow alphabetically after saved rows.
   const students = (memberships ?? [])
-    .map((m: any) => m.users)
-    .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name, 'th')) as Pick<User, 'id' | 'full_name' | 'email'>[]
+    .map((m: any) => ({ ...m.users, roster_order: m.roster_order as number | null }))
+    .sort((a: any, b: any) => (
+      (a.roster_order ?? Number.MAX_SAFE_INTEGER) - (b.roster_order ?? Number.MAX_SAFE_INTEGER)
+      || a.full_name.localeCompare(b.full_name, 'th')
+    )) as (Pick<User, 'id' | 'full_name' | 'email'> & { roster_order: number | null })[]
 
   // Assignments linked to this classroom (via assignment_classrooms, not the
   // legacy single classroom_id column, so multi-classroom assignments count too)
@@ -330,6 +375,10 @@ export default async function ClassroomDetailPage({
   const groupIdsByAssignment = new Map(
     (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, (l.group_ids ?? null) as string[] | null])
   )
+  const categoryByAssignment = new Map(
+    (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, (l.category_id ?? null) as string | null])
+  )
+  const assignmentCategories = (assignmentCategoryRows ?? []) as AssignmentCategory[]
   const groups = (groupRows ?? []) as ClassroomGroup[]
   // Members of students still on the roster only; the FK cascade makes a
   // leftover impossible, but the roster read and this one are not atomic.
@@ -350,6 +399,7 @@ export default async function ClassroomDetailPage({
     max_attempts: number | null; score_strategy: 'best' | 'average' | 'latest'
     display_order: number | null
     group_ids: string[] | null
+    category_id: string | null
   }[] = []
   let classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
@@ -358,14 +408,10 @@ export default async function ClassroomDetailPage({
   let classroomExtensions: {
     id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
   }[] = []
-  // How much hand-in is still waiting for a person to score it. Auto-grading
-  // leaves `is_correct` null exactly on the answers a teacher has to read
-  // (essays, manual fill-blanks) — the same rule the submission page uses.
-  // Answer rows, not submissions, so the read is capped: past the cap the
-  // overview says "n+" instead of pretending to know the exact number.
+  // Auto-grading leaves `is_correct` null exactly on the answers a teacher has
+  // to read (essays, manual fill-blanks). Answer rows are capped to keep this
+  // classroom-level read bounded; the assignment tab shows the counts per งาน.
   const PENDING_REVIEW_ROW_CAP = 1000
-  let pendingReviewCount = 0
-  let pendingReviewCapped = false
   // How many hand-ins are waiting per งาน, keyed by assignment id.
   let pendingReviewByAssignment: Record<string, number> = {}
   if (c.classroom_type === 'subject' && canManage && linkedAssignmentIds.length > 0) {
@@ -393,21 +439,17 @@ export default async function ClassroomDetailPage({
         .limit(PENDING_REVIEW_ROW_CAP),
     ])
 
-    const pendingSubmissionIds = new Set<string>()
     // Same rows, also split per งาน so the "งานที่มอบหมาย" tab can put the
     // count on the งาน it belongs to instead of only on the overview total.
     const pendingSubmissionIdsByAssignment = new Map<string, Set<string>>()
     for (const row of (pendingAnswerRows ?? []) as any[]) {
       if (!rosterIds.has(row.submissions?.student_id)) continue
-      pendingSubmissionIds.add(row.submission_id as string)
       const assignmentId = row.submissions?.assignment_id as string | undefined
       if (!assignmentId) continue
       let set = pendingSubmissionIdsByAssignment.get(assignmentId)
       if (!set) { set = new Set<string>(); pendingSubmissionIdsByAssignment.set(assignmentId, set) }
       set.add(row.submission_id as string)
     }
-    pendingReviewCount = pendingSubmissionIds.size
-    pendingReviewCapped = (pendingAnswerRows?.length ?? 0) >= PENDING_REVIEW_ROW_CAP
     pendingReviewByAssignment = Object.fromEntries(
       Array.from(pendingSubmissionIdsByAssignment, ([assignmentId, set]) => [assignmentId, set.size])
     )
@@ -415,6 +457,7 @@ export default async function ClassroomDetailPage({
       ...a,
       display_order: displayOrderByAssignment.get(a.id) ?? null,
       group_ids: groupIdsByAssignment.get(a.id) ?? null,
+      category_id: categoryByAssignment.get(a.id) ?? null,
     }))
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map(a => [a.id as string, (a as any).display_max_score as number | null]))
     classroomSubmissions = rescaleToDisplayMax(
@@ -482,33 +525,60 @@ export default async function ClassroomDetailPage({
     }])
   )
 
-  // Other classrooms for "move student" feature (owners only).
-  const otherClassroomList = (otherClassroomRows ?? []) as {
-    id: string; name: string; status: string; deleted_at: string | null
+  const ownedClassroomList = (otherClassroomRows ?? []) as {
+    id: string; name: string; description: string | null; classroom_type: string
+    status: string; deleted_at: string | null
   }[]
-  const otherClassrooms = otherClassroomList.map(({ id: classroomId, name }) => ({ id: classroomId, name }))
-  // Cross-posting an announcement only makes sense into a room students are
-  // still in — an archived or trashed classroom would take the post and show
-  // it to nobody.
-  const crossPostTargets = otherClassroomList
-    .filter(row => row.status === 'active' && !row.deleted_at)
+  const switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>> = []
+  const seenSwitchableClassroomIds = new Set<string>()
+  const switchableCandidates = [
+    c,
+    ...ownedClassroomList.filter(row => row.status === 'active' && !row.deleted_at),
+    ...(coTeachingClassroomRows ?? [])
+      .map((row: any) => row.classrooms)
+      .filter((row: any) => row?.status === 'active' && !row.deleted_at),
+  ]
+  for (const candidate of switchableCandidates) {
+    if (!seenSwitchableClassroomIds.has(candidate.id)) {
+      seenSwitchableClassroomIds.add(candidate.id)
+      switchableClassrooms.push({
+        id: candidate.id,
+        name: candidate.name,
+        description: candidate.description,
+      })
+    }
+  }
+  // Reusing or cross-posting an announcement is available in every other
+  // active classroom this teacher can manage, including co-taught rooms. The
+  // switchable list was already filtered to active, non-deleted classrooms.
+  const crossPostTargets = switchableClassrooms
+    .filter(row => row.id !== c.id)
     .map(({ id: classroomId, name }) => ({ id: classroomId, name }))
 
   // Who has seen each announcement. Only the teaching side can read these rows
   // (post_reads_select), and only this side has any use for them.
   const seenByPost = canManage ? await getPostSeenByPost(posts.map(p => p.id)) : {}
+  const initialNavigationItem = resolveClassroomNavigationKey(
+    sp.view,
+    classroomNavigationFor(c.classroom_type, canManage),
+  )
+  const rawView = Array.isArray(sp.view) ? sp.view[0] : sp.view
+  const rawPeopleView = Array.isArray(sp.people) ? sp.people[0] : sp.people
+  const initialPeopleView = rawView === 'groups' || rawPeopleView === 'groups' ? 'groups' : 'students'
+  const backHref = backHrefFromSearchParams(sp, '/classrooms')
 
   return (
     <ClassroomDetailClient
       classroom={c}
+      switchableClassrooms={switchableClassrooms}
       students={students}
       assignmentCount={assignmentCount ?? 0}
-      otherClassrooms={otherClassrooms}
       isOwner={isOwner}
       canManage={canManage}
       coTeachers={coTeachers}
       invites={invites}
       classroomAssignments={classroomAssignments}
+      assignmentCategories={assignmentCategories}
       classroomSubmissions={classroomSubmissions}
       classroomExtensions={classroomExtensions}
       homeroomAssignments={homeroomAssignments}
@@ -517,13 +587,14 @@ export default async function ClassroomDetailPage({
       studentProfiles={studentProfiles}
       ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
       posts={posts}
-      pendingReviewCount={pendingReviewCount}
-      pendingReviewCapped={pendingReviewCapped}
       pendingReviewByAssignment={pendingReviewByAssignment}
       seenByPost={seenByPost}
       crossPostTargets={crossPostTargets}
       groups={groups}
       groupMembers={groupMembers}
+      initialNavigationItem={initialNavigationItem}
+      initialPeopleView={initialPeopleView}
+      backHref={backHref}
     />
   )
 }

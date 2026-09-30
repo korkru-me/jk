@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 27 กันยายน 2026
+อัปเดตล่าสุด: 29 กันยายน 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -10,7 +10,7 @@
 - `public.users` — profile และ global role ของ application
 - `organizations` — tenant/workspace และ subscription tier เชิงข้อมูล
 - `organization_members` — สมาชิกและ role ภายใน organization
-- `org_invitations` — คำเชิญเข้า organization
+- `org_invitations` — คำเชิญเข้า organization · อ่าน/เขียนตรงได้เฉพาะ owner/admin ของ org ผู้รับเชิญใช้ `get_org_invitation_preview`/`accept_org_invitation` ที่ต้องได้ token ตรงตัว (`docs/SECURITY.md` หัวข้อ "ลิงก์เชิญ")
 - `super_admins` — แนวทางแยก platform-level authority จาก user role
 
 Invariant สำคัญ:
@@ -41,12 +41,13 @@ Invariant สำคัญ:
 
 ## ห้องเรียน
 
-- `classrooms` — owner teacher, type, class code และ lifecycle
-- `classroom_students` — roster
+- `classrooms` — owner teacher, type, class code และ lifecycle · `display_order` คือลำดับห้องรายวิชาที่เจ้าของลากจัดเอง; ห้องที่ `pinned_at` ไม่ว่างอยู่นอกลำดับนี้และต้องเลิกปักหมุดก่อนลาก · `reorder_my_classrooms(uuid[])` ตรวจเจ้าของ สถานะ active ชนิด subject รายการครบ และไม่รับห้องปักหมุด ก่อนอัปเดตทั้งลำดับใน transaction เดียว · archive ถูกเลิกใช้แล้ว migration `20260929054543` ย้ายแถว legacy ไป `deleted` โดยคงข้อมูลไว้ในถังขยะ · `purge_expired_classrooms()` ทำงานด้วย `pg_cron` ทุกวันและลบห้องที่อยู่ในถังขยะเกิน 30 วันพร้อมข้อมูลลูกแบบ cascade
+- `classroom_students` — roster · `roster_order` คือลำดับนักเรียนที่ครูลากจัดในตารางคะแนน ใช้ร่วมกันในห้องและยังคงอยู่หลังรีเฟรช; แถวที่ยังไม่มีค่าจะต่อท้ายตามชื่อ
 - `classroom_co_teachers` — ครูร่วมและ permission
 - `classroom_groups` — กลุ่มย่อยในห้อง (ชื่อไม่เกิน 60 ตัวอักษร, `color` เป็น id ของสีหน้าปกห้องเรียน, `position` คือลำดับที่ครูลากเรียง) · `classroom_group_members` — หนึ่งแถวต่อ (ห้อง, นักเรียน) → กลุ่ม **นักเรียนอยู่ได้ไม่เกินหนึ่งกลุ่มต่อห้อง** (PK `(classroom_id, student_id)`) · FK คู่ `(group_id, classroom_id)` บังคับให้กลุ่มเป็นของห้องเดียวกัน และ `(classroom_id, student_id)` → `classroom_students` ON DELETE CASCADE ออกจากห้อง = หลุดจากกลุ่ม · RLS: เจ้าของห้องและผู้ช่วยสอนทุกสิทธิ์อ่านได้ เขียนได้เฉพาะเจ้าของและ `admin`/`manage` · นักเรียนไม่อ่านสองตารางนี้ตรง (migration `20260926232639`)
-- `classroom_invitations` — invitation token สำหรับครูร่วม
-- `classroom_posts` และ `post_comments` — stream การสื่อสาร · `attachments` (jsonb) เก็บไฟล์แนบสูงสุด 6 ไฟล์ต่อประกาศเป็น `{url, name, mime, size}` — เก็บ `name` เพราะ path ใน storage เป็นชื่อสุ่ม ถ้าไม่เก็บ นักเรียนจะได้ไฟล์ชื่อ `1788007637477_gv4hcdo5px4.pdf` · `edited_at` คือเวลาที่ "แก้ไขข้อความ/ไฟล์" จริง — ห้ามอ่าน `updated_at` แทน เพราะ trigger เด้งทุกครั้งที่แตะแถว การปักหมุดจึงเคยขึ้นป้าย “แก้ไขแล้ว” ทั้งที่เนื้อหาไม่เปลี่ยน · ลิงก์ในประกาศไม่มีคอลัมน์ของตัวเอง URL ในข้อความถูกทำเป็นลิงก์ตอน render (`lib/linkify.ts`)
+- `classroom_assignment_categories` — กลุ่มงานชั้นเดียวภายในห้อง ชื่อไม่เกิน 60 ตัวอักษรและไม่ซ้ำกันแบบไม่สนตัวพิมพ์, ใช้ `color`/`position` เพื่อแสดงและเรียงกลุ่ม · เจ้าของห้องกับครูร่วม `admin`/`manage` จัดการได้ ครูร่วม `view` และนักเรียนใน roster อ่านได้เพื่อให้สองฝั่งเห็นโครงเดียวกัน (migration `20260928234553`)
+- `classroom_invitations` — invitation token สำหรับครูร่วม · อ่าน/เขียนตรงได้เฉพาะเจ้าของห้องและครูร่วม `admin` ผู้รับเชิญใช้ `get_classroom_invitation_preview`/`accept_classroom_invitation` ที่ต้องได้ token ตรงตัว
+- `classroom_posts` และ `post_comments` — stream การสื่อสาร · `attachments` (jsonb) เก็บไฟล์แนบสูงสุด 6 ไฟล์ต่อประกาศเป็น `{url, name, mime, size}` — เก็บ `name` เพราะ path ใน storage เป็นชื่อสุ่ม ถ้าไม่เก็บ นักเรียนจะได้ไฟล์ชื่อ `1788007637477_gv4hcdo5px4.pdf` · `edited_at` คือเวลาที่ "แก้ไขข้อความ/ไฟล์" จริง — ห้ามอ่าน `updated_at` แทน เพราะ trigger เด้งทุกครั้งที่แตะแถว การปักหมุดจึงเคยขึ้นป้าย “แก้ไขแล้ว” ทั้งที่เนื้อหาไม่เปลี่ยน · ลิงก์ในประกาศไม่มีคอลัมน์ของตัวเอง URL ในข้อความถูกทำเป็นลิงก์ตอน render (`lib/linkify.ts`) · การนำประกาศห้องอื่นมาใช้ซ้ำเติมข้อความ/ไฟล์เข้า composer ก่อน ครูยังต้องกดโพสต์เอง และเมื่อโพสต์แล้วสร้างแถวใหม่เหมือน cross-post เพื่อแยกความเห็น/หมุด/สถิติการเห็น
 - `post_reads` — หนึ่งแถวต่อ (ประกาศ, นักเรียน) เขียนครั้งแรกที่ประกาศปรากฏบนจอ ไม่มี `updated_at` เพราะการเห็นซ้ำไม่ใช่เหตุการณ์ใหม่ · UI เขียนว่า “เห็นแล้ว” ไม่ใช่ “อ่านแล้ว” เพราะข้อมูลบอกได้แค่นั้น
 - **การเพิ่ม `post_reads` เคยทำให้ประกาศหายทั้งระบบ** — ตารางนี้มี FK ไปทั้ง `classroom_posts` และ `users` PostgREST จึงเห็นทาง embed `users` จาก `classroom_posts` ได้ 2 ทางและปฏิเสธที่จะเดา (`more than one relationship was found`) query ที่เขียน `users(full_name)` เฉย ๆ เลย error แล้วกลายเป็นรายการว่าง · embed ที่มีตารางเชื่อมแบบนี้ต้องระบุชื่อ FK เช่น `users!classroom_posts_author_id_fkey(full_name)`
 
@@ -57,7 +58,7 @@ Invariant สำคัญ:
 - `assignments` — การมอบหมายและการตั้งค่าข้อสอบ; `random_question_count` กำหนดจำนวนที่สุ่มจาก `question_ids` ต่อ attempt, `exam_watermark_enabled` เปิดลายน้ำ, `secure_browser_mode` เป็น `browser|seb_required` และ `android_exam_mode` เป็น `blocked|monitored` สำหรับทางสำรองที่ครูตรวจเครื่อง · `show_solutions` (default `false`, migration `20260926020630`) คือครูให้นักเรียนเปิดเฉลยวิธีทำของแต่ละข้อจากหน้าสรุปผลหรือไม่ — แยกจาก `show_results` ที่คุมคะแนนและคำตอบที่ถูก · `shared_random_seed` (integer NULL, migration `20260926105608`) — ว่าง = นักเรียนแต่ละคนสุ่มตัวเลขของตัวเองเหมือนเดิม มีค่า = ทุกคนได้ตัวเลขชุดเดียวกันในโจทย์สุ่มตัวเลข
 - `assignment_seb_config_revisions` — ประวัติ revision แบบ append-only ของรหัสออก SEB ที่ครูเจ้าของข้อสอบกำหนด ผูก exact assignment + org + owner และเก็บเฉพาะ SHA-256 lower-case Base16 ที่ SEB ต้องใช้กับเวลาจาก server ไม่เก็บรหัสจริงหรือช่องยืนยัน Browser role ไม่มี policy/สิทธิ์อ่านเขียน และการสร้าง revision ต้องผ่าน service-role-only RPC ที่ล็อก assignment แล้วตรวจเจ้าของ สถานะข้อสอบ active attempt และ compare-and-swap ซ้ำใน transaction เดียว หน้าแก้ไขอ่านได้เฉพาะ revision/time metadata ที่ปลอดภัยสำหรับ exact owner; revision อย่างเดียวยังไม่ใช่ไฟล์พร้อมใช้
 - `assignment_seb_config_releases` — immutable server-only binding ของ exact password revision กับ private `.seb` path, SHA-256/size, opaque release ID, raw Config Key และ BEK registry แยก exact platform/version/build ไม่มี browser policy/grant และ registration RPC คืนเฉพาะ metadata ที่ไม่มี CK/BEK ก่อน insert application ต้องดาวน์โหลด private object กลับมาตรวจ path/bytes/hash; database trigger และ application publish gate ยอมเฉพาะ release ของ revision ปัจจุบัน
-- `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom · `group_ids uuid[]` (migration `20260926232639`): NULL = ทั้งห้อง, มีค่า = เฉพาะสมาชิกกลุ่มเหล่านั้น, `{}` = ไม่มีใคร — เป็น array ไม่ใช่ตารางเชื่อมโดยตั้งใจ เพราะ FK cascade ตอนลบกลุ่มจะทำให้งานเปิดให้ทั้งห้องเงียบ ๆ · ไม่มี UPDATE policy สำหรับ browser: การเปลี่ยนผ่าน `updateAssignmentGroupTargets`/`deleteClassroomGroup` ที่ตรวจสิทธิ์แล้วใช้ service role กับแถวที่ระบุ · `get_my_visible_assignment_ids()` เคารพ `group_ids` และยกเว้นให้นักเรียนที่มี submission ของงานนั้นแล้ว
+- `assignment_classrooms` — many-to-many ระหว่าง assignment กับ classroom · `group_ids uuid[]` (migration `20260926232639`): NULL = ทั้งห้อง, มีค่า = เฉพาะสมาชิกกลุ่มเหล่านั้น, `{}` = ไม่มีใคร — เป็น array ไม่ใช่ตารางเชื่อมโดยตั้งใจ เพราะ FK cascade ตอนลบกลุ่มจะทำให้งานเปิดให้ทั้งห้องเงียบ ๆ · `category_id` (migration `20260928234553`) เป็นกลุ่มงานของลิงก์ในห้องนั้น ไม่ใช่ของ assignment กลาง งานเดียวจึงอยู่คนละกลุ่มเมื่อมอบหลายห้องได้; trigger กัน category ข้ามห้องและลบกลุ่มแล้ว FK ตั้งค่านี้เป็น NULL โดยไม่ลบงาน · ไม่มี UPDATE policy สำหรับ browser: การเปลี่ยนผ่าน action ที่ตรวจสิทธิ์แล้วใช้ service role กับแถวที่ระบุ · `get_my_visible_assignment_ids()` เคารพ `group_ids` และยกเว้นให้นักเรียนที่มี submission ของงานนั้นแล้ว
 - `assignment_extensions` — ขยายเวลารายคน
 - `submissions` — attempt ต่อผู้เรียน; `exam_access_mode` แยก `browser|seb|android_monitored`, `seb_config_revision` ผูก SEB attempt กับ exact immutable assignment release ตั้งแต่ transaction สร้าง attempt, SEB audit เก็บ verified time/platform/version และ Android audit เก็บ approval time/teacher เท่านั้น ไม่เก็บ CK, BEK, request hash, user-agent หรือ fingerprint
 - `submission_answers` — answer snapshot และคะแนนรายข้อ

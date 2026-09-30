@@ -2,16 +2,94 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
-import { BreakoutGroups, type GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
-import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/[id]/_components/group-actions-context'
-import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
+import type { GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
 import {
-  GROUP_COLOR_IDS, defaultGroupName, nextGroupColor, splitIntoGroups, type ClassroomGroup,
-} from '@/lib/classroom-groups'
+  ClassroomPeopleTabs, type PeopleView,
+} from '@/app/(app)/classrooms/[id]/_components/classroom-people-tabs'
+import type { StudentProfileRow } from '@/app/(app)/classrooms/[id]/_components/homeroom-overview'
+import {
+  ClassroomAssignmentsTab,
+  type ClassroomAssignmentRow,
+} from '@/app/(app)/classrooms/[id]/_components/classroom-assignments-tab'
+import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/[id]/_components/group-actions-context'
+import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
+import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
+import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
+import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
+import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
+import { ClassroomAccessPanel } from '@/app/(app)/classrooms/[id]/_components/classroom-access-panel'
+import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
 
 export type GroupsLabScenario = 'default' | 'many' | 'empty'
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000001'
+
+const LAB_ASSIGNMENTS: ClassroomAssignmentRow[] = [
+  {
+    id: '00000000-0000-4000-b000-000000000001',
+    title: 'แบบฝึกหัดที่กำลังเตรียมโจทย์',
+    type: 'exercise',
+    mode: 'standard',
+    status: 'draft',
+    start_at: null,
+    end_at: null,
+    question_ids: ['q1', 'q2', 'q3'],
+    random_question_count: null,
+    completion_rule: null,
+    streak_target: null,
+    created_at: '2026-09-27T08:00:00.000Z',
+    passing_type: null,
+    passing_value: null,
+    max_attempts: null,
+    score_strategy: 'best',
+    display_order: 1,
+    category_id: null,
+    group_ids: null,
+  },
+  {
+    id: '00000000-0000-4000-b000-000000000002',
+    title: 'การเคลื่อนที่แบบโปรเจกไทล์',
+    type: 'exercise',
+    mode: 'standard',
+    status: 'published',
+    start_at: null,
+    end_at: null,
+    question_ids: ['q1', 'q2', 'q3', 'q4', 'q5'],
+    random_question_count: null,
+    completion_rule: null,
+    streak_target: null,
+    created_at: '2026-09-28T08:00:00.000Z',
+    passing_type: 'percent',
+    passing_value: 80,
+    max_attempts: 3,
+    score_strategy: 'best',
+    display_order: 2,
+    category_id: null,
+    group_ids: null,
+  },
+  {
+    id: '00000000-0000-4000-b000-000000000003',
+    title: 'ทบทวนก่อนสอบกลางภาค',
+    type: 'exercise',
+    mode: 'standard',
+    status: 'closed',
+    start_at: null,
+    end_at: '2026-09-29T08:00:00.000Z',
+    question_ids: ['q1', 'q2', 'q3', 'q4'],
+    random_question_count: null,
+    completion_rule: null,
+    streak_target: null,
+    created_at: '2026-09-29T08:00:00.000Z',
+    passing_type: 'percent',
+    passing_value: 70,
+    max_attempts: 1,
+    score_strategy: 'best',
+    display_order: 3,
+    category_id: null,
+    group_ids: null,
+  },
+]
 
 const FIRST = ['กนกธร', 'กมลวรรณ', 'ขวัญหทัย', 'จิรัชญา', 'ชญานิษฐ์', 'ชลดา', 'ชลธิชา', 'โชติกา', 'ชาคริต', 'ณัฐวุฒิ', 'ธนกร', 'ธีรภัทร', 'นภัสสร', 'ปภาวรินทร์', 'พิมพ์ชนก', 'ภูมิพัฒน์', 'วรินทร', 'ศุภกร', 'สิรินดา', 'อนันดา']
 const LAST = ['พรมยศ', 'จินามา', 'ขัติยเนตร', 'สุวราพัฒนากรณ์', 'คงธนอนันต์', 'ปัญญาดิบวงศ์', 'ทะยศ', 'บุญหนอ', 'ศรีสุข', 'ใจดี', 'มั่นคง', 'รุ่งเรือง']
@@ -21,6 +99,10 @@ function students(count: number) {
     id: `00000000-0000-4000-9000-${String(i + 1).padStart(12, '0')}`,
     // Two students share a name on purpose — the lists must still tell them apart by id.
     full_name: i === 7 ? `${FIRST[7]} ${LAST[7]}` : `${FIRST[i % FIRST.length]} ${LAST[(i * 7) % LAST.length]}`,
+    grade_level: i % 13 === 0 ? null : `ม.${4 + (i % 3)}`,
+    section_number: i % 11 === 0 ? null : (i % 4) + 1,
+    class_number: i + 1,
+    student_code: `2569${String(i + 1).padStart(4, '0')}`,
   })).sort((a, b) => a.full_name.localeCompare(b.full_name, 'th'))
 }
 
@@ -53,6 +135,8 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
   const seed = useMemo(() => initial(scenario), [scenario])
   const [state, setState] = useState<GroupState>(seed.state)
   const [targets, setTargets] = useState<GroupTargets>({})
+  const [peopleView, setPeopleView] = useState<PeopleView>('students')
+  const [sortRules, setSortRules] = useState<StudentSortRule[]>([{ key: 'name', dir: 'asc' }])
   const counter = useRef(100)
   // The fake "server" keeps its own copy, like the database would.
   const server = useRef<GroupState>(seed.state)
@@ -109,27 +193,8 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
         server.current = { ...server.current, members }
         return { ok: true as const }
       },
-      async randomizeClassroomGroups(_classroomId, createCount) {
-        await wait()
-        if (fail) return refuse
-        let groups = server.current.groups
-        if (groups.length === 0) {
-          const names: string[] = []
-          const colors: string[] = []
-          groups = Array.from({ length: createCount ?? 2 }, (_, position) => {
-            const name = defaultGroupName(names)
-            const color = nextGroupColor(colors)
-            names.push(name)
-            colors.push(color)
-            return { ...group(counter.current++, name), color, position }
-          })
-        }
-        const members = Object.fromEntries(splitIntoGroups(seed.roster.map(s => s.id), groups.map(g => g.id)))
-        server.current = { groups, members }
-        return { ok: true as const, groups, members }
-      },
     }
-  }, [fail, seed.roster])
+  }, [fail])
 
   const groupOptions = {
     [CLASSROOM_ID]: state.groups.map(g => ({
@@ -139,25 +204,67 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
       memberCount: Object.values(state.members).filter(id => id === g.id).length,
     })),
   }
+  const roster = seed.roster.map(student => ({
+    id: student.id,
+    full_name: student.full_name,
+    email: `${student.student_code}@example.invalid`,
+  }))
+  const profiles = Object.fromEntries(seed.roster.map(student => [student.id, {
+    student_id: student.id,
+    grade_level: student.grade_level,
+    section_number: student.section_number,
+    class_number: student.class_number,
+    student_code: student.student_code,
+    nickname: null,
+    date_of_birth: null,
+    gender: null,
+    food_allergy: null,
+    chronic_disease: null,
+    school_name: null,
+    address: null,
+    phone: null,
+    guardians: [],
+  } as StudentProfileRow]))
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       <div>
-        <h1 className="text-xl font-bold text-foreground">ห้องทดลอง: กลุ่มย่อย</h1>
+        <h1 className="text-xl font-bold text-foreground">ห้องทดลอง: นักเรียนและกลุ่ม</h1>
         <p className="text-sm text-muted-foreground">
           ข้อมูลจำลอง {seed.roster.length} คน · การบันทึกทั้งหมดอยู่ในหน่วยความจำของแท็บนี้
           {fail && ' · โหมด ?fail=1: ทุกการบันทึกจะล้มเหลว'}
         </p>
       </div>
 
-      <GroupActionsProvider value={actions}>
-        <BreakoutGroups
-          classroomId={CLASSROOM_ID}
-          students={seed.roster}
-          state={state}
-          setState={setState}
+      <div className="flex justify-start rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-6 text-white sm:justify-end">
+        <ClassroomAccessPanel
+          classCode="ABC123"
           canManage
+          onCover={false}
+          mutedClassName="text-white/60"
+        />
+      </div>
+
+      <Card padding="lg" className="flex max-w-md flex-col gap-2">
+        <p className="text-sm font-semibold text-foreground">ตัวอย่างปลายทางลิงก์เชิญนักเรียน</p>
+        <p className="text-xs text-muted-foreground">เมื่อเปิดลิงก์ ระบบเติมรหัสห้องเรียนให้พร้อมกดเข้าร่วม</p>
+        <JoinClassroomForm initialCode="ABC123" />
+      </Card>
+
+      <GroupActionsProvider value={actions}>
+        <ClassroomPeopleTabs
+          classroomId={CLASSROOM_ID}
+          students={roster}
+          groupStudents={seed.roster}
+          profiles={profiles}
+          canManage
+          sortRules={sortRules}
+          onToggleSort={key => setSortRules(current => nextStudentSortRules(current, key))}
+          groupState={state}
+          setGroupState={setState}
           assignmentTitlesByGroup={new Map(state.groups.slice(0, 1).map(g => [g.id, ['แบบฝึกหัดเรื่องแรงและการเคลื่อนที่']]))}
+          value={peopleView}
+          onValueChange={setPeopleView}
         />
       </GroupActionsProvider>
 
@@ -171,6 +278,58 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
           idPrefix="lab-target"
         />
       </Card>
+
+      <Card padding="lg" className="flex max-w-sm flex-col gap-2">
+        <p className="text-sm font-semibold text-foreground">ตัวอย่างเมนู “มอบหมายงาน”</p>
+        <AssignmentCreationMenu
+          classroomId={CLASSROOM_ID}
+          label="มอบหมายงาน"
+          variant="primaryGhost"
+          align="start"
+          className="w-full justify-start"
+        />
+      </Card>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">ตัวอย่างรายการงานและการลากเรียง</h2>
+          <p className="text-sm text-muted-foreground">
+            มีครบทั้งฉบับร่าง เผยแพร่แล้ว และปิดแล้ว · ลำดับที่ลากอยู่ในหน่วยความจำของแท็บนี้
+          </p>
+        </div>
+        <ClassroomAssignmentsTab
+          classroomId={CLASSROOM_ID}
+          assignments={LAB_ASSIGNMENTS}
+          categories={[]}
+          submissions={[]}
+          studentCount={32}
+          pendingReviewByAssignment={{}}
+          onReorderAssignments={async () => {
+            await wait()
+            return fail
+              ? { error: '(ห้องทดลอง) บันทึกลำดับไม่สำเร็จ — รายการควรย้อนกลับเป็นแบบเดิม' }
+              : {}
+          }}
+        />
+      </section>
+
+      <div className="max-w-2xl">
+        <AssignmentReviewSummary
+          mode="copy"
+          theme={groupPreset('blue')}
+          rows={[
+            { label: 'ชื่อ', value: 'ทดสอบระบบตรวจกลับไปให้คะแนนเอง (สำเนา)' },
+            { label: 'ห้องเรียน', value: 'ทดสอบ สอบแก้กลางภาค' },
+            { label: 'มอบหมายให้', value: 'นักเรียนทุกคนในห้อง' },
+            { label: 'ประเภท', value: '🔁 แบบฝึกหัด' },
+            { label: 'โจทย์', value: '5 ข้อ' },
+            { label: 'คะแนนเต็ม', value: '11 คะแนน' },
+            { label: 'เงื่อนไขจบ', value: 'ทำครบแล้วจบ' },
+            { label: 'วิธีเก็บคะแนน', value: 'คะแนนครั้งที่ดีที่สุด' },
+            { label: 'แสดงผล', value: 'ทันทีหลังส่ง' },
+          ]}
+        />
+      </div>
     </div>
   )
 }

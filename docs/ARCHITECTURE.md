@@ -37,6 +37,8 @@
 - `supabase/bootstrap/` — ลำดับและ SQL สำหรับ fresh Staging project เท่านั้น ไม่อยู่ใน Production migration ledger
 - `proxy.ts` — refresh Supabase session สำหรับ request ที่เข้าแอป
 
+App shell มี contextual sidebar registry ฝั่ง client ที่ผูก renderer กับ pathname ปัจจุบัน หน้ารายละเอียดห้องและหน้าสร้างงานที่มีบริบทห้องใช้ registry เดียวกัน จึงแทน sidebar หลักได้โดยไม่สร้าง sidebar ซ้อนในเนื้อหา สำหรับ route นอก `/classrooms` เช่น `/assignments/new` ฝั่ง server ต้องตรวจห้อง active และสิทธิ์จัดการจาก session-bound Supabase client ก่อนส่งข้อมูลห้องให้ registrar; URL หรือ state ฝั่ง client อย่างเดียวไม่ใช่สิทธิ์
+
 ## Runtime boundaries
 
 ### Browser
@@ -52,6 +54,10 @@
 ### Privileged server
 
 `lib/supabase/admin.ts` ใช้ `SUPABASE_SERVICE_ROLE_KEY` และข้าม RLS ได้ เรียกได้เฉพาะ server และต้องตรวจ authentication/authorization ก่อนทุกครั้ง การมี session อย่างเดียวไม่เพียงพอ
+
+### เวลาบน server
+
+Vercel รันโค้ดฝั่ง server ด้วยเขตเวลา UTC ดังนั้น `toLocaleString('th-TH')`, `toLocaleDateString('th-TH')`, `getHours()` ใน Server Component, Route Handler หรือโค้ดที่สร้างไฟล์ จะได้เวลาช้ากว่าเวลาไทย 7 ชั่วโมง (กำหนดส่ง 16:00 แสดงเป็น 09:00 และกำหนดส่งเที่ยงคืนตกไปเป็นวันก่อนหน้า) ฝั่ง server จึงต้องจัดรูปวันที่ผ่าน `lib/thai-time.ts` (`formatThaiDate`, `formatThaiDateTime`, `thaiHour`) หรือใส่ `timeZone: 'Asia/Bangkok'` เอง ขอบของวันก็เช่นกัน: "วันนี้" ใน query ใช้ `startOfThaiDay()` ไม่ใช่ `setHours(0, 0, 0, 0)` ซึ่งบน server คือ 07:00 น. เวลาไทย และวันที่ในชื่อไฟล์ใช้ `thaiDateStamp()` (`YYYY-MM-DD` ปี ค.ศ.) ไม่ใช่ `toISOString().slice(0, 10)` ซึ่งเป็นวันที่ UTC ไม่ว่าโค้ดจะรันที่ไหน ไฟล์ที่ออกช่วง 00:00–07:00 น. จึงได้วันที่ของเมื่อวาน ส่วน Client Component ใช้ `toLocale*String` ได้เพราะใช้เขตเวลาของเบราว์เซอร์ผู้อ่าน ไฟล์ export ที่ตั้งใจเก็บเวลาแบบ ISO/UTC ให้เครื่องอ่าน (เช่น CSV หลักฐานคุมสอบ) ไม่อยู่ในกติกานี้
 
 ## Authentication และ authorization
 
@@ -80,7 +86,7 @@
 
 1. ครูสร้าง `questions` และ optional configuration ตาม `question_type`
 2. ครูรวมโจทย์เป็น `question_sets` หรือเลือกตรงเข้า `assignments`
-3. `assignment_classrooms` เชื่อมงานหนึ่งรายการกับหลายห้อง
+3. `assignment_classrooms` เชื่อมงานหนึ่งรายการกับหลายห้อง พร้อม audience (`group_ids`) และหมวดภายในห้อง (`category_id` → `classroom_assignment_categories`)
 4. เมื่อเริ่มทำ `startSubmission()` จะสร้าง `submissions` และ `submission_answers`
 5. ถ้า `assignments.secure_browser_mode = 'seb_required'` เส้นทาง take จะออก challenge แบบ HMAC อายุ 5 นาที; `SebLaunchGate` อ่าน CK/BEK request hashes จาก SEB JavaScript API แล้ว Server Action ตรวจ exact origin/path/challenge, Config Key, Browser Exam Key และ version ก่อนออก HttpOnly session ที่ผูก user + assignment อายุ 12 ชั่วโมง ทุก server boundary ของ attempt ตรวจ session นี้ซ้ำ และบันทึกเฉพาะเวลา/platform/version ลง submission ไม่เก็บ raw key/hash ส่วน `/system-check` ออก challenge คนละ purpose หลังตรวจ roster เพื่อทดสอบเครื่องโดยไม่อ่านโจทย์/สร้าง attempt/เริ่ม timer และ server ปฏิเสธการ publish ข้อสอบ SEB เมื่อ production URL หรือ secret/CK/BEK ยังไม่พร้อม
    - รหัสออกที่ครูเจ้าของข้อสอบตั้งใช้ server-only core ตรวจสิทธิ์/ความแข็งแรงก่อน hash แล้ว Phase 2 ส่งเฉพาะ SHA-256 lower-case Base16 ไปยัง service-role-only RPC; RPC ล็อก exact assignment ตรวจ owner/org/eligibility/active attempt/revision ซ้ำและเพิ่ม immutable row ใน `assignment_seb_config_revisions` แบบ compare-and-swap โดยคืน metadata ที่ไม่มี hash เฟส 3 เพิ่มช่องตั้ง/เปลี่ยนรหัสใน flow สร้างและแก้ข้อสอบให้เฉพาะ exact owner และล้าง plaintext ฝั่ง client หลัง action ทุกครั้ง เฟส 4 ผูก revision ปัจจุบันกับ private immutable `.seb` object + digest + CK + BEK registry ใน `assignment_seb_config_releases`; challenge/session ผูก opaque release ID + integer revision และ RPC สร้าง attempt ล็อก assignment แล้วเขียน revision เดียวกันใน transaction เดียว การหมุนรหัสทำให้ assignment กลับ `draft` และทุก read/write ของ attempt ตรวจ stored revision กับ access mode เดิมซ้ำ จึงเผยแพร่หรือแจก signed URL ไม่ได้จนกว่า exact artifact release จะพร้อม

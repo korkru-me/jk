@@ -1,28 +1,36 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import {
-  Users, BookOpen, Copy, Check,
-  GraduationCap, UserPlus, Grid3x3, ChevronLeft,
-  ClipboardList, CalendarDays, Home, LayoutDashboard, ChartColumnIncreasing,
+  Users, BookOpen, Home,
 } from 'lucide-react'
-import { toast } from 'sonner'
-import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
 import { parseDescription, coverOf, displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
-import type { SortKey as StudentSortKey, SortDir as StudentSortDir } from './student-table'
+import type { SortKey as StudentSortKey } from './student-table'
 import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { ClassroomOverview, type OverviewTarget } from './classroom-overview'
 import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
-import { IconButton } from '@/components/ui/icon-button'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
+import type { AssignmentCategory } from '@/lib/assignment-categories'
+import {
+  classroomNavigationHref,
+  classroomNavigationFor,
+  classroomNavigationPath,
+  resolveClassroomNavigationKey,
+  type ClassroomNavigationKey,
+} from '@/lib/classroom-navigation'
 import type { GroupState } from './breakout-groups'
+import { ClassroomContextNavigation } from './classroom-context-sidebar'
+import { useContextualSidebar } from '@/components/layout/sidebar-context'
+import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
+import type { PeopleView } from './classroom-people-tabs'
+import { ClassroomAccessPanel } from './classroom-access-panel'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -33,7 +41,6 @@ function TabLoading() {
 // opens that tab, keeping the first classroom bundle focused on what is
 // actually visible.
 const StudentTable = dynamic(() => import('./student-table').then(module => module.StudentTable), { loading: TabLoading })
-const InvitePanel = dynamic(() => import('./invite-panel').then(module => module.InvitePanel), { loading: TabLoading })
 const CoTeachers = dynamic(() => import('./co-teachers').then(module => module.CoTeachers), { loading: TabLoading })
 const ClassroomAssignmentsTab = dynamic(
   () => import('./classroom-assignments-tab').then(module => module.ClassroomAssignmentsTab),
@@ -47,42 +54,25 @@ const StudentAbilityTab = dynamic(
   () => import('./student-ability-tab').then(module => module.StudentAbilityTab),
   { loading: TabLoading },
 )
-const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
+const ClassroomPeopleTabs = dynamic(
+  () => import('./classroom-people-tabs').then(module => module.ClassroomPeopleTabs),
+  { loading: TabLoading },
+)
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
-type Tab = 'overview' | 'students' | 'assignments' | 'scores' | 'ability' | 'homeroom' | 'groups' | 'invite' | 'coteachers'
-
-const SUBJECT_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
-  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
-  { key: 'assignments', label: 'งานที่มอบหมาย',    icon: BookOpen, managerOnly: true },
-  { key: 'scores',      label: 'คะแนนและการส่งงาน', icon: ClipboardList, managerOnly: true },
-  { key: 'ability',     label: 'ศักยภาพผู้เรียน',   icon: ChartColumnIncreasing, managerOnly: true },
-  { key: 'students',    label: 'นักเรียน',        icon: Users },
-  { key: 'groups',      label: 'กลุ่มย่อย',       icon: Grid3x3 },
-  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
-  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-]
-
-const HOMEROOM_TABS: { key: Tab; label: string; icon: typeof Users; managerOnly?: boolean }[] = [
-  { key: 'overview',    label: 'ภาพรวม',          icon: LayoutDashboard },
-  { key: 'homeroom',    label: 'การบ้านนักเรียน', icon: CalendarDays, managerOnly: true },
-  { key: 'students',    label: 'นักเรียน',        icon: Users },
-  { key: 'invite',      label: 'เชิญเข้าร่วม',    icon: UserPlus },
-  { key: 'coteachers',  label: 'ผู้ช่วยสอน',      icon: GraduationCap },
-]
-
-interface RealStudent { id: string; full_name: string; email: string }
+interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
 
 interface Props {
   classroom: Classroom
+  switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>>
   students: RealStudent[]
   assignmentCount: number
-  otherClassrooms: { id: string; name: string }[]
   isOwner: boolean
   canManage: boolean
   coTeachers: CoTeacherRow[]
   invites: InviteRow[]
   classroomAssignments: ClassroomAssignmentRow[]
+  assignmentCategories: AssignmentCategory[]
   classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
     total_score: number | null; max_score: number; submitted_at: string | null; attempt_number: number
@@ -99,10 +89,6 @@ interface Props {
   studentProfiles: Record<string, StudentProfileRow>
   ownerName: string
   posts: ClassroomPost[]
-  /** Hand-ins with at least one answer still waiting for a teacher's score. */
-  pendingReviewCount: number
-  /** The lookup above stops at a row cap — true means the count is a floor. */
-  pendingReviewCapped: boolean
   /** The same waiting hand-ins split per งาน, keyed by assignment id. */
   pendingReviewByAssignment: Record<string, number>
   /** Student ids that have seen each announcement, keyed by post id. */
@@ -112,19 +98,26 @@ interface Props {
   /** กลุ่มย่อย of this room, and each student's group (student id → group id). */
   groups: ClassroomGroup[]
   groupMembers: Record<string, string>
+  initialNavigationItem: ClassroomNavigationKey
+  initialPeopleView: PeopleView
+  backHref: string
 }
 
 export function ClassroomDetailClient({
-  classroom, students, assignmentCount, otherClassrooms, isOwner, canManage, coTeachers, invites,
-  classroomAssignments, classroomSubmissions, classroomExtensions,
+  classroom, switchableClassrooms, students, assignmentCount, isOwner, canManage, coTeachers, invites,
+  classroomAssignments, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
-  pendingReviewCount, pendingReviewCapped, pendingReviewByAssignment, seenByPost, crossPostTargets,
-  groups, groupMembers,
+  pendingReviewByAssignment, seenByPost, crossPostTargets,
+  groups, groupMembers, initialNavigationItem, initialPeopleView, backHref,
 }: Props) {
+  const router = useRouter()
   const isHomeroom = classroom.classroom_type === 'homeroom'
-  const TABS = isHomeroom ? HOMEROOM_TABS : SUBJECT_TABS
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
-  const [codeCopied, setCodeCopied] = useState(false)
+  const navigationItems = useMemo(
+    () => classroomNavigationFor(classroom.classroom_type, canManage),
+    [classroom.classroom_type, canManage],
+  )
+  const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
+  const [peopleView, setPeopleView] = useState<PeopleView>(initialPeopleView)
   const savedCover = coverOf(parseDescription(classroom.description))
   // A chosen cover paints the banner as a tinted surface whose text is the same
   // colour at full strength; secondary lines just dim it. Without one the
@@ -132,16 +125,25 @@ export function ClassroomDetailClient({
   const coverMuted = savedCover ? savedCover.textMuted : 'text-muted-foreground'
   const shownDescription = displayDescription(classroom.description)
 
-  // Shared with the "คะแนนและการส่งงาน" tab so both show students in the
-  // same order — set here (not inside StudentTable) so it survives
-  // switching tabs and both consumers stay in sync.
-  const [studentSortKey, setStudentSortKey] = useState<StudentSortKey>('name')
-  const [studentSortDir, setStudentSortDir] = useState<StudentSortDir>('asc')
+  // Owned here so the student-table sort survives switching tabs.
+  const [studentSortRules, setStudentSortRules] = useState<StudentSortRule[]>([
+    { key: 'name', dir: 'asc' },
+  ])
 
   // กลุ่มย่อย live here rather than inside their tab: the tab unmounts when
   // another is opened, and the งาน tabs read the same arrangement to count
   // each งาน only against the students it was handed to.
   const [groupState, setGroupState] = useState<GroupState>({ groups, members: groupMembers })
+  const groupStudents = useMemo(() => students.map(student => {
+    const profile = studentProfiles[student.id]
+    return {
+      ...student,
+      grade_level: profile?.grade_level ?? null,
+      section_number: profile?.section_number ?? null,
+      class_number: profile?.class_number ?? null,
+      student_code: profile?.student_code ?? null,
+    }
+  }), [studentProfiles, students])
   const rosterIds = useMemo(() => students.map(s => s.id), [students])
   const audienceByAssignment = useMemo(() => {
     const groupOf = new Map(Object.entries(groupState.members))
@@ -163,33 +165,86 @@ export function ClassroomDetailClient({
     return map
   }, [classroomAssignments])
 
-  function toggleStudentSort(key: StudentSortKey) {
-    setStudentSortDir(d => (studentSortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
-    setStudentSortKey(key)
-  }
+  const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
+    setActiveTab(nextItem)
 
-  function copyCode() {
-    navigator.clipboard.writeText(classroom.class_code).then(() => {
-      setCodeCopied(true)
-      toast.success('คัดลอกรหัสแล้ว')
-      setTimeout(() => setCodeCopied(false), 2000)
-    })
+    const nextUrl = classroomNavigationHref(window.location.href, nextItem)
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
+  }, [])
+
+  const changePeopleView = useCallback((nextView: PeopleView) => {
+    setPeopleView(nextView)
+    const url = new URL(
+      classroomNavigationHref(window.location.href, 'students'),
+      window.location.origin,
+    )
+    if (nextView === 'groups') url.searchParams.set('people', 'groups')
+    else url.searchParams.delete('people')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
+
+  const switchClassroom = useCallback((classroomId: string) => {
+    router.push(classroomNavigationPath(classroomId, activeTab))
+  }, [activeTab, router])
+
+  useEffect(() => {
+    function syncNavigationFromHistory() {
+      const params = new URLSearchParams(window.location.search)
+      const rawView = params.get('view')
+      const nextItem = resolveClassroomNavigationKey(params.get('view'), navigationItems)
+      const nextPeopleView = rawView === 'groups' || params.get('people') === 'groups' ? 'groups' : 'students'
+      setActiveTab(nextItem)
+      setPeopleView(nextPeopleView)
+
+      // Keep copied/reloaded URLs truthful. A stale or unauthorized `view`
+      // falls back to overview, so replace that history entry with the same
+      // canonical URL the overview button would create instead of leaving the
+      // address bar claiming a different panel is open.
+      const canonical = new URL(classroomNavigationHref(window.location.href, nextItem), window.location.origin)
+      if (nextPeopleView === 'groups') canonical.searchParams.set('people', 'groups')
+      const canonicalUrl = `${canonical.pathname}${canonical.search}${canonical.hash}`
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      if (canonicalUrl !== currentUrl) window.history.replaceState(null, '', canonicalUrl)
+    }
+
+    syncNavigationFromHistory()
+    window.addEventListener('popstate', syncNavigationFromHistory)
+    return () => window.removeEventListener('popstate', syncNavigationFromHistory)
+  }, [navigationItems])
+
+  const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
+    <ClassroomContextNavigation
+      classroom={classroom}
+      switchableClassrooms={switchableClassrooms}
+      backHref={backHref}
+      navigationItems={navigationItems}
+      activeItem={activeTab}
+      studentCount={students.length}
+      onNavigate={navigateTo}
+      onSwitchClassroom={switchClassroom}
+      onClose={onNavigate}
+      managementActions={isOwner
+        ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
+        : undefined}
+    />
+  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, students.length, switchableClassrooms, switchClassroom])
+
+  useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar)
+
+  function toggleStudentSort(key: StudentSortKey) {
+    setStudentSortRules(current => nextStudentSortRules(current, key))
   }
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
-      {/* Back link */}
-      <Link href="/classrooms" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
-        <ChevronLeft className="w-4 h-4" /> ห้องเรียนทั้งหมด
-      </Link>
-
+    <div className="flex min-w-0 max-w-[1200px] flex-col gap-6">
       {/* Header card */}
       <div
         className={savedCover
           ? `rounded-2xl p-6 border-2 ${savedCover.surface} ${savedCover.text}`
           : `rounded-2xl p-6 text-white bg-gradient-to-br ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 min-w-0">
             {isHomeroom && (
               <p className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-1.5 ${savedCover ? savedCover.textMuted : 'text-primary'}`}>
@@ -202,7 +257,7 @@ export function ClassroomDetailClient({
             )}
 
             {/* Stats row */}
-            <div className="flex items-center gap-5 mt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <Users className={`w-4 h-4 ${coverMuted}`} />
                 <span className="font-semibold">{students.length}</span>
@@ -213,68 +268,29 @@ export function ClassroomDetailClient({
                 <span className="font-semibold">{isHomeroom ? homeroomAssignments.length : assignmentCount}</span>
                 <span className={coverMuted}>{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
               </div>
-              {!isHomeroom && (
-                <Link href={`/assignments/new?classroom=${classroom.id}`} className="ml-auto text-xs text-primary hover:text-primary transition-colors">
-                  + สร้างชุดข้อสอบ
-                </Link>
-              )}
             </div>
           </div>
 
-          {/* Class code */}
-          <div className="shrink-0 text-right">
-            <p className={`text-xs mb-1 ${coverMuted}`}>รหัสห้องเรียน</p>
-            <div className="flex items-center gap-2">
-              <p className={`font-mono font-black text-2xl tracking-[0.3em] ${savedCover ? "" : "text-white"}`}>{classroom.class_code}</p>
-              <IconButton onClick={copyCode} label="คัดลอกรหัสห้องเรียน" className="bg-card/10 hover:bg-card/20">
-                {codeCopied ? <Check className="text-success" /> : <Copy />}
-              </IconButton>
-            </div>
-          </div>
+          {/* Class access: one compact place for the code and student invite link. */}
+          <ClassroomAccessPanel
+            classCode={classroom.class_code}
+            canManage={canManage}
+            onCover={!!savedCover}
+            mutedClassName={coverMuted}
+          />
         </div>
 
         {/* Owner actions */}
         {isOwner && (
-          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-white/10">
+          <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4 lg:hidden">
             <ClassroomSettingsDialog classroom={classroom} onCover={!!savedCover} />
-            <div className="ml-auto">
-              <DeleteClassroomButton id={classroom.id} />
-            </div>
           </div>
         )}
       </div>
 
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1 overflow-x-auto">
-        {TABS.filter(tab => !tab.managerOnly || canManage).map(tab => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                activeTab === tab.key
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-muted-foreground hover:bg-card/50'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.key === 'students' && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  {students.length}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
       {/* Tab content */}
       <div>
-        {activeTab === 'overview' && canManage && (
+        {activeTab === 'overview' && (
           <ClassroomOverview
             classroomId={classroom.id}
             isHomeroom={isHomeroom}
@@ -282,55 +298,64 @@ export function ClassroomDetailClient({
             assignments={classroomAssignments}
             homeroomAssignments={homeroomAssignments}
             submissions={isHomeroom ? homeroomSubmissions : classroomSubmissions}
-            pendingReviewCount={pendingReviewCount}
-            pendingReviewCapped={pendingReviewCapped}
             posts={posts}
             seenByPost={seenByPost}
             crossPostTargets={crossPostTargets}
             canManage={canManage}
             audienceByAssignment={audienceByAssignment}
-            onNavigate={(target: OverviewTarget) => setActiveTab(target)}
+            onNavigate={(target: OverviewTarget) => navigateTo(target)}
           />
         )}
-        {activeTab === 'students' && (
+        {activeTab === 'students' && (isHomeroom ? (
           <StudentTable
             classroomId={classroom.id}
             students={students}
-            otherClassrooms={otherClassrooms}
             profiles={studentProfiles}
+            canManage={canManage}
             showRoster={canManage}
-            showProfiles={isHomeroom && canManage}
-            sortKey={studentSortKey}
-            sortDir={studentSortDir}
+            showProfiles={canManage}
+            sortRules={studentSortRules}
             onToggleSort={toggleStudentSort}
           />
-        )}
+        ) : (
+          <ClassroomPeopleTabs
+            classroomId={classroom.id}
+            students={students}
+            groupStudents={groupStudents}
+            profiles={studentProfiles}
+            canManage={canManage}
+            sortRules={studentSortRules}
+            onToggleSort={toggleStudentSort}
+            groupState={groupState}
+            setGroupState={setGroupState}
+            assignmentTitlesByGroup={assignmentTitlesByGroup}
+            value={peopleView}
+            onValueChange={changePeopleView}
+          />
+        ))}
         {activeTab === 'assignments' && canManage && (
           <ClassroomAssignmentsTab
             classroomId={classroom.id}
             assignments={classroomAssignments}
+            categories={assignmentCategories}
             submissions={classroomSubmissions}
             studentCount={students.length}
             audienceByAssignment={audienceByAssignment}
             groupNameById={groupNameById}
             pendingReviewByAssignment={pendingReviewByAssignment}
-            onViewScores={() => setActiveTab('scores')}
           />
         )}
         {activeTab === 'scores' && canManage && (
           <ClassroomScoresMatrix
             classroomId={classroom.id}
             classroomName={classroom.name}
-            students={students}
+            students={groupStudents}
             assignments={classroomAssignments}
+            categories={assignmentCategories}
             submissions={classroomSubmissions}
             extensions={classroomExtensions}
-            profiles={studentProfiles}
             audienceByAssignment={audienceByAssignment}
             groupNameById={groupNameById}
-            sortKey={studentSortKey}
-            sortDir={studentSortDir}
-            onViewStudents={() => setActiveTab('students')}
           />
         )}
         {activeTab === 'ability' && canManage && (
@@ -352,21 +377,6 @@ export function ClassroomDetailClient({
             notes={studentNotes}
             profiles={studentProfiles}
           />
-        )}
-        {activeTab === 'groups' && (
-          <BreakoutGroups
-            classroomId={classroom.id}
-            students={students}
-            state={groupState}
-            setState={setGroupState}
-            canManage={canManage}
-            assignmentTitlesByGroup={assignmentTitlesByGroup}
-          />
-        )}
-        {activeTab === 'invite' && (
-          <div className="max-w-lg">
-            <InvitePanel classCode={classroom.class_code} classroomId={classroom.id} />
-          </div>
         )}
         {activeTab === 'coteachers' && (
           <div className="max-w-2xl">

@@ -9,6 +9,7 @@ import { dedupeTags } from '@/lib/tag-suggest'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import { releaseQuestionFiles } from '@/lib/storage-release'
+import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig, MatchingConfig, ClassifyConfig, ImageLabelConfig } from '@/lib/types'
 import { safeQuestionsRedirect } from '@/lib/question-return'
 
@@ -139,7 +140,11 @@ export async function createQuestion(data: QuestionFormData) {
     grade_level: data.grade_level || null,
     subject: data.subject || null,
     title: data.title,
-    question_text: data.question_text,
+    // โจทย์ and เฉลย are typed into the rich-text editor, so they are stored
+    // cleaned as HTML (every render site cleans them again regardless). Choice
+    // text and extra_data are stored as sent: much of it is typed into plain
+    // inputs where `x<y` is literal, and reading it as HTML would drop text.
+    question_text: sanitizeRichTextForStorage(data.question_text),
     question_type: data.question_type,
     difficulty: data.difficulty,
     visibility: data.visibility,
@@ -152,7 +157,7 @@ export async function createQuestion(data: QuestionFormData) {
     answer_tolerance: data.answer_tolerance,
     mcq_options: resolveMcqOptions(data),
     extra_data: data.extra_data ?? {},
-    solution_text: data.solution_text || null,
+    solution_text: sanitizeRichTextForStorage(data.solution_text ?? '') || null,
     solution_image_urls: data.solution_image_urls ?? [],
     tags: data.tags.length > 0 ? data.tags : null,
     image_urls: data.image_urls.length > 0 ? data.image_urls : [],
@@ -230,7 +235,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
       grade_level: data.grade_level || null,
       subject: data.subject || null,
       title: data.title,
-      question_text: data.question_text,
+      question_text: sanitizeRichTextForStorage(data.question_text),
       question_type: data.question_type,
       difficulty: data.difficulty,
       visibility: isOwner ? data.visibility : existing.visibility,
@@ -243,7 +248,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
       answer_tolerance: data.answer_tolerance,
       mcq_options: resolveMcqOptions(data),
       extra_data: data.extra_data ?? {},
-      solution_text: data.solution_text || null,
+      solution_text: sanitizeRichTextForStorage(data.solution_text ?? '') || null,
       solution_image_urls: data.solution_image_urls ?? [],
       tags: data.tags.length > 0 ? data.tags : null,
       image_urls: data.image_urls,

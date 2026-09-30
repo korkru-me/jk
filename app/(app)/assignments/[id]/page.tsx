@@ -8,6 +8,7 @@ import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
 import { AssignmentDetailClient } from './_components/assignment-detail-client'
+import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
 
@@ -60,11 +61,8 @@ export default async function AssignmentDetailPage({
   // "นักเรียน" tab here. Authorization is stated instead of inherited.
   if (!await canManageAssignment(id, user.id)) notFound()
 
-  const [{ data: questions }, { data: submissions }, { data: classroomLinks }, { data: pendingAnswerRows }] = await Promise.all([
-    supabase
-      .from('questions')
-      .select('id, title, question_type, difficulty, question_text')
-      .in('id', a.question_ids),
+  const [questionResult, { data: submissions }, { data: classroomLinks }, { data: pendingAnswerRows }] = await Promise.all([
+    loadAssignmentQuestionsByProvenance(a),
     admin
       .from('submissions')
       .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name)')
@@ -88,14 +86,14 @@ export default async function AssignmentDetailPage({
       .limit(PENDING_REVIEW_ROW_CAP),
   ])
 
+  if ('error' in questionResult) throw new Error(questionResult.error)
+
   const pendingSubmissionIds = Array.from(
     new Set((pendingAnswerRows ?? []).map((row: any) => row.submission_id as string))
   )
   const pendingReviewCapped = (pendingAnswerRows?.length ?? 0) >= PENDING_REVIEW_ROW_CAP
 
-  // Re-order questions to match assignment's question_ids order
-  const qMap = new Map((questions ?? []).map((q: any) => [q.id, q]))
-  const orderedQuestions = a.question_ids.map(qid => qMap.get(qid)).filter(Boolean) as Question[]
+  const orderedQuestions = questionResult.questions as Question[]
 
   // Full roster of the assignment's linked classroom(s) — admin client to
   // sidestep RLS complexity for a roster read, same approach already used in

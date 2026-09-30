@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { ChartColumnBig, Hexagon } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { cn } from '@/lib/utils'
 import { formatPercent, type AbilityCellState } from '@/lib/student-ability'
 
 /**
@@ -216,6 +217,8 @@ interface FullChartProps {
   activeKey: string | null
   onActiveChange: (key: string | null) => void
   label: string
+  showClassAverage: boolean
+  labelMode: AbilityLabelMode
 }
 
 /**
@@ -223,12 +226,13 @@ interface FullChartProps {
  * inside the chart. Centring it with a fixed clamp pushed it past the dialog
  * edge on a phone, where the chart is narrower than the tooltip is wide.
  */
-function ChartTooltip({ datum, x, y, containerWidth }: {
+function ChartTooltip({ datum, x, y, containerWidth, showClassAverage }: {
   datum: AbilityDatum
   /** Anchor point in the chart's own pixels. */
   x: number
   y: number
   containerWidth: number
+  showClassAverage: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [left, setLeft] = useState(x)
@@ -257,7 +261,7 @@ function ChartTooltip({ datum, x, y, containerWidth }: {
       ) : (
         <p className="mt-1 text-sm font-semibold text-foreground">{noBarLabel(datum)}</p>
       )}
-      {datum.classAverage !== undefined && (
+      {showClassAverage && datum.classAverage !== undefined && (
         <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">
           <span aria-hidden="true" className="inline-block h-0.5 w-3 rounded-full bg-muted-foreground" />
           ค่าเฉลี่ยห้อง {formatPercent(datum.classAverage ?? null)}
@@ -268,14 +272,23 @@ function ChartTooltip({ datum, x, y, containerWidth }: {
   )
 }
 
-export function AbilityBarChart({ data, activeKey, onActiveChange, label }: FullChartProps) {
+export function AbilityBarChart({
+  data, activeKey, onActiveChange, label, showClassAverage, labelMode,
+}: FullChartProps) {
   const [ref, measured] = useMeasuredWidth(640)
-  const BAR_W = Math.max(260, measured)
-  const BAR_H = BAR_W < 480 ? 280 : 340
+  const titleLabels = labelMode === 'title'
+  const BAR_W = Math.max(260, measured, titleLabels ? data.length * 112 + 56 : 0)
+  const compact = measured < 480
+  const longestTitle = data.reduce((length, datum) => Math.max(length, datum.title.length), 0)
+  const labelBand = titleLabels ? Math.min(190, Math.max(92, longestTitle * 3.2)) : 34
   const left = 40
   const right = BAR_W - 8
-  const top = 26
-  const baseline = BAR_H - 34
+  // Leave room above the plot for the active tooltip. The old compact chart
+  // clipped it against the scroll container when title labels made the chart
+  // horizontally scrollable.
+  const top = 78
+  const baseline = top + (compact ? 230 : 300)
+  const BAR_H = baseline + labelBand
   const plotH = baseline - top
   const slot = (right - left) / Math.max(1, data.length)
   const barW = Math.min(26, slot * 0.55)
@@ -288,108 +301,128 @@ export function AbilityBarChart({ data, activeKey, onActiveChange, label }: Full
   const indexStep = Math.max(1, Math.ceil(20 / slot))
 
   return (
-    <div ref={ref} className="relative" onPointerLeave={() => onActiveChange(null)}>
-      <svg viewBox={`0 0 ${BAR_W} ${BAR_H}`} className="block h-auto w-full" role="img" aria-label={label}>
-        {[0, 25, 50, 75, 100].map(p => (
-          <g key={p}>
-            <line x1={left} x2={right} y1={y(p)} y2={y(p)} className="stroke-border" strokeWidth={1} />
-            <text x={left - 8} y={y(p) + 4} textAnchor="end" className="fill-muted-foreground tabular-nums" fontSize={11}>
-              {p}%
-            </text>
-          </g>
-        ))}
-        {data.map((d, i) => {
-          const x0 = left + slot * i
-          const cx = x0 + slot / 2
-          const isActive = d.key === activeKey
-          const dim = activeKey !== null && !isActive
-          const barTop = d.percent === null ? baseline : Math.min(y(d.percent), baseline - 2)
-          const avgY = d.classAverage == null ? null : y(d.classAverage)
-          // The value rides its bar; it only hops over the class-average tick
-          // when that tick would sit on top of the number.
-          const tickCollides = avgY !== null && avgY <= barTop && avgY >= barTop - 20
-          const labelY = (tickCollides ? avgY : barTop) - 7
-          return (
-            <g key={d.key}>
-              {isActive && <rect x={x0 + 2} y={top - 18} width={slot - 4} height={baseline - top + 18} rx={8} className="fill-muted/60" />}
-              {d.percent !== null ? (
-                <>
-                  <path
-                    d={barPath(cx - barW / 2, barTop, barW, baseline, 4)}
-                    className={`fill-primary motion-safe:transition-opacity ${dim ? 'opacity-40' : ''}`}
-                  />
-                  {(showValues || isActive) && (
-                    <text x={cx} y={labelY} textAnchor="middle" className="fill-foreground font-semibold tabular-nums" fontSize={12}>
-                      {formatPercent(d.percent)}
-                    </text>
-                  )}
-                </>
-              ) : slot >= 58 ? (
-                <text x={cx} y={baseline - 8} textAnchor="middle" className="fill-muted-foreground" fontSize={11}>
-                  {isUnscored(d) ? 'ไม่มีคะแนน' : STATE_LABEL[d.state]}
-                </text>
-              ) : isUnscored(d) ? (
-                <UnscoredMark cx={cx} baseline={baseline} r={4} />
-              ) : (
-                <text x={cx} y={baseline - 8} textAnchor="middle" className="fill-muted-foreground" fontSize={11}>–</text>
-              )}
-              {avgY !== null && (
-                <line
-                  x1={cx - barW / 2 - 7}
-                  x2={cx + barW / 2 + 7}
-                  y1={avgY}
-                  y2={avgY}
-                  className={`stroke-muted-foreground ${dim ? 'opacity-40' : ''}`}
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                />
-              )}
-              {/* Numbers only: the table beside the chart carries each full title. */}
-              {(i % indexStep === 0 || isActive) && (
-                <text x={cx} y={BAR_H - 12} textAnchor="middle" className={`font-semibold tabular-nums ${isActive ? 'fill-primary' : 'fill-foreground'}`} fontSize={slot < 22 ? 11 : 13}>
-                  {d.index}
-                </text>
-              )}
-              {/* The whole column is the hit target, not the painted bar. */}
-              <rect
-                x={x0}
-                y={0}
-                width={slot}
-                height={BAR_H}
-                className="fill-transparent outline-none"
-                tabIndex={0}
-                aria-label={`${d.index}. ${d.title}: ${spokenValue(d)}`}
-                onPointerEnter={() => onActiveChange(d.key)}
-                onFocus={() => onActiveChange(d.key)}
-                onBlur={() => onActiveChange(null)}
-              />
+    <div ref={ref} className="overflow-x-auto" onPointerLeave={() => onActiveChange(null)}>
+      <div className="relative" style={{ width: BAR_W }}>
+        <svg viewBox={`0 0 ${BAR_W} ${BAR_H}`} className="block h-auto max-w-none" style={{ width: BAR_W }} role="img" aria-label={label}>
+          {[0, 25, 50, 75, 100].map(p => (
+            <g key={p}>
+              <line x1={left} x2={right} y1={y(p)} y2={y(p)} className="stroke-border" strokeWidth={1} />
+              <text x={left - 8} y={y(p) + 4} textAnchor="end" className="fill-muted-foreground tabular-nums" fontSize={11}>
+                {p}%
+              </text>
             </g>
-          )
-        })}
-      </svg>
-      {active && (() => {
-        const i = data.indexOf(active)
-        const cx = left + slot * i + slot / 2
-        const barTop = active.percent === null ? baseline - 20 : y(active.percent)
-        const avgY = active.classAverage == null ? barTop : y(active.classAverage)
-        return <ChartTooltip datum={active} x={cx} y={Math.min(barTop, avgY)} containerWidth={BAR_W} />
-      })()}
+          ))}
+          {data.map((d, i) => {
+            const x0 = left + slot * i
+            const cx = x0 + slot / 2
+            const isActive = d.key === activeKey
+            const dim = activeKey !== null && !isActive
+            const barTop = d.percent === null ? baseline : Math.min(y(d.percent), baseline - 2)
+            const avgY = !showClassAverage || d.classAverage == null ? null : y(d.classAverage)
+            // The value rides its bar; it only hops over the class-average tick
+            // when that tick would sit on top of the number.
+            const tickCollides = avgY !== null && avgY <= barTop && avgY >= barTop - 20
+            const labelY = (tickCollides ? avgY : barTop) - 7
+            return (
+              <g key={d.key}>
+                {isActive && <rect x={x0 + 2} y={top - 18} width={slot - 4} height={baseline - top + 18} rx={8} className="fill-muted/60" />}
+                {d.percent !== null ? (
+                  <>
+                    <path
+                      d={barPath(cx - barW / 2, barTop, barW, baseline, 4)}
+                      className={`fill-primary motion-safe:transition-opacity ${dim ? 'opacity-40' : ''}`}
+                    />
+                    {(showValues || isActive) && (
+                      <text x={cx} y={labelY} textAnchor="middle" className="fill-foreground font-semibold tabular-nums" fontSize={12}>
+                        {formatPercent(d.percent)}
+                      </text>
+                    )}
+                  </>
+                ) : slot >= 58 ? (
+                  <text x={cx} y={baseline - 8} textAnchor="middle" className="fill-muted-foreground" fontSize={11}>
+                    {isUnscored(d) ? 'ไม่มีคะแนน' : STATE_LABEL[d.state]}
+                  </text>
+                ) : isUnscored(d) ? (
+                  <UnscoredMark cx={cx} baseline={baseline} r={4} />
+                ) : (
+                  <text x={cx} y={baseline - 8} textAnchor="middle" className="fill-muted-foreground" fontSize={11}>–</text>
+                )}
+                {avgY !== null && (
+                  <line
+                    x1={cx - barW / 2 - 7}
+                    x2={cx + barW / 2 + 7}
+                    y1={avgY}
+                    y2={avgY}
+                    className={`stroke-muted-foreground ${dim ? 'opacity-40' : ''}`}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                  />
+                )}
+                {titleLabels ? (
+                  <text
+                    x={cx}
+                    y={baseline + 18}
+                    textAnchor="start"
+                    transform={`rotate(35 ${cx} ${baseline + 18})`}
+                    className={isActive ? 'fill-primary font-semibold' : 'fill-foreground'}
+                    fontSize={slot < 80 ? 10 : 11}
+                  >
+                    {d.title}
+                  </text>
+                ) : (i % indexStep === 0 || isActive) && (
+                  <text x={cx} y={BAR_H - 12} textAnchor="middle" className={`font-semibold tabular-nums ${isActive ? 'fill-primary' : 'fill-foreground'}`} fontSize={slot < 22 ? 11 : 13}>
+                    {d.index}
+                  </text>
+                )}
+                {/* The whole column is the hit target, not the painted bar. */}
+                <rect
+                  x={x0}
+                  y={0}
+                  width={slot}
+                  height={BAR_H}
+                  className="fill-transparent outline-none"
+                  role="img"
+                  tabIndex={0}
+                  aria-label={`${d.index}. ${d.title}: ${spokenValue(d)}`}
+                  onPointerEnter={() => onActiveChange(d.key)}
+                  onFocus={() => onActiveChange(d.key)}
+                  onBlur={() => onActiveChange(null)}
+                />
+              </g>
+            )
+          })}
+        </svg>
+        {active && (() => {
+          const i = data.indexOf(active)
+          const cx = left + slot * i + slot / 2
+          const barTop = active.percent === null ? baseline - 20 : y(active.percent)
+          const avgY = showClassAverage && active.classAverage !== null && active.classAverage !== undefined
+            ? y(active.classAverage)
+            : barTop
+          return <ChartTooltip datum={active} x={cx} y={Math.min(barTop, avgY)} containerWidth={BAR_W} showClassAverage={showClassAverage} />
+        })()}
+      </div>
     </div>
   )
 }
 
-export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: FullChartProps) {
+export function AbilityRadarChart({
+  data, activeKey, onActiveChange, label, showClassAverage, labelMode,
+}: FullChartProps) {
   const [ref, measured] = useMeasuredWidth(420)
   const RADAR_W = Math.max(260, measured)
-  const RADAR_H = Math.round(RADAR_W * 0.86)
+  const titleLabels = labelMode === 'title'
+  const RADAR_H = Math.round(RADAR_W * (titleLabels ? 0.98 : 0.86))
   const cx = RADAR_W / 2
   const cy = RADAR_H / 2
-  const R = Math.min(cx, cy) - 34
-  const labelR = R + 20
+  const R = Math.min(cx, cy) - (titleLabels ? 88 : 34)
+  const labelR = R + (titleLabels ? 48 : 20)
   const n = data.length
   const ring = (p: number) => pointsAttr(data.map((_, i) => polar(cx, cy, (R * p) / 100, i, n)))
   const studentPoints = data.flatMap((d, i) => (d.percent === null ? [] : [polar(cx, cy, (R * d.percent) / 100, i, n)]))
-  const averagePoints = data.flatMap((d, i) => (d.classAverage == null ? [] : [polar(cx, cy, (R * d.classAverage) / 100, i, n)]))
+  const averagePoints = showClassAverage
+    ? data.flatMap((d, i) => (d.classAverage == null ? [] : [polar(cx, cy, (R * d.classAverage) / 100, i, n)]))
+    : []
   const active = data.find(d => d.key === activeKey) ?? null
 
   function wedge(i: number): string {
@@ -400,7 +433,7 @@ export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: Fu
   }
 
   return (
-    <div ref={ref} className="relative mx-auto w-full max-w-[32rem]" onPointerLeave={() => onActiveChange(null)}>
+    <div ref={ref} className="relative mx-auto w-full max-w-[38rem]" onPointerLeave={() => onActiveChange(null)}>
       <svg viewBox={`0 0 ${RADAR_W} ${RADAR_H}`} className="block h-auto w-full" role="img" aria-label={label}>
         {[25, 50, 75, 100].map(p => (
           <polygon key={p} points={ring(p)} className="fill-none stroke-border" strokeWidth={1} />
@@ -421,7 +454,19 @@ export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: Fu
         {data.map((d, i) => {
           const [x, y] = polar(cx, cy, labelR, i, n)
           const isActive = d.key === activeKey
-          return (
+          return titleLabels ? (
+            <foreignObject key={d.key} x={x - 66} y={y - 28} width={132} height={56}>
+              <div
+                title={d.title}
+                className={cn(
+                  'line-clamp-3 text-center text-[10px] leading-tight font-medium break-words',
+                  isActive ? 'text-primary' : d.percent === null ? 'text-muted-foreground/60' : 'text-foreground',
+                )}
+              >
+                {d.title}
+              </div>
+            </foreignObject>
+          ) : (
             <g key={d.key}>
               <circle cx={x} cy={y} r={11} className={isActive ? 'fill-primary/15' : 'fill-muted'} />
               <text
@@ -442,6 +487,7 @@ export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: Fu
             key={d.key}
             d={wedge(i)}
             className="fill-transparent outline-none"
+            role="img"
             tabIndex={0}
             aria-label={`${d.index}. ${d.title}: ${spokenValue(d)}`}
             onPointerEnter={() => onActiveChange(d.key)}
@@ -453,7 +499,7 @@ export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: Fu
       {active && (() => {
         const i = data.indexOf(active)
         const [x, y] = active.percent === null ? polar(cx, cy, labelR, i, n) : polar(cx, cy, (R * active.percent) / 100, i, n)
-        return <ChartTooltip datum={active} x={x} y={y} containerWidth={RADAR_W} />
+        return <ChartTooltip datum={active} x={x} y={y} containerWidth={RADAR_W} showClassAverage={showClassAverage} />
       })()}
     </div>
   )
@@ -462,16 +508,39 @@ export function AbilityRadarChart({ data, activeKey, onActiveChange, label }: Fu
 // ─── Chart type switch ──────────────────────────────────────────────────────
 
 export type AbilityChartType = 'bar' | 'radar'
+export type AbilityLabelMode = 'number' | 'title'
 
 /** A radar with fewer than three spokes is a line, not a shape. */
 export const RADAR_MIN_ASSIGNMENTS = 3
+
+export function LabelModeToggle({ value, onChange }: {
+  value: AbilityLabelMode
+  onChange: (value: AbilityLabelMode) => void
+}) {
+  const itemClass = 'rounded-lg px-3 text-foreground aria-pressed:bg-card aria-pressed:shadow-sm'
+  return (
+    <ToggleGroup
+      value={[value]}
+      onValueChange={values => {
+        const next = values.at(-1)
+        if (next === 'number' || next === 'title') onChange(next)
+      }}
+      aria-label="ข้อความกำกับงานบนกราฟ"
+      spacing={1}
+      className="rounded-xl bg-muted p-1"
+    >
+      <ToggleGroupItem value="number" size="sm" className={itemClass}>ตัวเลข</ToggleGroupItem>
+      <ToggleGroupItem value="title" size="sm" className={itemClass}>ชื่องาน</ToggleGroupItem>
+    </ToggleGroup>
+  )
+}
 
 export function ChartTypeToggle({ value, onChange, radarAllowed }: {
   value: AbilityChartType
   onChange: (value: AbilityChartType) => void
   radarAllowed: boolean
 }) {
-  const itemClass = 'gap-1.5 rounded-lg px-3 text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:shadow-sm'
+  const itemClass = 'gap-1.5 rounded-lg px-3 text-foreground aria-pressed:bg-card aria-pressed:shadow-sm'
   return (
     <ToggleGroup
       value={[value]}

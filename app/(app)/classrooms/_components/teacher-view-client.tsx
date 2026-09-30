@@ -1,16 +1,28 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition, type ComponentProps } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, CheckSquare, X, Archive, Trash2, BookOpen, Users, GraduationCap } from 'lucide-react'
+import { Plus, CheckSquare, X, Trash2, BookOpen, Users, GraduationCap, GripVertical } from 'lucide-react'
+import {
+  DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { bulkDeleteClassrooms, bulkArchiveClassrooms, togglePinClassroom } from '@/lib/actions/classrooms'
+import { IconButton } from '@/components/ui/icon-button'
+import {
+  bulkDeleteClassrooms, deleteClassroom, reorderClassrooms,
+} from '@/lib/actions/classrooms'
 import { ClassroomCard } from './classroom-card'
-import { HomeroomBanner } from './homeroom-banner'
 import type { Classroom } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface Props {
   classrooms: Classroom[]
@@ -18,27 +30,68 @@ interface Props {
   assignmentCountMap: Record<string, number>
   totalStudents: number
   totalAssignments: number
-  archivedCount: number
   trashedCount: number
 }
 
 export function TeacherViewClient({
   classrooms, studentCountMap, assignmentCountMap,
-  totalStudents, totalAssignments, archivedCount, trashedCount,
+  totalStudents, totalAssignments, trashedCount,
 }: Props) {
+  const router = useRouter()
   const [isSelecting, setIsSelecting] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [orderedSubjects, setOrderedSubjects] = useState(
+    () => classrooms.filter(c => c.classroom_type !== 'homeroom'),
+  )
+  const [confirm, confirmDialog] = useConfirm()
   const [isPending, startTransition] = useTransition()
-  const [, startPinTransition] = useTransition()
+  const [, startOrderTransition] = useTransition()
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   const homeroomClassrooms = classrooms.filter(c => c.classroom_type === 'homeroom')
-  const subjectClassrooms = classrooms.filter(c => c.classroom_type !== 'homeroom')
+  useEffect(() => {
+    setOrderedSubjects(classrooms.filter(c => c.classroom_type !== 'homeroom'))
+  }, [classrooms])
 
-  function handleTogglePin(id: string, currentlyPinned: boolean) {
-    startPinTransition(async () => {
-      const res = await togglePinClassroom(id, !currentlyPinned)
-      if (res?.error) toast.error(res.error)
-      else toast.success(currentlyPinned ? 'เลิกปักหมุดแล้ว' : 'ปักหมุดห้องเรียนแล้ว')
+  function handleDuplicate(id: string) {
+    router.push(`/classrooms/new?copyFrom=${encodeURIComponent(id)}`)
+  }
+
+  async function handleDelete(classroom: Classroom) {
+    const accepted = await confirm({
+      title: `ย้าย “${classroom.name}” ไปถังขยะ?`,
+      description: 'ห้องเรียนและข้อมูลภายในจะถูกซ่อนทันที คุณยังกู้คืนได้จากถังขยะภายใน 30 วัน ก่อนระบบลบถาวร',
+      confirmLabel: 'ย้ายไปถังขยะ',
+      variant: 'destructive',
+    })
+    if (!accepted) return
+    startTransition(async () => {
+      const res = await deleteClassroom(classroom.id)
+      if (res?.error) { toast.error(res.error); return }
+      toast.success(`ย้าย “${classroom.name}” ไปถังขยะแล้ว`)
+      router.refresh()
+    })
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const previous = orderedSubjects
+    const oldIndex = previous.findIndex(classroom => classroom.id === active.id)
+    const newIndex = previous.findIndex(classroom => classroom.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const nextSubjects = arrayMove(previous, oldIndex, newIndex)
+    setOrderedSubjects(nextSubjects)
+    startOrderTransition(async () => {
+      const res = await reorderClassrooms(nextSubjects.map(classroom => classroom.id))
+      if (res?.error) {
+        setOrderedSubjects(previous)
+        toast.error(res.error)
+      }
     })
   }
 
@@ -60,20 +113,19 @@ export function TeacherViewClient({
     setSelected(new Set())
   }
 
-  function handleBulkArchive() {
-    startTransition(async () => {
-      const res = await bulkArchiveClassrooms([...selected])
-      if (res?.error) { toast.error(res.error); return }
-      toast.success(`เก็บถาวร ${selected.size} ห้องเรียนแล้ว`)
-      exitSelection()
+  async function handleBulkDelete() {
+    const count = selected.size
+    const accepted = await confirm({
+      title: `ย้ายห้องเรียน ${count} ห้องไปถังขยะ?`,
+      description: 'ห้องเรียนและข้อมูลภายในจะถูกซ่อนทันที คุณยังกู้คืนได้จากถังขยะภายใน 30 วัน ก่อนระบบลบถาวร',
+      confirmLabel: 'ย้ายไปถังขยะ',
+      variant: 'destructive',
     })
-  }
-
-  function handleBulkDelete() {
+    if (!accepted) return
     startTransition(async () => {
       const res = await bulkDeleteClassrooms([...selected])
       if (res?.error) { toast.error(res.error); return }
-      toast.success(`ย้าย ${selected.size} ห้องเรียนไปถังขยะแล้ว`)
+      toast.success(`ย้าย ${count} ห้องเรียนไปถังขยะแล้ว`)
       exitSelection()
     })
   }
@@ -87,17 +139,6 @@ export function TeacherViewClient({
           <p className="text-sm text-muted-foreground mt-0.5">{classrooms.length} ห้องเรียน</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Archive / Trash links */}
-          {archivedCount > 0 && (
-            <Link
-              href="/classrooms/archived"
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors"
-            >
-              <Archive className="w-4 h-4" />
-              เก็บถาวร
-              <span className="bg-muted text-muted-foreground text-xs font-semibold px-1.5 py-0.5 rounded-full">{archivedCount}</span>
-            </Link>
-          )}
           {trashedCount > 0 && (
             <Link
               href="/classrooms/trash"
@@ -155,7 +196,7 @@ export function TeacherViewClient({
           {[
             { label: 'ห้องเรียน', value: classrooms.length, icon: BookOpen, color: 'bg-primary/10 text-primary' },
             { label: 'นักเรียนรวม', value: totalStudents, icon: Users, color: 'bg-tint-1/10 text-tint-1' },
-            { label: 'ชุดข้อสอบรวม', value: totalAssignments, icon: BookOpen, color: 'bg-warning/10 text-warning' },
+            { label: 'งานทั้งหมด', value: totalAssignments, icon: BookOpen, color: 'bg-warning/10 text-warning' },
           ].map(s => {
             const Icon = s.icon
             return (
@@ -180,7 +221,7 @@ export function TeacherViewClient({
             <BookOpen className="w-8 h-8 text-primary" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีห้องเรียน</h3>
-          <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">สร้างห้องเรียนแรกของคุณเพื่อเริ่มมอบหมายข้อสอบให้นักเรียน</p>
+          <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">สร้างห้องเรียนแรกของคุณเพื่อเริ่มมอบหมายงานให้นักเรียน</p>
           <Link href="/classrooms/new" className={cn(buttonVariants(), 'gap-2')}>
             <Plus className="w-4 h-4" />
             สร้างห้องเรียน
@@ -193,15 +234,18 @@ export function TeacherViewClient({
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 <GraduationCap className="w-3.5 h-3.5" /> ห้อง Homeroom
               </div>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {homeroomClassrooms.map((c) => (
-                  <HomeroomBanner
+                  <ClassroomCard
                     key={c.id}
                     classroom={c}
                     studentCount={studentCountMap[c.id] ?? 0}
+                    assignmentCount={assignmentCountMap[c.id] ?? 0}
                     isSelecting={isSelecting}
                     isSelected={selected.has(c.id)}
                     onToggle={() => toggleSelect(c.id)}
+                    onDuplicate={() => handleDuplicate(c.id)}
+                    onDelete={() => handleDelete(c)}
                   />
                 ))}
               </div>
@@ -214,32 +258,36 @@ export function TeacherViewClient({
                 <BookOpen className="w-3.5 h-3.5" /> ห้องเรียนวิชา
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {subjectClassrooms.map((c, i) => (
-                <ClassroomCard
-                  key={c.id}
-                  classroom={c}
-                  studentCount={studentCountMap[c.id] ?? 0}
-                  assignmentCount={assignmentCountMap[c.id] ?? 0}
-                  index={i}
-                  isSelecting={isSelecting}
-                  isSelected={selected.has(c.id)}
-                  onToggle={() => toggleSelect(c.id)}
-                  onTogglePin={() => handleTogglePin(c.id, !!c.pinned_at)}
-                />
-              ))}
-              {!isSelecting && (
-                <Link
-                  href="/classrooms/new"
-                  className="border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-3 p-8 hover:border-primary/20 hover:bg-primary/10 transition-colors group min-h-[200px]"
-                >
-                  <div className="w-10 h-10 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <p className="text-sm text-muted-foreground group-hover:text-primary font-medium transition-colors">สร้างห้องเรียนใหม่</p>
-                </Link>
-              )}
-            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={orderedSubjects.map(c => c.id)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {orderedSubjects.map(c => (
+                    <SortableClassroomCard
+                      key={c.id}
+                      classroom={c}
+                      studentCount={studentCountMap[c.id] ?? 0}
+                      assignmentCount={assignmentCountMap[c.id] ?? 0}
+                      isSelecting={isSelecting}
+                      isSelected={selected.has(c.id)}
+                      onToggle={() => toggleSelect(c.id)}
+                      onDuplicate={() => handleDuplicate(c.id)}
+                      onDelete={() => handleDelete(c)}
+                    />
+                  ))}
+                  {!isSelecting && (
+                    <Link
+                      href="/classrooms/new"
+                      className="group flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/20 hover:bg-primary/10"
+                    >
+                      <div className="flex size-10 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-primary/10">
+                        <Plus className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-primary">สร้างห้องเรียนใหม่</p>
+                    </Link>
+                  )}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
       )}
@@ -251,14 +299,6 @@ export function TeacherViewClient({
             <span className="text-sm font-medium">{selected.size} ห้องเรียน</span>
             <div className="w-px h-4 bg-card/20" />
             <button
-              onClick={handleBulkArchive}
-              disabled={isPending}
-              className="flex items-center gap-1.5 text-sm hover:text-warning transition-colors disabled:opacity-50"
-            >
-              <Archive className="w-4 h-4" />
-              เก็บถาวร
-            </button>
-            <button
               onClick={handleBulkDelete}
               disabled={isPending}
               className="flex items-center gap-1.5 text-sm hover:text-destructive transition-colors disabled:opacity-50"
@@ -269,6 +309,38 @@ export function TeacherViewClient({
           </div>
         </div>
       )}
+      {confirmDialog}
+    </div>
+  )
+}
+
+function SortableClassroomCard(props: ComponentProps<typeof ClassroomCard>) {
+  const disabled = props.isSelecting
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id: props.classroom.id, disabled })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(isDragging && 'relative opacity-80 shadow-xl')}
+    >
+      <ClassroomCard
+        {...props}
+        dragHandle={!disabled ? (
+          <IconButton
+            type="button"
+            label={`ลากเพื่อเปลี่ยนลำดับ ${props.classroom.name}`}
+            size="sm"
+            className="absolute left-2.5 top-2.5 z-20 flex size-8 cursor-grab touch-none items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-4" aria-hidden="true" />
+          </IconButton>
+        ) : undefined}
+      />
     </div>
   )
 }

@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import {
-  Settings, Archive, Users, CalendarDays, Clock, Tag, BookOpen, Home, Info, Palette, Check, Ban,
+  Settings, Users, CalendarDays, Clock, Tag, BookOpen, Home, Info, Palette, Check, Ban,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -14,11 +13,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
-import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
-import { updateClassroom, archiveClassroom } from '@/lib/actions/classrooms'
+import { updateClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import {
   composeDescription, parseDescription, GRADE_SUGGESTIONS, getTermSuggestions,
@@ -28,22 +26,23 @@ import {
 import {
   AccessTypePicker, TagInput, CreatableCombobox,
 } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
+import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 
 export function ClassroomSettingsDialog({
-  classroom, onCover = false,
+  classroom, onCover = false, placement = 'banner',
 }: {
   classroom: Classroom
   /** True when the banner behind the trigger is a tinted cover rather than the
    *  dark default — the trigger then inherits the banner's colour instead of
    *  the light-on-dark tokens. */
   onCover?: boolean
+  /** The contextual sidebar uses a quieter, full-width navigation treatment. */
+  placement?: 'banner' | 'sidebar'
 }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(classroom.name)
   const [meta, setMeta] = useState<ClassroomMeta>(() => parseDescription(classroom.description))
   const [isPending, startTransition] = useTransition()
-  const [confirm, confirmDialog] = useConfirm()
-  const router = useRouter()
 
   const isHomeroom = classroom.classroom_type === 'homeroom'
 
@@ -88,32 +87,22 @@ export function ClassroomSettingsDialog({
     })
   }
 
-  async function handleArchive() {
-    const ok = await confirm({
-      title: 'เก็บห้องเรียนนี้เข้าคลัง?',
-      description: 'ห้องเรียนจะหายจากรายการหลัก แต่กู้คืนได้ภายหลังจากหน้าถังขยะ',
-      confirmLabel: 'เก็บเข้าคลัง',
-    })
-    if (!ok) return
-    startTransition(async () => {
-      const res = await archiveClassroom(classroom.id)
-      if (res?.error) toast.error(res.error)
-      else { toast.success('เก็บห้องเรียนเข้าคลังแล้ว'); setOpen(false); router.push('/classrooms') }
-    })
-  }
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button
             size="sm"
-            variant="outline"
+            variant={placement === 'sidebar' ? 'ghost' : 'outline'}
             className={cn(
-              'gap-1.5 bg-transparent',
-              onCover
-                ? 'border-current text-current hover:bg-current/10 hover:text-current'
-                : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground',
+              placement === 'sidebar'
+                ? 'w-full justify-start'
+                : 'gap-1.5 bg-transparent',
+              placement === 'banner' && (
+                onCover
+                  ? 'border-current text-current hover:bg-current/10 hover:text-current'
+                  : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'
+              ),
             )}
           />
         }
@@ -354,17 +343,14 @@ export function ClassroomSettingsDialog({
           </div>
         </form>
 
-        <div className={cn('border-t border-border pt-4')}>
-          <p className="text-sm font-medium">เก็บเข้าคลัง</p>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-            ซ่อนห้องเรียนจากรายการหลักโดยไม่ลบข้อมูล กู้คืนได้จากหน้าคลังห้องเรียน
+        <div className="border-t border-border pt-4">
+          <p className="text-sm font-medium text-destructive">พื้นที่อันตราย</p>
+          <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
+            ย้ายห้องเรียนไปถังขยะพร้อมข้อมูลภายในทั้งหมด และกู้คืนได้ภายใน 30 วันก่อนลบถาวร
           </p>
-          <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={handleArchive} disabled={isPending}>
-            <Archive className="w-3.5 h-3.5" /> เก็บห้องเรียนเข้าคลัง
-          </Button>
+          <DeleteClassroomButton id={classroom.id} />
         </div>
       </DialogContent>
-      {confirmDialog}
     </Dialog>
   )
 }

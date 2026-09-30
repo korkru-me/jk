@@ -1,8 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import {
+  useCallback, useEffect, useRef, useState, type ReactNode, type RefObject,
+} from 'react'
 import { toast } from 'sonner'
-import { Loader2, Paperclip, X } from 'lucide-react'
+import { Loader2, Paperclip, UploadCloud, X } from 'lucide-react'
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 import {
@@ -36,6 +38,12 @@ interface Props {
   attachments: PostAttachment[]
   onChange: (attachments: PostAttachment[]) => void
   disabled?: boolean
+  /** An adjacent composer action, such as attaching a web link. */
+  action?: ReactNode
+  /** Actions shown before the file picker, kept in the same utility row. */
+  leadingActions?: ReactNode
+  /** The whole composer surface that accepts files dropped from the desktop. */
+  dropZoneRef?: RefObject<HTMLElement | null>
 }
 
 /**
@@ -48,48 +56,114 @@ interface Props {
  * from the database only drops the reference, because the post being edited
  * may still be cancelled and a deleted file cannot be brought back.
  */
-export function PostAttach({ attachments, onChange, disabled }: Props) {
+export function PostAttach({ attachments, onChange, disabled, action, leadingActions, dropZoneRef }: Props) {
   const [uploading, setUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const uploadedHere = useRef(new Set<string>())
+  const dragDepth = useRef(0)
+  const uploadingRef = useRef(false)
 
   const remaining = MAX_POST_ATTACHMENTS - attachments.length
 
-  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []).slice(0, remaining)
-    if (picked.length === 0) return
-
-    setUploading(true)
-    const supabase = await browserSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setUploading(false); return }
-
-    const added: PostAttachment[] = []
-    for (const original of picked) {
-      // Only pictures are shrunk. downscaleImage returns anything else
-      // untouched, and a PDF has to arrive byte-for-byte anyway.
-      const file = await downscaleImage(original)
-      const ext = original.name.split('.').pop() ?? 'bin'
-      const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false })
-      if (error) {
-        toast.error(uploadErrorMessage(error.message, original.name, MAX_MB))
-        continue
-      }
-      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
-      uploadedHere.current.add(publicUrl)
-      added.push({
-        url: publicUrl,
-        name: original.name,
-        mime: original.type || file.type,
-        size: file.size,
-      })
+  const uploadFiles = useCallback(async (files: File[]) => {
+    if (disabled || uploadingRef.current) return
+    if (remaining <= 0) {
+      toast.error(`แนบได้สูงสุด ${MAX_POST_ATTACHMENTS} ไฟล์`)
+      return
     }
 
-    if (added.length > 0) onChange([...attachments, ...added])
-    setUploading(false)
+    const picked = files.slice(0, remaining)
+    if (picked.length === 0) return
+    if (files.length > remaining) {
+      toast.info(`แนบ ${picked.length} ไฟล์แรก — ประกาศหนึ่งแนบได้สูงสุด ${MAX_POST_ATTACHMENTS} ไฟล์`)
+    }
+
+    uploadingRef.current = true
+    setUploading(true)
+    try {
+      const supabase = await browserSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const added: PostAttachment[] = []
+      for (const original of picked) {
+        // Only pictures are shrunk. downscaleImage returns anything else
+        // untouched, and a PDF has to arrive byte-for-byte anyway.
+        const file = await downscaleImage(original)
+        const ext = original.name.split('.').pop() ?? 'bin'
+        const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false })
+        if (error) {
+          toast.error(uploadErrorMessage(error.message, original.name, MAX_MB))
+          continue
+        }
+        const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
+        uploadedHere.current.add(publicUrl)
+        added.push({
+          url: publicUrl,
+          name: original.name,
+          mime: original.type || file.type,
+          size: file.size,
+        })
+      }
+      if (added.length > 0) onChange([...attachments, ...added])
+    } catch {
+      toast.error('แนบไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง')
+    } finally {
+      uploadingRef.current = false
+      setUploading(false)
+    }
+  }, [attachments, disabled, onChange, remaining])
+
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    await uploadFiles(Array.from(e.target.files ?? []))
     if (inputRef.current) inputRef.current.value = ''
   }
+
+  useEffect(() => {
+    const zone = dropZoneRef?.current
+    if (!zone) return
+
+    const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
+    const enter = (event: DragEvent) => {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      if (disabled || uploading || remaining <= 0) return
+      dragDepth.current += 1
+      setIsDragging(true)
+    }
+    const over = (event: DragEvent) => {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = disabled || uploading || remaining <= 0 ? 'none' : 'copy'
+      }
+    }
+    const leave = (event: DragEvent) => {
+      if (!carriesFiles(event)) return
+      dragDepth.current = Math.max(0, dragDepth.current - 1)
+      if (dragDepth.current === 0) setIsDragging(false)
+    }
+    const drop = (event: DragEvent) => {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      dragDepth.current = 0
+      setIsDragging(false)
+      void uploadFiles(Array.from(event.dataTransfer?.files ?? []))
+    }
+
+    zone.addEventListener('dragenter', enter)
+    zone.addEventListener('dragover', over)
+    zone.addEventListener('dragleave', leave)
+    zone.addEventListener('drop', drop)
+    return () => {
+      zone.removeEventListener('dragenter', enter)
+      zone.removeEventListener('dragover', over)
+      zone.removeEventListener('dragleave', leave)
+      zone.removeEventListener('drop', drop)
+    }
+  }, [disabled, dropZoneRef, remaining, uploadFiles, uploading])
 
   async function remove(url: string) {
     onChange(attachments.filter(a => a.url !== url))
@@ -101,7 +175,19 @@ export function PostAttach({ attachments, onChange, disabled }: Props) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex min-w-0 flex-col gap-2">
+      {isDragging && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-background/95 shadow-sm"
+        >
+          <div className="flex flex-col items-center gap-1.5 text-center">
+            <UploadCloud className="size-7 text-primary" />
+            <p className="font-semibold text-primary">วางไฟล์เพื่อแนบกับประกาศ</p>
+            <p className="text-xs text-muted-foreground">รูป เอกสาร หรืองานของนักเรียน · สูงสุด {MAX_POST_ATTACHMENTS} ไฟล์</p>
+          </div>
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -146,17 +232,26 @@ export function PostAttach({ attachments, onChange, disabled }: Props) {
         </div>
       )}
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled={disabled || uploading || remaining <= 0}
-        onClick={() => inputRef.current?.click()}
-      >
-        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
-        {uploading ? 'กำลังอัปโหลด...' : remaining <= 0 ? `แนบได้สูงสุด ${MAX_POST_ATTACHMENTS} ไฟล์` : 'แนบไฟล์/รูป'}
-      </Button>
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5">
+        {leadingActions}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 gap-1.5"
+          disabled={disabled || uploading || remaining <= 0}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+          {uploading ? 'กำลังอัปโหลด...' : remaining <= 0 ? `แนบได้สูงสุด ${MAX_POST_ATTACHMENTS} ไฟล์` : 'แนบไฟล์/รูป'}
+        </Button>
+        {action}
+        {dropZoneRef && remaining > 0 && !uploading && (
+          <span className="inline-flex shrink-0 items-center gap-1 self-center text-xs text-muted-foreground">
+            <UploadCloud className="size-3.5" /> หรือลากไฟล์มาวาง
+          </span>
+        )}
+      </div>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { resolveOrgId } from '@/lib/actions/questions'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import { releaseQuestionFiles } from '@/lib/storage-release'
+import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import type { Variable, Difficulty, Visibility } from '@/lib/types'
 import { RETURN_PARAM } from '@/lib/question-return'
 
@@ -157,7 +158,9 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
       answer_formula: sq.answer_formula,
       answer_unit: sq.answer_unit || null,
       answer_tolerance: sq.answer_tolerance,
-      solution_text: sq.solution_text || null,
+      // Only the เฉลย comes from the rich-text editor. The shared context and
+      // each sub-question are plain textareas, where `x<y` is literal text.
+      solution_text: sanitizeRichTextForStorage(sq.solution_text ?? '') || null,
       solution_image_urls: sq.solution_image_urls ?? [],
       parent_question_id: parentId,
       group_id: groupId,

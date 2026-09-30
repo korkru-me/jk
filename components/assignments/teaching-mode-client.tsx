@@ -5,10 +5,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter } from 'next/navigation'
 import {
   BookOpenCheck,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Eye,
   EyeOff,
   ImagePlus,
@@ -66,6 +64,8 @@ import {
   type TeachingBoardTarget,
 } from '@/lib/teaching-board-draft-state'
 import { scratchpadHasMeaningfulDraft } from '@/lib/scratchpad-state'
+import { useContextualSidebar } from '@/components/layout/sidebar-context'
+import { cn } from '@/lib/utils'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
@@ -96,6 +96,8 @@ interface Props {
   questionsPerPage: number
   initialBoards: TeachingBoardView[]
   initialBoardsError?: string
+  /** Registers the teaching controls in the surrounding app shell. */
+  contextualSidebarPath?: string
 }
 
 /** The ช่อง a new เฉลย can be saved into. */
@@ -168,7 +170,7 @@ function TrueFalseChoice({ value, onSelect }: { value: string; onSelect: (next: 
   )
 }
 
-function TeachingQuestion({ question, index, total, showSolution, answer, actions, folded = false, onInsertImage }: {
+function TeachingQuestion({ question, index, total, showSolution, answer, actions, onInsertImage }: {
   question: TeachingQuestionView
   index: number
   total: number
@@ -177,8 +179,6 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
   answer: { values: string[]; set: (index: number, value: string) => void }
   /** This ข้อ's own controls, sat on its badge row instead of the top bar. */
   actions?: React.ReactNode
-  /** Folded down to its heading: the badges, the title and the controls. */
-  folded?: boolean
   /** Puts one of this ข้อ's pictures onto its board, to write over. */
   onInsertImage?: (url: string) => void
 }) {
@@ -201,10 +201,9 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
         )}
         {actions && <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">{actions}</span>}
       </div>
-      {question.title && <h2 className={`text-lg font-semibold ${folded ? 'truncate' : ''}`}>{question.title}</h2>}
+      {question.title && <h2 className="text-lg font-semibold">{question.title}</h2>}
     </Fragment>
   )
-  if (folded) return <div className="space-y-4">{heading}</div>
 
   return (
     <div className="space-y-4">
@@ -346,13 +345,12 @@ function TeachingQuestion({ question, index, total, showSolution, answer, action
  *
  * `active` marks the ข้อ whose board is open on the right: only that one can
  * highlight a slot as selected, and pressing a slot on any other ข้อ moves
- * the board there first. Folded, only the heading and its แสดง button stay.
+ * the board there first. Page-level visibility is controlled by the sidebar.
  */
 function TeachingBoardSlots({
-  open, boards, loading, canManage, currentUserId, active, selectedSlot, selectedBoardId,
-  dirtySlots, onOpenChange, onOpenSlot, onOpenBoard, onDelete, onRefresh,
+  boards, loading, canManage, currentUserId, active, selectedSlot, selectedBoardId,
+  dirtySlots, separated, onOpenSlot, onOpenBoard, onDelete, onRefresh,
 }: {
-  open: boolean
   boards: TeachingBoardView[]
   loading: boolean
   canManage: boolean
@@ -361,7 +359,7 @@ function TeachingBoardSlots({
   selectedSlot: number
   selectedBoardId: string | null
   dirtySlots: number[]
-  onOpenChange: (open: boolean) => void
+  separated: boolean
   onOpenSlot: (slot: number) => void
   onOpenBoard: (board: TeachingBoardView) => void
   onDelete: (board: TeachingBoardView) => void
@@ -373,21 +371,13 @@ function TeachingBoardSlots({
   // tile until it is deleted, rather than dropping out of sight.
   const slots = [...new Set([...SAVE_SLOTS, ...ownBoards.map(board => board.slot)])].sort((a, b) => a - b)
 
-  const heading = (
-    <div className="flex items-center gap-2">
-      <Presentation className="size-4 text-primary" />
-      <h3 className="text-sm font-semibold">เฉลยที่บันทึกไว้</h3>
-      {loading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
-      <Button type="button" variant="ghost" size="xs" className="ml-auto" aria-expanded={open} onClick={() => onOpenChange(!open)}>
-        {open ? <ChevronUp /> : <ChevronDown />} {open ? 'ซ่อน' : 'แสดง'}
-      </Button>
-    </div>
-  )
-  if (!open) return <div className="border-t border-border pt-3">{heading}</div>
-
   return (
-    <div className="space-y-3 border-t border-border pt-3">
-      {heading}
+    <div className={cn('flex flex-col gap-3', separated && 'border-t border-border pt-3')}>
+      <div className="flex items-center gap-2">
+        <Presentation className="size-4 text-primary" aria-hidden="true" />
+        <h3 className="text-sm font-semibold">เฉลยที่บันทึกไว้</h3>
+        {loading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+      </div>
 
       {canManage ? (
         <div className="grid max-w-md grid-cols-3 gap-2">
@@ -475,16 +465,20 @@ function TeachingBoardSlots({
  *
  * The answer lives here because it is entered in two places: a ตัวเลือก
  * pressed inside the question, or a box under it. Both feed the one array
- * `TeachingAnswerCheck` grades. Folding the card keeps it mounted, so an
- * answer typed before ซ่อนโจทย์ is still there when it opens again.
+ * `TeachingAnswerCheck` grades. The card stays mounted while its visible
+ * sections are hidden, so a teacher's trial answer is still there when the
+ * question is shown again from the sidebar.
  */
-function TeachingQuestionCard({ question, index, total, showSolution, folded, actions, slots, outlined, onActivate, onInsertImage }: {
+function TeachingQuestionCard({
+  question, index, total, showSolution, showQuestion, showSavedBoards,
+  actions, slots, outlined, onActivate, onInsertImage,
+}: {
   question: TeachingQuestionView
   index: number
   total: number
   showSolution: boolean
-  /** Folded to its heading, with the rest of the card — slots too — put away. */
-  folded: boolean
+  showQuestion: boolean
+  showSavedBoards: boolean
   actions?: React.ReactNode
   /** This ข้อ's own saved boards, grouped with it. */
   slots?: React.ReactNode
@@ -508,7 +502,12 @@ function TeachingQuestionCard({ question, index, total, showSolution, folded, ac
   return (
     <Card
       padding="lg"
-      className={`space-y-4 ${outlined ? 'border-primary' : ''} ${onActivate ? 'cursor-pointer' : ''}`}
+      className={cn(
+        'flex flex-col gap-4',
+        !showQuestion && !showSavedBoards && 'hidden',
+        outlined && 'border-primary',
+        onActivate && 'cursor-pointer',
+      )}
       /* Clicking anywhere quiet in another ข้อ brings the board to it, so the
          teacher does not have to go up to the bar to change ข้อ. Controls and
          fields inside keep their own click. */
@@ -517,17 +516,18 @@ function TeachingQuestionCard({ question, index, total, showSolution, folded, ac
         onActivate()
       } : undefined}
     >
-      <TeachingQuestion
-        question={question}
-        index={index}
-        total={total}
-        showSolution={showSolution}
-        answer={{ values, set: setValue }}
-        actions={actions}
-        folded={folded}
-        onInsertImage={onInsertImage}
-      />
-      {!folded && fields && (
+      {showQuestion && (
+        <TeachingQuestion
+          question={question}
+          index={index}
+          total={total}
+          showSolution={showSolution}
+          answer={{ values, set: setValue }}
+          actions={actions}
+          onInsertImage={onInsertImage}
+        />
+      )}
+      {showQuestion && fields && (
         <TeachingAnswerCheck
           question={question}
           fields={fields}
@@ -537,37 +537,147 @@ function TeachingQuestionCard({ question, index, total, showSolution, folded, ac
           revealAnswerKey={showSolution}
         />
       )}
-      {!folded && slots}
+      {showSavedBoards && slots}
     </Card>
   )
 }
 
-/**
- * A ข้อ's board folded down to its heading.
- *
- * The editor is not mounted behind it — the scene waits in the parked draft,
- * so folding costs nothing and the board opens again as it was left.
- */
-function FoldedTeachingBoard({ label, status, onShow }: {
-  /** "ข้อ 15/22", as the open board's own heading reads. */
-  label: string
-  status: string
-  onShow: () => void
-}) {
+interface TeachingModeSidebarProps {
+  assignmentTitle: string
+  questionIndex: number
+  questionCount: number
+  showQuestion: boolean
+  showSavedBoards: boolean
+  showBoard: boolean
+  onToggleQuestion: () => void
+  onToggleSavedBoards: () => void
+  onToggleBoard: () => void
+  onBack: () => void
+  onNavigate?: () => void
+}
+
+function TeachingModeSidebar({
+  assignmentTitle,
+  questionIndex,
+  questionCount,
+  showQuestion,
+  showSavedBoards,
+  showBoard,
+  onToggleQuestion,
+  onToggleSavedBoards,
+  onToggleBoard,
+  onBack,
+  onNavigate,
+}: TeachingModeSidebarProps) {
+  const runAndClose = (action: () => void) => {
+    action()
+    onNavigate?.()
+  }
+
   return (
-    <Card role="region" aria-label={`กระดานสอน ${label}`} className="min-w-0 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <PenLine className="size-4 shrink-0 text-primary" aria-hidden="true" />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">กระดานสอน · {label}</p>
-          <p className="text-[10px] text-muted-foreground">{status}</p>
+    <div className="flex min-w-0 flex-col gap-3">
+      <Button
+        type="button"
+        variant="ghost"
+        className="w-full justify-start"
+        onClick={() => runAndClose(onBack)}
+      >
+        <ChevronLeft data-icon="inline-start" />
+        กลับไปงานที่มอบหมาย
+      </Button>
+
+      <Card radius="md" padding="sm" className="flex flex-col gap-2.5 border-primary/20 bg-primary/5">
+        <div className="flex items-center gap-2 text-primary">
+          <Presentation aria-hidden="true" className="size-4" />
+          <span className="text-xs font-semibold">โหมดสอน</span>
+          <Badge variant="outline" className="ml-auto">ข้อ {questionIndex + 1}/{questionCount}</Badge>
         </div>
-        <Button type="button" variant="ghost" size="xs" className="ml-auto" aria-expanded={false} onClick={onShow}>
-          <ChevronDown /> แสดงกระดาน
+        <div className="min-w-0">
+          <p className="line-clamp-2 font-bold leading-snug text-foreground" title={assignmentTitle}>
+            {assignmentTitle}
+          </p>
+        </div>
+      </Card>
+
+      <div className="px-2 text-xs font-medium text-muted-foreground">การแสดงผล</div>
+      <div className="flex flex-col gap-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full justify-start"
+          aria-expanded={showQuestion}
+          onClick={() => runAndClose(onToggleQuestion)}
+        >
+          {showQuestion ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
+          {showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full justify-start"
+          aria-expanded={showSavedBoards}
+          onClick={() => runAndClose(onToggleSavedBoards)}
+        >
+          {showSavedBoards ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
+          {showSavedBoards ? 'ซ่อนเฉลยที่บันทึกไว้' : 'แสดงเฉลยที่บันทึกไว้'}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full justify-start"
+          aria-expanded={showBoard}
+          onClick={() => runAndClose(onToggleBoard)}
+        >
+          {showBoard ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
+          {showBoard ? 'ซ่อนกระดาน' : 'แสดงกระดาน'}
         </Button>
       </div>
-    </Card>
+    </div>
   )
+}
+
+function TeachingModeSidebarRegistrar({
+  pathname,
+  assignmentTitle,
+  questionIndex,
+  questionCount,
+  showQuestion,
+  showSavedBoards,
+  showBoard,
+  onToggleQuestion,
+  onToggleSavedBoards,
+  onToggleBoard,
+  onBack,
+}: Omit<TeachingModeSidebarProps, 'onNavigate'> & { pathname: string }) {
+  const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
+    <TeachingModeSidebar
+      assignmentTitle={assignmentTitle}
+      questionIndex={questionIndex}
+      questionCount={questionCount}
+      showQuestion={showQuestion}
+      showSavedBoards={showSavedBoards}
+      showBoard={showBoard}
+      onToggleQuestion={onToggleQuestion}
+      onToggleSavedBoards={onToggleSavedBoards}
+      onToggleBoard={onToggleBoard}
+      onBack={onBack}
+      onNavigate={onNavigate}
+    />
+  ), [
+    assignmentTitle,
+    onBack,
+    onToggleBoard,
+    onToggleQuestion,
+    onToggleSavedBoards,
+    questionCount,
+    questionIndex,
+    showBoard,
+    showQuestion,
+    showSavedBoards,
+  ])
+
+  useContextualSidebar(pathname, renderContextualSidebar)
+  return null
 }
 
 export function TeachingModeClient({
@@ -580,6 +690,7 @@ export function TeachingModeClient({
   questionsPerPage,
   initialBoards,
   initialBoardsError,
+  contextualSidebarPath,
 }: Props) {
   const router = useRouter()
   const [confirm, confirmDialog] = useConfirm()
@@ -597,12 +708,11 @@ export function TeachingModeClient({
   // Revealed per ข้อ: the button sits on each card, so pressing it there
   // should show that ข้อ's เฉลย and leave the others on the page covered.
   const [revealedQuestionIds, setRevealedQuestionIds] = useState<string[]>([])
-  // Each of these folds its part down to a heading with a แสดง button, in
-  // place, rather than moving it off the page. They are one setting for the
-  // whole page, so a fold stays as it was while the teacher moves through ข้อ.
+  // These are page-wide presentation controls. In the authenticated route
+  // they are exposed by the contextual sidebar and survive question changes.
   const [showQuestion, setShowQuestion] = useState(true)
-  // The slots start folded: a teacher opens them to switch or save a board
-  // and then wants the room back for the question.
+  // Saved answers start hidden; the teacher can reveal them from the sidebar
+  // when switching, opening, or saving a board.
   const [showBoards, setShowBoards] = useState(false)
   const [showBoard, setShowBoard] = useState(true)
   const [fingerInputMode, setFingerInputMode] = useState<FingerInputMode>('finger_draw')
@@ -1253,8 +1363,6 @@ export function TeachingModeClient({
   }
 
   // The scene is parked, so folding the board away costs nothing.
-  const hideBoard = () => setShowBoard(false)
-
   /**
    * Where the board about to be saved should land.
    *
@@ -1393,13 +1501,38 @@ export function TeachingModeClient({
     toast.success(`กู้คืนกระดานข้อ ${nextQuestionIndex + 1} ช่อง ${restoredDraft.target.slot} แล้ว`)
   }
 
-  const leaveTeachingMode = async () => {
+  const leaveTeachingMode = useCallback(async () => {
     if (!await confirmAllDraftExit()) return
     router.push(backHref)
-  }
+  }, [backHref, confirmAllDraftExit, router])
+
+  const toggleQuestionVisibility = useCallback(() => {
+    setShowQuestion(value => !value)
+  }, [])
+  const toggleSavedBoardsVisibility = useCallback(() => {
+    setShowBoards(value => !value)
+  }, [])
+  const toggleBoardVisibility = useCallback(() => {
+    setShowBoard(value => !value)
+  }, [])
 
   return (
     <div className="flex min-h-[calc(100dvh-7rem)] flex-col gap-4">
+      {contextualSidebarPath && (
+        <TeachingModeSidebarRegistrar
+          pathname={contextualSidebarPath}
+          assignmentTitle={assignmentTitle}
+          questionIndex={questionIndex}
+          questionCount={questions.length}
+          showQuestion={showQuestion}
+          showSavedBoards={showBoards}
+          showBoard={showBoard}
+          onToggleQuestion={toggleQuestionVisibility}
+          onToggleSavedBoards={toggleSavedBoardsVisibility}
+          onToggleBoard={toggleBoardVisibility}
+          onBack={leaveTeachingMode}
+        />
+      )}
       {/* One line: the bar sits above every ข้อ and every board, so a second
           row of it is width taken from the teaching itself. */}
       <Card padding="sm" className="sticky top-0 z-20 shrink-0">
@@ -1467,10 +1600,12 @@ export function TeachingModeClient({
         </div>
       </Card>
 
-      {/* Each ข้อ is one row of its own: the question and its saved slots on
-          the left, its board on the right. Scrolling to the next ข้อ brings
-          that ข้อ's board with it, because the board belongs to it. Folding
-          either side stacks the row, so the other one gets the full width. */}
+      {/* Each ข้อ is one row of its own: the question and saved answers on
+          the left, its board on the right. The question track is based on the
+          normal desktop viewport after subtracting the 64-unit sidebar,
+          12 units of page padding and the 3-unit gap. Collapsing the sidebar
+          therefore gives all reclaimed width to the board instead of making
+          the question wider, including with a custom density/spacing theme. */}
       <div className="flex min-h-0 min-w-0 flex-1 gap-3">
         <div className="min-w-0 flex-1 space-y-4">
           {pageQuestions.map((pageQuestion, offset) => {
@@ -1480,38 +1615,32 @@ export function TeachingModeClient({
             return (
               <div
                 key={pageQuestion.id}
-                className={`grid min-w-0 gap-3 ${
-                  showQuestion && showBoard ? 'lg:grid-cols-[minmax(17rem,0.72fr)_minmax(30rem,1.28fr)]' : ''
-                }`}
+                className={cn(
+                  'grid min-w-0 gap-3',
+                  !showQuestion && !showBoards && !showBoard && 'hidden',
+                  (showQuestion || showBoards) && showBoard
+                    && 'lg:grid-cols-[clamp(17rem,calc(36vw-(var(--spacing)*28.44)),35rem)_minmax(30rem,1fr)]',
+                )}
               >
                 <TeachingQuestionCard
                   question={pageQuestion}
                   index={index}
                   total={questions.length}
                   showSolution={revealed}
-                  folded={!showQuestion}
+                  showQuestion={showQuestion}
+                  showSavedBoards={showBoards}
                   outlined={perPage > 1 && isBoardQuestion}
                   onActivate={isBoardQuestion ? undefined : () => void changeQuestion(index)}
                   onInsertImage={url => void insertQuestionImage(index, url)}
                   actions={
-                    /* Every ข้อ carries its own pair: the เฉลย it reveals is
-                       its own, and ซ่อนโจทย์ folds every card on the page down
-                       to its heading from whichever one the teacher is
-                       reading. A folded card has no เฉลย to show. */
-                    <>
-                      {showQuestion && (
-                        <Button type="button" variant="outline" size="xs" onClick={() => toggleSolution(pageQuestion.id)} aria-pressed={revealed}>
-                          {revealed ? <EyeOff /> : <Eye />}{revealed ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
-                        </Button>
-                      )}
-                      <Button type="button" variant="ghost" size="xs" aria-expanded={showQuestion} onClick={() => setShowQuestion(value => !value)}>
-                        {showQuestion ? <ChevronUp /> : <ChevronDown />} {showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
-                      </Button>
-                    </>
+                    /* Correct-answer reveal remains per question; page-level
+                       visibility lives only in the sidebar. */
+                    <Button type="button" variant="outline" size="xs" onClick={() => toggleSolution(pageQuestion.id)} aria-pressed={revealed}>
+                      {revealed ? <EyeOff /> : <Eye />}{revealed ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
+                    </Button>
                   }
                   slots={
                     <TeachingBoardSlots
-                      open={showBoards}
                       boards={boardsByQuestion[pageQuestion.id] ?? []}
                       loading={loadingQuestionIds.includes(pageQuestion.id)}
                       canManage={canManage}
@@ -1519,10 +1648,10 @@ export function TeachingModeClient({
                       active={isBoardQuestion}
                       selectedSlot={selectedSlot}
                       selectedBoardId={selectedBoardId}
+                      separated={showQuestion}
                       dirtySlots={draftRecords
                         .filter(draft => draft.target.questionId === pageQuestion.id && draft.dirty)
                         .map(draft => draft.target.slot)}
-                      onOpenChange={setShowBoards}
                       onOpenSlot={slot => void openSlotOn(index, slot)}
                       onOpenBoard={board => void openBoardOn(index, board)}
                       onDelete={board => void deleteBoard(board, pageQuestion.id)}
@@ -1531,16 +1660,7 @@ export function TeachingModeClient({
                   }
                 />
 
-                {!showBoard ? (
-                  <FoldedTeachingBoard
-                    label={`ข้อ ${index + 1}/${questions.length}`}
-                    status={TEACHER_DRAFT_STATE_LABEL[activeDraftFor(pageQuestion.id)?.state ?? 'new_draft']}
-                    onShow={() => {
-                      setShowBoard(true)
-                      if (!isBoardQuestion) void changeQuestion(index)
-                    }}
-                  />
-                ) : (
+                {showBoard && (
                   <div className="min-h-[560px] min-w-0 lg:min-h-0">
                     {isBoardQuestion ? (
                       <TeachingBoardEditor
@@ -1587,7 +1707,6 @@ export function TeachingModeClient({
                         onSessionLibraryItemRemove={itemId => {
                           setSessionLibraryItems(current => current.filter(item => item.id !== itemId))
                         }}
-                        onHide={hideBoard}
                       />
                     ) : (
                       /* Only one board is live at a time: several Excalidraw

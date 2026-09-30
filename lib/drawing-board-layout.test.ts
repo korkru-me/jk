@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest'
+import {
+  boardPageTop,
+  boardPaperHeight,
+  BOARD_PAGE_GAP,
+  BOARD_SHEET_HEIGHT,
+  BOARD_SHEET_WIDTH,
+  clampBoardScrollX,
+  minimumBoardZoom,
+} from '@/components/exam/drawing-board-utils'
+
+describe('drawing board paper layout', () => {
+  it('uses the board width as the minimum zoom', () => {
+    expect(minimumBoardZoom(BOARD_SHEET_WIDTH)).toBe(1)
+    expect(minimumBoardZoom(800)).toBe(0.5)
+    expect(BOARD_SHEET_WIDTH * minimumBoardZoom(1234)).toBeCloseTo(1234)
+  })
+
+  it('stops horizontal movement when either paper edge reaches the viewport', () => {
+    expect(clampBoardScrollX(120, 800, 1)).toBe(0)
+    expect(clampBoardScrollX(-900, 800, 1)).toBe(-800)
+    expect(clampBoardScrollX(-300, 800, 1)).toBe(-300)
+    expect(clampBoardScrollX(-300, 800, 0.5)).toBe(0)
+    expect(clampBoardScrollX(-500, 800, 2)).toBe(-500)
+  })
+
+  it('stacks at most three fixed-height pages with a visible gap', () => {
+    expect(boardPaperHeight(1)).toBe(BOARD_SHEET_HEIGHT)
+    expect(boardPaperHeight(3)).toBe(BOARD_SHEET_HEIGHT * 3 + BOARD_PAGE_GAP * 2)
+    expect(boardPaperHeight(99)).toBe(BOARD_SHEET_HEIGHT * 3 + BOARD_PAGE_GAP * 2)
+    expect(boardPageTop(2)).toBe((BOARD_SHEET_HEIGHT + BOARD_PAGE_GAP) * 2)
+  })
+})

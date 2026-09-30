@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
-import { fetchBankQuestions, withQuestionPoints, QUESTION_POINT_FIELDS } from '@/lib/question-bank'
+import { fetchBankQuestions, withQuestionPoints } from '@/lib/question-bank'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
@@ -12,6 +12,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { manageableClassroomIds } from '@/lib/classroom-groups-server'
 import { AssignmentGroupTargetsCard } from '@/components/assignments/assignment-group-targets-card'
 import type { AssignmentGroupOption, GroupTargets } from '@/components/assignments/group-target-picker'
+import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
+import { AssignmentEditSidebar } from './_components/assignment-edit-sidebar'
+import type { AssignmentSidebarSummary } from '../_components/assignment-context-sidebar'
 
 export const metadata = { title: 'แก้ไขชุดข้อสอบ — KorKru' }
 
@@ -32,7 +36,7 @@ export default async function EditAssignmentPage({
   // unauthorized and is handled by notFound() below.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('id, org_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode')
+    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
@@ -44,21 +48,19 @@ export default async function EditAssignmentPage({
 
   if (!assignment) notFound()
   const a = assignment as EditableAssignment
+  if (!await canManageAssignment(id, user.id)) notFound()
+  const admin = createAdminClient()
 
-  // The bank doubles as the lookup for the questions already in this
-  // assignment, so one read serves both the list and the "เพิ่มโจทย์" picker.
-  // A question shared by a teammate can be in the assignment without being in
-  // this teacher's own bank, so those are still read by id.
-  const [bank, { data: questionRows }, { data: startedSubmission }, sebQuitPasswordSetup, groupTargeting] = await Promise.all([
+  // The picker remains session-scoped so a co-teacher can add only questions
+  // they may actually browse. Existing assignment refs use stable assignment
+  // provenance, preserving private owner questions for authorized managers.
+  const [bank, questionResult, { data: startedSubmission }, sebQuitPasswordSetup, groupTargeting] = await Promise.all([
     fetchBankQuestions(supabase, user.id),
-    supabase
-      .from('questions')
-      .select(`id, title, question_text, ${QUESTION_POINT_FIELDS}`)
-      .in('id', a.question_ids),
+    loadAssignmentQuestionsByProvenance(a),
     // One row is enough: the question set is frozen into every attempt as it
     // starts, so once anyone has begun, changing it would hand later students
     // a different paper — and a different คะแนนเต็ม — from the same งาน.
-    supabase
+    admin
       .from('submissions')
       .select('id')
       .eq('assignment_id', id)
@@ -67,6 +69,8 @@ export default async function EditAssignmentPage({
     readSebQuitPasswordSetupState(id, user.id),
     loadGroupTargeting(supabase, id, user.id),
   ])
+  if ('error' in questionResult) throw new Error(questionResult.error)
+  const questionRows = questionResult.questions
 
   // Preserve the assignment's own question order rather than whatever the
   // `in` query happens to return. withQuestionPoints turns each row's
@@ -76,12 +80,22 @@ export default async function EditAssignmentPage({
     ((questionRows ?? []) as unknown as QuestionPointRow[])
       .map(q => [q.id, withQuestionPoints(q)] as const)
   )
-  const questions = a.question_ids
+  const questions = [...new Set(a.question_ids)]
     .map(id => questionsById.get(id))
     .filter((q): q is NonNullable<typeof q> => !!q)
+  const uniqueQuestionCount = new Set(a.question_ids).size
+  const missingQuestionCount = Math.max(0, uniqueQuestionCount - questions.length)
+  const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
 
   return (
     <div className="max-w-2xl space-y-6">
+      <AssignmentEditSidebar
+        assignment={assignment as unknown as AssignmentSidebarSummary}
+        availableQuestionCount={questions.length}
+        missingQuestionCount={missingQuestionCount}
+        duplicateQuestionCount={duplicateQuestionCount}
+      />
+
       <Link href={`/assignments/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
         <ChevronLeft className="w-4 h-4" /> กลับไปหน้าชุดข้อสอบ
       </Link>

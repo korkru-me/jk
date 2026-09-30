@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import {
-  AlertTriangle, ArrowRight, ChevronRight, ClipboardList, Plus, Printer, Sparkles, UserPlus,
-} from 'lucide-react'
+import { ChevronRight, Printer } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { ClassroomStream } from './classroom-stream'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -16,7 +15,7 @@ import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 
 /** The tabs this overview can hand the teacher off to. */
-export type OverviewTarget = 'students' | 'assignments' | 'scores' | 'homeroom' | 'invite'
+export type OverviewTarget = 'students' | 'assignments' | 'scores' | 'homeroom'
 
 interface OverviewStudent { id: string; full_name: string }
 
@@ -29,10 +28,6 @@ interface Props {
   /** Homeroom rooms only — งาน the roster has in their subject rooms. */
   homeroomAssignments: HomeroomAssignmentRow[]
   submissions: ProgressSubmission[]
-  /** Hand-ins holding at least one answer nobody has scored yet. */
-  pendingReviewCount: number
-  /** True when the pending-review lookup hit its row cap, so the count is a floor. */
-  pendingReviewCapped: boolean
   posts: ClassroomPost[]
   /** Student ids that have seen each announcement, keyed by post id. */
   seenByPost: Record<string, string[]>
@@ -80,8 +75,7 @@ function rateTone(rate: number): string {
 
 export function ClassroomOverview({
   classroomId, isHomeroom, students, assignments, homeroomAssignments, submissions,
-  pendingReviewCount, pendingReviewCapped, posts, seenByPost, crossPostTargets,
-  canManage, audienceByAssignment, onNavigate,
+  posts, seenByPost, crossPostTargets, canManage, audienceByAssignment, onNavigate,
 }: Props) {
   const now = Date.now()
   const studentIds = students.map(s => s.id)
@@ -94,7 +88,6 @@ export function ClassroomOverview({
   const given = isHomeroom
     ? homeroomAssignments
     : assignments.filter(a => a.status === 'published' || a.status === 'closed')
-  const draftCount = isHomeroom ? 0 : assignments.filter(a => a.status === 'draft').length
   const summary = summarizeClassroomProgress(
     studentIds, given, submissions, now,
     a => (isHomeroom ? null : audienceByAssignment?.get(a.id) ?? null),
@@ -137,76 +130,14 @@ export function ClassroomOverview({
     return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
   })
 
-  const overdue = items
-    .filter(i => !i.closed && i.endAt && isDueBy(i.endAt, now) && i.progress.missing > 0)
-    .sort((a, b) => (b.endAt ?? '').localeCompare(a.endAt ?? ''))
-
-  // Everyone with work outstanding, worst first. The panel shows the first
-  // few; the action list needs the real total behind them.
+  // Everyone with work outstanding, worst first. The side panel is the single
+  // place for following up, so the overview never repeats the same warning in
+  // a second "ต้องดำเนินการ" card above it.
   const behindAll = students
     .map(s => summary.byStudent.get(s.id)!)
     .filter(p => p && p.total > 0 && p.rate < 100)
     .sort((a, b) => a.rate - b.rate)
   const behind = behindAll.slice(0, 5)
-
-  // What the room needs from this teacher right now, most urgent first. Every
-  // entry is something they can act on — an empty list means nothing is late.
-  function buildActions() {
-    const list: { key: string; text: string; tone: 'destructive' | 'warning' | 'primary'; label: string; run: () => void }[] = []
-
-    if (students.length === 0) {
-      list.push({
-        key: 'no-students', tone: 'warning', text: 'ยังไม่มีนักเรียนในห้องเรียนนี้',
-        label: 'เชิญนักเรียน', run: () => onNavigate('invite'),
-      })
-    }
-
-    for (const item of overdue.slice(0, 2)) {
-      list.push({
-        key: `overdue-${item.id}`, tone: 'destructive',
-        text: `“${item.title}” เลยกำหนดแล้ว ยังไม่ส่ง ${item.progress.missing} คน`,
-        label: 'ดูว่าใครยังไม่ส่ง', run: () => onNavigate(isHomeroom ? 'homeroom' : 'scores'),
-      })
-    }
-
-    // Work with no deadline never goes "overdue", so without this a room where
-    // half the งาน is still outstanding would report that nothing is pending.
-    if (behindAll.length > 0) {
-      const worst = behindAll[0].rate
-      list.push({
-        key: 'behind', tone: worst < 50 ? 'warning' : 'primary',
-        text: `มีนักเรียน ${behindAll.length} คนส่งงานยังไม่ครบ (ต่ำสุด ${worst}%)`,
-        label: 'ดูรายชื่อ', run: () => onNavigate(isHomeroom ? 'homeroom' : 'scores'),
-      })
-    }
-
-    if (pendingReviewCount > 0) {
-      list.push({
-        key: 'pending-review', tone: 'warning',
-        text: `มีงานที่ส่งแล้ว ${pendingReviewCount}${pendingReviewCapped ? '+' : ''} ชิ้น รอครูตรวจให้คะแนนเอง`,
-        label: 'ไปตรวจงาน', run: () => onNavigate('scores'),
-      })
-    }
-
-    if (draftCount > 0) {
-      list.push({
-        key: 'drafts', tone: 'primary',
-        text: `มีงานฉบับร่าง ${draftCount} ชิ้นที่ยังไม่ได้เผยแพร่ให้นักเรียน`,
-        label: 'เปิดรายการงาน', run: () => onNavigate('assignments'),
-      })
-    }
-
-    if (!isHomeroom && given.length === 0 && students.length > 0) {
-      list.push({
-        key: 'no-assignments', tone: 'primary', text: 'ยังไม่ได้มอบหมายงานให้ห้องนี้',
-        label: 'ไปที่แท็บงาน', run: () => onNavigate('assignments'),
-      })
-    }
-
-    return list
-  }
-
-  const actions = buildActions()
 
   // Announcements lead the page: it is the one part of a classroom that is
   // read every day, and the one thing a teacher comes here to write. The board
@@ -218,7 +149,7 @@ export function ClassroomOverview({
       canPost={canManage}
       initialPosts={posts}
       variant="panel"
-      maxHeightClass="max-h-[360px]"
+      maxHeightClass="max-h-[680px]"
       students={students}
       seenByPost={seenByPost}
       crossPostTargets={crossPostTargets}
@@ -236,73 +167,24 @@ export function ClassroomOverview({
     <div className="space-y-5">
       {announcements}
 
-      {/* ── Quick actions ─────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2">
-        {isHomeroom ? (
-          <>
-            <Button size="lg" className="gap-1.5" onClick={() => onNavigate('homeroom')}>
-              <ClipboardList className="w-4 h-4" /> ดูการบ้านนักเรียน
-            </Button>
-            <Link
-              href={`/classrooms/${classroomId}/report`}
-              target="_blank"
-              className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'gap-1.5')}
-            >
-              <Printer className="w-4 h-4" /> พิมพ์รายงานผู้ปกครอง
-            </Link>
-          </>
-        ) : (
-          <>
-            <Link
-              href={`/assignments/new?classroom=${classroomId}`}
-              className={cn(buttonVariants({ size: 'lg' }), 'gap-1.5')}
-            >
-              <Plus className="w-4 h-4" /> มอบหมายงานใหม่
-            </Link>
-            <Button variant="outline" size="lg" className="gap-1.5" onClick={() => onNavigate('scores')}>
-              <ClipboardList className="w-4 h-4" /> ดูคะแนนและการส่งงาน
-            </Button>
-          </>
-        )}
-        <Button variant="outline" size="lg" className="gap-1.5" onClick={() => onNavigate('invite')}>
-          <UserPlus className="w-4 h-4" /> เชิญนักเรียน
-        </Button>
-      </div>
-
-      {/* ── What needs the teacher now ────────────────────────────────── */}
-      <Card padding="md">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-          <AlertTriangle className="w-3.5 h-3.5" /> ต้องดำเนินการ
+      {/* The contextual sidebar already owns navigation actions. Homeroom's
+          printable parent report stays here because it is a page-specific
+          export, not another destination in that navigation. */}
+      {isHomeroom && (
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/classrooms/${classroomId}/report`}
+            target="_blank"
+            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'gap-1.5')}
+          >
+            <Printer className="w-4 h-4" /> พิมพ์รายงานผู้ปกครอง
+          </Link>
         </div>
-        {actions.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Sparkles className="w-4 h-4 text-success" />
-            ตอนนี้ไม่มีอะไรค้าง — งานส่งครบและไม่มีอะไรรอครูอยู่
-          </div>
-        ) : (
-          <ul className="space-y-1.5">
-            {actions.map(action => (
-              <li key={action.key} className="flex items-center gap-3 flex-wrap">
-                <span
-                  className={cn('w-1.5 h-1.5 rounded-full shrink-0', {
-                    'bg-destructive': action.tone === 'destructive',
-                    'bg-warning': action.tone === 'warning',
-                    'bg-primary': action.tone === 'primary',
-                  })}
-                />
-                <span className="text-sm text-foreground flex-1 min-w-0">{action.text}</span>
-                <Button variant="link" size="sm" className="gap-0.5 px-0" onClick={action.run}>
-                  {action.label} <ArrowRight className="w-3 h-3" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-5 xl:grid-cols-2">
         {/* ── Assignment progress ─────────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="min-w-0">
           <Section
             title={isHomeroom ? 'การบ้านที่กำลังติดตาม' : 'งานที่มอบหมาย'}
             note={ordered.length > 0
@@ -319,12 +201,12 @@ export function ClassroomOverview({
                     : 'ยังไม่มีงานที่เผยแพร่ให้ห้องนี้'}
                 </p>
                 {!isHomeroom && (
-                  <Link
-                    href={`/assignments/new?classroom=${classroomId}`}
-                    className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5')}
-                  >
-                    <Plus className="w-3.5 h-3.5" /> มอบหมายงานแรก
-                  </Link>
+                  <AssignmentCreationMenu
+                    classroomId={classroomId}
+                    label="มอบหมายงานแรก"
+                    size="sm"
+                    align="center"
+                  />
                 )}
               </div>
             ) : (
@@ -345,9 +227,10 @@ export function ClassroomOverview({
         </div>
 
         {/* ── Side column ─────────────────────────────────────────────── */}
-        <div className="space-y-4">
+        <div className="min-w-0">
           <Section
             title="นักเรียนที่ควรติดตาม"
+            note={behindAll.length > 0 ? `${behindAll.length} คน` : undefined}
             actionLabel={behind.length > 0 ? 'ดูทั้งห้อง' : undefined}
             onAction={() => onNavigate(isHomeroom ? 'homeroom' : 'scores')}
           >
@@ -386,7 +269,7 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="h-full overflow-hidden">
       <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {title}

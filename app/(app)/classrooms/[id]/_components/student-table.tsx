@@ -2,25 +2,23 @@
 
 import { useState, useTransition } from 'react'
 import {
-  Search, ChevronUp, ChevronDown, MoreVertical,
-  Mail, ArrowRightLeft, UserMinus, X, IdCard,
+  Search, ChevronUp, ChevronDown, ChevronsUpDown,
+  Trash2, X, IdCard, ListChecks,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { removeStudent } from '@/lib/actions/classrooms'
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
-  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { removeStudent, removeStudents } from '@/lib/actions/classrooms'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StudentProfilePanel, type StudentProfileRow } from './homeroom-overview'
-import { compareStudents, type StudentSortKey, type StudentSortDir } from '@/lib/student-sort'
+import { compareStudentsByRules, type StudentSortKey, type StudentSortRule } from '@/lib/student-sort'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { cn } from '@/lib/utils'
 
 export type SortKey = StudentSortKey
-export type SortDir = StudentSortDir
+export type SortRule = StudentSortRule
 
 interface RealStudent { id: string; full_name: string; email: string }
 interface Student extends RealStudent {
@@ -30,18 +28,16 @@ interface Student extends RealStudent {
 interface Props {
   classroomId: string
   students: RealStudent[]
-  otherClassrooms: { id: string; name: string }[]
   profiles?: Record<string, StudentProfileRow>
+  canManage?: boolean
   /** Grade/room/number/code columns — any teacher who can manage this
    *  classroom (subject or homeroom), scoped per classroom. */
   showRoster?: boolean
   /** Full personal-info dialog (health/address/guardians) — homeroom
    *  advisor only, a stricter gate than showRoster. */
   showProfiles?: boolean
-  /** Sort state lives in the parent so the "คะแนนและการส่งงาน" tab can
-   *  mirror the same student order. */
-  sortKey: SortKey
-  sortDir: SortDir
+  /** Sort state lives in the parent so it survives switching tabs. */
+  sortRules: SortRule[]
   onToggleSort: (key: SortKey) => void
 }
 
@@ -49,15 +45,17 @@ interface Props {
 // 1fr, each row's intrinsic width calc lets its own full_name+email length
 // push the track wider, so rows (and the header) end up different total
 // widths and the fixed columns after it drift out of alignment row to row.
-const GRID_COLS_DEFAULT = 'grid-cols-[auto_minmax(160px,1fr)_40px]'
+const GRID_COLS_READ_ONLY = 'grid-cols-[auto_minmax(160px,1fr)]'
+const GRID_COLS_MANAGE = 'grid-cols-[auto_minmax(160px,1fr)_40px]'
+const GRID_COLS_MANAGE_SELECT = 'grid-cols-[32px_auto_minmax(160px,1fr)_40px]'
 const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
+const GRID_COLS_WITH_ROSTER_SELECT = 'grid-cols-[32px_56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
 
 export function StudentTable({
-  classroomId, students, otherClassrooms, profiles = {}, showRoster = false, showProfiles = false,
-  sortKey, sortDir, onToggleSort,
+  classroomId, students, profiles = {}, canManage = false, showRoster = false, showProfiles = false,
+  sortRules, onToggleSort,
 }: Props) {
   const [confirm, confirmDialog] = useConfirm()
-  const GRID_COLS = showRoster ? GRID_COLS_WITH_ROSTER : GRID_COLS_DEFAULT
   const augmented: Student[] = students.map(s => ({
     ...s,
     initials: s.full_name.slice(0, 2),
@@ -65,14 +63,46 @@ export function StudentTable({
 
   const [query, setQuery] = useState('')
   const [viewingProfile, setViewingProfile] = useState<Student | null>(null)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [isPending, startTransition] = useTransition()
+
+  const GRID_COLS = showRoster && canManage
+    ? selectionMode ? GRID_COLS_WITH_ROSTER_SELECT : GRID_COLS_WITH_ROSTER
+    : canManage
+      ? selectionMode ? GRID_COLS_MANAGE_SELECT : GRID_COLS_MANAGE
+      : GRID_COLS_READ_ONLY
 
   const filtered = augmented
     .filter(s =>
       s.full_name.toLowerCase().includes(query.toLowerCase()) ||
       s.email.toLowerCase().includes(query.toLowerCase())
     )
-    .sort((a, b) => compareStudents(a, b, profiles, sortKey, sortDir))
+    .sort((a, b) => compareStudentsByRules(a, b, profiles, sortRules))
+
+  const selectedStudents = augmented.filter(student => selectedIds.has(student.id))
+  const allFilteredSelected = filtered.length > 0 && filtered.every(student => selectedIds.has(student.id))
+  const someFilteredSelected = filtered.some(student => selectedIds.has(student.id))
+
+  function toggleStudent(studentId: string) {
+    setSelectedIds(current => {
+      const next = new Set(current)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      return next
+    })
+  }
+
+  function toggleFilteredStudents() {
+    setSelectedIds(current => {
+      const next = new Set(current)
+      for (const student of filtered) {
+        if (allFilteredSelected) next.delete(student.id)
+        else next.add(student.id)
+      }
+      return next
+    })
+  }
 
   async function handleRemove(studentId: string, name: string) {
     const ok = await confirm({
@@ -85,27 +115,77 @@ export function StudentTable({
     startTransition(async () => {
       const res = await removeStudent(classroomId, studentId)
       if (res?.error) toast.error(res.error)
-      else toast.success(`ลบ ${name} ออกแล้ว`)
+      else {
+        setSelectedIds(current => {
+          const next = new Set(current)
+          next.delete(studentId)
+          return next
+        })
+        toast.success(`ลบ ${name} ออกแล้ว`)
+      }
+    })
+  }
+
+  async function handleBulkRemove() {
+    const count = selectedStudents.length
+    if (count === 0) return
+    const previewNames = selectedStudents.slice(0, 3).map(student => student.full_name).join(', ')
+    const remainder = count - 3
+    const ok = await confirm({
+      title: `นำนักเรียน ${count} คนออกจากห้องเรียน?`,
+      description: (
+        <>
+          <span className="font-medium text-foreground">{previewNames}</span>
+          {remainder > 0 && ` และอีก ${remainder} คน`}
+          <span className="mt-1 block">นักเรียนจะไม่เห็นห้องเรียนนี้อีก และเพิ่มกลับเข้ามาใหม่ได้ภายหลัง</span>
+        </>
+      ),
+      confirmLabel: `นำออก ${count} คน`,
+      variant: 'destructive',
+    })
+    if (!ok) return
+    startTransition(async () => {
+      const res = await removeStudents(classroomId, selectedStudents.map(student => student.id))
+      if (res?.error) toast.error(res.error)
+      else {
+        setSelectedIds(new Set())
+        setSelectionMode(false)
+        toast.success(`นำนักเรียนออกแล้ว ${count} คน`)
+      }
     })
   }
 
   function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ChevronUp className="w-3 h-3 text-muted-foreground/40" />
-    return sortDir === 'asc'
-      ? <ChevronUp className="w-3 h-3 text-primary" />
-      : <ChevronDown className="w-3 h-3 text-primary" />
+    const ruleIndex = sortRules.findIndex(rule => rule.key === col)
+    if (ruleIndex < 0) return <ChevronsUpDown className="size-3 text-muted-foreground/40" />
+    const rule = sortRules[ruleIndex]
+    return rule.dir === 'asc'
+      ? <ChevronUp className="size-3 text-primary" />
+      : <ChevronDown className="size-3 text-primary" />
   }
 
   function headerBtnClass(col: SortKey) {
-    return `flex items-center gap-1 px-2 py-1 -my-1 rounded-lg transition-colors ${
-      sortKey === col ? 'bg-primary/10 text-primary font-semibold' : 'hover:text-muted-foreground hover:bg-muted'
-    }`
+    const ruleIndex = sortRules.findIndex(rule => rule.key === col)
+    return cn(
+      'flex items-center gap-1 rounded-lg px-2 py-1 -my-1 transition-colors',
+      ruleIndex === 0 && 'bg-primary/10 font-semibold text-primary',
+      ruleIndex > 0 && 'bg-background text-foreground',
+      ruleIndex < 0 && 'hover:bg-muted hover:text-muted-foreground',
+    )
+  }
+
+  function sortButtonTitle(col: SortKey) {
+    const ruleIndex = sortRules.findIndex(rule => rule.key === col)
+    if (ruleIndex < 0) return 'กดเพื่อใช้เป็นลำดับหลัก โดยคงการเรียงเดิมเป็นลำดับรอง'
+    const rule = sortRules[ruleIndex]
+    if (ruleIndex === 0) return `ลำดับหลัก: ${rule.dir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'} · กดอีกครั้งเพื่อกลับทิศ`
+    return 'ลำดับรอง · กดเพื่อเลื่อนเป็นลำดับหลัก'
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       {/* Search bar */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
@@ -119,38 +199,93 @@ export function StudentTable({
             </button>
           )}
         </div>
+        {canManage && (
+          <div className="flex flex-wrap items-center gap-2">
+            {selectionMode ? (
+              <>
+                <Badge variant="secondary">เลือกแล้ว {selectedStudents.length} คน</Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectionMode(false)
+                    setSelectedIds(new Set())
+                  }}
+                  disabled={isPending}
+                >
+                  ยกเลิก
+                </Button>
+                {selectedStudents.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleBulkRemove}
+                    disabled={isPending}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    ลบนักเรียน {selectedStudents.length} คน
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSelectionMode(true)}
+                disabled={students.length === 0 || isPending}
+              >
+                <ListChecks data-icon="inline-start" />
+                เลือกนักเรียน
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
       <Card edge="ring" className="overflow-x-auto">
         {/* Header */}
         <div className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-muted border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
+          {canManage && selectionMode && (
+            <label className="flex items-center justify-center" title="เลือกนักเรียนที่แสดงทั้งหมด">
+              <input
+                type="checkbox"
+                className="size-4 cursor-pointer accent-primary"
+                checked={allFilteredSelected}
+                ref={element => {
+                  if (element) element.indeterminate = someFilteredSelected && !allFilteredSelected
+                }}
+                onChange={toggleFilteredStudents}
+                aria-label="เลือกนักเรียนที่แสดงทั้งหมด"
+              />
+            </label>
+          )}
           {showRoster && (
             <div className="text-center" title="ลำดับตามที่แสดงในตารางนี้ (เรียงคอลัมน์อื่นได้ แต่เลขนี้ไม่เปลี่ยน)">
               ลำดับ
             </div>
           )}
           <div className="w-8" />
-          <button className={`text-left ${headerBtnClass('name')}`} onClick={() => onToggleSort('name')}>
+          <button className={cn('text-left', headerBtnClass('name'))} onClick={() => onToggleSort('name')} title={sortButtonTitle('name')}>
             ชื่อ <SortIcon col="name" />
           </button>
           {showRoster && (
             <>
-              <button className={headerBtnClass('grade')} onClick={() => onToggleSort('grade')}>
+              <button className={headerBtnClass('grade')} onClick={() => onToggleSort('grade')} title={sortButtonTitle('grade')}>
                 ระดับชั้น <SortIcon col="grade" />
               </button>
-              <button className={headerBtnClass('section')} onClick={() => onToggleSort('section')}>
+              <button className={headerBtnClass('section')} onClick={() => onToggleSort('section')} title={sortButtonTitle('section')}>
                 ห้อง <SortIcon col="section" />
               </button>
-              <button className={headerBtnClass('number')} onClick={() => onToggleSort('number')}>
+              <button className={headerBtnClass('number')} onClick={() => onToggleSort('number')} title={sortButtonTitle('number')}>
                 เลขที่ <SortIcon col="number" />
               </button>
-              <button className={headerBtnClass('code')} onClick={() => onToggleSort('code')}>
+              <button className={headerBtnClass('code')} onClick={() => onToggleSort('code')} title={sortButtonTitle('code')}>
                 รหัสนักเรียน <SortIcon col="code" />
               </button>
             </>
           )}
-          <div />
+          {canManage && <div />}
         </div>
 
         {/* Rows */}
@@ -165,6 +300,17 @@ export function StudentTable({
                   key={student.id}
                   className={`grid ${GRID_COLS} gap-3 items-center px-4 py-3 hover:bg-muted/50 transition-colors relative`}
                 >
+                  {canManage && selectionMode && (
+                    <label className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        className="size-4 cursor-pointer accent-primary"
+                        checked={selectedIds.has(student.id)}
+                        onChange={() => toggleStudent(student.id)}
+                        aria-label={`เลือก ${student.full_name}`}
+                      />
+                    </label>
+                  )}
                   {showRoster && (
                     <span className="text-sm text-muted-foreground text-center">{index + 1}</span>
                   )}
@@ -194,42 +340,20 @@ export function StudentTable({
                     </>
                   )}
 
-                  {/* Actions */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-muted-foreground transition-colors outline-none">
-                      <MoreVertical className="w-3.5 h-3.5" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => toast.success('ฟีเจอร์กำลังพัฒนา')}>
-                        <Mail className="w-3.5 h-3.5 text-muted-foreground" /> ส่งข้อความ
-                      </DropdownMenuItem>
-                      {otherClassrooms.length > 0 && (
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>
-                            <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" /> ย้ายห้องเรียน
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            {otherClassrooms.map(c => (
-                              <DropdownMenuItem
-                                key={c.id}
-                                onClick={() => toast.success(`ย้ายไป ${c.name} (ฟีเจอร์กำลังพัฒนา)`)}
-                              >
-                                {c.name}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => handleRemove(student.id, student.full_name)}
-                        disabled={isPending}
-                      >
-                        <UserMinus className="w-3.5 h-3.5" /> ลบออกจากห้อง
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {/* Destructive row action stays visible instead of hiding in a menu. */}
+                  {canManage && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon-sm"
+                      onClick={() => handleRemove(student.id, student.full_name)}
+                      disabled={isPending}
+                      aria-label={`ลบ ${student.full_name} ออกจากห้องเรียน`}
+                      title="ลบนักเรียนออก"
+                    >
+                      <Trash2 />
+                    </Button>
+                  )}
                 </div>
               )
             })}

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   MoreVertical, Pin, PinOff, Pencil, Trash2, Send, MessageCircle, Link2, Megaphone,
-  Paperclip, Download, Eye, ChevronDown, ChevronUp, Users,
+  Paperclip, Download, Eye, ChevronDown, ChevronUp, Users, ExternalLink, Globe2, Video, Plus,
+  RefreshCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,9 +15,12 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   createClassroomPost, updateClassroomPost, togglePinClassroomPost, deleteClassroomPost,
-  addComment, markPostsSeen,
+  addComment, getReusableAnnouncements, markPostsSeen, type ReusableAnnouncement,
 } from '@/lib/actions/classroom-posts'
 import { linkify, shortenUrl } from '@/lib/linkify'
+import {
+  announcementLinks, appendAnnouncementLink, normalizeAnnouncementUrl,
+} from '@/lib/announcement-links'
 import {
   attachmentKindLabel, formatFileSize, isImageAttachment, shortenFileName,
   type PostAttachment,
@@ -29,6 +33,9 @@ import { PostAttach } from '@/components/classrooms/post-attach'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 /**
  * `page` — the standing list a student scrolls, one card per announcement.
@@ -63,8 +70,15 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+function reusableAnnouncementLabel(post: ReusableAnnouncement): string {
+  const firstLine = post.body.trim().split('\n')[0]
+  if (firstLine) return firstLine.length > 70 ? `${firstLine.slice(0, 67)}...` : firstLine
+  const firstFile = post.attachments[0]?.name
+  return firstFile ? `ไฟล์: ${firstFile}` : 'ประกาศไม่มีข้อความ'
+}
+
 export function ClassroomStream({
-  classroomId, canPost, initialPosts, variant = 'page', maxHeightClass = 'max-h-[420px]',
+  classroomId, canPost, initialPosts, variant = 'page', maxHeightClass = 'max-h-[680px]',
   title = 'ประกาศห้องเรียน',
   students = [], seenByPost = {}, crossPostTargets = [], trackSeen = false,
 }: Props) {
@@ -73,10 +87,19 @@ export function ClassroomStream({
   const [attachments, setAttachments] = useState<PostAttachment[]>([])
   const [alsoIn, setAlsoIn] = useState<string[]>([])
   const [showTargets, setShowTargets] = useState(false)
+  const [showReuse, setShowReuse] = useState(false)
+  const [reuseSourceId, setReuseSourceId] = useState('')
+  const [reuseAnnouncementId, setReuseAnnouncementId] = useState('')
+  const [reuseAnnouncements, setReuseAnnouncements] = useState<ReusableAnnouncement[]>([])
+  const [showLinkField, setShowLinkField] = useState(false)
+  const [composerOpen, setComposerOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [isReusePending, startReuseTransition] = useTransition()
+  const composerDropZoneRef = useRef<HTMLDivElement>(null)
 
   const isPanel = variant === 'panel'
   const canSubmit = draft.trim().length > 0 || attachments.length > 0
+  const hasComposerDraft = canSubmit || alsoIn.length > 0 || showLinkField
 
   function submitPost() {
     if (!canSubmit) return
@@ -87,6 +110,8 @@ export function ClassroomStream({
       setAttachments([])
       setAlsoIn([])
       setShowTargets(false)
+      setShowLinkField(false)
+      setComposerOpen(false)
       // Say where it actually landed. A cross-post that reached three rooms out
       // of four must not report itself as a plain success.
       const extra = (res?.postedTo ?? 1) - 1
@@ -96,8 +121,32 @@ export function ClassroomStream({
     })
   }
 
-  const composer = canPost && (
-    <div className={cn('space-y-2.5', isPanel ? 'px-4 py-3 border-b border-border' : '')}>
+  function chooseReuseSource(sourceId: string) {
+    setReuseSourceId(sourceId)
+    setReuseAnnouncementId('')
+    setReuseAnnouncements([])
+    if (!sourceId) return
+    startReuseTransition(async () => {
+      const result = await getReusableAnnouncements(sourceId)
+      if ('error' in result) { toast.error(result.error); return }
+      setReuseAnnouncements(result.announcements)
+    })
+  }
+
+  function applyReusableAnnouncement() {
+    const selected = reuseAnnouncements.find(post => post.id === reuseAnnouncementId)
+    if (!selected) return
+    setDraft(selected.body)
+    setAttachments(selected.attachments)
+    setShowReuse(false)
+    toast.success('นำประกาศเดิมมาใส่ในช่องเขียนแล้ว แก้ไขก่อนโพสต์ได้')
+  }
+
+  const composer = canPost && (!isPanel || composerOpen) && (
+    <div
+      ref={composerDropZoneRef}
+      className={cn('relative flex flex-col gap-2.5', isPanel ? 'px-4 py-3 border-b border-border' : '')}
+    >
       <Textarea
         placeholder="ประกาศอะไรถึงห้องเรียนนี้... วางลิงก์ในข้อความได้เลย"
         value={draft}
@@ -105,25 +154,129 @@ export function ClassroomStream({
         className={isPanel ? 'min-h-16' : 'min-h-20'}
       />
 
-      {crossPostTargets.length > 0 && (
-        <div>
+      <PostAttach
+        attachments={attachments}
+        onChange={setAttachments}
+        disabled={isPending}
+        dropZoneRef={composerDropZoneRef}
+        leadingActions={crossPostTargets.length > 0 ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              aria-expanded={showReuse}
+              onClick={() => {
+                setShowReuse(open => !open)
+                setShowTargets(false)
+              }}
+            >
+              <RefreshCcw data-icon="inline-start" aria-hidden="true" />
+              ใช้ประกาศเดิมจากห้องอื่น
+              {showReuse
+                ? <ChevronUp data-icon="inline-end" aria-hidden="true" />
+                : <ChevronDown data-icon="inline-end" aria-hidden="true" />}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              aria-expanded={showTargets}
+              onClick={() => {
+                setShowTargets(open => !open)
+                setShowReuse(false)
+              }}
+            >
+              <Users data-icon="inline-start" aria-hidden="true" />
+              {alsoIn.length > 0 ? `โพสต์ไปอีก ${alsoIn.length} ห้อง` : 'โพสต์ไปห้องอื่นด้วย'}
+              {showTargets
+                ? <ChevronUp data-icon="inline-end" aria-hidden="true" />
+                : <ChevronDown data-icon="inline-end" aria-hidden="true" />}
+            </Button>
+          </>
+        ) : undefined}
+        action={(
           <Button
-            variant="ghost"
-            size="xs"
-            className="gap-1 px-1 text-muted-foreground"
-            onClick={() => setShowTargets(open => !open)}
+            type="button"
+            variant={showLinkField ? 'secondary' : 'outline'}
+            size="sm"
+            className="shrink-0"
+            aria-expanded={showLinkField}
+            onClick={() => setShowLinkField(open => !open)}
           >
-            <Users className="w-3.5 h-3.5" />
-            {alsoIn.length > 0 ? `โพสต์ไปอีก ${alsoIn.length} ห้อง` : 'โพสต์ไปห้องอื่นด้วย'}
-            {showTargets ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            <Link2 data-icon="inline-start" aria-hidden="true" /> แนบลิงก์
           </Button>
+        )}
+      />
+
+      {crossPostTargets.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {showReuse && (
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <label className="text-xs font-medium text-foreground">1. เลือกห้องเรียนต้นทาง</label>
+                  <Select value={reuseSourceId} onValueChange={value => value !== null && chooseReuseSource(value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="เลือกห้องเรียน">
+                        {value => crossPostTargets.find(target => target.id === value)?.name ?? 'เลือกห้องเรียน'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {crossPostTargets.map(target => (
+                          <SelectItem key={target.id} value={target.id}>{target.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <label className="text-xs font-medium text-foreground">2. เลือกประกาศ</label>
+                  <Select
+                    value={reuseAnnouncementId}
+                    disabled={!reuseSourceId || isReusePending || reuseAnnouncements.length === 0}
+                    onValueChange={value => value !== null && setReuseAnnouncementId(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={isReusePending ? 'กำลังโหลด...' : reuseAnnouncements.length === 0 && reuseSourceId ? 'ห้องนี้ยังไม่มีประกาศ' : 'เลือกประกาศ'}>
+                        {value => {
+                          const selected = reuseAnnouncements.find(post => post.id === value)
+                          return selected ? reusableAnnouncementLabel(selected) : 'เลือกประกาศ'
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {reuseAnnouncements.map(post => (
+                          <SelectItem key={post.id} value={post.id}>
+                            {reusableAnnouncementLabel(post)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">ระบบจะคัดลอกข้อความและไฟล์มาให้แก้ไขก่อน ยังไม่โพสต์ทันที</p>
+                <Button type="button" size="sm" variant="outline" disabled={!reuseAnnouncementId} onClick={applyReusableAnnouncement}>
+                  นำมาใช้
+                </Button>
+              </div>
+            </div>
+          )}
+
           {showTargets && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 rounded-xl border border-border bg-muted/30 p-3">
               {crossPostTargets.map(target => {
                 const picked = alsoIn.includes(target.id)
                 return (
                   <Button
                     key={target.id}
+                    type="button"
                     variant={picked ? 'default' : 'outline'}
                     size="xs"
                     onClick={() => setAlsoIn(ids => picked ? ids.filter(id => id !== target.id) : [...ids, target.id])}
@@ -137,8 +290,17 @@ export function ClassroomStream({
         </div>
       )}
 
-      <div className="flex items-end justify-between gap-2 flex-wrap">
-        <PostAttach attachments={attachments} onChange={setAttachments} disabled={isPending} />
+      {showLinkField && (
+        <AnnouncementLinkField
+          onAdd={href => {
+            setDraft(body => appendAnnouncementLink(body, href))
+            setShowLinkField(false)
+          }}
+          onCancel={() => setShowLinkField(false)}
+        />
+      )}
+
+      <div className="flex justify-end">
         <Button size="sm" className="gap-1.5" disabled={isPending || !canSubmit} onClick={submitPost}>
           <Send className="w-3.5 h-3.5" /> โพสต์ประกาศ
         </Button>
@@ -173,19 +335,40 @@ export function ClassroomStream({
     return (
       <Card className="overflow-hidden">
         {/* The board has no tab of its own on either side, so it says what it is. */}
-        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
-          <h2 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <Megaphone className="w-3.5 h-3.5" /> {title}
           </h2>
-          <span className="text-xs text-muted-foreground shrink-0">
-            {initialPosts.length > 0 ? `${initialPosts.length} ประกาศ` : 'ยังไม่มีประกาศ'}
-            {/* The hint only earns its space where there is space. */}
-            <span className="hidden sm:inline">{initialPosts.length > 0 ? ' · เลื่อนดูในกรอบนี้' : ''}</span>
-          </span>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              {initialPosts.length > 0 ? `${initialPosts.length} ประกาศ · เลื่อนดูในกรอบนี้` : 'ยังไม่มีประกาศ'}
+            </span>
+            {canPost && (
+              <Button
+                type="button"
+                size="sm"
+                variant={composerOpen ? 'ghost' : 'default'}
+                aria-expanded={composerOpen}
+                onClick={() => setComposerOpen(open => !open)}
+              >
+                {composerOpen
+                  ? <ChevronUp data-icon="inline-start" />
+                  : <Plus data-icon="inline-start" />}
+                {composerOpen ? 'ซ่อนช่องเขียน' : hasComposerDraft ? 'เขียนต่อ' : 'เพิ่มประกาศ'}
+              </Button>
+            )}
+          </div>
         </div>
         {composer}
         {initialPosts.length === 0 ? emptyState : (
-          <div className={cn('overflow-y-auto divide-y divide-border', maxHeightClass)}>{list}</div>
+          <div
+            className={cn(
+              'flex flex-col gap-3 overflow-y-auto overscroll-y-auto bg-muted/30 p-3 [scrollbar-gutter:stable]',
+              maxHeightClass,
+            )}
+          >
+            {list}
+          </div>
         )}
       </Card>
     )
@@ -208,7 +391,7 @@ export function ClassroomStream({
 function PostBody({ body }: { body: string }) {
   if (!body) return null
   return (
-    <p className="text-sm mt-2 whitespace-pre-wrap leading-relaxed break-words">
+    <p className="mt-3 whitespace-pre-wrap break-words text-base font-medium leading-7 text-foreground">
       {linkify(body).map((segment, i) => (
         segment.type === 'text' ? segment.value : (
           <a
@@ -223,6 +406,130 @@ function PostBody({ body }: { body: string }) {
         )
       ))}
     </p>
+  )
+}
+
+/**
+ * A deliberate link attachment is still stored in the announcement body, so
+ * it travels through edit and cross-post without adding a second database
+ * shape. This control gives that simple model clear validation and feedback.
+ */
+function AnnouncementLinkField({
+  onAdd, onCancel,
+}: {
+  onAdd: (href: string) => void
+  onCancel: () => void
+}) {
+  const inputId = useId()
+  const [value, setValue] = useState('')
+  const [error, setError] = useState('')
+
+  function add() {
+    const href = normalizeAnnouncementUrl(value)
+    if (!href) {
+      setError('ใส่ลิงก์เว็บไซต์ที่ขึ้นต้นด้วย http:// หรือ https://')
+      return
+    }
+    onAdd(href)
+  }
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+      <label className="mb-1.5 block text-xs font-medium" htmlFor={inputId}>
+        ลิงก์ที่ต้องการแนบ
+      </label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          id={inputId}
+          type="url"
+          inputMode="url"
+          autoFocus
+          placeholder="https://example.com หรือ YouTube"
+          value={value}
+          aria-invalid={!!error}
+          onChange={event => {
+            setValue(event.target.value)
+            if (error) setError('')
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              add()
+            }
+            if (event.key === 'Escape') onCancel()
+          }}
+        />
+        <div className="flex gap-2">
+          <Button type="button" size="sm" className="shrink-0" disabled={!value.trim()} onClick={add}>
+            เพิ่มลิงก์
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onCancel}>
+            ยกเลิก
+          </Button>
+        </div>
+      </div>
+      {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        ลิงก์ YouTube จะแสดงวิดีโอให้เปิดดูได้จากประกาศโดยตรง
+      </p>
+    </div>
+  )
+}
+
+/** Rich previews for URLs in the announcement. YouTube is the only embeddable
+ * host; every video id is reduced to a strict eleven-character allowlist by
+ * announcementLinks before it can enter the iframe URL. */
+function PostLinkPreviews({ body }: { body: string }) {
+  const links = announcementLinks(body)
+  if (links.length === 0) return null
+
+  return (
+    <div className="mt-2.5 grid gap-2">
+      {links.map(link => link.youtubeVideoId ? (
+        <div key={link.href} className="max-w-xl overflow-hidden rounded-xl border border-border bg-muted/30">
+          <div className="flex items-center justify-between gap-3 px-3 py-2">
+            <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
+              <Video className="h-4 w-4 shrink-0 text-destructive" />
+              <span className="truncate">วิดีโอ YouTube</span>
+            </span>
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
+            >
+              เปิดบน YouTube <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${link.youtubeVideoId}`}
+            title="วิดีโอ YouTube ที่แนบในประกาศ"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+            className="aspect-video w-full border-0 bg-foreground"
+          />
+        </div>
+      ) : (
+        <a
+          key={link.href}
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="flex max-w-xl items-center gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2.5 transition-colors hover:bg-muted"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-primary">
+            <Globe2 className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{link.host}</span>
+            <span className="block truncate text-xs text-muted-foreground">{shortenUrl(link.href, 64)}</span>
+          </span>
+          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </a>
+      ))}
+    </div>
   )
 }
 
@@ -343,12 +650,14 @@ function PostCard({
   const [isEditing, setIsEditing] = useState(false)
   const [editBody, setEditBody] = useState(post.body)
   const [editAttachments, setEditAttachments] = useState<PostAttachment[]>(post.attachments ?? [])
+  const [showEditLinkField, setShowEditLinkField] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [showComments, setShowComments] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
   const [isCommentPending, startCommentTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
   const cardRef = useRef<HTMLDivElement>(null)
+  const editDropZoneRef = useRef<HTMLDivElement>(null)
 
   const isPanel = variant === 'panel'
   const authorName = post.users?.full_name ?? 'ครูผู้สอน'
@@ -387,7 +696,12 @@ function PostCard({
     startTransition(async () => {
       const res = await updateClassroomPost(post.id, classroomId, editBody, editAttachments)
       if (res?.error) toast.error(res.error)
-      else { setIsEditing(false); toast.success('แก้ไขประกาศแล้ว'); router.refresh() }
+      else {
+        setIsEditing(false)
+        setShowEditLinkField(false)
+        toast.success('แก้ไขประกาศแล้ว')
+        router.refresh()
+      }
     })
   }
 
@@ -415,67 +729,34 @@ function PostCard({
   }
 
   return (
-    <div
+    <Card
       ref={cardRef}
+      padding="md"
+      elevation={isPanel ? 'sm' : 'none'}
       className={cn(
-        isPanel
-          ? cn('px-4 py-3', post.pinned && 'bg-primary/5')
-          : cn('bg-card border rounded-2xl p-4', post.pinned && 'border-primary/20'),
+        post.pinned && 'border-primary/30 bg-primary/5',
       )}
     >
       <div className="flex items-start gap-3">
         <div className={cn(
           'rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold shrink-0',
-          isPanel ? 'w-7 h-7 text-xs' : 'w-9 h-9 text-sm',
+          isPanel ? 'size-10 text-sm' : 'size-9 text-sm',
         )}>
           {initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold">{authorName}</p>
+            <p className="text-base font-semibold">{authorName}</p>
             {post.pinned && (
               <Badge variant="outline" className="gap-1 text-primary border-primary/20">
                 <Pin className="w-3 h-3" /> ปักหมุด
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {formatTime(post.created_at)}
             {post.edited_at && ' (แก้ไขแล้ว)'}
           </p>
-
-          {isEditing ? (
-            <div className="mt-2 space-y-2">
-              <Textarea value={editBody} onChange={e => setEditBody(e.target.value)} className="min-h-20" />
-              <PostAttach attachments={editAttachments} onChange={setEditAttachments} disabled={isPending} />
-              <div className="flex gap-2 justify-end">
-                <Button size="sm" variant="outline" onClick={() => {
-                  setIsEditing(false)
-                  setEditBody(post.body)
-                  setEditAttachments(post.attachments ?? [])
-                }}>
-                  ยกเลิก
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={isPending || (!editBody.trim() && editAttachments.length === 0)}
-                  onClick={saveEdit}
-                >
-                  บันทึก
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <PostBody body={post.body} />
-              <PostAttachments attachments={attachments} />
-              {canManage && (
-                <div className="mt-2">
-                  <SeenPanel students={students} seenBy={seenBy} />
-                </div>
-              )}
-            </>
-          )}
         </div>
 
         {canManage && !isEditing && (
@@ -508,8 +789,69 @@ function PostCard({
         )}
       </div>
 
+      {isEditing ? (
+        <div ref={editDropZoneRef} className="relative mt-3 flex flex-col gap-2">
+          <Textarea value={editBody} onChange={e => setEditBody(e.target.value)} className="min-h-20" />
+          {showEditLinkField && (
+            <AnnouncementLinkField
+              onAdd={href => {
+                setEditBody(body => appendAnnouncementLink(body, href))
+                setShowEditLinkField(false)
+              }}
+              onCancel={() => setShowEditLinkField(false)}
+            />
+          )}
+          <PostAttach
+            attachments={editAttachments}
+            onChange={setEditAttachments}
+            disabled={isPending}
+            dropZoneRef={editDropZoneRef}
+            action={(
+              <Button
+                type="button"
+                variant={showEditLinkField ? 'secondary' : 'outline'}
+                size="sm"
+                className="gap-1.5"
+                aria-expanded={showEditLinkField}
+                onClick={() => setShowEditLinkField(open => !open)}
+              >
+                <Link2 className="w-3.5 h-3.5" /> แนบลิงก์
+              </Button>
+            )}
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => {
+              setIsEditing(false)
+              setShowEditLinkField(false)
+              setEditBody(post.body)
+              setEditAttachments(post.attachments ?? [])
+            }}>
+              ยกเลิก
+            </Button>
+            <Button
+              size="sm"
+              disabled={isPending || (!editBody.trim() && editAttachments.length === 0)}
+              onClick={saveEdit}
+            >
+              บันทึก
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <PostBody body={post.body} />
+          <PostLinkPreviews body={post.body} />
+          <PostAttachments attachments={attachments} />
+          {canManage && (
+            <div className="mt-2">
+              <SeenPanel students={students} seenBy={seenBy} />
+            </div>
+          )}
+        </>
+      )}
+
       {/* Comments */}
-      <div className={cn('mt-3 pt-3 border-t', isPanel ? 'pl-10' : 'pl-12')}>
+      <div className="mt-3 border-t pt-3">
         <Button
           variant="ghost"
           size="xs"
@@ -559,6 +901,6 @@ function PostCard({
         )}
       </div>
       {confirmDialog}
-    </div>
+    </Card>
   )
 }
