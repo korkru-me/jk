@@ -565,6 +565,9 @@ export default async function ClassroomDetailPage({
     sp.view,
     classroomNavigationFor(c.classroom_type, canManage),
   )
+  const rawView = Array.isArray(sp.view) ? sp.view[0] : sp.view
+  const rawPeopleView = Array.isArray(sp.people) ? sp.people[0] : sp.people
+  const initialPeopleView = rawView === 'groups' || rawPeopleView === 'groups' ? 'groups' : 'students'
   const backHref = backHrefFromSearchParams(sp, '/classrooms')
 
   return (
@@ -594,6 +597,7 @@ export default async function ClassroomDetailPage({
       groups={groups}
       groupMembers={groupMembers}
       initialNavigationItem={initialNavigationItem}
+      initialPeopleView={initialPeopleView}
       backHref={backHref}
     />
   )

@@ -2,7 +2,11 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
-import { BreakoutGroups, type GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
+import type { GroupState } from '@/app/(app)/classrooms/[id]/_components/breakout-groups'
+import {
+  ClassroomPeopleTabs, type PeopleView,
+} from '@/app/(app)/classrooms/[id]/_components/classroom-people-tabs'
+import type { StudentProfileRow } from '@/app/(app)/classrooms/[id]/_components/homeroom-overview'
 import {
   ClassroomAssignmentsTab,
   type ClassroomAssignmentRow,
@@ -13,6 +17,7 @@ import { AssignmentReviewSummary } from '@/components/assignments/assignment-rev
 import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
+import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 
 export type GroupsLabScenario = 'default' | 'many' | 'empty'
 
@@ -128,6 +133,8 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
   const seed = useMemo(() => initial(scenario), [scenario])
   const [state, setState] = useState<GroupState>(seed.state)
   const [targets, setTargets] = useState<GroupTargets>({})
+  const [peopleView, setPeopleView] = useState<PeopleView>('students')
+  const [sortRules, setSortRules] = useState<StudentSortRule[]>([{ key: 'name', dir: 'asc' }])
   const counter = useRef(100)
   // The fake "server" keeps its own copy, like the database would.
   const server = useRef<GroupState>(seed.state)
@@ -195,11 +202,32 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
       memberCount: Object.values(state.members).filter(id => id === g.id).length,
     })),
   }
+  const roster = seed.roster.map(student => ({
+    id: student.id,
+    full_name: student.full_name,
+    email: `${student.student_code}@example.invalid`,
+  }))
+  const profiles = Object.fromEntries(seed.roster.map(student => [student.id, {
+    student_id: student.id,
+    grade_level: student.grade_level,
+    section_number: student.section_number,
+    class_number: student.class_number,
+    student_code: student.student_code,
+    nickname: null,
+    date_of_birth: null,
+    gender: null,
+    food_allergy: null,
+    chronic_disease: null,
+    school_name: null,
+    address: null,
+    phone: null,
+    guardians: [],
+  } as StudentProfileRow]))
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       <div>
-        <h1 className="text-xl font-bold text-foreground">ห้องทดลอง: กลุ่มย่อย</h1>
+        <h1 className="text-xl font-bold text-foreground">ห้องทดลอง: นักเรียนและกลุ่ม</h1>
         <p className="text-sm text-muted-foreground">
           ข้อมูลจำลอง {seed.roster.length} คน · การบันทึกทั้งหมดอยู่ในหน่วยความจำของแท็บนี้
           {fail && ' · โหมด ?fail=1: ทุกการบันทึกจะล้มเหลว'}
@@ -207,13 +235,20 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
       </div>
 
       <GroupActionsProvider value={actions}>
-        <BreakoutGroups
+        <ClassroomPeopleTabs
           classroomId={CLASSROOM_ID}
-          students={seed.roster}
-          state={state}
-          setState={setState}
+          students={roster}
+          groupStudents={seed.roster}
+          otherClassrooms={[]}
+          profiles={profiles}
           canManage
+          sortRules={sortRules}
+          onToggleSort={key => setSortRules(current => nextStudentSortRules(current, key))}
+          groupState={state}
+          setGroupState={setState}
           assignmentTitlesByGroup={new Map(state.groups.slice(0, 1).map(g => [g.id, ['แบบฝึกหัดเรื่องแรงและการเคลื่อนที่']]))}
+          value={peopleView}
+          onValueChange={setPeopleView}
         />
       </GroupActionsProvider>
 

@@ -20,8 +20,7 @@ export const SUBJECT_CLASSROOM_NAVIGATION = [
   { key: 'assignments', label: 'งานที่มอบหมาย', managerOnly: true },
   { key: 'scores', label: 'คะแนนและการส่งงาน', managerOnly: true },
   { key: 'ability', label: 'ศักยภาพผู้เรียน', managerOnly: true },
-  { key: 'students', label: 'นักเรียน' },
-  { key: 'groups', label: 'กลุ่มย่อย' },
+  { key: 'students', label: 'นักเรียนและกลุ่ม' },
   { key: 'invite', label: 'เชิญเข้าร่วม' },
   { key: 'coteachers', label: 'ผู้ช่วยสอน' },
 ] as const satisfies readonly ClassroomNavigationItem[]
@@ -50,6 +49,9 @@ export function resolveClassroomNavigationKey(
   availableItems: readonly ClassroomNavigationItem[],
 ): ClassroomNavigationKey {
   const candidate = Array.isArray(value) ? value[0] : value
+  // `groups` used to be a separate sidebar page. Keep old bookmarks useful
+  // after merging it into the students page's internal tabs.
+  if (candidate === 'groups' && availableItems.some(item => item.key === 'students')) return 'students'
   const match = availableItems.find(item => item.key === candidate)
   return match?.key ?? 'overview'
 }

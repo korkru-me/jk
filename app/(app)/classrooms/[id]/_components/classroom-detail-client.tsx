@@ -31,6 +31,7 @@ import type { GroupState } from './breakout-groups'
 import { ClassroomContextNavigation } from './classroom-context-sidebar'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
+import type { PeopleView } from './classroom-people-tabs'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -55,7 +56,10 @@ const StudentAbilityTab = dynamic(
   () => import('./student-ability-tab').then(module => module.StudentAbilityTab),
   { loading: TabLoading },
 )
-const BreakoutGroups = dynamic(() => import('./breakout-groups').then(module => module.BreakoutGroups), { loading: TabLoading })
+const ClassroomPeopleTabs = dynamic(
+  () => import('./classroom-people-tabs').then(module => module.ClassroomPeopleTabs),
+  { loading: TabLoading },
+)
 const HomeroomOverview = dynamic(() => import('./homeroom-overview').then(module => module.HomeroomOverview), { loading: TabLoading })
 
 interface RealStudent { id: string; full_name: string; email: string; roster_order?: number | null }
@@ -98,6 +102,7 @@ interface Props {
   groups: ClassroomGroup[]
   groupMembers: Record<string, string>
   initialNavigationItem: ClassroomNavigationKey
+  initialPeopleView: PeopleView
   backHref: string
 }
 
@@ -106,7 +111,7 @@ export function ClassroomDetailClient({
   classroomAssignments, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewByAssignment, seenByPost, crossPostTargets,
-  groups, groupMembers, initialNavigationItem, backHref,
+  groups, groupMembers, initialNavigationItem, initialPeopleView, backHref,
 }: Props) {
   const router = useRouter()
   const isHomeroom = classroom.classroom_type === 'homeroom'
@@ -115,6 +120,7 @@ export function ClassroomDetailClient({
     [classroom.classroom_type, canManage],
   )
   const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
+  const [peopleView, setPeopleView] = useState<PeopleView>(initialPeopleView)
   const [codeCopied, setCodeCopied] = useState(false)
   const savedCover = coverOf(parseDescription(classroom.description))
   // A chosen cover paints the banner as a tinted surface whose text is the same
@@ -171,6 +177,17 @@ export function ClassroomDetailClient({
     if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
   }, [])
 
+  const changePeopleView = useCallback((nextView: PeopleView) => {
+    setPeopleView(nextView)
+    const url = new URL(
+      classroomNavigationHref(window.location.href, 'students'),
+      window.location.origin,
+    )
+    if (nextView === 'groups') url.searchParams.set('people', 'groups')
+    else url.searchParams.delete('people')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
+
   const switchClassroom = useCallback((classroomId: string) => {
     router.push(classroomNavigationPath(classroomId, activeTab))
   }, [activeTab, router])
@@ -178,18 +195,24 @@ export function ClassroomDetailClient({
   useEffect(() => {
     function syncNavigationFromHistory() {
       const params = new URLSearchParams(window.location.search)
+      const rawView = params.get('view')
       const nextItem = resolveClassroomNavigationKey(params.get('view'), navigationItems)
+      const nextPeopleView = rawView === 'groups' || params.get('people') === 'groups' ? 'groups' : 'students'
       setActiveTab(nextItem)
+      setPeopleView(nextPeopleView)
 
       // Keep copied/reloaded URLs truthful. A stale or unauthorized `view`
       // falls back to overview, so replace that history entry with the same
       // canonical URL the overview button would create instead of leaving the
       // address bar claiming a different panel is open.
-      const canonicalUrl = classroomNavigationHref(window.location.href, nextItem)
+      const canonical = new URL(classroomNavigationHref(window.location.href, nextItem), window.location.origin)
+      if (nextPeopleView === 'groups') canonical.searchParams.set('people', 'groups')
+      const canonicalUrl = `${canonical.pathname}${canonical.search}${canonical.hash}`
       const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
       if (canonicalUrl !== currentUrl) window.history.replaceState(null, '', canonicalUrl)
     }
 
+    syncNavigationFromHistory()
     syncNavigationFromHistory()
     window.addEventListener('popstate', syncNavigationFromHistory)
     return () => window.removeEventListener('popstate', syncNavigationFromHistory)
@@ -299,18 +322,34 @@ export function ClassroomDetailClient({
             onNavigate={(target: OverviewTarget) => navigateTo(target)}
           />
         )}
-        {activeTab === 'students' && (
+        {activeTab === 'students' && (isHomeroom ? (
           <StudentTable
             classroomId={classroom.id}
             students={students}
             otherClassrooms={otherClassrooms}
             profiles={studentProfiles}
             showRoster={canManage}
-            showProfiles={isHomeroom && canManage}
+            showProfiles={canManage}
             sortRules={studentSortRules}
             onToggleSort={toggleStudentSort}
           />
-        )}
+        ) : (
+          <ClassroomPeopleTabs
+            classroomId={classroom.id}
+            students={students}
+            groupStudents={groupStudents}
+            otherClassrooms={otherClassrooms}
+            profiles={studentProfiles}
+            canManage={canManage}
+            sortRules={studentSortRules}
+            onToggleSort={toggleStudentSort}
+            groupState={groupState}
+            setGroupState={setGroupState}
+            assignmentTitlesByGroup={assignmentTitlesByGroup}
+            value={peopleView}
+            onValueChange={changePeopleView}
+          />
+        ))}
         {activeTab === 'assignments' && canManage && (
           <ClassroomAssignmentsTab
             classroomId={classroom.id}
@@ -354,16 +393,6 @@ export function ClassroomDetailClient({
             submissions={homeroomSubmissions}
             notes={studentNotes}
             profiles={studentProfiles}
-          />
-        )}
-        {activeTab === 'groups' && (
-          <BreakoutGroups
-            classroomId={classroom.id}
-            students={groupStudents}
-            state={groupState}
-            setState={setGroupState}
-            canManage={canManage}
-            assignmentTitlesByGroup={assignmentTitlesByGroup}
           />
         )}
         {activeTab === 'invite' && (

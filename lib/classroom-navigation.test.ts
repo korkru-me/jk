@@ -18,7 +18,6 @@ describe('classroom navigation', () => {
       'scores',
       'ability',
       'students',
-      'groups',
       'invite',
       'coteachers',
     ])
@@ -28,7 +27,6 @@ describe('classroom navigation', () => {
     expect(classroomNavigationFor('subject', false).map(item => item.key)).toEqual([
       'overview',
       'students',
-      'groups',
       'invite',
       'coteachers',
     ])
@@ -67,7 +65,12 @@ describe('classroom navigation', () => {
     expect(resolveClassroomNavigationKey('scores', viewOnlyItems)).toBe('overview')
     expect(resolveClassroomNavigationKey('unknown', viewOnlyItems)).toBe('overview')
     expect(resolveClassroomNavigationKey(undefined, viewOnlyItems)).toBe('overview')
-    expect(resolveClassroomNavigationKey(['groups', 'students'], viewOnlyItems)).toBe('groups')
+    expect(resolveClassroomNavigationKey(['groups', 'students'], viewOnlyItems)).toBe('students')
+  })
+
+  it('labels the merged subject-classroom page clearly', () => {
+    expect(SUBJECT_CLASSROOM_NAVIGATION.find(item => item.key === 'students')?.label)
+      .toBe('นักเรียนและกลุ่ม')
   })
 
   it('updates the view parameter without losing the remembered back target', () => {
