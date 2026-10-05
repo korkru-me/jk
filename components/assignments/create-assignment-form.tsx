@@ -161,6 +161,11 @@ interface Props {
   preselectedAssignmentType: AssignmentType
   copySource?: AssignmentCopyPreset
   initialGroupTargets?: GroupTargets
+  /** Local QA can capture submissions without writing synthetic data. */
+  actions?: {
+    createQuestionSet: typeof createQuestionSet
+    createAssignment: typeof createAssignment
+  }
 }
 
 export function CreateAssignmentForm({
@@ -173,6 +178,7 @@ export function CreateAssignmentForm({
   preselectedAssignmentType,
   copySource,
   initialGroupTargets = {},
+  actions,
 }: Props) {
   const router = useRouter()
   const assignmentType = preselectedAssignmentType
@@ -201,6 +207,7 @@ export function CreateAssignmentForm({
   // When not starting from an existing set, offer to save the picked
   // questions back into the library as a new reusable set.
   const [saveAsSet, setSaveAsSet] = useState(false)
+  const [questionSetTitle, setQuestionSetTitle] = useState('')
 
   // Step 1 (continued) — filter out any question_ids that no longer resolve to a real
   // question (e.g. deleted since the set was saved). Otherwise a dangling id
@@ -482,14 +489,18 @@ export function CreateAssignmentForm({
   function canNext() {
     if (step === 0) {
       return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
-        && groupTargetsComplete(groupTargets, classroomIds) && selectedIds.length > 0
+        && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
+        && selectedIds.length > 0 && (!saveAsSet || questionSetTitle.trim().length > 0)
     }
     // Refuse to leave คะแนนและเกณฑ์ with a streak the server would reject, so
     // the teacher reads the reason next to the field that caused it rather
     // than as an error after ยืนยัน three screens later.
     if (step === 1) return !(streakOn && streakBlocked)
-    if (step === 2 && assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
-      return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
+    if (step === 2) {
+      if (!groupTargetsComplete(groupTargets, classroomIds)) return false
+      if (assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
+        return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
+      }
     }
     return true
   }
@@ -531,12 +542,22 @@ export function CreateAssignmentForm({
   }
 
   function finalizeSubmit(status: AssignmentStatus, effectiveStartAt: string) {
+    if (!preselectedSet && saveAsSet && !questionSetTitle.trim()) {
+      toast.error('กรุณากรอกชื่อแฟ้มโจทย์')
+      setStep(0)
+      return
+    }
+    if (!groupTargetsComplete(groupTargets, classroomIds)) {
+      toast.error('กรุณาเลือกกลุ่มนักเรียนที่ต้องการมอบหมายให้ครบทุกห้อง')
+      setStep(2)
+      return
+    }
     startTransition(async () => {
       let setId = preselectedSet?.id
 
       if (!preselectedSet && saveAsSet) {
-        const setRes = await createQuestionSet({
-          title: title.trim(),
+        const setRes = await (actions?.createQuestionSet ?? createQuestionSet)({
+          title: questionSetTitle.trim(),
           description: description.trim(),
           question_ids: selectedIds,
           visibility: 'private',
@@ -570,7 +591,7 @@ export function CreateAssignmentForm({
           ? parsedRandomCount
           : null
 
-      const res = await createAssignment({
+      const res = await (actions?.createAssignment ?? createAssignment)({
         copy_source_assignment_id: copySource?.id,
         classroom_ids: classroomIds,
         group_targets: groupTargetsFor(groupTargets, classroomIds),
@@ -715,30 +736,29 @@ export function CreateAssignmentForm({
               />
             </div>
 
-            <div className="space-y-1.5">
-              {!preselectedClassroomId && (
+            {!preselectedClassroomId && (
+              <div className="space-y-1.5">
                 <Label>ห้องเรียน <span className="text-destructive">*</span> {classroomIds.length > 1 && <span className="text-muted-foreground font-normal">({classroomIds.length} ห้อง)</span>}</Label>
-              )}
-              {classrooms.length === 0 ? (
-                <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
-                  ยังไม่มีห้องเรียน กรุณา{' '}
-                  <a href="/classrooms" className="underline font-medium">สร้างห้องเรียน</a> ก่อน
-                </div>
-              ) : (
-                <ClassroomPicker
-                  classrooms={classrooms}
-                  selectedIds={classroomIds}
-                  onToggle={toggleClassroom}
-                  primaryClassroomId={preselectedClassroomId}
-                />
-              )}
-            </div>
+                {classrooms.length === 0 ? (
+                  <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
+                    ยังไม่มีห้องเรียน กรุณา{' '}
+                    <a href="/classrooms" className="underline font-medium">สร้างห้องเรียน</a> ก่อน
+                  </div>
+                ) : (
+                  <ClassroomPicker
+                    classrooms={classrooms}
+                    selectedIds={classroomIds}
+                    onToggle={toggleClassroom}
+                  />
+                )}
+              </div>
+            )}
 
             {classroomIds.length > 0 && (
               <div className="space-y-1.5">
                 <Label>มอบหมายให้</Label>
                 <GroupTargetPicker
-                  classrooms={classroomIds.flatMap(id => {
+                  classrooms={(preselectedClassroomId ? [preselectedClassroomId] : classroomIds).flatMap(id => {
                     const c = classrooms.find(room => room.id === id)
                     return c ? [{ id: c.id, name: c.name }] : []
                   })}
@@ -818,10 +838,7 @@ export function CreateAssignmentForm({
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                     <Layers className="size-4 text-muted-foreground" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">บันทึกเป็นแฟ้มโจทย์ไว้ใช้ซ้ำ</p>
-                    <p className="text-xs text-muted-foreground">บันทึกโจทย์ที่เลือกไว้ในคลัง เพื่อค้นหาและนำกลับมาใช้ภายหลัง</p>
-                  </div>
+                  <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
                 </div>
                 <input
                   type="checkbox"
@@ -830,6 +847,18 @@ export function CreateAssignmentForm({
                   className="size-4 shrink-0 accent-primary"
                 />
               </label>
+              {saveAsSet && (
+                <div className="space-y-1.5 px-4 pb-4">
+                  <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="question-set-title"
+                    value={questionSetTitle}
+                    onChange={event => setQuestionSetTitle(event.target.value)}
+                    placeholder="เช่น แฟ้มโจทย์เรื่องแรงและการเคลื่อนที่"
+                    required
+                  />
+                </div>
+              )}
             </Card>
           )}
 
@@ -855,7 +884,7 @@ export function CreateAssignmentForm({
                     !randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
                 >
-                  <p className="font-medium text-sm text-foreground">ให้ครบทั้ง {selectedIds.length} ข้อ</p>
+                  <p className="font-medium text-sm text-foreground">ให้ทำทุกข้อ</p>
                   <p className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
                     ทุกคนได้โจทย์ชุดเดียวกัน
                   </p>
@@ -869,7 +898,7 @@ export function CreateAssignmentForm({
                     randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
                 >
-                  <p className="font-medium text-sm text-foreground">สุ่มมาให้คนละไม่กี่ข้อ</p>
+                  <p className="font-medium text-sm text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
                   <p className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
                     แต่ละคน แต่ละรอบ ได้คนละชุด
                   </p>
@@ -1249,6 +1278,32 @@ export function CreateAssignmentForm({
       {step === 2 && (
         <Card padding="xl" className="space-y-5">
           <h2 className="font-semibold text-foreground">ตั้งค่าการสอบ</h2>
+
+          {preselectedClassroomId && (
+            <div className="space-y-4">
+              <ClassroomPicker
+                classrooms={classrooms}
+                selectedIds={classroomIds}
+                onToggle={toggleClassroom}
+                primaryClassroomId={preselectedClassroomId}
+              />
+              {classroomIds.some(id => id !== preselectedClassroomId) && (
+                <div className="space-y-1.5">
+                  <Label>มอบหมายให้ในห้องเรียนอื่น</Label>
+                  <GroupTargetPicker
+                    classrooms={classroomIds.filter(id => id !== preselectedClassroomId).flatMap(id => {
+                      const c = classrooms.find(room => room.id === id)
+                      return c ? [{ id: c.id, name: c.name }] : []
+                    })}
+                    groupsByClassroom={groupsByClassroom}
+                    value={groupTargets}
+                    onChange={setGroupTargets}
+                    idPrefix="additional-target"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="dur" className="flex items-center gap-1.5">
