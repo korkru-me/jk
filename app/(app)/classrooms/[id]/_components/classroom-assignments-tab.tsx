@@ -38,6 +38,7 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
+  type SortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS as DndCSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
@@ -148,6 +149,7 @@ function SortableAssignmentRow({
   categoryId,
   title,
   disabled,
+  freezeLayout,
   tone,
   status,
   children,
@@ -156,6 +158,7 @@ function SortableAssignmentRow({
   categoryId: string | null
   title: string
   disabled: boolean
+  freezeLayout: boolean
   tone: string
   status: ReturnType<typeof statusConfig>
   children: ReactNode
@@ -178,11 +181,14 @@ function SortableAssignmentRow({
     <div
       ref={setNodeRef}
       data-assignment-row
-      style={{ transform: DndCSS.Transform.toString(transform), transition }}
+      style={{
+        // The overlay follows the pointer; the original row keeps its place.
+        transform: isDragging || freezeLayout ? undefined : DndCSS.Transform.toString(transform),
+        transition: freezeLayout ? undefined : transition,
+      }}
       className={cn(
         'relative flex gap-2 border-l-4 py-3 pr-2 pl-3 transition-[background-color,box-shadow,opacity]',
         tone,
-        isDragging && 'bg-muted/40 opacity-35 hover:bg-muted/40',
       )}
     >
       <HoverCard>
@@ -228,6 +234,8 @@ const categoryDropId = (categoryId: string | null) => (
   `assignment-category:${categoryId ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}`
 )
 
+const stationaryAssignmentStrategy: SortingStrategy = () => null
+
 /** Prefer a row when the pointer is over one; otherwise the surrounding
  * category card becomes the drop target, including when that card is empty. */
 const assignmentCollision: CollisionDetection = args => {
@@ -250,7 +258,6 @@ interface AssignmentCategoryCardProps {
   category: AssignmentCategory | null
   assignmentCount: number
   showHeader: boolean
-  assignmentDragging: boolean
   isDropTarget: boolean
   children: ReactNode
 }
@@ -259,7 +266,6 @@ function AssignmentCategoryCard({
   category,
   assignmentCount,
   showHeader,
-  assignmentDragging,
   isDropTarget,
   children,
 }: AssignmentCategoryCardProps) {
@@ -278,7 +284,7 @@ function AssignmentCategoryCard({
       data-assignment-category-id={category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
       className={cn(
         'relative overflow-hidden transition-shadow',
-        isDropTarget && 'ring-2 ring-primary/60 shadow-md [&_[data-assignment-row]]:bg-transparent',
+        isDropTarget && '[&_[data-assignment-row]]:bg-transparent',
       )}
     >
       {isDropTarget && (
@@ -303,32 +309,13 @@ function AssignmentCategoryCard({
             <span className={cn('text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
               {assignmentCount} งาน
             </span>
-            {isDropTarget && (
-              <span className={cn(
-                'ml-auto inline-flex items-center gap-1 rounded-full bg-card/80 px-2 py-1 text-xs font-semibold shadow-sm',
-                preset?.text ?? 'text-primary',
-              )}>
-                <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                ปล่อยเพื่อย้ายมาที่นี่
-              </span>
-            )}
           </div>
         )}
         <div className={cn('divide-y divide-border', assignmentCount === 0 && 'min-h-24')}>
           {assignmentCount === 0 ? (
-            <div className={cn(
-              'flex min-h-24 items-center justify-center gap-2 px-4 py-6 text-center text-xs text-muted-foreground transition-colors',
-              assignmentDragging && !isDropTarget && 'bg-muted/20',
-              isDropTarget && cn('bg-transparent font-medium', preset?.text ?? 'text-primary'),
-            )}>
-              {isDropTarget
-                ? <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-                : <Folder className="size-4 shrink-0" aria-hidden="true" />}
-              {isDropTarget
-                ? 'ปล่อยเพื่อย้ายงานเข้ากลุ่มนี้'
-                : assignmentDragging
-                  ? 'ลากงานมาวางในกลุ่มนี้'
-                  : 'ยังไม่มีงาน · ลากงานมาวางในกลุ่มนี้ได้'}
+            <div className="flex min-h-24 items-center justify-center gap-2 px-4 py-6 text-center text-xs text-muted-foreground">
+              <Folder className="size-4 shrink-0" aria-hidden="true" />
+              ยังไม่มีงาน · ลากงานมาวางในกลุ่มนี้ได้
             </div>
           ) : children}
         </div>
@@ -498,23 +485,26 @@ export function ClassroomAssignmentsTab({
 
     const previousCategoryId = normalizeAssignmentCategoryId(categoryByAssignment[assignmentId], categories)
     const previousOrder = rows.map(assignment => assignment.id)
-    const visibleIds = filtered.map(assignment => assignment.id)
+    const categoryChanged = previousCategoryId !== targetCategoryId
+    const visibleIds = filtered
+      .filter(assignment => assignment.category_id === previousCategoryId)
+      .map(assignment => assignment.id)
     let nextOrder = previousOrder
 
-    if (overData?.type === 'assignment' && assignmentId !== String(event.over.id)) {
-      nextOrder = moveVisibleAssignmentColumn(previousOrder, visibleIds, assignmentId, String(event.over.id))
-    } else if (overData?.type === 'category') {
-      const lastAssignmentId = filtered
+    if (categoryChanged) {
+      // Cross-group drops always append, even over an existing row or with a type filter.
+      const lastAssignmentId = rows
         .filter(assignment => assignment.id !== assignmentId && assignment.category_id === targetCategoryId)
         .at(-1)?.id
       if (lastAssignmentId) {
-        nextOrder = moveVisibleAssignmentAfter(previousOrder, visibleIds, assignmentId, lastAssignmentId)
+        nextOrder = moveVisibleAssignmentAfter(previousOrder, previousOrder, assignmentId, lastAssignmentId)
       }
+    } else if (overData?.type === 'assignment' && assignmentId !== String(event.over.id)) {
+      nextOrder = moveVisibleAssignmentColumn(previousOrder, visibleIds, assignmentId, String(event.over.id))
     }
 
     const orderChanged = nextOrder.length === previousOrder.length
       && nextOrder.some((id, index) => id !== previousOrder[index])
-    const categoryChanged = previousCategoryId !== targetCategoryId
 
     if (orderChanged) saveAssignmentOrder(previousOrder, nextOrder)
     if (!categoryChanged) return
@@ -626,17 +616,23 @@ export function ClassroomAssignmentsTab({
             },
           }}
         >
-          <SortableContext items={filtered.map(assignment => assignment.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
               {sections.map(section => {
                 const sectionKey = section.category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE
+                const sectionCategoryId = section.category?.id ?? null
+                const sortingWithinCategory = draggingAssignmentId !== null
+                  && categoryByAssignment[draggingAssignmentId] === sectionCategoryId
+                  && dragTargetCategoryId === sectionCategoryId
                 return (
-                  <AssignmentCategoryCard
+                  <SortableContext
                     key={sectionKey}
+                    items={section.assignments.map(assignment => assignment.id)}
+                    strategy={sortingWithinCategory ? verticalListSortingStrategy : stationaryAssignmentStrategy}
+                  >
+                  <AssignmentCategoryCard
                     category={section.category}
                     assignmentCount={section.assignments.length}
                     showHeader={categories.length > 0}
-                    assignmentDragging={draggingAssignmentId !== null}
                     isDropTarget={
                       draggingAssignmentId !== null
                       && dragTargetCategoryId !== undefined
@@ -663,6 +659,7 @@ export function ClassroomAssignmentsTab({
                         categoryId={assignment.category_id ?? null}
                         title={assignment.title}
                         disabled={isOrderPending || isPending}
+                        freezeLayout={!sortingWithinCategory}
                         tone={statusCfg.row}
                         status={statusCfg}
                       >
@@ -793,10 +790,10 @@ export function ClassroomAssignmentsTab({
                     )
                   })}
                   </AssignmentCategoryCard>
+                  </SortableContext>
                 )
               })}
             </div>
-          </SortableContext>
           <DragOverlay dropAnimation={null}>
             {draggingAssignment && (
               <Card
