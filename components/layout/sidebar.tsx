@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import {
   ChevronDown,
   ChevronLeft,
@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { isClassroomSectionPath } from '@/lib/classroom-navigation'
 import { Separator } from '@/components/ui/separator'
-import { useSidebarContext } from './sidebar-context'
+import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -247,13 +247,26 @@ interface SidebarProps {
 
 export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = false }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const search = sidebarSearchKey(searchParams.toString())
   const navItems = role === 'teacher' || role === 'admin' ? teacherNav : studentNav
-  const { contextualSidebar } = useSidebarContext()
+  const { contextualSidebar, pendingSidebar, clearPendingSidebar } = useSidebarContext()
   const usesTeacherNavigation = role === 'teacher' || role === 'admin'
   const usesClassroomSidebar = usesTeacherNavigation && isClassroomSectionPath(pathname)
-  const contextualContent = usesTeacherNavigation && contextualSidebar?.pathname === pathname
-    ? contextualSidebar.render(onClose)
+  const pendingMatches = pendingSidebar?.pathname === pathname && pendingSidebar.search === search
+  const sidebarEntry = pendingMatches ? pendingSidebar.entry : contextualSidebar
+  const contextualMatches = sidebarEntry?.pathname === pathname
+    && (pathname !== '/assignments/new' || sidebarEntry.classroomId === searchParams.get('classroom'))
+  const contextualContent = usesTeacherNavigation
+    && (pendingMatches || contextualMatches)
+    ? sidebarEntry?.render(onClose)
     : null
+
+  useEffect(() => {
+    if (pendingSidebar && pathname !== pendingSidebar.sourcePathname && !pendingMatches) {
+      clearPendingSidebar()
+    }
+  }, [clearPendingSidebar, pathname, pendingMatches, pendingSidebar])
 
   return (
     <aside className={cn(

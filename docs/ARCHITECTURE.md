@@ -38,6 +38,8 @@
 
 App shell มี contextual sidebar registry ฝั่ง client ที่ผูก renderer กับ pathname ปัจจุบัน หน้ารายละเอียดห้องและหน้าสร้างงานที่มีบริบทห้องใช้ registry เดียวกัน จึงแทน sidebar หลักได้โดยไม่สร้าง sidebar ซ้อนในเนื้อหา สำหรับ route นอก `/classrooms` เช่น `/assignments/new` ฝั่ง server ต้องตรวจห้อง active และสิทธิ์จัดการจาก session-bound Supabase client ก่อนส่งข้อมูลห้องให้ registrar; URL หรือ state ฝั่ง client อย่างเดียวไม่ใช่สิทธิ์
 
+เมื่อเลือกนำงานเดิมมาใช้/แบบฝึกหัด/ข้อสอบจากห้อง `Link.onNavigate` จะเก็บ renderer ของห้องที่ลงทะเบียนไว้แล้วเป็น pending entry เฉพาะห้องเดียวกันและ URL ปลายทางเดียวกัน (pathname + query ที่เรียงชื่อ key) เพื่อคงแถบห้องเรียนระหว่าง Next.js loading boundary ทั้งก่อนและหลัง registrar หน้าเดิมถูกถอดออก · หน้าใหม่ลงทะเบียนใน layout effect ก่อน paint แล้วล้าง pending; ถ้าหน้าใหม่ไม่มีบริบทที่ผ่านตรวจ ใช้ `ClearPendingSidebar` คืนเมนูตาม route · การออกไปเส้นทางอื่นหรือ query คนละห้องไม่ใช้ renderer นี้ และการเปิดแท็บใหม่ไม่สร้าง pending ในแท็บเดิม · renderer ที่คงไว้ใช้ข้อมูลเดิมที่ส่งถึง browser แล้วเท่านั้น ไม่ fetch ข้อมูลหรือเพิ่มสิทธิ์; การนำทางจากแถบเก่าระหว่างโหลดต้องเข้าหน้าห้องผ่าน router ไม่แก้แท็บของ component ที่เลิกใช้งานแล้ว
+
 ## Runtime boundaries
 
 ### Browser

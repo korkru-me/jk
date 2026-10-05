@@ -166,12 +166,16 @@ export function ClassroomDetailClient({
   }, [classroomAssignments])
 
   const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
+    if (window.location.pathname !== `/classrooms/${classroom.id}`) {
+      router.push(classroomNavigationPath(classroom.id, nextItem))
+      return
+    }
     setActiveTab(nextItem)
 
     const nextUrl = classroomNavigationHref(window.location.href, nextItem)
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
     if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
-  }, [])
+  }, [classroom.id, router])
 
   const changePeopleView = useCallback((nextView: PeopleView) => {
     setPeopleView(nextView)
@@ -230,7 +234,7 @@ export function ClassroomDetailClient({
     />
   ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, students.length, switchableClassrooms, switchClassroom])
 
-  useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar)
+  useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar, classroom.id)
 
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortRules(current => nextStudentSortRules(current, key))

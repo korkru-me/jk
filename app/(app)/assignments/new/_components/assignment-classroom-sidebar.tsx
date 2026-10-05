@@ -56,7 +56,7 @@ export function AssignmentClassroomSidebar({
     />
   ), [classroom, isOwner, navigateTo, navigationItems, studentCount, switchableClassrooms, switchClassroom])
 
-  useContextualSidebar('/assignments/new', renderContextualSidebar)
+  useContextualSidebar('/assignments/new', renderContextualSidebar, classroom.id)
 
   return null
 }

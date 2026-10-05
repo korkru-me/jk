@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { assignmentCreationHref, assignmentReuseHref } from '@/lib/assignment-creation'
 import { Button } from '@/components/ui/button'
+import { useOptionalSidebarContext } from '@/components/layout/sidebar-context'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +44,11 @@ export function AssignmentCreationMenu({
   active = false,
   onNavigate,
 }: AssignmentCreationMenuProps) {
+  const sidebar = useOptionalSidebarContext()
+  function navigate(href: string) {
+    sidebar?.prepareSidebarNavigation(href, classroomId)
+    onNavigate?.()
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -65,7 +71,7 @@ export function AssignmentCreationMenu({
           <DropdownMenuItem
             variant="primary"
             className="py-2"
-            render={<Link href={assignmentReuseHref(classroomId)} onClick={onNavigate} />}
+            render={<Link href={assignmentReuseHref(classroomId)} onNavigate={() => navigate(assignmentReuseHref(classroomId))} />}
           >
             <Copy aria-hidden="true" />
             <span>นำงานเดิมมาใช้</span>
@@ -76,7 +82,7 @@ export function AssignmentCreationMenu({
             render={(
               <Link
                 href={assignmentCreationHref(classroomId, 'exercise')}
-                onClick={onNavigate}
+                onNavigate={() => navigate(assignmentCreationHref(classroomId, 'exercise'))}
               />
             )}
           >
@@ -89,7 +95,7 @@ export function AssignmentCreationMenu({
             render={(
               <Link
                 href={assignmentCreationHref(classroomId, 'exam')}
-                onClick={onNavigate}
+                onNavigate={() => navigate(assignmentCreationHref(classroomId, 'exam'))}
               />
             )}
           >
