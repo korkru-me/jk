@@ -281,10 +281,10 @@ export function CreateAssignmentForm({
   // ผิด" and "บอกว่าคำตอบคืออะไร" are not the same amount of help.
   const [instantCheck, setInstantCheck] = useState(copySource?.instant_check ?? true)
   const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(copySource?.instant_check_answer_key ?? true)
-  // Approved defaults for a new online งาน: practice tools start on for an
-  // exercise and off for an exam. Existing assignments are never backfilled.
-  const [calculatorEnabled, setCalculatorEnabled] = useState(copySource?.calculator_enabled ?? initialTypeDefaults.mathToolsEnabled)
-  const [scratchpadEnabled, setScratchpadEnabled] = useState(copySource?.scratchpad_enabled ?? initialTypeDefaults.mathToolsEnabled)
+  // Calculator is opt-in; scratchpad keeps its type-specific default.
+  // Copies preserve the source's choices. Existing assignments are never backfilled.
+  const [calculatorEnabled, setCalculatorEnabled] = useState(copySource?.calculator_enabled ?? initialTypeDefaults.calculatorEnabled)
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(copySource?.scratchpad_enabled ?? initialTypeDefaults.scratchpadEnabled)
   const [accessCode, setAccessCode] = useState(copySource?.access_code ?? '')
   const [proctoringEnabled, setProctoringEnabled] = useState(copySource?.proctoring_enabled ?? false)
   const [fullscreenRequired, setFullscreenRequired] = useState(copySource?.fullscreen_required ?? false)

@@ -1,9 +1,11 @@
 import type { AssignmentType, RetryScope } from '@/lib/types'
+import { resolveNewAssignmentMathTools } from '@/lib/assignment-math-tools'
 
 interface NewAssignmentTypeDefaults {
   maxAttempts: string
   retryScope: RetryScope
-  mathToolsEnabled: boolean
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
 }
 
 export function firstSearchParam(
@@ -19,7 +21,7 @@ export function newAssignmentTypeDefaults(
   return {
     maxAttempts: isExam ? '1' : '',
     retryScope: isExam ? 'all' : 'wrong_only',
-    mathToolsEnabled: !isExam,
+    ...resolveNewAssignmentMathTools({ type: assignmentType }),
   }
 }
 

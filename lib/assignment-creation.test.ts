@@ -61,11 +61,12 @@ describe('assignment creation navigation', () => {
     expect(firstSearchParam(undefined)).toBeUndefined()
   })
 
-  it('uses exercise defaults for repeatable work with math tools', () => {
+  it('uses exercise defaults with scratchpad enabled but calculator opt-in', () => {
     expect(newAssignmentTypeDefaults('exercise')).toEqual({
       maxAttempts: '',
       retryScope: 'wrong_only',
-      mathToolsEnabled: true,
+      calculatorEnabled: false,
+      scratchpadEnabled: true,
     })
   })
 
@@ -73,7 +74,8 @@ describe('assignment creation navigation', () => {
     expect(newAssignmentTypeDefaults('exam')).toEqual({
       maxAttempts: '1',
       retryScope: 'all',
-      mathToolsEnabled: false,
+      calculatorEnabled: false,
+      scratchpadEnabled: false,
     })
   })
 
