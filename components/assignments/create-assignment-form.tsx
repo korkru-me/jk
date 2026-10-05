@@ -73,7 +73,7 @@ const QuestionPicker = dynamic(
   { loading: () => <div className="h-96 animate-pulse rounded-2xl bg-muted" aria-label="กำลังโหลดคลังโจทย์" /> }
 )
 
-const STEPS = ['รายละเอียดและโจทย์', 'คะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
+const STEPS = ['รายละเอียด โจทย์ และคะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
 // สรุปก่อนสร้าง used to read the two original values only, so a งาน set to
 // แสดงคะแนนแต่ไม่แสดงเฉลย or ไม่แสดงผลลัพธ์ was summarised as
@@ -190,7 +190,7 @@ export function CreateAssignmentForm({
   const [scheduleMode, setScheduleMode] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
 
-  // Step 1: รายละเอียดและโจทย์
+  // Step 1: รายละเอียด โจทย์ และคะแนน
   const [title, setTitle] = useState(
     copySource ? assignmentCopyTitle(copySource.title) : (preselectedSet?.title ?? ''),
   )
@@ -233,7 +233,7 @@ export function CreateAssignmentForm({
     copySource?.random_question_count != null ? String(copySource.random_question_count) : '',
   )
 
-  // Step 2 (คะแนน) — a question starts at the point value its own structure
+  // Step 1 (คะแนน) — a question starts at the point value its own structure
   // gives it (one per ข้อย่อย); teacher can edit individual questions and the
   // total recalculates automatically.
   const [questionPointDrafts, setQuestionPointDrafts] = useState<Record<string, string>>(
@@ -251,7 +251,7 @@ export function CreateAssignmentForm({
     copySource?.display_max_score != null ? String(copySource.display_max_score) : '',
   )
 
-  // Step 3 (ตั้งค่า)
+  // Step 2 (ตั้งค่า)
   const [duration, setDuration] = useState(
     copySource?.duration_minutes != null ? String(copySource.duration_minutes) : '',
   )
@@ -317,7 +317,7 @@ export function CreateAssignmentForm({
     copySource?.passing_value != null ? String(copySource.passing_value) : '',
   )
 
-  // Step 4 (กำหนดการสอบ)
+  // Step 3 (กำหนดการสอบ)
   const [startAt, setStartAt] = useState(toLocalInputValue(copySource?.start_at ?? null))
   const [endAt, setEndAt] = useState(toLocalInputValue(copySource?.end_at ?? null))
 
@@ -491,12 +491,9 @@ export function CreateAssignmentForm({
       return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
         && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
         && selectedIds.length > 0 && (!saveAsSet || questionSetTitle.trim().length > 0)
+        && !(streakOn && streakBlocked)
     }
-    // Refuse to leave คะแนนและเกณฑ์ with a streak the server would reject, so
-    // the teacher reads the reason next to the field that caused it rather
-    // than as an error after ยืนยัน three screens later.
-    if (step === 1) return !(streakOn && streakBlocked)
-    if (step === 2) {
+    if (step === 1) {
       if (!groupTargetsComplete(groupTargets, classroomIds)) return false
       if (assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
         return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
@@ -549,7 +546,7 @@ export function CreateAssignmentForm({
     }
     if (!groupTargetsComplete(groupTargets, classroomIds)) {
       toast.error('กรุณาเลือกกลุ่มนักเรียนที่ต้องการมอบหมายให้ครบทุกห้อง')
-      setStep(2)
+      setStep(1)
       return
     }
     startTransition(async () => {
@@ -683,7 +680,7 @@ export function CreateAssignmentForm({
               }`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
               </div>
-              <p className={`text-xs mt-1 whitespace-nowrap ${i === step ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+              <p className={`text-xs mt-1 max-w-32 text-center sm:max-w-none sm:whitespace-nowrap ${i === step ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                 {label}
               </p>
             </div>
@@ -949,8 +946,8 @@ export function CreateAssignmentForm({
         </div>
       )}
 
-      {/* ── Step 2: คะแนน ────────────────────────────────────────────── */}
-      {step === 1 && (
+      {/* ── Step 1 continued: คะแนน ──────────────────────────────────── */}
+      {step === 0 && (
         <div className="space-y-4">
           <Card padding="xl" className="space-y-4">
             <div className="flex items-center justify-between gap-3">
@@ -964,7 +961,7 @@ export function CreateAssignmentForm({
               แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
               สลับลำดับข้อได้ที่นี่ — ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
               กดรูปตาเพื่อดูตัวอย่างข้อนั้นแบบที่นักเรียนเห็น
-              และถ้าเจอข้อซ้ำหรือข้อที่ไม่เอาแล้ว กดกากบาทท้ายแถวเอาออกได้เลย ไม่ต้องย้อนกลับไปหน้าเลือกโจทย์
+              และถ้าเจอข้อซ้ำหรือข้อที่ไม่เอาแล้ว กดกากบาทท้ายแถวเอาออกได้เลย ไม่ต้องเลื่อนกลับไปเลือกโจทย์
             </p>
 
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
@@ -1274,8 +1271,8 @@ export function CreateAssignmentForm({
         </div>
       )}
 
-      {/* ── Step 3: ตั้งค่า ──────────────────────────────────────────── */}
-      {step === 2 && (
+      {/* ── Step 2: ตั้งค่า ──────────────────────────────────────────── */}
+      {step === 1 && (
         <Card padding="xl" className="space-y-5">
           <h2 className="font-semibold text-foreground">ตั้งค่าการสอบ</h2>
 
@@ -1763,8 +1760,8 @@ export function CreateAssignmentForm({
         </Card>
       )}
 
-      {/* ── Step 4: กำหนดการสอบ ─────────────────────────────────────── */}
-      {step === 3 && (
+      {/* ── Step 3: กำหนดการสอบ ─────────────────────────────────────── */}
+      {step === 2 && (
         <div className="space-y-4">
           <Card padding="xl" className="space-y-4">
             <h2 className="font-semibold text-foreground flex items-center gap-2">

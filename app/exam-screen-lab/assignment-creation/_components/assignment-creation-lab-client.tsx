@@ -34,7 +34,7 @@ export function AssignmentCreationLabClient({ contextual, type }: { contextual: 
   }), [])
 
   return (
-    <main className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+    <main className="mx-auto w-full max-w-3xl space-y-4 p-4 sm:p-6">
       <p className="text-xs text-muted-foreground">ห้องทดลองแบบฟอร์มมอบหมายงาน · ข้อมูลจำลอง · การบันทึกใช้หน่วยความจำของแท็บเท่านั้น</p>
       <CreateAssignmentForm
         classrooms={[
