@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
 import {
   ChevronDown,
@@ -286,25 +285,12 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
     <SidebarDisplayProvider compactOnDesktop={collapsed}>
     <aside id="app-sidebar" aria-label="เมนูด้านข้าง" inert={!desktop && !isOpen} className={cn(
       'flex-shrink-0 border-r bg-card overflow-hidden',
-      'fixed inset-y-0 left-0 z-30 w-64 transition-[width,transform] duration-200 ease-in-out motion-reduce:transition-none',
+      'fixed bottom-0 left-0 top-16 z-30 w-64 transition-[width,transform] duration-200 ease-in-out motion-reduce:transition-none',
       'md:static',
       isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       collapsed ? 'md:w-20' : 'md:w-64',
     )}>
       <div className="w-full h-full flex flex-col">
-        {/* Logo */}
-        <div className={cn('h-16 flex items-center px-5 border-b shrink-0', collapsed && 'md:justify-center md:px-2')}>
-          <Link href="/dashboard" onClick={onClose} title="KorKru · หน้าหลัก">
-            <Image
-              src="/logo.png"
-              alt="KorKru"
-              width={423}
-              height={576}
-              className="h-11 w-auto object-contain dark:brightness-0 dark:invert"
-            />
-          </Link>
-        </div>
-
         {/* Nav */}
         {contextualContent || usesClassroomSidebar ? (
           <div className={cn('flex-1 overflow-y-auto overflow-x-hidden p-3', collapsed && 'md:p-2')}>

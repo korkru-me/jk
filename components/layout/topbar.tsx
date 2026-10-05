@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
 import { useTheme } from 'next-themes'
 import { Menu, Moon, Sun } from 'lucide-react'
 import { IconButton } from '@/components/ui/icon-button'
+import { cn } from '@/lib/utils'
 import { logout } from '@/lib/actions/auth'
 import {
   DropdownMenu,
@@ -23,9 +26,10 @@ interface TopbarProps {
   sidebarOpen?: boolean
   notificationsEnabled?: boolean
   onSidebarCollapseToggle?: () => void
+  onLogoNavigate?: () => void
 }
 
-export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, sidebarOpen = false, notificationsEnabled = true, onSidebarCollapseToggle }: TopbarProps) {
+export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, sidebarOpen = false, notificationsEnabled = true, onSidebarCollapseToggle, onLogoNavigate }: TopbarProps) {
   const { resolvedTheme, setTheme } = useTheme()
   const [themeMounted, setThemeMounted] = useState(false)
   const isDark = resolvedTheme === 'dark'
@@ -33,34 +37,49 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
   useEffect(() => setThemeMounted(true), [])
 
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between px-4 sm:px-6 shrink-0">
-      <IconButton
-        className="size-11 md:hidden"
-        onClick={onMenuToggle}
-        label={sidebarOpen ? 'ปิดเมนูด้านข้าง' : 'เปิดเมนูด้านข้าง'}
-        aria-expanded={sidebarOpen}
-        aria-controls="app-sidebar"
-      >
-        <Menu />
-      </IconButton>
-      <IconButton
-        className="hidden size-11 md:inline-flex"
-        onClick={onSidebarCollapseToggle}
-        label={sidebarCollapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'}
-        aria-expanded={!sidebarCollapsed}
-        aria-controls="app-sidebar"
-      >
-        <Menu />
-      </IconButton>
+    <header className="h-16 border-b bg-card flex items-center justify-between gap-2 px-2 sm:px-6 shrink-0">
+      <div className="flex shrink-0 items-center gap-2">
+        <IconButton
+          className="size-11 md:hidden"
+          onClick={onMenuToggle}
+          label={sidebarOpen ? 'ปิดเมนูด้านข้าง' : 'เปิดเมนูด้านข้าง'}
+          aria-expanded={sidebarOpen}
+          aria-controls="app-sidebar"
+        >
+          <Menu />
+        </IconButton>
+        <IconButton
+          className="hidden size-11 md:inline-flex"
+          onClick={onSidebarCollapseToggle}
+          label={sidebarCollapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'}
+          aria-expanded={!sidebarCollapsed}
+          aria-controls="app-sidebar"
+        >
+          <Menu />
+        </IconButton>
 
-      <div className="flex items-center gap-3">
+        <Link href="/dashboard" onClick={onLogoNavigate} title="KorKru · หน้าหลัก" className="shrink-0">
+          <Image
+            src="/logo.png"
+            alt="KorKru"
+            width={423}
+            height={576}
+            className="h-11 w-auto object-contain dark:brightness-0 dark:invert"
+          />
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Notifications */}
-        {notificationsEnabled && <NotificationsBell initialUnreadCount={initialUnreadCount} />}
+        {notificationsEnabled
+          ? <NotificationsBell initialUnreadCount={initialUnreadCount} />
+          // Keep the real bell's footprint in local fixtures without polling.
+          : <span aria-hidden="true" className="size-9 shrink-0" />}
 
         {/* Dark / Light toggle switch */}
         {themeMounted ? (
           <div className="flex items-center gap-1.5">
-            <Sun size={13} className={isDark ? 'text-muted-foreground' : 'text-warning'} />
+            <Sun size={13} className={cn('hidden sm:block', isDark ? 'text-muted-foreground' : 'text-warning')} />
             <button
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
               aria-label="สลับโหมดสี"
@@ -78,7 +97,7 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
                   : <Sun size={10} className="text-warning" />}
               </span>
             </button>
-            <Moon size={13} className={isDark ? 'text-primary' : 'text-muted-foreground'} />
+            <Moon size={13} className={cn('hidden sm:block', isDark ? 'text-primary' : 'text-muted-foreground')} />
           </div>
         ) : <div className="h-6 w-[81px]" aria-hidden="true" />}
 

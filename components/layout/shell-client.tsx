@@ -54,33 +54,36 @@ export function ShellClient({
 
   return (
     <SidebarContextProvider>
-      <div className="flex h-[var(--app-height,100dvh)] overflow-hidden bg-background">
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-20 bg-overlay md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        <Sidebar
-          role={user.role}
-          fullName={user.full_name}
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          collapsed={sidebarCollapsed}
+      <div className="flex h-[var(--app-height,100dvh)] flex-col overflow-hidden bg-background">
+        <Topbar
+          user={user}
+          initialUnreadCount={initialUnreadCount}
+          onMenuToggle={() => setSidebarOpen(o => !o)}
+          sidebarCollapsed={sidebarCollapsed}
+          sidebarOpen={sidebarOpen}
+          notificationsEnabled={notificationsEnabled}
+          onSidebarCollapseToggle={toggleSidebarCollapsed}
+          onLogoNavigate={() => setSidebarOpen(false)}
         />
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <Topbar
-            user={user}
-            initialUnreadCount={initialUnreadCount}
-            onMenuToggle={() => setSidebarOpen(o => !o)}
-            sidebarCollapsed={sidebarCollapsed}
-            sidebarOpen={sidebarOpen}
-            notificationsEnabled={notificationsEnabled}
-            onSidebarCollapseToggle={toggleSidebarCollapsed}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 top-16 z-20 bg-overlay md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          <Sidebar
+            role={user.role}
+            fullName={user.full_name}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            collapsed={sidebarCollapsed}
           />
-          <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6">
-            {children}
-          </main>
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6">
+              {children}
+            </main>
+          </div>
         </div>
       </div>
     </SidebarContextProvider>
