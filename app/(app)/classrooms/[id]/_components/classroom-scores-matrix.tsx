@@ -42,6 +42,7 @@ import {
 } from '@/lib/classroom-score-sort'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { AssignmentTypeFilter, type AssignmentTypeFilterValue } from '@/components/assignments/assignment-type-filter'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 
@@ -49,7 +50,7 @@ const STATUS_LABEL: Record<string, string> = {
   submitted: 'ส่งแล้ว', graded: 'ส่งแล้ว', in_progress: 'กำลังทำ',
 }
 
-type TypeFilter = 'all' | 'exercise' | 'exam'
+type TypeFilter = AssignmentTypeFilterValue
 
 interface RealStudent {
   id: string
@@ -518,24 +519,10 @@ export function ClassroomScoresMatrix({
 
   return (
     <div className="space-y-3">
-      {/* Filter chips + export */}
+      {/* Assignment-type filter + export */}
       <div className="flex items-center gap-2 flex-wrap justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          {([
-            { key: 'all', label: 'ทั้งหมด' },
-            { key: 'exercise', label: 'แบบฝึกหัด' },
-            { key: 'exam', label: 'ข้อสอบ' },
-          ] as { key: TypeFilter; label: string }[]).map(f => (
-            <button
-              key={f.key}
-              onClick={() => setTypeFilter(f.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                typeFilter === f.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+          <AssignmentTypeFilter value={typeFilter} onValueChange={setTypeFilter} />
           <Select
             value={categoryFilter}
             onValueChange={value => { if (value !== null) setCategoryFilter(value) }}

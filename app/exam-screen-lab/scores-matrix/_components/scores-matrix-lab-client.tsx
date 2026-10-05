@@ -1,5 +1,8 @@
 'use client'
 
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { AssignmentList, type StudentAssignmentRow } from '@/app/(app)/classrooms/[id]/_components/assignment-list'
 import { ClassroomScoresMatrix } from '@/app/(app)/classrooms/[id]/_components/classroom-scores-matrix'
 import type { ClassroomAssignmentRow } from '@/app/(app)/classrooms/[id]/_components/classroom-assignments-tab'
 
@@ -41,23 +44,41 @@ const submissions = [
   { id: id(3, 4), assignment_id: assignments[4].id, student_id: students[1].id, status: 'submitted', total_score: 9, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
 ]
 
+const studentAssignments: StudentAssignmentRow[] = assignments.map(assignment => ({
+  ...assignment,
+  duration_minutes: null,
+  retry_scope: 'all',
+  show_results: 'immediate',
+  attempts_used: 0,
+  has_in_progress: false,
+  submission: null,
+}))
+
 export function ScoresMatrixLabClient() {
+  const [studentView, setStudentView] = useState(false)
   return (
     <main className="min-h-dvh bg-background p-6">
       <div className="mx-auto max-w-[1800px] space-y-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">คะแนนและการส่งงาน</h1>
+          <h1 className="text-2xl font-bold text-foreground">{studentView ? 'งานที่มอบหมาย · นักเรียนจำลอง' : 'คะแนนและการส่งงาน'}</h1>
           <p className="text-sm text-muted-foreground">ข้อมูลจำลองสำหรับตรวจตาราง คอลัมน์ และการเรียงลำดับ</p>
+          <Button variant="outline" size="sm" onClick={() => setStudentView(value => !value)}>
+            {studentView ? 'กลับตารางคะแนนจำลอง' : 'ดูงานในมุมนักเรียนจำลอง'}
+          </Button>
         </div>
-        <ClassroomScoresMatrix
-          classroomId={id(4, 1)}
-          classroomName="ห้องทดสอบ"
-          students={students}
-          assignments={assignments}
-          categories={[]}
-          submissions={submissions}
-          extensions={[]}
-        />
+        {studentView ? (
+          <AssignmentList assignments={studentAssignments} categories={[]} />
+        ) : (
+          <ClassroomScoresMatrix
+            classroomId={id(4, 1)}
+            classroomName="ห้องทดสอบ"
+            students={students}
+            assignments={assignments}
+            categories={[]}
+            submissions={submissions}
+            extensions={[]}
+          />
+        )}
       </div>
     </main>
   )

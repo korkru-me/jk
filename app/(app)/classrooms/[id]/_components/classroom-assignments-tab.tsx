@@ -69,7 +69,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { AssignmentTypeFilter, type AssignmentTypeFilterValue } from '@/components/assignments/assignment-type-filter'
 import {
   Select,
   SelectContent,
@@ -114,7 +114,7 @@ export interface ClassroomAssignmentSubmissionRow {
   attempt_number: number
 }
 
-type TypeFilter = 'all' | 'exercise' | 'exam'
+type TypeFilter = AssignmentTypeFilterValue
 
 const STATUS_CFG = {
   draft: {
@@ -558,22 +558,7 @@ export function ClassroomAssignmentsTab({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup
-          value={[typeFilter]}
-          onValueChange={values => {
-            const next = values.at(-1)
-            if (next === 'all' || next === 'exercise' || next === 'exam') setTypeFilter(next)
-          }}
-          aria-label="กรองประเภทงาน"
-          variant="primary"
-          size="sm"
-          spacing={1}
-          className="rounded-xl bg-muted p-1"
-        >
-          <ToggleGroupItem value="all">ทั้งหมด</ToggleGroupItem>
-          <ToggleGroupItem value="exercise">แบบฝึกหัด</ToggleGroupItem>
-          <ToggleGroupItem value="exam">ข้อสอบ</ToggleGroupItem>
-        </ToggleGroup>
+        <AssignmentTypeFilter value={typeFilter} onValueChange={setTypeFilter} />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <AssignmentCategoryManager
