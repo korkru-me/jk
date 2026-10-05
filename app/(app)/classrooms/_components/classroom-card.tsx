@@ -2,13 +2,14 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Users, BookOpen, CalendarRange, Check, Copy, GraduationCap, Trash2 } from 'lucide-react'
+import { Users, BookOpen, Check, Copy, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
 import { parseDescription, coverOf } from './classroom-meta'
 import { IconButton } from '@/components/ui/icon-button'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 
 interface Props {
   classroom: Classroom
@@ -31,13 +32,15 @@ export function ClassroomCard({
   const meta = parseDescription(classroom.description)
   const savedCover = coverOf(meta)
   const shownDescription = meta.description
+  const gradeLevel = meta.gradeLevel || 'ยังไม่ระบุ'
+  const academicTerm = meta.academicTerm || 'ยังไม่ระบุ'
 
   const cardBody = (
     <>
       {/* Cover */}
       <div
         className={cn(
-          'h-20 relative flex items-center justify-between px-5',
+          'relative flex h-16 items-center px-4',
           savedCover
             ? `border-b-2 ${savedCover.surface} ${savedCover.text}`
             : 'border-b border-border bg-muted text-foreground',
@@ -47,116 +50,117 @@ export function ClassroomCard({
         {isSelecting && (
           <div
             className={cn(
-              'absolute top-2.5 left-2.5 w-6 h-6 rounded-md border-2 border-background flex items-center justify-center transition-colors z-10',
+              'absolute left-3 top-5 z-10 flex size-6 items-center justify-center rounded-md border-2 border-background transition-colors',
               isSelected ? 'bg-card' : 'bg-card/20'
             )}
           >
-            {isSelected && <Check className="w-3.5 h-3.5 text-primary stroke-[3]" />}
+            {isSelected && <Check className="size-3.5 text-primary stroke-[3]" />}
           </div>
         )}
         {dragHandle}
-        <div className={cn('min-w-0', isSelecting ? 'ml-8' : dragHandle && 'ml-8')}>
-          {isHomeroom && <Badge variant="warning" className="mb-1">HOMEROOM</Badge>}
-          <p className="text-base font-bold leading-tight">
-            {classroom.name}
-          </p>
-          {shownDescription && (
-            <p className={cn(
-              'text-xs mt-0.5 truncate max-w-[180px]',
+        <div className={cn('min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate text-base font-bold leading-tight">
+              {classroom.name}
+            </p>
+            {isHomeroom && <Badge variant="warning" className="shrink-0">HOMEROOM</Badge>}
+          </div>
+          <p
+            className={cn(
+              'mt-1 flex min-w-0 items-center gap-1.5 text-xs font-medium',
               savedCover ? savedCover.textMuted : 'text-muted-foreground',
-            )}>{shownDescription}</p>
-          )}
+            )}
+          >
+            <span className="shrink-0"><span className="sr-only">ระดับชั้น </span>{gradeLevel}</span>
+            <span aria-hidden="true">·</span>
+            <span className="shrink-0"><span className="sr-only">ภาคเรียน </span>{academicTerm}</span>
+            {shownDescription && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="truncate">{shownDescription}</span>
+              </>
+            )}
+          </p>
         </div>
         <div className={cn(
-          'absolute inset-0 transition-colors',
+          'pointer-events-none absolute inset-0 transition-colors',
           isSelecting && isSelected ? 'bg-primary/15' : 'bg-foreground/0 group-hover:bg-foreground/5'
         )} />
       </div>
 
       {/* Body */}
-      <div className="p-4">
-        <div className="flex items-center gap-4 mb-4">
+      <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-4">
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Users className="w-3.5 h-3.5 text-muted-foreground" />
+            <Users className="size-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="font-semibold text-foreground">{studentCount}</span>
             <span className="text-xs">คน</span>
           </div>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+            <BookOpen className="size-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="font-semibold text-foreground">{assignmentCount}</span>
             <span className="text-xs">งาน</span>
           </div>
         </div>
-
-        <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-muted p-3">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
-              <GraduationCap className="size-3" aria-hidden="true" /> ระดับชั้น
-            </div>
-            <p className="truncate text-sm font-semibold text-foreground">{meta.gradeLevel || 'ยังไม่ระบุ'}</p>
+        {!isSelecting && (onDuplicate || onDelete) && (
+          <div className="relative z-20 flex shrink-0 items-center gap-1">
+            {onDuplicate && (
+              <IconButton
+                type="button"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDuplicate() }}
+                label={`คัดลอก ${classroom.name} และเก็บงานเดิมเป็นแบบร่าง`}
+                size="sm"
+                className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Copy aria-hidden="true" />
+              </IconButton>
+            )}
+            {onDelete && (
+              <IconButton
+                type="button"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}
+                label={`ลบ ${classroom.name}`}
+                size="sm"
+                className="flex size-8 items-center justify-center rounded-lg border border-destructive/20 text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <Trash2 aria-hidden="true" />
+              </IconButton>
+            )}
           </div>
-          <div className="min-w-0 border-l border-border pl-3">
-            <div className="mb-1 flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
-              <CalendarRange className="size-3" aria-hidden="true" /> ภาคเรียน
-            </div>
-            <p className="truncate text-sm font-semibold text-foreground">{meta.academicTerm || 'ยังไม่ระบุ'}</p>
-          </div>
-        </div>
-
-        <div className="flex items-end justify-between gap-3 border-t border-border pt-3">
-          <div>
-            <p className="text-[10px] text-muted-foreground">รหัสห้องเรียน</p>
-            <p className="font-mono font-bold text-foreground tracking-widest text-sm">{classroom.class_code}</p>
-          </div>
-          {!isSelecting && (onDuplicate || onDelete) && (
-            <div className="relative z-20 flex items-center gap-1">
-              {onDuplicate && (
-                <IconButton
-                  type="button"
-                  onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDuplicate() }}
-                  label={`คัดลอก ${classroom.name} และเก็บงานเดิมเป็นแบบร่าง`}
-                  size="sm"
-                  className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Copy className="size-4" aria-hidden="true" />
-                </IconButton>
-              )}
-              {onDelete && (
-                <IconButton
-                  type="button"
-                  onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}
-                  label={`ลบ ${classroom.name}`}
-                  size="sm"
-                  className="flex size-8 items-center justify-center rounded-lg border border-destructive/20 text-destructive transition-colors hover:bg-destructive/10"
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </IconButton>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </>
   )
 
   if (isSelecting) {
     return (
-      <div
+      <Card
+        edge="ring"
         onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          onToggle?.()
+        }}
+        role="checkbox"
+        aria-checked={isSelected}
+        aria-label={`เลือกห้องเรียน ${classroom.name}`}
+        tabIndex={0}
         className={cn(
-          'group cursor-pointer bg-card rounded-2xl ring-1 overflow-hidden transition-all duration-150',
+          'group cursor-pointer overflow-hidden transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           isSelected ? 'ring-2 ring-primary shadow-md' : 'ring-border hover:ring-primary/20'
         )}
       >
         {cardBody}
-      </div>
+      </Card>
     )
   }
 
   return (
-    <div
+    <Card
+      edge="ring"
       className={cn(
-        'group relative overflow-hidden rounded-2xl bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+        'group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
         isHomeroom ? 'ring-2 ring-warning/50 shadow-md' : 'ring-1 ring-border',
       )}
     >
@@ -166,6 +170,6 @@ export function ClassroomCard({
         className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       {cardBody}
-    </div>
+    </Card>
   )
 }

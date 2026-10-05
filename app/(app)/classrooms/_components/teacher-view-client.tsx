@@ -277,10 +277,10 @@ export function TeacherViewClient({
                   {!isSelecting && (
                     <Link
                       href="/classrooms/new"
-                      className="group flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/20 hover:bg-primary/10"
+                      className="group flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-5 transition-colors hover:border-primary/20 hover:bg-primary/10"
                     >
-                      <div className="flex size-10 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-primary/10">
-                        <Plus className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                      <div className="flex size-9 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-primary/10">
+                        <Plus className="size-4 text-muted-foreground transition-colors group-hover:text-primary" />
                       </div>
                       <p className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-primary">สร้างห้องเรียนใหม่</p>
                     </Link>
@@ -333,11 +333,11 @@ function SortableClassroomCard(props: ComponentProps<typeof ClassroomCard>) {
             type="button"
             label={`ลากเพื่อเปลี่ยนลำดับ ${props.classroom.name}`}
             size="sm"
-            className="absolute left-2.5 top-2.5 z-20 flex size-8 cursor-grab touch-none items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground active:cursor-grabbing"
+            className="absolute left-3 top-4 z-20 flex size-8 cursor-grab touch-none items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground active:cursor-grabbing"
             {...attributes}
             {...listeners}
           >
-            <GripVertical className="size-4" aria-hidden="true" />
+            <GripVertical aria-hidden="true" />
           </IconButton>
         ) : undefined}
       />
