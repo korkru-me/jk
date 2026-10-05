@@ -18,7 +18,8 @@ import {
   Users,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { SidebarButton, useSidebarCompact } from '@/components/layout/sidebar-display'
+import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
@@ -79,6 +80,7 @@ export function AssignmentContextNavigation({
   onDelete,
   onClose,
 }: AssignmentContextNavigationProps) {
+  const compact = useSidebarCompact()
   const statusMeta = STATUS_META[a.status]
   const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const isOpeningAgain = a.status === 'closed'
@@ -95,16 +97,16 @@ export function AssignmentContextNavigation({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Button
+      <SidebarButton
+        label="กลับไปงานที่มอบหมาย"
         variant="ghost"
         className="w-full justify-start"
         render={<Link href={classroomNavigationPath(a.classroom_id, 'assignments')} onClick={onClose} />}
       >
         <ChevronLeft data-icon="inline-start" />
-        กลับไปงานที่มอบหมาย
-      </Button>
+      </SidebarButton>
 
-      <Card radius="md" padding="sm" className="flex flex-col gap-2.5 border-primary/20 bg-primary/5">
+      <Card radius="md" padding="sm" className={cn('flex flex-col gap-2.5 border-primary/20 bg-primary/5', compact && 'md:hidden')}>
         <div className="flex items-center justify-between gap-2">
           <Badge variant="secondary" className={statusMeta.color}>
             <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
@@ -139,7 +141,8 @@ export function AssignmentContextNavigation({
       <Separator />
 
       <div className="flex flex-col gap-1.5">
-        <Button
+        <SidebarButton
+          label="ภาพรวม"
           size="sm"
           variant={currentSection === 'detail' ? 'navigation' : 'ghost'}
           className="w-full justify-start"
@@ -147,20 +150,20 @@ export function AssignmentContextNavigation({
           render={<Link href={`/assignments/${a.id}`} onClick={onClose} />}
         >
           <Activity data-icon="inline-start" />
-          ภาพรวม
-        </Button>
+        </SidebarButton>
         {canOpenAssignment && (
           <>
-            <Button
+            <SidebarButton
+              label={openActionLabel}
               onClick={() => runAction(onPublish)}
               disabled={isPending || !questionsReady}
               size="sm"
               className="w-full justify-start border-0 bg-success text-success-foreground hover:bg-success/90"
             >
-              <Play data-icon="inline-start" /> {openActionLabel}
-            </Button>
+              <Play data-icon="inline-start" />
+            </SidebarButton>
             {!questionsReady && (
-              <p className="px-2 text-xs leading-5 text-warning">
+              <p className={cn('px-2 text-xs leading-5 text-warning', compact && 'md:sr-only')}>
                 {missingQuestionCount > 0
                   ? `ตรวจและแก้โจทย์ที่หายก่อน${openActionLabel}`
                   : duplicateQuestionCount > 0
@@ -171,48 +174,52 @@ export function AssignmentContextNavigation({
           </>
         )}
         {a.status === 'published' && (
-          <Button
+          <SidebarButton
+            label={`ปิด${assignmentTypeLabel}`}
             onClick={() => runAction(onCloseExam)}
             disabled={isPending}
             size="sm"
             variant="destructive"
             className="w-full justify-start"
           >
-            <Square data-icon="inline-start" /> ปิด{assignmentTypeLabel}
-          </Button>
+            <Square data-icon="inline-start" />
+          </SidebarButton>
         )}
         {a.mode === 'online' && questionsReady && (
-          <Button
+          <SidebarButton
+            label="ดูตัวอย่างนักเรียน"
             size="sm"
             variant="ghost"
             render={<Link href={`/assignments/${a.id}/preview`} target="_blank" rel="noopener noreferrer" onClick={onClose} />}
             className="w-full justify-start"
           >
-            <Eye data-icon="inline-start" /> ดูตัวอย่างนักเรียน
-          </Button>
+            <Eye data-icon="inline-start" />
+          </SidebarButton>
         )}
-        <Button
+        <SidebarButton
+          label={pendingCount > 0
+            ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
+            : 'ตรวจให้คะแนน / ดูคำตอบ'}
           size="sm"
           variant="ghost"
           render={<Link href={gradeHref} onClick={onClose} />}
           className="w-full justify-start"
         >
           <ClipboardCheck data-icon="inline-start" />
-          {pendingCount > 0
-            ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
-            : 'ตรวจให้คะแนน / ดูคำตอบ'}
-        </Button>
-        <Button
+        </SidebarButton>
+        <SidebarButton
+          label="แก้ไขรายละเอียด"
           size="sm"
           variant={currentSection === 'edit' ? 'navigation' : 'ghost'}
           aria-current={currentSection === 'edit' ? 'page' : undefined}
           render={<Link href={`/assignments/${a.id}/edit`} onClick={onClose} />}
           className="w-full justify-start"
         >
-          <Pencil data-icon="inline-start" /> แก้ไขรายละเอียด
-        </Button>
+          <Pencil data-icon="inline-start" />
+        </SidebarButton>
         {questionsReady && (
-          <Button
+          <SidebarButton
+            label="โหมดสอน"
             size="sm"
             variant="ghost"
             render={(
@@ -225,33 +232,36 @@ export function AssignmentContextNavigation({
             )}
             className="w-full justify-start"
           >
-            <Presentation data-icon="inline-start" /> โหมดสอน
-          </Button>
+            <Presentation data-icon="inline-start" />
+          </SidebarButton>
         )}
         {a.mode === 'online' && a.type === 'exam' && (
           <>
-            <Button
+            <SidebarButton
+              label="ห้องคุมสอบสด"
               size="sm"
               variant="ghost"
               render={<Link href={`/assignments/${a.id}/proctor`} onClick={onClose} />}
               className="w-full justify-start"
             >
-              <Radio data-icon="inline-start" /> ห้องคุมสอบสด
-            </Button>
-            <Button
+              <Radio data-icon="inline-start" />
+            </SidebarButton>
+            <SidebarButton
+              label="รายงานคุมสอบ"
               size="sm"
               variant="ghost"
               render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}
               className="w-full justify-start"
             >
-              <FileClock data-icon="inline-start" /> รายงานคุมสอบ
-            </Button>
+              <FileClock data-icon="inline-start" />
+            </SidebarButton>
           </>
         )}
 
         <Separator className="my-1" />
 
-        <Button
+        <SidebarButton
+          label={`ลบ${assignmentTypeLabel}`}
           type="button"
           size="sm"
           variant="destructive"
@@ -259,19 +269,19 @@ export function AssignmentContextNavigation({
           disabled={isPending}
           className="w-full justify-start"
         >
-          <Trash2 data-icon="inline-start" /> ลบ{assignmentTypeLabel}
-        </Button>
+          <Trash2 data-icon="inline-start" />
+        </SidebarButton>
       </div>
 
       <Separator />
-      <Button
+      <SidebarButton
+        label="เมนูหลัก"
         variant="ghost"
         className="w-full justify-start"
         render={<Link href="/dashboard" onClick={onClose} />}
       >
         <LayoutDashboard data-icon="inline-start" />
-        เมนูหลัก
-      </Button>
+      </SidebarButton>
     </div>
   )
 }

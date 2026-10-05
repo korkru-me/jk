@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
-import { Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Menu, Moon, Sun } from 'lucide-react'
+import { IconButton } from '@/components/ui/icon-button'
 import { logout } from '@/lib/actions/auth'
 import {
   DropdownMenu,
@@ -19,10 +20,12 @@ interface TopbarProps {
   initialUnreadCount: number
   onMenuToggle?: () => void
   sidebarCollapsed?: boolean
+  sidebarOpen?: boolean
+  notificationsEnabled?: boolean
   onSidebarCollapseToggle?: () => void
 }
 
-export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, onSidebarCollapseToggle }: TopbarProps) {
+export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, sidebarOpen = false, notificationsEnabled = true, onSidebarCollapseToggle }: TopbarProps) {
   const { resolvedTheme, setTheme } = useTheme()
   const [themeMounted, setThemeMounted] = useState(false)
   const isDark = resolvedTheme === 'dark'
@@ -31,29 +34,28 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
 
   return (
     <header className="h-16 border-b bg-card flex items-center justify-between px-4 sm:px-6 shrink-0">
-      <button
-        className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+      <IconButton
+        className="size-11 md:hidden"
         onClick={onMenuToggle}
-        aria-label="เปิดเมนู"
+        label={sidebarOpen ? 'ปิดเมนูด้านข้าง' : 'เปิดเมนูด้านข้าง'}
+        aria-expanded={sidebarOpen}
+        aria-controls="app-sidebar"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-      </button>
-      <button
-        className="hidden md:flex p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+        <Menu />
+      </IconButton>
+      <IconButton
+        className="hidden size-11 md:inline-flex"
         onClick={onSidebarCollapseToggle}
-        aria-label={sidebarCollapsed ? 'แสดงแถบด้านข้าง' : 'ซ่อนแถบด้านข้าง'}
-        title={sidebarCollapsed ? 'แสดงแถบด้านข้าง' : 'ซ่อนแถบด้านข้าง'}
+        label={sidebarCollapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'}
+        aria-expanded={!sidebarCollapsed}
+        aria-controls="app-sidebar"
       >
-        {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-      </button>
+        <Menu />
+      </IconButton>
 
       <div className="flex items-center gap-3">
         {/* Notifications */}
-        <NotificationsBell initialUnreadCount={initialUnreadCount} />
+        {notificationsEnabled && <NotificationsBell initialUnreadCount={initialUnreadCount} />}
 
         {/* Dark / Light toggle switch */}
         {themeMounted ? (

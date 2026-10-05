@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { isClassroomSectionPath } from '@/lib/classroom-navigation'
 import { Separator } from '@/components/ui/separator'
 import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
+import { SidebarDisplayProvider, SidebarLabel, useSidebarCompact } from './sidebar-display'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -118,9 +119,9 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
         className={cn(
           'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
           hasActiveChild
-            ? 'text-primary'
+            ? 'bg-primary/10 text-primary'
             : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-          compactOnDesktop && 'md:justify-center md:px-2'
+          compactOnDesktop && 'md:min-h-11 md:justify-center md:px-2'
         )}
       >
         <span className="text-base">{group.icon}</span>
@@ -163,7 +164,7 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
                   isNavActive(pathname, child.href)
                     ? 'bg-primary/10 text-primary'
                     : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                  compactOnDesktop && 'md:justify-center md:px-2'
+                  compactOnDesktop && 'md:min-h-11 md:justify-center md:px-2'
                 )}
               >
                 <span className="text-sm">{child.icon}</span>
@@ -181,6 +182,7 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
   pathname: string
   onNavigate?: () => void
 }) {
+  const compact = useSidebarCompact()
   const items = [
     { href: '/classrooms', label: 'ห้องเรียนทั้งหมด', Icon: LayoutGrid },
     { href: '/classrooms/new', label: 'สร้างห้องเรียน', Icon: Plus },
@@ -192,17 +194,18 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
       <Link
         href="/dashboard"
         onClick={onNavigate}
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        title={compact ? 'เมนูหลัก' : undefined}
+        className={cn('flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', compact && 'md:justify-center md:px-0 md:h-11')}
       >
         <ChevronLeft aria-hidden="true" className="size-4" />
-        เมนูหลัก
+        <SidebarLabel>เมนูหลัก</SidebarLabel>
       </Link>
 
-      <div className="flex items-start gap-3 px-2 py-1">
+      <div className={cn('flex items-start gap-3 px-2 py-1', compact && 'md:justify-center md:px-0')} title="ห้องเรียน">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <School aria-hidden="true" className="size-5" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className={cn('min-w-0 flex-1', compact && 'md:hidden')}>
           <p className="font-semibold text-foreground">ห้องเรียน</p>
           <p className="text-xs text-muted-foreground">จัดการพื้นที่การเรียนรู้</p>
         </div>
@@ -210,7 +213,7 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
 
       <Separator />
 
-      <div className="px-2 text-xs font-medium text-muted-foreground">เมนูห้องเรียน</div>
+      <div className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>เมนูห้องเรียน</div>
       <nav aria-label="เมนูจัดการห้องเรียน" className="flex flex-col gap-1">
         {items.map(({ href, label, Icon }) => {
           const selected = pathname === href
@@ -220,15 +223,17 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
               href={href}
               onClick={onNavigate}
               aria-current={selected ? 'page' : undefined}
+              title={compact ? label : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 selected
                   ? 'bg-primary/10 text-primary'
                   : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                compact && 'md:h-11 md:justify-center md:px-0',
               )}
             >
               <Icon aria-hidden="true" className="size-4" />
-              <span className="truncate">{label}</span>
+              <SidebarLabel>{label}</SidebarLabel>
             </Link>
           )
         })}
@@ -246,6 +251,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = false }: SidebarProps) {
+  const [desktop, setDesktop] = useState(false)
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const search = sidebarSearchKey(searchParams.toString())
@@ -263,23 +269,32 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
     : null
 
   useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)')
+    const update = () => setDesktop(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
     if (pendingSidebar && pathname !== pendingSidebar.sourcePathname && !pendingMatches) {
       clearPendingSidebar()
     }
   }, [clearPendingSidebar, pathname, pendingMatches, pendingSidebar])
 
   return (
-    <aside className={cn(
+    <SidebarDisplayProvider compactOnDesktop={collapsed}>
+    <aside id="app-sidebar" aria-label="เมนูด้านข้าง" inert={!desktop && !isOpen} className={cn(
       'flex-shrink-0 border-r bg-card overflow-hidden',
-      'fixed inset-y-0 left-0 z-30 transition-[width,transform] duration-200 ease-in-out',
+      'fixed inset-y-0 left-0 z-30 w-64 transition-[width,transform] duration-200 ease-in-out motion-reduce:transition-none',
       'md:static',
-      isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0',
-      collapsed ? 'md:w-0 md:border-r-0' : 'md:w-64',
+      isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      collapsed ? 'md:w-20' : 'md:w-64',
     )}>
-      <div className="w-64 h-full flex flex-col">
+      <div className="w-full h-full flex flex-col">
         {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b shrink-0">
-          <Link href="/dashboard" onClick={onClose}>
+        <div className={cn('h-16 flex items-center px-5 border-b shrink-0', collapsed && 'md:justify-center md:px-2')}>
+          <Link href="/dashboard" onClick={onClose} title="KorKru · หน้าหลัก">
             <Image
               src="/logo.png"
               alt="KorKru"
@@ -292,11 +307,11 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
 
         {/* Nav */}
         {contextualContent || usesClassroomSidebar ? (
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className={cn('flex-1 overflow-y-auto overflow-x-hidden p-3', collapsed && 'md:p-2')}>
             {contextualContent ?? <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />}
           </div>
         ) : (
-          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+          <nav aria-label="เมนูหลัก" className={cn('flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3', collapsed && 'md:p-2')}>
             {navItems.map((entry) => (
               isGroup(entry)
                 ? (
@@ -305,6 +320,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
                     group={entry}
                     pathname={pathname}
                     onNavigate={onClose}
+                    compactOnDesktop={collapsed}
                   />
                 )
                 : (
@@ -312,15 +328,18 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
                     key={entry.href}
                     href={entry.href}
                     onClick={onClose}
+                    title={collapsed ? entry.label : undefined}
+                    aria-current={isNavActive(pathname, entry.href) ? 'page' : undefined}
                     className={cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                       isNavActive(pathname, entry.href)
                         ? 'bg-primary/10 text-primary'
                         : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                      collapsed && 'md:justify-center md:px-2 md:min-h-11',
                     )}
                   >
                     <span className="text-base">{entry.icon}</span>
-                    <span>{entry.label}</span>
+                    <SidebarLabel>{entry.label}</SidebarLabel>
                   </Link>
                 )
             ))}
@@ -329,25 +348,26 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
 
         {/* Admin link */}
         {role === 'admin' && !usesClassroomSidebar && !contextualContent && (
-          <div className="px-3 pb-2">
+          <div className={cn('px-3 pb-2', collapsed && 'md:px-2')}>
             <Link
               href="/admin"
               onClick={onClose}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20"
+              title={collapsed ? 'Admin Panel' : undefined}
+              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20', collapsed && 'md:justify-center md:px-2')}
             >
               <span className="text-base">⚙️</span>
-              <span>Admin Panel</span>
+              <SidebarLabel>Admin Panel</SidebarLabel>
             </Link>
           </div>
         )}
 
         {/* User info */}
-        <div className="p-4 border-t shrink-0">
-          <div className="flex items-center gap-3">
+        <div className={cn('p-4 border-t shrink-0', collapsed && 'md:px-2')} title={fullName}>
+          <div className={cn('flex items-center gap-3', collapsed && 'md:justify-center')}>
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
               {fullName.charAt(0)}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className={cn('flex-1 min-w-0', collapsed && 'md:sr-only')}>
               <p className="text-sm font-medium truncate">{fullName}</p>
               <p className="text-xs text-muted-foreground">
                 {role === 'teacher' ? 'ครู' : role === 'student' ? 'นักเรียน' : 'Admin'}
@@ -357,5 +377,6 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         </div>
       </div>
     </aside>
+    </SidebarDisplayProvider>
   )
 }

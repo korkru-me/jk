@@ -7,6 +7,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useSidebarCompact } from '@/components/layout/sidebar-display'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,7 @@ export function ClassroomSettingsDialog({
   /** The contextual sidebar uses a quieter, full-width navigation treatment. */
   placement?: 'banner' | 'sidebar'
 }) {
+  const compact = useSidebarCompact() && placement === 'sidebar'
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(classroom.name)
   const [meta, setMeta] = useState<ClassroomMeta>(() => parseDescription(classroom.description))
@@ -94,6 +96,8 @@ export function ClassroomSettingsDialog({
           <Button
             size="sm"
             variant={placement === 'sidebar' ? 'ghost' : 'outline'}
+            aria-label="ตั้งค่าห้องเรียน"
+            title={compact ? 'ตั้งค่าห้องเรียน' : undefined}
             className={cn(
               placement === 'sidebar'
                 ? 'w-full justify-start'
@@ -103,11 +107,13 @@ export function ClassroomSettingsDialog({
                   ? 'border-current text-current hover:bg-current/10 hover:text-current'
                   : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'
               ),
+              compact && 'md:h-11 md:justify-center md:px-0',
             )}
           />
         }
       >
-        <Settings className="w-3.5 h-3.5" /> ตั้งค่าห้องเรียน
+        <Settings data-icon="inline-start" />
+        <span className={cn(compact && 'md:sr-only')}>ตั้งค่าห้องเรียน</span>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { assignmentCreationHref, assignmentReuseHref } from '@/lib/assignment-creation'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useOptionalSidebarContext } from '@/components/layout/sidebar-context'
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ interface AssignmentCreationMenuProps {
   className?: string
   align?: 'start' | 'center' | 'end'
   active?: boolean
+  compactOnDesktop?: boolean
   onNavigate?: () => void
 }
 
@@ -42,6 +44,7 @@ export function AssignmentCreationMenu({
   className,
   align = 'end',
   active = false,
+  compactOnDesktop = false,
   onNavigate,
 }: AssignmentCreationMenuProps) {
   const sidebar = useOptionalSidebarContext()
@@ -57,13 +60,15 @@ export function AssignmentCreationMenu({
             type="button"
             variant={variant}
             size={size}
-            className={className}
+            className={cn(className, compactOnDesktop && 'md:h-11 md:justify-center md:px-0')}
+            aria-label={label}
+            title={compactOnDesktop ? label : undefined}
             aria-current={active ? 'page' : undefined}
           />
         )}
       >
         <Plus data-icon="inline-start" />
-        <span className="truncate">{label}</span>
+        <span className={cn('truncate', compactOnDesktop && 'md:sr-only')}>{label}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="min-w-56">
         <DropdownMenuGroup>

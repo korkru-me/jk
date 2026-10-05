@@ -15,10 +15,13 @@ export function ShellClient({
   user,
   initialUnreadCount,
   children,
+  notificationsEnabled = true,
 }: {
   user: ShellUser
   initialUnreadCount: number
   children: React.ReactNode
+  /** Local shell fixtures disable polling; authenticated app shells keep it. */
+  notificationsEnabled?: boolean
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -31,6 +34,15 @@ export function ShellClient({
   useEffect(() => {
     setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1')
   }, [])
+
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) setSidebarOpen(false)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [sidebarOpen])
 
   function toggleSidebarCollapsed() {
     setSidebarCollapsed(prev => {
@@ -62,6 +74,8 @@ export function ShellClient({
             initialUnreadCount={initialUnreadCount}
             onMenuToggle={() => setSidebarOpen(o => !o)}
             sidebarCollapsed={sidebarCollapsed}
+            sidebarOpen={sidebarOpen}
+            notificationsEnabled={notificationsEnabled}
             onSidebarCollapseToggle={toggleSidebarCollapsed}
           />
           <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6">

@@ -65,6 +65,7 @@ import {
 } from '@/lib/teaching-board-draft-state'
 import { scratchpadHasMeaningfulDraft } from '@/lib/scratchpad-state'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
+import { SidebarButton, useSidebarCompact } from '@/components/layout/sidebar-display'
 import { cn } from '@/lib/utils'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
 
@@ -556,7 +557,7 @@ interface TeachingModeSidebarProps {
   onNavigate?: () => void
 }
 
-function TeachingModeSidebar({
+export function TeachingModeSidebar({
   assignmentTitle,
   questionIndex,
   questionCount,
@@ -569,6 +570,7 @@ function TeachingModeSidebar({
   onBack,
   onNavigate,
 }: TeachingModeSidebarProps) {
+  const compact = useSidebarCompact()
   const runAndClose = (action: () => void) => {
     action()
     onNavigate?.()
@@ -576,17 +578,17 @@ function TeachingModeSidebar({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Button
+      <SidebarButton
+        label="กลับไปงานที่มอบหมาย"
         type="button"
         variant="ghost"
         className="w-full justify-start"
         onClick={() => runAndClose(onBack)}
       >
         <ChevronLeft data-icon="inline-start" />
-        กลับไปงานที่มอบหมาย
-      </Button>
+      </SidebarButton>
 
-      <Card radius="md" padding="sm" className="flex flex-col gap-2.5 border-primary/20 bg-primary/5">
+      <Card radius="md" padding="sm" className={cn('flex flex-col gap-2.5 border-primary/20 bg-primary/5', compact && 'md:hidden')}>
         <div className="flex items-center gap-2 text-primary">
           <Presentation aria-hidden="true" className="size-4" />
           <span className="text-xs font-semibold">โหมดสอน</span>
@@ -599,9 +601,10 @@ function TeachingModeSidebar({
         </div>
       </Card>
 
-      <div className="px-2 text-xs font-medium text-muted-foreground">การแสดงผล</div>
+      <div className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>การแสดงผล</div>
       <div className="flex flex-col gap-1.5">
-        <Button
+        <SidebarButton
+          label={showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
           type="button"
           variant="ghost"
           className="w-full justify-start"
@@ -609,9 +612,9 @@ function TeachingModeSidebar({
           onClick={() => runAndClose(onToggleQuestion)}
         >
           {showQuestion ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
-          {showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
-        </Button>
-        <Button
+        </SidebarButton>
+        <SidebarButton
+          label={showSavedBoards ? 'ซ่อนเฉลยที่บันทึกไว้' : 'แสดงเฉลยที่บันทึกไว้'}
           type="button"
           variant="ghost"
           className="w-full justify-start"
@@ -619,9 +622,9 @@ function TeachingModeSidebar({
           onClick={() => runAndClose(onToggleSavedBoards)}
         >
           {showSavedBoards ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
-          {showSavedBoards ? 'ซ่อนเฉลยที่บันทึกไว้' : 'แสดงเฉลยที่บันทึกไว้'}
-        </Button>
-        <Button
+        </SidebarButton>
+        <SidebarButton
+          label={showBoard ? 'ซ่อนกระดาน' : 'แสดงกระดาน'}
           type="button"
           variant="ghost"
           className="w-full justify-start"
@@ -629,8 +632,7 @@ function TeachingModeSidebar({
           onClick={() => runAndClose(onToggleBoard)}
         >
           {showBoard ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
-          {showBoard ? 'ซ่อนกระดาน' : 'แสดงกระดาน'}
-        </Button>
+        </SidebarButton>
       </div>
     </div>
   )
