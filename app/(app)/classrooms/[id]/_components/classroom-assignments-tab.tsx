@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -29,6 +30,7 @@ import {
   type Announcements,
   type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
 import {
@@ -175,11 +177,12 @@ function SortableAssignmentRow({
   return (
     <div
       ref={setNodeRef}
+      data-assignment-row
       style={{ transform: DndCSS.Transform.toString(transform), transition }}
       className={cn(
         'relative flex gap-2 border-l-4 py-3 pr-2 pl-3 transition-[background-color,box-shadow,opacity]',
         tone,
-        isDragging && 'relative z-10 opacity-75 shadow-md',
+        isDragging && 'bg-muted/40 opacity-35 hover:bg-muted/40',
       )}
     >
       <HoverCard>
@@ -248,6 +251,7 @@ interface AssignmentCategoryCardProps {
   assignmentCount: number
   showHeader: boolean
   assignmentDragging: boolean
+  isDropTarget: boolean
   children: ReactNode
 }
 
@@ -256,10 +260,11 @@ function AssignmentCategoryCard({
   assignmentCount,
   showHeader,
   assignmentDragging,
+  isDropTarget,
   children,
 }: AssignmentCategoryCardProps) {
   const preset = category ? groupPreset(category.color) : null
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef } = useDroppable({
     id: categoryDropId(category?.id ?? null),
     data: { type: 'category', categoryId: category?.id ?? null },
   })
@@ -272,41 +277,61 @@ function AssignmentCategoryCard({
       aria-label={`กลุ่มงาน ${category?.name ?? 'ยังไม่จัดกลุ่ม'} ${assignmentCount} งาน`}
       data-assignment-category-id={category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
       className={cn(
-        'overflow-hidden transition-[box-shadow,background-color]',
-        assignmentDragging && 'ring-primary/30',
-        isOver && assignmentDragging && 'bg-primary/5 ring-2 ring-primary',
+        'relative overflow-hidden transition-shadow',
+        isDropTarget && 'ring-2 ring-primary/60 shadow-md [&_[data-assignment-row]]:bg-transparent',
       )}
     >
-      {showHeader && (
-        <div className={cn(
-          'flex items-center gap-2 border-b px-4 py-2.5',
-          preset?.surface ?? 'bg-muted/40',
-        )}>
-          <Folder className={cn('size-4', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
-          <h3 className={cn('text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
-            {category?.name ?? 'ยังไม่จัดกลุ่ม'}
-          </h3>
-          <span className={cn('text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
-            {assignmentCount} งาน
-          </span>
-          {assignmentDragging && (
-            <span className="ml-auto text-xs font-medium text-primary">
-              {isOver ? 'ปล่อยเพื่อย้ายมาที่นี่' : 'วางงานในกรอบนี้'}
-            </span>
+      {isDropTarget && (
+        <div
+          aria-hidden="true"
+          className={cn(
+            'pointer-events-none absolute inset-0',
+            preset?.surface ?? 'border-primary/20 bg-primary/10',
           )}
-        </div>
+        />
       )}
-      <div className={cn('divide-y divide-border', assignmentCount === 0 && 'min-h-24')}>
-        {assignmentCount === 0 ? (
+      <div className="relative">
+        {showHeader && (
           <div className={cn(
-            'flex min-h-24 items-center justify-center gap-2 px-4 py-6 text-center text-xs text-muted-foreground transition-colors',
-            assignmentDragging && 'bg-muted/30',
-            isOver && assignmentDragging && 'bg-primary/10 text-primary',
+            'flex items-center gap-2 border-b px-4 py-2.5',
+            preset?.surface ?? 'bg-muted/40',
           )}>
-            <Folder className="size-4 shrink-0" aria-hidden="true" />
-            {assignmentDragging ? 'ปล่อยงานเพื่อย้ายเข้ากลุ่มนี้' : 'ยังไม่มีงาน · ลากงานมาวางในกลุ่มนี้ได้'}
+            <Folder className={cn('size-4', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
+            <h3 className={cn('text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
+              {category?.name ?? 'ยังไม่จัดกลุ่ม'}
+            </h3>
+            <span className={cn('text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
+              {assignmentCount} งาน
+            </span>
+            {isDropTarget && (
+              <span className={cn(
+                'ml-auto inline-flex items-center gap-1 rounded-full bg-card/80 px-2 py-1 text-xs font-semibold shadow-sm',
+                preset?.text ?? 'text-primary',
+              )}>
+                <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                ปล่อยเพื่อย้ายมาที่นี่
+              </span>
+            )}
           </div>
-        ) : children}
+        )}
+        <div className={cn('divide-y divide-border', assignmentCount === 0 && 'min-h-24')}>
+          {assignmentCount === 0 ? (
+            <div className={cn(
+              'flex min-h-24 items-center justify-center gap-2 px-4 py-6 text-center text-xs text-muted-foreground transition-colors',
+              assignmentDragging && !isDropTarget && 'bg-muted/20',
+              isDropTarget && cn('bg-transparent font-medium', preset?.text ?? 'text-primary'),
+            )}>
+              {isDropTarget
+                ? <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+                : <Folder className="size-4 shrink-0" aria-hidden="true" />}
+              {isDropTarget
+                ? 'ปล่อยเพื่อย้ายงานเข้ากลุ่มนี้'
+                : assignmentDragging
+                  ? 'ลากงานมาวางในกลุ่มนี้'
+                  : 'ยังไม่มีงาน · ลากงานมาวางในกลุ่มนี้ได้'}
+            </div>
+          ) : children}
+        </div>
       </div>
     </Card>
   )
@@ -355,6 +380,7 @@ export function ClassroomAssignmentsTab({
   const [isPending, startTransition] = useTransition()
   const [isOrderPending, startOrderTransition] = useTransition()
   const [draggingAssignmentId, setDraggingAssignmentId] = useState<string | null>(null)
+  const [dragTargetCategoryId, setDragTargetCategoryId] = useState<string | null | undefined>(undefined)
   const defaultAssignmentIds = useMemo(
     () => assignments
       .map((assignment, index) => ({ assignment, index }))
@@ -445,11 +471,22 @@ export function ClassroomAssignmentsTab({
   function handleAssignmentDragStart(event: DragStartEvent) {
     if (event.active.data.current?.type === 'assignment') {
       setDraggingAssignmentId(String(event.active.id))
+      setDragTargetCategoryId(undefined)
     }
+  }
+
+  function handleAssignmentDragOver(event: DragOverEvent) {
+    const overData = event.over?.data.current
+    if (overData?.type === 'category' || overData?.type === 'assignment') {
+      setDragTargetCategoryId(overData.categoryId as string | null)
+      return
+    }
+    setDragTargetCategoryId(undefined)
   }
 
   function handleAssignmentDragEnd(event: DragEndEvent) {
     setDraggingAssignmentId(null)
+    setDragTargetCategoryId(undefined)
     if (!event.over || event.active.data.current?.type !== 'assignment') return
 
     const assignmentId = String(event.active.id)
@@ -511,6 +548,12 @@ export function ClassroomAssignmentsTab({
   }
 
   const assignmentById = new Map(rows.map(assignment => [assignment.id, assignment]))
+  const draggingAssignment = draggingAssignmentId ? assignmentById.get(draggingAssignmentId) ?? null : null
+  const draggingTypeCfg = draggingAssignment
+    ? TYPE_CFG[draggingAssignment.type] ?? TYPE_CFG.exam
+    : TYPE_CFG.exam
+  const DraggingTypeIcon = draggingTypeCfg.icon
+  const dragTargetName = dragTargetCategoryId === undefined ? null : categoryName(dragTargetCategoryId)
   const announcements: Announcements = {
     onDragStart: ({ active }) => `หยิบงาน ${assignmentById.get(String(active.id))?.title ?? 'งาน'}`,
     onDragOver: ({ active, over }) => over
@@ -570,8 +613,12 @@ export function ClassroomAssignmentsTab({
           sensors={sensors}
           collisionDetection={assignmentCollision}
           onDragStart={handleAssignmentDragStart}
+          onDragOver={handleAssignmentDragOver}
           onDragEnd={handleAssignmentDragEnd}
-          onDragCancel={() => setDraggingAssignmentId(null)}
+          onDragCancel={() => {
+            setDraggingAssignmentId(null)
+            setDragTargetCategoryId(undefined)
+          }}
           accessibility={{
             announcements,
             screenReaderInstructions: {
@@ -590,6 +637,11 @@ export function ClassroomAssignmentsTab({
                     assignmentCount={section.assignments.length}
                     showHeader={categories.length > 0}
                     assignmentDragging={draggingAssignmentId !== null}
+                    isDropTarget={
+                      draggingAssignmentId !== null
+                      && dragTargetCategoryId !== undefined
+                      && dragTargetCategoryId === (section.category?.id ?? null)
+                    }
                   >
                   {section.assignments.map(assignment => {
                     const statusCfg = statusConfig(assignment.status)
@@ -745,6 +797,29 @@ export function ClassroomAssignmentsTab({
               })}
             </div>
           </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {draggingAssignment && (
+              <Card
+                radius="md"
+                edge="ring"
+                elevation="lg"
+                className="pointer-events-none flex w-[30rem] max-w-[calc(100vw-2rem)] items-center gap-3 p-3 ring-primary/40"
+              >
+                <div className={cn(
+                  'flex size-9 shrink-0 items-center justify-center rounded-lg',
+                  draggingTypeCfg.bg,
+                )}>
+                  <DraggingTypeIcon className={cn('size-4', draggingTypeCfg.text)} aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">{draggingAssignment.title}</p>
+                  <p className="mt-0.5 text-xs font-medium text-primary">
+                    {dragTargetName ? `ย้ายไป “${dragTargetName}”` : 'ลากไปยังกลุ่มงานที่ต้องการ'}
+                  </p>
+                </div>
+              </Card>
+            )}
+          </DragOverlay>
         </DndContext>
       )}
     </div>
