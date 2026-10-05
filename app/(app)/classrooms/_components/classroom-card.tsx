@@ -32,8 +32,8 @@ export function ClassroomCard({
   const meta = parseDescription(classroom.description)
   const savedCover = coverOf(meta)
   const shownDescription = meta.description
-  const gradeLevel = meta.gradeLevel || 'ยังไม่ระบุ'
-  const academicTerm = meta.academicTerm || 'ยังไม่ระบุ'
+  const gradeLevel = meta.gradeLevel
+  const academicTerm = meta.academicTerm
 
   const cardBody = (
     <>
@@ -65,22 +65,22 @@ export function ClassroomCard({
             </p>
             {isHomeroom && <Badge variant="warning" className="shrink-0">HOMEROOM</Badge>}
           </div>
-          <p
+          {(gradeLevel || academicTerm || shownDescription) && <p
             className={cn(
               'mt-1 flex min-w-0 items-center gap-1.5 text-xs font-medium',
               savedCover ? savedCover.textMuted : 'text-muted-foreground',
             )}
           >
-            <span className="shrink-0"><span className="sr-only">ระดับชั้น </span>{gradeLevel}</span>
-            <span aria-hidden="true">·</span>
-            <span className="shrink-0"><span className="sr-only">ภาคเรียน </span>{academicTerm}</span>
+            {gradeLevel && <span className="shrink-0"><span className="sr-only">ระดับชั้น </span>{gradeLevel}</span>}
+            {gradeLevel && academicTerm && <span aria-hidden="true">·</span>}
+            {academicTerm && <span className="shrink-0"><span className="sr-only">ภาคเรียน </span>{academicTerm}</span>}
             {shownDescription && (
               <>
-                <span aria-hidden="true">·</span>
+                {(gradeLevel || academicTerm) && <span aria-hidden="true">·</span>}
                 <span className="truncate">{shownDescription}</span>
               </>
             )}
-          </p>
+          </p>}
         </div>
         <div className={cn(
           'pointer-events-none absolute inset-0 transition-colors',
