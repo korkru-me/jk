@@ -9,6 +9,7 @@ import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
 import { assignmentCopyTitle, assignmentCreationTitle, newAssignmentTypeDefaults } from '@/lib/assignment-creation'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
+import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Collapsible,
@@ -482,6 +483,7 @@ export function CreateAssignmentForm({
   // refused by the database, not just by the form).
   const completionChoice: 'complete' | 'threshold' | 'streak' =
     streakOn ? 'streak' : (passingEnabled ? 'threshold' : 'complete')
+  const canRepeat = completionChoice !== 'complete' || maxAttempts !== '1'
 
   function chooseCompletion(choice: 'complete' | 'threshold' | 'streak') {
     if (choice === 'streak') {
@@ -550,6 +552,11 @@ export function CreateAssignmentForm({
   }
 
   function finalizeSubmit(status: AssignmentStatus, effectiveStartAt: string) {
+    if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
+      toast.error('กรุณากรอกเกณฑ์ผ่านให้ถูกต้อง')
+      setStep(0)
+      return
+    }
     if (!preselectedSet && saveAsSet && !questionSetTitle.trim()) {
       toast.error('กรุณากรอกชื่อแฟ้มโจทย์')
       setStep(0)
@@ -624,8 +631,8 @@ export function CreateAssignmentForm({
         random_question_count: selectedRandomCount,
         show_results: showResults,
         show_solutions: showSolutions,
-        max_attempts: maxAttempts ? Number(maxAttempts) : null,
-        score_strategy: scoreStrategy,
+        max_attempts: completionChoice === 'complete' && maxAttempts ? Number(maxAttempts) : null,
+        score_strategy: completionChoice === 'complete' ? scoreStrategy : 'best',
         // The wrong-only switch is hidden while a draw is on, so store the
         // behavior the teacher can actually see rather than whatever the
         // switch was left on before they turned the draw on.
@@ -1094,12 +1101,12 @@ export function CreateAssignmentForm({
                 {
                   key: 'threshold' as const,
                   label: 'ต้องผ่านเกณฑ์',
-                  desc: 'ทำครบแล้วดูว่าถึงเปอร์เซ็นต์หรือคะแนนที่ตั้งไว้ไหม',
+                  desc: 'ทำจนถึงคะแนนหรือเปอร์เซ็นต์ที่ตั้งไว้ ผ่านแล้วไม่เริ่มรอบใหม่',
                 },
                 {
                   key: 'streak' as const,
                   label: 'ถูกติดกันจึงจบ',
-                  desc: 'ทำไปเรื่อย ๆ จนตอบถูกติดต่อกันครบตามที่ตั้ง',
+                  desc: 'ทำจนตอบถูกติดต่อกันครบตามที่ตั้ง ผ่านแล้วไม่เริ่มรอบใหม่',
                 },
               ]).map(opt => (
                 <button
@@ -1122,10 +1129,15 @@ export function CreateAssignmentForm({
             </div>
 
             {completionChoice === 'complete' && (
-              <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
-                ไม่ต้องตั้งค่าอะไรเพิ่ม — บันทึกคะแนนที่ทำได้ตามจริง
-                {assignmentType === 'exercise' ? ' เหมาะกับแบบฝึกหัดเก็บคะแนนตามปกติ' : ' เหมาะกับข้อสอบเก็บคะแนนตามปกติ'}
-              </p>
+              <CompletionAttemptSettings id="attempts" maxAttempts={maxAttempts}
+                onMaxAttemptsChange={value => {
+                  setMaxAttempts(value)
+                  if (value === '1') setRetryScope('all')
+                }} scoreStrategy={scoreStrategy} onScoreStrategyChange={setScoreStrategy} />
+            )}
+
+            {completionChoice !== 'complete' && (
+              <p className="text-xs text-muted-foreground">ทำรอบใหม่ได้จนกว่าจะผ่าน เมื่อผ่านแล้วจะเริ่มรอบใหม่ไม่ได้ · เก็บคะแนนจากรอบที่ดีที่สุด</p>
             )}
 
             {completionChoice === 'threshold' && (
@@ -1276,48 +1288,6 @@ export function CreateAssignmentForm({
                     บันทึกเป็นผ่าน/ยังไม่ผ่าน โดยผ่าน = คะแนนเต็มที่ตั้งไว้ · เก็บคะแนนจากรอบที่ดีที่สุด ·
                     รอบใหม่เริ่มใหม่ทั้งชุด
                   </p>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card padding="xl" className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="attempts" className="flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-muted-foreground" /> จำกัดจำนวนครั้งที่ทำได้
-              </Label>
-              <Input
-                id="attempts"
-                type="number"
-                min={1}
-                value={maxAttempts}
-                onChange={e => {
-                  setMaxAttempts(e.target.value)
-                  if (e.target.value === '1') setRetryScope('all')
-                }}
-                placeholder="ไม่จำกัด (เว้นว่าง)"
-                className="max-w-[200px]"
-              />
-            </div>
-
-            {maxAttempts !== '1' && !streakOn && (
-              <div className="flex flex-col gap-1.5">
-                <Label className="flex items-center gap-1.5">
-                  <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
-                </Label>
-                <div className="grid w-full grid-cols-1 overflow-hidden rounded-lg border border-border sm:w-fit sm:grid-cols-3">
-                  {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setScoreStrategy(s)}
-                      className={`px-3 py-2 text-xs font-medium transition-all ${
-                        scoreStrategy === s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {SCORE_STRATEGY_LABELS[s]}
-                    </button>
-                  ))}
                 </div>
               </div>
             )}
@@ -1482,7 +1452,7 @@ export function CreateAssignmentForm({
                 footer: (sharedRandomValues ? (
                   <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground px-1">
-                      {maxAttempts !== '1' && 'ทำรอบใหม่ก็ยังได้ตัวเลขชุดเดิม · '}
+                      {canRepeat && 'ทำรอบใหม่ก็ยังได้ตัวเลขชุดเดิม · '}
                       สร้างงานแล้วกด &ldquo;ดูตัวอย่าง&rdquo; เพื่อดูตัวเลขที่นักเรียนจะได้
                     </p>
                     {assignmentType === 'exam' && (
@@ -1508,7 +1478,7 @@ export function CreateAssignmentForm({
               // Hidden while a สุ่ม draw is on: the point of a draw is that the
               // next round is a different paper, which is the opposite of
               // coming back to the same ข้อ that were missed.
-              ...(maxAttempts !== '1' && !randomDrawOn && !streakOn ? [{
+              ...(canRepeat && !randomDrawOn && !streakOn ? [{
                 label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
                 desc: `รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ${sharedRandomOn ? 'ตัวเลขในโจทย์เป็นชุดเดิม (ตั้งให้ทุกคนได้ชุดเดียวกันไว้)' : 'ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ'}`,
                 icon: RotateCcw,
@@ -1552,7 +1522,7 @@ export function CreateAssignmentForm({
                 </div>
               )
             })}
-            {randomDrawOn && maxAttempts !== '1' && (
+            {randomDrawOn && canRepeat && (
               <p className="text-xs text-muted-foreground px-1">
                 ตั้งให้สุ่ม {questionsPerAttempt} ข้อจากคลังไว้ที่ขั้นเลือกโจทย์ รอบต่อไปนักเรียนจึงได้ชุดใหม่ทั้งชุด
                 ไม่ใช่กลับมาแก้ข้อเดิม
@@ -1727,6 +1697,7 @@ export function CreateAssignmentForm({
             onChange={setShowSolutions}
             assignmentType={assignmentType}
             maxAttempts={maxAttempts}
+            untilPassed={completionChoice !== 'complete'}
           />
 
           <div className="space-y-1.5">
@@ -1830,12 +1801,12 @@ export function CreateAssignmentForm({
               },
               ...(streakOn && streakCapValue ? [{ label: 'เพดานข้อ', value: `${streakCapValue} ข้อ` }] : []),
               ...(streakOn ? [{ label: 'ทำครบคลังแล้ว', value: streakRecycle ? 'วนกลับมาใหม่' : 'จบเลย' }] : []),
-              ...(maxAttempts ? [{ label: 'จำนวนครั้ง', value: `${maxAttempts} ครั้ง` }] : []),
-              ...(maxAttempts !== '1' ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[scoreStrategy] }] : []),
-              ...(maxAttempts !== '1' && !randomDrawOn && retryScope === 'wrong_only'
+              { label: 'จำนวนครั้ง', value: completionChoice !== 'complete' ? 'ทำจนผ่าน · ผ่านแล้วไม่เริ่มรอบใหม่' : maxAttempts ? `${maxAttempts} ครั้ง` : 'ไม่จำกัด' },
+              ...(canRepeat ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[completionChoice === 'complete' ? scoreStrategy : 'best'] }] : []),
+              ...(canRepeat && !randomDrawOn && !streakOn && retryScope === 'wrong_only'
                 ? [{ label: 'การทำรอบต่อไป', value: 'แก้เฉพาะข้อที่ไม่ถูกต้อง' }]
                 : []),
-              ...(randomDrawOn && maxAttempts !== '1'
+              ...(randomDrawOn && canRepeat
                 ? [{ label: 'การทำรอบต่อไป', value: 'สุ่มชุดใหม่ทั้งชุด' }]
                 : []),
               ...(perPageValue > 1

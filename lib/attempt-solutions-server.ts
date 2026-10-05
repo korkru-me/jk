@@ -12,11 +12,13 @@ import {
   type AttemptSolutionRow,
 } from '@/lib/attempt-solutions'
 import type { AssignmentStatus, AssignmentType } from '@/lib/types'
+import type { CompletionAssignment } from '@/lib/assignment-completion'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
 /** What of an assignment the release rule reads. */
-export interface SolutionReleaseAssignment {
+export interface SolutionReleaseAssignment extends CompletionAssignment {
   id: string
   show_solutions: boolean | null
   status: AssignmentStatus
@@ -28,7 +30,7 @@ export interface SolutionReleaseAssignment {
 
 /** The same columns, as a PostgREST select — embed it as `assignments(...)`. */
 export const SOLUTION_RELEASE_ASSIGNMENT_FIELDS =
-  'id, show_solutions, status, type, end_at, max_attempts, duration_minutes'
+  'id, show_solutions, status, type, end_at, max_attempts, duration_minutes, completion_rule, passing_type, passing_value, display_max_score'
 
 /**
  * Where one student stands with a งาน's เฉลยวิธีทำ, read fresh.
@@ -55,11 +57,12 @@ export async function loadSolutionRelease(
       .eq('assignment_id', assignment.id)
       .eq('student_id', studentId)
       .maybeSingle(),
-    admin
+    fetchAllRows((from, to) => admin
       .from('submissions')
-      .select('id, status, attempt_number, started_at')
+      .select('id, status, attempt_number, started_at, total_score, max_score, streak_reached')
       .eq('assignment_id', assignment.id)
-      .eq('student_id', studentId),
+      .eq('student_id', studentId)
+      .order('attempt_number').range(from, to)),
   ])
   if (extension.error || attempts.error) {
     console.error('[solution-release] read failed:', extension.error ?? attempts.error)
@@ -74,7 +77,11 @@ export async function loadSolutionRelease(
     extendedEndAt: (extension.data?.extended_end_at as string | null | undefined) ?? null,
     maxAttempts: assignment.max_attempts,
     durationMinutes: assignment.duration_minutes,
-    attempts: (attempts.data ?? []) as SolutionReleaseAttempt[],
+    completionRule: assignment.completion_rule,
+    passingType: assignment.passing_type,
+    passingValue: assignment.passing_value,
+    displayMaxScore: assignment.display_max_score,
+    attempts: attempts.rows as SolutionReleaseAttempt[],
   })
 }
 

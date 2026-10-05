@@ -31,6 +31,8 @@ import { getWritableStudentAnswer } from '@/lib/exam-write-access'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
+import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 
 export async function startSubmission(
   assignmentId: string,
@@ -69,6 +71,10 @@ export async function startSubmission(
   ])
 
   const assignment = assignmentRes.data
+
+  if (assignmentRes.error || extensionRes.error || existingRes.error) {
+    return { error: 'ตรวจสอบสถานะงานไม่สำเร็จ กรุณาลองใหม่' }
+  }
 
   if (!assignment) return { error: 'ไม่พบชุดข้อสอบ' }
 
@@ -195,10 +201,19 @@ export async function startSubmission(
         enforceSecureBrowser: false,
       })
     }
-    // submitted / graded: retry up to max_attempts. Exercises are unlimited
-    // when not set; exams fall back to single-attempt for legacy rows saved
-    // before max_attempts was configurable for exam type.
-    const attemptLimit = assignment.max_attempts ?? (assignment.type === 'exercise' ? null : 1)
+    // Re-read after forced finalization. Check every run so a later failed
+    // legacy attempt cannot undo a previous pass, and never trust a UI flag.
+    const { rows: completedRuns, error: completedError } = await fetchAllRows((from, to) => admin
+      .from('submissions')
+      .select('id, status, total_score, max_score, streak_reached')
+      .eq('assignment_id', assignmentId)
+      .eq('student_id', user.id)
+      .in('status', ['submitted', 'graded'])
+      .order('attempt_number').range(from, to))
+    if (completedError) return { error: 'ตรวจสอบผลการทำงานไม่สำเร็จ กรุณาลองใหม่' }
+    const passedRun = findPassingCompletion(assignment, completedRuns)
+    if (passedRun) return { submissionId: passedRun.id, alreadySubmitted: true }
+    const attemptLimit = completionAttemptLimit(assignment)
     if (attemptLimit && existing.attempt_number >= attemptLimit) {
       return { submissionId: existing.id, alreadySubmitted: true }
     }

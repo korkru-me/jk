@@ -25,12 +25,13 @@ function openingSummary(type: AssignmentType, maxAttempts: string): string {
  * can no longer work on the งาน (lib/solution-release.ts). Shared by สร้างงาน
  * and แก้ไขงาน so the promise reads the same in both.
  */
-export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxAttempts }: {
+export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxAttempts, untilPassed = false }: {
   checked: boolean
   onChange: (checked: boolean) => void
   assignmentType: AssignmentType
   /** The จำกัดจำนวนครั้ง field as typed; empty = no limit set. */
   maxAttempts: string
+  untilPassed?: boolean
 }) {
   return (
     <div className="space-y-1.5">
@@ -55,7 +56,9 @@ export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxA
         />
       </label>
       {checked && (
-        <p className="text-xs text-muted-foreground px-1">{openingSummary(assignmentType, maxAttempts)}</p>
+        <p className="text-xs text-muted-foreground px-1">{untilPassed
+          ? 'เห็นเฉลยเมื่อผ่านและส่งงานแล้ว หรือเมื่อพ้นเวลาปิดรับหรือครูกดปิดงาน โดยไม่มีรอบที่ยังทำค้างอยู่'
+          : openingSummary(assignmentType, maxAttempts)}</p>
       )}
       {checked && assignmentType === 'exam' && (
         <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">

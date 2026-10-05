@@ -10,6 +10,8 @@ import { getClassroomPosts, getPostSeenByPost } from '@/lib/actions/classroom-po
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
+import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
@@ -163,11 +165,12 @@ export default async function ClassroomDetailPage({
     const publishedIds = (assignmentRows ?? []).map((a: any) => a.id)
 
     const { data: rawSubRows } = publishedIds.length > 0
-      ? await admin
+      ? await fetchAllRows((from, to) => admin
           .from('submissions')
-          .select('id, assignment_id, status, total_score, max_score, attempt_number, started_at')
+          .select('id, assignment_id, status, total_score, max_score, streak_reached, attempt_number, started_at')
           .in('assignment_id', publishedIds)
           .eq('student_id', authUser!.id)
+          .order('id').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
       : { data: [] }
 
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
@@ -216,7 +219,8 @@ export default async function ClassroomDetailPage({
         end_at: a.end_at,
         duration_minutes: a.duration_minutes,
         type: a.type,
-        max_attempts: a.max_attempts,
+        max_attempts: completionAttemptLimit(a),
+        completion_reached: findPassingCompletion(a, (rawSubRows ?? []).filter(s => s.assignment_id === a.id)) != null,
         retry_scope: a.retry_scope ?? 'all',
         passing_type: a.passing_type,
         passing_value: a.passing_value,

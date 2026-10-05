@@ -17,10 +17,9 @@ export function firstSearchParam(
 export function newAssignmentTypeDefaults(
   assignmentType: AssignmentType,
 ): NewAssignmentTypeDefaults {
-  const isExam = assignmentType === 'exam'
   return {
-    maxAttempts: isExam ? '1' : '',
-    retryScope: isExam ? 'all' : 'wrong_only',
+    maxAttempts: '1',
+    retryScope: 'all',
     ...resolveNewAssignmentMathTools({ type: assignmentType }),
   }
 }

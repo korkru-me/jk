@@ -1,5 +1,12 @@
 # Feature status
 
+### ปรับเงื่อนไขจบงานและการทำซ้ำ (5 ตุลาคม 2026)
+
+- หน้าสร้าง/แก้ไขรวม “ให้ทำได้ … ครั้ง” และ best/average/latest ไว้ใต้ “ทำครบแล้วจบ” ด้วย `CompletionAttemptSettings` ร่วมกัน งานใหม่ทั้งแบบฝึกหัดและข้อสอบเริ่ม 1 ครั้ง; เว้นว่างยังไม่จำกัดและไม่เปลี่ยน quota งานเก่า โหมดต้องผ่านเกณฑ์/ถูกติดกันซ่อนช่องซ้ำซ้อน ทำรอบใหม่ได้จนผ่าน แล้วห้ามเริ่มใหม่ การบันทึกสองโหมดนี้ normalize เป็น quota NULL + best ฝั่ง server
+- `startSubmission` ตรวจผลผ่านจาก finished attempts ทุกหน้า หลังสิทธิ์มอบหมาย/session และหลัง finalize รอบหมดเวลา แล้วคืนหน้าผลรอบที่ผ่านโดยไม่สร้างรอบใหม่; ข้อมูลอ่านไม่สำเร็จ fail closed threshold เทียบสเกล display_max_score และ streak ต้องเป็น streak_reached จริง การ์ดงานนักเรียน หน้าแสดงผล และ policy เปิดเฉลยใช้กติกาเดียวกันแม้ show_results ซ่อนคะแนน ไม่เปิดเฉลยขณะมี writable attempt ค้าง
+- ยังคงเวลาปิดรับ เวลาต่อรอบ ขีดจำกัดจำนวนข้อของ streak และเงื่อนไขโจทย์ที่ตรวจได้ไว้เดิม ล็อกการสลับ complete/threshold/streak หลังมีผู้เริ่มทำโดยไม่ลบ/เขียนคะแนน attempt เก่าทับ ไม่เปลี่ยน RLS/schema และไม่มี migration
+- ตรวจด้วย pure policy/solution/student-status tests, mocked startSubmission positive/negative/read-error cases, TypeScript, token lint, production build และ local Chromium wizard (quota/score อยู่ก้อนเดียว, สลับแล้วค่าคงเดิม, threshold/streak payload ไม่มี quota + best, 320px ไม่ล้น) ไม่ได้ทดสอบบัญชี/Supabase จริงหรือ physical SEB/Safari/mobile และไม่ใช้ผลจำลองเป็นหลักฐาน Production
+
 ตรวจจาก repository และ isolated Staging; รายการที่ระบุ Production ตรวจฐานจริง: 29 กันยายน 2026
 
 ## วิธีอ่านสถานะ

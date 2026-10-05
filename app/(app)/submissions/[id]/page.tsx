@@ -28,7 +28,9 @@ import { MATH_WORK_BUCKET } from '@/lib/math-work'
 import { shouldOfferSebExit } from '@/lib/seb-exit'
 import { attemptItemHasSolution } from '@/lib/attempt-solutions'
 import { loadAttemptSolutionItems, loadSolutionRelease } from '@/lib/attempt-solutions-server'
-import { attemptLimitFor, type SolutionRelease } from '@/lib/solution-release'
+import { type SolutionRelease } from '@/lib/solution-release'
+import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import {
   AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
 } from '@/components/student/attempt-solutions'
@@ -95,7 +97,7 @@ export default async function SubmissionResultPage({
     .select(`
       id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
-      assignments(id, title, show_results, show_solutions, end_at, duration_minutes, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
+      assignments(id, title, show_results, show_solutions, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
     .eq('id', id)
     .eq('student_id', user.id)
@@ -216,8 +218,16 @@ export default async function SubmissionResultPage({
   // The limit startSubmission enforces: a ข้อสอบ saved without max_attempts is
   // one attempt, not unlimited — otherwise this page offered a retry the
   // server then refused, next to a เฉลยวิธีทำ it had just opened for being done.
-  const attemptLimit = attemptLimitFor(assignment.type, assignment.max_attempts)
-  const attemptsRemaining = attemptLimit == null || submission.attempt_number < attemptLimit
+  const attemptLimit = completionAttemptLimit(assignment)
+  const { data: ownAttempts, error: attemptsError } = isOwnSubmission
+    ? await fetchAllRows((from, to) => admin.from('submissions')
+        .select('id, status, total_score, max_score, streak_reached, attempt_number')
+        .eq('assignment_id', submission.assignment_id).eq('student_id', user.id)
+        .order('attempt_number').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
+    : { data: [], error: null }
+  const attemptsUsed = (ownAttempts ?? []).reduce((highest, attempt) => Math.max(highest, attempt.attempt_number), 0)
+  const attemptsRemaining = !attemptsError && !findPassingCompletion(assignment, ownAttempts ?? [])
+    && (attemptLimit == null || attemptsUsed < attemptLimit)
 
   // A wrong-only retry only has something to reopen while a question is still
   // short of full marks. Questions waiting on the teacher are not counted:
@@ -258,6 +268,10 @@ export default async function SubmissionResultPage({
         end_at: assignment.end_at,
         max_attempts: assignment.max_attempts,
         duration_minutes: assignment.duration_minutes,
+        completion_rule: assignment.completion_rule,
+        passing_type: assignment.passing_type,
+        passing_value: assignment.passing_value,
+        display_max_score: assignment.display_max_score,
       }, user.id),
       loadAttemptSolutionItems(admin, id),
     ])

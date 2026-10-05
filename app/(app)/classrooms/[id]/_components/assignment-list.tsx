@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
+import { completionAttemptLimit, completionChoiceFor } from '@/lib/assignment-completion'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
 import { Card } from '@/components/ui/card'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
@@ -144,8 +145,10 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
   const passed = isDone
     ? computePassed(a.submission?.total_score ?? null, a.submission?.max_score ?? 0, a.passing_type, a.passing_value)
     : null
-  const attemptsRemaining = a.max_attempts == null || a.attempts_used < a.max_attempts
-  const canRetry = !isInProgress && isDone && attemptsRemaining
+  const attemptLimit = completionAttemptLimit({ ...a, type: a.type === 'exam' ? 'exam' : 'exercise' })
+  const attemptsRemaining = attemptLimit == null || a.attempts_used < attemptLimit
+  const masteryComplete = completionChoiceFor(a) !== 'complete' && isCompleted(a)
+  const canRetry = !isInProgress && isDone && attemptsRemaining && !masteryComplete
   const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
 
   return (

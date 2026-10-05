@@ -63,8 +63,8 @@ describe('assignment creation navigation', () => {
 
   it('uses exercise defaults with scratchpad enabled but calculator opt-in', () => {
     expect(newAssignmentTypeDefaults('exercise')).toEqual({
-      maxAttempts: '',
-      retryScope: 'wrong_only',
+      maxAttempts: '1',
+      retryScope: 'all',
       calculatorEnabled: false,
       scratchpadEnabled: true,
     })

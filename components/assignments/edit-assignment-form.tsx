@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
-import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
+import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
 import type { Assignment, CompletionRule, Question, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import {
   STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN, STREAK_CAP_MAX, STREAK_CAP_MIN,
@@ -291,6 +291,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
       ? parsedDisplayMax
       : null
 
+    if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
+      toast.error('กรุณากรอกเกณฑ์ผ่านให้ถูกต้อง')
+      return
+    }
     startTransition(async () => {
       const res = await updateAssignment(a.id, {
         title: title.trim(),
@@ -298,8 +302,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         start_at: startAt || null,
         end_at: endAt || null,
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
-        max_attempts: maxAttempts ? Number(maxAttempts) : null,
-        score_strategy: scoreStrategy,
+        max_attempts: completionChoice === 'complete' && maxAttempts ? Number(maxAttempts) : null,
+        score_strategy: completionChoice === 'complete' ? scoreStrategy : 'best',
         retry_scope: retryScope,
         questions_per_page: Number(questionsPerPage) || 1,
         instant_check: instantCheck,
@@ -680,9 +684,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         <div className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           {([
             { key: 'complete' as const, label: 'ทำครบแล้วจบ', desc: 'ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน' },
-            { key: 'threshold' as const, label: 'ต้องผ่านเกณฑ์', desc: 'ดูว่าถึงเปอร์เซ็นต์หรือคะแนนที่ตั้งไว้ไหม' },
+            { key: 'threshold' as const, label: 'ต้องผ่านเกณฑ์', desc: 'ทำจนถึงคะแนนหรือเปอร์เซ็นต์ที่ตั้งไว้ ผ่านแล้วไม่เริ่มรอบใหม่' },
             ...(streakOffered ? [{
-              key: 'streak' as const, label: 'ถูกติดกันจึงจบ', desc: 'ทำไปเรื่อย ๆ จนตอบถูกติดต่อกันครบ',
+              key: 'streak' as const, label: 'ถูกติดกันจึงจบ', desc: 'ทำจนตอบถูกติดต่อกันครบตามที่ตั้ง ผ่านแล้วไม่เริ่มรอบใหม่',
             }] : []),
           ]).map(opt => (
             <button
@@ -699,6 +703,17 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             </button>
           ))}
         </div>
+
+        {completionChoice === 'complete' && (
+          <CompletionAttemptSettings id="edit-attempts" maxAttempts={maxAttempts}
+            onMaxAttemptsChange={value => {
+              setMaxAttempts(value)
+              if (value === '1') setRetryScope('all')
+            }} scoreStrategy={scoreStrategy} onScoreStrategyChange={setScoreStrategy} />
+        )}
+        {completionChoice !== 'complete' && (
+          <p className="text-xs text-muted-foreground">ทำรอบใหม่ได้จนกว่าจะผ่าน เมื่อผ่านแล้วจะเริ่มรอบใหม่ไม่ได้ · เก็บคะแนนจากรอบที่ดีที่สุด</p>
+        )}
 
         {completionChoice === 'threshold' && (
           <div className="flex items-center gap-2 p-3 rounded-xl border border-border flex-wrap">
@@ -1052,47 +1067,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           onChange={setShowSolutions}
           assignmentType={a.type}
           maxAttempts={maxAttempts}
+          untilPassed={completionChoice !== 'complete'}
         />
-
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-attempts" className="flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-muted-foreground" /> จำกัดจำนวนครั้งที่ทำได้
-          </Label>
-          <Input
-            id="edit-attempts"
-            type="number"
-            min={1}
-            value={maxAttempts}
-            onChange={e => {
-              setMaxAttempts(e.target.value)
-              if (e.target.value === '1') setRetryScope('all')
-            }}
-            placeholder="ไม่จำกัด (เว้นว่าง)"
-            className="max-w-[200px]"
-          />
-        </div>
-
-        {maxAttempts !== '1' && !streakOn && (
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
-            </Label>
-            <div className="flex rounded-lg border border-border overflow-hidden w-fit">
-              {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setScoreStrategy(s)}
-                  className={`px-3 py-2 text-xs font-medium transition-all ${
-                    scoreStrategy === s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {SCORE_STRATEGY_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {a.mode === 'online' && a.type === 'exercise' && !streakOn && (
           <div className="space-y-3 rounded-xl border border-border p-4">
@@ -1137,7 +1113,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         )}
 
-        {a.mode === 'online' && maxAttempts !== '1' && !streakOn && (
+        {a.mode === 'online' && (completionChoice !== 'complete' || maxAttempts !== '1') && !streakOn && (
           <div className="space-y-3 rounded-xl border border-border p-4">
             <label className="flex items-center justify-between gap-4 cursor-pointer">
               <div className="flex items-start gap-3">
