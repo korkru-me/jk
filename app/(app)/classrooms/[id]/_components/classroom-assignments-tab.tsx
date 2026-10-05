@@ -565,6 +565,7 @@ export function ClassroomAssignmentsTab({
             if (next === 'all' || next === 'exercise' || next === 'exam') setTypeFilter(next)
           }}
           aria-label="กรองประเภทงาน"
+          variant="primary"
           size="sm"
           spacing={1}
           className="rounded-xl bg-muted p-1"
