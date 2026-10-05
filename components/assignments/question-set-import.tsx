@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Layers, Plus, Search } from 'lucide-react'
+import { Check, ChevronDown, Eye, Layers, Minus, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 
 /** Past this many แฟ้ม the list gets a search box of its own. Below it,
@@ -17,7 +18,8 @@ interface Props {
    *  โจทย์ that have since been deleted, and those can never be added. */
   bankIds: ReadonlySet<string>
   selectedIds: string[]
-  onImport: (set: AssignmentQuestionSetOption) => void
+  onToggle: (set: AssignmentQuestionSetOption) => void
+  onPreview: (set: AssignmentQuestionSetOption) => void
 }
 
 interface SetRow {
@@ -37,7 +39,7 @@ interface SetRow {
  * bank list is long, and a teacher halfway down it should not have to
  * remember that a card scrolled off the top is where แฟ้ม come from.
  */
-export function QuestionSetImport({ sets, bankIds, selectedIds, onImport }: Props) {
+export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPreview }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
@@ -45,12 +47,12 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onImport }: Prop
 
   const picked = new Set(selectedIds)
   const rows: SetRow[] = sets.map(set => {
-    const usableIds = set.question_ids.filter(id => bankIds.has(id))
+    const usableIds = [...new Set(set.question_ids)].filter(id => bankIds.has(id))
     return {
       set,
       usable: usableIds.length,
       added: usableIds.filter(id => picked.has(id)).length,
-      missing: set.question_ids.length - usableIds.length,
+      missing: new Set(set.question_ids).size - usableIds.length,
     }
   })
 
@@ -82,14 +84,14 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onImport }: Prop
         <span className="text-foreground">เพิ่มจากแฟ้มโจทย์ที่มีอยู่</span>
         <span className="text-xs font-normal text-muted-foreground">{sets.length} แฟ้ม</span>
         <ChevronDown
-          className={`ml-auto text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
+          className={cn('ml-auto text-muted-foreground transition-transform', open && 'rotate-180')}
         />
       </Button>
 
       {open && (
-        <div className="border-t border-border p-3 space-y-2">
+        <div className="flex flex-col gap-2 border-t border-border p-3">
           <p className="text-xs text-muted-foreground">
-            กดที่แฟ้มเพื่อเพิ่มโจทย์ในแฟ้มนั้นเข้ามาทั้งหมด — ปรับเพิ่ม/ลดทีละข้อได้ในรายการด้านล่าง
+            กดแฟ้มเพื่อเลือกทุกข้อ กดซ้ำเมื่อเลือกครบเพื่อเอาข้อในแฟ้มออก — ปรับทีละข้อได้ด้านล่าง
           </p>
 
           {sets.length > SEARCH_THRESHOLD && (
@@ -110,29 +112,36 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onImport }: Prop
             </p>
           )}
 
-          <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+          <div className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
             {visible.length === 0 ? (
               <p className="py-6 text-center text-xs text-muted-foreground">
                 ไม่พบแฟ้มที่ชื่อตรงกับ “{query.trim()}”
               </p>
             ) : visible.map(row => {
-              const exhausted = row.usable === 0 || row.added === row.usable
+              const selected = row.usable > 0 && row.added === row.usable
+              const partial = row.added > 0 && !selected
               return (
-                <Button
-                  key={row.set.id}
-                  type="button"
-                  variant="outline"
-                  disabled={exhausted}
-                  onClick={() => onImport(row.set)}
-                  className="h-auto w-full justify-start gap-2 px-2.5 py-2 text-left font-normal hover:border-primary/20 hover:bg-primary/10"
-                >
-                  <Layers className="size-3.5 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{row.set.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{statusLine(row)}</p>
-                  </div>
-                  {!exhausted && <Plus className="size-3.5 text-muted-foreground" />}
-                </Button>
+                <div key={row.set.id} className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={selected ? 'navigation' : 'outline'}
+                    disabled={row.usable === 0}
+                    aria-pressed={selected}
+                    aria-label={`${selected ? 'ยกเลิก' : 'เลือก'}แฟ้ม ${row.set.title}`}
+                    onClick={() => onToggle(row.set)}
+                    className="h-auto min-w-0 flex-1 justify-start gap-2 px-2.5 py-2 text-left"
+                  >
+                    <Layers data-icon="inline-start" />
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="truncate">{row.set.title}</span>
+                      <span className="truncate text-xs font-normal">{statusLine(row)}</span>
+                    </span>
+                    {selected ? <Check aria-hidden="true" /> : partial ? <Minus aria-hidden="true" /> : row.usable > 0 ? <Plus aria-hidden="true" /> : null}
+                  </Button>
+                  <Button type="button" variant="outline" size="icon-lg" aria-label={`ดูโจทย์ในแฟ้ม ${row.set.title}`} title={`ดูโจทย์ในแฟ้ม ${row.set.title}`} onClick={() => onPreview(row.set)}>
+                    <Eye aria-hidden="true" />
+                  </Button>
+                </div>
               )
             })}
           </div>
@@ -151,8 +160,8 @@ function statusLine({ usable, added, missing }: SetRow): string {
       : 'ยังไม่มีโจทย์ในแฟ้มนี้'
   }
   const parts = [`${usable} ข้อ`]
-  if (added === usable) parts.push('เพิ่มครบแล้ว')
-  else if (added > 0) parts.push(`เพิ่มไปแล้ว ${added} ข้อ`)
+  if (added === usable) parts.push('เลือกแล้ว')
+  else if (added > 0) parts.push(`เลือกบางส่วน ${added}/${usable} ข้อ`)
   if (missing > 0) parts.push(`ข้าม ${missing} ข้อที่ถูกลบไปแล้ว`)
   return parts.join(' · ')
 }

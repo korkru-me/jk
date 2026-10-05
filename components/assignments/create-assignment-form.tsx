@@ -50,6 +50,9 @@ import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
+import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
+import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
+import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
 import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
@@ -165,6 +168,7 @@ interface Props {
   actions?: {
     createQuestionSet: typeof createQuestionSet
     createAssignment: typeof createAssignment
+    getQuestionPreviewDetails?: typeof getQuestionPreviewDetails
   }
 }
 
@@ -244,6 +248,7 @@ export function CreateAssignmentForm({
   // Which row's มุมมองนักเรียน is open, as an index into selectedIds so the
   // dialog's ข้อถัดไป walks the teacher's own order. null = closed.
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  const [listPreview, setListPreview] = useState<{ ids: string[]; title: string } | null>(null)
   // Independent of the per-question points above — rescales what's
   // *reported* only (never the underlying structure), and can be changed
   // any time later from the edit page too, even after students finish.
@@ -354,12 +359,18 @@ export function CreateAssignmentForm({
   }
 
   function importSet(set: AssignmentQuestionSetOption) {
-    const validIds = set.question_ids.filter(id => bankIds.has(id))
-    const missingCount = set.question_ids.length - validIds.length
+    const validIds = [...new Set(set.question_ids)].filter(id => bankIds.has(id))
+    const missingCount = new Set(set.question_ids).size - validIds.length
+    const removing = validIds.length > 0 && validIds.every(id => selectedIds.includes(id))
+    setSelectedIds(prev => toggleQuestionSetSelection(prev, set.question_ids, bankIds))
+    if (removing) {
+      // As with unticking one question, retain section/point drafts for re-selection.
+      toast.success(`เอา ${validIds.length} ข้อจากแฟ้ม "${set.title}" ออกจากรายการที่เลือกแล้ว`)
+      return
+    }
     // What the click actually changed. Re-importing a แฟ้ม the teacher already
     // pulled in used to claim it added all 22 ข้อ again.
     const addedCount = validIds.filter(id => !selectedIds.includes(id)).length
-    setSelectedIds(prev => Array.from(new Set([...prev, ...validIds])))
     // Sections follow their questions in. Ids already claimed by an earlier
     // แฟ้ม stay where they are, so two แฟ้ม can be merged without a question
     // showing up under two แฟ้มย่อย.
@@ -782,7 +793,7 @@ export function CreateAssignmentForm({
                   {selectedIds.length} ข้อที่เลือก
                 </span>
                 {selectedIds.length > 0 && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPreviewIndex(0)}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setListPreview({ ids: previewIds, title: 'ตัวอย่างโจทย์ที่เลือก' })}>
                     <Eye data-icon="inline-start" />
                     ดูตัวอย่างโจทย์ที่เลือก
                   </Button>
@@ -794,7 +805,8 @@ export function CreateAssignmentForm({
               sets={questionSets}
               bankIds={bankIds}
               selectedIds={selectedIds}
-              onImport={importSet}
+              onToggle={importSet}
+              onPreview={set => setListPreview({ ids: set.question_ids.filter(id => bankIds.has(id)), title: `โจทย์ในแฟ้ม ${set.title}` })}
             />
 
             <Collapsible>
@@ -1857,6 +1869,13 @@ export function CreateAssignmentForm({
         </div>
       )}
 
+      <QuestionListPreviewDialog
+        ids={listPreview?.ids ?? []}
+        title={listPreview?.title}
+        open={listPreview !== null}
+        onOpenChange={open => { if (!open) setListPreview(null) }}
+        loadQuestions={actions?.getQuestionPreviewDetails}
+      />
       <QuestionPreviewDialog
         ids={previewIds}
         open={previewIndex !== null}

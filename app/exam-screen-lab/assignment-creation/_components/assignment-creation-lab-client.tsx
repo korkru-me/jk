@@ -31,6 +31,14 @@ export function AssignmentCreationLabClient({ contextual, type }: { contextual: 
       setReceivedAssignment(`${data.title} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ`)
       return { error: '(ห้องทดลอง) รับข้อมูลแล้ว ไม่มีการบันทึกฐานข้อมูล' }
     },
+    async getQuestionPreviewDetails(ids) {
+      return { data: questions.filter(q => ids.includes(q.id)).map(q => ({
+        id: q.id, title: q.title, question_text: q.question_text,
+        question_type: q.question_type, is_random: false, variables: [],
+        answer_parts: [], image_urls: [], extra_data: {},
+        mcq_options: [{ text: 'ตัวเลือกจำลอง ก', is_correct: true }, { text: 'ตัวเลือกจำลอง ข', is_correct: false }],
+      })) }
+    },
   }), [])
 
   return (
@@ -45,7 +53,12 @@ export function AssignmentCreationLabClient({ contextual, type }: { contextual: 
           [ROOM_TWO]: [{ id: '00000000-0000-4000-8300-000000000001', name: 'กลุ่มจำลอง', color: 'purple', memberCount: 5 }],
         }}
         questions={questions}
-        questionSets={[{ id: '00000000-0000-4000-8400-000000000001', title: 'แฟ้มจำลองสามข้อ', description: null, question_ids: questions.map(q => q.id), sections: [] }]}
+        questionSets={[
+          { id: 'lab-all', title: 'แฟ้มจำลองสามข้อ', description: null, question_ids: questions.map(q => q.id), sections: [] },
+          { id: 'lab-overlap', title: 'แฟ้มจำลองข้อซ้ำ', description: null, question_ids: [questions[0].id, questions[1].id], sections: [] },
+          { id: 'lab-missing', title: 'แฟ้มจำลองมีข้อที่หายไป', description: null, question_ids: [questions[2].id, '00000000-0000-4000-8100-000000000099'], sections: [] },
+          { id: 'lab-empty', title: 'แฟ้มจำลองว่าง', description: null, question_ids: [], sections: [] },
+        ]}
         preselectedClassroomId={contextual ? ROOM_ONE : undefined}
         preselectedAssignmentType={type}
         actions={actions}

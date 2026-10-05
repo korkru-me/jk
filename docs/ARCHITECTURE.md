@@ -46,6 +46,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ใช้ `lib/supabase/client.ts` ซึ่งรับเฉพาะ public URL และ anon key ห้าม import service-role client เข้า Client Component
 
+ตัวอย่างโจทย์ทุกข้อในหน้าสร้างงานโหลดตามคำขอเปิด Dialog ผ่าน `lib/actions/question-previews.ts` ไม่ส่งรายละเอียดทั้งคลังตั้งแต่โหลดหน้า: ตรวจ session, UUID และเพดาน 50 id ต่อคำขอ แล้วใช้ session-bound query + question-bank RLS เดิม กรอง research snapshot และเลือกเฉพาะคอลัมน์ที่ตัวอย่างต้องใช้ · browser แสดงทุกข้อเรียงตามรายการที่เลือก/แฟ้มและโหลดชุดต่อไปจนหมด ไม่เก็บ cache ข้ามผู้ใช้ ไม่เขียนคะแนน/คำตอบ และทิ้งผลตอบกลับเมื่อปิดหรือเปลี่ยนชุด
+
 ### Server with user session
 
 ใช้ `lib/supabase/server.ts` เพื่อให้ query ทำงานภายใต้ session และ RLS ของผู้ใช้ นี่ควรเป็นค่าเริ่มต้น
