@@ -1268,6 +1268,75 @@ export function CreateAssignmentForm({
               </div>
             )}
           </Card>
+
+          <Card padding="xl" className="flex flex-col gap-5">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="attempts" className="flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-muted-foreground" /> จำกัดจำนวนครั้งที่ทำได้
+              </Label>
+              <Input
+                id="attempts"
+                type="number"
+                min={1}
+                value={maxAttempts}
+                onChange={e => {
+                  setMaxAttempts(e.target.value)
+                  if (e.target.value === '1') setRetryScope('all')
+                }}
+                placeholder="ไม่จำกัด (เว้นว่าง)"
+                className="max-w-[200px]"
+              />
+            </div>
+
+            {maxAttempts !== '1' && !streakOn && (
+              <div className="flex flex-col gap-1.5">
+                <Label className="flex items-center gap-1.5">
+                  <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
+                </Label>
+                <div className="grid w-full grid-cols-1 overflow-hidden rounded-lg border border-border sm:w-fit sm:grid-cols-3">
+                  {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setScoreStrategy(s)}
+                      className={`px-3 py-2 text-xs font-medium transition-all ${
+                        scoreStrategy === s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {SCORE_STRATEGY_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <Card padding="xl" className="flex flex-col gap-3">
+            {streakOn && (
+              <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+                เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
+                และเปิดการตรวจทีละข้อให้เสมอ ปรับสองอย่างนี้ที่นี่ไม่ได้
+              </p>
+            )}
+
+            {!streakOn && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="per-page" className="flex items-center gap-1.5">
+                  <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
+                </Label>
+                <Input
+                  id="per-page"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={questionsPerPage}
+                  onChange={e => setQuestionsPerPage(e.target.value)}
+                  className="max-w-[200px]"
+                />
+                <p className="text-xs text-muted-foreground">{perPageHint}</p>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
@@ -1316,31 +1385,6 @@ export function CreateAssignmentForm({
               className="max-w-[200px]"
             />
           </div>
-
-          {streakOn && (
-            <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
-              เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
-              และเปิดการตรวจทีละข้อให้เสมอ ปรับสองอย่างนี้ที่นี่ไม่ได้
-            </p>
-          )}
-
-          {!streakOn && (
-            <div className="space-y-1.5">
-              <Label htmlFor="per-page" className="flex items-center gap-1.5">
-                <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
-              </Label>
-              <Input
-                id="per-page"
-                type="number"
-                min={1}
-                max={50}
-                value={questionsPerPage}
-                onChange={e => setQuestionsPerPage(e.target.value)}
-                className="max-w-[200px]"
-              />
-              <p className="text-xs text-muted-foreground">{perPageHint}</p>
-            </div>
-          )}
 
           <div className="space-y-2">
             {[
@@ -1664,86 +1708,14 @@ export function CreateAssignmentForm({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5">
-              <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
-            </Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {([
-                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
-                { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
-                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
-                { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
-              ] as const).map(o => (
-                <button
-                  key={o.key}
-                  type="button"
-                  onClick={() => setShowResults(o.key)}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    showResults === o.key ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                  }`}
-                >
-                  <p className="font-medium text-sm text-foreground">{o.label}</p>
-                  <p className={cn(
-                    'mt-0.5 text-xs',
-                    showResults === o.key ? 'text-foreground' : 'text-muted-foreground',
-                  )}>
-                    {o.desc}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Beside แสดงผลลัพธ์ because a teacher deciding what students see
-              after hand-in decides this too — but separately: that one is the
-              score and the answer key, this is the เฉลยวิธีทำ they attached. */}
+          {/* Solution permission stays independent from the score/answer-key
+              release choices in กำหนดการสอบ. */}
           <SolutionReleaseSetting
             checked={showSolutions}
             onChange={setShowSolutions}
             assignmentType={assignmentType}
             maxAttempts={maxAttempts}
           />
-
-          <div className="space-y-1.5">
-            <Label htmlFor="attempts" className="flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-muted-foreground" /> จำกัดจำนวนครั้งที่ทำได้
-            </Label>
-            <Input
-              id="attempts"
-              type="number"
-              min={1}
-              value={maxAttempts}
-              onChange={e => {
-                setMaxAttempts(e.target.value)
-                if (e.target.value === '1') setRetryScope('all')
-              }}
-              placeholder="ไม่จำกัด (เว้นว่าง)"
-              className="max-w-[200px]"
-            />
-          </div>
-
-          {maxAttempts !== '1' && !streakOn && (
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
-              </Label>
-              <div className="flex rounded-lg border border-border overflow-hidden w-fit">
-                {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setScoreStrategy(s)}
-                    className={`px-3 py-2 text-xs font-medium transition-all ${
-                      scoreStrategy === s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {SCORE_STRATEGY_LABELS[s]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="code" className="flex items-center gap-1.5">
@@ -1776,6 +1748,37 @@ export function CreateAssignmentForm({
                 <Label htmlFor="eat">ปิดรับเมื่อ</Label>
                 <Input id="eat" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
               </div>
+            </div>
+          </Card>
+
+          <Card padding="xl" className="flex flex-col gap-3">
+            <h2 className="flex items-center gap-1.5 font-semibold text-foreground">
+              <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([
+                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
+                { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
+                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
+                { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
+              ] as const).map(o => (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() => setShowResults(o.key)}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    showResults === o.key ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
+                  }`}
+                >
+                  <p className="font-medium text-sm text-foreground">{o.label}</p>
+                  <p className={cn(
+                    'mt-0.5 text-xs',
+                    showResults === o.key ? 'text-foreground' : 'text-muted-foreground',
+                  )}>
+                    {o.desc}
+                  </p>
+                </button>
+              ))}
             </div>
           </Card>
 
