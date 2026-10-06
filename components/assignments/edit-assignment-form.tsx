@@ -21,6 +21,7 @@ import {
   decideCompletion, defaultQuestionCap, streakEligibleCount, streakExcludedCount, streakPoolAdvice,
 } from '@/lib/streak-completion'
 import { Card } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { IconButton } from '@/components/ui/icon-button'
 import {
   Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -547,13 +548,14 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </Card>
       )}
 
-      <Card padding="xl" className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-foreground">โจทย์และคะแนน</h2>
+      <Card padding="xl" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-foreground">ตั้งค่าคะแนน</h2>
           <span className="text-sm font-semibold text-primary shrink-0">
             {questionIds.length} ข้อ · รวม {pointsSum} คะแนน
           </span>
         </div>
+        <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
         {canEditQuestions ? (
           <p className="text-xs text-muted-foreground">
             เพิ่ม เอาออก และสลับลำดับข้อได้ เพราะยังไม่มีนักเรียนเริ่มทำชุดนี้ —
@@ -573,47 +575,50 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
         <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
           {orderedQuestions.map((q, i) => (
-            <div key={q.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-border">
-              {canEditQuestions ? (
-                <OrderNumberInput
-                  position={i + 1}
-                  total={questionIds.length}
-                  onMove={(to: number) => applyQuestionChange(moveQuestionToIndex(sections, questionIds, q.id, to - 1))}
-                />
-              ) : (
-                <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
-              )}
-              {canEditQuestions && (
-                <div className="flex flex-col shrink-0">
-                  <IconButton
-                    label="ย้ายขึ้น"
-                    size="2xs"
-                    disabled={i === 0}
-                    onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, -1))}
-                  >
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  </IconButton>
-                  <IconButton
-                    label="ย้ายลง"
-                    size="2xs"
-                    disabled={i === questionIds.length - 1}
-                    onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, 1))}
-                  >
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </IconButton>
+            <div key={q.id} className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-border sm:flex-nowrap">
+              <div className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:basis-auto">
+                {canEditQuestions ? (
+                  <OrderNumberInput
+                    position={i + 1}
+                    total={questionIds.length}
+                    onMove={(to: number) => applyQuestionChange(moveQuestionToIndex(sections, questionIds, q.id, to - 1))}
+                  />
+                ) : (
+                  <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
+                )}
+                {canEditQuestions && (
+                  <div className="flex flex-col shrink-0">
+                    <IconButton
+                      label="ย้ายขึ้น"
+                      size="2xs"
+                      disabled={i === 0}
+                      onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, -1))}
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </IconButton>
+                    <IconButton
+                      label="ย้ายลง"
+                      size="2xs"
+                      disabled={i === questionIds.length - 1}
+                      onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, 1))}
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </IconButton>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
               </div>
               <Input
                 type="number"
                 min={0}
                 step="any"
                 value={pointsDraft(q.id)}
+                aria-label={`คะแนนข้อ ${i + 1}`}
                 onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
-                className="w-20 text-center shrink-0"
+                className="w-16 text-center shrink-0 sm:w-20"
               />
               <span className="text-xs text-muted-foreground shrink-0">คะแนน</span>
               {canEditQuestions && (
@@ -636,33 +641,34 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Plus /> เพิ่มโจทย์จากคลัง
           </Button>
         )}
-      </Card>
-
-      <Card padding="xl" className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Scale className="w-4 h-4 text-muted-foreground" />
+        <Separator />
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Scale className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h3>
+              <p className="text-xs text-muted-foreground">
+                ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
+                เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ระบบจะคูณสัดส่วนคะแนนของนักเรียนแต่ละคนให้อัตโนมัติ
+                ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h2>
-            <p className="text-xs text-muted-foreground">
-              ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
-              เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ระบบจะคูณสัดส่วนคะแนนของนักเรียนแต่ละคนให้อัตโนมัติ
-              ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
-            </p>
+          <div className="flex items-center gap-2 pl-11">
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={displayMaxScore}
+              aria-label="คะแนนเต็มที่แสดงผล"
+              onChange={e => setDisplayMaxScore(e.target.value)}
+              placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
+              className="max-w-[160px]"
+            />
+            <span className="text-sm text-muted-foreground">คะแนน</span>
           </div>
-        </div>
-        <div className="flex items-center gap-2 pl-11">
-          <Input
-            type="number"
-            min={0}
-            step="any"
-            value={displayMaxScore}
-            onChange={e => setDisplayMaxScore(e.target.value)}
-            placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
-            className="max-w-[160px]"
-          />
-          <span className="text-sm text-muted-foreground">คะแนน</span>
         </div>
       </Card>
 
