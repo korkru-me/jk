@@ -3,6 +3,7 @@
 import { Lightbulb } from 'lucide-react'
 import { attemptLimitFor } from '@/lib/solution-release'
 import type { AssignmentType } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 /**
  * When, for this งาน as it is set up right now, a student would first see
@@ -25,21 +26,27 @@ function openingSummary(type: AssignmentType, maxAttempts: string): string {
  * can no longer work on the งาน (lib/solution-release.ts). Shared by สร้างงาน
  * and แก้ไขงาน so the promise reads the same in both.
  */
-export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxAttempts, untilPassed = false }: {
+export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxAttempts, untilPassed = false, compact = false }: {
   checked: boolean
   onChange: (checked: boolean) => void
   assignmentType: AssignmentType
   /** The จำกัดจำนวนครั้ง field as typed; empty = no limit set. */
   maxAttempts: string
   untilPassed?: boolean
+  compact?: boolean
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+      <label className={cn(
+        'flex items-center justify-between gap-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-colors',
+        compact ? 'min-h-10 px-3 py-2' : 'p-3',
+      )}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-            <Lightbulb className="w-4 h-4 text-warning" aria-hidden="true" />
-          </div>
+          {!compact && (
+            <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+              <Lightbulb className="w-4 h-4 text-warning" aria-hidden="true" />
+            </div>
+          )}
           <div>
             <p className="text-sm font-medium text-foreground">ให้นักเรียนดูเฉลยวิธีทำ</p>
             <p data-assignment-description className="text-xs text-muted-foreground">

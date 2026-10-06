@@ -6,15 +6,16 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import type { ScoreStrategy } from '@/lib/types'
 
-export function CompletionAttemptSettings({ id, maxAttempts, onMaxAttemptsChange, scoreStrategy, onScoreStrategyChange }: {
+export function CompletionAttemptSettings({ id, maxAttempts, onMaxAttemptsChange, scoreStrategy, onScoreStrategyChange, compact = false }: {
   id: string
   maxAttempts: string
   onMaxAttemptsChange: (value: string) => void
   scoreStrategy: ScoreStrategy
   onScoreStrategyChange: (value: ScoreStrategy) => void
+  compact?: boolean
 }) {
   return (
-    <FieldGroup>
+    <FieldGroup className={compact ? 'gap-3 sm:flex-row sm:items-start' : undefined}>
       <Field>
         <FieldLabel htmlFor={id}>ให้ทำได้</FieldLabel>
         <div className="flex items-center gap-2">

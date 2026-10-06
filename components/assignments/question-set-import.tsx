@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, ChevronDown, Eye, Layers, Minus, Plus, Search } from 'lucide-react'
+import { Check, ChevronDown, Eye, Minus, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -80,7 +80,6 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
         aria-expanded={open}
         className="h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5"
       >
-        <Layers className="text-muted-foreground" />
         <span className="text-foreground">เพิ่มจากแฟ้มโจทย์ที่มีอยู่</span>
         <span className="text-xs font-normal text-muted-foreground">{sets.length} แฟ้ม</span>
         <ChevronDown
@@ -131,7 +130,6 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
                     onClick={() => onToggle(row.set)}
                     className="h-auto min-w-0 flex-1 justify-start gap-2 px-2.5 py-2 text-left"
                   >
-                    <Layers data-icon="inline-start" />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="truncate">{row.set.title}</span>
                       <span className="truncate text-xs font-normal">{statusLine(row)}</span>

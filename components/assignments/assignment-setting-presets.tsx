@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useId, useRef, useState, useTransition, type ReactNode } from 'react'
-import { Bookmark, ChevronDown, Pencil, RotateCcw, Save, Star, Trash2 } from 'lucide-react'
+import { ChevronDown, Pencil, RotateCcw, Save, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   assignmentPresetDefaults, assignmentPresetSettingsSchema,
@@ -283,12 +283,11 @@ export function AssignmentSettingPresetsProvider({
   </>
 
   const recall = (
-    <Card padding="lg" className="min-w-0" aria-busy={isPending}>
+    <Card padding="md" className="min-w-0" aria-busy={isPending}>
       <Collapsible>
         <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
           <span className="flex min-w-0 flex-col items-start gap-1">
-            <span className="flex items-center gap-2 font-semibold">
-              <Bookmark className="size-4 shrink-0" aria-hidden="true" />
+            <span className="text-sm font-semibold">
               เรียกใช้การตั้งค่าเดิม · {typeLabel}
             </span>
             <span data-assignment-description className="text-sm font-normal text-muted-foreground">{recalledSettingLabel}</span>
@@ -296,7 +295,7 @@ export function AssignmentSettingPresetsProvider({
           <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
         </CollapsibleTrigger>
         <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
-          <div className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-3 pt-3">
             <FieldGroup className="gap-3">
               <Field data-disabled={busy || unavailable}>
                 <FieldLabel htmlFor={`${id}-selection`}>ใช้การตั้งค่า</FieldLabel>
@@ -324,12 +323,11 @@ export function AssignmentSettingPresetsProvider({
   )
 
   const save = (
-    <Card padding="lg" className="min-w-0" aria-busy={isPending}>
+    <Card padding="md" className="min-w-0" aria-busy={isPending}>
       <Collapsible>
         <h2>
           <CollapsibleTrigger className="group flex w-full flex-wrap items-center justify-between gap-2 text-left">
-            <span className="flex min-w-0 items-center gap-2 font-semibold">
-              <Bookmark className="size-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 text-sm font-semibold">
               บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปไหม?
             </span>
             <span className="ml-auto flex shrink-0 items-center gap-2">
@@ -340,7 +338,7 @@ export function AssignmentSettingPresetsProvider({
           </CollapsibleTrigger>
         </h2>
         <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
-          <div className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-3 pt-3">
             <p data-assignment-description className="text-sm text-muted-foreground">เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน ข้ามส่วนนี้แล้วสร้างงานได้ตามปกติ</p>
             <FieldGroup className="gap-3">
               <Field data-disabled={busy || unavailable}>

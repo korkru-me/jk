@@ -28,11 +28,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, Timer,
-  Globe, Calendar, Shuffle, FileText, Layers, Target, Scale, ShieldCheck, Maximize,
-  Fingerprint, ListFilter, Camera, LockKeyhole, Smartphone, RotateCcw, X, Dices,
-  CircleCheck, Calculator, NotebookPen, Hash, Save,
-  Copy,
+  Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye,
+  X, Save, FileText,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
@@ -781,10 +778,11 @@ export function CreateAssignmentForm({
     >
     <div
       ref={wizardRef}
-      className="space-y-6 [&_[data-assignment-description]]:hidden [&_[data-slot=field-description]]:hidden"
+      data-assignment-wizard
+      className="space-y-4 [&_[data-assignment-description]]:hidden [&_[data-slot=field-description]]:hidden"
     >
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">
           {isCopy ? 'ทำสำเนา' : assignmentCreationTitle(assignmentType)}
         </h1>
         <p data-assignment-description className="mt-1 text-sm text-muted-foreground">
@@ -821,20 +819,18 @@ export function CreateAssignmentForm({
 
       {/* ── Step 1: ข้อมูลพื้นฐาน ─────────────────────────────────────── */}
       {step === 0 && (
-        <div className="space-y-4">
-          <Card padding="xl" className="space-y-4">
-            <h2 className="font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
+        <div className="space-y-3">
+          <Card padding="md" className="space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
 
             {copySource && (
               <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2.5 text-sm text-primary">
-                <Copy className="size-4 shrink-0" aria-hidden="true" />
                 เติมข้อมูลและโจทย์จาก &ldquo;{copySource.title}&rdquo; ให้แล้ว — แก้ไขได้ก่อนทำสำเนา
               </div>
             )}
 
             {preselectedSet && (
               <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-xl px-3 py-2.5">
-                <Layers className="w-4 h-4 shrink-0" />
                 ใช้แฟ้มโจทย์ &ldquo;{preselectedSet.title}&rdquo; ({selectedIds.length} ข้อ) — ปรับโจทย์ที่เลือกได้ด้านล่าง
               </div>
             )}
@@ -865,7 +861,7 @@ export function CreateAssignmentForm({
               <div className="space-y-1.5">
                 <Label>ห้องเรียน <span className="text-destructive">*</span> {classroomIds.length > 1 && <span className="text-muted-foreground font-normal">({classroomIds.length} ห้อง)</span>}</Label>
                 {classrooms.length === 0 ? (
-                  <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-warning">
+                  <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-sm text-foreground">
                     ยังไม่มีห้องเรียน กรุณา{' '}
                     <a href="/classrooms" className="underline font-medium">สร้างห้องเรียน</a> ก่อน
                   </div>
@@ -901,10 +897,10 @@ export function CreateAssignmentForm({
 
       {/* ── Step 1 continued: โจทย์ คะแนน และเวลา ─────────────────────── */}
       {step === 0 && (
-        <div className="space-y-4">
-          <Card padding="xl" className="flex min-w-0 flex-col gap-4">
+        <div className="space-y-3">
+          <Card padding="md" className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
+              <h2 className="text-sm font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
               <span className="shrink-0 text-sm font-semibold text-primary">
                 {previewQuestions.length} ข้อ · รวม {pointsSum} คะแนน
               </span>
@@ -935,7 +931,6 @@ export function CreateAssignmentForm({
                   'group h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5 text-left',
                 )}
               >
-                <ListFilter className="text-muted-foreground" />
                 <span className="text-foreground">เลือกโจทย์รายข้อ</span>
                 <span className="text-xs font-normal text-muted-foreground">{questions.length} ข้อในคลัง</span>
                 <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
@@ -1035,35 +1030,25 @@ export function CreateAssignmentForm({
               ))}
             </div>
             <Separator />
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Scale className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h3>
-                  <p data-assignment-description className="text-xs text-muted-foreground">
-                    ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
-                    เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ปรับได้ภายหลังจากหน้าแก้ไขได้ตลอด แม้นักเรียนทำไปแล้ว
-                  </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label htmlFor="display-max-score">คะแนนเต็มที่แสดงผล</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="display-max-score"
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={displayMaxScore}
+                    aria-label="คะแนนเต็มที่แสดงผล"
+                    onChange={e => setDisplayMaxScore(e.target.value)}
+                    placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
+                    className="max-w-[160px]"
+                  />
+                  <span className="text-sm text-muted-foreground">คะแนน</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 pl-11">
-                <Input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={displayMaxScore}
-                  aria-label="คะแนนเต็มที่แสดงผล"
-                  onChange={e => setDisplayMaxScore(e.target.value)}
-                  placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
-                  className="max-w-[160px]"
-                />
-                <span className="text-sm text-muted-foreground">คะแนน</span>
-              </div>
-            </div>
-            <Separator />
-            <div className="flex flex-col gap-3">
+
               {streakOn && (
                 <p data-assignment-description className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
                   เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
@@ -1073,9 +1058,7 @@ export function CreateAssignmentForm({
 
               {!streakOn && (
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="per-page" className="flex items-center gap-1.5">
-                    <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
-                  </Label>
+                  <Label htmlFor="per-page">จำนวนข้อต่อหนึ่งหน้า</Label>
                   <Input
                     id="per-page"
                     type="number"
@@ -1088,33 +1071,25 @@ export function CreateAssignmentForm({
                   <p data-assignment-description className="text-xs text-muted-foreground">{perPageHint}</p>
                 </div>
               )}
-            </div>
-            <Separator />
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dur" className="flex items-center gap-1.5">
-                <Timer className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
-              </Label>
-              <Input
-                id="dur"
-                type="number"
-                min={1}
-                value={duration}
-                onChange={e => setDuration(e.target.value)}
-                placeholder="ไม่จำกัด (เว้นว่าง)"
-                className="max-w-[200px]"
-              />
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="dur">เวลาทำ (นาที)</Label>
+                <Input
+                  id="dur"
+                  type="number"
+                  min={1}
+                  value={duration}
+                  onChange={e => setDuration(e.target.value)}
+                  placeholder="ไม่จำกัด (เว้นว่าง)"
+                  className="max-w-[200px]"
+                />
+              </div>
             </div>
 
             {!preselectedSet && (
               <>
-                <Separator />
-                <label className="flex cursor-pointer items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <Layers className="size-4 text-muted-foreground" />
-                    </div>
-                    <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
-                  </div>
+                <label className="flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+                  <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
                   <input
                     type="checkbox"
                     checked={saveAsSet}
@@ -1123,7 +1098,7 @@ export function CreateAssignmentForm({
                   />
                 </label>
                 {saveAsSet && (
-                  <div className="flex flex-col gap-1.5 pl-11">
+                  <div className="flex flex-col gap-1.5">
                     <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
                     <Input
                       id="question-set-title"
@@ -1139,17 +1114,12 @@ export function CreateAssignmentForm({
           </Card>
 
           {(canDrawRandomSubset || randomQuestionCount.trim() !== '') && (
-            <Card padding="xl" className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Dices className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
-                  <p data-assignment-description className="text-xs text-muted-foreground">
-                    คลังของงานนี้ {selectedIds.length} ข้อ — เลือกว่าจะจ่ายให้นักเรียนทั้งหมด หรือสุ่มมาบางข้อ
-                  </p>
-                </div>
+            <Card padding="md" className="space-y-3">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
+                <p data-assignment-description className="text-xs text-muted-foreground">
+                  คลังของงานนี้ {selectedIds.length} ข้อ — เลือกว่าจะจ่ายให้นักเรียนทั้งหมด หรือสุ่มมาบางข้อ
+                </p>
               </div>
 
               {randomDrawInvalid && <p role="alert" className="text-sm text-destructive">
@@ -1210,14 +1180,14 @@ export function CreateAssignmentForm({
                   </p>
                   {drawnPointsVary && !displayMaxSet && (
                     <div className="flex items-start justify-between gap-3 rounded-lg bg-warning/10 px-3 py-2">
-                      <p className="text-xs text-warning">
+                      <p className="text-xs text-foreground">
                         คะแนนแต่ละข้อในคลังไม่เท่ากัน คนที่จับได้ข้อคะแนนสูงจะได้เปรียบ —
                         ตั้ง “คะแนนเต็มที่แสดงผล” ให้ทุกคนเทียบกันได้
                       </p>
                       <button
                         type="button"
                         onClick={() => setDisplayMaxScore(String(questionsPerAttempt))}
-                        className="text-xs font-medium text-warning underline shrink-0"
+                        className="text-xs font-medium text-foreground underline shrink-0"
                       >
                         ตั้งเป็น {questionsPerAttempt}
                       </button>
@@ -1228,17 +1198,12 @@ export function CreateAssignmentForm({
             </Card>
           )}
 
-          <Card padding="xl" className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Target className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-foreground">เงื่อนไขจบงาน</h2>
-                <p data-assignment-description className="text-xs text-muted-foreground">
-                  นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร
-                </p>
-              </div>
+          <Card padding="md" className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">เงื่อนไขจบงาน</h2>
+              <p data-assignment-description className="text-xs text-muted-foreground">
+                นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1285,7 +1250,7 @@ export function CreateAssignmentForm({
                 onMaxAttemptsChange={value => {
                   setMaxAttempts(value)
                   if (value === '1') setRetryScope('all')
-                }} scoreStrategy={scoreStrategy} onScoreStrategyChange={setScoreStrategy} />
+                }} scoreStrategy={scoreStrategy} onScoreStrategyChange={setScoreStrategy} compact />
             )}
 
             {completionChoice !== 'complete' && (
@@ -1395,13 +1360,13 @@ export function CreateAssignmentForm({
                   </p>
                 )}
                 {!streakBlocked && streakExcluded > 0 && (
-                  <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                  <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">
                     ข้อเขียนและข้อส่งไฟล์ {streakExcluded} ข้อจะไม่ถูกสุ่มมาในโหมดนี้ เพราะระบบตัดสินถูก/ผิดให้ทันทีไม่ได้
                     — เหลือโจทย์ที่ใช้ได้ {streakEligible} ข้อ
                   </p>
                 )}
                 {streakAdvice && (
-                  <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">{streakAdvice}</p>
+                  <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">{streakAdvice}</p>
                 )}
 
                 {/* Lives here rather than with the ตรวจทีละข้อ switch in
@@ -1427,7 +1392,7 @@ export function CreateAssignmentForm({
                     />
                   </label>
                   {assignmentType === 'exam' && instantCheckAnswerKey && (
-                    <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                    <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">
                       งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือคำตอบที่ถูกออกไปจากห้องได้ แนะนำให้ปิด
                     </p>
                   )}
@@ -1449,8 +1414,10 @@ export function CreateAssignmentForm({
 
       {/* ── Step 2: ตั้งค่า ──────────────────────────────────────────── */}
       {step === 1 && (
-        <Card padding="xl" className="space-y-5">
-          <h2 className="font-semibold text-foreground">ตั้งค่าการสอบ</h2>
+        <Card padding="md" className="space-y-3">
+          <h2 className="text-sm font-semibold text-foreground">
+            {assignmentType === 'exam' ? 'ตั้งค่าข้อสอบ' : 'ตั้งค่าแบบฝึกหัด'}
+          </h2>
 
           <div className="space-y-2">
             {[
@@ -1460,12 +1427,11 @@ export function CreateAssignmentForm({
               ...(assignmentType === 'exercise' && !streakOn ? [{
                 label: 'ให้นักเรียนกดตรวจทีละข้อ',
                 desc: 'ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย — คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน',
-                icon: CircleCheck,
                 value: instantCheck,
                 set: setInstantCheck,
                 footer: (instantCheck ? (
-                  <div className="space-y-1.5 pl-11">
-                    <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
+                  <div className="space-y-1.5 pl-3">
+                    <label className="flex min-h-10 items-center justify-between rounded-xl border border-border px-3 py-2 cursor-pointer transition-colors hover:border-ring">
                       <div>
                         <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                         <p data-assignment-description className="text-xs text-muted-foreground">
@@ -1482,7 +1448,7 @@ export function CreateAssignmentForm({
                       />
                     </label>
                     {instantCheckAnswerKey && (
-                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                      <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">
                         นักเรียนเห็นคำตอบที่ถูกระหว่างทำ แล้วแก้คำตอบให้ถูกได้ คะแนนแบบฝึกหัดจึงสะท้อน &ldquo;ทำจนเข้าใจ&rdquo; ไม่ใช่ &ldquo;ถูกตั้งแต่แรก&rdquo; — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดูในหน้าผลรายคน
                       </p>
                     )}
@@ -1492,14 +1458,12 @@ export function CreateAssignmentForm({
               {
                 label: 'ให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์',
                 desc: 'เปิดปุ่มเครื่องคิดเลขในหน้าทำโจทย์ นักเรียนเลือก DEG/RAD ตามช่องคำตอบที่กำลังใช้ได้',
-                icon: Calculator,
                 value: calculatorEnabled,
                 set: setCalculatorEnabled,
                 footer: null as React.ReactNode,
               }, {
                 label: 'เปิดกระดาษทด',
                 desc: 'ให้นักเรียนเขียนทดบนอุปกรณ์ได้ สิ่งที่ยังไม่แนบจะอยู่เฉพาะเครื่องและไม่กินพื้นที่เก็บไฟล์ของระบบ',
-                icon: NotebookPen,
                 value: scratchpadEnabled,
                 set: setScratchpadEnabled,
                 footer: null as React.ReactNode,
@@ -1509,28 +1473,24 @@ export function CreateAssignmentForm({
                 desc: shuffleQ
                   ? `${assignedSections.length} แฟ้มย่อย — สับลำดับข้ออยู่ ชื่อแฟ้มย่อยจะแสดงกำกับรายข้อแทนหัวเรื่อง`
                   : `${assignedSections.length} แฟ้มย่อยจากแฟ้มโจทย์ เช่น "${assignedSections[0].title || 'ไม่ได้ตั้งชื่อ'}"`,
-                icon: Layers,
                 value: showSections,
                 set: setShowSections,
               }] : []),
               {
                 label: 'สับลำดับข้อ',
                 desc: 'นักเรียนแต่ละคนได้ลำดับข้อต่างกัน',
-                icon: Shuffle,
                 value: shuffleQ,
                 set: setShuffleQ,
               },
               {
                 label: 'สับลำดับตัวเลือก (MCQ)',
                 desc: 'ตัวเลือก A–D สลับสำหรับแต่ละคน',
-                icon: Shuffle,
                 value: shuffleA,
                 set: setShuffleA,
               },
               ...(randomValueQuestionCount > 0 ? [{
                 label: 'ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน',
                 desc: `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — ปกติแต่ละคนได้ตัวเลขไม่ซ้ำกัน เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น`,
-                icon: Hash,
                 value: sharedRandomValues,
                 set: setSharedRandomValues,
                 footer: (sharedRandomValues ? (
@@ -1540,7 +1500,7 @@ export function CreateAssignmentForm({
                       สร้างงานแล้วกด &ldquo;ดูตัวอย่าง&rdquo; เพื่อดูตัวเลขที่นักเรียนจะได้
                     </p>
                     {assignmentType === 'exam' && (
-                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                      <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">
                         ตัวเลขเหมือนกันทุกคน คำตอบที่ถูกจึงเหมือนกันทุกคนด้วย — นักเรียนบอกคำตอบกันได้ง่ายกว่าแบบต่างคนต่างสุ่ม
                       </p>
                     )}
@@ -1550,7 +1510,6 @@ export function CreateAssignmentForm({
               ...(hasWorkImageQuestions ? [{
                 label: 'ให้นักเรียนแนบรูปแสดงวิธีทำ',
                 desc: `${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)`,
-                icon: Camera,
                 value: requireWorkImage,
                 set: setRequireWorkImage,
                 footer: null as React.ReactNode,
@@ -1565,13 +1524,12 @@ export function CreateAssignmentForm({
               ...(canRepeat && !randomDrawOn && !streakOn ? [{
                 label: 'แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม',
                 desc: `รอบต่อไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม ${sharedRandomOn ? 'ตัวเลขในโจทย์เป็นชุดเดิม (ตั้งให้ทุกคนได้ชุดเดียวกันไว้)' : 'ตัวเลขในโจทย์สุ่มใหม่ทุกรอบ'}`,
-                icon: RotateCcw,
                 value: retryScope === 'wrong_only',
                 set: (on: boolean) => setRetryScope(on ? 'wrong_only' : 'all'),
                 footer: (
                   <>
                     {retryScope === 'wrong_only' && showResults === 'immediate' && (
-                      <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+                      <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">
                         ตอนนี้ตั้งให้แสดงคำตอบที่ถูกทันทีหลังส่ง นักเรียนจึงเห็นคำตอบก่อนกลับมาแก้ข้อที่ผิด
                       </p>
                     )}
@@ -1581,31 +1539,23 @@ export function CreateAssignmentForm({
                   </>
                 ) as React.ReactNode,
               }] : []),
-            ].map(opt => {
-              const Icon = opt.icon
-              return (
-                <div key={opt.label} className="space-y-1.5">
-                  <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                        <p data-assignment-description className="text-xs text-muted-foreground">{opt.desc}</p>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={opt.value}
-                      onChange={e => opt.set(e.target.checked)}
-                      className="accent-primary w-4 h-4 shrink-0"
-                    />
-                  </label>
-                  {opt.footer}
-                </div>
-              )
-            })}
+            ].map(opt => (
+              <div key={opt.label} className="space-y-1.5">
+                <label className="flex min-h-10 items-center justify-between rounded-xl border border-border px-3 py-2 cursor-pointer transition-colors hover:border-ring">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                    <p data-assignment-description className="text-xs text-muted-foreground">{opt.desc}</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={opt.value}
+                    onChange={e => opt.set(e.target.checked)}
+                    className="accent-primary w-4 h-4 shrink-0"
+                  />
+                </label>
+                {opt.footer}
+              </div>
+            ))}
             {randomDrawOn && canRepeat && (
               <p data-assignment-description className="text-xs text-muted-foreground px-1">
                 ตั้งให้สุ่ม {questionsPerAttempt} ข้อจากคลังไว้ที่ขั้นเลือกโจทย์ รอบต่อไปนักเรียนจึงได้ชุดใหม่ทั้งชุด
@@ -1615,18 +1565,13 @@ export function CreateAssignmentForm({
           </div>
 
           {assignmentType === 'exam' && (
-            <div className="space-y-3 rounded-xl border border-border p-4">
-              <label className="flex items-center justify-between gap-4 cursor-pointer">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <LockKeyhole className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">บังคับใช้ Safe Exam Browser</p>
-                    <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">
-                      ล็อกเครื่องและตรวจ Config Key + Browser Exam Key ก่อนเริ่ม อ่าน บันทึก อัปโหลด และส่งข้อสอบ
-                    </p>
-                  </div>
+            <div className="space-y-3 rounded-xl border border-border p-3">
+              <label className="flex min-h-10 items-center justify-between gap-4 cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-foreground">บังคับใช้ Safe Exam Browser</p>
+                  <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">
+                    ล็อกเครื่องและตรวจ Config Key + Browser Exam Key ก่อนเริ่ม อ่าน บันทึก อัปโหลด และส่งข้อสอบ
+                  </p>
                 </div>
                 <input
                   id="create-seb-required"
@@ -1645,23 +1590,20 @@ export function CreateAssignmentForm({
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
-              <p className="pl-11 text-xs leading-5 text-warning">
+              <p className="text-xs leading-5 text-foreground">
                 หลังสร้าง ข้อสอบจะอยู่เป็นร่างก่อน ระบบจะยอมเผยแพร่เมื่อไฟล์ SEB รุ่นของข้อสอบและ exact build ผ่านการตรวจครบ นักเรียนต้องตรวจเครื่องก่อนสอบ{' '}
                 <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
                   ตรวจความพร้อม SEB
                 </Link>
               </p>
               {secureBrowserMode === 'seb_required' && (
-                <div className="ml-11 space-y-2 border-t border-border pt-3">
+                <div className="ml-3 space-y-2 border-t border-border pt-3">
                   <label className="flex cursor-pointer items-start justify-between gap-4">
-                    <div className="flex items-start gap-2">
-                      <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูอนุมัติรายคน</p>
-                        <p data-assignment-description className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                          นักเรียนรอในหน้าเข้าสอบ ครูตรวจว่าเป็นเครื่อง Android จริงแล้วกดอนุมัติจากห้องคุมสอบ
-                        </p>
-                      </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูอนุมัติรายคน</p>
+                      <p data-assignment-description className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                        นักเรียนรอในหน้าเข้าสอบ ครูตรวจว่าเป็นเครื่อง Android จริงแล้วกดอนุมัติจากห้องคุมสอบ
+                      </p>
                     </div>
                     <input
                       type="checkbox"
@@ -1671,7 +1613,7 @@ export function CreateAssignmentForm({
                     />
                   </label>
                   {androidExamMode === 'monitored' && (
-                    <p className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-warning">
+                    <p className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-foreground">
                       Android monitored ตรวจการสลับแอป/ออกจากหน้าและการเชื่อมต่อ แต่เว็บห้ามหรือตรวจ screenshot ของระบบไม่ได้ จึงมีความมั่นใจต่ำกว่า SEB
                     </p>
                   )}
@@ -1682,6 +1624,7 @@ export function CreateAssignmentForm({
                     onPasswordChange={setSebQuitPassword}
                     onConfirmationChange={setSebQuitPasswordConfirmation}
                     disabled={isPending}
+                    compact
                   />
                 </div>
               )}
@@ -1693,15 +1636,10 @@ export function CreateAssignmentForm({
               now its own card in เลือกโจทย์, next to the คลัง it draws from,
               and available to แบบฝึกหัด as well. */}
           {assignmentType === 'exam' && (
-            <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 cursor-pointer">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Fingerprint className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">แสดงลายน้ำผู้เข้าสอบ</p>
-                  <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
-                </div>
+            <label className="flex min-h-10 items-center justify-between gap-4 rounded-xl border border-border px-3 py-2 cursor-pointer">
+              <div>
+                <p className="text-sm font-medium text-foreground">แสดงลายน้ำผู้เข้าสอบ</p>
+                <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
               </div>
               <input
                 type="checkbox"
@@ -1713,18 +1651,13 @@ export function CreateAssignmentForm({
           )}
 
           {assignmentType === 'exam' && (
-            <div className="space-y-3 rounded-xl border border-border p-4">
-              <label className="flex items-center justify-between gap-4 cursor-pointer">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
-                    <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">
-                      ครูเห็นสถานะออนไลน์ การออกจากแท็บ/เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์
-                    </p>
-                  </div>
+            <div className="space-y-3 rounded-xl border border-border p-3">
+              <label className="flex min-h-10 items-center justify-between gap-4 cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
+                  <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">
+                    ครูเห็นสถานะออนไลน์ การออกจากแท็บ/เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์
+                  </p>
                 </div>
                 <input
                   type="checkbox"
@@ -1738,14 +1671,11 @@ export function CreateAssignmentForm({
               </label>
 
               {proctoringEnabled && (
-                <div className="space-y-2 border-t border-border pt-3 pl-11">
+                <div className="space-y-2 border-t border-border pt-3 pl-3">
                   <label className="flex items-center justify-between gap-4 cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <Maximize className="w-4 h-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
-                        <p data-assignment-description className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า</p>
-                      </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
+                      <p data-assignment-description className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า</p>
                     </div>
                     <input
                       type="checkbox"
@@ -1766,7 +1696,7 @@ export function CreateAssignmentForm({
                       className="accent-primary w-4 h-4 shrink-0"
                     />
                   </label>
-                  <p className="text-xs text-warning">
+                  <p className="text-xs text-foreground">
                     เวลาในข้อสอบยังเดินต่อเมื่อออกจากแท็บหรือเต็มจอ เพื่อไม่ให้ใช้การออกจากหน้าเป็นวิธีหยุดเวลา
                   </p>
                 </div>
@@ -1782,6 +1712,7 @@ export function CreateAssignmentForm({
             assignmentType={assignmentType}
             maxAttempts={maxAttempts}
             untilPassed={completionChoice !== 'complete'}
+            compact
           />
 
         </Card>
@@ -1789,29 +1720,26 @@ export function CreateAssignmentForm({
 
       {/* ── Step 3: กำหนดการสอบ ─────────────────────────────────────── */}
       {step === 2 && (
-        <div className="space-y-4">
-          <Card padding="xl">
+        <div className="space-y-3">
+          <Card padding="md">
             <Collapsible defaultOpen={Boolean(startAt || endAt)}>
               <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
-                <span className="flex min-w-0 items-start gap-3">
-                  <Calendar className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span className="flex min-w-0 flex-col gap-1">
-                    <span className="font-semibold text-foreground">กำหนดวันทำ</span>
-                    <span data-assignment-description className="text-sm font-normal text-muted-foreground">
-                      {startAt && endAt
-                        ? 'กำหนดเวลาเปิดและปิดรับแล้ว'
-                        : startAt
-                          ? 'กำหนดเวลาเปิดรับแล้ว'
-                          : endAt
-                            ? 'กำหนดเวลาปิดรับแล้ว'
-                            : 'ไม่กำหนดวันและเวลา'}
-                    </span>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="text-sm font-semibold text-foreground">กำหนดวันทำ</span>
+                  <span data-assignment-description className="text-sm font-normal text-muted-foreground">
+                    {startAt && endAt
+                      ? 'กำหนดเวลาเปิดและปิดรับแล้ว'
+                      : startAt
+                        ? 'กำหนดเวลาเปิดรับแล้ว'
+                        : endAt
+                          ? 'กำหนดเวลาปิดรับแล้ว'
+                          : 'ไม่กำหนดวันและเวลา'}
                   </span>
                 </span>
                 <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
               </CollapsibleTrigger>
               <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
-                <div className="grid gap-4 pt-4 sm:grid-cols-2">
+                <div className="grid gap-3 pt-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="sat">เปิดรับตั้งแต่</Label>
                     <Input id="sat" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} />
@@ -1825,11 +1753,9 @@ export function CreateAssignmentForm({
             </Collapsible>
           </Card>
 
-          <Card padding="xl">
+          <Card padding="md">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="code" className="flex items-center gap-1.5">
-                <FileText className="size-4 text-muted-foreground" /> รหัสผ่านเข้าทำ (ถ้ามี)
-              </Label>
+              <Label htmlFor="code">รหัสผ่านเข้าทำ (ถ้ามี)</Label>
               <Input
                 id="code"
                 value={accessCode}
@@ -1841,7 +1767,7 @@ export function CreateAssignmentForm({
           </Card>
 
           {preselectedClassroomId && (
-            <Card padding="xl" className="flex flex-col gap-4">
+            <Card padding="md" className="flex flex-col gap-3">
               <ClassroomPicker
                 classrooms={classrooms}
                 selectedIds={classroomIds}
@@ -1866,10 +1792,8 @@ export function CreateAssignmentForm({
             </Card>
           )}
 
-          <Card padding="xl" className="flex flex-col gap-3">
-            <h2 className="flex items-center gap-1.5 font-semibold text-foreground">
-              <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
-            </h2>
+          <Card padding="md" className="flex flex-col gap-2.5">
+            <h2 className="text-sm font-semibold text-foreground">แสดงผลลัพธ์</h2>
             <ToggleGroup
               value={[showResults]}
               onValueChange={values => {
@@ -1893,7 +1817,7 @@ export function CreateAssignmentForm({
                 <ToggleGroupItem
                   key={o.key}
                   value={o.key}
-                  className="h-auto w-full min-w-0 justify-start whitespace-normal rounded-xl border-2 p-3 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+                  className="min-h-10 w-full min-w-0 justify-start whitespace-normal rounded-xl border-2 px-3 py-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
                 >
                   <span className="flex w-full items-center gap-3">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left sm:flex-row sm:items-center sm:gap-4">
@@ -1918,7 +1842,7 @@ export function CreateAssignmentForm({
                   : `${classrooms.find(c => c.id === classroomIds[0])?.name ?? ''} และอีก ${classroomIds.length - 1} ห้อง`,
               },
               { label: 'มอบหมายให้', value: audienceSummary },
-              { label: 'ประเภท', value: assignmentType === 'exam' ? '📝 ข้อสอบ' : '🔁 แบบฝึกหัด' },
+              { label: 'ประเภท', value: assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด' },
               {
                 label: 'โจทย์',
                 value: randomDrawOn
