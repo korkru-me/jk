@@ -74,7 +74,7 @@
 
 :root {
   /* Approved wordmark orange; preserve brand identity across UI presets. */
-  --brand-accent: #c65300;
+  --brand-accent: #fe5d00;
   /* Dominant navy sampled from the approved deer mark, not UI text black. */
   --brand-foreground: #002262;
   --background: oklch(1 0 0);
@@ -160,7 +160,6 @@
 }
 
 .dark {
-  --brand-accent: #ff9b4a;
   --brand-foreground: #ffffff;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
