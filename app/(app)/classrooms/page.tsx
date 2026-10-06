@@ -8,7 +8,8 @@ import { School, GraduationCap, ArrowRight } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
 import { Card } from '@/components/ui/card'
-import { displayDescription } from './_components/classroom-meta'
+import { displayDescription, parseDescription } from './_components/classroom-meta'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { withBackHref } from '@/lib/back-link'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { getStudentGroups } from '@/lib/classroom-groups-server'
@@ -179,7 +180,7 @@ function StudentView({
                     className="flex items-center gap-5 bg-surface-inverse rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
-                      <School className="size-6 text-surface-inverse-foreground" aria-hidden="true" />
+                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 text-surface-inverse-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-primary">ครูที่ปรึกษาประจำชั้น</p>
@@ -214,7 +215,7 @@ function StudentView({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold truncate">{c.name}</p>
-                      <School className="size-6 shrink-0 text-primary" aria-hidden="true" />
+                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 shrink-0 text-primary" />
                     </div>
                     {displayDescription(c.description) && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{displayDescription(c.description)}</p>

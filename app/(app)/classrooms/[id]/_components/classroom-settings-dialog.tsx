@@ -28,6 +28,8 @@ import {
   AccessTypePicker, TagInput, CreatableCombobox,
 } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
 
 export function ClassroomSettingsDialog({
   classroom, onCover = false, placement = 'banner',
@@ -163,6 +165,7 @@ export function ClassroomSettingsDialog({
                 cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
               )}
             >
+              <ClassroomIcon iconKey={meta.iconKey} className="mr-3 size-7 shrink-0" />
               <p className="font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -200,6 +203,8 @@ export function ClassroomSettingsDialog({
               })}
             </div>
           </div>
+
+          <ClassroomIconPicker value={meta.iconKey} onValueChange={key => set('iconKey', key)} disabled={isPending} />
 
           {/* ── Basics ── */}
           <div className="space-y-5">

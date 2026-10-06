@@ -30,6 +30,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 
 interface ClassroomContextSidebarProps {
   classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
@@ -90,14 +91,14 @@ export function ClassroomContextNavigation({
           compact && canSwitchClassroom && 'md:hidden',
           cover ? 'bg-current/10' : 'bg-primary text-primary-foreground',
         )}>
-          <School aria-hidden="true" className={cn('size-6', compact && 'md:size-5')} />
+          <ClassroomIcon iconKey={meta.iconKey} className={cn('size-6', compact && 'md:size-5')} />
         </div>
         {compact && canSwitchClassroom && (
           <DropdownMenuTrigger
             id={`${switcherId}-icon`}
             render={<Button type="button" variant="ghost" size="icon" className="hidden md:inline-flex" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
           >
-            <School />
+            <ClassroomIcon iconKey={meta.iconKey} />
           </DropdownMenuTrigger>
         )}
         <div className={cn('min-w-0 flex-1', compact && 'md:sr-only')}>
@@ -147,7 +148,7 @@ export function ClassroomContextNavigation({
                         'flex size-8 shrink-0 items-center justify-center rounded-lg border',
                         optionCover ? cn(optionCover.surface, optionCover.text) : 'bg-muted text-muted-foreground',
                       )}>
-                        <School aria-hidden="true" />
+                        <ClassroomIcon iconKey={optionMeta.iconKey} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{option.name}</span>

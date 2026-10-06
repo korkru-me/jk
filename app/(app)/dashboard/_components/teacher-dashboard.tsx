@@ -9,6 +9,8 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/question-display'
 import type { User } from '@/lib/types'
+import type { ClassroomIconKey } from '@/lib/classroom-icons'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 
 /**
  * One decorative accent per section, so ห้องเรียน / แฟ้มโจทย์ / โจทย์ read as
@@ -79,6 +81,7 @@ export interface DashboardClassroom {
   id: string
   name: string
   classroom_type: string
+  iconKey?: ClassroomIconKey
   studentCount: number
   assignmentCount: number
 }
@@ -180,6 +183,7 @@ export function TeacherDashboard({
                 href={`/classrooms/${classroom.id}`}
                 title={classroom.name}
                 icon={School}
+                iconNode={<ClassroomIcon iconKey={classroom.iconKey} className="size-4" />}
                 accent={CLASSROOM_ACCENT}
               >
                 <span className="inline-flex items-center gap-1">
@@ -339,11 +343,12 @@ function Section({
 }
 
 function Row({
-  href, title, icon: Icon, accent, children,
+  href, title, icon: Icon, iconNode, accent, children,
 }: {
   href: string
   title: string
   icon: React.ElementType
+  iconNode?: React.ReactNode
   accent: Accent
   children: React.ReactNode
 }) {
@@ -353,7 +358,7 @@ function Row({
         aria-hidden
         className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', accent.chip)}
       >
-        <Icon className="w-4 h-4" />
+        {iconNode ?? <Icon className="w-4 h-4" />}
       </span>
       {/* The icon chip costs the title about 50px, which on a phone left names
           truncated to "ก...". Wrapping the meta onto its own line below the

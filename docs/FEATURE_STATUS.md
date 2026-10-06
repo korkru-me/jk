@@ -27,10 +27,11 @@
 - ตรวจ catalog ฐานหลักเพิ่มเติม: ไม่มี `assignment_seb_config_revisions`, `assignment_seb_config_releases`, `seb_staging_qa_run_reservations` และ direct INSERT/DELETE policies ทั้งสี่ของ `work-images`/`submission-files` ยังอยู่ จึงไม่ใช่แค่ ledger ตกหล่นสำหรับ footprint เหล่านี้ โค้ด `createAssignment` สำหรับ `seb_required` เรียก persistence ที่ต้องมีตารางใหม่; เมื่อบันทึกรหัสไม่สำเร็จจะ best-effort ลบเฉพาะ assignment ที่ request นี้เพิ่งสร้าง ไม่ใช่งานเก่าทั้งหมด ยังไม่ได้ทดสอบเส้นทางนี้กับ Production หรือประเมิน SQL เก่าครบทุก statement
 - การตรวจครั้งนี้ไม่ apply SQL ไม่ repair ledger ไม่ replay migration เก่า และไม่อ่านข้อมูลผู้ใช้ การพิจารณา rollout ของ SEB ต้องแยกจากระบบชุดการตั้งค่าใหม่ โดยเฉพาะ QA-only migrations ไม่ควรถูกติดตั้งฐานหลักโดยอัตโนมัติ
 
-### ไอคอนประจำห้องเรียน — รับงานแล้ว ยังไม่พัฒนา (6 ตุลาคม 2026)
+### ไอคอนประจำห้องเรียน — UI-016 พัฒนาและตรวจแล้ว รอ deployment (6 ตุลาคม 2026)
 
 - เจ้าของขอ optional picker ในหน้าสร้างห้องเรียน 21 ตัวเลือก: อาคารเรียนเดิม, ฟิสิกส์, คณิตศาสตร์, เทคโนโลยี, ห้องปฏิบัติการ, เคมี, ชีวะพืช, ชีวะสัตว์, วิทยาศาสตร์ทั่วไป, ดาราศาสตร์, โลก, ภาษาไทย, ภาษาอังกฤษ, สังคม, ศาสนา, ศิลปะ, ดนตรี, พละ, ภาษาจีน, ภาษาเกาหลี, ภาษาญี่ปุ่น เลือกได้อิสระ ไม่ผูกกับชื่อวิชา ไม่เลือกใช้อาคารเรียนเดิม และไอคอนที่เลือกแทนไอคอนประจำห้องในส่วนที่เกี่ยวข้อง
-- ขั้นสำรวจพบ metadata ของหน้าปกใน `classroom-meta.ts` และ create wizard/settings/context sidebar/list/picker ที่ต้องใช้การเลือกเดียวกัน ยังไม่เปลี่ยน schema หรือเขียน UI ในงานนี้
+- ใช้ `ClassroomIcon` ร่วมกันและ optional picker ทั้ง wizard/ตั้งค่าห้อง คีย์ metadata เก็บร่วม description เดิม ตัวเลือก 21 รูปไม่มีชื่อวิชาแสดงตามคำยืนยันล่าสุด มีเพียงชื่อรูปกลาง ๆ สำหรับ screen reader/tooltip ไม่เลือก/คีย์เก่าหรือไม่รู้จักใช้อาคารเรียน การ์ด/รายการห้อง Dashboard ส่วนหัว เมนูเต็ม/ย่อ และตัวเลือกเปลี่ยนห้องอ่านคีย์เดียวกัน ทำสำเนาคงรูปเดิม ไม่เปลี่ยนสิทธิ์ของ Server Actions หรือ schema/ข้อมูลย้อนหลัง
+- ผ่าน focused tests 63 เคส, full suite 206 ไฟล์/2,798 เคส, token lint และ webpack production build รวม TypeScript ตรวจใน local Chrome 1200px/320px สว่าง/มืด: ครบ 21 รูป ไม่มีชื่อวิชาและไม่ล้นจอ hit area อย่างน้อย 44px เลือกด้วย Enter และเลือกรูปให้ห้องต่างชื่อวิชาได้ preview/metadata/save จำลอง/เมนูย่อ/เปิดสำเนาใช้รูปตรงกัน ใช้ lab ที่ไม่อ่านหรือเขียน Supabase ไม่ถือเป็น authenticated Staging/Production write หรือ physical-device UAT
 
 ### เวลาในขั้นแรกและกลับบนสุดเมื่อเปลี่ยนขั้น (6 ตุลาคม 2026)
 

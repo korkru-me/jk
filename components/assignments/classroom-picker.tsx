@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { School, Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Search } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Collapsible,
@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { coverOf, parseDescription, type CoverPreset } from '@/app/(app)/classrooms/_components/classroom-meta'
 import type { AssignmentClassroomOption } from '@/components/assignments/create-assignment-form'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import type { ClassroomIconKey } from '@/lib/classroom-icons'
 
 /** Past this many ห้องเรียน the list gets a search box. Below it, everything
  *  is on screen at once and a search field is one more thing to read past. */
@@ -29,6 +31,7 @@ interface Props {
 interface Row {
   classroom: AssignmentClassroomOption
   cover: CoverPreset | null
+  iconKey?: ClassroomIconKey
   /** The one line under the name: ระดับ · ภาคเรียน · what the teacher typed. */
   meta: string
   /** Everything a search should match, lowercased once. */
@@ -55,6 +58,7 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
     return {
       classroom,
       cover: coverOf(meta),
+      iconKey: meta.iconKey,
       meta: [meta.gradeLevel, meta.academicTerm, meta.description.trim()].filter(Boolean).join(' · '),
       haystack: [classroom.name, meta.gradeLevel, meta.academicTerm, meta.tags.join(' '), meta.description]
         .join(' ')
@@ -171,7 +175,7 @@ function ClassroomRow({
           cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-muted-foreground border-transparent',
         )}
       >
-        <School className="size-3.5" aria-hidden="true" />
+        <ClassroomIcon iconKey={row.iconKey} className="size-3.5" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{classroom.name}</p>

@@ -10,6 +10,7 @@ import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
 import { parseDescription, coverOf, displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import type { SortKey as StudentSortKey } from './student-table'
 import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
@@ -118,7 +119,8 @@ export function ClassroomDetailClient({
   )
   const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
   const [peopleView, setPeopleView] = useState<PeopleView>(initialPeopleView)
-  const savedCover = coverOf(parseDescription(classroom.description))
+  const classroomMeta = parseDescription(classroom.description)
+  const savedCover = coverOf(classroomMeta)
   // A chosen cover paints the banner as a tinted surface whose text is the same
   // colour at full strength; secondary lines just dim it. Without one the
   // banner keeps its original dark gradient and white text.
@@ -255,7 +257,10 @@ export function ClassroomDetailClient({
                 <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
               </p>
             )}
-            <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
+            <h1 className="flex items-center gap-3 text-2xl font-bold leading-tight">
+              <ClassroomIcon iconKey={classroomMeta.iconKey} className="size-7 shrink-0" />
+              <span className="min-w-0">{classroom.name}</span>
+            </h1>
             {shownDescription && (
               <p className={`text-sm mt-1 ${coverMuted}`}>{shownDescription}</p>
             )}

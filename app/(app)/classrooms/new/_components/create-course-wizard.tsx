@@ -24,6 +24,9 @@ import { AccessTypePicker, TagInput, CreatableCombobox } from '@/app/(app)/class
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { ClassroomType } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
+import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -32,6 +35,7 @@ import { Card } from '@/components/ui/card'
 const wizardSchema = z.object({
   classroomType:   z.enum(['subject', 'homeroom']),
   cover:           z.string(),
+  iconKey:         z.custom<ClassroomIconKey>(isClassroomIconKey, 'กรุณาเลือกไอคอนจากตัวเลือกที่มี'),
   coverImageUrl:   z.string(),
   name:            z.string().min(1, 'กรุณากรอกชื่อห้องเรียน').max(100, 'ชื่อห้องเรียนไม่เกิน 100 ตัวอักษร'),
   description:     z.string().max(500, 'คำอธิบายไม่เกิน 500 ตัวอักษร'),
@@ -50,6 +54,7 @@ export type WizardData = z.infer<typeof wizardSchema>
 const DEFAULT_VALUES: WizardData = {
   classroomType:   'subject',
   cover:           COVER_PRESETS[0].id,
+  iconKey:         DEFAULT_CLASSROOM_ICON,
   coverImageUrl:   '',
   name:            '',
   description:     '',
@@ -264,7 +269,7 @@ function ClassroomPreviewCard({ values }: { values: WizardData }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <School className="size-4 text-muted-foreground" aria-hidden="true" />
+        <ClassroomIcon iconKey={values.iconKey} className="size-4 text-muted-foreground" />
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">ตัวอย่าง Live Preview</p>
       </div>
 
@@ -279,18 +284,21 @@ function ClassroomPreviewCard({ values }: { values: WizardData }) {
             : undefined}
         >
           {hasCover && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />}
-          <div className="relative">
-            <p className={cn(
-              'font-bold text-lg leading-tight truncate',
-              hasCover && 'text-white drop-shadow-sm',
-            )}>
-              {values.name.trim() || 'ชื่อห้องเรียน'}
-            </p>
-            {(values.gradeLevel || values.academicTerm) && (
-              <p className={cn('text-xs mt-0.5', hasCover ? 'text-white opacity-80' : preset?.textMuted)}>
-                {[values.gradeLevel, values.academicTerm].filter(Boolean).join(' · ')}
+          <div className="relative flex items-center gap-3">
+            <ClassroomIcon iconKey={values.iconKey} className={cn('size-9 shrink-0', hasCover && 'text-surface-inverse-foreground')} />
+            <div className="min-w-0">
+              <p className={cn(
+                'font-bold text-lg leading-tight truncate',
+                hasCover && 'text-white drop-shadow-sm',
+              )}>
+                {values.name.trim() || 'ชื่อห้องเรียน'}
               </p>
-            )}
+              {(values.gradeLevel || values.academicTerm) && (
+                <p className={cn('text-xs mt-0.5', hasCover ? 'text-white opacity-80' : preset?.textMuted)}>
+                  {[values.gradeLevel, values.academicTerm].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -411,6 +419,7 @@ function Step0Content({
   values,
   onClassroomTypeChange,
   onCoverChange,
+  onIconChange,
   onCoverImageChange,
   onTagsChange,
   classroomTypeLocked,
@@ -420,6 +429,7 @@ function Step0Content({
   values: WizardData
   onClassroomTypeChange: (v: ClassroomType) => void
   onCoverChange: (id: string) => void
+  onIconChange: (key: ClassroomIconKey) => void
   onCoverImageChange: (u: string) => void
   onTagsChange: (t: string[]) => void
   classroomTypeLocked?: boolean
@@ -436,6 +446,8 @@ function Step0Content({
         onChange={onClassroomTypeChange}
         disabled={classroomTypeLocked}
       />
+
+      <ClassroomIconPicker value={values.iconKey} onValueChange={onIconChange} />
 
       <CoverDesignSection
         cover={values.cover}
@@ -653,19 +665,28 @@ function Step1Content({
 
 // ─── Main Wizard ──────────────────────────────────────────────────────────────
 
+/** The dev-only screen lab injects local mutations instead of touching Supabase. */
+export interface CreateCourseWizardActions {
+  createClassroom: typeof createClassroom
+  duplicateClassroom: typeof duplicateClassroom
+  onCreated?: () => void
+}
+
 export function CreateCourseWizard({
   duplicateSourceId,
   initialValues,
+  actions,
 }: {
   duplicateSourceId?: string
   initialValues?: Partial<WizardData>
+  actions?: CreateCourseWizardActions
 }) {
   const [currentStep, setCurrentStep] = useState(0)
   const [isPending, startTransition] = useTransition()
 
   const form = useForm<WizardData>({
     resolver: zodResolver(wizardSchema),
-    defaultValues: { ...DEFAULT_VALUES, ...initialValues },
+    defaultValues: { ...DEFAULT_VALUES, ...initialValues, iconKey: classroomIconKey(initialValues?.iconKey) },
     mode: 'onTouched',
   })
 
@@ -704,6 +725,7 @@ export function CreateCourseWizard({
     const description = composeDescription({
       description:     data.description,
       cover:           data.cover,
+      iconKey:         data.iconKey,
       gradeLevel:      data.gradeLevel,
       academicTerm:    data.academicTerm,
       tags:            data.tags,
@@ -717,11 +739,11 @@ export function CreateCourseWizard({
     startTransition(async () => {
       try {
         const res = duplicateSourceId
-          ? await duplicateClassroom(duplicateSourceId, {
+          ? await (actions?.duplicateClassroom ?? duplicateClassroom)(duplicateSourceId, {
               name: data.name.trim(),
               description,
             })
-          : await createClassroom({
+          : await (actions?.createClassroom ?? createClassroom)({
               name: data.name.trim(),
               description,
               classroomType: data.classroomType,
@@ -736,7 +758,8 @@ export function CreateCourseWizard({
         toast.success(duplicateSourceId
           ? `สร้างสำเนาห้องเรียนแล้ว${copiedAssignments > 0 ? ` · เก็บงาน ${copiedAssignments} ชิ้นเป็นแบบร่าง` : ''}`
           : 'สร้างห้องเรียนสำเร็จ! กำลังเปลี่ยนหน้า...')
-        setTimeout(() => { window.location.href = '/classrooms' }, 800)
+        if (actions?.onCreated) actions.onCreated()
+        else setTimeout(() => { window.location.href = '/classrooms' }, 800)
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e)
         toast.error('เกิดข้อผิดพลาดที่ไม่คาดคิด: ' + msg)
@@ -768,6 +791,7 @@ export function CreateCourseWizard({
               values={values}
               onClassroomTypeChange={(v) => setValue('classroomType', v)}
               onCoverChange={(id) => setValue('cover', id)}
+              onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
               onCoverImageChange={(u) => setValue('coverImageUrl', u)}
               onTagsChange={(t) => setValue('tags', t)}
               classroomTypeLocked={!!duplicateSourceId}

@@ -10,6 +10,7 @@ import { parseDescription, coverOf } from './classroom-meta'
 import { IconButton } from '@/components/ui/icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 
 interface Props {
   classroom: Classroom
@@ -60,6 +61,7 @@ export function ClassroomCard({
         {dragHandle}
         <div className={cn('min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
           <div className="flex min-w-0 items-center gap-2">
+            <ClassroomIcon iconKey={meta.iconKey} className="size-5 shrink-0" />
             <p className="truncate text-base font-bold leading-tight">
               {classroom.name}
             </p>

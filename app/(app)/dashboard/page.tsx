@@ -18,6 +18,7 @@ import { formatThaiDate, thaiHour } from '@/lib/thai-time'
 import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { Clock, BookOpen, School, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
 
@@ -49,7 +50,7 @@ export default async function DashboardPage() {
       // the same way the classroom list page reads them.
       admin
         .from('classrooms')
-        .select('id, name, classroom_type, created_at, classroom_students(count), assignment_classrooms(count)')
+        .select('id, name, description, classroom_type, created_at, classroom_students(count), assignment_classrooms(count)')
         .eq('teacher_id', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false }),
@@ -86,6 +87,7 @@ export default async function DashboardPage() {
       id: row.id,
       name: row.name,
       classroom_type: row.classroom_type,
+      iconKey: parseDescription(row.description).iconKey,
       studentCount: row.classroom_students?.[0]?.count ?? 0,
       assignmentCount: row.assignment_classrooms?.[0]?.count ?? 0,
     }))
