@@ -33,7 +33,7 @@ export function AssignmentReviewSummary({ mode, rows }: AssignmentReviewSummaryP
           <h3 className="text-base font-bold text-foreground">
             {isCopy ? 'สรุปก่อนทำสำเนา' : 'สรุปก่อนสร้าง'}
           </h3>
-          <p className="text-xs leading-5 text-muted-foreground">
+          <p data-assignment-description className="text-xs leading-5 text-muted-foreground">
             ตรวจรายละเอียดทั้งหมดอีกครั้งก่อนบันทึกงาน
           </p>
         </div>
@@ -53,7 +53,7 @@ export function AssignmentReviewSummary({ mode, rows }: AssignmentReviewSummaryP
         ))}
       </dl>
 
-      <div className="flex items-start gap-2 border-t border-border pt-4 text-muted-foreground">
+      <div data-assignment-description className="flex items-start gap-2 border-t border-border pt-4 text-muted-foreground">
         <CircleCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <p className="text-xs leading-5">
           {isCopy

@@ -136,7 +136,7 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
           >
             <span className="flex min-w-0 flex-col items-start gap-0.5 whitespace-normal">
               <span className="font-medium text-foreground">มอบหมายให้ห้องเรียนอื่นด้วย</span>
-              <span className="text-xs font-normal text-muted-foreground">
+              <span data-assignment-description className="text-xs font-normal text-muted-foreground">
                 {selectedRows.length > 0
                   ? `เลือกเพิ่มแล้ว ${selectedRows.length} ห้องเรียน`
                   : 'หากไม่เลือกเพิ่ม งานจะอยู่ในห้องนี้เท่านั้น'}

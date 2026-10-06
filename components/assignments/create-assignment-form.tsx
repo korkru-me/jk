@@ -779,12 +779,15 @@ export function CreateAssignmentForm({
       isCopy={isCopy}
       disabled={isPending}
     >
-    <div ref={wizardRef} className="space-y-6">
+    <div
+      ref={wizardRef}
+      className="space-y-6 [&_[data-assignment-description]]:hidden [&_[data-slot=field-description]]:hidden"
+    >
       <div>
         <h1 className="text-2xl font-bold text-foreground">
           {isCopy ? 'ทำสำเนา' : assignmentCreationTitle(assignmentType)}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p data-assignment-description className="mt-1 text-sm text-muted-foreground">
           {isCopy
             ? 'ตรวจสอบข้อมูล การตั้งค่า และโจทย์จากงานเดิมก่อนสร้างสำเนา'
             : 'รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน'}
@@ -956,7 +959,7 @@ export function CreateAssignmentForm({
             </Collapsible>
             <Separator />
             <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
-            <p className="text-xs text-muted-foreground">
+            <p data-assignment-description className="text-xs text-muted-foreground">
               ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
               แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
               สลับลำดับข้อได้ที่นี่ — ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
@@ -1039,7 +1042,7 @@ export function CreateAssignmentForm({
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h3>
-                  <p className="text-xs text-muted-foreground">
+                  <p data-assignment-description className="text-xs text-muted-foreground">
                     ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
                     เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ปรับได้ภายหลังจากหน้าแก้ไขได้ตลอด แม้นักเรียนทำไปแล้ว
                   </p>
@@ -1062,7 +1065,7 @@ export function CreateAssignmentForm({
             <Separator />
             <div className="flex flex-col gap-3">
               {streakOn && (
-                <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+                <p data-assignment-description className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
                   เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
                   และเปิดการตรวจทีละข้อให้เสมอ ปรับสองอย่างนี้ที่นี่ไม่ได้
                 </p>
@@ -1082,7 +1085,7 @@ export function CreateAssignmentForm({
                     onChange={e => setQuestionsPerPage(e.target.value)}
                     className="max-w-[200px]"
                   />
-                  <p className="text-xs text-muted-foreground">{perPageHint}</p>
+                  <p data-assignment-description className="text-xs text-muted-foreground">{perPageHint}</p>
                 </div>
               )}
             </div>
@@ -1143,7 +1146,7 @@ export function CreateAssignmentForm({
                 </div>
                 <div>
                   <h2 className="font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
-                  <p className="text-xs text-muted-foreground">
+                  <p data-assignment-description className="text-xs text-muted-foreground">
                     คลังของงานนี้ {selectedIds.length} ข้อ — เลือกว่าจะจ่ายให้นักเรียนทั้งหมด หรือสุ่มมาบางข้อ
                   </p>
                 </div>
@@ -1163,7 +1166,7 @@ export function CreateAssignmentForm({
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">ให้ทำทุกข้อ</p>
-                  <p className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
+                  <p data-assignment-description className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
                     ทุกคนได้โจทย์ชุดเดียวกัน
                   </p>
                 </button>
@@ -1177,7 +1180,7 @@ export function CreateAssignmentForm({
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
-                  <p className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
+                  <p data-assignment-description className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
                     แต่ละคน แต่ละรอบ ได้คนละชุด
                   </p>
                 </button>
@@ -1202,7 +1205,7 @@ export function CreateAssignmentForm({
                       ข้อ จากคลัง {selectedIds.length} ข้อ
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p data-assignment-description className="text-xs text-muted-foreground">
                     ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
                   </p>
                   {drawnPointsVary && !displayMaxSet && (
@@ -1232,7 +1235,7 @@ export function CreateAssignmentForm({
               </div>
               <div>
                 <h2 className="font-semibold text-foreground">เงื่อนไขจบงาน</h2>
-                <p className="text-xs text-muted-foreground">
+                <p data-assignment-description className="text-xs text-muted-foreground">
                   นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร
                 </p>
               </div>
@@ -1267,7 +1270,7 @@ export function CreateAssignmentForm({
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">{opt.label}</p>
-                  <p className={cn(
+                  <p data-assignment-description className={cn(
                     'mt-0.5 text-xs',
                     completionChoice === opt.key ? 'text-foreground' : 'text-muted-foreground',
                   )}>
@@ -1286,7 +1289,7 @@ export function CreateAssignmentForm({
             )}
 
             {completionChoice !== 'complete' && (
-              <p className="text-xs text-muted-foreground">ทำรอบใหม่ได้จนกว่าจะผ่าน เมื่อผ่านแล้วจะเริ่มรอบใหม่ไม่ได้ · เก็บคะแนนจากรอบที่ดีที่สุด</p>
+              <p data-assignment-description className="text-xs text-muted-foreground">ทำรอบใหม่ได้จนกว่าจะผ่าน เมื่อผ่านแล้วจะเริ่มรอบใหม่ไม่ได้ · เก็บคะแนนจากรอบที่ดีที่สุด</p>
             )}
 
             {completionChoice === 'threshold' && (
@@ -1336,7 +1339,7 @@ export function CreateAssignmentForm({
                     className="max-w-[100px]"
                   />
                   <span className="text-sm text-muted-foreground">
-                    ข้อ จึงจะจบ · ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0
+                    ข้อ
                   </span>
                 </div>
 
@@ -1344,7 +1347,7 @@ export function CreateAssignmentForm({
                   <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                     <div>
                       <p className="text-sm font-medium text-foreground">หยุดให้เองเมื่อทำครบจำนวนที่กำหนด</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p data-assignment-description className="text-xs text-muted-foreground">
                         ถึงเพดานแล้วจบเป็น “ยังไม่ผ่าน” — กันไม่ให้เด็กที่ยังไม่แม่นทำวนอยู่ทั้งคืน
                       </p>
                     </div>
@@ -1373,7 +1376,7 @@ export function CreateAssignmentForm({
                 <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                   <div>
                     <p className="text-sm font-medium text-foreground">ทำครบคลังแล้ววนกลับมาใหม่</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p data-assignment-description className="text-xs text-muted-foreground">
                       โจทย์สุ่มตัวเลขจะได้ตัวเลขชุดใหม่ทุกครั้งที่วนกลับมา ข้อคงที่จะซ้ำของเดิม ·
                       ปิดไว้ = ทำครบคลังแล้วจบเลย
                     </p>
@@ -1410,7 +1413,7 @@ export function CreateAssignmentForm({
                   <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                     <div>
                       <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p data-assignment-description className="text-xs text-muted-foreground">
                         {instantCheckAnswerKey
                           ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ'
                           : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
@@ -1432,7 +1435,7 @@ export function CreateAssignmentForm({
 
                 <div className="border-t border-border pt-3 space-y-1">
                   <p className="text-xs font-medium text-foreground">โหมดนี้ตั้งค่าต่อไปนี้ให้เอง</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p data-assignment-description className="text-xs text-muted-foreground">
                     เปิดการตรวจทีละข้อ · แสดงทีละ 1 ข้อ · ไม่ใช้เกณฑ์คะแนน/เปอร์เซ็นต์ ·
                     บันทึกเป็นผ่าน/ยังไม่ผ่าน โดยผ่าน = คะแนนเต็มที่ตั้งไว้ · เก็บคะแนนจากรอบที่ดีที่สุด ·
                     รอบใหม่เริ่มใหม่ทั้งชุด
@@ -1465,7 +1468,7 @@ export function CreateAssignmentForm({
                     <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
                       <div>
                         <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p data-assignment-description className="text-xs text-muted-foreground">
                           {instantCheckAnswerKey
                             ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ — ส่วนเฉลยวิธีทำที่แนบไว้ ดูได้หลังจบงานตามติ๊ก "ให้นักเรียนดูเฉลยวิธีทำ"'
                             : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
@@ -1532,7 +1535,7 @@ export function CreateAssignmentForm({
                 set: setSharedRandomValues,
                 footer: (sharedRandomValues ? (
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground px-1">
+                    <p data-assignment-description className="text-xs text-muted-foreground px-1">
                       {canRepeat && 'ทำรอบใหม่ก็ยังได้ตัวเลขชุดเดิม · '}
                       สร้างงานแล้วกด &ldquo;ดูตัวอย่าง&rdquo; เพื่อดูตัวเลขที่นักเรียนจะได้
                     </p>
@@ -1572,7 +1575,7 @@ export function CreateAssignmentForm({
                         ตอนนี้ตั้งให้แสดงคำตอบที่ถูกทันทีหลังส่ง นักเรียนจึงเห็นคำตอบก่อนกลับมาแก้ข้อที่ผิด
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground px-1">
+                    <p data-assignment-description className="text-xs text-muted-foreground px-1">
                       ข้ออัตนัยที่ครูยังไม่ได้ตรวจจะยกมาตามเดิม ไม่ถูกนับว่าผิดและนักเรียนแก้ไม่ได้
                     </p>
                   </>
@@ -1589,7 +1592,7 @@ export function CreateAssignmentForm({
                       </div>
                       <div>
                         <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                        <p data-assignment-description className="text-xs text-muted-foreground">{opt.desc}</p>
                       </div>
                     </div>
                     <input
@@ -1604,7 +1607,7 @@ export function CreateAssignmentForm({
               )
             })}
             {randomDrawOn && canRepeat && (
-              <p className="text-xs text-muted-foreground px-1">
+              <p data-assignment-description className="text-xs text-muted-foreground px-1">
                 ตั้งให้สุ่ม {questionsPerAttempt} ข้อจากคลังไว้ที่ขั้นเลือกโจทย์ รอบต่อไปนักเรียนจึงได้ชุดใหม่ทั้งชุด
                 ไม่ใช่กลับมาแก้ข้อเดิม
               </p>
@@ -1620,7 +1623,7 @@ export function CreateAssignmentForm({
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">บังคับใช้ Safe Exam Browser</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">
                       ล็อกเครื่องและตรวจ Config Key + Browser Exam Key ก่อนเริ่ม อ่าน บันทึก อัปโหลด และส่งข้อสอบ
                     </p>
                   </div>
@@ -1655,7 +1658,7 @@ export function CreateAssignmentForm({
                       <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                       <div>
                         <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูอนุมัติรายคน</p>
-                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                        <p data-assignment-description className="mt-0.5 text-xs leading-5 text-muted-foreground">
                           นักเรียนรอในหน้าเข้าสอบ ครูตรวจว่าเป็นเครื่อง Android จริงแล้วกดอนุมัติจากห้องคุมสอบ
                         </p>
                       </div>
@@ -1697,7 +1700,7 @@ export function CreateAssignmentForm({
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">แสดงลายน้ำผู้เข้าสอบ</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
+                  <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
                 </div>
               </div>
               <input
@@ -1718,7 +1721,7 @@ export function CreateAssignmentForm({
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">
                       ครูเห็นสถานะออนไลน์ การออกจากแท็บ/เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์
                     </p>
                   </div>
@@ -1741,7 +1744,7 @@ export function CreateAssignmentForm({
                       <Maximize className="w-4 h-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
-                        <p className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า</p>
+                        <p data-assignment-description className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า</p>
                       </div>
                     </div>
                     <input
@@ -1754,7 +1757,7 @@ export function CreateAssignmentForm({
                   <label className="flex items-center justify-between gap-4 cursor-pointer">
                     <div>
                       <p className="text-sm font-medium text-foreground">ปิดการคัดลอก วาง และเมนูคลิกขวา</p>
-                      <p className="text-xs text-muted-foreground">ลดการนำข้อความออกจากหน้า แต่ไม่สามารถกันภาพถ่ายหรือเครื่องมือระดับระบบได้ทั้งหมด</p>
+                      <p data-assignment-description className="text-xs text-muted-foreground">ลดการนำข้อความออกจากหน้า แต่ไม่สามารถกันภาพถ่ายหรือเครื่องมือระดับระบบได้ทั้งหมด</p>
                     </div>
                     <input
                       type="checkbox"
@@ -1794,7 +1797,7 @@ export function CreateAssignmentForm({
                   <Calendar className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <span className="flex min-w-0 flex-col gap-1">
                     <span className="font-semibold text-foreground">กำหนดวันทำ</span>
-                    <span className="text-sm font-normal text-muted-foreground">
+                    <span data-assignment-description className="text-sm font-normal text-muted-foreground">
                       {startAt && endAt
                         ? 'กำหนดเวลาเปิดและปิดรับแล้ว'
                         : startAt
@@ -1895,7 +1898,7 @@ export function CreateAssignmentForm({
                   <span className="flex w-full items-center gap-3">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left sm:flex-row sm:items-center sm:gap-4">
                       <span className="text-sm font-medium text-foreground sm:w-64 sm:shrink-0">{o.label}</span>
-                      <span className="text-xs text-muted-foreground">{o.desc}</span>
+                      <span data-assignment-description className="text-xs text-muted-foreground">{o.desc}</span>
                     </span>
                     {showResults === o.key && <Check className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />}
                   </span>
@@ -2050,7 +2053,7 @@ export function CreateAssignmentForm({
             <h3 className="font-bold text-lg text-foreground">
               {isCopy ? 'เผยแพร่สำเนานี้เมื่อไหร่?' : `เผยแพร่${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้เมื่อไหร่?`}
             </h3>
-            <p className="text-sm text-muted-foreground mt-2">
+            <p data-assignment-description className="text-sm text-muted-foreground mt-2">
               เลือกได้ว่าจะให้นักเรียนเห็นและเริ่มทำได้ทันที ตั้งเวลาให้เปิดล่วงหน้า หรือเก็บไว้เป็นร่างก่อนแล้วค่อยเผยแพร่ทีหลัง
             </p>
 
@@ -2085,7 +2088,7 @@ export function CreateAssignmentForm({
                     value={scheduleAt}
                     onChange={e => setScheduleAt(e.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">นักเรียนจะเริ่มเห็นและเข้าทำได้ตั้งแต่เวลานี้เป็นต้นไป</p>
+                  <p data-assignment-description className="text-xs text-muted-foreground">นักเรียนจะเริ่มเห็นและเข้าทำได้ตั้งแต่เวลานี้เป็นต้นไป</p>
                 </div>
                 <div className="flex flex-col gap-2">
                   <Button type="button" onClick={handleScheduleConfirm} disabled={isPending} className="w-full">

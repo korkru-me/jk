@@ -50,6 +50,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ตาม UI-025 เมื่อ sidebar อยู่ในสถานะย่อบน desktop หน้า `/assignments/new` จะขยายกรอบสร้างงานไปทางซ้ายเท่ากับพื้นที่ sidebar ที่คืนมา (`w-64` → `w-20`) โดยตรึงขอบขวาไว้ตำแหน่งเดิม; ใช้ marker `assignment-create-stage` เพื่อจำกัดพฤติกรรมไว้เฉพาะหน้าสร้างงาน ไม่จัดกึ่งกลาง direct child อื่นของ `<main>` แบบเหมารวม และ mobile drawer ไม่รับกฎนี้
 
+ตาม UI-026 `CreateAssignmentForm` ซ่อนเฉพาะ node ที่ทำเครื่องหมาย `data-assignment-description` และ `FieldDescription` ภายใน root ของ wizard ทั้ง 3 ขั้น จึงใช้ primitive/ส่วนย่อยร่วมกับหน้าแก้ไขและ fixture อื่นได้โดยไม่ลบคำอธิบายจากบริบทเหล่านั้น; ข้อความสถานะ, validation และ warning/destructive ไม่อยู่ใน selector นี้
+
 ### Browser
 
 ใช้ `lib/supabase/client.ts` ซึ่งรับเฉพาะ public URL และ anon key ห้าม import service-role client เข้า Client Component

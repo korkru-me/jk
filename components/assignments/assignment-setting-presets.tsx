@@ -291,7 +291,7 @@ export function AssignmentSettingPresetsProvider({
               <Bookmark className="size-4 shrink-0" aria-hidden="true" />
               เรียกใช้การตั้งค่าเดิม · {typeLabel}
             </span>
-            <span className="text-sm font-normal text-muted-foreground">{recalledSettingLabel}</span>
+            <span data-assignment-description className="text-sm font-normal text-muted-foreground">{recalledSettingLabel}</span>
           </span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
         </CollapsibleTrigger>
@@ -309,8 +309,8 @@ export function AssignmentSettingPresetsProvider({
                 <FieldDescription>เลือกชุดส่วนตัวมาใช้กับงานนี้ หรือเริ่มจากค่าระบบ บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปได้ในขั้นสุดท้าย</FieldDescription>
               </Field>
             </FieldGroup>
-            {currentOrigin === 'copy' && <p className="text-sm text-muted-foreground">สำเนาใช้การตั้งค่าจากงานต้นฉบับ ไม่โหลดชุดเริ่มต้นทับ</p>}
-            {dirty && <p className="text-sm text-muted-foreground" role="status">ปรับการตั้งค่าสำหรับงานนี้แล้ว · ชุดที่บันทึกไว้ยังไม่เปลี่ยน</p>}
+            {currentOrigin === 'copy' && <p data-assignment-description className="text-sm text-muted-foreground">สำเนาใช้การตั้งค่าจากงานต้นฉบับ ไม่โหลดชุดเริ่มต้นทับ</p>}
+            {dirty && <p data-assignment-description className="text-sm text-muted-foreground" role="status">ปรับการตั้งค่าสำหรับงานนี้แล้ว · ชุดที่บันทึกไว้ยังไม่เปลี่ยน</p>}
             <div className="flex flex-wrap gap-2">
               {selected && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(selected.id)}><RotateCcw data-icon="inline-start" />เรียกชุดนี้อีกครั้ง</Button>}
               <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(null)}><RotateCcw data-icon="inline-start" />ใช้ค่าระบบ</Button>
@@ -329,7 +329,7 @@ export function AssignmentSettingPresetsProvider({
         <h2 className="flex items-center gap-2 font-semibold"><Bookmark className="size-4" aria-hidden="true" />บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปไหม?</h2>
         <div className="flex items-center gap-2"><Badge variant="secondary">ไม่บังคับ</Badge>{!unavailable && <Badge variant="secondary">{data.presets.length}/3 ชุด</Badge>}</div>
       </div>
-      <p className="text-sm text-muted-foreground">เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน ข้ามส่วนนี้แล้วสร้างงานได้ตามปกติ</p>
+      <p data-assignment-description className="text-sm text-muted-foreground">เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน ข้ามส่วนนี้แล้วสร้างงานได้ตามปกติ</p>
       <FieldGroup className="gap-3">
         <Field data-disabled={busy || unavailable}>
           <FieldLabel htmlFor={`${id}-save-target`}>บันทึกการตั้งค่าเป็น</FieldLabel>
@@ -351,7 +351,7 @@ export function AssignmentSettingPresetsProvider({
         {data.defaultPresetId !== null && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => run(() => actions.setDefault({ type, id: null }), 'ใช้ค่าระบบเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งค่าระบบเป็นค่าเริ่มต้น</Button>}
         <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
       </div>
-      {!unavailable && data.presets.length >= 3 && <p className="text-sm text-muted-foreground">ครบ 3 ชุดแล้ว เลือกอัปเดตชุดเดิมหรือลบชุดที่ไม่ใช้ก่อนบันทึกชุดใหม่ ระบบไม่ลบให้เอง</p>}
+      {!unavailable && data.presets.length >= 3 && <p data-assignment-description className="text-sm text-muted-foreground">ครบ 3 ชุดแล้ว เลือกอัปเดตชุดเดิมหรือลบชุดที่ไม่ใช้ก่อนบันทึกชุดใหม่ ระบบไม่ลบให้เอง</p>}
       {status}
     </Card>
   )
@@ -363,7 +363,7 @@ export function AssignmentSettingPresetsProvider({
         <DialogContent showCloseButton={!isPending}>
           <DialogHeader>
             <DialogTitle>{dialog === 'rename' ? 'เปลี่ยนชื่อชุดการตั้งค่า' : `บันทึกชุดการตั้งค่า${typeLabel}`}</DialogTitle>
-            <DialogDescription>เก็บเฉพาะการตั้งค่า ไม่ได้บันทึกหรือมอบหมายงานนี้</DialogDescription>
+            <DialogDescription className="sr-only">เก็บเฉพาะการตั้งค่า ไม่ได้บันทึกหรือมอบหมายงานนี้</DialogDescription>
           </DialogHeader>
           <form onSubmit={event => { event.preventDefault(); submitName() }} className="flex flex-col gap-4">
             <FieldGroup>

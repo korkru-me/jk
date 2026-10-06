@@ -42,7 +42,7 @@ export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxA
           </div>
           <div>
             <p className="text-sm font-medium text-foreground">ให้นักเรียนดูเฉลยวิธีทำ</p>
-            <p className="text-xs text-muted-foreground">
+            <p data-assignment-description className="text-xs text-muted-foreground">
               เฉลยที่แนบไว้กับโจทย์ (ข้อความ รูป PDF กระดาน) กดดูทีละข้อได้จากหน้าสรุปผล
               หลังนักเรียนทำงานนี้ต่อไม่ได้แล้วเท่านั้น — ระหว่างทำหรือยังเหลือรอบให้ทำจะเปิดไม่ได้
             </p>
@@ -56,7 +56,7 @@ export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxA
         />
       </label>
       {checked && (
-        <p className="text-xs text-muted-foreground px-1">{untilPassed
+        <p data-assignment-description className="text-xs text-muted-foreground px-1">{untilPassed
           ? 'เห็นเฉลยเมื่อผ่านและส่งงานแล้ว หรือเมื่อพ้นเวลาปิดรับหรือครูกดปิดงาน โดยไม่มีรอบที่ยังทำค้างอยู่'
           : openingSummary(assignmentType, maxAttempts)}</p>
       )}

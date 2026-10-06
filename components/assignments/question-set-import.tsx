@@ -90,7 +90,7 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
 
       {open && (
         <div className="flex flex-col gap-2 border-t border-border p-3">
-          <p className="text-xs text-muted-foreground">
+          <p data-assignment-description className="text-xs text-muted-foreground">
             กดแฟ้มเพื่อเลือกทุกข้อ กดซ้ำเมื่อเลือกครบเพื่อเอาข้อในแฟ้มออก — ปรับทีละข้อได้ด้านล่าง
           </p>
 

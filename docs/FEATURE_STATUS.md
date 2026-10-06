@@ -1,5 +1,10 @@
 # Feature status
 
+### ลดข้อความอธิบายในหน้าสร้างแบบฝึกหัดและข้อสอบ (6 ตุลาคม 2026)
+
+- **UI-026** — ซ่อน helper description สีเทาใน wizard สร้างแบบฝึกหัด/ข้อสอบครบทั้ง 3 ขั้น รวมคำโปรยใต้ชื่อหน้า คำอธิบายใต้หัวข้อ/ตัวเลือก/ชุดการตั้งค่า/สรุป/กำหนดการ และข้อความประกอบใน dialog เผยแพร่; ยังคง label, placeholder, หน่วย, จำนวน/สถานะที่เป็นข้อมูล, validation และคำเตือนสีเหลือง–แดงไว้ โดยไม่เปลี่ยนหน้าแก้ไขงาน
+- ผ่าน source-only TypeScript, token lint, webpack production build และ Next.js compilation/runtime checks · local Chrome fixture ไล่ทั้งข้อสอบและแบบฝึกหัดครบ 3 ขั้นแล้วไม่พบ helper description ที่มองเห็น (`visible = 0`) ทุกขั้น; viewport 320px ไม่ล้นแนวนอนทั้ง 3 ขั้น · `npx tsc --noEmit` ปกติยังพบ generated `LayoutRoutes` ขัดกันใน `.next/types`/`.next/dev/types` cache ของ live dev server จึงตรวจ source-only แยกโดยไม่ล้าง cache ไม่มีการเขียนฐานข้อมูลและไม่มี migration
+
 ### ขยายหน้าสร้างงานไปทางซ้ายเมื่อย่อเมนูด้านข้าง (6 ตุลาคม 2026)
 
 - **UI-025** — เมื่อย่อ sidebar เป็น icon rail บน desktop กรอบหน้าสร้างแบบฝึกหัด/ข้อสอบจะขยายเฉพาะด้านซ้ายเข้าไปใช้พื้นที่ที่เพิ่มขึ้น โดยขอบขวาอยู่ตำแหน่งเดิม ไม่เลื่อนทั้งหน้าไปทางขวา; จำกัดกฎไว้เฉพาะหน้าสร้างงานและไม่กระทบ mobile drawer
