@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -191,6 +191,16 @@ export function CreateAssignmentForm({
   const isCopy = copySource !== undefined
   const initialTypeDefaults = newAssignmentTypeDefaults(assignmentType)
   const [step, setStep] = useState(0)
+  const wizardRef = useRef<HTMLDivElement>(null)
+  const previousStepRef = useRef(step)
+
+  useEffect(() => {
+    if (previousStepRef.current === step) return
+    previousStepRef.current = step
+    // The app shell scrolls its main panel; standalone pages scroll the window.
+    wizardRef.current?.closest('main')?.scrollTo({ top: 0, behavior: 'instant' })
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [step])
   const [isPending, startTransition] = useTransition()
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [scheduleMode, setScheduleMode] = useState(false)
@@ -675,7 +685,7 @@ export function CreateAssignmentForm({
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={wizardRef} className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">
           {isCopy ? 'ทำสำเนา' : assignmentCreationTitle(assignmentType)}
@@ -749,6 +759,21 @@ export function CreateAssignmentForm({
                 onChange={e => setDescription(e.target.value)}
                 placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
                 rows={2}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dur" className="flex items-center gap-1.5">
+                <Timer className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
+              </Label>
+              <Input
+                id="dur"
+                type="number"
+                min={1}
+                value={duration}
+                onChange={e => setDuration(e.target.value)}
+                placeholder="ไม่จำกัด (เว้นว่าง)"
+                className="max-w-[200px]"
               />
             </div>
 
@@ -1358,21 +1383,6 @@ export function CreateAssignmentForm({
               )}
             </div>
           )}
-
-          <div className="space-y-1.5">
-            <Label htmlFor="dur" className="flex items-center gap-1.5">
-              <Timer className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
-            </Label>
-            <Input
-              id="dur"
-              type="number"
-              min={1}
-              value={duration}
-              onChange={e => setDuration(e.target.value)}
-              placeholder="ไม่จำกัด (เว้นว่าง)"
-              className="max-w-[200px]"
-            />
-          </div>
 
           <div className="space-y-2">
             {[
