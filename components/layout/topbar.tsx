@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import { BrandLogo } from '@/components/brand-logo'
 import { useTheme } from 'next-themes'
 import { Menu, Moon, Sun } from 'lucide-react'
 import { IconButton } from '@/components/ui/icon-button'
@@ -59,13 +59,7 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
         </IconButton>
 
         <Link href="/dashboard" onClick={onLogoNavigate} title="KorKru · หน้าหลัก" className="shrink-0">
-          <Image
-            src="/logo.png"
-            alt="KorKru"
-            width={423}
-            height={576}
-            className="h-11 w-auto object-contain dark:brightness-0 dark:invert"
-          />
+          <BrandLogo layout="stacked" />
         </Link>
       </div>
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LoginForm } from '@/components/auth/login-form'
 import { Card } from '@/components/ui/card'
+import { BrandLogo } from '@/components/brand-logo'
 
 export const metadata: Metadata = { title: 'เข้าสู่ระบบ — KorKru' }
 
@@ -10,13 +11,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
       {/* Logo mark */}
       <Link href="/" className="mb-8 flex items-center gap-2.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-md">
-          K
-        </div>
-        <div>
-          <p className="text-lg font-bold text-foreground leading-none">KorKru</p>
-          <p className="text-xs text-muted-foreground">คลังข้อสอบอัจฉริยะ</p>
-        </div>
+        <BrandLogo subtitle="คลังข้อสอบอัจฉริยะ" />
       </Link>
 
       <Card padding="2xl" elevation="sm" className="w-full max-w-md">
