@@ -633,6 +633,39 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <span className="text-sm text-muted-foreground">คะแนน</span>
           </div>
         </div>
+        {a.mode === 'online' && (
+          <>
+            <Separator />
+            <div className="flex flex-col gap-4">
+              {streakOn && (
+                <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+                  เงื่อนไขจบงานเป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
+                  ปรับสองอย่างนี้ที่นี่ไม่ได้
+                </p>
+              )}
+
+              {!streakOn && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="edit-per-page" className="flex items-center gap-1.5">
+                    <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
+                  </Label>
+                  <Input
+                    id="edit-per-page"
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={questionsPerPage}
+                    onChange={e => setQuestionsPerPage(e.target.value)}
+                    className="max-w-[200px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    1 = แสดงทีละข้อเหมือนเดิม · เป็นการจัดหน้าจออย่างเดียว ไม่กระทบคะแนน และมีผลทันทีแม้กับคนที่กำลังทำอยู่
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       {a.mode === 'online' && a.question_ids.length >= 2 && (
@@ -669,37 +702,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
               : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
           </p>
-        </Card>
-      )}
-
-      {a.mode === 'online' && (
-        <Card padding="xl" className="space-y-4">
-          {streakOn && (
-            <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
-              เงื่อนไขจบงานเป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
-              ปรับสองอย่างนี้ที่นี่ไม่ได้
-            </p>
-          )}
-
-          {!streakOn && (
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-per-page" className="flex items-center gap-1.5">
-                <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
-              </Label>
-              <Input
-                id="edit-per-page"
-                type="number"
-                min={1}
-                max={50}
-                value={questionsPerPage}
-                onChange={e => setQuestionsPerPage(e.target.value)}
-                className="max-w-[200px]"
-              />
-              <p className="text-xs text-muted-foreground">
-                1 = แสดงทีละข้อเหมือนเดิม · เป็นการจัดหน้าจออย่างเดียว ไม่กระทบคะแนน และมีผลทันทีแม้กับคนที่กำลังทำอยู่
-              </p>
-            </div>
-          )}
         </Card>
       )}
 
