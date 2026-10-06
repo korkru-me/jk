@@ -52,6 +52,7 @@ describe('private assignment settings allowlist', () => {
   })
   it('maps SQL errors to fixed, secret-safe messages', () => {
     expect(assignmentPresetError('40001')).toContain('อีกหน้าต่าง')
+    expect(assignmentPresetError('PT409')).toContain('อีกหน้าต่าง')
     expect(assignmentPresetError('P0001')).toContain('3 ชุด')
     expect(assignmentPresetError('XX000')).not.toContain('XX000')
   })

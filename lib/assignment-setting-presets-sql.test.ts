@@ -10,6 +10,8 @@ import { PGlite, type Transaction } from '@electric-sql/pglite'
 import { assignmentPresetDefaults, assignmentPresetSettingsSchema } from './assignment-setting-presets'
 
 const MIGRATION = readFileSync(new URL('../supabase/migrations/20261006082912_assignment_setting_presets.sql', import.meta.url), 'utf8')
+const CONFLICT_FIX = readFileSync(new URL('../supabase/migrations/20261006102054_assignment_preset_conflict_http_status.sql', import.meta.url), 'utf8')
+const ORIGINAL_MUTATOR = MIGRATION.slice(MIGRATION.indexOf('CREATE FUNCTION public.mutate_assignment_setting_preset('))
 const A = '10000000-0000-4000-8000-000000000001'
 const B = '10000000-0000-4000-8000-000000000002'
 const ADMIN = '10000000-0000-4000-8000-000000000003'
@@ -87,6 +89,7 @@ beforeAll(async () => {
     INSERT INTO public.assignments(settings_snapshot) VALUES ('{"duration_minutes":30,"question_ids":["synthetic-question"]}');
   `)
   await db.exec(MIGRATION)
+  await db.exec(CONFLICT_FIX)
   await db.query(`INSERT INTO public.assignment_setting_presets(id, owner_id, assignment_type, slot, name, settings)
     VALUES ($1, $2, 'exercise', 1, 'A original', $7::jsonb),
       ($3, $4, 'exercise', 1, 'B original', $7::jsonb),
@@ -229,14 +232,14 @@ describe('preset persistence, quota and concurrent revisions', () => {
       const input: Mutation = { action, id: PRESET_A, revision: 99 }
       if (action === 'update' || action === 'rename') input.name = 'new'
       if (action === 'update') input.settings = SETTINGS
-      await expect(as(caller(A), tx => rpc(tx, input))).rejects.toMatchObject({ code: '40001', message: 'preset_stale_revision' })
+      await expect(as(caller(A), tx => rpc(tx, input))).rejects.toMatchObject({ code: 'PT409', message: 'preset_stale_revision' })
       delete input.revision
       await expect(as(caller(A), tx => rpc(tx, input))).rejects.toMatchObject({ code: '22023' })
     }
     await expect(as(caller(A), async tx => {
       await rpc(tx, { action: 'rename', id: PRESET_A, name: 'first writer', revision: 1 })
       await rpc(tx, { action: 'rename', id: PRESET_A, name: 'stale writer', revision: 1 })
-    })).rejects.toMatchObject({ code: '40001' })
+    })).rejects.toMatchObject({ code: 'PT409' })
   })
   it('atomically replaces/clears defaults and deletion clears only the deleted preset default', async () => {
     await as(caller(A), async tx => {
@@ -282,6 +285,42 @@ describe('preset persistence, quota and concurrent revisions', () => {
       await expect(db.transaction(tx => tx.query(`INSERT INTO public.assignment_setting_preset_preferences(owner_id, assignment_type, default_preset_id) VALUES ($1, $2, $3)`, ownerAndType)))
         .rejects.toMatchObject({ code: '23503' })
     }
+  })
+})
+
+describe('expected conflict HTTP status migration', () => {
+  it('changes only the expected conflict code, preserving the original mutation and grant contract', () => {
+    const replacement = CONFLICT_FIX.slice(CONFLICT_FIX.indexOf('CREATE OR REPLACE FUNCTION public.mutate_assignment_setting_preset('))
+      .replace('CREATE OR REPLACE FUNCTION', 'CREATE FUNCTION')
+      .replace("ERRCODE = 'PT409', MESSAGE = 'preset_stale_revision'", "ERRCODE = '40001', MESSAGE = 'preset_stale_revision'")
+    expect(replacement.trim()).toBe(ORIGINAL_MUTATOR.trim())
+    expect(CONFLICT_FIX.match(/ERRCODE = 'PT409'/g)).toHaveLength(1)
+  })
+  it('upgrades an already-installed 40001 function without changing the underlying stale-write rejection', async () => {
+    // A transactional replay of ONLY the old function, never the old tables.
+    // Raising the old conflict rolls it back, restoring the installed fix.
+    await expect(db.transaction(async tx => {
+      await tx.exec(ORIGINAL_MUTATOR.replace('CREATE FUNCTION', 'CREATE OR REPLACE FUNCTION'))
+      await tx.query(`SELECT set_config('request.jwt.claim.sub', $1, true)`, [A])
+      await tx.exec('SET LOCAL ROLE authenticated')
+      await rpc(tx, { action: 'rename', id: PRESET_A, name: 'stale old wire code', revision: 99 })
+    })).rejects.toMatchObject({ code: '40001', message: 'preset_stale_revision' })
+    await expect(as(caller(A), tx => rpc(tx, { action: 'rename', id: PRESET_A, name: 'stale new wire code', revision: 99 })))
+      .rejects.toMatchObject({ code: 'PT409', message: 'preset_stale_revision' })
+  })
+  it('two overlapping rename requests persist one revision bump and return one PT409 (single connection)', async () => {
+    const before = (await db.query<{ revision: number }>('SELECT revision FROM public.assignment_setting_presets WHERE id = $1', [PRESET_A])).rows[0]
+    expect(before.revision).toBe(1)
+    const names = ['Wire editor A', 'Wire editor B']
+    const results = await Promise.allSettled(names.map(name =>
+      as(caller(A), tx => rpc(tx, { action: 'rename', id: PRESET_A, name, revision: before.revision }), true)))
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+    expect(failures).toHaveLength(1)
+    expect(failures[0].reason).toMatchObject({ code: 'PT409', message: 'preset_stale_revision' })
+    const persisted = (await db.query<{ revision: number; name: string }>('SELECT revision, name FROM public.assignment_setting_presets WHERE id = $1', [PRESET_A])).rows[0]
+    expect(persisted.revision).toBe(2)
+    expect(names).toContain(persisted.name)
   })
 })
 

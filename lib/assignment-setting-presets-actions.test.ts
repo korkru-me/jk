@@ -97,10 +97,20 @@ describe('session-bound preset actions', () => {
     expect(JSON.stringify(result)).toContain('บันทึกคำสั่งแล้ว')
     expect(mocks.rpc).toHaveBeenCalledTimes(1)
   })
-  it('returns fixed SQL error messages without reflecting database detail', async () => {
-    mocks.rpc.mockResolvedValue({ error: { code: '40001', message: 'private query' } })
+  it.each(['40001', 'PT409'])('returns fixed SQL error messages for %s without reflecting database detail', async code => {
+    mocks.rpc.mockResolvedValue({ error: { code, message: 'private query' } })
     const result = await saveAssignmentSettingPreset({ type: 'exam', id: PRESET, expectedRevision: 1, name: 'ชุด', settings: assignmentPresetDefaults('exam') })
     expect(JSON.stringify(result)).toContain('อีกหน้าต่าง')
     expect(JSON.stringify(result)).not.toContain('private query')
+  })
+  it.each([null, undefined, {}, 'not-an-id', OWNER])('refuses unconfirmed mutation responses (%s)', async data => {
+    mocks.rpc.mockResolvedValue({ data, error: null })
+    const result = await saveAssignmentSettingPreset({ type: 'exam', id: PRESET, expectedRevision: 1, name: 'ชุด', settings: assignmentPresetDefaults('exam') })
+    expect(JSON.stringify(result)).toContain('ยังไม่ยืนยัน')
+    expect(mocks.from).toHaveBeenCalledTimes(1)
+  })
+  it('accepts a null response only for clearing the default', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: null })
+    expect(await setDefaultAssignmentSettingPreset({ type: 'exercise', id: null })).toHaveProperty('data')
   })
 })

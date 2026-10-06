@@ -79,12 +79,18 @@ async function mutate(input: {
   try {
     const session = await presetSession()
     if ('error' in session) return { error: session.error ?? LOAD_ERROR }
-    const { error } = await session.supabase.rpc('mutate_assignment_setting_preset', {
+    const { data, error } = await session.supabase.rpc('mutate_assignment_setting_preset', {
       p_type: input.type, p_action: input.action, p_id: input.id ?? null,
       p_name: input.name ?? null, p_settings: input.settings ?? null,
       p_expected_revision: input.expectedRevision ?? null,
     })
     if (error) return { error: assignmentPresetError(error.code) }
+    // A transport/proxy response is not proof of a successful write. Every
+    // mutation returns the exact preset UUID; clearing a default returns null.
+    const responseValid = input.action === 'clear_default'
+      ? data === null
+      : z.string().uuid().safeParse(data).success && (!input.id || data === input.id)
+    if (!responseValid) return { error: 'ผลการบันทึกยังไม่ยืนยัน กรุณาโหลดรายการใหม่ก่อนลองซ้ำ' }
     const refreshed = await loadForSession(session, input.type)
     if ('error' in refreshed) return { error: 'บันทึกคำสั่งแล้ว แต่โหลดรายการใหม่ไม่สำเร็จ กรุณากดโหลดใหม่ก่อนลองบันทึกซ้ำ' }
     return refreshed
