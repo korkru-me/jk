@@ -6,9 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import {
-  Check, ChevronRight, ChevronLeft, Users, Globe, UserCheck, Lock,
-  CalendarDays, Clock, X, Tag, Upload, Plus,
-  ArrowLeftRight, GraduationCap, School, HelpCircle, Info,
+  Check, ChevronRight, ChevronLeft, Clock, X, Upload, Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -17,14 +15,13 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { createClassroom, duplicateClassroom } from '@/lib/actions/classrooms'
 import {
-  ACCESS_LABEL, ACCESS_BADGE, GRADE_SUGGESTIONS, getTermSuggestions, getSmartTermDefault,
+  GRADE_SUGGESTIONS, getTermSuggestions, getSmartTermDefault,
   composeDescription, COVER_PRESETS,
 } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { AccessTypePicker, TagInput, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { ClassroomType } from '@/lib/types'
 import { Card } from '@/components/ui/card'
-import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
 import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
 
@@ -106,10 +103,10 @@ function CoverDesignSection({
   onImageChange: (u: string) => void
 }) {
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
+    <div className="grid gap-4 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <div className="space-y-1.5">
         <Label className="text-sm font-medium">ธีมสี</Label>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-wrap gap-2">
           {COVER_PRESETS.map((preset) => (
             <button
               key={preset.id}
@@ -119,10 +116,10 @@ function CoverDesignSection({
               aria-pressed={cover === preset.id}
               onClick={() => onCoverChange(preset.id)}
               className={cn(
-                'w-8 h-8 rounded-full transition-all hover:scale-110',
+                'size-8 rounded-full transition-transform hover:scale-105',
                 preset.solid,
                 cover === preset.id
-                  ? 'scale-110 shadow-md ring-2 ring-offset-2 ring-ring'
+                  ? 'shadow-sm ring-2 ring-ring ring-offset-2'
                   : 'opacity-70 hover:opacity-100',
               )}
             />
@@ -130,10 +127,10 @@ function CoverDesignSection({
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label className="text-sm font-medium">
           รูปภาพหน้าปก
-          <span className="text-xs text-muted-foreground font-normal ml-1">(ไม่บังคับ — แทนที่สีหน้าปก)</span>
+          <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
         </Label>
         <ImageUploadZone value={coverImageUrl} onChange={onImageChange} />
       </div>
@@ -162,39 +159,42 @@ function ImageUploadZone({ value, onChange }: { value: string; onChange: (u: str
 
   if (value) {
     return (
-      <div className="relative rounded-xl overflow-hidden group">
-        <img src={value} alt="cover preview" className="w-full h-24 object-cover" />
+      <div className="group relative overflow-hidden rounded-lg">
+        <img src={value} alt="ภาพหน้าปกที่เลือก" className="h-16 w-full object-cover" />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
         <button
           type="button"
           onClick={() => onChange('')}
-          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-overlay text-white flex items-center justify-center hover:bg-overlay transition-colors"
+          aria-label="นำรูปภาพหน้าปกออก"
+          className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-overlay text-white transition-colors hover:bg-overlay"
         >
-          <X className="w-3 h-3" />
+          <X className="size-4" />
         </button>
       </div>
     )
   }
 
   return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={handleDrop}
-      onClick={() => inputRef.current?.click()}
-      className={cn(
-        'border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all',
-        isDragging
-          ? 'border-primary bg-primary/10 scale-[1.01]'
-          : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30',
-      )}
-    >
-      <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
-      <p className="text-sm text-muted-foreground">
-        ลากวางรูปภาพ หรือ{' '}
-        <span className="text-primary font-medium">คลิกเพื่อเลือก</span>
-      </p>
-      <p className="text-xs text-muted-foreground/60 mt-1">PNG, JPG, WebP — สูงสุด 5MB</p>
+    <>
+      <button
+        type="button"
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+        className={cn(
+          'flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+          isDragging
+            ? 'border-primary bg-primary/10'
+            : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30',
+        )}
+      >
+        <Upload className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 text-left">
+          <span className="block text-sm text-foreground">ลากวาง หรือ <span className="font-medium text-primary">เลือกไฟล์</span></span>
+          <span className="block text-xs text-muted-foreground">PNG, JPG, WebP · สูงสุด 5MB</span>
+        </span>
+      </button>
       <input
         ref={inputRef}
         type="file"
@@ -202,7 +202,7 @@ function ImageUploadZone({ value, onChange }: { value: string; onChange: (u: str
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
       />
-    </div>
+    </>
   )
 }
 
@@ -223,25 +223,25 @@ function StepIndicator({
 
         return (
           <div key={step.id} className="flex items-center">
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-1">
               <button
                 type="button"
                 disabled={!done}
                 onClick={() => done && onStepClick(step.id)}
                 className={cn(
-                  'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-all duration-300',
+                  'flex size-7 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors',
                   done
-                    ? 'bg-primary border-primary text-primary-foreground dark:bg-primary dark:border-primary cursor-pointer hover:bg-primary/90 hover:border-primary hover:scale-105'
+                    ? 'cursor-pointer border-primary bg-primary text-primary-foreground hover:bg-primary/90 dark:border-primary dark:bg-primary'
                     : active
                     ? 'border-primary text-primary bg-primary/10 dark:border-primary'
                     : 'border-border text-muted-foreground bg-background cursor-default',
                 )}
                 title={done ? `กลับไปขั้นตอน: ${step.label}` : undefined}
               >
-                {done ? <Check className="w-4 h-4" /> : String(step.id + 1)}
+                {done ? <Check className="size-3.5" /> : String(step.id + 1)}
               </button>
               <span className={cn(
-                'text-[11px] font-medium whitespace-nowrap hidden sm:block',
+                'hidden whitespace-nowrap text-[11px] font-medium sm:block',
                 active ? 'text-primary' : done ? 'text-primary/70 dark:text-primary/60' : 'text-muted-foreground',
               )}>
                 {step.label}
@@ -249,108 +249,13 @@ function StepIndicator({
             </div>
             {idx < STEPS.length - 1 && (
               <div className={cn(
-                'h-0.5 w-12 sm:w-20 mx-1.5 mb-5 transition-colors duration-300',
+                'mx-1.5 mb-4 h-px w-10 transition-colors sm:w-16',
                 current > step.id ? 'bg-primary dark:bg-primary' : 'bg-border',
               )} />
             )}
           </div>
         )
       })}
-    </div>
-  )
-}
-
-// ─── Classroom Preview Card (right side, sticky) ─────────────────────────────
-
-function ClassroomPreviewCard({ values }: { values: WizardData }) {
-  const preset = COVER_PRESETS.find(p => p.id === values.cover) ?? null
-  const hasCover = values.coverImageUrl !== ''
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <ClassroomIcon iconKey={values.iconKey} className="size-4 text-muted-foreground" />
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">ตัวอย่าง Live Preview</p>
-      </div>
-
-      <div className="rounded-2xl overflow-hidden border border-border shadow-lg">
-        <div
-          className={cn(
-            'relative h-36 flex flex-col justify-end p-5 overflow-hidden',
-            !hasCover && (preset ? `${preset.surface} ${preset.text}` : 'bg-muted text-muted-foreground'),
-          )}
-          style={hasCover
-            ? { backgroundImage: `url(${values.coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-            : undefined}
-        >
-          {hasCover && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />}
-          <div className="relative flex items-center gap-3">
-            <ClassroomIcon iconKey={values.iconKey} className={cn('size-9 shrink-0', hasCover && 'text-surface-inverse-foreground')} />
-            <div className="min-w-0">
-              <p className={cn(
-                'font-bold text-lg leading-tight truncate',
-                hasCover && 'text-white drop-shadow-sm',
-              )}>
-                {values.name.trim() || 'ชื่อห้องเรียน'}
-              </p>
-              {(values.gradeLevel || values.academicTerm) && (
-                <p className={cn('text-xs mt-0.5', hasCover ? 'text-white opacity-80' : preset?.textMuted)}>
-                  {[values.gradeLevel, values.academicTerm].filter(Boolean).join(' · ')}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card px-4 py-3 space-y-3">
-          {values.description.trim() && (
-            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-              {values.description}
-            </p>
-          )}
-          <div className="flex items-center gap-2">
-            <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', ACCESS_BADGE[values.accessType])}>
-              {ACCESS_LABEL[values.accessType]}
-            </span>
-          </div>
-          {values.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-0.5">
-              {values.tags.slice(0, 5).map((tag) => (
-                <span key={tag} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-md">
-                  {tag}
-                </span>
-              ))}
-              {values.tags.length > 5 && (
-                <span className="text-xs text-muted-foreground">+{values.tags.length - 5}</span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">ข้อมูลการตั้งค่า</p>
-        <div className="space-y-1.5">
-          {values.capacityEnabled && values.maxCapacity && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Users className="w-3.5 h-3.5 shrink-0" />
-              <span>จำกัด {values.maxCapacity} คน</span>
-            </div>
-          )}
-          {values.startDate && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                เปิด {values.startDate}
-                {values.endDate ? ` → ${values.endDate}` : ''}
-              </span>
-            </div>
-          )}
-          {!values.capacityEnabled && !values.startDate && (
-            <p className="text-xs text-muted-foreground/50 italic">กรอกข้อมูลเพิ่มเติมในขั้นตอนถัดไป</p>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
@@ -365,48 +270,46 @@ function ClassroomTypeSection({
   disabled?: boolean
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <Label className="text-sm font-medium">ประเภทห้องเรียน</Label>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
           type="button"
           disabled={disabled}
           onClick={() => onChange('subject')}
+          aria-pressed={value === 'subject'}
           className={cn(
-            'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+            'flex min-h-14 items-center gap-3 rounded-xl border p-3 text-left transition-colors',
             disabled && 'cursor-not-allowed opacity-70',
             value === 'subject'
-              ? 'border-primary bg-primary/10 shadow-sm'
+              ? 'border-primary bg-primary/10'
               : 'border-border bg-card hover:border-muted-foreground/30',
           )}
         >
-          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'subject' ? 'bg-card/60' : 'bg-muted')}>
-            <School className={cn('size-4', value === 'subject' ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
-          </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className={cn('font-semibold text-sm', value === 'subject' ? 'text-primary' : 'text-foreground')}>ห้องเรียนวิชา</p>
-            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">มอบหมายการบ้าน สอบ ให้คะแนน</p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">มอบหมายการบ้าน สอบ และให้คะแนน</p>
           </div>
+          {value === 'subject' && <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />}
         </button>
         <button
           type="button"
           disabled={disabled}
           onClick={() => onChange('homeroom')}
+          aria-pressed={value === 'homeroom'}
           className={cn(
-            'flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+            'flex min-h-14 items-center gap-3 rounded-xl border p-3 text-left transition-colors',
             disabled && 'cursor-not-allowed opacity-70',
             value === 'homeroom'
-              ? 'border-primary bg-primary/10 shadow-sm'
+              ? 'border-primary bg-primary/10'
               : 'border-border bg-card hover:border-muted-foreground/30',
           )}
         >
-          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'homeroom' ? 'bg-card/60' : 'bg-muted')}>
-            <Users className={cn('w-4 h-4', value === 'homeroom' ? 'text-primary' : 'text-muted-foreground')} />
-          </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className={cn('font-semibold text-sm', value === 'homeroom' ? 'text-primary' : 'text-foreground')}>ห้อง Homeroom</p>
-            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">ครูที่ปรึกษาติดตามการส่งงานทุกวิชา</p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">ติดตามการส่งงานของนักเรียนทุกวิชา</p>
           </div>
+          {value === 'homeroom' && <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />}
         </button>
       </div>
     </div>
@@ -435,11 +338,8 @@ function Step0Content({
   classroomTypeLocked?: boolean
 }) {
   return (
-    <div className="space-y-7">
-      <div>
-        <h2 className="text-lg font-bold text-foreground">การออกแบบหน้าปกและข้อมูล</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">ตั้งชื่อ เลือกธีม และกรอกรายละเอียดห้องเรียน</p>
-      </div>
+    <div className="space-y-4">
+      <h2 className="text-sm font-semibold text-foreground">หน้าปกและข้อมูลห้องเรียน</h2>
 
       <ClassroomTypeSection
         value={values.classroomType}
@@ -447,7 +347,7 @@ function Step0Content({
         disabled={classroomTypeLocked}
       />
 
-      <ClassroomIconPicker value={values.iconKey} onValueChange={onIconChange} />
+      <ClassroomIconPicker value={values.iconKey} onValueChange={onIconChange} compact />
 
       <CoverDesignSection
         cover={values.cover}
@@ -456,48 +356,50 @@ function Step0Content({
         onImageChange={onCoverImageChange}
       />
 
-      <div className="space-y-1.5">
-        <Label htmlFor="cls-name">
-          ชื่อห้องเรียน <span className="text-destructive">*</span>
-        </Label>
-        <Controller
-          control={control}
-          name="name"
-          render={({ field }) => (
-            <Input
-              {...field}
-              id="cls-name"
-              placeholder="เช่น ฟิสิกส์ ม.4/1 ภาคเรียน 1"
-              autoFocus
-              className="h-10"
-            />
-          )}
-        />
-        <FieldError message={errors.name?.message} />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="cls-name">
+            ชื่อห้องเรียน <span className="text-destructive">*</span>
+          </Label>
+          <Controller
+            control={control}
+            name="name"
+            render={({ field }) => (
+              <Input
+                {...field}
+                id="cls-name"
+                placeholder="เช่น ฟิสิกส์ ม.4/1 ภาคเรียน 1"
+                autoFocus
+                className="h-10"
+              />
+            )}
+          />
+          <FieldError message={errors.name?.message} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="cls-desc">
+            คำอธิบายรายวิชา
+            <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
+          </Label>
+          <Controller
+            control={control}
+            name="description"
+            render={({ field }) => (
+              <Textarea
+                {...field}
+                id="cls-desc"
+                placeholder="เนื้อหา เป้าหมาย หรือรายละเอียดที่เป็นประโยชน์"
+                rows={2}
+                className="min-h-10 resize-none"
+              />
+            )}
+          />
+          <FieldError message={errors.description?.message} />
+        </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="cls-desc">
-          คำอธิบายรายวิชา
-          <span className="text-xs text-muted-foreground font-normal ml-1">(ไม่บังคับ)</span>
-        </Label>
-        <Controller
-          control={control}
-          name="description"
-          render={({ field }) => (
-            <Textarea
-              {...field}
-              id="cls-desc"
-              placeholder="อธิบายเนื้อหาที่จะเรียน เป้าหมาย หรือรายละเอียดที่เป็นประโยชน์..."
-              rows={3}
-              className="resize-none"
-            />
-          )}
-        />
-        <FieldError message={errors.description?.message} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="grade-combobox">ระดับชั้น</Label>
           <Controller
@@ -531,40 +433,12 @@ function Step0Content({
       </div>
 
       <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5">
-          <Label className="flex items-center gap-1.5">
-            <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-            แท็กรายวิชา
-            <span className="text-xs text-muted-foreground font-normal">(ไม่บังคับ)</span>
-          </Label>
-          <TooltipIcon text="แท็กช่วยให้นักเรียนค้นหาคอร์สได้ง่ายขึ้น เช่น ฟิสิกส์, กลศาสตร์, ม.4" />
-        </div>
+        <Label>
+          แท็กรายวิชา
+          <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
+        </Label>
         <TagInput tags={values.tags} onChange={onTagsChange} />
       </div>
-    </div>
-  )
-}
-
-function TooltipIcon({ text }: { text: string }) {
-  const [show, setShow] = useState(false)
-  return (
-    <div className="relative inline-block">
-      <button
-        type="button"
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-        onFocus={() => setShow(true)}
-        onBlur={() => setShow(false)}
-        className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted-foreground/20 transition-colors"
-        aria-label="คำอธิบาย"
-      >
-        <HelpCircle className="w-3 h-3" />
-      </button>
-      {show && (
-        <div className="absolute left-6 -top-1 z-50 w-56 bg-popover border border-border rounded-lg shadow-lg px-3 py-2 pointer-events-none">
-          <p className="text-xs text-popover-foreground leading-relaxed">{text}</p>
-        </div>
-      )}
     </div>
   )
 }
@@ -581,83 +455,67 @@ function Step1Content({
   onToggleCapacity: (v: boolean) => void
 }) {
   return (
-    <div className="space-y-7">
-      <div>
-        <h2 className="text-lg font-bold text-foreground">การเข้าร่วมและระยะเวลา</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">กำหนดวิธีเข้าร่วมและช่วงเวลาของห้องเรียน</p>
-      </div>
+    <div className="space-y-4">
+      <h2 className="text-sm font-semibold text-foreground">การเข้าร่วมและระยะเวลา</h2>
 
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         <Label className="text-sm font-medium">ประเภทการเข้าร่วม</Label>
         <Controller
           control={control}
           name="accessType"
           render={({ field }) => (
-            <AccessTypePicker value={field.value} onChange={field.onChange} />
+            <AccessTypePicker value={field.value} onChange={field.onChange} compact />
           )}
         />
       </div>
 
-      <Card padding="lg" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Users className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <p className="font-medium text-sm text-foreground">จำกัดจำนวนที่นั่ง</p>
-              <p className="text-xs text-muted-foreground">ล็อกอัตโนมัติเมื่อนักเรียนเต็มจำนวน</p>
-            </div>
+      <Card padding="md" className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p id="capacity-label" className="text-sm font-semibold text-foreground">จำกัดจำนวนที่นั่ง</p>
+            <p className="text-xs text-muted-foreground">ปิดรับอัตโนมัติเมื่อครบจำนวน</p>
           </div>
-          <ToggleSwitch checked={values.capacityEnabled} onChange={onToggleCapacity} />
+          <ToggleSwitch checked={values.capacityEnabled} onChange={onToggleCapacity} aria-labelledby="capacity-label" />
         </div>
         {values.capacityEnabled && (
-          <div className="pt-1 space-y-1.5 border-t border-border">
-            <Label htmlFor="max-cap" className="text-sm pt-3 block">จำนวนที่นั่งสูงสุด</Label>
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="max-cap" className="text-sm">จำนวนที่นั่งสูงสุด</Label>
               <Controller
                 control={control}
                 name="maxCapacity"
                 render={({ field }) => (
-                  <Input {...field} id="max-cap" type="number" min={1} max={500} className="h-10 w-28 text-center text-base font-semibold" placeholder="30" />
+                  <Input {...field} id="max-cap" type="number" min={1} max={500} className="h-10 w-28 text-center font-semibold" placeholder="30" />
                 )}
               />
-              <span className="text-sm text-muted-foreground">คน</span>
+            </div>
+            <span className="pb-2.5 text-sm text-muted-foreground">คน</span>
+          </div>
+        )}
+
+        <div className="space-y-3 border-t border-border pt-3">
+          <p className="text-sm font-semibold text-foreground">ระยะเวลาของห้องเรียน</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="start-date" className="text-sm">วันเปิดคอร์ส</Label>
+              <Controller control={control} name="startDate" render={({ field }) => (
+                <Input {...field} id="start-date" type="date" className="h-10" />
+              )} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="end-date" className="text-sm">วันปิดคอร์ส</Label>
+              <Controller control={control} name="endDate" render={({ field }) => (
+                <Input {...field} id="end-date" type="date" className="h-10" />
+              )} />
             </div>
           </div>
-        )}
-      </Card>
-
-      <Card padding="lg" className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-            <CalendarDays className="w-4 h-4 text-warning" />
-          </div>
-          <div>
-            <p className="font-medium text-sm text-foreground">ระยะเวลาของห้องเรียน</p>
-            <p className="text-xs text-muted-foreground">ไม่บังคับ — หากไม่กำหนดวันสิ้นสุด ห้องเรียนจะเปิดตลอด</p>
-          </div>
+          {(values.startDate || values.endDate) && (
+            <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+              <Clock className="mt-0.5 size-3.5 shrink-0" />
+              <p>เมื่อถึงวันปิดคอร์ส ระบบจะเปลี่ยนเป็น <strong>Read-only</strong> — นักเรียนดูประวัติได้แต่ส่งคำตอบไม่ได้</p>
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="start-date" className="text-sm">วันเปิดคอร์ส</Label>
-            <Controller control={control} name="startDate" render={({ field }) => (
-              <Input {...field} id="start-date" type="date" className="h-10" />
-            )} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="end-date" className="text-sm">วันปิดคอร์ส</Label>
-            <Controller control={control} name="endDate" render={({ field }) => (
-              <Input {...field} id="end-date" type="date" className="h-10" />
-            )} />
-          </div>
-        </div>
-        {(values.startDate || values.endDate) && (
-          <div className="flex items-start gap-2.5 text-xs text-warning bg-warning/10 rounded-xl px-3.5 py-3 border border-warning/20">
-            <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            <p>เมื่อถึงวันปิดคอร์ส ระบบจะเปลี่ยนเป็น <strong>Read-only</strong> — นักเรียนดูประวัติได้แต่ส่งคำตอบไม่ได้</p>
-          </div>
-        )}
       </Card>
     </div>
   )
@@ -695,19 +553,22 @@ export function CreateCourseWizard({
 
   const isNextEnabled = canProceed(currentStep, values) && !isPending
 
+  function validateEnrollment() {
+    if (values.capacityEnabled && (!values.maxCapacity || Number(values.maxCapacity) < 1)) {
+      toast.error('กรุณากรอกจำนวนที่นั่งที่ถูกต้อง')
+      return false
+    }
+    if (values.startDate && values.endDate && values.startDate > values.endDate) {
+      toast.error('วันเปิดคอร์สต้องอยู่ก่อนวันปิดคอร์ส')
+      return false
+    }
+    return true
+  }
+
   async function handleNext() {
     const valid = await form.trigger(STEP_FIELDS[currentStep])
     if (!valid) return
-    if (currentStep === 1) {
-      if (values.capacityEnabled && (!values.maxCapacity || Number(values.maxCapacity) < 1)) {
-        toast.error('กรุณากรอกจำนวนที่นั่งที่ถูกต้อง')
-        return
-      }
-      if (values.startDate && values.endDate && values.startDate > values.endDate) {
-        toast.error('วันเปิดคอร์สต้องอยู่ก่อนวันปิดคอร์ส')
-        return
-      }
-    }
+    if (currentStep === 1 && !validateEnrollment()) return
     setCurrentStep((prev) => prev + 1)
   }
 
@@ -718,6 +579,7 @@ export function CreateCourseWizard({
   }
 
   function handleSubmit() {
+    if (!validateEnrollment()) return
     const data = values
 
     // The description encoding is shared with the settings dialog — see
@@ -768,89 +630,78 @@ export function CreateCourseWizard({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-8 items-start">
-      {/* ── Left: Form ── */}
-      <Card elevation="sm" className="overflow-hidden">
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b border-border">
-          <div className="mb-5">
-            <h1 className="text-xl font-bold text-foreground">
-              {duplicateSourceId ? 'ตรวจสอบข้อมูลสำเนาห้องเรียน' : 'สร้างห้องเรียนใหม่'}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">ขั้นตอน {currentStep + 1} จาก {STEPS.length}</p>
-          </div>
+    <div data-classroom-create-wizard className="w-full">
+      <header className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-foreground">
+            {duplicateSourceId ? 'ตรวจสอบข้อมูลสำเนาห้องเรียน' : 'สร้างห้องเรียนใหม่'}
+          </h1>
+          <p className="text-xs text-muted-foreground">ขั้นตอน {currentStep + 1} จาก {STEPS.length}</p>
+        </div>
+        <div className="self-center sm:self-auto">
           <StepIndicator current={currentStep} onStepClick={handleStepClick} />
         </div>
+      </header>
 
-        {/* Step Content */}
-        <div className="px-6 py-7">
-          {currentStep === 0 && (
-            <Step0Content
-              control={control}
-              errors={errors}
-              values={values}
-              onClassroomTypeChange={(v) => setValue('classroomType', v)}
-              onCoverChange={(id) => setValue('cover', id)}
-              onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
-              onCoverImageChange={(u) => setValue('coverImageUrl', u)}
-              onTagsChange={(t) => setValue('tags', t)}
-              classroomTypeLocked={!!duplicateSourceId}
-            />
-          )}
-          {currentStep === 1 && (
-            <Step1Content
-              control={control}
-              values={values}
-              onToggleCapacity={(v) => setValue('capacityEnabled', v)}
-            />
-          )}
-        </div>
-
-        {/* Navigation */}
-        <div className="px-6 pb-6 flex items-center justify-between border-t border-border pt-5">
-          <div>
-            {currentStep > 0 && (
-              <Button type="button" variant="outline" onClick={handleBack} disabled={isPending}>
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                ย้อนกลับ
-              </Button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            {currentStep < STEPS.length - 1 ? (
-              <Button
-                type="button"
-                onClick={handleNext}
-                disabled={!isNextEnabled}
-                title={!isNextEnabled ? 'กรุณากรอกข้อมูลที่จำเป็นให้ครบก่อน' : undefined}
-              >
-                ถัดไป
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!isNextEnabled}
-                className="bg-success hover:bg-success/90 disabled:bg-success/40 text-success-foreground min-w-[160px]"
-              >
-                <Check className="w-4 h-4 mr-1.5" />
-                {isPending
-                  ? 'กำลังสร้างห้องเรียน...'
-                  : duplicateSourceId ? 'ยืนยันสร้างสำเนา' : 'ยืนยันสร้างห้องเรียน'}
-              </Button>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      {/* ── Right: Live Preview ── */}
-      <div className="hidden lg:block">
-        <Card elevation="sm" padding="lg" className="sticky top-8">
-          <ClassroomPreviewCard values={values} />
-        </Card>
+      <div className="py-4">
+        {currentStep === 0 && (
+          <Step0Content
+            control={control}
+            errors={errors}
+            values={values}
+            onClassroomTypeChange={(v) => setValue('classroomType', v)}
+            onCoverChange={(id) => setValue('cover', id)}
+            onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
+            onCoverImageChange={(u) => setValue('coverImageUrl', u)}
+            onTagsChange={(t) => setValue('tags', t)}
+            classroomTypeLocked={!!duplicateSourceId}
+          />
+        )}
+        {currentStep === 1 && (
+          <Step1Content
+            control={control}
+            values={values}
+            onToggleCapacity={(v) => setValue('capacityEnabled', v)}
+          />
+        )}
       </div>
+
+      <footer className="flex items-center justify-between border-t border-border pt-4">
+        <div>
+          {currentStep > 0 && (
+            <Button type="button" variant="outline" onClick={handleBack} disabled={isPending}>
+              <ChevronLeft className="mr-1 size-4" />
+              ย้อนกลับ
+            </Button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {currentStep < STEPS.length - 1 ? (
+            <Button
+              type="button"
+              onClick={handleNext}
+              disabled={!isNextEnabled}
+              title={!isNextEnabled ? 'กรุณากรอกข้อมูลที่จำเป็นให้ครบก่อน' : undefined}
+            >
+              ถัดไป
+              <ChevronRight className="ml-1 size-4" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!isNextEnabled}
+              className="min-w-40 bg-success text-success-foreground hover:bg-success/90 disabled:bg-success/40"
+            >
+              <Check className="mr-1.5 size-4" />
+              {isPending
+                ? 'กำลังสร้างห้องเรียน...'
+                : duplicateSourceId ? 'ยืนยันสร้างสำเนา' : 'ยืนยันสร้างห้องเรียน'}
+            </Button>
+          )}
+        </div>
+      </footer>
     </div>
   )
 }

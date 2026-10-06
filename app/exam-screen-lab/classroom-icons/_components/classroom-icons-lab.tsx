@@ -32,7 +32,7 @@ function LabContent() {
     onCreated: () => setCreated(true),
   }
   const savedMeta = parseDescription(room.description)
-  return <div className="flex flex-col gap-4">
+  return <div className="classroom-create-stage flex max-w-4xl flex-col gap-4">
     <p>ห้องทดลองไอคอน · ข้อมูลสมมติ · ไม่อ่านหรือเขียน Supabase</p>
     <Card className="flex flex-col gap-3 p-4">
       <h1>ไอคอนที่บันทึกจำลอง</h1>

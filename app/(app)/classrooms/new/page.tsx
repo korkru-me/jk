@@ -54,7 +54,7 @@ export default async function NewClassroomPage({
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-6 px-4 sm:px-6">
+    <div className="classroom-create-stage max-w-4xl">
       <CreateCourseWizard duplicateSourceId={duplicateSourceId} initialValues={initialValues} />
     </div>
   )

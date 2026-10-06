@@ -44,14 +44,15 @@ export const ACCESS_TYPES = [
 ]
 
 export function AccessTypePicker({
-  value, onChange, columns = 3,
+  value, onChange, columns = 3, compact = false,
 }: {
   value: AccessType
   onChange: (v: AccessType) => void
   columns?: 1 | 3
+  compact?: boolean
 }) {
   return (
-    <div className={cn('grid grid-cols-1 gap-3', columns === 3 && 'sm:grid-cols-3')}>
+    <div className={cn('grid grid-cols-1', compact ? 'gap-2' : 'gap-3', columns === 3 && 'sm:grid-cols-3')}>
       {ACCESS_TYPES.map((type) => {
         const isSelected = value === type.value
         const Icon = type.Icon
@@ -60,25 +61,30 @@ export function AccessTypePicker({
             key={type.value}
             type="button"
             onClick={() => onChange(type.value)}
+            aria-pressed={isSelected}
             className={cn(
-              'relative flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+              'relative flex text-left transition-colors',
+              compact
+                ? 'min-h-14 items-center gap-2.5 rounded-xl border p-3'
+                : 'flex-col items-start gap-3 rounded-2xl border-2 p-4',
               isSelected ? type.cardActive + ' shadow-sm' : 'border-border bg-card hover:border-muted-foreground/30',
             )}
           >
-            <div className="flex items-center justify-between w-full">
-              <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', isSelected ? 'bg-card/60' : 'bg-muted')}>
+            <div className={cn('flex items-center justify-between', compact ? 'shrink-0' : 'w-full')}>
+              <div className={cn('flex items-center justify-center', compact ? 'size-8 rounded-lg' : 'size-9 rounded-xl', isSelected ? 'bg-card/60' : 'bg-muted')}>
                 <Icon className={cn('w-4 h-4', isSelected ? type.iconColor : 'text-muted-foreground')} />
               </div>
-              {isSelected && (
+              {isSelected && !compact && (
                 <div className={cn('w-5 h-5 rounded-full flex items-center justify-center', type.chip)}>
                   <Check className={cn('w-3 h-3', type.chipForeground)} />
                 </div>
               )}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className={cn('font-semibold text-sm', isSelected ? type.iconColor : 'text-foreground')}>{type.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{type.desc}</p>
+              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{type.desc}</p>
             </div>
+            {isSelected && compact && <Check className={cn('size-4 shrink-0', type.iconColor)} aria-hidden="true" />}
           </button>
         )
       })}

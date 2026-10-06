@@ -108,7 +108,7 @@ export function ShellClient({
             collapsed={sidebarCollapsed}
           />
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6 md:[&>.assignment-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))]">
+            <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6 md:[&>.assignment-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.classroom-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))]">
               {children}
             </main>
           </div>
