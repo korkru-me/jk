@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import {
-  Settings, Users, CalendarDays, Clock, Tag, BookOpen, Home, Info, Palette, Check, Ban,
+  Settings, Users, CalendarDays, Clock, Tag, School, Home, Info, Palette, Check, Ban,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -131,7 +131,7 @@ export function ClassroomSettingsDialog({
               <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
                 {isHomeroom
                   ? <Home className="w-4 h-4 text-muted-foreground" />
-                  : <BookOpen className="w-4 h-4 text-muted-foreground" />}
+                  : <School className="size-4 text-muted-foreground" aria-hidden="true" />}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">ประเภทห้องเรียน</p>

@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   Check, ChevronRight, ChevronLeft, Users, Globe, UserCheck, Lock,
   CalendarDays, Clock, X, Tag, Upload, Plus,
-  ArrowLeftRight, GraduationCap, BookOpen, HelpCircle, Info,
+  ArrowLeftRight, GraduationCap, School, HelpCircle, Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -264,7 +264,7 @@ function ClassroomPreviewCard({ values }: { values: WizardData }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <BookOpen className="w-4 h-4 text-muted-foreground" />
+        <School className="size-4 text-muted-foreground" aria-hidden="true" />
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">ตัวอย่าง Live Preview</p>
       </div>
 
@@ -373,7 +373,7 @@ function ClassroomTypeSection({
           )}
         >
           <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', value === 'subject' ? 'bg-card/60' : 'bg-muted')}>
-            <BookOpen className={cn('w-4 h-4', value === 'subject' ? 'text-primary' : 'text-muted-foreground')} />
+            <School className={cn('size-4', value === 'subject' ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
           </div>
           <div>
             <p className={cn('font-semibold text-sm', value === 'subject' ? 'text-primary' : 'text-foreground')}>ห้องเรียนวิชา</p>

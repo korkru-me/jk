@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import {
-  BookOpen, Layers, GraduationCap, Plus, ChevronRight, Users, FileText,
-  House, ListChecks, PenLine, NotebookPen, ToggleLeft, TextCursorInput,
+  BookOpen, Layers, School, Plus, ChevronRight, Users, FileText,
+  ListChecks, PenLine, NotebookPen, ToggleLeft, TextCursorInput,
   ArrowLeftRight, ListOrdered, Paperclip, Boxes, Table2,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -128,7 +128,7 @@ export function TeacherDashboard({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard
               href="/classrooms"
-              icon={GraduationCap}
+              icon={School}
               accent={CLASSROOM_ACCENT}
               value={classroomsCount}
               label="ห้องเรียน"
@@ -166,7 +166,7 @@ export function TeacherDashboard({
 
           <Section
             title="ห้องเรียนของฉัน"
-            icon={GraduationCap}
+            icon={School}
             accent={CLASSROOM_ACCENT}
             href="/classrooms"
             seeAll={classroomsCount > classrooms.length ? `ดูทั้งหมด ${classroomsCount} ห้อง` : 'ดูทั้งหมด'}
@@ -179,7 +179,7 @@ export function TeacherDashboard({
                 key={classroom.id}
                 href={`/classrooms/${classroom.id}`}
                 title={classroom.name}
-                icon={classroom.classroom_type === 'homeroom' ? House : GraduationCap}
+                icon={School}
                 accent={CLASSROOM_ACCENT}
               >
                 <span className="inline-flex items-center gap-1">
@@ -388,7 +388,7 @@ function GettingStarted() {
     },
     {
       href: '/classrooms/new',
-      icon: GraduationCap,
+      icon: School,
       accent: CLASSROOM_ACCENT,
       title: 'สร้างห้องเรียน',
       desc: 'เชิญนักเรียนเข้าร่วมด้วยรหัสห้องเรียน',

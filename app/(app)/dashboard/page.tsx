@@ -16,7 +16,7 @@ import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { canStudentViewScore } from '@/lib/result-visibility'
 import { formatThaiDate, thaiHour } from '@/lib/thai-time'
 import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
-import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
+import { Clock, BookOpen, School, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
@@ -304,7 +304,7 @@ function StudentDashboard({
         <StatCard
           value={String(classroomsCount)}
           label="ห้องเรียน"
-          icon={<span className="text-2xl">🏫</span>}
+          icon={<School className="size-6" aria-hidden="true" />}
           href="/classrooms"
           accent="blue"
         />
@@ -355,7 +355,7 @@ function StudentDashboard({
         </Card>
       ) : (
         <div className="bg-card border-2 border-dashed border-primary/20 bg-primary/10 rounded-2xl p-10 text-center">
-          <p className="text-4xl mb-3">🏫</p>
+          <School className="mx-auto mb-3 size-10 text-primary" aria-hidden="true" />
           <h3 className="font-semibold mb-1">เข้าร่วมห้องเรียนแรกของคุณ</h3>
           <p className="text-sm text-muted-foreground mb-4">ขอรหัส Class Code จากครู แล้วกรอกในหน้าห้องเรียน</p>
           <Link href="/classrooms" className={cn(buttonVariants())}>

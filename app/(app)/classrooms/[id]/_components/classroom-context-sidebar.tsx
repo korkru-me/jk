@@ -3,7 +3,6 @@
 import { Fragment, useId, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  BookOpen,
   ChevronLeft,
   ChevronsUpDown,
   LayoutDashboard,
@@ -84,10 +83,10 @@ export function ClassroomContextNavigation({
       )} title={classroom.name}>
         <div className={cn(
           'flex size-12 shrink-0 items-center justify-center rounded-xl shadow-sm',
-          compact && 'md:size-10',
+          compact && 'md:size-8',
           cover ? 'bg-current/10' : 'bg-primary text-primary-foreground',
         )}>
-          <BookOpen aria-hidden="true" className="size-6" />
+          <School aria-hidden="true" className={cn('size-6', compact && 'md:size-5')} />
         </div>
         <div className={cn('min-w-0 flex-1', compact && 'md:sr-only')}>
           <p className={cn('text-xs font-medium', cover ? cover.textMuted : 'text-primary')}>ห้องเรียนปัจจุบัน</p>
@@ -134,7 +133,7 @@ export function ClassroomContextNavigation({
                         'flex size-8 shrink-0 items-center justify-center rounded-lg border',
                         optionCover ? cn(optionCover.surface, optionCover.text) : 'bg-muted text-muted-foreground',
                       )}>
-                        <BookOpen aria-hidden="true" />
+                        <School aria-hidden="true" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{option.name}</span>

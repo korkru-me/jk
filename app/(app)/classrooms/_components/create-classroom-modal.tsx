@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Palette, BookOpen, Users } from 'lucide-react'
+import { Plus, Palette, School, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,7 +86,7 @@ export function CreateClassroomModal() {
                     : 'border-border hover:border-ring text-muted-foreground'
                 }`}
               >
-                <BookOpen className="w-4 h-4 shrink-0 mt-0.5" />
+                <School className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
                 <div>
                   <p className="font-medium leading-tight">ห้องเรียนวิชา</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">มอบหมายการบ้าน สอบ ให้คะแนน</p>

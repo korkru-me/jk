@@ -10,6 +10,7 @@ import {
   Plus,
   School,
   Trash2,
+  type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isClassroomSectionPath } from '@/lib/classroom-navigation'
@@ -21,7 +22,7 @@ import type { UserRole } from '@/lib/types'
 interface NavItem {
   href: string
   label: string
-  icon: string
+  icon: string | LucideIcon
 }
 
 /** A heading that opens to reveal its pages instead of navigating anywhere. */
@@ -48,7 +49,7 @@ const teacherNav: NavEntry[] = [
       { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
     ],
   },
-  { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
+  { href: '/classrooms', label: 'ห้องเรียน', icon: School },
   {
     label: 'วิจัยการศึกษา',
     icon: '🧪',
@@ -62,7 +63,7 @@ const teacherNav: NavEntry[] = [
 
 const studentNav: NavEntry[] = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
-  { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: '🏫' },
+  { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
   { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: '📋' },
   { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: '⚙️' },
 ]
@@ -81,6 +82,12 @@ function isNavActive(pathname: string, href: string): boolean {
     )
   }
   return pathname === href || pathname.startsWith(href + '/')
+}
+
+function NavItemIcon({ icon: Icon, className = 'text-base' }: Pick<NavItem, 'icon'> & { className?: string }) {
+  return typeof Icon === 'string'
+    ? <span className={className}>{Icon}</span>
+    : <Icon className="size-4 shrink-0" aria-hidden="true" />
 }
 
 /**
@@ -166,7 +173,7 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
                   compactOnDesktop && 'md:min-h-11 md:justify-center md:px-2'
                 )}
               >
-                <span className="text-sm">{child.icon}</span>
+                <NavItemIcon icon={child.icon} className="text-sm" />
                 <span className={cn(compactOnDesktop && 'md:sr-only')}>{child.label}</span>
               </Link>
             ))}
@@ -324,7 +331,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
                       collapsed && 'md:justify-center md:px-2 md:min-h-11',
                     )}
                   >
-                    <span className="text-base">{entry.icon}</span>
+                    <NavItemIcon icon={entry.icon} />
                     <SidebarLabel>{entry.label}</SidebarLabel>
                   </Link>
                 )

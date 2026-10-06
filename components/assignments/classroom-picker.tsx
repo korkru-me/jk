@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, Check, ChevronDown, Search } from 'lucide-react'
+import { School, Check, ChevronDown, Search } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Collapsible,
@@ -171,7 +171,7 @@ function ClassroomRow({
           cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-muted-foreground border-transparent',
         )}
       >
-        <BookOpen className="size-3.5" />
+        <School className="size-3.5" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{classroom.name}</p>
