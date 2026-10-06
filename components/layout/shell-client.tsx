@@ -6,6 +6,7 @@ import { SidebarContextProvider } from './sidebar-context'
 import { Topbar } from './topbar'
 import { useAppViewport } from '@/hooks/use-app-viewport'
 import type { User } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 const SIDEBAR_COLLAPSE_KEY = 'korkru:sidebar-collapsed'
 
@@ -80,7 +81,12 @@ export function ShellClient({
             collapsed={sidebarCollapsed}
           />
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6">
+            <main
+              className={cn(
+                'flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6',
+                sidebarCollapsed && 'md:[&>*]:mx-auto',
+              )}
+            >
               {children}
             </main>
           </div>
