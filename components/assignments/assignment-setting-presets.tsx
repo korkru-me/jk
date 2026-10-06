@@ -324,35 +324,50 @@ export function AssignmentSettingPresetsProvider({
   )
 
   const save = (
-    <Card padding="lg" className="flex min-w-0 flex-col gap-4" aria-busy={isPending}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 font-semibold"><Bookmark className="size-4" aria-hidden="true" />บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปไหม?</h2>
-        <div className="flex items-center gap-2"><Badge variant="secondary">ไม่บังคับ</Badge>{!unavailable && <Badge variant="secondary">{data.presets.length}/3 ชุด</Badge>}</div>
-      </div>
-      <p data-assignment-description className="text-sm text-muted-foreground">เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน ข้ามส่วนนี้แล้วสร้างงานได้ตามปกติ</p>
-      <FieldGroup className="gap-3">
-        <Field data-disabled={busy || unavailable}>
-          <FieldLabel htmlFor={`${id}-save-target`}>บันทึกการตั้งค่าเป็น</FieldLabel>
-          <NativeSelect id={`${id}-save-target`} value={saveTargetId ?? '__new'} disabled={busy || unavailable}
-            onChange={event => { setSaveTargetId(event.target.value === '__new' ? null : event.target.value); setError(null) }}>
-            <option value="__new">ชุดใหม่</option>
-            {data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}{data.defaultPresetId === preset.id ? ' · ค่าเริ่มต้น' : ''}</option>)}
-          </NativeSelect>
-          <FieldDescription>เลือกชุดเดิมเพื่ออัปเดตด้วยค่าของงานนี้ การเลือกตรงนี้ไม่เรียกค่าเก่ามาทับฟอร์ม และยังไม่บันทึกจนกดปุ่ม</FieldDescription>
-        </Field>
-      </FieldGroup>
-      <div className="flex flex-wrap gap-2">
-        {saveTarget ? <>
-          <Button type="button" size="sm" disabled={busy || unavailable || !saveTargetDirty} onClick={() => void updateSelected(saveTarget)}><Save data-icon="inline-start" />อัปเดตชุดนี้</Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => { setName(saveTarget.name); setNameError(null); setDialog('rename') }}><Pencil data-icon="inline-start" />เปลี่ยนชื่อ</Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable || data.defaultPresetId === saveTarget.id} onClick={() => run(() => actions.setDefault({ type, id: saveTarget.id, expectedRevision: saveTarget.revision }), 'ตั้งเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งเป็นค่าเริ่มต้น</Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void removeSelected(saveTarget)}><Trash2 data-icon="inline-start" />ลบชุด</Button>
-        </> : <Button type="button" size="sm" disabled={busy || unavailable || data.presets.length >= 3} onClick={() => { setName(''); setNameError(null); setDialog('new') }}><Save data-icon="inline-start" />บันทึกเป็นชุดใหม่</Button>}
-        {data.defaultPresetId !== null && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => run(() => actions.setDefault({ type, id: null }), 'ใช้ค่าระบบเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งค่าระบบเป็นค่าเริ่มต้น</Button>}
-        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
-      </div>
-      {!unavailable && data.presets.length >= 3 && <p data-assignment-description className="text-sm text-muted-foreground">ครบ 3 ชุดแล้ว เลือกอัปเดตชุดเดิมหรือลบชุดที่ไม่ใช้ก่อนบันทึกชุดใหม่ ระบบไม่ลบให้เอง</p>}
-      {status}
+    <Card padding="lg" className="min-w-0" aria-busy={isPending}>
+      <Collapsible>
+        <h2>
+          <CollapsibleTrigger className="group flex w-full flex-wrap items-center justify-between gap-2 text-left">
+            <span className="flex min-w-0 items-center gap-2 font-semibold">
+              <Bookmark className="size-4 shrink-0" aria-hidden="true" />
+              บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปไหม?
+            </span>
+            <span className="ml-auto flex shrink-0 items-center gap-2">
+              <Badge variant="secondary">ไม่บังคับ</Badge>
+              {!unavailable && <Badge variant="secondary">{data.presets.length}/3 ชุด</Badge>}
+              <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
+            </span>
+          </CollapsibleTrigger>
+        </h2>
+        <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+          <div className="flex flex-col gap-4 pt-4">
+            <p data-assignment-description className="text-sm text-muted-foreground">เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน ข้ามส่วนนี้แล้วสร้างงานได้ตามปกติ</p>
+            <FieldGroup className="gap-3">
+              <Field data-disabled={busy || unavailable}>
+                <FieldLabel htmlFor={`${id}-save-target`}>บันทึกการตั้งค่าเป็น</FieldLabel>
+                <NativeSelect id={`${id}-save-target`} value={saveTargetId ?? '__new'} disabled={busy || unavailable}
+                  onChange={event => { setSaveTargetId(event.target.value === '__new' ? null : event.target.value); setError(null) }}>
+                  <option value="__new">ชุดใหม่</option>
+                  {data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}{data.defaultPresetId === preset.id ? ' · ค่าเริ่มต้น' : ''}</option>)}
+                </NativeSelect>
+                <FieldDescription>เลือกชุดเดิมเพื่ออัปเดตด้วยค่าของงานนี้ การเลือกตรงนี้ไม่เรียกค่าเก่ามาทับฟอร์ม และยังไม่บันทึกจนกดปุ่ม</FieldDescription>
+              </Field>
+            </FieldGroup>
+            <div className="flex flex-wrap gap-2">
+              {saveTarget ? <>
+                <Button type="button" size="sm" disabled={busy || unavailable || !saveTargetDirty} onClick={() => void updateSelected(saveTarget)}><Save data-icon="inline-start" />อัปเดตชุดนี้</Button>
+                <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => { setName(saveTarget.name); setNameError(null); setDialog('rename') }}><Pencil data-icon="inline-start" />เปลี่ยนชื่อ</Button>
+                <Button type="button" variant="outline" size="sm" disabled={busy || unavailable || data.defaultPresetId === saveTarget.id} onClick={() => run(() => actions.setDefault({ type, id: saveTarget.id, expectedRevision: saveTarget.revision }), 'ตั้งเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งเป็นค่าเริ่มต้น</Button>
+                <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void removeSelected(saveTarget)}><Trash2 data-icon="inline-start" />ลบชุด</Button>
+              </> : <Button type="button" size="sm" disabled={busy || unavailable || data.presets.length >= 3} onClick={() => { setName(''); setNameError(null); setDialog('new') }}><Save data-icon="inline-start" />บันทึกเป็นชุดใหม่</Button>}
+              {data.defaultPresetId !== null && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => run(() => actions.setDefault({ type, id: null }), 'ใช้ค่าระบบเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งค่าระบบเป็นค่าเริ่มต้น</Button>}
+              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
+            </div>
+            {!unavailable && data.presets.length >= 3 && <p data-assignment-description className="text-sm text-muted-foreground">ครบ 3 ชุดแล้ว เลือกอัปเดตชุดเดิมหรือลบชุดที่ไม่ใช้ก่อนบันทึกชุดใหม่ ระบบไม่ลบให้เอง</p>}
+            {status}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   )
 

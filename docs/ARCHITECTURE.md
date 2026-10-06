@@ -52,6 +52,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ตาม UI-026 `CreateAssignmentForm` ซ่อนเฉพาะ node ที่ทำเครื่องหมาย `data-assignment-description` และ `FieldDescription` ภายใน root ของ wizard ทั้ง 3 ขั้น จึงใช้ primitive/ส่วนย่อยร่วมกับหน้าแก้ไขและ fixture อื่นได้โดยไม่ลบคำอธิบายจากบริบทเหล่านั้น; ข้อความสถานะ, validation และ warning/destructive ไม่อยู่ใน selector นี้
 
+ตาม UI-027 view `AssignmentSettingPresetsSave` ใช้ `Collapsible` แบบ uncontrolled และปิดเป็นค่าเริ่มต้น โดย provider และ state ของรายการ/เป้าหมายบันทึกยัง mount ตลอด wizard เหมือนเดิม การเปิดหรือปิดจึงเป็นเพียง presentation state ฝั่ง client ไม่เรียก Server Action ไม่แก้ draft และไม่เปลี่ยน payload งาน
+
 ### Browser
 
 ใช้ `lib/supabase/client.ts` ซึ่งรับเฉพาะ public URL และ anon key ห้าม import service-role client เข้า Client Component
