@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef, useState, useTransition } from 'react'
+import { createContext, useContext, useId, useRef, useState, useTransition, type ReactNode } from 'react'
 import { Bookmark, Pencil, RotateCcw, Save, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -88,12 +88,27 @@ interface Props {
   isCopy: boolean
   disabled?: boolean
   actions?: AssignmentPresetActions
+  children: ReactNode
 }
 
-/** Only settings enter this boundary. No work title, recipients, questions,
- *  points, dates, passwords or random seeds are accepted by this component. */
-export function AssignmentSettingPresets({
-  type, bootstrap, settings, onApply, isCopy, disabled = false, actions = defaultActions,
+const PresetPartsContext = createContext<{ recall: ReactNode; save: ReactNode } | null>(null)
+
+export function AssignmentSettingPresetsRecall() {
+  const parts = useContext(PresetPartsContext)
+  if (!parts) throw new Error('Assignment settings require their provider')
+  return parts.recall
+}
+
+export function AssignmentSettingPresetsSave() {
+  const parts = useContext(PresetPartsContext)
+  if (!parts) throw new Error('Assignment settings require their provider')
+  return parts.save
+}
+
+/** Preset data and mutations accept settings only, never work content or secrets.
+ *  Keep this controller mounted while its recall/save views change wizard steps. */
+export function AssignmentSettingPresetsProvider({
+  type, bootstrap, settings, onApply, isCopy, disabled = false, actions = defaultActions, children,
 }: Props) {
   const id = useId()
   const [data, setData] = useState<AssignmentPresetBootstrap>(bootstrap ?? {
@@ -102,6 +117,8 @@ export function AssignmentSettingPresets({
   const [selectedId, setSelectedId] = useState<string | null>(
     isCopy ? null : bootstrap?.defaultPresetId ?? null,
   )
+  // A save destination is not a recalled source: choosing it must not apply settings.
+  const [saveTargetId, setSaveTargetId] = useState<string | null>(null)
   const [currentOrigin, setCurrentOrigin] = useState<'copy' | 'current' | null>(isCopy ? 'copy' : null)
   const [baseline, setBaseline] = useState(settings)
   const [error, setError] = useState<string | null>(data.error)
@@ -113,6 +130,8 @@ export function AssignmentSettingPresets({
   const busyRef = useRef(false)
   const [confirm, confirmation] = useConfirm()
   const selected = data.presets.find(preset => preset.id === selectedId) ?? null
+  const saveTarget = data.presets.find(preset => preset.id === saveTargetId) ?? null
+  const saveTargetDirty = saveTarget !== null && changedKeys(settings, saveTarget.settings).length > 0
   const dirty = changedKeys(settings, baseline).length > 0
   const busy = disabled || isPending
   const unavailable = data.error !== null || needsReload
@@ -168,6 +187,7 @@ export function AssignmentSettingPresets({
     }
     onApply(next)
     setSelectedId(nextId)
+    setSaveTargetId(null)
     setCurrentOrigin(null)
     setBaseline(next)
     setError(null)
@@ -187,12 +207,13 @@ export function AssignmentSettingPresets({
     const cleanName = name.trim()
     if (!cleanName || cleanName.length > 60) { setNameError('กรอกชื่อชุด 1–60 ตัวอักษร'); return }
     if (data.presets.some(preset => preset.name.toLocaleLowerCase() === cleanName.toLocaleLowerCase()
-      && (dialog === 'new' || preset.id !== selected?.id))) {
+      && (dialog === 'new' || preset.id !== saveTarget?.id))) {
       setNameError('มีชื่อชุดนี้แล้ว กรุณาใช้ชื่ออื่น')
       return
     }
-    if (dialog === 'rename' && selected) {
-      run(() => actions.rename({ type, id: selected.id, expectedRevision: selected.revision, name: cleanName }),
+    if (dialog === 'rename') {
+      if (!saveTarget) { setNameError('ไม่พบชุดนี้ กรุณาปิดหน้าต่างและโหลดรายการใหม่'); return }
+      run(() => actions.rename({ type, id: saveTarget.id, expectedRevision: saveTarget.revision, name: cleanName }),
         'เปลี่ยนชื่อชุดแล้ว', () => setDialog(null))
       return
     }
@@ -201,6 +222,7 @@ export function AssignmentSettingPresets({
     run(() => actions.save({ type, name: cleanName, settings: snapshot }), 'บันทึกชุดการตั้งค่าแล้ว', next => {
       const created = next.presets.find(preset => !data.presets.some(old => old.id === preset.id))
       setSelectedId(created?.id ?? null)
+      setSaveTargetId(created?.id ?? null)
       setCurrentOrigin(null)
       setBaseline(snapshot)
       setDialog(null)
@@ -216,7 +238,11 @@ export function AssignmentSettingPresets({
       confirmLabel: 'อัปเดตชุด',
     }))) return
     run(() => actions.save({ type, id: preset.id, expectedRevision: preset.revision,
-      name: preset.name, settings: snapshot }), 'อัปเดตชุดการตั้งค่าแล้ว', () => setBaseline(snapshot))
+      name: preset.name, settings: snapshot }), 'อัปเดตชุดการตั้งค่าแล้ว', () => {
+        setSelectedId(preset.id)
+        setCurrentOrigin(null)
+        setBaseline(snapshot)
+      })
   }
 
   async function removeSelected(preset: AssignmentSettingPreset) {
@@ -226,17 +252,27 @@ export function AssignmentSettingPresets({
       confirmLabel: 'ลบชุดการตั้งค่า', variant: 'destructive',
     }))) return
     run(() => actions.delete({ type, id: preset.id, expectedRevision: preset.revision }), 'ลบชุดการตั้งค่าแล้ว', () => {
-      setSelectedId(null)
-      setCurrentOrigin('current')
+      setSaveTargetId(null)
+      if (selectedId === preset.id) { setSelectedId(null); setCurrentOrigin('current') }
     })
   }
 
-  return (
+  function reload() {
+    run(() => actions.load(type), 'โหลดรายการแล้ว', next => {
+      // Refresh metadata only, never replace the current assignment draft.
+      if (selectedId && !next.presets.some(preset => preset.id === selectedId)) { setSelectedId(null); setCurrentOrigin('current') }
+      if (saveTargetId && !next.presets.some(preset => preset.id === saveTargetId)) setSaveTargetId(null)
+    }, true)
+  }
+
+  const status = <>
+    {isPending && <p role="status" className="text-sm text-muted-foreground">กำลังบันทึกหรือโหลดชุดการตั้งค่า…</p>}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+  </>
+
+  const recall = (
     <Card padding="lg" className="flex min-w-0 flex-col gap-4" aria-busy={isPending}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 font-semibold"><Bookmark className="size-4" aria-hidden="true" />ชุดการตั้งค่าส่วนตัว · {typeLabel}</h2>
-        {!unavailable && <Badge variant="secondary">{data.presets.length}/3 ชุด</Badge>}
-      </div>
+      <h2 className="flex items-center gap-2 font-semibold"><Bookmark className="size-4" aria-hidden="true" />เรียกใช้การตั้งค่าเดิม · {typeLabel}</h2>
       <FieldGroup className="gap-3">
         <Field data-disabled={busy || unavailable}>
           <FieldLabel htmlFor={`${id}-selection`}>ใช้การตั้งค่า</FieldLabel>
@@ -246,33 +282,56 @@ export function AssignmentSettingPresets({
             <option value="__system">ค่าระบบ{data.defaultPresetId === null ? ' · ค่าเริ่มต้น' : ''}</option>
             {data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}{data.defaultPresetId === preset.id ? ' · ค่าเริ่มต้น' : ''}</option>)}
           </NativeSelect>
-          <FieldDescription>บันทึกได้ 3 ชุดต่อประเภท เฉพาะบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน การแก้ฟอร์มไม่อัปเดตชุดจนกดบันทึก</FieldDescription>
+          <FieldDescription>เลือกชุดส่วนตัวมาใช้กับงานนี้ หรือเริ่มจากค่าระบบ บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปได้ในขั้นสุดท้าย</FieldDescription>
         </Field>
       </FieldGroup>
       {currentOrigin === 'copy' && <p className="text-sm text-muted-foreground">สำเนาใช้การตั้งค่าจากงานต้นฉบับ ไม่โหลดชุดเริ่มต้นทับ</p>}
       {dirty && <p className="text-sm text-muted-foreground" role="status">ปรับการตั้งค่าสำหรับงานนี้แล้ว · ชุดที่บันทึกไว้ยังไม่เปลี่ยน</p>}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" disabled={busy || unavailable || data.presets.length >= 3} onClick={() => { setName(''); setNameError(null); setDialog('new') }}>
-          <Save data-icon="inline-start" />บันทึกเป็นชุดใหม่
-        </Button>
-        {selected && <>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(selected.id)}><RotateCcw data-icon="inline-start" />เรียกชุดนี้อีกครั้ง</Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable || !dirty} onClick={() => void updateSelected(selected)}><Save data-icon="inline-start" />อัปเดตชุดนี้</Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => { setName(selected.name); setNameError(null); setDialog('rename') }}><Pencil data-icon="inline-start" />เปลี่ยนชื่อ</Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable || data.defaultPresetId === selected.id} onClick={() => run(() => actions.setDefault({ type, id: selected.id, expectedRevision: selected.revision }), 'ตั้งเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งเป็นค่าเริ่มต้น</Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void removeSelected(selected)}><Trash2 data-icon="inline-start" />ลบชุด</Button>
-        </>}
+        {selected && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(selected.id)}><RotateCcw data-icon="inline-start" />เรียกชุดนี้อีกครั้ง</Button>}
         <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(null)}><RotateCcw data-icon="inline-start" />ใช้ค่าระบบ</Button>
-        {!selected && !currentOrigin && data.defaultPresetId !== null && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => run(() => actions.setDefault({ type, id: null }), 'ใช้ค่าระบบเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งค่าระบบเป็นค่าเริ่มต้น</Button>}
-        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => run(() => actions.load(type), 'โหลดรายการแล้ว', next => {
-          // Reload only updates the list. It must never replace an edited draft.
-          if (selectedId && !next.presets.some(preset => preset.id === selectedId)) { setSelectedId(null); setCurrentOrigin('current') }
-        }, true)}>โหลดรายการใหม่</Button>
+        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
+      </div>
+      {status}
+    </Card>
+  )
+
+  const save = (
+    <Card padding="lg" className="flex min-w-0 flex-col gap-4" aria-busy={isPending}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-semibold"><Bookmark className="size-4" aria-hidden="true" />บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปไหม?</h2>
+        <div className="flex items-center gap-2"><Badge variant="secondary">ไม่บังคับ</Badge>{!unavailable && <Badge variant="secondary">{data.presets.length}/3 ชุด</Badge>}</div>
+      </div>
+      <p className="text-sm text-muted-foreground">เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน ข้ามส่วนนี้แล้วสร้างงานได้ตามปกติ</p>
+      <FieldGroup className="gap-3">
+        <Field data-disabled={busy || unavailable}>
+          <FieldLabel htmlFor={`${id}-save-target`}>บันทึกการตั้งค่าเป็น</FieldLabel>
+          <NativeSelect id={`${id}-save-target`} value={saveTargetId ?? '__new'} disabled={busy || unavailable}
+            onChange={event => { setSaveTargetId(event.target.value === '__new' ? null : event.target.value); setError(null) }}>
+            <option value="__new">ชุดใหม่</option>
+            {data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}{data.defaultPresetId === preset.id ? ' · ค่าเริ่มต้น' : ''}</option>)}
+          </NativeSelect>
+          <FieldDescription>เลือกชุดเดิมเพื่ออัปเดตด้วยค่าของงานนี้ การเลือกตรงนี้ไม่เรียกค่าเก่ามาทับฟอร์ม และยังไม่บันทึกจนกดปุ่ม</FieldDescription>
+        </Field>
+      </FieldGroup>
+      <div className="flex flex-wrap gap-2">
+        {saveTarget ? <>
+          <Button type="button" size="sm" disabled={busy || unavailable || !saveTargetDirty} onClick={() => void updateSelected(saveTarget)}><Save data-icon="inline-start" />อัปเดตชุดนี้</Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => { setName(saveTarget.name); setNameError(null); setDialog('rename') }}><Pencil data-icon="inline-start" />เปลี่ยนชื่อ</Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable || data.defaultPresetId === saveTarget.id} onClick={() => run(() => actions.setDefault({ type, id: saveTarget.id, expectedRevision: saveTarget.revision }), 'ตั้งเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งเป็นค่าเริ่มต้น</Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void removeSelected(saveTarget)}><Trash2 data-icon="inline-start" />ลบชุด</Button>
+        </> : <Button type="button" size="sm" disabled={busy || unavailable || data.presets.length >= 3} onClick={() => { setName(''); setNameError(null); setDialog('new') }}><Save data-icon="inline-start" />บันทึกเป็นชุดใหม่</Button>}
+        {data.defaultPresetId !== null && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => run(() => actions.setDefault({ type, id: null }), 'ใช้ค่าระบบเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}><Star data-icon="inline-start" />ตั้งค่าระบบเป็นค่าเริ่มต้น</Button>}
+        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
       </div>
       {!unavailable && data.presets.length >= 3 && <p className="text-sm text-muted-foreground">ครบ 3 ชุดแล้ว เลือกอัปเดตชุดเดิมหรือลบชุดที่ไม่ใช้ก่อนบันทึกชุดใหม่ ระบบไม่ลบให้เอง</p>}
-      {isPending && <p role="status" className="text-sm text-muted-foreground">กำลังบันทึกหรือโหลดชุดการตั้งค่า…</p>}
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {status}
+    </Card>
+  )
 
+  return (
+    <PresetPartsContext.Provider value={{ recall, save }}>
+      {children}
       <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !isPending) setDialog(null) }}>
         <DialogContent showCloseButton={!isPending}>
           <DialogHeader>
@@ -289,7 +348,7 @@ export function AssignmentSettingPresets({
               </Field>
             </FieldGroup>
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            {needsReload && <Button type="button" variant="outline" disabled={isPending} onClick={() => run(() => actions.load(type), 'โหลดรายการแล้ว', undefined, true)}>โหลดรายการก่อนลองใหม่</Button>}
+            {needsReload && <Button type="button" variant="outline" disabled={isPending} onClick={reload}>โหลดรายการก่อนลองใหม่</Button>}
             <DialogFooter>
               <Button type="button" variant="outline" disabled={isPending} onClick={() => setDialog(null)}>ยกเลิก</Button>
               <Button type="submit" disabled={isPending || needsReload || !name.trim()}>{isPending ? 'กำลังบันทึก…' : 'บันทึกชุด'}</Button>
@@ -298,6 +357,6 @@ export function AssignmentSettingPresets({
         </DialogContent>
       </Dialog>
       {confirmation}
-    </Card>
+    </PresetPartsContext.Provider>
   )
 }

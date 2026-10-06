@@ -12,7 +12,8 @@ import {
   assignmentPresetDefaults, type AssignmentPresetBootstrap, type AssignmentPresetSettings,
 } from '@/lib/assignment-setting-presets'
 import {
-  AssignmentSettingPresets, type AssignmentPresetActions,
+  AssignmentSettingPresetsProvider, AssignmentSettingPresetsRecall,
+  AssignmentSettingPresetsSave, type AssignmentPresetActions,
 } from '@/components/assignments/assignment-setting-presets'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
@@ -775,6 +776,15 @@ export function CreateAssignmentForm({
   }
 
   return (
+    <AssignmentSettingPresetsProvider
+      type={assignmentType}
+      bootstrap={presetBootstrap}
+      actions={presetActions}
+      settings={presetSettings}
+      onApply={applyPreset}
+      isCopy={isCopy}
+      disabled={isPending}
+    >
     <div ref={wizardRef} className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">
@@ -787,15 +797,7 @@ export function CreateAssignmentForm({
         </p>
       </div>
 
-      <AssignmentSettingPresets
-        type={assignmentType}
-        bootstrap={presetBootstrap}
-        actions={presetActions}
-        settings={presetSettings}
-        onApply={applyPreset}
-        isCopy={isCopy}
-        disabled={isPending}
-      />
+      {step === 0 && <AssignmentSettingPresetsRecall />}
 
       {/* Step indicator */}
       <div className="flex items-start">
@@ -1958,6 +1960,7 @@ export function CreateAssignmentForm({
               { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
             ]}
           />
+          <AssignmentSettingPresetsSave />
         </div>
       )}
 
@@ -2083,5 +2086,6 @@ export function CreateAssignmentForm({
         </div>
       )}
     </div>
+    </AssignmentSettingPresetsProvider>
   )
 }
