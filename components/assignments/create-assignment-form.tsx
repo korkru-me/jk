@@ -847,122 +847,6 @@ export function CreateAssignmentForm({
               </CollapsibleContent>
             </Collapsible>
           </Card>
-
-          {!preselectedSet && (
-            <Card>
-              <label className="flex cursor-pointer items-center justify-between gap-3 p-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Layers className="size-4 text-muted-foreground" />
-                  </div>
-                  <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={saveAsSet}
-                  onChange={event => setSaveAsSet(event.target.checked)}
-                  className="size-4 shrink-0 accent-primary"
-                />
-              </label>
-              {saveAsSet && (
-                <div className="space-y-1.5 px-4 pb-4">
-                  <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
-                  <Input
-                    id="question-set-title"
-                    value={questionSetTitle}
-                    onChange={event => setQuestionSetTitle(event.target.value)}
-                    placeholder="เช่น แฟ้มโจทย์เรื่องแรงและการเคลื่อนที่"
-                    required
-                  />
-                </div>
-              )}
-            </Card>
-          )}
-
-          {canDrawRandomSubset && (
-            <Card padding="xl" className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Dices className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
-                  <p className="text-xs text-muted-foreground">
-                    คลังของงานนี้ {selectedIds.length} ข้อ — เลือกว่าจะจ่ายให้นักเรียนทั้งหมด หรือสุ่มมาบางข้อ
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setRandomQuestionCount('')}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    !randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                  }`}
-                >
-                  <p className="font-medium text-sm text-foreground">ให้ทำทุกข้อ</p>
-                  <p className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
-                    ทุกคนได้โจทย์ชุดเดียวกัน
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!randomDrawOn) setRandomQuestionCount(String(Math.min(5, maxRandomDraw)))
-                  }}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                  }`}
-                >
-                  <p className="font-medium text-sm text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
-                  <p className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
-                    แต่ละคน แต่ละรอบ ได้คนละชุด
-                  </p>
-                </button>
-              </div>
-
-              {randomDrawOn && (
-                <div className="space-y-3 rounded-xl border border-border p-4">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Label htmlFor="random-question-count" className="text-sm text-muted-foreground">
-                      ให้นักเรียนทำ
-                    </Label>
-                    <Input
-                      id="random-question-count"
-                      type="number"
-                      min={1}
-                      max={maxRandomDraw}
-                      value={randomQuestionCount}
-                      onChange={event => setRandomQuestionCount(event.target.value)}
-                      className="max-w-[110px]"
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      ข้อ จากคลัง {selectedIds.length} ข้อ
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
-                  </p>
-                  {drawnPointsVary && !displayMaxSet && (
-                    <div className="flex items-start justify-between gap-3 rounded-lg bg-warning/10 px-3 py-2">
-                      <p className="text-xs text-warning">
-                        คะแนนแต่ละข้อในคลังไม่เท่ากัน คนที่จับได้ข้อคะแนนสูงจะได้เปรียบ —
-                        ตั้ง “คะแนนเต็มที่แสดงผล” ให้ทุกคนเทียบกันได้
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setDisplayMaxScore(String(questionsPerAttempt))}
-                        className="text-xs font-medium text-warning underline shrink-0"
-                      >
-                        ตั้งเป็น {questionsPerAttempt}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </Card>
-          )}
         </div>
       )}
 
@@ -1081,6 +965,122 @@ export function CreateAssignmentForm({
               </div>
             </div>
           </Card>
+
+          {!preselectedSet && (
+            <Card>
+              <label className="flex cursor-pointer items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Layers className="size-4 text-muted-foreground" />
+                  </div>
+                  <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={saveAsSet}
+                  onChange={event => setSaveAsSet(event.target.checked)}
+                  className="size-4 shrink-0 accent-primary"
+                />
+              </label>
+              {saveAsSet && (
+                <div className="space-y-1.5 px-4 pb-4">
+                  <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="question-set-title"
+                    value={questionSetTitle}
+                    onChange={event => setQuestionSetTitle(event.target.value)}
+                    placeholder="เช่น แฟ้มโจทย์เรื่องแรงและการเคลื่อนที่"
+                    required
+                  />
+                </div>
+              )}
+            </Card>
+          )}
+
+          {canDrawRandomSubset && (
+            <Card padding="xl" className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  <Dices className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
+                  <p className="text-xs text-muted-foreground">
+                    คลังของงานนี้ {selectedIds.length} ข้อ — เลือกว่าจะจ่ายให้นักเรียนทั้งหมด หรือสุ่มมาบางข้อ
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRandomQuestionCount('')}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    !randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
+                  }`}
+                >
+                  <p className="font-medium text-sm text-foreground">ให้ทำทุกข้อ</p>
+                  <p className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
+                    ทุกคนได้โจทย์ชุดเดียวกัน
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!randomDrawOn) setRandomQuestionCount(String(Math.min(5, maxRandomDraw)))
+                  }}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
+                  }`}
+                >
+                  <p className="font-medium text-sm text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
+                  <p className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
+                    แต่ละคน แต่ละรอบ ได้คนละชุด
+                  </p>
+                </button>
+              </div>
+
+              {randomDrawOn && (
+                <div className="space-y-3 rounded-xl border border-border p-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Label htmlFor="random-question-count" className="text-sm text-muted-foreground">
+                      ให้นักเรียนทำ
+                    </Label>
+                    <Input
+                      id="random-question-count"
+                      type="number"
+                      min={1}
+                      max={maxRandomDraw}
+                      value={randomQuestionCount}
+                      onChange={event => setRandomQuestionCount(event.target.value)}
+                      className="max-w-[110px]"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      ข้อ จากคลัง {selectedIds.length} ข้อ
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
+                  </p>
+                  {drawnPointsVary && !displayMaxSet && (
+                    <div className="flex items-start justify-between gap-3 rounded-lg bg-warning/10 px-3 py-2">
+                      <p className="text-xs text-warning">
+                        คะแนนแต่ละข้อในคลังไม่เท่ากัน คนที่จับได้ข้อคะแนนสูงจะได้เปรียบ —
+                        ตั้ง “คะแนนเต็มที่แสดงผล” ให้ทุกคนเทียบกันได้
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setDisplayMaxScore(String(questionsPerAttempt))}
+                        className="text-xs font-medium text-warning underline shrink-0"
+                      >
+                        ตั้งเป็น {questionsPerAttempt}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
 
           <Card padding="xl" className="flex flex-col gap-3">
             {streakOn && (

@@ -429,43 +429,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </Card>
       )}
 
-      {a.mode === 'online' && a.question_ids.length >= 2 && (
-        <Card padding="xl" className="space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <Dices className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                สุ่มจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอดรอบนั้น รวมถึงหลังปิดหน้าจอแล้วกลับมาทำต่อ
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 pl-11">
-            <Input
-              id="edit-random-question-count"
-              type="number"
-              min={1}
-              max={Math.max(1, a.question_ids.length - 1)}
-              value={randomQuestionCount}
-              onChange={event => setRandomQuestionCount(event.target.value)}
-              placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
-              disabled={hasSubmissions}
-              className="max-w-[150px]"
-            />
-            <Label htmlFor="edit-random-question-count" className="text-sm text-muted-foreground">
-              ข้อต่อคน
-            </Label>
-          </div>
-          <p className="text-xs text-muted-foreground pl-11">
-            {hasSubmissions
-              ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
-              : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
-          </p>
-        </Card>
-      )}
-
       {a.mode === 'online' && a.type === 'exam' && (
         <Card padding="xl" className="space-y-3">
           <label className="flex items-center justify-between gap-4 cursor-pointer">
@@ -671,6 +634,43 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         </div>
       </Card>
+
+      {a.mode === 'online' && a.question_ids.length >= 2 && (
+        <Card padding="xl" className="space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Dices className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                สุ่มจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอดรอบนั้น รวมถึงหลังปิดหน้าจอแล้วกลับมาทำต่อ
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pl-11">
+            <Input
+              id="edit-random-question-count"
+              type="number"
+              min={1}
+              max={Math.max(1, a.question_ids.length - 1)}
+              value={randomQuestionCount}
+              onChange={event => setRandomQuestionCount(event.target.value)}
+              placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
+              disabled={hasSubmissions}
+              className="max-w-[150px]"
+            />
+            <Label htmlFor="edit-random-question-count" className="text-sm text-muted-foreground">
+              ข้อต่อคน
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground pl-11">
+            {hasSubmissions
+              ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
+              : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
+          </p>
+        </Card>
+      )}
 
       {a.mode === 'online' && (
         <Card padding="xl" className="space-y-4">
