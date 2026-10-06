@@ -30,7 +30,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, className }: BrandL
       />
       <span className={cn('flex flex-col', stacked && 'items-center')}>
         <span className={cn('font-bold leading-none tracking-tight text-foreground', stacked ? 'text-sm' : 'text-lg')}>
-          KorKru
+          K<span className="text-brand-accent">o</span>rKru
         </span>
         {subtitle && <span className="mt-1 text-xs text-muted-foreground">{subtitle}</span>}
       </span>
