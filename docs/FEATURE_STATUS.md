@@ -1,5 +1,9 @@
 # Feature status
 
+### ไอคอนเมนูหลัก (6 ตุลาคม 2026)
+
+- **UI-004** — เปลี่ยน emoji ของเมนูหลักครู/นักเรียนและเมนูย่อยเป็น Lucide outline ชุดเดียวกับเมนูห้องเรียน ขนาด/เส้นสม่ำเสมอ ใช้ `School` แทนห้องเรียนเหมือนเดิม ไม่เปลี่ยน route, label, active state หรือสิทธิ์; ผ่าน TypeScript, token lint, webpack production build และ local Chrome QA บนเมนูจำลองครู/นักเรียน ทั้งแถบเต็ม/ย่อ/มือถือ โหมดสว่าง/มืด และเปิดกลุ่มเมนู ไม่มี horizontal overflow ยังไม่ได้ตรวจด้วยบัญชีจริง ไม่มี migration
+
 ### โลโก้เว็บแบบกวางเรียบ (6 ตุลาคม 2026)
 
 - **UI-002** — ใช้ภาพกวางใหม่กับคำว่า `KorKru` ผ่าน `BrandLogo` ร่วมกันใน header, navbar/footer สาธารณะ และหน้าเข้าสู่ระบบ/สมัครสมาชิก/กู้รหัสผ่าน รวม favicon และไอคอนหน้าจอมือถือ; รูปโหมดมืดเป็นสีขาว โลโก้เต็มเดิมและไอคอนเดิมเก็บไว้ครบโดยตรวจ hash ตรงกับไฟล์เดิม มีภาพต้นฉบับจากผู้ใช้และพรอมต์ imagegen ใน `public/brand/` · ผ่าน TypeScript, token lint, webpack production build และ Chrome QA บนเมนู shell จำลอง หน้า login และหน้าสาธารณะที่ 320–390px รวมแสงสว่าง/มืด ไม่มี horizontal overflow และรูปโหลดจริงผ่านขนาด responsive; ไม่มีการเปลี่ยน auth หรือข้อมูล และไม่มี migration

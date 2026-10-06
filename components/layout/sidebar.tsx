@@ -6,10 +6,22 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import {
   ChevronDown,
   ChevronLeft,
+  ClipboardCheck,
+  ClipboardList,
+  FilePlus2,
+  FileUp,
+  FlaskConical,
+  FolderKanban,
+  House,
   LayoutGrid,
+  LibraryBig,
+  NotebookPen,
   Plus,
   School,
+  Settings,
+  ShieldCheck,
   Trash2,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -22,13 +34,13 @@ import type { UserRole } from '@/lib/types'
 interface NavItem {
   href: string
   label: string
-  icon: string | LucideIcon
+  icon: LucideIcon
 }
 
 /** A heading that opens to reveal its pages instead of navigating anywhere. */
 interface NavGroup {
   label: string
-  icon: string
+  icon: LucideIcon
   children: NavItem[]
 }
 
@@ -39,33 +51,33 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 }
 
 const teacherNav: NavEntry[] = [
-  { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
+  { href: '/dashboard', label: 'หน้าหลัก', icon: House },
   {
     label: 'จัดการโจทย์',
-    icon: '📝',
+    icon: NotebookPen,
     children: [
-      { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
-      { href: '/questions/import', label: 'นำเข้าโจทย์', icon: '📥' },
-      { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
+      { href: '/questions/new', label: 'สร้างโจทย์', icon: FilePlus2 },
+      { href: '/questions/import', label: 'นำเข้าโจทย์', icon: FileUp },
+      { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
     ],
   },
   { href: '/classrooms', label: 'ห้องเรียน', icon: School },
   {
     label: 'วิจัยการศึกษา',
-    icon: '🧪',
+    icon: FlaskConical,
     children: [
-      { href: '/research', label: 'โครงการวิจัย', icon: '📊' },
-      { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: '📋' },
+      { href: '/research', label: 'โครงการวิจัย', icon: FolderKanban },
+      { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: ClipboardCheck },
     ],
   },
-  { href: '/settings/profile', label: 'ตั้งค่า', icon: '⚙️' },
+  { href: '/settings/profile', label: 'ตั้งค่า', icon: Settings },
 ]
 
 const studentNav: NavEntry[] = [
-  { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
+  { href: '/dashboard', label: 'หน้าหลัก', icon: House },
   { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
-  { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: '📋' },
-  { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: '⚙️' },
+  { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: ClipboardList },
+  { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: UserRound },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {
@@ -84,10 +96,8 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/')
 }
 
-function NavItemIcon({ icon: Icon, className = 'text-base' }: Pick<NavItem, 'icon'> & { className?: string }) {
-  return typeof Icon === 'string'
-    ? <span className={className}>{Icon}</span>
-    : <Icon className="size-4 shrink-0" aria-hidden="true" />
+function NavItemIcon({ icon: Icon }: Pick<NavItem, 'icon'>) {
+  return <Icon className="size-4 shrink-0" aria-hidden="true" />
 }
 
 /**
@@ -130,7 +140,7 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
           compactOnDesktop && 'md:min-h-11 md:justify-center md:px-2'
         )}
       >
-        <span className="text-base">{group.icon}</span>
+        <NavItemIcon icon={group.icon} />
         <span className={cn(compactOnDesktop && 'md:sr-only')}>{group.label}</span>
         <ChevronDown
           aria-hidden="true"
@@ -173,7 +183,7 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
                   compactOnDesktop && 'md:min-h-11 md:justify-center md:px-2'
                 )}
               >
-                <NavItemIcon icon={child.icon} className="text-sm" />
+                <NavItemIcon icon={child.icon} />
                 <span className={cn(compactOnDesktop && 'md:sr-only')}>{child.label}</span>
               </Link>
             ))}
@@ -348,7 +358,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
               title={collapsed ? 'Admin Panel' : undefined}
               className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20', collapsed && 'md:justify-center md:px-2')}
             >
-              <span className="text-base">⚙️</span>
+              <NavItemIcon icon={ShieldCheck} />
               <SidebarLabel>Admin Panel</SidebarLabel>
             </Link>
           </div>
