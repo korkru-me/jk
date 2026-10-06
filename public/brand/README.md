@@ -3,11 +3,12 @@
 Approved by the product owner on 6 October 2026 (UI-002).
 
 - `deer-mark-source.png`: exact original image supplied by the owner; retained unchanged.
-- `deer-mark.png`: transparent cutout prepared with the built-in imagegen tool.
+- `deer-mark.png`: transparent raster cutout prepared with the built-in imagegen tool; retained as the earlier asset.
+- `deer-mark.svg`: flat vector trace generated from the original silhouette. This is the web UI source so the mark stays sharp at every zoom level and contains no glow, blur, gradient, filter or embedded bitmap.
 - `legacy-icon.png` and `legacy-apple-icon.png`: unchanged copies of the previous browser and home-screen icons.
 - The previous full logo remains unchanged at `public/logo.png`; retain it for future use.
-- `components/brand-logo.tsx` uses the new mark with the exact wordmark `KorKru` (both K letters uppercase). Light mode retains navy/orange. Dark mode renders the mark white. Following UI-009, other letters use `brand-foreground`: `#002262` in light mode, sampled from the dominant high-alpha navy pixels of the mark, and white in dark mode. The owner selected the antler-tip orange for the `o`, so `brand-accent` is now `#fe5d00` in both modes, replacing the darker UI-007 choice. The raster mark and previous assets are unchanged.
-- `node scripts/build-brand-icons.mjs` resizes the approved mark into `app/icon.png` and `app/apple-icon.png` on a white square so it remains legible in browser and OS chrome. It does not change the source mark.
+- `components/brand-logo.tsx` uses the SVG mark with the exact wordmark `KorKru` (both K letters uppercase). Light mode retains navy/orange. Dark mode renders the mark white. Following UI-009, other letters use `brand-foreground`: `#002262` in light mode, sampled from the dominant high-alpha navy pixels of the mark, and white in dark mode. The owner selected the antler-tip orange for the `o`, so `brand-accent` is now `#fe5d00` in both modes, replacing the darker UI-007 choice. The previous raster and legacy assets remain available.
+- `node scripts/vectorize-brand-mark.mjs` reproducibly traces the two flat color regions from the untouched source into the SVG. `node scripts/build-brand-icons.mjs` renders that SVG into `app/icon.png` and `app/apple-icon.png` on a white square so it remains legible in browser and OS chrome.
 
 ## Final imagegen prompt
 

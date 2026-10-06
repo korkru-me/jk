@@ -18,11 +18,11 @@ export function BrandLogo({ layout = 'horizontal', subtitle, className }: BrandL
       className,
     )}>
       <Image
-        src="/brand/deer-mark.png"
+        src="/brand/deer-mark.svg"
         alt=""
-        width={1024}
-        height={1536}
-        sizes={stacked ? '32px' : '36px'}
+        width={580}
+        height={1045}
+        unoptimized
         className={cn(
           'w-auto shrink-0 object-contain dark:brightness-0 dark:invert',
           stacked ? 'h-10' : 'h-11',

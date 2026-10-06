@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
-// Raster sizing only: the approved transparent mark remains the source of truth.
-const mark = fileURLToPath(new URL('../public/brand/deer-mark.png', import.meta.url))
+// Browser and home-screen icons stay raster, but are rendered from the sharp vector mark.
+const mark = fileURLToPath(new URL('../public/brand/deer-mark.svg', import.meta.url))
 
 for (const [filename, size] of [['icon.png', 512], ['apple-icon.png', 180]]) {
   const content = await sharp(mark)
