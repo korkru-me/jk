@@ -1,5 +1,10 @@
 # Feature status
 
+### เปลี่ยนห้องผ่านไอคอนเมื่อย่อเมนู (6 ตุลาคม 2026)
+
+- **UI-015** — ใน `ClassroomContextNavigation` เมื่อย่อ app sidebar บน desktop ซ่อนปุ่ม ChevronsUpDown และเปลี่ยนไอคอน School ให้เป็น DropdownMenuTrigger ของเมนูเปลี่ยนห้องเดียวกัน มีชื่อ accessible/tooltip “สลับไปห้องเรียนอื่น”; เมนูเต็มและ drawer มือถือคงไอคอนตกแต่ง/ปุ่มลูกศรเดิม รวมกรณีที่มือถือมีสถานะย่อจำจาก desktop ไม่มีห้องอื่นหรือไม่มี callback ไม่สร้างปุ่มหลอก ไม่เปลี่ยนรายการห้อง callback/onClose หรือการตรวจสิทธิ์
+- ตรวจด้วย local Chrome/React/Next.js fixture ที่ไม่อ่าน Supabase: ย่อแล้วมี trigger อาคารเรียนที่มองเห็นหนึ่งปุ่ม ลูกศรมี width=0 กดเปิดรายการและเลือกห้องจำลองได้ ขยายแล้วเหลือ trigger ลูกศรหนึ่งปุ่ม; มือถือ 390px ทั้งสถานะย่อที่จำไว้และแสดงเต็มไม่มีปุ่มซ้ำ/overflow ไม่มี runtime/compilation error ผ่าน token lint และ webpack production build พร้อม TypeScript check ส่วน `npx tsc --noEmit` ปกติพบ LayoutRoutes ขัดกันใน cache `.next/types`/`.next/dev/types` เดิม แต่ isolated tsc ที่ใช้ types ของ build นี้ผ่าน ไม่ล้าง cache dev ไม่ทดสอบบัญชีจริงหรือ physical mobile ไม่รัน npm test เพราะไม่แก้ lib ไม่มี migration
+
 ### ย่อ–ขยายเมนูทันที (6 ตุลาคม 2026)
 
 - **UI-014** — ตามคำขอให้เร็วที่สุด ตัวแถบเมนูของ app shell เปลี่ยนจาก width/transform transition 200ms เป็น `transition-none` (0s) ทั้งย่อ–ขยาย desktop และเปิด–ปิด drawer มือถือ ใช้ร่วมกันในเมนูหลัก ห้องเรียน งาน และโหมดสอน คงขนาด rail/full, localStorage, aria-expanded, inert, backdrop, Escape, registry และ authorization เดิม ไม่เปลี่ยน transition ของเมนูย่อย/ปุ่มสี/ส่วนอื่นหรือแถบ super-admin แยกต่างหาก

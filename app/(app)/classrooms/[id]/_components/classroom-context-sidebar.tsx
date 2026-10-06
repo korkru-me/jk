@@ -64,6 +64,8 @@ export function ClassroomContextNavigation({
   const cover = coverOf(meta)
   const subtitle = [meta.gradeLevel, meta.academicTerm].filter(Boolean).join(' • ')
   const otherClassrooms = switchableClassrooms.filter(option => option.id !== classroom.id)
+  const canSwitchClassroom = onSwitchClassroom && otherClassrooms.length > 0
+  const switcherId = useId()
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -76,6 +78,7 @@ export function ClassroomContextNavigation({
         <ChevronLeft data-icon="inline-start" />
       </SidebarButton>
 
+      <DropdownMenu>
       <div className={cn(
         'flex items-center gap-3 rounded-2xl border p-3',
         compact && 'md:flex-col md:gap-1 md:p-1',
@@ -84,10 +87,19 @@ export function ClassroomContextNavigation({
         <div className={cn(
           'flex size-12 shrink-0 items-center justify-center rounded-xl shadow-sm',
           compact && 'md:size-8',
+          compact && canSwitchClassroom && 'md:hidden',
           cover ? 'bg-current/10' : 'bg-primary text-primary-foreground',
         )}>
           <School aria-hidden="true" className={cn('size-6', compact && 'md:size-5')} />
         </div>
+        {compact && canSwitchClassroom && (
+          <DropdownMenuTrigger
+            id={`${switcherId}-icon`}
+            render={<Button type="button" variant="ghost" size="icon" className="hidden md:inline-flex" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
+          >
+            <School />
+          </DropdownMenuTrigger>
+        )}
         <div className={cn('min-w-0 flex-1', compact && 'md:sr-only')}>
           <p className={cn('text-xs font-medium', cover ? cover.textMuted : 'text-primary')}>ห้องเรียนปัจจุบัน</p>
           <p className={cn('truncate text-lg font-bold leading-tight', cover ? cover.text : 'text-foreground')}>{classroom.name}</p>
@@ -95,14 +107,16 @@ export function ClassroomContextNavigation({
             {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
           </p>
         </div>
-        {onSwitchClassroom && otherClassrooms.length > 0 && (
-          <DropdownMenu>
+        {canSwitchClassroom && (
+          <>
             <DropdownMenuTrigger
+              id={`${switcherId}-arrows`}
               render={(
                 <Button
                   type="button"
                   variant="outline"
                   size="icon-sm"
+                  className={cn(compact && 'md:hidden')}
                   aria-label="สลับไปห้องเรียนอื่น"
                   title="สลับไปห้องเรียนอื่น"
                 />
@@ -125,7 +139,7 @@ export function ClassroomContextNavigation({
                       key={option.id}
                       className="py-2"
                       onClick={() => {
-                        onSwitchClassroom(option.id)
+                        onSwitchClassroom?.(option.id)
                         onClose?.()
                       }}
                     >
@@ -155,9 +169,10 @@ export function ClassroomContextNavigation({
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </>
         )}
       </div>
+      </DropdownMenu>
 
       <Separator />
 

@@ -113,6 +113,7 @@ preset ปรับได้ 5 แกน: สี, `--radius`, `--spacing`, `--el
 
 - Mobile-first และใช้งานได้อย่างน้อยบน mobile/tablet/desktop
 - ตาม UI-014 การย่อ/ขยายแถบเมนูของ app shell เปลี่ยนขนาดทันที (`transition-none`) และ drawer มือถือเปิด/ปิดทันที ไม่มีแอนิเมชัน width/transform 200ms เดิม คง icon rail, การจำสถานะ, inert, backdrop และ Escape เดิม ไม่เปลี่ยนแอนิเมชันเมนูย่อยหรือส่วนอื่นของเว็บ
+- ตาม UI-015 ตัวเลือกห้องปัจจุบันเมื่อย่อบน desktop ใช้ปุ่ม School เปิดรายการเปลี่ยนห้องโดยไม่มีปุ่มลูกศรขึ้น–ลงอีกปุ่ม เมนูเต็ม/มือถือคงลูกศรเดิม; ตัวเรียกทั้งสองอยู่ใน DropdownMenu เดียวและซ่อนตาม breakpoint ไม่อิงสถานะย่ออย่างเดียวจนเปลี่ยนหน้าตามือถือ
 - ปุ่มหลักหนึ่งจุดต่อ section เมื่อเป็นไปได้
 - ทุก mutation ต้องมี pending, success และ error feedback
 - หน้า data ต้องมี loading, empty และ permission-denied states
