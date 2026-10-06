@@ -15,7 +15,6 @@ import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
-import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 import { ClassroomAccessPanel } from '@/app/(app)/classrooms/[id]/_components/classroom-access-panel'
@@ -342,7 +341,6 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
       <div className="max-w-2xl">
         <AssignmentReviewSummary
           mode="copy"
-          theme={groupPreset('blue')}
           rows={[
             { label: 'ชื่อ', value: 'ทดสอบระบบตรวจกลับไปให้คะแนนเอง (สำเนา)' },
             { label: 'ห้องเรียน', value: 'ทดสอบ สอบแก้กลางภาค' },

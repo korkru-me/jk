@@ -23,6 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -78,7 +79,6 @@ import {
 } from '@/components/assignments/seb-quit-password-settings'
 import { cn } from '@/lib/utils'
 import { THAI_TIME_ZONE } from '@/lib/thai-time'
-import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -501,11 +501,6 @@ export function CreateAssignmentForm({
           .map(g => g.name)
           .join(', ')}`
       : `เฉพาะบางกลุ่มใน ${limitedRooms.length} ห้อง`
-  const summaryClassroom = classrooms.find(classroom => classroom.id === classroomIds[0])
-  const summaryTheme = summaryClassroom
-    ? coverOf(parseDescription(summaryClassroom.description))
-    : null
-
   // What survives of the แฟ้มย่อย after the teacher's own picking.
   const assignedSections = filterSectionsToQuestions(sections, selectedIds)
 
@@ -604,7 +599,6 @@ export function CreateAssignmentForm({
         && !randomDrawInvalid
     }
     if (step === 1) {
-      if (!groupTargetsComplete(groupTargets, classroomIds)) return false
       if (assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
         return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
       }
@@ -666,7 +660,7 @@ export function CreateAssignmentForm({
     }
     if (!groupTargetsComplete(groupTargets, classroomIds)) {
       toast.error('กรุณาเลือกกลุ่มนักเรียนที่ต้องการมอบหมายให้ครบทุกห้อง')
-      setStep(1)
+      setStep(2)
       return
     }
     startTransition(async () => {
@@ -864,21 +858,6 @@ export function CreateAssignmentForm({
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dur" className="flex items-center gap-1.5">
-                <Timer className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
-              </Label>
-              <Input
-                id="dur"
-                type="number"
-                min={1}
-                value={duration}
-                onChange={e => setDuration(e.target.value)}
-                placeholder="ไม่จำกัด (เว้นว่าง)"
-                className="max-w-[200px]"
-              />
-            </div>
-
             {!preselectedClassroomId && (
               <div className="space-y-1.5">
                 <Label>ห้องเรียน <span className="text-destructive">*</span> {classroomIds.length > 1 && <span className="text-muted-foreground font-normal">({classroomIds.length} ห้อง)</span>}</Label>
@@ -917,23 +896,25 @@ export function CreateAssignmentForm({
         </div>
       )}
 
-      {/* ── Step 1 continued: เลือกโจทย์ ──────────────────────────────── */}
+      {/* ── Step 1 continued: โจทย์ คะแนน และเวลา ─────────────────────── */}
       {step === 0 && (
         <div className="space-y-4">
           <Card padding="xl" className="flex min-w-0 flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
+              <span className="shrink-0 text-sm font-semibold text-primary">
+                {previewQuestions.length} ข้อ · รวม {pointsSum} คะแนน
+              </span>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold text-foreground">เลือกโจทย์</h2>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                  {selectedIds.length} ข้อที่เลือก
-                </span>
-                {selectedIds.length > 0 && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => setListPreview({ ids: previewIds, title: 'ตัวอย่างโจทย์ที่เลือก' })}>
-                    <Eye data-icon="inline-start" />
-                    ดูตัวอย่างโจทย์ที่เลือก
-                  </Button>
-                )}
-              </div>
+              <h3 className="text-sm font-semibold text-foreground">เลือกโจทย์</h3>
+              {selectedIds.length > 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setListPreview({ ids: previewIds, title: 'ตัวอย่างโจทย์ที่เลือก' })}>
+                  <Eye data-icon="inline-start" />
+                  ดูตัวอย่างโจทย์ที่เลือก
+                </Button>
+              )}
             </div>
 
             <QuestionSetImport
@@ -973,20 +954,7 @@ export function CreateAssignmentForm({
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          </Card>
-        </div>
-      )}
-
-      {/* ── Step 1 continued: คะแนน ──────────────────────────────────── */}
-      {step === 0 && (
-        <div className="space-y-4">
-          <Card padding="xl" className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-semibold text-foreground">ตั้งค่าคะแนน</h2>
-              <span className="text-sm font-semibold text-primary shrink-0">
-                {previewQuestions.length} ข้อ · รวม {pointsSum} คะแนน
-              </span>
-            </div>
+            <Separator />
             <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
             <p className="text-xs text-muted-foreground">
               ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
@@ -1118,38 +1086,54 @@ export function CreateAssignmentForm({
                 </div>
               )}
             </div>
-          </Card>
+            <Separator />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dur" className="flex items-center gap-1.5">
+                <Timer className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
+              </Label>
+              <Input
+                id="dur"
+                type="number"
+                min={1}
+                value={duration}
+                onChange={e => setDuration(e.target.value)}
+                placeholder="ไม่จำกัด (เว้นว่าง)"
+                className="max-w-[200px]"
+              />
+            </div>
 
-          {!preselectedSet && (
-            <Card>
-              <label className="flex cursor-pointer items-center justify-between gap-3 p-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Layers className="size-4 text-muted-foreground" />
+            {!preselectedSet && (
+              <>
+                <Separator />
+                <label className="flex cursor-pointer items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Layers className="size-4 text-muted-foreground" />
+                    </div>
+                    <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
                   </div>
-                  <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={saveAsSet}
-                  onChange={event => setSaveAsSet(event.target.checked)}
-                  className="size-4 shrink-0 accent-primary"
-                />
-              </label>
-              {saveAsSet && (
-                <div className="space-y-1.5 px-4 pb-4">
-                  <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
-                  <Input
-                    id="question-set-title"
-                    value={questionSetTitle}
-                    onChange={event => setQuestionSetTitle(event.target.value)}
-                    placeholder="เช่น แฟ้มโจทย์เรื่องแรงและการเคลื่อนที่"
-                    required
+                  <input
+                    type="checkbox"
+                    checked={saveAsSet}
+                    onChange={event => setSaveAsSet(event.target.checked)}
+                    className="size-4 shrink-0 accent-primary"
                   />
-                </div>
-              )}
-            </Card>
-          )}
+                </label>
+                {saveAsSet && (
+                  <div className="flex flex-col gap-1.5 pl-11">
+                    <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="question-set-title"
+                      value={questionSetTitle}
+                      onChange={event => setQuestionSetTitle(event.target.value)}
+                      placeholder="เช่น แฟ้มโจทย์เรื่องแรงและการเคลื่อนที่"
+                      required
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </Card>
 
           {(canDrawRandomSubset || randomQuestionCount.trim() !== '') && (
             <Card padding="xl" className="space-y-4">
@@ -1464,32 +1448,6 @@ export function CreateAssignmentForm({
       {step === 1 && (
         <Card padding="xl" className="space-y-5">
           <h2 className="font-semibold text-foreground">ตั้งค่าการสอบ</h2>
-
-          {preselectedClassroomId && (
-            <div className="space-y-4">
-              <ClassroomPicker
-                classrooms={classrooms}
-                selectedIds={classroomIds}
-                onToggle={toggleClassroom}
-                primaryClassroomId={preselectedClassroomId}
-              />
-              {classroomIds.some(id => id !== preselectedClassroomId) && (
-                <div className="space-y-1.5">
-                  <Label>มอบหมายให้ในห้องเรียนอื่น</Label>
-                  <GroupTargetPicker
-                    classrooms={classroomIds.filter(id => id !== preselectedClassroomId).flatMap(id => {
-                      const c = classrooms.find(room => room.id === id)
-                      return c ? [{ id: c.id, name: c.name }] : []
-                    })}
-                    groupsByClassroom={groupsByClassroom}
-                    value={groupTargets}
-                    onChange={setGroupTargets}
-                    idPrefix="additional-target"
-                  />
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="space-y-2">
             {[
@@ -1823,74 +1781,131 @@ export function CreateAssignmentForm({
             untilPassed={completionChoice !== 'complete'}
           />
 
-          <div className="space-y-1.5">
-            <Label htmlFor="code" className="flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-muted-foreground" /> รหัสผ่านเข้าทำ (ถ้ามี)
-            </Label>
-            <Input
-              id="code"
-              value={accessCode}
-              onChange={e => setAccessCode(e.target.value)}
-              placeholder="ไม่บังคับ — เว้นว่างถ้าไม่ต้องใช้รหัส"
-              className="max-w-[200px]"
-            />
-          </div>
         </Card>
       )}
 
       {/* ── Step 3: กำหนดการสอบ ─────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
-          <Card padding="xl" className="space-y-4">
-            <h2 className="font-semibold text-foreground flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการสอบ (ไม่บังคับ)
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="sat">เปิดรับตั้งแต่</Label>
-                <Input id="sat" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="eat">ปิดรับเมื่อ</Label>
-                <Input id="eat" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
-              </div>
+          <Card padding="xl">
+            <Collapsible defaultOpen={Boolean(startAt || endAt)}>
+              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
+                <span className="flex min-w-0 items-start gap-3">
+                  <Calendar className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="font-semibold text-foreground">กำหนดวันทำ</span>
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {startAt && endAt
+                        ? 'กำหนดเวลาเปิดและปิดรับแล้ว'
+                        : startAt
+                          ? 'กำหนดเวลาเปิดรับแล้ว'
+                          : endAt
+                            ? 'กำหนดเวลาปิดรับแล้ว'
+                            : 'ไม่กำหนดวันและเวลา'}
+                    </span>
+                  </span>
+                </span>
+                <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+                <div className="grid gap-4 pt-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="sat">เปิดรับตั้งแต่</Label>
+                    <Input id="sat" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="eat">ปิดรับเมื่อ</Label>
+                    <Input id="eat" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+
+          <Card padding="xl">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="code" className="flex items-center gap-1.5">
+                <FileText className="size-4 text-muted-foreground" /> รหัสผ่านเข้าทำ (ถ้ามี)
+              </Label>
+              <Input
+                id="code"
+                value={accessCode}
+                onChange={e => setAccessCode(e.target.value)}
+                placeholder="ไม่บังคับ — เว้นว่างถ้าไม่ต้องใช้รหัส"
+                className="max-w-[200px]"
+              />
             </div>
           </Card>
+
+          {preselectedClassroomId && (
+            <Card padding="xl" className="flex flex-col gap-4">
+              <ClassroomPicker
+                classrooms={classrooms}
+                selectedIds={classroomIds}
+                onToggle={toggleClassroom}
+                primaryClassroomId={preselectedClassroomId}
+              />
+              {classroomIds.some(id => id !== preselectedClassroomId) && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>มอบหมายให้ในห้องเรียนอื่น</Label>
+                  <GroupTargetPicker
+                    classrooms={classroomIds.filter(id => id !== preselectedClassroomId).flatMap(id => {
+                      const c = classrooms.find(room => room.id === id)
+                      return c ? [{ id: c.id, name: c.name }] : []
+                    })}
+                    groupsByClassroom={groupsByClassroom}
+                    value={groupTargets}
+                    onChange={setGroupTargets}
+                    idPrefix="additional-target"
+                  />
+                </div>
+              )}
+            </Card>
+          )}
 
           <Card padding="xl" className="flex flex-col gap-3">
             <h2 className="flex items-center gap-1.5 font-semibold text-foreground">
               <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <ToggleGroup
+              value={[showResults]}
+              onValueChange={values => {
+                const next = values.at(-1)
+                if (next === 'immediate' || next === 'score_only' || next === 'after_due' || next === 'never') {
+                  setShowResults(next)
+                }
+              }}
+              aria-label="เลือกการแสดงผลลัพธ์"
+              variant="outline"
+              orientation="vertical"
+              spacing={2}
+              className="w-full items-stretch"
+            >
               {([
                 { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
                 { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
                 { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
                 { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
               ] as const).map(o => (
-                <button
+                <ToggleGroupItem
                   key={o.key}
-                  type="button"
-                  onClick={() => setShowResults(o.key)}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    showResults === o.key ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                  }`}
+                  value={o.key}
+                  className="h-auto w-full min-w-0 justify-start whitespace-normal rounded-xl border-2 p-3 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
                 >
-                  <p className="font-medium text-sm text-foreground">{o.label}</p>
-                  <p className={cn(
-                    'mt-0.5 text-xs',
-                    showResults === o.key ? 'text-foreground' : 'text-muted-foreground',
-                  )}>
-                    {o.desc}
-                  </p>
-                </button>
+                  <span className="flex w-full items-center gap-3">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left sm:flex-row sm:items-center sm:gap-4">
+                      <span className="text-sm font-medium text-foreground sm:w-64 sm:shrink-0">{o.label}</span>
+                      <span className="text-xs text-muted-foreground">{o.desc}</span>
+                    </span>
+                    {showResults === o.key && <Check className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />}
+                  </span>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
           </Card>
 
           <AssignmentReviewSummary
             mode={isCopy ? 'copy' : 'create'}
-            theme={summaryTheme}
             rows={[
               { label: 'ชื่อ', value: title },
               {

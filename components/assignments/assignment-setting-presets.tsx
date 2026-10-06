@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useId, useRef, useState, useTransition, type ReactNode } from 'react'
-import { Bookmark, Pencil, RotateCcw, Save, Star, Trash2 } from 'lucide-react'
+import { Bookmark, ChevronDown, Pencil, RotateCcw, Save, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   assignmentPresetDefaults, assignmentPresetSettingsSchema,
@@ -17,6 +17,11 @@ import type { AssignmentType } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -136,6 +141,13 @@ export function AssignmentSettingPresetsProvider({
   const busy = disabled || isPending
   const unavailable = data.error !== null || needsReload
   const typeLabel = type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const recalledSettingLabel = currentOrigin === 'copy'
+    ? 'ค่าจากงานต้นฉบับ'
+    : currentOrigin === 'current'
+      ? 'ค่าของงานนี้'
+      : selected
+        ? `${selected.name}${data.defaultPresetId === selected.id ? ' · ค่าเริ่มต้น' : ''}`
+        : `ค่าระบบ${data.defaultPresetId === null ? ' · ค่าเริ่มต้น' : ''}`
 
   function run(
     operation: () => Promise<AssignmentPresetActionResult>,
@@ -271,28 +283,43 @@ export function AssignmentSettingPresetsProvider({
   </>
 
   const recall = (
-    <Card padding="lg" className="flex min-w-0 flex-col gap-4" aria-busy={isPending}>
-      <h2 className="flex items-center gap-2 font-semibold"><Bookmark className="size-4" aria-hidden="true" />เรียกใช้การตั้งค่าเดิม · {typeLabel}</h2>
-      <FieldGroup className="gap-3">
-        <Field data-disabled={busy || unavailable}>
-          <FieldLabel htmlFor={`${id}-selection`}>ใช้การตั้งค่า</FieldLabel>
-          <NativeSelect id={`${id}-selection`} value={currentOrigin ? '__current' : selectedId ?? '__system'}
-            disabled={busy || unavailable} onChange={event => void applySelection(event.target.value === '__system' ? null : event.target.value)}>
-            {currentOrigin && <option value="__current" disabled>{currentOrigin === 'copy' ? 'ค่าจากงานต้นฉบับ' : 'ค่าของงานนี้'}</option>}
-            <option value="__system">ค่าระบบ{data.defaultPresetId === null ? ' · ค่าเริ่มต้น' : ''}</option>
-            {data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}{data.defaultPresetId === preset.id ? ' · ค่าเริ่มต้น' : ''}</option>)}
-          </NativeSelect>
-          <FieldDescription>เลือกชุดส่วนตัวมาใช้กับงานนี้ หรือเริ่มจากค่าระบบ บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปได้ในขั้นสุดท้าย</FieldDescription>
-        </Field>
-      </FieldGroup>
-      {currentOrigin === 'copy' && <p className="text-sm text-muted-foreground">สำเนาใช้การตั้งค่าจากงานต้นฉบับ ไม่โหลดชุดเริ่มต้นทับ</p>}
-      {dirty && <p className="text-sm text-muted-foreground" role="status">ปรับการตั้งค่าสำหรับงานนี้แล้ว · ชุดที่บันทึกไว้ยังไม่เปลี่ยน</p>}
-      <div className="flex flex-wrap gap-2">
-        {selected && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(selected.id)}><RotateCcw data-icon="inline-start" />เรียกชุดนี้อีกครั้ง</Button>}
-        <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(null)}><RotateCcw data-icon="inline-start" />ใช้ค่าระบบ</Button>
-        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
-      </div>
-      {status}
+    <Card padding="lg" className="min-w-0" aria-busy={isPending}>
+      <Collapsible>
+        <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
+          <span className="flex min-w-0 flex-col items-start gap-1">
+            <span className="flex items-center gap-2 font-semibold">
+              <Bookmark className="size-4 shrink-0" aria-hidden="true" />
+              เรียกใช้การตั้งค่าเดิม · {typeLabel}
+            </span>
+            <span className="text-sm font-normal text-muted-foreground">{recalledSettingLabel}</span>
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+          <div className="flex flex-col gap-4 pt-4">
+            <FieldGroup className="gap-3">
+              <Field data-disabled={busy || unavailable}>
+                <FieldLabel htmlFor={`${id}-selection`}>ใช้การตั้งค่า</FieldLabel>
+                <NativeSelect id={`${id}-selection`} value={currentOrigin ? '__current' : selectedId ?? '__system'}
+                  disabled={busy || unavailable} onChange={event => void applySelection(event.target.value === '__system' ? null : event.target.value)}>
+                  {currentOrigin && <option value="__current" disabled>{currentOrigin === 'copy' ? 'ค่าจากงานต้นฉบับ' : 'ค่าของงานนี้'}</option>}
+                  <option value="__system">ค่าระบบ{data.defaultPresetId === null ? ' · ค่าเริ่มต้น' : ''}</option>
+                  {data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}{data.defaultPresetId === preset.id ? ' · ค่าเริ่มต้น' : ''}</option>)}
+                </NativeSelect>
+                <FieldDescription>เลือกชุดส่วนตัวมาใช้กับงานนี้ หรือเริ่มจากค่าระบบ บันทึกการตั้งค่าไว้ใช้ครั้งต่อไปได้ในขั้นสุดท้าย</FieldDescription>
+              </Field>
+            </FieldGroup>
+            {currentOrigin === 'copy' && <p className="text-sm text-muted-foreground">สำเนาใช้การตั้งค่าจากงานต้นฉบับ ไม่โหลดชุดเริ่มต้นทับ</p>}
+            {dirty && <p className="text-sm text-muted-foreground" role="status">ปรับการตั้งค่าสำหรับงานนี้แล้ว · ชุดที่บันทึกไว้ยังไม่เปลี่ยน</p>}
+            <div className="flex flex-wrap gap-2">
+              {selected && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(selected.id)}><RotateCcw data-icon="inline-start" />เรียกชุดนี้อีกครั้ง</Button>}
+              <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(null)}><RotateCcw data-icon="inline-start" />ใช้ค่าระบบ</Button>
+              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
+            </div>
+            {status}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   )
 

@@ -3,10 +3,13 @@
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DIFF_META, TYPE_SHORT, questionExcerpt } from '@/lib/question-display'
 import { filterQuestions, tagsMatchingTerm } from '@/lib/question-search'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
 import { Card } from '@/components/ui/card'
+
+const DIFFICULTY_FILTERS = ['all', 'easy', 'medium', 'hard', 'analytical'] as const
 
 interface Props {
   questions: AssignmentQuestionOption[]
@@ -117,20 +120,32 @@ export function QuestionPicker({
             className="pl-9"
           />
         </div>
-        <div className="flex gap-1 flex-wrap">
-          {['all', 'easy', 'medium', 'hard', 'analytical'].map(d => (
-            <button
+        <ToggleGroup
+          value={[diffFilter]}
+          onValueChange={values => {
+            const next = values.at(-1)
+            // Keep one filter selected. Clicking the active filter should not
+            // leave the list in a visually blank/undefined state.
+            if (next && DIFFICULTY_FILTERS.includes(next as typeof DIFFICULTY_FILTERS[number])) {
+              onDiffFilterChange(next)
+            }
+          }}
+          aria-label="กรองโจทย์ตามระดับความยาก"
+          variant="primary"
+          size="sm"
+          spacing={1}
+          className="max-w-full flex-wrap"
+        >
+          {DIFFICULTY_FILTERS.map(d => (
+            <ToggleGroupItem
               key={d}
-              type="button"
-              onClick={() => onDiffFilterChange(d)}
-              className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                diffFilter === d ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:border-ring'
-              }`}
+              value={d}
+              className="h-auto rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground aria-pressed:border-primary aria-pressed:text-primary-foreground data-[state=on]:border-primary data-[state=on]:text-primary-foreground"
             >
               {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.label ?? d}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       {/* Tag shortcuts for the word being typed. Spelled out rather than left

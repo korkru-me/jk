@@ -102,7 +102,7 @@ export function ClassroomSettingsDialog({
             title={compact ? 'ตั้งค่าห้องเรียน' : undefined}
             className={cn(
               placement === 'sidebar'
-                ? 'w-full justify-start'
+                ? 'w-full justify-start transition-colors'
                 : 'gap-1.5 bg-transparent',
               placement === 'banner' && (
                 onCover

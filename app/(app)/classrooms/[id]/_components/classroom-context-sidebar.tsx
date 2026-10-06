@@ -96,7 +96,7 @@ export function ClassroomContextNavigation({
         {compact && canSwitchClassroom && (
           <DropdownMenuTrigger
             id={`${switcherId}-icon`}
-            render={<Button type="button" variant="ghost" size="icon" className="hidden md:inline-flex" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
+            render={<Button type="button" variant="ghost" size="icon" className="hidden transition-colors md:inline-flex" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
           >
             <ClassroomIcon iconKey={meta.iconKey} />
           </DropdownMenuTrigger>
@@ -117,7 +117,7 @@ export function ClassroomContextNavigation({
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  className={cn(compact && 'md:hidden')}
+                  className={cn('transition-colors', compact && 'md:hidden')}
                   aria-label="สลับไปห้องเรียนอื่น"
                   title="สลับไปห้องเรียนอื่น"
                 />

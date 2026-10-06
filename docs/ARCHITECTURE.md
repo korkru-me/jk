@@ -46,7 +46,7 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ## Runtime boundaries
 
-ตาม UI-014 (6 ต.ค. 2026) ตัวแถบ `Sidebar` ของ app shell ใช้ `transition-none` แทน width/transform 200ms ทั้งการย่อเป็น icon rail บน desktop และเปิด/ปิด drawer บนมือถือ การเปลี่ยนนี้เป็น CSS display-only ไม่เพิ่ม timer/request และไม่เปลี่ยน state persistence, registry หรือ authorization
+ตาม UI-014/UI-018 (6 ต.ค. 2026) ตัวแถบ `Sidebar` ของ app shell ใช้ `transition-none` แทน width/transform 200ms ทั้งการย่อเป็น icon rail บน desktop และเปิด/ปิด drawer บนมือถือ ปุ่มที่เปลี่ยนความสูง/padding ระหว่าง full/compact ใน contextual sidebar ใช้ `transition-colors` แทน `transition-all` เฉพาะตำแหน่งนั้น เพื่อให้ตำแหน่งไอคอนตามแกน Y เปลี่ยนพร้อมตัวแถบในเฟรมเดียวโดยยังคง color feedback การเปลี่ยนนี้เป็น CSS display-only ไม่เพิ่ม timer/request และไม่เปลี่ยน state persistence, registry หรือ authorization
 
 ### Browser
 
