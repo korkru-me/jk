@@ -6,7 +6,7 @@ Approved by the product owner on 6 October 2026 (UI-002).
 - `deer-mark.png`: transparent cutout prepared with the built-in imagegen tool.
 - `legacy-icon.png` and `legacy-apple-icon.png`: unchanged copies of the previous browser and home-screen icons.
 - The previous full logo remains unchanged at `public/logo.png`; retain it for future use.
-- `components/brand-logo.tsx` uses the new mark with the exact wordmark `KorKru` (both K letters uppercase). Light mode retains navy/orange. Dark mode renders the mark white. Following the owner's final UI-007 choice, only the wordmark's `o` uses the fixed `brand-accent` orange (`#c65300` light / `#ff9b4a` dark); other letters remain in the theme foreground. The raster mark and previous assets are unchanged.
+- `components/brand-logo.tsx` uses the new mark with the exact wordmark `KorKru` (both K letters uppercase). Light mode retains navy/orange. Dark mode renders the mark white. Following UI-009, other letters use `brand-foreground`: `#002262` in light mode, sampled from the dominant high-alpha navy pixels of the mark, and white in dark mode. The `o` retains the approved UI-007 `brand-accent` orange (`#c65300` light / `#ff9b4a` dark). This is darker than the mark's approximately `#fe5d00` orange; an exact-orange change awaits the owner's choice. The raster mark and previous assets are unchanged.
 - `node scripts/build-brand-icons.mjs` resizes the approved mark into `app/icon.png` and `app/apple-icon.png` on a white square so it remains legible in browser and OS chrome. It does not change the source mark.
 
 ## Final imagegen prompt
