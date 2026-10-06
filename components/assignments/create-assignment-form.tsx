@@ -1076,6 +1076,33 @@ export function CreateAssignmentForm({
             </div>
           </Card>
 
+          <Card padding="xl" className="flex flex-col gap-3">
+            {streakOn && (
+              <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+                เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
+                และเปิดการตรวจทีละข้อให้เสมอ ปรับสองอย่างนี้ที่นี่ไม่ได้
+              </p>
+            )}
+
+            {!streakOn && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="per-page" className="flex items-center gap-1.5">
+                  <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
+                </Label>
+                <Input
+                  id="per-page"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={questionsPerPage}
+                  onChange={e => setQuestionsPerPage(e.target.value)}
+                  className="max-w-[200px]"
+                />
+                <p className="text-xs text-muted-foreground">{perPageHint}</p>
+              </div>
+            )}
+          </Card>
+
           <Card padding="xl" className="space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -1289,33 +1316,6 @@ export function CreateAssignmentForm({
                     รอบใหม่เริ่มใหม่ทั้งชุด
                   </p>
                 </div>
-              </div>
-            )}
-          </Card>
-
-          <Card padding="xl" className="flex flex-col gap-3">
-            {streakOn && (
-              <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
-                เงื่อนไขจบงานตั้งไว้เป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
-                และเปิดการตรวจทีละข้อให้เสมอ ปรับสองอย่างนี้ที่นี่ไม่ได้
-              </p>
-            )}
-
-            {!streakOn && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="per-page" className="flex items-center gap-1.5">
-                  <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
-                </Label>
-                <Input
-                  id="per-page"
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={questionsPerPage}
-                  onChange={e => setQuestionsPerPage(e.target.value)}
-                  className="max-w-[200px]"
-                />
-                <p className="text-xs text-muted-foreground">{perPageHint}</p>
               </div>
             )}
           </Card>
