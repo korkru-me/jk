@@ -368,7 +368,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     <>
       {assignmentSidebar}
 
-      <div className="max-w-2xl space-y-6">
+      <div className="assignment-create-stage max-w-2xl space-y-6">
         <CreateAssignmentForm
           key={`${preselectedAssignmentType}:${copySource?.id ?? preselectedSet?.id ?? 'new'}`}
           classrooms={classrooms}

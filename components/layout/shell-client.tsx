@@ -84,7 +84,8 @@ export function ShellClient({
             <main
               className={cn(
                 'flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6',
-                sidebarCollapsed && 'md:[&>*]:mx-auto',
+                sidebarCollapsed &&
+                  'md:[&>.assignment-create-stage]:max-w-[calc(42rem+(var(--spacing)*44))]',
               )}
             >
               {children}

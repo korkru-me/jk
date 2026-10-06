@@ -1,8 +1,13 @@
 # Feature status
 
+### ขยายหน้าสร้างงานไปทางซ้ายเมื่อย่อเมนูด้านข้าง (6 ตุลาคม 2026)
+
+- **UI-025** — เมื่อย่อ sidebar เป็น icon rail บน desktop กรอบหน้าสร้างแบบฝึกหัด/ข้อสอบจะขยายเฉพาะด้านซ้ายเข้าไปใช้พื้นที่ที่เพิ่มขึ้น โดยขอบขวาอยู่ตำแหน่งเดิม ไม่เลื่อนทั้งหน้าไปทางขวา; จำกัดกฎไว้เฉพาะหน้าสร้างงานและไม่กระทบ mobile drawer
+- ผ่าน source-only TypeScript, token lint, webpack production build และ Next.js compilation/runtime checks · local Chrome fixture ยืนยันที่ 2048px ว่าขอบขวาคงที่ `1007.99px` และที่ 1024px คงที่ `995.20px` ทั้งก่อน/หลังย่อ sidebar ขณะที่ขอบซ้ายขยายเข้าไปใช้พื้นที่ที่คืนมา; 320px ไม่มี horizontal overflow และ drawer ยังเปิด/ปิดด้วย Escape พร้อมสลับ `inert` ถูกต้อง ไม่มีการเขียนฐานข้อมูลและไม่มี migration
+
 ### จัดสมดุลคอนเทนต์เมื่อย่อเมนูด้านข้าง (6 ตุลาคม 2026)
 
-- **UI-024** — เมื่อย่อ sidebar เป็น icon rail บน desktop คอนเทนต์ระดับหน้าจะคง width/`max-width` เดิมและจัดกึ่งกลางในพื้นที่ทำงานที่เหลือ ไม่เกาะซ้ายจนทิ้งพื้นที่ขวาว่าง; หน้ากว้างยังใช้พื้นที่เต็ม สถานะขยายคงตำแหน่งเดิม และ mobile drawer ไม่เปลี่ยน
+- **UI-024 (แทนที่โดย UI-025)** — แนวทางเดิมจัดคอนเทนต์ระดับหน้ากึ่งกลางเมื่อย่อ sidebar; เปลี่ยนเป็นการขยายเฉพาะหน้าสร้างงานไปทางซ้ายและตรึงขอบขวาเพื่อรักษาจังหวะเดิมของหน้า
 - ผ่าน source-only TypeScript, token lint, webpack production build และ Next.js compilation/runtime checks · local Chrome fixture ยืนยันที่ 2048px และ 1024px ว่าคอนเทนต์ `max-width: 672px` อยู่กึ่งกลางเมื่อย่อและกลับตำแหน่งเดิมเมื่อขยาย ขณะที่ลูกเต็มกว้างยังเต็มพื้นที่; 320px ไม่มี horizontal overflow และ drawer ยังเปิด/ปิดด้วย Escape พร้อมสลับ `inert` ถูกต้อง · `npx tsc --noEmit` ปกติยังพบ generated `LayoutRoutes` ขัดกันใน `.next/types`/`.next/dev/types` cache เดิม ไม่ล้าง live dev cache ไม่มีการเขียนฐานข้อมูลและไม่มี migration
 
 ### ปรับกำหนดการสอบและสรุปก่อนสร้าง (6 ตุลาคม 2026)
