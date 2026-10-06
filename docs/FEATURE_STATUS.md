@@ -1,5 +1,10 @@
 # Feature status
 
+### ย่อ–ขยายเมนูทันที (6 ตุลาคม 2026)
+
+- **UI-014** — ตามคำขอให้เร็วที่สุด ตัวแถบเมนูของ app shell เปลี่ยนจาก width/transform transition 200ms เป็น `transition-none` (0s) ทั้งย่อ–ขยาย desktop และเปิด–ปิด drawer มือถือ ใช้ร่วมกันในเมนูหลัก ห้องเรียน งาน และโหมดสอน คงขนาด rail/full, localStorage, aria-expanded, inert, backdrop, Escape, registry และ authorization เดิม ไม่เปลี่ยน transition ของเมนูย่อย/ปุ่มสี/ส่วนอื่นหรือแถบ super-admin แยกต่างหาก
+- ผ่าน TypeScript, token lint และ webpack production build (cache แยกจาก dev); local Chrome/React/Next.js QA บน shell จำลองที่ไม่เรียก Supabase: สี่บริบทบน desktop ย่อ/ขยายถึงขนาด 96/307.2px ตาม spacing preset ตั้งแต่ requestAnimationFrame แรก duration=0s/getAnimations=0 และสถานะ localStorage ตรงทุกครั้ง; 390px drawer เปิด x=0/inert=false ปิดด้วย Escape x=-307.2/inert=true ไม่ล้นจอ ไม่มี runtime/compilation error ไม่ทดสอบบัญชีจริง/Staging/physical mobile หรือ Safari ไม่รัน npm test เพราะไม่แก้ lib ไม่มี migration
+
 ### ชุดการตั้งค่างานส่วนตัว — ออกแบบเท่านั้น (6 ตุลาคม 2026)
 
 - เจ้าของผลิตภัณฑ์ขอออกแบบการบันทึก/เรียกใช้ชุดสำหรับสร้างแบบฝึกหัดและข้อสอบ และยืนยันล่าสุดให้เก็บ **3 ชุดต่อประเภทต่อบัญชี** แทน 5 ชุด รวม 6 ชุด เลือกค่าเริ่มต้นหนึ่งชุดต่อประเภทได้; ค่าเริ่มต้นนับอยู่ใน 3 ชุด ไม่ใช่ช่องเพิ่ม ขณะนี้ยังไม่มีตาราง/Server Actions/UI จริงหรือ migration สำหรับระบบนี้

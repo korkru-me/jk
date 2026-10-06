@@ -302,7 +302,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
     <SidebarDisplayProvider compactOnDesktop={collapsed}>
     <aside id="app-sidebar" aria-label="เมนูด้านข้าง" inert={!desktop && !isOpen} className={cn(
       'flex-shrink-0 border-r bg-card overflow-hidden',
-      'fixed bottom-0 left-0 top-16 z-30 w-64 transition-[width,transform] duration-200 ease-in-out motion-reduce:transition-none',
+      'fixed bottom-0 left-0 top-16 z-30 w-64 transition-none',
       'md:static',
       isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       collapsed ? 'md:w-20' : 'md:w-64',

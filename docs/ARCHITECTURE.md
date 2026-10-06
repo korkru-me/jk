@@ -46,6 +46,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ## Runtime boundaries
 
+ตาม UI-014 (6 ต.ค. 2026) ตัวแถบ `Sidebar` ของ app shell ใช้ `transition-none` แทน width/transform 200ms ทั้งการย่อเป็น icon rail บน desktop และเปิด/ปิด drawer บนมือถือ การเปลี่ยนนี้เป็น CSS display-only ไม่เพิ่ม timer/request และไม่เปลี่ยน state persistence, registry หรือ authorization
+
 ### Browser
 
 ใช้ `lib/supabase/client.ts` ซึ่งรับเฉพาะ public URL และ anon key ห้าม import service-role client เข้า Client Component
