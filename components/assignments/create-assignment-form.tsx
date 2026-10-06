@@ -7,7 +7,13 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
-import { assignmentCopyTitle, assignmentCreationTitle, newAssignmentTypeDefaults } from '@/lib/assignment-creation'
+import { assignmentCopyTitle, assignmentCreationTitle } from '@/lib/assignment-creation'
+import {
+  assignmentPresetDefaults, type AssignmentPresetBootstrap, type AssignmentPresetSettings,
+} from '@/lib/assignment-setting-presets'
+import {
+  AssignmentSettingPresets, type AssignmentPresetActions,
+} from '@/components/assignments/assignment-setting-presets'
 import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
 import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -42,7 +48,7 @@ import type {
   ShowResultsMode,
 } from '@/lib/types'
 import {
-  STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN,
+  STREAK_TARGET_MAX, STREAK_TARGET_MIN,
   STREAK_CAP_MAX, STREAK_CAP_MIN,
   decideCompletion, defaultQuestionCap, streakEligibleCount, streakExcludedCount, streakPoolAdvice,
 } from '@/lib/streak-completion'
@@ -166,6 +172,8 @@ interface Props {
   preselectedAssignmentType: AssignmentType
   copySource?: AssignmentCopyPreset
   initialGroupTargets?: GroupTargets
+  presetBootstrap?: AssignmentPresetBootstrap
+  presetActions?: AssignmentPresetActions
   /** Local QA can capture submissions without writing synthetic data. */
   actions?: {
     createQuestionSet: typeof createQuestionSet
@@ -184,12 +192,19 @@ export function CreateAssignmentForm({
   preselectedAssignmentType,
   copySource,
   initialGroupTargets = {},
+  presetBootstrap,
+  presetActions,
   actions,
 }: Props) {
   const router = useRouter()
   const assignmentType = preselectedAssignmentType
   const isCopy = copySource !== undefined
-  const initialTypeDefaults = newAssignmentTypeDefaults(assignmentType)
+  // Resolve the saved default synchronously, before any draft state is created.
+  // A copied assignment has priority; refreshes never reinitialize an edited draft.
+  const initialSettings = !copySource && !presetBootstrap?.error
+    ? presetBootstrap?.presets.find(preset => preset.id === presetBootstrap.defaultPresetId)?.settings
+      ?? assignmentPresetDefaults(assignmentType)
+    : assignmentPresetDefaults(assignmentType)
   const [step, setStep] = useState(0)
   const wizardRef = useRef<HTMLDivElement>(null)
   const previousStepRef = useRef(step)
@@ -219,7 +234,7 @@ export function CreateAssignmentForm({
   // Off unless the teacher says otherwise: turning it on blocks ส่งคำตอบ until
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
   // able to block students is not a safe default.
-  const [requireWorkImage, setRequireWorkImage] = useState(copySource?.require_work_image ?? false)
+  const [requireWorkImage, setRequireWorkImage] = useState(copySource?.require_work_image ?? initialSettings.require_work_image)
   // When not starting from an existing set, offer to save the picked
   // questions back into the library as a new reusable set.
   const [saveAsSet, setSaveAsSet] = useState(false)
@@ -238,7 +253,7 @@ export function CreateAssignmentForm({
   const [sections, setSections] = useState<QuestionSetSection[]>(
     parseSections(copySource?.sections ?? preselectedSet?.sections)
   )
-  const [showSections, setShowSections] = useState(copySource?.show_sections ?? true)
+  const [showSections, setShowSections] = useState(copySource?.show_sections ?? initialSettings.show_question_sections)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
   // How much of the คลัง above each student actually receives. Empty = all of
@@ -246,7 +261,8 @@ export function CreateAssignmentForm({
   // rather than in ตั้งค่า because "ให้เด็กทำกี่ข้อ" is the thought that comes
   // immediately after ticking the last โจทย์, not three steps later.
   const [randomQuestionCount, setRandomQuestionCount] = useState(
-    copySource?.random_question_count != null ? String(copySource.random_question_count) : '',
+    (copySource ? copySource.random_question_count : initialSettings.random_question_count) != null
+      ? String(copySource ? copySource.random_question_count : initialSettings.random_question_count) : '',
   )
 
   // Step 1 (คะแนน) — a question starts at the point value its own structure
@@ -265,74 +281,143 @@ export function CreateAssignmentForm({
   // *reported* only (never the underlying structure), and can be changed
   // any time later from the edit page too, even after students finish.
   const [displayMaxScore, setDisplayMaxScore] = useState(
-    copySource?.display_max_score != null ? String(copySource.display_max_score) : '',
+    (copySource ? copySource.display_max_score : initialSettings.display_max_score) != null
+      ? String(copySource ? copySource.display_max_score : initialSettings.display_max_score) : '',
   )
 
   // Step 2 (ตั้งค่า)
   const [duration, setDuration] = useState(
-    copySource?.duration_minutes != null ? String(copySource.duration_minutes) : '',
+    (copySource ? copySource.duration_minutes : initialSettings.duration_minutes) != null
+      ? String(copySource ? copySource.duration_minutes : initialSettings.duration_minutes) : '',
   )
-  const [shuffleQ, setShuffleQ] = useState(copySource?.shuffle_questions ?? false)
-  const [shuffleA, setShuffleA] = useState(copySource?.shuffle_options ?? false)
+  const [shuffleQ, setShuffleQ] = useState(copySource?.shuffle_questions ?? initialSettings.shuffle_questions)
+  const [shuffleA, setShuffleA] = useState(copySource?.shuffle_options ?? initialSettings.shuffle_options)
   // Off unless the teacher asks: every งาน before this existed gave each
   // student their own numbers, and that is still what a โจทย์สุ่มตัวเลข is for.
-  const [sharedRandomValues, setSharedRandomValues] = useState(copySource?.shared_random_seed != null)
-  const [showResults, setShowResults] = useState<ShowResultsMode>(copySource?.show_results ?? 'immediate')
+  const [sharedRandomValues, setSharedRandomValues] = useState(copySource ? copySource.shared_random_seed != null : initialSettings.shared_random_values)
+  const [showResults, setShowResults] = useState<ShowResultsMode>(copySource?.show_results ?? initialSettings.show_results)
   // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
   // before this setting existed, and one that does is a choice, not a default.
-  const [showSolutions, setShowSolutions] = useState(copySource?.show_solutions ?? false)
+  const [showSolutions, setShowSolutions] = useState(copySource?.show_solutions ?? initialSettings.show_solutions)
   const [maxAttempts, setMaxAttempts] = useState(
-    copySource ? (copySource.max_attempts != null ? String(copySource.max_attempts) : '') : initialTypeDefaults.maxAttempts,
+    copySource ? (copySource.max_attempts != null ? String(copySource.max_attempts) : '')
+      : (initialSettings.max_attempts != null ? String(initialSettings.max_attempts) : ''),
   )
-  const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(copySource?.score_strategy ?? 'best')
+  const [scoreStrategy, setScoreStrategy] = useState<ScoreStrategy>(copySource?.score_strategy ?? initialSettings.score_strategy)
   // On by default: a แบบฝึกหัด a student can retake is nearly always meant as
   // a second chance at what they got wrong, not as the whole set again. A
   // teacher who wants the full set back only has to untick it — and ข้อสอบ,
   // which is one attempt, resets this to 'all' below where it means nothing.
-  const [retryScope, setRetryScope] = useState<RetryScope>(copySource?.retry_scope ?? initialTypeDefaults.retryScope)
-  const [questionsPerPage, setQuestionsPerPage] = useState(String(copySource?.questions_per_page ?? 1))
+  const [retryScope, setRetryScope] = useState<RetryScope>(copySource?.retry_scope ?? initialSettings.retry_scope)
+  const [questionsPerPage, setQuestionsPerPage] = useState(String(copySource?.questions_per_page ?? initialSettings.questions_per_page))
   // On by default, and the reason a แบบฝึกหัด is not just a ข้อสอบ with more
   // attempts: the student finishes a ข้อ, presses ตรวจ, and finds out there and
   // then. A teacher who wants the whole set answered blind before any feedback
   // unticks it; the เฉลย itself is a separate decision below, because "บอกว่า
   // ผิด" and "บอกว่าคำตอบคืออะไร" are not the same amount of help.
-  const [instantCheck, setInstantCheck] = useState(copySource?.instant_check ?? true)
-  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(copySource?.instant_check_answer_key ?? true)
+  const [instantCheck, setInstantCheck] = useState(copySource?.instant_check ?? initialSettings.instant_check)
+  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(copySource?.instant_check_answer_key ?? initialSettings.instant_check_answer_key)
   // Calculator is opt-in; scratchpad keeps its type-specific default.
   // Copies preserve the source's choices. Existing assignments are never backfilled.
-  const [calculatorEnabled, setCalculatorEnabled] = useState(copySource?.calculator_enabled ?? initialTypeDefaults.calculatorEnabled)
-  const [scratchpadEnabled, setScratchpadEnabled] = useState(copySource?.scratchpad_enabled ?? initialTypeDefaults.scratchpadEnabled)
+  const [calculatorEnabled, setCalculatorEnabled] = useState(copySource?.calculator_enabled ?? initialSettings.calculator_enabled)
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(copySource?.scratchpad_enabled ?? initialSettings.scratchpad_enabled)
   const [accessCode, setAccessCode] = useState(copySource?.access_code ?? '')
-  const [proctoringEnabled, setProctoringEnabled] = useState(copySource?.proctoring_enabled ?? false)
-  const [fullscreenRequired, setFullscreenRequired] = useState(copySource?.fullscreen_required ?? false)
-  const [blockClipboard, setBlockClipboard] = useState(copySource?.block_clipboard ?? false)
-  const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(copySource?.exam_watermark_enabled ?? false)
-  const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>(copySource?.secure_browser_mode ?? 'browser')
-  const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>(copySource?.android_exam_mode ?? 'blocked')
+  const [proctoringEnabled, setProctoringEnabled] = useState(copySource?.proctoring_enabled ?? initialSettings.proctoring_enabled)
+  const [fullscreenRequired, setFullscreenRequired] = useState(copySource?.fullscreen_required ?? initialSettings.fullscreen_required)
+  const [blockClipboard, setBlockClipboard] = useState(copySource?.block_clipboard ?? initialSettings.block_clipboard)
+  const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(copySource?.exam_watermark_enabled ?? initialSettings.exam_watermark_enabled)
+  const [secureBrowserMode, setSecureBrowserMode] = useState<'browser' | 'seb_required'>(copySource?.secure_browser_mode ?? initialSettings.secure_browser_mode)
+  const [androidExamMode, setAndroidExamMode] = useState<'blocked' | 'monitored'>(copySource?.android_exam_mode ?? initialSettings.android_exam_mode)
   const [sebQuitPassword, setSebQuitPassword] = useState('')
   const [sebQuitPasswordConfirmation, setSebQuitPasswordConfirmation] = useState('')
   // เงื่อนไขจบงาน. The three choices a teacher sees are a view over two stored
   // values — 'fixed' + no threshold, 'fixed' + a threshold, or 'streak' — so
   // that turning a threshold on and choosing to end on a run are visibly the
   // same decision rather than two switches that can disagree.
-  const [completionRule, setCompletionRule] = useState<CompletionRule>(copySource?.completion_rule ?? 'fixed')
+  const [completionRule, setCompletionRule] = useState<CompletionRule>(copySource?.completion_rule ?? initialSettings.completion_rule)
   const [streakTarget, setStreakTarget] = useState(
-    String(copySource?.streak_target ?? STREAK_TARGET_DEFAULT),
+    String(copySource?.streak_target ?? initialSettings.streak_target),
   )
   const [streakCapEnabled, setStreakCapEnabled] = useState(
-    copySource ? copySource.streak_question_cap != null : true,
+    copySource ? copySource.streak_question_cap != null : initialSettings.streak_question_cap != null,
   )
   const [streakCap, setStreakCap] = useState(
-    String(copySource?.streak_question_cap ?? defaultQuestionCap(copySource?.streak_target ?? STREAK_TARGET_DEFAULT)),
+    String(copySource
+      ? copySource.streak_question_cap ?? defaultQuestionCap(copySource.streak_target ?? initialSettings.streak_target)
+      : initialSettings.streak_question_cap ?? defaultQuestionCap(initialSettings.streak_target)),
   )
-  const [streakRecycle, setStreakRecycle] = useState(copySource?.streak_recycle_pool ?? true)
+  const [streakRecycle, setStreakRecycle] = useState(copySource?.streak_recycle_pool ?? initialSettings.streak_recycle_pool)
   const [passingEnabled, setPassingEnabled] = useState(
-    copySource?.passing_type != null && copySource.passing_value != null,
+    copySource ? copySource.passing_type != null && copySource.passing_value != null
+      : initialSettings.passing_type != null && initialSettings.passing_value != null,
   )
-  const [passingType, setPassingType] = useState<'score' | 'percent'>(copySource?.passing_type ?? 'percent')
+  const [passingType, setPassingType] = useState<'score' | 'percent'>(copySource?.passing_type ?? initialSettings.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(
-    copySource?.passing_value != null ? String(copySource.passing_value) : '',
+    (copySource ? copySource.passing_value : initialSettings.passing_value) != null
+      ? String(copySource ? copySource.passing_value : initialSettings.passing_value) : '',
   )
+
+  // Capture requested settings, not the question-dependent effective payload.
+  // Invalid numeric drafts stay invalid so the preset schema can explain them.
+  const optionalNumber = (value: string) => value.trim() === '' ? null : Number(value)
+  const presetSettings: AssignmentPresetSettings = {
+    duration_minutes: optionalNumber(duration), shuffle_questions: shuffleQ,
+    shuffle_options: shuffleA, shared_random_values: sharedRandomValues,
+    show_results: showResults, show_solutions: showSolutions,
+    max_attempts: optionalNumber(maxAttempts), score_strategy: scoreStrategy,
+    retry_scope: retryScope, questions_per_page: Number(questionsPerPage),
+    instant_check: instantCheck, instant_check_answer_key: instantCheckAnswerKey,
+    calculator_enabled: calculatorEnabled, scratchpad_enabled: scratchpadEnabled,
+    proctoring_enabled: proctoringEnabled, fullscreen_required: fullscreenRequired,
+    block_clipboard: blockClipboard, exam_watermark_enabled: examWatermarkEnabled,
+    secure_browser_mode: secureBrowserMode, android_exam_mode: androidExamMode,
+    completion_rule: completionRule, streak_target: Number(streakTarget),
+    streak_question_cap: streakCapEnabled ? optionalNumber(streakCap) : null,
+    streak_recycle_pool: streakRecycle,
+    passing_type: passingEnabled ? passingType : null,
+    passing_value: passingEnabled ? optionalNumber(passingValue) : null,
+    random_question_count: optionalNumber(randomQuestionCount),
+    display_max_score: optionalNumber(displayMaxScore),
+    show_question_sections: showSections, require_work_image: requireWorkImage,
+  }
+
+  function applyPreset(settings: AssignmentPresetSettings) {
+    const numberDraft = (value: number | null) => value === null ? '' : String(value)
+    setDuration(numberDraft(settings.duration_minutes))
+    setShuffleQ(settings.shuffle_questions)
+    setShuffleA(settings.shuffle_options)
+    setSharedRandomValues(settings.shared_random_values)
+    setShowResults(settings.show_results)
+    setShowSolutions(settings.show_solutions)
+    setMaxAttempts(numberDraft(settings.max_attempts))
+    setScoreStrategy(settings.score_strategy)
+    setRetryScope(settings.retry_scope)
+    setQuestionsPerPage(String(settings.questions_per_page))
+    setInstantCheck(settings.instant_check)
+    setInstantCheckAnswerKey(settings.instant_check_answer_key)
+    setCalculatorEnabled(settings.calculator_enabled)
+    setScratchpadEnabled(settings.scratchpad_enabled)
+    setProctoringEnabled(settings.proctoring_enabled)
+    setFullscreenRequired(settings.fullscreen_required)
+    setBlockClipboard(settings.block_clipboard)
+    setExamWatermarkEnabled(settings.exam_watermark_enabled)
+    setSecureBrowserMode(settings.secure_browser_mode)
+    setAndroidExamMode(settings.android_exam_mode)
+    setCompletionRule(settings.completion_rule)
+    setStreakTarget(String(settings.streak_target))
+    setStreakCapEnabled(settings.streak_question_cap !== null)
+    setStreakCap(String(settings.streak_question_cap ?? defaultQuestionCap(settings.streak_target)))
+    setStreakRecycle(settings.streak_recycle_pool)
+    setPassingEnabled(settings.passing_type !== null && settings.passing_value !== null)
+    setPassingType(settings.passing_type ?? 'percent')
+    setPassingValue(numberDraft(settings.passing_value))
+    setRandomQuestionCount(numberDraft(settings.random_question_count))
+    setDisplayMaxScore(numberDraft(settings.display_max_score))
+    setShowSections(settings.show_question_sections)
+    setRequireWorkImage(settings.require_work_image)
+    // Passwords are never part of a preset. A previously typed SEB exit password
+    // remains this draft's value; a new job always starts with fresh blank fields.
+  }
 
   // Step 3 (กำหนดการสอบ)
   const [startAt, setStartAt] = useState(toLocalInputValue(copySource?.start_at ?? null))
@@ -437,17 +522,16 @@ export function CreateAssignmentForm({
   // ── สุ่มชุดโจทย์รายคน ────────────────────────────────────────────────────
   // Below two โจทย์ there is nothing to draw from.
   const canDrawRandomSubset = selectedIds.length >= 2
-  const randomDrawOn = canDrawRandomSubset && Number(randomQuestionCount) > 0
+  const randomDrawOn = Number(randomQuestionCount) > 0
   // Highest draw that is still a draw: taking all of them is the other option.
   const maxRandomDraw = Math.max(1, selectedIds.length - 1)
 
-  // Unticking โจทย์ can leave the draw larger than the คลัง it draws from.
-  // Clamping here — visibly, in the field the teacher can see — is what keeps
-  // finalizeSubmit from quietly storing null and handing out the whole set
-  // instead of the smaller paper the teacher asked for.
-  useEffect(() => {
-    if (Number(randomQuestionCount) > maxRandomDraw) setRandomQuestionCount(String(maxRandomDraw))
-  }, [maxRandomDraw, randomQuestionCount])
+  // A preset may request 5 questions before any pool has been chosen. Preserve
+  // that intention instead of the old effect silently clamping it to 1.
+  const randomDrawInvalid = randomQuestionCount.trim() !== '' && (
+    !Number.isInteger(Number(randomQuestionCount)) || Number(randomQuestionCount) < 1
+    || Number(randomQuestionCount) >= selectedIds.length
+  )
 
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
@@ -516,6 +600,7 @@ export function CreateAssignmentForm({
         && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
         && selectedIds.length > 0 && (!saveAsSet || questionSetTitle.trim().length > 0)
         && !(streakOn && streakBlocked)
+        && !randomDrawInvalid
     }
     if (step === 1) {
       if (!groupTargetsComplete(groupTargets, classroomIds)) return false
@@ -563,6 +648,11 @@ export function CreateAssignmentForm({
   }
 
   function finalizeSubmit(status: AssignmentStatus, effectiveStartAt: string) {
+    if (randomDrawInvalid) {
+      toast.error('จำนวนโจทย์ที่สุ่มต้องน้อยกว่าคลัง กรุณาเพิ่มโจทย์หรือปรับจำนวนก่อนสร้างงาน')
+      setStep(0)
+      return
+    }
     if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
       toast.error('กรุณากรอกเกณฑ์ผ่านให้ถูกต้อง')
       setStep(0)
@@ -696,6 +786,16 @@ export function CreateAssignmentForm({
             : 'รวบรวมโจทย์ทำเป็นข้อสอบหรือแบบฝึกหัด แล้วมอบหมายให้นักเรียน'}
         </p>
       </div>
+
+      <AssignmentSettingPresets
+        type={assignmentType}
+        bootstrap={presetBootstrap}
+        actions={presetActions}
+        settings={presetSettings}
+        onApply={applyPreset}
+        isCopy={isCopy}
+        disabled={isPending}
+      />
 
       {/* Step indicator */}
       <div className="flex items-start">
@@ -1049,7 +1149,7 @@ export function CreateAssignmentForm({
             </Card>
           )}
 
-          {canDrawRandomSubset && (
+          {(canDrawRandomSubset || randomQuestionCount.trim() !== '') && (
             <Card padding="xl" className="space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -1062,6 +1162,11 @@ export function CreateAssignmentForm({
                   </p>
                 </div>
               </div>
+
+              {randomDrawInvalid && <p role="alert" className="text-sm text-destructive">
+                ชุดการตั้งค่านี้ขอสุ่ม {randomQuestionCount} ข้อ แต่คลังมี {selectedIds.length} ข้อ
+                — เพิ่มโจทย์ให้มากกว่าจำนวนที่สุ่ม ปรับจำนวน หรือเลือกให้ทำทุกข้อก่อนสร้างงาน ค่าที่บันทึกไว้ยังไม่เปลี่ยน
+              </p>}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
