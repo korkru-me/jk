@@ -65,10 +65,9 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
 
       <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Notifications */}
-        {notificationsEnabled
-          ? <NotificationsBell initialUnreadCount={initialUnreadCount} />
-          // Keep the real bell's footprint in local fixtures without polling.
-          : <span aria-hidden="true" className="size-9 shrink-0" />}
+        <span data-notification-anchor className="flex size-9 shrink-0 items-center justify-center">
+          {notificationsEnabled && <NotificationsBell initialUnreadCount={initialUnreadCount} />}
+        </span>
 
         {/* Dark / Light toggle switch */}
         {themeMounted ? (

@@ -54,6 +54,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ตาม UI-027 view `AssignmentSettingPresetsSave` ใช้ `Collapsible` แบบ uncontrolled และปิดเป็นค่าเริ่มต้น โดย provider และ state ของรายการ/เป้าหมายบันทึกยัง mount ตลอด wizard เหมือนเดิม การเปิดหรือปิดจึงเป็นเพียง presentation state ฝั่ง client ไม่เรียก Server Action ไม่แก้ draft และไม่เปลี่ยน payload งาน
 
+ตาม UI-028 `ShellClient` วัดกึ่งกลาง element `data-notification-anchor` ใน Topbar ด้วย `ResizeObserver` แล้วเก็บระยะจากขอบขวาไว้ใน CSS custom property ของ shell; selector ที่จำกัดเฉพาะ direct child `.assignment-create-stage` คำนวณ `max-width` จาก content box กับค่านี้ จึงตรึงขอบขวาไว้ที่กระดิ่งโดยอัตโนมัติเมื่อ sidebar/viewport/topbar actions เปลี่ยน และไม่กระทบหน้าชนิดอื่นหรือ mobile breakpoint
+
 ### Browser
 
 ใช้ `lib/supabase/client.ts` ซึ่งรับเฉพาะ public URL และ anon key ห้าม import service-role client เข้า Client Component
