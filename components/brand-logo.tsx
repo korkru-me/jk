@@ -22,10 +22,10 @@ export function BrandLogo({ layout = 'horizontal', subtitle, className }: BrandL
         alt=""
         width={1024}
         height={1536}
-        sizes={stacked ? '24px' : '32px'}
+        sizes={stacked ? '32px' : '36px'}
         className={cn(
           'w-auto shrink-0 object-contain dark:brightness-0 dark:invert',
-          stacked ? 'h-7' : 'h-9',
+          stacked ? 'h-10' : 'h-11',
         )}
       />
       <span className={cn('flex flex-col', stacked && 'items-center')}>
