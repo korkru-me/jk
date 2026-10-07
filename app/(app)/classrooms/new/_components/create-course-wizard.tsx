@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import {
-  Check, ChevronRight, ChevronLeft, Clock, X, Upload, Info,
+  Check, ChevronDown, ChevronRight, ChevronLeft, Clock, X, Upload, Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -18,10 +18,11 @@ import {
   GRADE_SUGGESTIONS, getTermSuggestions, getSmartTermDefault,
   composeDescription, COVER_PRESETS,
 } from '@/app/(app)/classrooms/_components/classroom-meta'
-import { AccessTypePicker, TagInput, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
+import { AccessTypePicker, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { ClassroomType } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
 import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
 
@@ -102,29 +103,47 @@ function CoverDesignSection({
   onCoverChange: (id: string) => void
   onImageChange: (u: string) => void
 }) {
+  const [themePickerOpen, setThemePickerOpen] = useState(false)
+  const selectedPreset = COVER_PRESETS.find(preset => preset.id === cover) ?? COVER_PRESETS[0]
+
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
       <div className="space-y-1.5">
         <Label className="text-sm font-medium">ธีมสี</Label>
-        <div className="flex flex-wrap gap-2">
-          {COVER_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              title={preset.label}
-              aria-label={preset.label}
-              aria-pressed={cover === preset.id}
-              onClick={() => onCoverChange(preset.id)}
-              className={cn(
-                'size-8 rounded-full transition-transform hover:scale-105',
-                preset.solid,
-                cover === preset.id
-                  ? 'shadow-sm ring-2 ring-ring ring-offset-2'
-                  : 'opacity-70 hover:opacity-100',
-              )}
-            />
-          ))}
-        </div>
+        <Collapsible open={themePickerOpen} onOpenChange={setThemePickerOpen}>
+          <CollapsibleTrigger
+            render={<Button type="button" variant="outline" className="h-10 w-full justify-start gap-3" />}
+            aria-label={`ธีมสี: ${selectedPreset.label}`}
+          >
+            <span className={cn('size-5 shrink-0 rounded-full ring-1 ring-border', selectedPreset.solid)} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-left">{selectedPreset.label}</span>
+            <ChevronDown className={cn('size-4 shrink-0 transition-transform', themePickerOpen && 'rotate-180')} aria-hidden="true" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <Card padding="sm" radius="sm" className="mt-2 flex flex-wrap gap-2">
+              {COVER_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  title={preset.label}
+                  aria-label={preset.label}
+                  aria-pressed={cover === preset.id}
+                  onClick={() => {
+                    onCoverChange(preset.id)
+                    setThemePickerOpen(false)
+                  }}
+                  className={cn(
+                    'size-8 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                    preset.solid,
+                    cover === preset.id
+                      ? 'shadow-sm ring-2 ring-ring ring-offset-2'
+                      : 'opacity-70 hover:opacity-100',
+                  )}
+                />
+              ))}
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <div className="space-y-1.5">
@@ -287,7 +306,7 @@ function ClassroomTypeSection({
           )}
         >
           <div className="min-w-0 flex-1">
-            <p className={cn('font-semibold text-sm', value === 'subject' ? 'text-primary' : 'text-foreground')}>ห้องเรียนวิชา</p>
+            <p className={cn('font-semibold text-sm', value === 'subject' ? 'text-primary' : 'text-foreground')}>ห้องเรียน</p>
             <p className="mt-0.5 text-xs leading-snug text-muted-foreground">มอบหมายการบ้าน สอบ และให้คะแนน</p>
           </div>
           {value === 'subject' && <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />}
@@ -324,7 +343,6 @@ function Step0Content({
   onCoverChange,
   onIconChange,
   onCoverImageChange,
-  onTagsChange,
   classroomTypeLocked,
 }: {
   control: ReturnType<typeof useForm<WizardData>>['control']
@@ -334,7 +352,6 @@ function Step0Content({
   onCoverChange: (id: string) => void
   onIconChange: (key: ClassroomIconKey) => void
   onCoverImageChange: (u: string) => void
-  onTagsChange: (t: string[]) => void
   classroomTypeLocked?: boolean
 }) {
   return (
@@ -432,13 +449,6 @@ function Step0Content({
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label>
-          แท็กรายวิชา
-          <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
-        </Label>
-        <TagInput tags={values.tags} onChange={onTagsChange} />
-      </div>
     </div>
   )
 }
@@ -653,7 +663,6 @@ export function CreateCourseWizard({
             onCoverChange={(id) => setValue('cover', id)}
             onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
             onCoverImageChange={(u) => setValue('coverImageUrl', u)}
-            onTagsChange={(t) => setValue('tags', t)}
             classroomTypeLocked={!!duplicateSourceId}
           />
         )}
