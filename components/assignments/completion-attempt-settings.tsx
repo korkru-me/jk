@@ -19,13 +19,17 @@ export function CompletionAttemptSettings({ id, maxAttempts, scoreStrategy, onSc
   return (
     <Field>
       <FieldTitle id={`${id}-score-label`}>เลือกคะแนน</FieldTitle>
-      <ToggleGroup variant="primary" size="sm" value={[scoreStrategy]} disabled={maxAttempts === '1'}
+      <ToggleGroup variant="outline" size="sm" value={[scoreStrategy]} disabled={maxAttempts === '1'}
         aria-labelledby={`${id}-score-label`} className="grid w-full max-w-md grid-cols-[1.35fr_0.8fr_1fr]"
         onValueChange={values => {
           if (values[0]) onScoreStrategyChange(values[0] as ScoreStrategy)
         }}>
         {(Object.keys(SCORE_STRATEGY_CONTROL_LABELS) as ScoreStrategy[]).map(value => (
-          <ToggleGroupItem key={value} value={value} className="w-full min-w-0 px-2">
+          <ToggleGroupItem
+            key={value}
+            value={value}
+            className="w-full min-w-0 border-border px-2 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+          >
             {SCORE_STRATEGY_CONTROL_LABELS[value]}
           </ToggleGroupItem>
         ))}

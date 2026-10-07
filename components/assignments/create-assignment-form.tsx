@@ -1155,8 +1155,8 @@ export function CreateAssignmentForm({
                 <button
                   type="button"
                   onClick={chooseAllQuestions}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    !randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
+                  className={`rounded-lg border p-2.5 text-left transition-colors ${
+                    !randomDrawOn ? 'border-border bg-primary/10 shadow-sm' : 'border-border bg-card hover:bg-muted/50'
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">ให้ทำทุกข้อ</p>
@@ -1169,8 +1169,8 @@ export function CreateAssignmentForm({
                   onClick={() => {
                     if (!randomDrawOn) setRandomQuestionCount(String(Math.min(5, maxRandomDraw)))
                   }}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
+                  className={`rounded-lg border p-2.5 text-left transition-colors ${
+                    randomDrawOn ? 'border-border bg-primary/10 shadow-sm' : 'border-border bg-card hover:bg-muted/50'
                   }`}
                 >
                   <p className="font-medium text-sm text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
@@ -1229,7 +1229,7 @@ export function CreateAssignmentForm({
             </Card>
           )}
 
-          <Card padding="md" className="space-y-3">
+          <Card radius="md" padding="sm" className="space-y-2.5">
             <div>
               <h2 className="text-sm font-semibold text-foreground">เงื่อนไขเพิ่มเติม</h2>
               <p data-assignment-description className="text-xs text-muted-foreground">
@@ -1237,7 +1237,7 @@ export function CreateAssignmentForm({
               </p>
             </div>
 
-            <div data-completion-rules role="group" aria-label="เงื่อนไขเพิ่มเติม" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div data-completion-rules role="group" aria-label="เงื่อนไขเพิ่มเติม" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <CompletionRuleCard
                 selected={completionChoice === 'complete'}
                 label="อนุญาตให้ทำ"
@@ -1263,11 +1263,6 @@ export function CreateAssignmentForm({
                   />
                   <span>ครั้ง</span>
                 </div>
-                <p data-assignment-description className="text-xs text-muted-foreground">
-                  {questionsPerAttempt > 0
-                    ? `ทำ ${questionsPerAttempt} ข้อที่ได้รับ ได้เท่าไหร่ก็เท่านั้น`
-                    : 'ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน'}
-                </p>
               </CompletionRuleCard>
 
               <CompletionRuleCard
@@ -1290,9 +1285,6 @@ export function CreateAssignmentForm({
                   />
                   <span>{passingType === 'percent' ? '%' : 'คะแนน'}</span>
                 </div>
-                <p data-assignment-description className="text-xs text-muted-foreground">
-                  ผ่านแล้วจะเริ่มรอบใหม่ไม่ได้
-                </p>
               </CompletionRuleCard>
 
               <CompletionRuleCard
@@ -1316,11 +1308,14 @@ export function CreateAssignmentForm({
                   />
                   <span>ข้อ</span>
                 </div>
-                <p data-assignment-description={streakAvailable ? '' : undefined} className="text-xs text-muted-foreground">
-                  {streakAvailable ? 'ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0' : 'ใช้ได้เมื่อเลือกสุ่มโจทย์'}
-                </p>
               </CompletionRuleCard>
             </div>
+
+            {!streakAvailable && (
+              <p className="text-xs text-muted-foreground">
+                “ทำถูกติดต่อกัน” ใช้ได้เมื่อเลือกสุ่มโจทย์
+              </p>
+            )}
 
             {completionChoice === 'complete' && (
               <CompletionAttemptSettings id="attempts" maxAttempts={maxAttempts}
@@ -1340,7 +1335,7 @@ export function CreateAssignmentForm({
                       type="button"
                       onClick={() => setPassingType(t)}
                       className={`px-3 py-2 text-xs font-medium transition-all ${
-                        passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
+                        passingType === t ? 'bg-primary/10 text-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       {t === 'percent' ? '%' : 'คะแนน'}
@@ -1862,7 +1857,7 @@ export function CreateAssignmentForm({
                 <ToggleGroupItem
                   key={o.key}
                   value={o.key}
-                  className="min-h-10 w-full min-w-0 justify-start whitespace-normal rounded-xl border-2 px-3 py-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+                  className="min-h-10 w-full min-w-0 justify-start whitespace-normal rounded-lg border border-border px-3 py-2 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
                 >
                   <span className="flex w-full items-center gap-3">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left sm:flex-row sm:items-center sm:gap-4">

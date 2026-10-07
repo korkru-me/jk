@@ -131,7 +131,7 @@ export function QuestionPicker({
             }
           }}
           aria-label="กรองโจทย์ตามระดับความยาก"
-          variant="primary"
+          variant="outline"
           size="sm"
           spacing={1}
           className="max-w-full flex-wrap"
@@ -140,7 +140,7 @@ export function QuestionPicker({
             <ToggleGroupItem
               key={d}
               value={d}
-              className="h-auto rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground aria-pressed:border-primary aria-pressed:text-primary-foreground data-[state=on]:border-primary data-[state=on]:text-primary-foreground"
+              className="h-auto rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
             >
               {d === 'all' ? 'ทั้งหมด' : DIFF_META[d]?.label ?? d}
             </ToggleGroupItem>
@@ -226,7 +226,7 @@ export function QuestionPicker({
                 className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
                   pending === 'add' ? 'bg-success/10 border-success/30'
                     : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
-                    : isSelected ? 'bg-primary/10 border-primary/20'
+                    : isSelected ? 'border-border bg-primary/10'
                     : 'border-transparent hover:bg-muted'
                 }`}
               >

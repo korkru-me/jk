@@ -21,9 +21,9 @@ export function CompletionRuleCard({
     <div
       data-completion-option
       className={cn(
-        'relative rounded-xl border-2 p-3 text-left transition-all',
-        selected ? 'border-primary bg-primary/10' : 'border-border',
-        disabled ? 'opacity-60' : 'hover:border-ring',
+        'relative rounded-lg border p-2.5 text-left transition-colors',
+        selected ? 'border-border bg-primary/10 shadow-sm' : 'border-border bg-card',
+        disabled ? 'opacity-60' : 'hover:bg-muted/50',
       )}
     >
       <Button
@@ -35,7 +35,7 @@ export function CompletionRuleCard({
         aria-pressed={selected}
         className="absolute inset-0 h-auto w-auto rounded-[inherit] p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
       />
-      <div className="pointer-events-none relative z-10 space-y-1">
+      <div className="pointer-events-none relative z-10 space-y-0.5">
         {children}
       </div>
     </div>
@@ -43,4 +43,4 @@ export function CompletionRuleCard({
 }
 
 export const completionRuleInputClassName =
-  'pointer-events-auto h-9 w-16 bg-card px-2 text-center text-sm font-medium sm:w-24'
+  'pointer-events-auto h-8 w-14 bg-card px-1.5 text-center text-sm font-medium'

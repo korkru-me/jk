@@ -187,8 +187,8 @@ function ClassroomRow({
   const rowClassName = cn(
     'flex h-auto w-full items-center justify-start gap-2.5 rounded-xl border p-2.5 text-left font-normal',
     selected
-      ? 'border-primary bg-primary/10'
-      : 'border-border hover:border-ring',
+      ? 'border-border bg-primary/10 shadow-sm'
+      : 'border-border hover:bg-muted/50',
   )
 
   return (

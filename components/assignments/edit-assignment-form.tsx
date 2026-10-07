@@ -851,7 +851,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   type="button"
                   onClick={() => setPassingType(t)}
                   className={`px-3 py-2 text-xs font-medium transition-all ${
-                    passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
+                    passingType === t ? 'bg-primary/10 text-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {t === 'percent' ? '%' : 'คะแนน'}
