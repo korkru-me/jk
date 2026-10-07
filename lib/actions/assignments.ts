@@ -384,7 +384,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       mode: 'online',
       type: assignmentType,
       shuffle_questions: data.shuffle_questions ?? false,
-      shuffle_options: data.shuffle_options ?? false,
+      shuffle_options: data.shuffle_options ?? true,
       shared_random_seed: data.shared_random_values === true
         ? (copiedSharedRandomSeed ?? createSharedRandomSeed())
         : null,

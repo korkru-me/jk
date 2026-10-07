@@ -38,6 +38,16 @@ import { questionExcerpt } from '@/lib/question-display'
 import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-password-settings'
 import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
 import { InstantCheckSettingLabel } from '@/components/assignments/instant-check-setting-label'
+import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
+
+const CALCULATOR_SETTING_DESCRIPTION =
+  'เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ภายในเว็บไซต์ระหว่างทำแบบฝึกหัดหรือข้อสอบ'
+const SCRATCHPAD_SETTING_DESCRIPTION =
+  'เปิดให้นักเรียนใช้กระดาษทดภายในเว็บไซต์เพื่อเขียนหรือวาดวิธีคิดระหว่างทำโจทย์'
+const WORK_IMAGE_SETTING_DESCRIPTION =
+  'สำหรับโจทย์เติมคำตอบตัวเลข นักเรียนต้องแนบรูปแสดงวิธีทำก่อนจึงจะส่งคำตอบได้ โดยผู้สอนต้องตรวจวิธีทำจากรูปที่แนบด้วยตนเอง'
+const SHARED_RANDOM_VALUES_SETTING_DESCRIPTION =
+  'กำหนดให้โจทย์ประเภทสุ่มตัวเลขใช้ตัวเลขชุดเดียวกันสำหรับนักเรียนทุกคน'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -966,10 +976,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <Calculator className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">ให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์</p>
-                  <p className="text-xs text-muted-foreground">
-                    {hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : 'เปิดปุ่มเครื่องคิดเลขในหน้าทำโจทย์ และใช้ DEG/RAD ตามช่องคำตอบที่กำลังเลือก'}
+                  <p className="text-sm font-medium text-foreground">
+                    <AssignmentSettingHoverLabel
+                      label="เครื่องคิดเลขวิทยาศาสตร์"
+                      description={CALCULATOR_SETTING_DESCRIPTION}
+                    />
                   </p>
+                  {hasSubmissions && (
+                    <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
+                  )}
                 </div>
               </div>
               <input
@@ -987,10 +1002,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <NotebookPen className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">เปิดกระดาษทด</p>
-                  <p className="text-xs text-muted-foreground">
-                    {hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : 'สิ่งที่นักเรียนยังไม่แนบจะอยู่เฉพาะอุปกรณ์ ไม่ถูกอัปโหลดขึ้นพื้นที่เก็บไฟล์'}
+                  <p className="text-sm font-medium text-foreground">
+                    <AssignmentSettingHoverLabel
+                      label="กระดาษทด"
+                      description={SCRATCHPAD_SETTING_DESCRIPTION}
+                    />
                   </p>
+                  {hasSubmissions && (
+                    <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
+                  )}
                 </div>
               </div>
               <input
@@ -1011,9 +1031,11 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 <Camera className="w-4 h-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">ให้นักเรียนแนบรูปแสดงวิธีทำ</p>
-                <p className="text-xs text-muted-foreground">
-                  งานนี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)
+                <p className="text-sm font-medium text-foreground">
+                  <AssignmentSettingHoverLabel
+                    label="ให้นักเรียนแนบรูปแสดงวิธีทำ"
+                    description={WORK_IMAGE_SETTING_DESCRIPTION}
+                  />
                 </p>
               </div>
             </div>
@@ -1033,12 +1055,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 <Hash className="w-4 h-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน</p>
-                <p className="text-xs text-muted-foreground">
-                  {hasSubmissions
-                    ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้'
-                    : `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น ทำรอบใหม่ก็ได้ชุดเดิม`}
+                <p className="text-sm font-medium text-foreground">
+                  <AssignmentSettingHoverLabel
+                    label="ให้นักเรียนได้ตัวเลขชุดเดียวกัน"
+                    description={SHARED_RANDOM_VALUES_SETTING_DESCRIPTION}
+                  />
                 </p>
+                {hasSubmissions && (
+                  <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
+                )}
               </div>
             </div>
             <input

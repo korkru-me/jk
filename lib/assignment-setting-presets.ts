@@ -83,7 +83,7 @@ export type SaveAssignmentSettingPresetInput = {
 export function assignmentPresetDefaults(type: AssignmentType): AssignmentPresetSettings {
   const defaults = newAssignmentTypeDefaults(type)
   return {
-    duration_minutes: null, shuffle_questions: false, shuffle_options: false,
+    duration_minutes: null, shuffle_questions: false, shuffle_options: true,
     shared_random_values: false, show_results: 'immediate', show_solutions: false,
     max_attempts: Number(defaults.maxAttempts), score_strategy: 'best', retry_scope: defaults.retryScope,
     questions_per_page: 1, instant_check: true, instant_check_answer_key: false,

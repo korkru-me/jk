@@ -1,11 +1,4 @@
-'use client'
-
-import { CircleHelp } from 'lucide-react'
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card'
+import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
 
 export const INSTANT_CHECK_SETTING_LABEL = 'ให้นักเรียนกดตรวจคำตอบได้ทีละข้อ'
 export const INSTANT_CHECK_SETTING_DESCRIPTION =
@@ -13,22 +6,9 @@ export const INSTANT_CHECK_SETTING_DESCRIPTION =
 
 export function InstantCheckSettingLabel() {
   return (
-    <HoverCard>
-      <HoverCardTrigger
-        delay={200}
-        render={(
-          <span
-            tabIndex={0}
-            className="inline-flex items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        )}
-      >
-        {INSTANT_CHECK_SETTING_LABEL}
-        <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-      </HoverCardTrigger>
-      <HoverCardContent align="start" side="top" className="w-80 max-w-[calc(100vw-2rem)]">
-        {INSTANT_CHECK_SETTING_DESCRIPTION}
-      </HoverCardContent>
-    </HoverCard>
+    <AssignmentSettingHoverLabel
+      label={INSTANT_CHECK_SETTING_LABEL}
+      description={INSTANT_CHECK_SETTING_DESCRIPTION}
+    />
   )
 }

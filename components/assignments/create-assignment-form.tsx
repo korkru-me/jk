@@ -84,8 +84,8 @@ import { THAI_TIME_ZONE } from '@/lib/thai-time'
 import {
   INSTANT_CHECK_SETTING_DESCRIPTION,
   INSTANT_CHECK_SETTING_LABEL,
-  InstantCheckSettingLabel,
 } from '@/components/assignments/instant-check-setting-label'
+import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -1465,14 +1465,16 @@ export function CreateAssignmentForm({
                 ) : null) as React.ReactNode,
               }] : []),
               {
-                label: 'ให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์',
-                desc: 'เปิดปุ่มเครื่องคิดเลขในหน้าทำโจทย์ นักเรียนเลือก DEG/RAD ตามช่องคำตอบที่กำลังใช้ได้',
+                label: 'เครื่องคิดเลขวิทยาศาสตร์',
+                desc: 'เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ภายในเว็บไซต์ระหว่างทำแบบฝึกหัดหรือข้อสอบ',
+                descriptionOnHover: true,
                 value: calculatorEnabled,
                 set: setCalculatorEnabled,
                 footer: null as React.ReactNode,
               }, {
-                label: 'เปิดกระดาษทด',
-                desc: 'ให้นักเรียนเขียนทดบนอุปกรณ์ได้ สิ่งที่ยังไม่แนบจะอยู่เฉพาะเครื่องและไม่กินพื้นที่เก็บไฟล์ของระบบ',
+                label: 'กระดาษทด',
+                desc: 'เปิดให้นักเรียนใช้กระดาษทดภายในเว็บไซต์เพื่อเขียนหรือวาดวิธีคิดระหว่างทำโจทย์',
+                descriptionOnHover: true,
                 value: scratchpadEnabled,
                 set: setScratchpadEnabled,
                 footer: null as React.ReactNode,
@@ -1492,14 +1494,16 @@ export function CreateAssignmentForm({
                 set: setShuffleQ,
               },
               {
-                label: 'สับลำดับตัวเลือก (MCQ)',
-                desc: 'ตัวเลือก A–D สลับสำหรับแต่ละคน',
+                label: 'สลับลำดับตัวเลือก',
+                desc: 'สลับลำดับตัวเลือกของโจทย์ปรนัยให้นักเรียนแต่ละคนได้รับลำดับที่แตกต่างกัน',
+                descriptionOnHover: true,
                 value: shuffleA,
                 set: setShuffleA,
               },
               ...(randomValueQuestionCount > 0 ? [{
-                label: 'ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน',
-                desc: `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — ปกติแต่ละคนได้ตัวเลขไม่ซ้ำกัน เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น`,
+                label: 'ให้นักเรียนได้ตัวเลขชุดเดียวกัน',
+                desc: 'กำหนดให้โจทย์ประเภทสุ่มตัวเลขใช้ตัวเลขชุดเดียวกันสำหรับนักเรียนทุกคน',
+                descriptionOnHover: true,
                 value: sharedRandomValues,
                 set: setSharedRandomValues,
                 footer: (sharedRandomValues ? (
@@ -1518,7 +1522,8 @@ export function CreateAssignmentForm({
               }] : []),
               ...(hasWorkImageQuestions ? [{
                 label: 'ให้นักเรียนแนบรูปแสดงวิธีทำ',
-                desc: `${assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}นี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)`,
+                desc: 'สำหรับโจทย์เติมคำตอบตัวเลข นักเรียนต้องแนบรูปแสดงวิธีทำก่อนจึงจะส่งคำตอบได้ โดยผู้สอนต้องตรวจวิธีทำจากรูปที่แนบด้วยตนเอง',
+                descriptionOnHover: true,
                 value: requireWorkImage,
                 set: setRequireWorkImage,
                 footer: null as React.ReactNode,
@@ -1554,7 +1559,7 @@ export function CreateAssignmentForm({
                   <div>
                     <p className="text-sm font-medium text-foreground">
                       {'descriptionOnHover' in opt && opt.descriptionOnHover
-                        ? <InstantCheckSettingLabel />
+                        ? <AssignmentSettingHoverLabel label={opt.label} description={opt.desc} />
                         : opt.label}
                     </p>
                     {!('descriptionOnHover' in opt && opt.descriptionOnHover) && (

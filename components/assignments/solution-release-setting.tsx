@@ -4,6 +4,7 @@ import { Lightbulb } from 'lucide-react'
 import { attemptLimitFor } from '@/lib/solution-release'
 import type { AssignmentType } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
 
 /**
  * When, for this งาน as it is set up right now, a student would first see
@@ -21,7 +22,7 @@ function openingSummary(type: AssignmentType, maxAttempts: string): string {
 }
 
 /**
- * "ให้นักเรียนดูเฉลยวิธีทำ" — the เฉลย a teacher attached to each โจทย์ under
+ * "ให้นักเรียนดูเฉลยวิธีทำหลังกดส่ง" — the เฉลย a teacher attached to each โจทย์ under
  * "เฉลยวิธีทำ", opened ข้อ by ข้อ from the student's summary page once they
  * can no longer work on the งาน (lib/solution-release.ts). Shared by สร้างงาน
  * and แก้ไขงาน so the promise reads the same in both.
@@ -35,6 +36,12 @@ export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxA
   untilPassed?: boolean
   compact?: boolean
 }) {
+  const releaseTiming = untilPassed
+    ? 'นักเรียนจะเห็นเฉลยเมื่อผ่านและส่งงานแล้ว หรือเมื่อพ้นเวลาปิดรับหรือผู้สอนปิดงาน โดยต้องไม่มีรอบที่ยังทำค้างอยู่'
+    : openingSummary(assignmentType, maxAttempts)
+  const description =
+    `หากผู้สอนแนบเฉลยไว้ในโจทย์ นักเรียนจะเปิดดูเฉลยจากหน้าสรุปผลได้หลังส่งงานและไม่สามารถกลับมาทำงานนั้นต่อได้แล้ว เฉลยอาจเป็นข้อความ รูปภาพ PDF หรือกระดานที่ผู้สอนแนบไว้ ${releaseTiming}`
+
   return (
     <div className="space-y-1.5">
       <label className={cn(
@@ -48,10 +55,11 @@ export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxA
             </div>
           )}
           <div>
-            <p className="text-sm font-medium text-foreground">ให้นักเรียนดูเฉลยวิธีทำ</p>
-            <p data-assignment-description className="text-xs text-muted-foreground">
-              เฉลยที่แนบไว้กับโจทย์ (ข้อความ รูป PDF กระดาน) กดดูทีละข้อได้จากหน้าสรุปผล
-              หลังนักเรียนทำงานนี้ต่อไม่ได้แล้วเท่านั้น — ระหว่างทำหรือยังเหลือรอบให้ทำจะเปิดไม่ได้
+            <p className="text-sm font-medium text-foreground">
+              <AssignmentSettingHoverLabel
+                label="ให้นักเรียนดูเฉลยวิธีทำหลังกดส่ง"
+                description={description}
+              />
             </p>
           </div>
         </div>
@@ -62,11 +70,6 @@ export function SolutionReleaseSetting({ checked, onChange, assignmentType, maxA
           className="accent-primary w-4 h-4 shrink-0"
         />
       </label>
-      {checked && (
-        <p data-assignment-description className="text-xs text-muted-foreground px-1">{untilPassed
-          ? 'เห็นเฉลยเมื่อผ่านและส่งงานแล้ว หรือเมื่อพ้นเวลาปิดรับหรือครูกดปิดงาน โดยไม่มีรอบที่ยังทำค้างอยู่'
-          : openingSummary(assignmentType, maxAttempts)}</p>
-      )}
       {checked && assignmentType === 'exam' && (
         <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
           ถ้าให้หลายห้องสอบชุดนี้คนละเวลา คนที่สอบเสร็จก่อนจะเห็นเฉลยและส่งต่อให้ห้องที่ยังไม่สอบได้ —
