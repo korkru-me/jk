@@ -174,11 +174,17 @@ export function AssignmentDetailClient({
   useContextualSidebar(`/assignments/${a.id}`, renderContextualSidebar)
 
   return (
-    <div className="flex max-w-[1200px] flex-col gap-6">
+    <div className="flex max-w-[1200px] flex-col gap-4">
       {/* Header card */}
-      <Card edge="border" padding="lg" className="border-primary/20 bg-primary/10 text-foreground">
+      <Card
+        data-assignment-summary
+        radius="md"
+        edge="border"
+        padding="md"
+        className="border-primary/20 bg-primary/10 text-foreground"
+      >
         <div className="min-w-0">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
             <Badge variant="secondary" className={statusMeta.color}>
               <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
               {statusMeta.label}
@@ -195,28 +201,28 @@ export function AssignmentDetailClient({
               </Badge>
             )}
           </div>
-          <h1 className="text-2xl font-bold leading-tight">{a.title}</h1>
+          <h1 className="text-xl font-bold leading-tight sm:text-2xl">{a.title}</h1>
           {a.classrooms?.name && <p className="mt-1 text-sm text-muted-foreground">ห้องหลัก · {a.classrooms.name}</p>}
           {a.description && <p className="mt-1 text-sm text-muted-foreground">{a.description}</p>}
         </div>
 
-        <Separator className="my-4 bg-primary/20" />
+        <Separator className="my-3 bg-primary/20" />
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
           {assignmentDetails.map(detail => {
             const Icon = detail.icon
             return (
               <div
                 key={detail.label}
                 className={cn(
-                  'flex items-start gap-2.5 rounded-xl bg-background/60 p-3',
-                  detail.wide && 'sm:col-span-2 lg:col-span-4',
+                  'flex min-w-0 items-start gap-2',
+                  detail.wide && 'col-span-2 sm:col-span-2 xl:col-span-1',
                 )}
               >
-                <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
+                <Icon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">{detail.label}</p>
-                  <p className="mt-0.5 text-sm font-medium leading-5 text-foreground">{detail.value}</p>
+                  <p className="text-sm font-medium leading-5 text-foreground">{detail.value}</p>
                 </div>
               </div>
             )
@@ -353,13 +359,13 @@ function OverviewTab({ a, questions, submittedCount, inProgressCount, totalSubs,
   }
 
   const stats = [
-    { label: 'ส่งแล้ว',      value: submittedCount,  icon: CheckCircle2, color: 'bg-success/10 text-success' },
-    { label: 'กำลังทำ',      value: inProgressCount, icon: Activity,     color: 'bg-warning/10 text-warning' },
-    { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'bg-primary/10 text-primary' },
+    { label: 'ส่งแล้ว',      value: submittedCount,  icon: CheckCircle2, color: 'text-success' },
+    { label: 'กำลังทำ',      value: inProgressCount, icon: Activity,     color: 'text-warning' },
+    { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'text-primary' },
   ]
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3">
       {/* งานที่ระบบตรวจเองไม่ได้ — ข้อเขียน ช่องเติมคำที่ครูตรวจเอง เหตุผลของ
           ถูก/ผิด — ค้างอยู่จนกว่าครูจะกรอกคะแนน คะแนนรวมของนักเรียนจึงยัง
           ไม่นิ่ง ปุ่มนี้พาไปที่หน้ากรอกคะแนนโดยตรง */}
@@ -385,41 +391,48 @@ function OverviewTab({ a, questions, submittedCount, inProgressCount, totalSubs,
         </Link>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <Card
+        data-assignment-overview
+        radius="md"
+        edge="ring"
+        padding="md"
+        className={cn(
+          'grid grid-cols-3 gap-3',
+          totalSubs > 0 && 'lg:grid-cols-[repeat(3,minmax(0,0.55fr))_minmax(18rem,1.5fr)]',
+        )}
+      >
         {stats.map(s => {
           const Icon = s.icon
           return (
-            <Card edge="ring" padding="md" className="flex items-center gap-3" key={s.label}>
-              <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl', s.color)}>
-                <Icon className="size-4" />
+            <div className="min-w-0" key={s.label}>
+              <div className="flex items-center gap-1.5">
+                <Icon aria-hidden="true" className={cn('size-3.5 shrink-0', s.color)} />
+                <p className="text-xl font-bold leading-none text-foreground">{s.value}</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold leading-none text-foreground">{s.value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-              </div>
-            </Card>
+              <p className="mt-1 text-xs leading-4 text-muted-foreground">{s.label}</p>
+            </div>
           )
         })}
-      </div>
 
-      {/* Progress bar */}
-      {totalSubs > 0 && (
-        <Card edge="ring" padding="lg">
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="font-medium text-muted-foreground">ความคืบหน้าการส่ง</span>
-            <span className="text-muted-foreground">{submittedCount} / {totalSubs} คน</span>
+        {/* Progress shares the same compact surface as the three headline stats. */}
+        {totalSubs > 0 && (
+          <div className="col-span-3 min-w-0 border-t border-border pt-3 lg:col-span-1 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+            <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+              <span className="font-medium text-muted-foreground">ความคืบหน้าการส่ง</span>
+              <span className="shrink-0 text-muted-foreground">{submittedCount} / {totalSubs} คน</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-success transition-all"
+                style={{ width: `${(submittedCount / totalSubs) * 100}%` }}
+              />
+            </div>
+            {inProgressCount > 0 && (
+              <p className="mt-1.5 text-xs text-muted-foreground">{inProgressCount} คนกำลังทำอยู่</p>
+            )}
           </div>
-          <div className="h-3 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full bg-success transition-all"
-              style={{ width: `${totalSubs > 0 ? (submittedCount / totalSubs) * 100 : 0}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            {inProgressCount > 0 && `${inProgressCount} คนกำลังทำอยู่`}
-          </p>
-        </Card>
-      )}
+        )}
+      </Card>
     </div>
   )
 }
