@@ -109,6 +109,8 @@ export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'questi
 export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions, sebQuitPasswordSetup }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const assignmentNoun = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const completionSectionLabel = `เงื่อนไขการทำ${assignmentNoun}เสร็จ`
 
   const assignmentSections = parseSections(a.sections)
 
@@ -656,7 +658,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <div className="flex flex-col gap-4">
               {streakOn && (
                 <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
-                  เงื่อนไขเพิ่มเติมเป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
+                  {completionSectionLabel}เป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
                   ปรับสองอย่างนี้ที่นี่ไม่ได้
                 </p>
               )}
@@ -740,7 +742,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Target className="w-4 h-4 text-muted-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-foreground">เงื่อนไขเพิ่มเติม</h2>
+            <h2 className="font-semibold text-foreground">{completionSectionLabel}</h2>
             <p className="text-xs text-muted-foreground">
               {canEditCompletion
                 ? 'นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร'
@@ -749,11 +751,12 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         </div>
 
-        <div data-completion-rules role="group" aria-label="เงื่อนไขเพิ่มเติม" className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div data-completion-rules role="group" aria-label={completionSectionLabel} className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <CompletionRuleCard
             selected={completionChoice === 'complete'}
             disabled={!canEditCompletion}
             label="อนุญาตให้ทำ"
+            description={`นักเรียนทำ${assignmentNoun}ได้ไม่เกินจำนวนครั้งที่กำหนด`}
             onSelect={() => chooseCompletion('complete')}
           >
             <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
@@ -777,13 +780,13 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               />
               <span>ครั้ง</span>
             </div>
-            <p className="text-xs text-muted-foreground">ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน</p>
           </CompletionRuleCard>
 
           <CompletionRuleCard
             selected={completionChoice === 'threshold'}
             disabled={!canEditCompletion}
             label="ผ่านเกณฑ์"
+            description={`นักเรียนทำ${assignmentNoun}ซ้ำได้โดยไม่จำกัดจำนวนครั้ง จนได้คะแนนถึงเกณฑ์ที่กำหนด จึงถือว่าทำ${assignmentNoun}เสร็จ`}
             onSelect={() => chooseCompletion('threshold')}
           >
             <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
@@ -800,9 +803,21 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 aria-label="ค่าเกณฑ์ผ่าน"
                 className={completionRuleInputClassName}
               />
-              <span>{passingType === 'percent' ? '%' : 'คะแนน'}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  chooseCompletion('threshold')
+                  setPassingType(passingType === 'percent' ? 'score' : 'percent')
+                }}
+                disabled={!canEditCompletion}
+                aria-label={`เปลี่ยนหน่วยเกณฑ์ผ่าน ปัจจุบันเป็น${passingType === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}`}
+                className="pointer-events-auto h-8 min-w-8 px-2 text-xs"
+              >
+                {passingType === 'percent' ? '%' : 'คะแนน'}
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">ผ่านแล้วจะเริ่มรอบใหม่ไม่ได้</p>
           </CompletionRuleCard>
 
           {streakOffered && (
@@ -810,6 +825,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               selected={completionChoice === 'streak'}
               disabled={!canEditCompletion || !streakAvailable}
               label="ทำถูกติดต่อกัน"
+              description={`${!streakAvailable ? 'ใช้ได้เมื่อเลือก “สุ่มจากโจทย์ที่เลือกข้างต้น” ' : ''}นักเรียนต้องตอบถูกติดต่อกันครบตามจำนวนที่กำหนด จึงถือว่าทำ${assignmentNoun}เสร็จ`}
               onSelect={() => chooseCompletion('streak')}
             >
               <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
@@ -827,9 +843,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 />
                 <span>ข้อ</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {streakAvailable ? 'ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0' : 'ใช้ได้เมื่อเลือกสุ่มโจทย์'}
-              </p>
             </CompletionRuleCard>
           )}
         </div>
@@ -840,25 +853,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         )}
         {completionChoice !== 'complete' && (
           <p className="text-xs text-muted-foreground">ทำรอบใหม่ได้จนกว่าจะผ่าน เมื่อผ่านแล้วจะเริ่มรอบใหม่ไม่ได้ · เก็บคะแนนจากรอบที่ดีที่สุด</p>
-        )}
-
-        {completionChoice === 'threshold' && (
-          <div className="flex items-center gap-2 flex-wrap" aria-label="หน่วยเกณฑ์ผ่าน">
-            <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
-              {(['percent', 'score'] as const).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setPassingType(t)}
-                  className={`px-3 py-2 text-xs font-medium transition-all ${
-                    passingType === t ? 'bg-primary/10 text-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {t === 'percent' ? '%' : 'คะแนน'}
-                </button>
-              ))}
-            </div>
-          </div>
         )}
 
         {completionChoice === 'streak' && (
