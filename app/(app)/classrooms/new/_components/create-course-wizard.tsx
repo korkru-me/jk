@@ -364,15 +364,6 @@ function Step0Content({
         disabled={classroomTypeLocked}
       />
 
-      <ClassroomIconPicker value={values.iconKey} onValueChange={onIconChange} compact />
-
-      <CoverDesignSection
-        cover={values.cover}
-        coverImageUrl={values.coverImageUrl}
-        onCoverChange={onCoverChange}
-        onImageChange={onCoverImageChange}
-      />
-
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="cls-name">
@@ -449,6 +440,14 @@ function Step0Content({
         </div>
       </div>
 
+      <ClassroomIconPicker value={values.iconKey} onValueChange={onIconChange} compact />
+
+      <CoverDesignSection
+        cover={values.cover}
+        coverImageUrl={values.coverImageUrl}
+        onCoverChange={onCoverChange}
+        onImageChange={onCoverImageChange}
+      />
     </div>
   )
 }
