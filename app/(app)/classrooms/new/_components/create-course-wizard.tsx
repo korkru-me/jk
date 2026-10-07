@@ -22,7 +22,6 @@ import type { ClassroomType } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
-import { ClassroomCoverUpload, type ClassroomCoverUploadHandler } from '@/components/classrooms/classroom-cover-upload'
 import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
@@ -33,7 +32,6 @@ const wizardSchema = z.object({
   classroomType:   z.enum(['subject', 'homeroom']),
   cover:           z.string(),
   iconKey:         z.custom<ClassroomIconKey>(isClassroomIconKey, 'กรุณาเลือกไอคอนจากตัวเลือกที่มี'),
-  coverImageUrl:   z.string(),
   name:            z.string().min(1, 'กรุณากรอกชื่อห้องเรียน').max(100, 'ชื่อห้องเรียนไม่เกิน 100 ตัวอักษร'),
   description:     z.string().max(500, 'คำอธิบายไม่เกิน 500 ตัวอักษร'),
   gradeLevel:      z.string(),
@@ -52,7 +50,6 @@ const DEFAULT_VALUES: WizardData = {
   classroomType:   'subject',
   cover:           COVER_PRESETS[0].id,
   iconKey:         DEFAULT_CLASSROOM_ICON,
-  coverImageUrl:   '',
   name:            '',
   description:     '',
   gradeLevel:      '',
@@ -80,21 +77,18 @@ function FieldError({ message }: { message?: string }) {
 // ─── Cover Design Section ─────────────────────────────────────────────────────
 
 function CoverDesignSection({
-  iconKey, cover, coverImageUrl, onIconChange, onCoverChange, onImageChange, uploadCoverImage,
+  iconKey, cover, onIconChange, onCoverChange,
 }: {
   iconKey: ClassroomIconKey
   cover: string
-  coverImageUrl: string
   onIconChange: (key: ClassroomIconKey) => void
   onCoverChange: (id: string) => void
-  onImageChange: (u: string) => void
-  uploadCoverImage?: ClassroomCoverUploadHandler
 }) {
   const [themePickerOpen, setThemePickerOpen] = useState(false)
   const selectedPreset = COVER_PRESETS.find(preset => preset.id === cover) ?? COVER_PRESETS[0]
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <ClassroomIconPicker value={iconKey} onValueChange={onIconChange} compact />
 
       <div className="space-y-1.5">
@@ -135,13 +129,6 @@ function CoverDesignSection({
         </Collapsible>
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium">
-          รูปภาพหน้าปก
-          <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
-        </Label>
-        <ClassroomCoverUpload value={coverImageUrl} onChange={onImageChange} uploadFile={uploadCoverImage} />
-      </div>
     </div>
   )
 }
@@ -209,8 +196,6 @@ function ClassroomFormContent({
   onClassroomTypeChange,
   onCoverChange,
   onIconChange,
-  onCoverImageChange,
-  uploadCoverImage,
   onToggleCapacity,
   classroomTypeLocked,
 }: {
@@ -220,8 +205,6 @@ function ClassroomFormContent({
   onClassroomTypeChange: (v: ClassroomType) => void
   onCoverChange: (id: string) => void
   onIconChange: (key: ClassroomIconKey) => void
-  onCoverImageChange: (u: string) => void
-  uploadCoverImage?: ClassroomCoverUploadHandler
   onToggleCapacity: (v: boolean) => void
   classroomTypeLocked?: boolean
 }) {
@@ -314,11 +297,8 @@ function ClassroomFormContent({
       <CoverDesignSection
         iconKey={values.iconKey}
         cover={values.cover}
-        coverImageUrl={values.coverImageUrl}
         onIconChange={onIconChange}
         onCoverChange={onCoverChange}
-        onImageChange={onCoverImageChange}
-        uploadCoverImage={uploadCoverImage}
       />
 
       <div className="border-t border-border pt-4">
@@ -398,7 +378,6 @@ function ClassroomFormContent({
 export interface CreateCourseWizardActions {
   createClassroom: typeof createClassroom
   duplicateClassroom: typeof duplicateClassroom
-  uploadCoverImage?: ClassroomCoverUploadHandler
   onCreated?: () => void
 }
 
@@ -456,7 +435,7 @@ export function CreateCourseWizard({
     const description = composeDescription({
       description:     data.description,
       cover:           data.cover,
-      coverImageUrl:   data.coverImageUrl,
+      coverImageUrl:   '',
       iconKey:         data.iconKey,
       gradeLevel:      data.gradeLevel,
       academicTerm:    data.academicTerm,
@@ -515,8 +494,6 @@ export function CreateCourseWizard({
           onClassroomTypeChange={(v) => setValue('classroomType', v)}
           onCoverChange={(id) => setValue('cover', id)}
           onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
-          onCoverImageChange={(u) => setValue('coverImageUrl', u)}
-          uploadCoverImage={actions?.uploadCoverImage}
           onToggleCapacity={(v) => setValue('capacityEnabled', v)}
           classroomTypeLocked={!!duplicateSourceId}
         />

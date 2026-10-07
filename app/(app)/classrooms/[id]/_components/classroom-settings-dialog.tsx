@@ -21,15 +21,13 @@ import { updateClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import {
   composeDescription, parseDescription, GRADE_SUGGESTIONS, getTermSuggestions,
-  COVER_PRESETS, coverOf, coverImageOf,
+  COVER_PRESETS, coverOf,
   type ClassroomMeta,
 } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { AccessTypePicker, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
-import { ClassroomCoverUpload } from '@/components/classrooms/classroom-cover-upload'
-import { ClassroomCoverBackdrop } from '@/components/classrooms/classroom-cover-backdrop'
 
 export function ClassroomSettingsDialog({
   classroom, onCover = false, placement = 'banner',
@@ -54,10 +52,9 @@ export function ClassroomSettingsDialog({
     setMeta(prev => ({ ...prev, [key]: value }))
   }
 
-  // Classrooms created before covers were persisted have none saved; the
-  // preview stays on the neutral surface until a teacher picks one.
+  // Classrooms created before cover colours were persisted have none saved;
+  // the preview stays on the neutral surface until a teacher picks one.
   const cover = coverOf(meta)
-  const coverImageUrl = coverImageOf(meta)
 
   function clearCover() {
     setMeta(prev => ({ ...prev, cover: '' }))
@@ -163,12 +160,9 @@ export function ClassroomSettingsDialog({
             <div
               className={cn(
                 'relative h-20 overflow-hidden rounded-2xl border-2 flex items-center px-5 transition-colors',
-                coverImageUrl
-                  ? 'border-surface-inverse-border bg-surface-inverse text-surface-inverse-foreground'
-                  : cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
+                cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
               )}
             >
-              <ClassroomCoverBackdrop imageUrl={coverImageUrl} cover={cover} />
               <ClassroomIcon iconKey={meta.iconKey} className="relative z-10 mr-3 size-7 shrink-0" />
               <p className="relative z-10 font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
             </div>
@@ -205,17 +199,6 @@ export function ClassroomSettingsDialog({
                   </button>
                 )
               })}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                รูปภาพหน้าปก
-                <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
-              </Label>
-              <ClassroomCoverUpload
-                value={meta.coverImageUrl}
-                onChange={url => set('coverImageUrl', url)}
-                disabled={isPending}
-              />
             </div>
           </div>
 

@@ -120,7 +120,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 - ตรวจ MIME type, ขนาด และจำนวนไฟล์ฝั่ง server/storage policy
 - **URL ของไฟล์ที่ client ส่งกลับมาให้บันทึกต้องตรวจถึง “host” ไม่ใช่แค่ path** — `https://evil.example/storage/v1/object/public/classroom-post-files/x.png` มี path ตรงทุกตัวอักษร ถ้าตรวจแค่ path ไฟล์นอกโปรเจกต์จะถูกฝังเป็น `<img src>`/ปุ่มดาวน์โหลดต่อหน้าทั้งห้องได้ · ไฟล์แนบประกาศตรวจด้วย `isPostFileUrl()` เทียบกับ `NEXT_PUBLIC_SUPABASE_URL` (มี unit test ครอบ) และชื่อไฟล์ที่ client ส่งมาถูกตัดอักขระคั่น path และจำกัดความยาวก่อนเก็บ
-- รูปหน้าปกห้องเรียนใช้ public bucket `question-images` จึงไม่ใช่ข้อมูลลับ: browser รับเฉพาะ PNG/JPEG/WebP ไม่เกิน 5 MB และย่อก่อนอัปโหลดไป `{auth.uid()}/classroom-cover_*`; action สร้าง/ทำสำเนา/แก้ไขตรวจ HTTPS origin ตรงกับ `NEXT_PUBLIC_SUPABASE_URL`, bucket, owner folder, filename และห้าม query/hash/credential ก่อนบันทึก · orphan sweep ต้องรวม reference จาก `classrooms.description` แบบ fail closed และ `releaseQuestionFiles` ห้ามลบ prefix `classroom-cover_`
+- UI-036 ถอดการอัปโหลดและการแสดงรูปหน้าปกห้องเรียนออกแล้ว · สำหรับ metadata เก่าที่ยังคง round-trip ได้ action สร้าง/ทำสำเนา/แก้ไขยังตรวจ HTTPS origin ตรงกับ `NEXT_PUBLIC_SUPABASE_URL`, bucket, owner folder, filename และห้าม query/hash/credential ก่อนบันทึก; orphan sweep ยังรวม reference จาก `classrooms.description` แบบ fail closed และ `releaseQuestionFiles` ไม่ลบ prefix `classroom-cover_`
 - ใช้ชื่อไฟล์และ path ที่ไม่เปิดเผยข้อมูลเกินจำเป็น
 - จำกัดการอ่านไฟล์ตาม owner/classroom/assignment
 - ระวัง orphan files เมื่อแก้หรือลบ resource

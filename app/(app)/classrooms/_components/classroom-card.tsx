@@ -6,12 +6,11 @@ import { Users, BookOpen, Check, Copy, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
-import { parseDescription, coverOf, coverImageOf } from './classroom-meta'
+import { parseDescription, coverOf } from './classroom-meta'
 import { IconButton } from '@/components/ui/icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
-import { ClassroomCoverBackdrop } from '@/components/classrooms/classroom-cover-backdrop'
 
 interface Props {
   classroom: Classroom
@@ -33,7 +32,6 @@ export function ClassroomCard({
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const meta = parseDescription(classroom.description)
   const savedCover = coverOf(meta)
-  const coverImageUrl = coverImageOf(meta)
   const shownDescription = meta.description
   const gradeLevel = meta.gradeLevel
   const academicTerm = meta.academicTerm
@@ -44,14 +42,11 @@ export function ClassroomCard({
       <div
         className={cn(
           'relative flex h-16 items-center px-4',
-          coverImageUrl
-            ? 'border-b border-surface-inverse-border bg-surface-inverse text-surface-inverse-foreground'
-            : savedCover
-              ? `border-b-2 ${savedCover.surface} ${savedCover.text}`
-              : 'border-b border-border bg-muted text-foreground',
+          savedCover
+            ? `border-b-2 ${savedCover.surface} ${savedCover.text}`
+            : 'border-b border-border bg-muted text-foreground',
         )}
       >
-        <ClassroomCoverBackdrop imageUrl={coverImageUrl} cover={savedCover} />
         {/* Checkbox overlay in selection mode */}
         {isSelecting && (
           <div
@@ -75,7 +70,7 @@ export function ClassroomCard({
           {(gradeLevel || academicTerm || shownDescription) && <p
             className={cn(
               'mt-1 flex min-w-0 items-center gap-1.5 text-xs font-medium',
-              coverImageUrl ? 'text-surface-inverse-muted' : savedCover ? savedCover.textMuted : 'text-muted-foreground',
+              savedCover ? savedCover.textMuted : 'text-muted-foreground',
             )}
           >
             {gradeLevel && <span className="shrink-0"><span className="sr-only">ระดับชั้น </span>{gradeLevel}</span>}

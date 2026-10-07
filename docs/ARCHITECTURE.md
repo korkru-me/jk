@@ -56,9 +56,11 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ตาม UI-028/UI-031 `ShellClient` วัดกึ่งกลาง element `data-notification-anchor` ใน Topbar ด้วย `ResizeObserver` แล้วเก็บระยะจากขอบขวาไว้ใน CSS custom property ของ shell; selector ที่จำกัดเฉพาะ direct child `.assignment-create-stage` และ `.classroom-create-stage` คำนวณ `max-width` จาก content box กับค่านี้ จึงตรึงขอบขวาไว้ที่กระดิ่งโดยอัตโนมัติเมื่อ sidebar/viewport/topbar actions เปลี่ยน และไม่กระทบหน้าชนิดอื่นหรือ mobile breakpoint
 
-ตาม UI-034 browser ย่อรูปหน้าปกแล้วอัปโหลดไป `question-images/{teacher_id}/classroom-cover_*` จากนั้น wizard/settings เขียน public URL ผ่าน codec `classroom-meta.ts` ลง `classrooms.description`; mutation ตรวจ origin, bucket, owner และรูปแบบ path ซ้ำฝั่ง server ก่อนบันทึก ส่วน card/detail/settings อ่านผ่าน validator เดียวกันและใช้ `ClassroomCoverBackdrop` ร่วมกัน สำเนาห้องอ้าง object เดิมโดยไม่คัดลอกไฟล์ และ orphan sweep จึงรวม reference จาก description ก่อนลบไฟล์
+UI-034 เคยให้ browser อัปโหลดรูปหน้าปกไป `question-images/{teacher_id}/classroom-cover_*`; UI-036 ถอด uploader และ renderer ออกจากทุกหน้าห้องเรียนแล้ว แต่ `classroom-meta.ts` ยัง parse/compose URL เก่าและ mutation ยังตรวจ origin, bucket, owner และรูปแบบ path เพื่อให้การแก้ห้องเก่าไม่ทำ metadata สูญหายหรือเปิดทางให้ URL ที่ไม่เชื่อถือได้ · orphan sweep ยังรวม reference จาก description ก่อนลบไฟล์ และ `releaseQuestionFiles` ยังไม่ลบ prefix เดิม
 
 ตาม UI-035 `CreateCourseWizard` ใช้ `react-hook-form` instance เดียวตลอดฟอร์มหน้าเดียวและตรวจ schema รวมกับเงื่อนไขจำนวนที่นั่ง/ลำดับวันก่อน mutation โดยไม่เปลี่ยน payload หรือ codec เดิม · `AccessTypePicker` รับ `includeClosed`; create/duplicate ส่ง `false` ขณะที่ settings ใช้ค่าเริ่มต้น `true` จึงยังแก้ห้องเดิมเป็น `closed` ได้ และ duplicate ที่รับ metadata `closed` จะ normalize เป็น `open` เฉพาะค่าเริ่มต้นของห้องใหม่
+
+ตาม UI-036 wizard ไม่รับ `coverImageUrl` ใน form state และเขียนค่าว่างให้ห้องใหม่/สำเนาใหม่; settings เก็บค่าเดิมที่ parse มาไว้ใน `ClassroomMeta` และ compose กลับโดยไม่เปิด control ให้เปลี่ยน ส่วน card/detail/lab ไม่ import image backdrop จึงไม่มี network request ไปยังรูปหน้าปกเก่า
 
 ### Browser
 
