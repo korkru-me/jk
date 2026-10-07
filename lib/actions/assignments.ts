@@ -400,7 +400,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       // counted — so this is the one case where an exam gets instant_check.
       // Ordinary ข้อสอบ still keep their single ส่งคำตอบ at the end.
       instant_check: forced?.instant_check ?? (isOnlineExercise && data.instant_check !== false),
-      instant_check_answer_key: data.instant_check_answer_key !== false,
+      instant_check_answer_key: data.instant_check_answer_key === true,
       completion_rule: completion.rule,
       streak_target: completion.target,
       streak_question_cap: completion.questionCap,

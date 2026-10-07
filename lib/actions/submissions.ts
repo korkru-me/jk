@@ -11,6 +11,7 @@ import {
 import {
   buildAssignmentAttempt,
   buildAttemptQuestion,
+  buildFreshRandomQuestion,
   buildRetryAttempt,
   gradeAnswer,
   type AssignmentAttemptSkeleton,
@@ -686,7 +687,7 @@ export async function checkAnswer(submissionAnswerId: string) {
     isCorrect: graded.is_correct,
     score: graded.score,
     maxScore,
-    revealAnswerKey: assignment.instant_check_answer_key !== false,
+    revealAnswerKey: assignment.instant_check_answer_key === true,
   })
 
   if (!isStreakRun) return { success: true as const, checkCount, feedback }
@@ -728,6 +729,74 @@ export async function checkAnswer(submissionAnswerId: string) {
       // rather than drawing a dot that did not move for no visible reason.
       counted: feedback.verdict !== 'pending',
     },
+  }
+}
+
+/**
+ * Start the next try after an ordinary exercise revealed the answer key.
+ * Random-number questions receive a fresh frozen value set and answer key;
+ * every other question is intentionally left untouched.
+ */
+export async function rerollCheckedRandomAnswer(submissionAnswerId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const admin = createAdminClient()
+
+  const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
+  if ('error' in writable) return { error: writable.error }
+  const assignment = writable.assignment
+  if (
+    assignment?.mode !== 'online'
+    || assignment.type !== 'exercise'
+    || assignment.instant_check !== true
+    || assignment.instant_check_answer_key !== true
+    || assignment.completion_rule === 'streak'
+  ) {
+    return { error: 'งานนี้ไม่ได้เปิดให้สุ่มโจทย์ใหม่หลังดูคำตอบ' }
+  }
+  if (writable.answer.carried_over) {
+    return { error: 'ข้อนี้ยกคะแนนมาจากครั้งก่อน ไม่ต้องทำใหม่' }
+  }
+  if (Number(writable.answer.check_count ?? 0) < 1) {
+    return { error: 'กรุณากดตรวจคำตอบก่อนทำใหม่' }
+  }
+
+  const { data: row } = await admin
+    .from('submission_answers')
+    .select(`
+      id, random_values,
+      questions(id, question_type, answer_formula, answer_parts, variables, logic_rules, extra_data, mcq_options)
+    `)
+    .eq('id', submissionAnswerId)
+    .eq('submission_id', writable.submission.id)
+    .maybeSingle()
+  if (!row) return { error: 'ไม่พบคำตอบ' }
+
+  const question = (Array.isArray(row.questions) ? row.questions[0] : row.questions) as Question | null
+  if (!question) return { error: 'ไม่พบโจทย์' }
+  const previousRandomValues = (row.random_values ?? {}) as Record<string, number>
+  const next = buildFreshRandomQuestion(question, previousRandomValues)
+  if (!next) return { success: true as const, rerolled: false as const }
+
+  const { error } = await admin
+    .from('submission_answers')
+    .update({
+      random_values: next.random_values,
+      correct_answer: next.correct_answer,
+      student_answer: null,
+      math_input_modes: {},
+    })
+    .eq('id', submissionAnswerId)
+    .eq('submission_id', writable.submission.id)
+  if (error) return { error: 'สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่' }
+
+  // The values are already visible in the question text; the new answer key
+  // remains server-only until the next authorized check.
+  return {
+    success: true as const,
+    rerolled: true as const,
+    randomValues: next.random_values,
   }
 }
 

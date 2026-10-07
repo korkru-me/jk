@@ -131,7 +131,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   // before seeing anything, and turning that on under a running งาน is the
   // teacher's call, not a side effect of opening the edit page.
   const [instantCheck, setInstantCheck] = useState(a.instant_check === true)
-  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(a.instant_check_answer_key !== false)
+  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(a.instant_check_answer_key === true)
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
   // Changeable at any time, even after everyone has finished — it decides only
   // whether a เฉลยวิธีทำ opens. Ticking it late is the way to hold a ข้อสอบ's
@@ -913,16 +913,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             {/* Same reason as in the create wizard: this mode hides the
                 ตรวจทีละข้อ switch because it is forced on, but whether the
                 check reveals the เฉลย is still the teacher's to choose. */}
-            <div className="border-t border-border pt-3 space-y-1.5">
+            <div className="border-t border-border pt-3">
               <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-                <div>
-                  <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                  <p className="text-xs text-muted-foreground">
-                    {instantCheckAnswerKey
-                      ? 'นักเรียนเห็นคำตอบที่ถูกทันที'
-                      : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ'}
-                  </p>
-                </div>
+                <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                 <input
                   type="checkbox"
                   checked={instantCheckAnswerKey}
@@ -930,11 +923,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
-              {a.type === 'exam' && instantCheckAnswerKey && (
-                <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                  งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือคำตอบที่ถูกออกไปจากห้องได้ แนะนำให้ปิด
-                </p>
-              )}
             </div>
 
             <p className="text-xs text-muted-foreground">
@@ -1155,14 +1143,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             </label>
             {instantCheck && (
               <label className="ml-11 flex items-center justify-between gap-4 rounded-xl border border-border p-3 cursor-pointer">
-                <div>
-                  <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {instantCheckAnswerKey
-                      ? 'นักเรียนเห็นคำตอบที่ถูกทันที แล้วแก้ให้ถูกได้ — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดู · เฉลยวิธีทำที่แนบไว้ดูได้หลังจบงานตามติ๊ก "ให้นักเรียนดูเฉลยวิธีทำ"'
-                      : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
-                  </p>
-                </div>
+                <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                 <input
                   type="checkbox"
                   checked={instantCheckAnswerKey}

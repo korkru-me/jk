@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
-  buildAssignmentAttempt, buildAttemptQuestion, buildRetryAttempt, gradeAnswer, naturalMaxScore, scaleScore,
+  buildAssignmentAttempt, buildAttemptQuestion, buildFreshRandomQuestion, buildRetryAttempt, gradeAnswer, naturalMaxScore, scaleScore,
   type GradableAnswer, type PreviousAttemptAnswer,
 } from './assignment-attempt'
 import type { AnswerPart, Assignment, Question } from '@/lib/types'
@@ -425,6 +425,37 @@ describe('buildAttemptQuestion, the single-ข้อ builder', () => {
   it('falls back to the ข้อ\'s own value with no override', () => {
     const natural = buildAttemptQuestion(mcqQuestion(options), { orderIndex: 0, shuffleOptions: false })
     expect(natural.max_score).toBe(1)
+  })
+})
+
+describe('buildFreshRandomQuestion', () => {
+  const randomQuestion = {
+    id: 'random-q',
+    question_type: 'written',
+    answer_formula: 'x * 2',
+    answer_parts: null,
+    variables: [{ name: 'x', min: 1, max: 9, step: 1 }],
+    logic_rules: [],
+    extra_data: {},
+    mcq_options: [],
+  } as unknown as Question
+
+  it('draws a different numeric variant when another outcome is available', () => {
+    const random = vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75)
+    const fresh = buildFreshRandomQuestion(randomQuestion, { x: 1 })
+    expect(fresh?.random_values).toEqual({ x: 7 })
+    expect(fresh?.correct_answer).toBe('14')
+    random.mockRestore()
+  })
+
+  it('leaves a non-random question alone', () => {
+    expect(buildFreshRandomQuestion(mcqQuestion([
+      { text: 'ก', is_correct: true },
+      { text: 'ข', is_correct: false },
+    ]), {})).toBeNull()
   })
 })
 

@@ -1401,16 +1401,9 @@ export function CreateAssignmentForm({
                     is the one part of that switch still worth choosing, and
                     for a ข้อสอบ it is the difference between an answer key
                     that stays in the room and one that walks out. */}
-                <div className="border-t border-border pt-3 space-y-1.5">
+                <div className="border-t border-border pt-3">
                   <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                      <p data-assignment-description className="text-xs text-muted-foreground">
-                        {instantCheckAnswerKey
-                          ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ'
-                          : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
-                      </p>
-                    </div>
+                    <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                     <input
                       type="checkbox"
                       checked={instantCheckAnswerKey}
@@ -1418,11 +1411,6 @@ export function CreateAssignmentForm({
                       className="accent-primary w-4 h-4 shrink-0"
                     />
                   </label>
-                  {assignmentType === 'exam' && instantCheckAnswerKey && (
-                    <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">
-                      งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือคำตอบที่ถูกออกไปจากห้องได้ แนะนำให้ปิด
-                    </p>
-                  )}
                 </div>
 
                 <div className="border-t border-border pt-3 space-y-1">
@@ -1457,16 +1445,9 @@ export function CreateAssignmentForm({
                 value: instantCheck,
                 set: setInstantCheck,
                 footer: (instantCheck ? (
-                  <div className="space-y-1.5 pl-3">
+                  <div className="pl-3">
                     <label className="flex min-h-10 items-center justify-between rounded-xl border border-border px-3 py-2 cursor-pointer transition-colors hover:border-ring">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                        <p data-assignment-description className="text-xs text-muted-foreground">
-                          {instantCheckAnswerKey
-                            ? 'นักเรียนเห็นคำตอบที่ถูกทันที เหมาะกับการฝึกให้เข้าใจ — ส่วนเฉลยวิธีทำที่แนบไว้ ดูได้หลังจบงานตามติ๊ก "ให้นักเรียนดูเฉลยวิธีทำ"'
-                            : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
-                        </p>
-                      </div>
+                      <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
                       <input
                         type="checkbox"
                         checked={instantCheckAnswerKey}
@@ -1474,11 +1455,6 @@ export function CreateAssignmentForm({
                         className="accent-primary w-4 h-4 shrink-0"
                       />
                     </label>
-                    {instantCheckAnswerKey && (
-                      <p className="text-xs text-foreground bg-warning/10 rounded-lg px-3 py-2">
-                        นักเรียนเห็นคำตอบที่ถูกระหว่างทำ แล้วแก้คำตอบให้ถูกได้ คะแนนแบบฝึกหัดจึงสะท้อน &ldquo;ทำจนเข้าใจ&rdquo; ไม่ใช่ &ldquo;ถูกตั้งแต่แรก&rdquo; — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดูในหน้าผลรายคน
-                      </p>
-                    )}
                   </div>
                 ) : null) as React.ReactNode,
               }] : []),

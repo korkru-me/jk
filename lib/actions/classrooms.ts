@@ -98,7 +98,7 @@ function assignmentDraftCopyPayload(source: Assignment, classroomId: string, cre
     retry_scope: source.retry_scope ?? 'all',
     questions_per_page: source.questions_per_page ?? 1,
     instant_check: source.instant_check ?? false,
-    instant_check_answer_key: source.instant_check_answer_key ?? true,
+    instant_check_answer_key: source.instant_check_answer_key ?? false,
     completion_rule: source.completion_rule ?? 'fixed',
     streak_target: source.streak_target ?? null,
     streak_question_cap: source.streak_question_cap ?? null,

@@ -10,6 +10,7 @@ describe('private assignment settings allowlist', () => {
     expect(assignmentPresetSettingsSchema.parse(JSON.parse(JSON.stringify(values)))).toEqual(values)
     expect(values.max_attempts).toBe(1)
     expect(values.scratchpad_enabled).toBe(type === 'exercise')
+    expect(values.instant_check_answer_key).toBe(false)
   })
 
   it.each(['question_ids', 'question_points', 'classroom_ids', 'group_ids', 'title', 'description',

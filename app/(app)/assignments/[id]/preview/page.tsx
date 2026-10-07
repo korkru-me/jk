@@ -134,6 +134,8 @@ export default async function AssignmentPreviewPage({
             : null,
         matching_options: matching?.options ?? null,
         variables: q.variables,
+        logic_rules: q.logic_rules,
+        answer_formula: q.answer_formula,
         answer_parts: q.answer_parts,
         extra_data: q.extra_data,
         image_urls: q.image_urls,
@@ -153,7 +155,7 @@ export default async function AssignmentPreviewPage({
     instantCheck: a.mode === 'online'
       && a.instant_check === true
       && (a.type === 'exercise' || a.completion_rule === 'streak'),
-    instantCheckAnswerKey: a.instant_check_answer_key !== false,
+    instantCheckAnswerKey: a.instant_check_answer_key === true,
     calculatorEnabled: a.calculator_enabled === true,
     scratchpadEnabled: a.scratchpad_enabled === true,
   }

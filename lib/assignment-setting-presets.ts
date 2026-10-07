@@ -86,7 +86,7 @@ export function assignmentPresetDefaults(type: AssignmentType): AssignmentPreset
     duration_minutes: null, shuffle_questions: false, shuffle_options: false,
     shared_random_values: false, show_results: 'immediate', show_solutions: false,
     max_attempts: Number(defaults.maxAttempts), score_strategy: 'best', retry_scope: defaults.retryScope,
-    questions_per_page: 1, instant_check: true, instant_check_answer_key: true,
+    questions_per_page: 1, instant_check: true, instant_check_answer_key: false,
     calculator_enabled: defaults.calculatorEnabled, scratchpad_enabled: defaults.scratchpadEnabled,
     proctoring_enabled: false, fullscreen_required: false, block_clipboard: false,
     exam_watermark_enabled: false, secure_browser_mode: 'browser', android_exam_mode: 'blocked',

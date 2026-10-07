@@ -176,7 +176,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       instant_check: assignment.type === 'exercise'
         && assignment.mode === 'online'
         && assignment.instant_check === true,
-      instant_check_answer_key: assignment.instant_check_answer_key !== false,
+      instant_check_answer_key: assignment.instant_check_answer_key === true,
       completion_rule: (assignment.completion_rule === 'streak' ? 'streak' : 'fixed') as 'fixed' | 'streak',
       streak_target: assignment.streak_target ?? null,
       streak_question_cap: assignment.streak_question_cap ?? null,
