@@ -262,17 +262,18 @@ export function ClassroomSettingsDialog({
           </div>
 
           <Card padding="lg" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Users className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">จำกัดจำนวนที่นั่ง</p>
-                  <p className="text-xs text-muted-foreground">ล็อกอัตโนมัติเมื่อนักเรียนเต็มจำนวน</p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-primary" />
               </div>
-              <ToggleSwitch checked={meta.capacityEnabled} onChange={v => set('capacityEnabled', v)} />
+              <div className="flex items-center gap-2">
+                <p id="settings-capacity-label" className="font-medium text-sm text-foreground">จำกัดจำนวนที่นั่ง</p>
+                <ToggleSwitch
+                  checked={meta.capacityEnabled}
+                  onChange={v => set('capacityEnabled', v)}
+                  aria-labelledby="settings-capacity-label"
+                />
+              </div>
             </div>
             {meta.capacityEnabled && (
               <div className="pt-1 space-y-1.5 border-t border-border">

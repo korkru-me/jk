@@ -1,5 +1,10 @@
 # Feature status
 
+### จัดสวิตช์จำกัดจำนวนที่นั่งให้สัมพันธ์กับชื่อ (7 ตุลาคม 2026)
+
+- **UI-039** — เอาคำอธิบายซ้ำใต้ “จำกัดจำนวนที่นั่ง” ออกจากหน้าสร้าง/ทำสำเนาและหน้าตั้งค่าห้องเรียน พร้อมย้ายสวิตช์มาอยู่ติดกับชื่อแทนการชิดขวาของ Card เพื่อลดความกำกวมกับช่องวันเปิดคอร์ส โดยคง state, validation, จำนวนสูงสุด และพฤติกรรมเปิด–ปิดเดิม
+- local Chrome fixture ของหน้าสร้างตรวจ desktop และ viewport 320px แล้วชื่อกับสวิตช์อ่านเป็น control ชุดเดียว ไม่มี horizontal overflow, label association ถูกต้อง และเปิดแล้วช่องจำนวนสูงสุดยังแสดง; หน้าตั้งค่าผ่าน compilation/build แต่ยังไม่ได้เปิดด้วยบัญชีจริง · TypeScript, design-token lint, unit test, production build และ Next.js compilation/runtime/accessibility checks ผ่าน ไม่มี migration
+
 ### ปรับกรอบห้องเรียนปัจจุบันให้เป็นทรง Card (7 ตุลาคม 2026)
 
 - **UI-038** — ลดรัศมีมุมของกรอบ “ห้องเรียนปัจจุบัน” ใน contextual sidebar จาก `rounded-2xl` เป็น `rounded-lg` ให้ทรงสี่เหลี่ยมมุมมนและอ่านเป็น Card ชัดขึ้น โดยคงสีธีม ไอคอน ข้อความ ปุ่มสลับห้อง และ compact sidebar behavior เดิม
