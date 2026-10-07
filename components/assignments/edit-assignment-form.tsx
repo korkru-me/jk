@@ -15,6 +15,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
+import {
+  CompletionRuleCard,
+  completionRuleInputClassName,
+} from '@/components/assignments/completion-rule-card'
 import type { Assignment, CompletionRule, Question, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import {
   STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN, STREAK_CAP_MAX, STREAK_CAP_MIN,
@@ -652,7 +656,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <div className="flex flex-col gap-4">
               {streakOn && (
                 <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
-                  เงื่อนไขจบงานเป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
+                  เงื่อนไขเพิ่มเติมเป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
                   ปรับสองอย่างนี้ที่นี่ไม่ได้
                 </p>
               )}
@@ -736,7 +740,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Target className="w-4 h-4 text-muted-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-foreground">เงื่อนไขจบงาน</h2>
+            <h2 className="font-semibold text-foreground">เงื่อนไขเพิ่มเติม</h2>
             <p className="text-xs text-muted-foreground">
               {canEditCompletion
                 ? 'นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร'
@@ -745,48 +749,101 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         </div>
 
-        <div className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-          {([
-            { key: 'complete' as const, label: 'ทำครบแล้วจบ', desc: 'ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน' },
-            { key: 'threshold' as const, label: 'ต้องผ่านเกณฑ์', desc: 'ทำจนถึงคะแนนหรือเปอร์เซ็นต์ที่ตั้งไว้ ผ่านแล้วไม่เริ่มรอบใหม่' },
-            ...(streakOffered ? [{
-              key: 'streak' as const, label: 'ถูกติดกันจึงจบ', desc: 'ทำจนตอบถูกติดต่อกันครบตามที่ตั้ง ผ่านแล้วไม่เริ่มรอบใหม่',
-            }] : []),
-          ]).map(opt => {
-            const streakUnavailable = canEditCompletion && opt.key === 'streak' && !streakAvailable
-            const disabled = !canEditCompletion || streakUnavailable
-            return (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => chooseCompletion(opt.key)}
-                disabled={disabled}
-                className={`rounded-xl border-2 p-3 text-left transition-all ${
-                  completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border'
-                } ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-ring'}`}
-              >
-                <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {streakUnavailable ? 'ใช้ได้เมื่อเลือกสุ่มโจทย์' : opt.desc}
-                </p>
-              </button>
-            )
-          })}
+        <div data-completion-rules role="group" aria-label="เงื่อนไขเพิ่มเติม" className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+          <CompletionRuleCard
+            selected={completionChoice === 'complete'}
+            disabled={!canEditCompletion}
+            label="อนุญาตให้ทำ"
+            onSelect={() => chooseCompletion('complete')}
+          >
+            <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
+              <span>อนุญาตให้ทำ</span>
+              <Input
+                id="edit-attempts"
+                type="number"
+                min={1}
+                step={1}
+                value={maxAttempts}
+                onFocus={() => chooseCompletion('complete')}
+                onChange={event => {
+                  const value = event.target.value
+                  setMaxAttempts(value)
+                  if (value === '1') setRetryScope('all')
+                }}
+                placeholder="ไม่จำกัด"
+                disabled={!canEditCompletion}
+                aria-label="จำนวนครั้งที่อนุญาตให้ทำ"
+                className={completionRuleInputClassName}
+              />
+              <span>ครั้ง</span>
+            </div>
+            <p className="text-xs text-muted-foreground">ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน</p>
+          </CompletionRuleCard>
+
+          <CompletionRuleCard
+            selected={completionChoice === 'threshold'}
+            disabled={!canEditCompletion}
+            label="ผ่านเกณฑ์"
+            onSelect={() => chooseCompletion('threshold')}
+          >
+            <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
+              <span>ผ่านเกณฑ์</span>
+              <Input
+                type="number"
+                min={0}
+                max={passingType === 'percent' ? 100 : undefined}
+                value={passingValue}
+                onFocus={() => chooseCompletion('threshold')}
+                onChange={event => setPassingValue(event.target.value)}
+                placeholder={passingType === 'percent' ? '70' : '7'}
+                disabled={!canEditCompletion}
+                aria-label="ค่าเกณฑ์ผ่าน"
+                className={completionRuleInputClassName}
+              />
+              <span>{passingType === 'percent' ? '%' : 'คะแนน'}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">ผ่านแล้วจะเริ่มรอบใหม่ไม่ได้</p>
+          </CompletionRuleCard>
+
+          {streakOffered && (
+            <CompletionRuleCard
+              selected={completionChoice === 'streak'}
+              disabled={!canEditCompletion || !streakAvailable}
+              label="ทำถูกติดต่อกัน"
+              onSelect={() => chooseCompletion('streak')}
+            >
+              <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
+                <span>ทำถูกติดต่อกัน</span>
+                <Input
+                  type="number"
+                  min={STREAK_TARGET_MIN}
+                  max={STREAK_TARGET_MAX}
+                  value={streakTarget}
+                  onFocus={() => chooseCompletion('streak')}
+                  onChange={event => setStreakTarget(event.target.value)}
+                  disabled={!canEditCompletion || !streakAvailable}
+                  aria-label="จำนวนข้อที่ต้องทำถูกติดต่อกัน"
+                  className={completionRuleInputClassName}
+                />
+                <span>ข้อ</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {streakAvailable ? 'ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0' : 'ใช้ได้เมื่อเลือกสุ่มโจทย์'}
+              </p>
+            </CompletionRuleCard>
+          )}
         </div>
 
         {completionChoice === 'complete' && (
           <CompletionAttemptSettings id="edit-attempts" maxAttempts={maxAttempts}
-            onMaxAttemptsChange={value => {
-              setMaxAttempts(value)
-              if (value === '1') setRetryScope('all')
-            }} scoreStrategy={scoreStrategy} onScoreStrategyChange={setScoreStrategy} />
+            scoreStrategy={scoreStrategy} onScoreStrategyChange={setScoreStrategy} />
         )}
         {completionChoice !== 'complete' && (
           <p className="text-xs text-muted-foreground">ทำรอบใหม่ได้จนกว่าจะผ่าน เมื่อผ่านแล้วจะเริ่มรอบใหม่ไม่ได้ · เก็บคะแนนจากรอบที่ดีที่สุด</p>
         )}
 
         {completionChoice === 'threshold' && (
-          <div className="flex items-center gap-2 p-3 rounded-xl border border-border flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap" aria-label="หน่วยเกณฑ์ผ่าน">
             <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
               {(['percent', 'score'] as const).map(t => (
                 <button
@@ -797,44 +854,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                     passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
-                  {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
+                  {t === 'percent' ? '%' : 'คะแนน'}
                 </button>
               ))}
             </div>
-            <Input
-              type="number"
-              min={0}
-              max={passingType === 'percent' ? 100 : undefined}
-              value={passingValue}
-              onChange={e => setPassingValue(e.target.value)}
-              placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
-              className="max-w-[120px]"
-            />
-            <span className="text-sm text-muted-foreground shrink-0">
-              {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
-            </span>
           </div>
         )}
 
         {completionChoice === 'streak' && (
           <div className="space-y-3 p-4 rounded-xl border border-border">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Label htmlFor="edit-streak-target" className="text-sm text-muted-foreground">
-                ต้องตอบถูกติดต่อกัน
-              </Label>
-              <Input
-                id="edit-streak-target"
-                type="number"
-                min={STREAK_TARGET_MIN}
-                max={STREAK_TARGET_MAX}
-                value={streakTarget}
-                onChange={event => setStreakTarget(event.target.value)}
-                disabled={!canEditCompletion}
-                className="max-w-[100px]"
-              />
-              <span className="text-sm text-muted-foreground">ข้อ จึงจะจบ · ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0</span>
-            </div>
-
             {/* The ceiling and pool recycling stay editable after students
                 start: neither changes what passing means. */}
             <div className="space-y-1.5">
