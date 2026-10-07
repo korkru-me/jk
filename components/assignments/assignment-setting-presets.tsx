@@ -53,7 +53,7 @@ const SETTING_LABELS: Record<keyof AssignmentPresetSettings, string> = {
   show_results: 'การแสดงผลลัพธ์', show_solutions: 'แสดงเฉลยวิธีทำ',
   max_attempts: 'จำนวนครั้งที่ทำได้', score_strategy: 'วิธีเลือกคะแนน',
   retry_scope: 'โจทย์ในรอบใหม่', questions_per_page: 'จำนวนข้อต่อหนึ่งหน้า',
-  instant_check: 'ตรวจคำตอบทีละข้อ', instant_check_answer_key: 'แสดงคำตอบหลังตรวจ',
+  instant_check: 'ตรวจคำตอบทีละข้อ', instant_check_answer_key: 'แสดงเฉลยหลังจากกดตรวจคำตอบ',
   calculator_enabled: 'เครื่องคิดเลข', scratchpad_enabled: 'กระดาษทด',
   proctoring_enabled: 'ตรวจจับการออกนอกหน้าสอบ', fullscreen_required: 'เต็มหน้าจอ',
   block_clipboard: 'ป้องกันคัดลอกและวาง', exam_watermark_enabled: 'ลายน้ำข้อสอบ',

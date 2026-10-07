@@ -37,7 +37,10 @@ import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
 import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-password-settings'
 import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
-import { InstantCheckSettingLabel } from '@/components/assignments/instant-check-setting-label'
+import {
+  InstantCheckAnswerKeySettingLabel,
+  InstantCheckSettingLabel,
+} from '@/components/assignments/instant-check-setting-label'
 import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
 
 const CALCULATOR_SETTING_DESCRIPTION =
@@ -926,7 +929,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 check reveals the เฉลย is still the teacher's to choose. */}
             <div className="border-t border-border pt-3">
               <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-                <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
+                <p className="text-sm font-medium text-foreground">
+                  <InstantCheckAnswerKeySettingLabel />
+                </p>
                 <input
                   type="checkbox"
                   checked={instantCheckAnswerKey}
@@ -1165,7 +1170,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             </label>
             {instantCheck && (
               <label className="ml-11 flex items-center justify-between gap-4 rounded-xl border border-border p-3 cursor-pointer">
-                <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
+                <p className="text-sm font-medium text-foreground">
+                  <InstantCheckAnswerKeySettingLabel />
+                </p>
                 <input
                   type="checkbox"
                   checked={instantCheckAnswerKey}

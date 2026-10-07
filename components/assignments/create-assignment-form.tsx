@@ -82,6 +82,7 @@ import {
 import { cn } from '@/lib/utils'
 import { THAI_TIME_ZONE } from '@/lib/thai-time'
 import {
+  InstantCheckAnswerKeySettingLabel,
   INSTANT_CHECK_SETTING_DESCRIPTION,
   INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
@@ -1408,7 +1409,9 @@ export function CreateAssignmentForm({
                     that stays in the room and one that walks out. */}
                 <div className="border-t border-border pt-3">
                   <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-                    <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
+                    <p className="text-sm font-medium text-foreground">
+                      <InstantCheckAnswerKeySettingLabel />
+                    </p>
                     <input
                       type="checkbox"
                       checked={instantCheckAnswerKey}
@@ -1453,7 +1456,9 @@ export function CreateAssignmentForm({
                 footer: (instantCheck ? (
                   <div className="pl-3">
                     <label className="flex min-h-10 items-center justify-between rounded-xl border border-border px-3 py-2 cursor-pointer transition-colors hover:border-ring">
-                      <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
+                      <p className="text-sm font-medium text-foreground">
+                        <InstantCheckAnswerKeySettingLabel />
+                      </p>
                       <input
                         type="checkbox"
                         checked={instantCheckAnswerKey}
